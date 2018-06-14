@@ -13,9 +13,9 @@ func assertNil(t *testing.T, err error) {
 
 func TestDriver(t *testing.T) {
 	uri := "localhost:7687"
-	driver, err := GraphDatabaseDriver(uri)
+	driver, err := NewDriver(uri, NoAuth(), nil)
 	assertNil(t, err)
-	if driver.Uri() != uri {
+	if driver.Target().String() != uri {
 		t.Errorf("driver.uri = %q", uri)
 	}
 	//if driver.connection.ProtocolVersion != 2 {
