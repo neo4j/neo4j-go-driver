@@ -12,13 +12,15 @@ func assertNil(t *testing.T, err error) {
 }
 
 func TestDriver(t *testing.T) {
-	uri := "localhost:7687"
+	uri := "bolt://localhost:7687"
 	driver, err := NewDriver(uri, NoAuth(), nil)
 	assertNil(t, err)
-	if driver.Target().String() != uri {
-		t.Errorf("driver.uri = %q", uri)
+
+	if driver.Target().Scheme != "bolt" {
+		t.Errorf("driver.uri.scheme = %q", driver.Target().Scheme)
 	}
-	//if driver.connection.ProtocolVersion != 2 {
-	//	t.Errorf("Expected protocol v2")
-	//}
+
+	if driver.Target().Host != "localhost:7687" {
+		t.Errorf("driver.uri.host = %q", driver.Target().Host)
+	}
 }

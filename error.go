@@ -1,18 +1,25 @@
 package neo4j_go_driver
 
-type Error struct {
+import "fmt"
+
+type Failure struct {
 	code    string
 	message string
 }
 
-func (error *Error) Code() string {
-	return error.code
+func (failure *Failure) Code() string {
+	return failure.code
 }
 
-func (error *Error) Message() string {
-	return error.message
+func (failure *Failure) Message() string {
+	return failure.message
 }
 
-func (error *Error) Error() string {
-	return error.message
+func (failure *Failure) Error() string {
+	return fmt.Sprintf("database returned error [%s]: %s", failure.code, failure.message)
+}
+
+func IsDatabaseFailure(err error) bool {
+	_, ok := err.(*Failure)
+	return ok
 }

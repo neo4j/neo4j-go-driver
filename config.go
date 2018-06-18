@@ -6,3 +6,4 @@ type Config struct {
 	// Whether to turn on/off TLS encryption (default: true)
 	Encrypted bool
 }
+

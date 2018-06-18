@@ -10,8 +10,19 @@ type directDriver struct {
 	connector neo4j.Connector
 }
 
+func configToConnectorConfig(config *Config) *neo4j.Config {
+	if config == nil {
+		return nil
+	}
+
+	return &neo4j.Config{
+		Encryption: config.Encrypted,
+		Debug:      false,
+	}
+}
+
 func newDirectDriver(target *url.URL, token AuthToken, config *Config) (*directDriver, error) {
-	connector, err := neo4j.NewConnector(target.String(), token.tokens, nil)
+	connector, err := neo4j.NewConnector(target.String(), token.tokens, configToConnectorConfig(config))
 	if err != nil {
 		return nil, err
 	}
