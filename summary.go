@@ -3,10 +3,10 @@ package neo4j_go_driver
 type StatementType int
 
 const (
-	ReadOnly    StatementType = 0
-	ReadWrite                 = 1
-	WriteOnly                 = 2
-	SchemaWrite               = 3
+	StatementTypeReadOnly    StatementType = 0
+	StatementTypeReadWrite                 = 1
+	StatementTypeWriteOnly                 = 2
+	StatementTypeSchemaWrite               = 3
 )
 
 type ServerInfo struct {

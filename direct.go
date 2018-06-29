@@ -55,8 +55,7 @@ func (driver *directDriver) SessionWithAccessModeAndBookmark(accessMode AccessMo
 }
 
 func (driver *directDriver) Close() error {
-	// TODO
-	return nil
+	return driver.connector.Close()
 }
 
 func (driver *directDriver) acquire(mode AccessMode) (neo4j.Connection, error) {

@@ -2,43 +2,57 @@ package neo4j_go_driver
 
 import (
 	"testing"
-	"neo4j-go-driver/test-utils"
 )
 
-func TestNoAuthGeneratesEmptyAuthToken(t *testing.T) {
-	token := NoAuth()
+func TestNoAuth(t *testing.T) {
+	t.Run("token should contain only scheme=none", func(t *testing.T) {
 
-	tokenMap := token.tokens
-	if tokenMap != nil {
-		t.Errorf("NoAuth() returned %q, whereas an empty map was expected", tokenMap)
-	}
+        token := NoAuth()
+
+        tokenMap := token.tokens
+
+        assertNonNil(t, tokenMap)
+        assertLen(t, &tokenMap, 1)
+        assertMapContainsKeyValue(t, &tokenMap, keyScheme, schemeNone)
+    })
 }
 
 func TestBasicAuth(t *testing.T) {
-	token := BasicAuth("test", "1234")
+    t.Run("should not include realm if not provided", func(t *testing.T) {
+        token := BasicAuth("test", "1234", "")
 
-	tokenMap := token.tokens
-	if tokenMap == nil {
-		t.Errorf("BasicAuth() returned an empty map")
-	}
+        tokenMap := token.tokens
 
-	test_utils.AssertLen(t, &tokenMap, 3)
-	test_utils.AssertMapKeyValue(t, &tokenMap, keyScheme, "basic")
-	test_utils.AssertMapKeyValue(t, &tokenMap, keyPrincipal, "test")
-	test_utils.AssertMapKeyValue(t, &tokenMap, keyCredentials, "1234")
+        assertNonNil(t, tokenMap)
+        assertLen(t, &tokenMap, 3)
+        assertMapContainsKeyValue(t, &tokenMap, keyScheme, schemeBasic)
+        assertMapContainsKeyValue(t, &tokenMap, keyPrincipal, "test")
+        assertMapContainsKeyValue(t, &tokenMap, keyCredentials, "1234")
+    })
+
+    t.Run("should include realm", func(t *testing.T) {
+        token := BasicAuth("test", "1234", "some_realm")
+
+        tokenMap := token.tokens
+
+        assertNonNil(t, tokenMap)
+        assertLen(t, &tokenMap, 4)
+        assertMapContainsKeyValue(t, &tokenMap, keyScheme, schemeBasic)
+        assertMapContainsKeyValue(t, &tokenMap, keyPrincipal, "test")
+        assertMapContainsKeyValue(t, &tokenMap, keyCredentials, "1234")
+        assertMapContainsKeyValue(t, &tokenMap, keyRealm, "some_realm")
+    })
 }
 
-func TestBasicAuthWithRealm(t *testing.T) {
-	token := BasicAuthWithRealm("test", "1234", "some_realm")
+func TestKerberosAuth(t *testing.T) {
+    t.Run("should include provided ticket", func(t *testing.T) {
+        token := KerberosAuth("ticket_data")
 
-	tokenMap := token.tokens
-	if tokenMap == nil {
-		t.Errorf("BasicAuthWithRealm() returned an empty map")
-	}
+        tokenMap := token.tokens
 
-	test_utils.AssertLen(t, &tokenMap, 4)
-	test_utils.AssertMapKeyValue(t, &tokenMap, keyScheme, "basic")
-	test_utils.AssertMapKeyValue(t, &tokenMap, keyPrincipal, "test")
-	test_utils.AssertMapKeyValue(t, &tokenMap, keyCredentials, "1234")
-	test_utils.AssertMapKeyValue(t, &tokenMap, keyRealm, "some_realm")
+        assertNonNil(t, tokenMap)
+        assertLen(t, &tokenMap, 2)
+        assertMapContainsKeyValue(t, &tokenMap, keyScheme, schemeKerberos)
+        assertMapContainsKeyValue(t, &tokenMap, keyTicket, "ticket_data")
+    })
 }

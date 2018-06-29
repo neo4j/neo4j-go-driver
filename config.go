@@ -5,5 +5,6 @@ package neo4j_go_driver
 type Config struct {
 	// Whether to turn on/off TLS encryption (default: true)
 	Encrypted bool
+	Log Logging
 }
 

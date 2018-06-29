@@ -15,10 +15,6 @@ func (record *Record) Values() []interface{} {
 	return record.values
 }
 
-func (record *Record) Scan(dest ...interface{}) error {
-	return nil
-}
-
 func (record *Record) Get(key string) (interface{}, bool) {
 	for i := range record.keys {
 		if record.keys[i] == key {
