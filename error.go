@@ -19,25 +19,12 @@
 
 package neo4j_go_driver
 
-import "errors"
+import (
+    neo4j "neo4j-go-connector"
+)
 
-type Statement struct {
-	cypher string
-	params *map[string]interface{}
+func isRetriableError(err error) bool {
+    return neo4j.IsServiceUnavailable(err) || neo4j.IsSessionExpired(err) || neo4j.IsTransientError(err)
 }
 
-func (statement *Statement) validate() error {
-	if len(statement.cypher) == 0 {
-		return errors.New("cypher statement should not be empty")
-	}
 
-	return nil
-}
-
-func NewStatement(cypher string) *Statement {
-	return &Statement{cypher: cypher}
-}
-
-func NewStatementWithParams(cypher string, params *map[string]interface{}) *Statement {
-	return &Statement{cypher: cypher, params: params}
-}

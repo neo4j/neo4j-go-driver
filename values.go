@@ -19,25 +19,24 @@
 
 package neo4j_go_driver
 
-import "errors"
-
-type Statement struct {
-	cypher string
-	params *map[string]interface{}
+type Node interface {
+    Id() int64
+    Labels() []string
+    Props() map[string]interface{}
 }
 
-func (statement *Statement) validate() error {
-	if len(statement.cypher) == 0 {
-		return errors.New("cypher statement should not be empty")
-	}
-
-	return nil
+type Relationship interface {
+    Id() int64
+    StartId() int64
+    EndId() int64
+    Type() string
+    Props() map[string]interface{}
 }
 
-func NewStatement(cypher string) *Statement {
-	return &Statement{cypher: cypher}
+type Path interface {
+    Start() Node
+    End() Node
+    Nodes() []Node
+    Relationships() []Relationship
 }
 
-func NewStatementWithParams(cypher string, params *map[string]interface{}) *Statement {
-	return &Statement{cypher: cypher, params: params}
-}

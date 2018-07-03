@@ -1,78 +1,73 @@
+/*
+ * Copyright (c) 2002-2018 "Neo4j,"
+ * Neo4j Sweden AB [http://neo4j.com]
+ *
+ * This file is part of Neo4j.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package neo4j_go_driver
 
 import (
-	"log"
-	"os"
-	"io/ioutil"
-)
-
-type LogLevel int
-
-const (
-	ERROR LogLevel = 0
-	WARN           = 1
-	INFO           = 2
-	DEBUG          = 3
+    "runtime"
+    "fmt"
+    "path/filepath"
 )
 
 type Logging interface {
-	Level() LogLevel
-	Log(level LogLevel, message string, messageArgs ...string)
+    ErrorEnabled() bool
+    WarningEnabled() bool
+    InfoEnabled() bool
+    DebugEnabled() bool
+
+    Errorf(message string, args ...interface{})
+    Warningf(message string, args ...interface{})
+    Infof(message string, args ...interface{})
+    Debugf(message string, args ...interface{})
 }
 
-type internalLogging struct {
-	level       LogLevel
-	errorLogger *log.Logger
-	warnLogger  *log.Logger
-	infoLogger  *log.Logger
-	debugLogger *log.Logger
+func fileAndLineNumberOfCall() string {
+    _, file, line, ok := runtime.Caller(2)
+    if !ok {
+        file = "?"
+        line = 0
+    }
+    _, file = filepath.Split(file)
+
+    return fmt.Sprintf("%s:%d", file, line)
 }
 
-func isLevelEnabled(logging Logging, level LogLevel) bool {
-	if logging == nil {
-		return false
-	}
-
-	return level <= logging.Level()
+func errorf(logging Logging, message string, args ...interface{}) {
+    if logging != nil && logging.ErrorEnabled() {
+        logging.Errorf(fmt.Sprintf("%s: %s", fileAndLineNumberOfCall(), message), args...)
+    }
 }
 
-func (logging *internalLogging) Level() LogLevel {
-	return logging.level
+func warningf(logging Logging, message string, args ...interface{}) {
+    if logging != nil && logging.WarningEnabled() {
+        logging.Warningf(fmt.Sprintf("%s: %s", fileAndLineNumberOfCall(), message), args...)
+    }
 }
 
-func (logging *internalLogging) Log(level LogLevel, message string, messageArgs ...string) {
-	if level <= logging.level {
-		switch level {
-		case ERROR:
-			logging.errorLogger.Printf(message, messageArgs)
-		case WARN:
-			logging.warnLogger.Printf(message, messageArgs)
-		case INFO:
-			logging.infoLogger.Printf(message, messageArgs)
-		case DEBUG:
-			logging.debugLogger.Printf(message, messageArgs)
-		}
-	}
+func infof(logging Logging, message string, args ...interface{}) {
+    if logging != nil && logging.InfoEnabled() {
+        logging.Infof(fmt.Sprintf("%s: %s", fileAndLineNumberOfCall(), message), args...)
+    }
 }
 
-func NoOpLogger() Logging {
-	discardLogger := log.New(ioutil.Discard, "", log.LstdFlags)
-
-	return &internalLogging{
-		level:       ERROR,
-		errorLogger: discardLogger,
-		warnLogger:  discardLogger,
-		infoLogger:  discardLogger,
-		debugLogger: discardLogger,
-	}
-}
-
-func ConsoleLogger(level LogLevel) Logging {
-	return &internalLogging{
-		level:       level,
-		errorLogger: log.New(os.Stderr, "ERROR: ", log.Ldate|log.Ltime|log.Lshortfile),
-		warnLogger:  log.New(os.Stdout, "WARN: ", log.Ldate|log.Ltime|log.Lshortfile),
-		infoLogger:  log.New(os.Stdout, "INFO: ", log.Ldate|log.Ltime|log.Lshortfile),
-		debugLogger: log.New(os.Stdout, "DEBUG: ", log.Ldate|log.Ltime|log.Lshortfile),
-	}
+func debugf(logging Logging, message string, args ...interface{}) {
+    if logging != nil && logging.DebugEnabled() {
+        logging.Debugf(fmt.Sprintf("%s: %s", fileAndLineNumberOfCall(), message), args...)
+    }
 }
