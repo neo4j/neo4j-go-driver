@@ -17,18 +17,21 @@
  * limitations under the License.
  */
 
-package neo4j_go_driver
+package neo4j
 
 import (
 	"errors"
 )
 
+// Transaction represents a transaction in the Neo4j database
 type Transaction struct {
-	session *Session
+	session        *Session
 	outcomeApplied bool
-	beginResult *Result
+	beginResult    *Result
 }
 
+// TransactionWork represents a unit of work that will be executed against the provided
+// transaction
 type TransactionWork func(transaction *Transaction) (interface{}, error)
 
 func (transaction *Transaction) ensureState() error {
@@ -43,6 +46,7 @@ func (transaction *Transaction) ensureState() error {
 	return nil
 }
 
+// Commit commits the transaction
 func (transaction *Transaction) Commit() error {
 	if err := transaction.ensureState(); err != nil {
 		return err
@@ -63,6 +67,7 @@ func (transaction *Transaction) Commit() error {
 	return nil
 }
 
+// Rollback rolls back the transaction
 func (transaction *Transaction) Rollback() error {
 	if err := transaction.ensureState(); err != nil {
 		return err
@@ -83,6 +88,8 @@ func (transaction *Transaction) Rollback() error {
 	return nil
 }
 
+// Close rolls back the actual transaction if it's not already committed/rolled back
+// and closes all resources associated with this transaction
 func (transaction *Transaction) Close() error {
 	if !transaction.outcomeApplied {
 		if err := transaction.Rollback(); err != nil {
@@ -99,11 +106,8 @@ func (transaction *Transaction) Close() error {
 	return nil
 }
 
-func (transaction *Transaction) Run(cypher string) (*Result, error) {
-	return transaction.runStatement(NewStatement(cypher))
-}
-
-func (transaction *Transaction) RunWithParams(cypher string, params *map[string]interface{}) (*Result, error) {
+// Run executes a statement on this transaction and returns a result
+func (transaction *Transaction) Run(cypher string, params *map[string]interface{}) (*Result, error) {
 	return transaction.runStatement(NewStatementWithParams(cypher, params))
 }
 

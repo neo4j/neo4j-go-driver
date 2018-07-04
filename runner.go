@@ -1,8 +1,8 @@
 /*
  * Copyright (c) 2002-2018 "Neo4j,"
- * Neo4j Sweden AB [http://neo4j.com]
+ * Neo4j Sweden AB [http://seabolt.com]
  *
- * This file is part of Neo4j.
+ * This file is part of seabolt.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,16 +17,16 @@
  * limitations under the License.
  */
 
-package neo4j_go_driver
+package neo4j
 
 import (
-    "errors"
-    neo4j "neo4j-go-connector"
+	"errors"
+	seabolt "neo4j-go-connector"
 )
 
 type statementRunner struct {
 	driver         Driver
-	connection     neo4j.Connection
+	connection     seabolt.Connection
 	autoClose      bool
 	accessMode     AccessMode
 	lastBookmark   string
@@ -76,13 +76,13 @@ func (runner *statementRunner) receiveAll() error {
 }
 
 func (runner *statementRunner) receive() (*Result, error) {
-    if len(runner.pendingResults) <= 0 {
+	if len(runner.pendingResults) <= 0 {
 		return nil, errors.New("unexpected state: no pending results registered on session")
 	}
 
 	if runner.connection == nil {
-	    return nil, errors.New("unexpected state: no open connection to perform receive")
-    }
+		return nil, errors.New("unexpected state: no open connection to perform receive")
+	}
 
 	activeResult := runner.pendingResults[0]
 	if !activeResult.runCompleted {
@@ -91,7 +91,7 @@ func (runner *statementRunner) receive() (*Result, error) {
 			return nil, err
 		}
 
-		if received != neo4j.METADATA {
+		if received != seabolt.METADATA {
 			return nil, errors.New("unexpected response received while waiting for a METADATA")
 		}
 
@@ -113,7 +113,7 @@ func (runner *statementRunner) receive() (*Result, error) {
 		}
 
 		switch received {
-		case neo4j.METADATA:
+		case seabolt.METADATA:
 			metadata, err := runner.connection.Metadata()
 			if err != nil {
 				return nil, err
@@ -121,14 +121,14 @@ func (runner *statementRunner) receive() (*Result, error) {
 
 			activeResult.collectMetadata(metadata)
 			activeResult.resultCompleted = true
-		case neo4j.RECORD:
+		case seabolt.RECORD:
 			fields, err := runner.connection.Data()
 			if err != nil {
 				return nil, err
 			}
 
 			activeResult.collectRecord(fields)
-		case neo4j.ERROR:
+		case seabolt.ERROR:
 			return nil, errors.New("unable to fetch from connection")
 		}
 	}

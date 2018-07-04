@@ -17,10 +17,11 @@
  * limitations under the License.
  */
 
-package neo4j_go_driver
+package neo4j
 
+// AuthToken contains credentials to be sent over to the neo4j server.
 type AuthToken struct {
-    tokens map[string]interface{}
+	tokens map[string]interface{}
 }
 
 const keyScheme = "scheme"
@@ -32,56 +33,55 @@ const keyCredentials = "credentials"
 const keyRealm = "realm"
 const keyTicket = "ticket"
 
-// Generates an empty authentication token
+// NoAuth generates an empty authentication token
 func NoAuth() AuthToken {
-    return AuthToken{tokens: map[string]interface{}{
-        keyScheme: schemeNone,
-    }}
+	return AuthToken{tokens: map[string]interface{}{
+		keyScheme: schemeNone,
+	}}
 }
 
-// Generates a basic authentication token with provided username and password
+// BasicAuth generates a basic authentication token with provided username and password
 func BasicAuth(username string, password string, realm string) AuthToken {
-    tokens := map[string]interface{}{
-        keyScheme:      schemeBasic,
-        keyPrincipal:   username,
-        keyCredentials: password,
-    }
+	tokens := map[string]interface{}{
+		keyScheme:      schemeBasic,
+		keyPrincipal:   username,
+		keyCredentials: password,
+	}
 
-    if realm != "" {
-        tokens[keyRealm] = realm
-    }
+	if realm != "" {
+		tokens[keyRealm] = realm
+	}
 
-    return AuthToken{tokens: tokens}
+	return AuthToken{tokens: tokens}
 }
 
-// Generates a kerberos authentication token with provided base-64 encoded kerberos
-// ticket
+// KerberosAuth generates a kerberos authentication token with provided base-64 encoded kerberos ticket
 func KerberosAuth(ticket string) AuthToken {
-    token := AuthToken{
-        tokens: map[string]interface{}{
-            keyScheme: schemeKerberos,
-            keyTicket: ticket,
-        },
-    }
+	token := AuthToken{
+		tokens: map[string]interface{}{
+			keyScheme: schemeKerberos,
+			keyTicket: ticket,
+		},
+	}
 
-    return token
+	return token
 }
 
-// Generates a custom authentication token with provided parameters
+// CustomAuth generates a custom authentication token with provided parameters
 func CustomAuth(scheme string, username string, password string, realm *string, parameters *map[string]interface{}) AuthToken {
-    tokens := map[string]interface{}{
-        keyScheme:      scheme,
-        keyPrincipal:   username,
-        keyCredentials: password,
-    }
+	tokens := map[string]interface{}{
+		keyScheme:      scheme,
+		keyPrincipal:   username,
+		keyCredentials: password,
+	}
 
-    if realm != nil {
-        tokens[keyRealm] = *realm
-    }
+	if realm != nil {
+		tokens[keyRealm] = *realm
+	}
 
-    if parameters != nil {
-        tokens["parameters"] = *parameters
-    }
+	if parameters != nil {
+		tokens["parameters"] = *parameters
+	}
 
-    return AuthToken{tokens: tokens}
+	return AuthToken{tokens: tokens}
 }

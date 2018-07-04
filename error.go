@@ -17,14 +17,12 @@
  * limitations under the License.
  */
 
-package neo4j_go_driver
+package neo4j
 
 import (
-    neo4j "neo4j-go-connector"
+	seabolt "neo4j-go-connector"
 )
 
 func isRetriableError(err error) bool {
-    return neo4j.IsServiceUnavailable(err) || neo4j.IsSessionExpired(err) || neo4j.IsTransientError(err)
+	return seabolt.IsServiceUnavailable(err) || seabolt.IsSessionExpired(err) || seabolt.IsTransientError(err)
 }
-
-

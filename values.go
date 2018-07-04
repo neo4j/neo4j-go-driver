@@ -17,26 +17,20 @@
  * limitations under the License.
  */
 
-package neo4j_go_driver
+package neo4j
 
+// Node represents a node in the neo4j graph database
 type Node interface {
-    Id() int64
-    Labels() []string
-    Props() map[string]interface{}
+	Id() int64
+	Labels() []string
+	Props() map[string]interface{}
 }
 
+// Relationship represents a relationship in the neo4j graph database
 type Relationship interface {
-    Id() int64
-    StartId() int64
-    EndId() int64
-    Type() string
-    Props() map[string]interface{}
+	Id() int64
+	StartId() int64
+	EndId() int64
+	Type() string
+	Props() map[string]interface{}
 }
-
-type Path interface {
-    Start() Node
-    End() Node
-    Nodes() []Node
-    Relationships() []Relationship
-}
-

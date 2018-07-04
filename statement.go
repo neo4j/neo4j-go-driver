@@ -17,10 +17,11 @@
  * limitations under the License.
  */
 
-package neo4j_go_driver
+package neo4j
 
 import "errors"
 
+// Statement represents a statement along with its parameters (if any)
 type Statement struct {
 	cypher string
 	params *map[string]interface{}
@@ -34,10 +35,13 @@ func (statement *Statement) validate() error {
 	return nil
 }
 
+// NewStatement creates a new Statement instance with given cypher statement
 func NewStatement(cypher string) *Statement {
 	return &Statement{cypher: cypher}
 }
 
+// NewStatementWithParams creates a new Statement instance with given cypher statement
+// and parameters
 func NewStatementWithParams(cypher string, params *map[string]interface{}) *Statement {
 	return &Statement{cypher: cypher, params: params}
 }

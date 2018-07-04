@@ -17,11 +17,12 @@
  * limitations under the License.
  */
 
-package neo4j_go_driver
+package neo4j
 
 import (
-	"testing"
 	"neo4j-go-driver/connector-mocks"
+	"testing"
+
 	"github.com/golang/mock/gomock"
 )
 

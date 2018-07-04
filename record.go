@@ -17,23 +17,28 @@
  * limitations under the License.
  */
 
-package neo4j_go_driver
+package neo4j
 
 import "errors"
 
+// Record contains ordered keys and values that are returned from a statement executed
+// on the server
 type Record struct {
 	keys   []string
 	values []interface{}
 }
 
+// Keys returns the keys available
 func (record *Record) Keys() []string {
 	return record.keys
 }
 
+// Values returns the values
 func (record *Record) Values() []interface{} {
 	return record.values
 }
 
+// Get returns the value (if any) corresponding to the given key
 func (record *Record) Get(key string) (interface{}, bool) {
 	for i := range record.keys {
 		if record.keys[i] == key {
@@ -44,6 +49,7 @@ func (record *Record) Get(key string) (interface{}, bool) {
 	return nil, false
 }
 
+// GetByIndex returns the value at given index
 func (record *Record) GetByIndex(index int) interface{} {
 	if len(record.values) <= index {
 		panic(errors.New("index out of bounds"))

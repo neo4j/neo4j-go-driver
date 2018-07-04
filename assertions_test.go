@@ -17,11 +17,11 @@
  * limitations under the License.
  */
 
-package neo4j_go_driver
+package neo4j
 
 import (
-	"testing"
 	"reflect"
+	"testing"
 )
 
 func assertTrue(t *testing.T, value interface{}) {
@@ -42,7 +42,6 @@ func assertBoolean(t *testing.T, value interface{}, expected bool) {
 		t.Errorf("Expected value to be '%v', but found '%v'", expected, valueAsBool)
 	}
 }
-
 
 func assertNil(t *testing.T, value interface{}) {
 	if value != nil && (reflect.ValueOf(value).Kind() == reflect.Ptr && !reflect.ValueOf(value).IsNil()) {

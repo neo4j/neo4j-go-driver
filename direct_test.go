@@ -17,21 +17,21 @@
  * limitations under the License.
  */
 
-package neo4j_go_driver
+package neo4j
 
 import (
-	neo4j "neo4j-go-connector"
+	seabolt "neo4j-go-connector"
 	"net/url"
 )
 
-func newDirectWithConnector(target string, connector neo4j.Connector) Driver {
-	targetUrl, err := url.Parse(target)
+func newDirectWithConnector(target string, connector seabolt.Connector) Driver {
+	targetURL, err := url.Parse(target)
 	if err != nil {
 		return nil
 	}
 
 	return &directDriver{
-		target: *targetUrl,
+		target:    *targetURL,
 		connector: connector,
 	}
 }

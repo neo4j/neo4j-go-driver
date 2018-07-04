@@ -1,8 +1,8 @@
 /*
  * Copyright (c) 2002-2018 "Neo4j,"
- * Neo4j Sweden AB [http://neo4j.com]
+ * Neo4j Sweden AB [http://seabolt.com]
  *
- * This file is part of Neo4j.
+ * This file is part of seabolt.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -24,9 +24,10 @@
 package connector_mocks
 
 import (
-	gomock "github.com/golang/mock/gomock"
-	neo4j "neo4j-go-connector"
+	seabolt "neo4j-go-connector"
 	reflect "reflect"
+
+	gomock "github.com/golang/mock/gomock"
 )
 
 // MockConnector is a mock of Connector interface
@@ -65,9 +66,9 @@ func (mr *MockConnectorMockRecorder) Close() *gomock.Call {
 }
 
 // GetPool connector-mocks base method
-func (m *MockConnector) GetPool() (neo4j.Pool, error) {
+func (m *MockConnector) GetPool() (seabolt.Pool, error) {
 	ret := m.ctrl.Call(m, "GetPool")
-	ret0, _ := ret[0].(neo4j.Pool)
+	ret0, _ := ret[0].(seabolt.Pool)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }

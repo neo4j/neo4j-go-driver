@@ -17,14 +17,14 @@
  * limitations under the License.
  */
 
-package neo4j_go_driver
+package neo4j
 
 func filter(vs []string, f func(string) bool) []string {
-    filtered := make([]string, 0)
-    for _, v := range vs {
-        if f(v) {
-            filtered = append(filtered, v)
-        }
-    }
-    return filtered
+	filtered := make([]string, 0)
+	for _, v := range vs {
+		if f(v) {
+			filtered = append(filtered, v)
+		}
+	}
+	return filtered
 }

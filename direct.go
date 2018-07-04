@@ -17,77 +17,65 @@
  * limitations under the License.
  */
 
-package neo4j_go_driver
+package neo4j
 
 import (
-    "net/url"
-    neo4j "neo4j-go-connector"
+	seabolt "neo4j-go-connector"
+	"net/url"
 )
 
 type directDriver struct {
-    config    *Config
-    target    url.URL
-    connector neo4j.Connector
+	config    *Config
+	target    url.URL
+	connector seabolt.Connector
 }
 
-func configToConnectorConfig(config *Config) *neo4j.Config {
-    return &neo4j.Config{
-        Encryption: config.encrypted,
-        Debug:      config.log.DebugEnabled(),
-    }
+func configToConnectorConfig(config *Config) *seabolt.Config {
+	return &seabolt.Config{
+		Encryption: config.encrypted,
+		Debug:      config.log.DebugEnabled(),
+	}
 }
 
 func newDirectDriver(target *url.URL, token AuthToken, config *Config) (*directDriver, error) {
-    if config == nil {
-        config = DefaultConfig()
-    }
+	if config == nil {
+		config = defaultConfig()
+	}
 
-    connector, err := neo4j.NewConnector(target.String(), token.tokens, configToConnectorConfig(config))
-    if err != nil {
-        return nil, err
-    }
+	connector, err := seabolt.NewConnector(target.String(), token.tokens, configToConnectorConfig(config))
+	if err != nil {
+		return nil, err
+	}
 
-    driver := directDriver{
-        config:    config,
-        target:    *target,
-        connector: connector,
-    }
-    return &driver, nil
+	driver := directDriver{
+		config:    config,
+		target:    *target,
+		connector: connector,
+	}
+	return &driver, nil
 }
 
 func (driver *directDriver) Target() url.URL {
-    return driver.target
+	return driver.target
 }
 
-func (driver *directDriver) Session() (*Session, error) {
-    return driver.SessionWithAccessMode(AccessModeWrite)
-}
-
-func (driver *directDriver) SessionWithAccessMode(accessMode AccessMode) (*Session, error) {
-    return driver.SessionWithAccessModeAndBookmark(accessMode)
-}
-
-func (driver *directDriver) SessionWithBookmark(bookmark string) (*Session, error) {
-    return driver.SessionWithAccessModeAndBookmark(AccessModeWrite, bookmark)
-}
-
-func (driver *directDriver) SessionWithAccessModeAndBookmark(accessMode AccessMode, bookmarks ...string) (*Session, error) {
-    return newSession(driver, accessMode, bookmarks), nil
+func (driver *directDriver) Session(accessMode AccessMode, bookmarks ...string) (*Session, error) {
+	return newSession(driver, accessMode, bookmarks), nil
 }
 
 func (driver *directDriver) Close() error {
-    return driver.connector.Close()
+	return driver.connector.Close()
 }
 
 func (driver *directDriver) configuration() *Config {
-    return driver.config
+	return driver.config
 }
 
-func (driver *directDriver) acquire(mode AccessMode) (neo4j.Connection, error) {
-    pool, err := driver.connector.GetPool()
-    if err != nil {
-        return nil, err
-    }
+func (driver *directDriver) acquire(mode AccessMode) (seabolt.Connection, error) {
+	pool, err := driver.connector.GetPool()
+	if err != nil {
+		return nil, err
+	}
 
-    return pool.Acquire()
+	return pool.Acquire()
 }

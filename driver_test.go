@@ -17,7 +17,7 @@
  * limitations under the License.
  */
 
-package neo4j_go_driver
+package neo4j
 
 import (
 	"testing"
@@ -59,7 +59,7 @@ func TestDriver_Session(t *testing.T) {
 					t.Fatalf("unable to construct driver: %s", err)
 				}
 
-				session, err := driver.Session()
+				session, err := driver.Session(AccessModeWrite)
 				if err != nil {
 					t.Fatalf("unable to obtain session: %s", err)
 				}
@@ -90,7 +90,7 @@ func TestDriver_SessionWithAccessMode(t *testing.T) {
 					t.Fatalf("unable to construct driver: %s", err)
 				}
 
-				session, err := driver.SessionWithAccessMode(testCase.mode)
+				session, err := driver.Session(testCase.mode)
 				if err != nil {
 					t.Fatalf("unable to obtain session: %s", err)
 				}
@@ -114,10 +114,10 @@ func TestDirectDriver_SessionWithBookmark(t *testing.T) {
 	}
 
 	for _, testCase := range testCases {
-	    bookmarks := []string(nil)
-	    if len(testCase.bookmark) > 0 {
-	        bookmarks = append(bookmarks, testCase.bookmark)
-        }
+		bookmarks := []string(nil)
+		if len(testCase.bookmark) > 0 {
+			bookmarks = append(bookmarks, testCase.bookmark)
+		}
 
 		t.Run(testCase.name, func(t *testing.T) {
 			verifySessionParameters(t, func() *Session {
@@ -126,7 +126,7 @@ func TestDirectDriver_SessionWithBookmark(t *testing.T) {
 					t.Fatalf("unable to construct driver: %s", err)
 				}
 
-				session, err := driver.SessionWithBookmark(testCase.bookmark)
+				session, err := driver.Session(AccessModeWrite, testCase.bookmark)
 				if err != nil {
 					t.Fatalf("unable to obtain session: %s", err)
 				}
@@ -137,8 +137,7 @@ func TestDirectDriver_SessionWithBookmark(t *testing.T) {
 	}
 }
 
-
-func verifySessionParameters(t *testing.T, sessionFactory func () *Session, expectedMode AccessMode, bookmarks []string) {
+func verifySessionParameters(t *testing.T, sessionFactory func() *Session, expectedMode AccessMode, bookmarks []string) {
 	session := sessionFactory()
 
 	if session.accessMode != expectedMode {

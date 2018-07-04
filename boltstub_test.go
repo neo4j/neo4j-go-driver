@@ -17,17 +17,17 @@
  * limitations under the License.
  */
 
-package neo4j_go_driver
+package neo4j
 
 import (
-	"runtime"
-	"path"
-	"os"
-	"testing"
-	"os/exec"
-	"net"
 	"fmt"
-    "time"
+	"net"
+	"os"
+	"os/exec"
+	"path"
+	"runtime"
+	"testing"
+	"time"
 )
 
 type stubServer struct {
@@ -65,17 +65,17 @@ func startStubServer(t *testing.T, port int, script string) *stubServer {
 
 	// try to establish a connection to the stub server
 	for i := 0; i < connectionAttempts; i++ {
-        conn, err := net.Dial("tcp", fmt.Sprintf(":%d", server.port))
-        if err != nil {
-            time.Sleep(200 * time.Millisecond)
-        }
+		conn, err := net.Dial("tcp", fmt.Sprintf(":%d", server.port))
+		if err != nil {
+			time.Sleep(200 * time.Millisecond)
+		}
 
-        server.conn = conn
+		server.conn = conn
 
-        return server
-    }
+		return server
+	}
 
-    server.test.Fatalf("unable to open a connection to boltstub server at [:%d]", server.port)
+	server.test.Fatalf("unable to open a connection to boltstub server at [:%d]", server.port)
 
 	return nil
 }

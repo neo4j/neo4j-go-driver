@@ -1,8 +1,8 @@
 /*
  * Copyright (c) 2002-2018 "Neo4j,"
- * Neo4j Sweden AB [http://neo4j.com]
+ * Neo4j Sweden AB [http://seabolt.com]
  *
- * This file is part of Neo4j.
+ * This file is part of seabolt.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -24,9 +24,10 @@
 package connector_mocks
 
 import (
-	gomock "github.com/golang/mock/gomock"
-	neo4j "neo4j-go-connector"
+	seabolt "neo4j-go-connector"
 	reflect "reflect"
+
+	gomock "github.com/golang/mock/gomock"
 )
 
 // MockConnection is a mock of Connection interface
@@ -53,9 +54,9 @@ func (m *MockConnection) EXPECT() *MockConnectionMockRecorder {
 }
 
 // Begin connector-mocks base method
-func (m *MockConnection) Begin(arg0 []string) (neo4j.RequestHandle, error) {
+func (m *MockConnection) Begin(arg0 []string) (seabolt.RequestHandle, error) {
 	ret := m.ctrl.Call(m, "Begin", arg0)
-	ret0, _ := ret[0].(neo4j.RequestHandle)
+	ret0, _ := ret[0].(seabolt.RequestHandle)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -78,9 +79,9 @@ func (mr *MockConnectionMockRecorder) Close() *gomock.Call {
 }
 
 // Commit connector-mocks base method
-func (m *MockConnection) Commit() (neo4j.RequestHandle, error) {
+func (m *MockConnection) Commit() (seabolt.RequestHandle, error) {
 	ret := m.ctrl.Call(m, "Commit")
-	ret0, _ := ret[0].(neo4j.RequestHandle)
+	ret0, _ := ret[0].(seabolt.RequestHandle)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -104,9 +105,9 @@ func (mr *MockConnectionMockRecorder) Data() *gomock.Call {
 }
 
 // DiscardAll connector-mocks base method
-func (m *MockConnection) DiscardAll() (neo4j.RequestHandle, error) {
+func (m *MockConnection) DiscardAll() (seabolt.RequestHandle, error) {
 	ret := m.ctrl.Call(m, "DiscardAll")
-	ret0, _ := ret[0].(neo4j.RequestHandle)
+	ret0, _ := ret[0].(seabolt.RequestHandle)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -117,9 +118,9 @@ func (mr *MockConnectionMockRecorder) DiscardAll() *gomock.Call {
 }
 
 // Fetch connector-mocks base method
-func (m *MockConnection) Fetch(arg0 neo4j.RequestHandle) (neo4j.FetchType, error) {
+func (m *MockConnection) Fetch(arg0 seabolt.RequestHandle) (seabolt.FetchType, error) {
 	ret := m.ctrl.Call(m, "Fetch", arg0)
-	ret0, _ := ret[0].(neo4j.FetchType)
+	ret0, _ := ret[0].(seabolt.FetchType)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -130,7 +131,7 @@ func (mr *MockConnectionMockRecorder) Fetch(arg0 interface{}) *gomock.Call {
 }
 
 // FetchSummary connector-mocks base method
-func (m *MockConnection) FetchSummary(arg0 neo4j.RequestHandle) (int, error) {
+func (m *MockConnection) FetchSummary(arg0 seabolt.RequestHandle) (int, error) {
 	ret := m.ctrl.Call(m, "FetchSummary", arg0)
 	ret0, _ := ret[0].(int)
 	ret1, _ := ret[1].(error)
@@ -180,9 +181,9 @@ func (mr *MockConnectionMockRecorder) Metadata() *gomock.Call {
 }
 
 // PullAll connector-mocks base method
-func (m *MockConnection) PullAll() (neo4j.RequestHandle, error) {
+func (m *MockConnection) PullAll() (seabolt.RequestHandle, error) {
 	ret := m.ctrl.Call(m, "PullAll")
-	ret0, _ := ret[0].(neo4j.RequestHandle)
+	ret0, _ := ret[0].(seabolt.RequestHandle)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -205,9 +206,9 @@ func (mr *MockConnectionMockRecorder) Reset() *gomock.Call {
 }
 
 // Rollback connector-mocks base method
-func (m *MockConnection) Rollback() (neo4j.RequestHandle, error) {
+func (m *MockConnection) Rollback() (seabolt.RequestHandle, error) {
 	ret := m.ctrl.Call(m, "Rollback")
-	ret0, _ := ret[0].(neo4j.RequestHandle)
+	ret0, _ := ret[0].(seabolt.RequestHandle)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -218,9 +219,9 @@ func (mr *MockConnectionMockRecorder) Rollback() *gomock.Call {
 }
 
 // Run connector-mocks base method
-func (m *MockConnection) Run(arg0 string, arg1 *map[string]interface{}) (neo4j.RequestHandle, error) {
+func (m *MockConnection) Run(arg0 string, arg1 *map[string]interface{}) (seabolt.RequestHandle, error) {
 	ret := m.ctrl.Call(m, "Run", arg0, arg1)
-	ret0, _ := ret[0].(neo4j.RequestHandle)
+	ret0, _ := ret[0].(seabolt.RequestHandle)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }

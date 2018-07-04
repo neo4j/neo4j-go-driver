@@ -18,7 +18,7 @@
  */
 package connector_mocks
 
-import neo4j "neo4j-go-connector"
+import seabolt "neo4j-go-connector"
 
 type mockConnector struct {
 	pool *mockPool
@@ -28,7 +28,7 @@ type mockPool struct {
 	connection *MockConnection
 }
 
-func (connector *mockConnector) GetPool() (neo4j.Pool, error) {
+func (connector *mockConnector) GetPool() (seabolt.Pool, error) {
 	return connector.pool, nil
 }
 
@@ -36,7 +36,7 @@ func (connector *mockConnector) Close() error {
 	return connector.pool.Close()
 }
 
-func (pool *mockPool) Acquire() (neo4j.Connection, error) {
+func (pool *mockPool) Acquire() (seabolt.Connection, error) {
 	return pool.connection, nil
 }
 
@@ -44,11 +44,10 @@ func (pool *mockPool) Close() error {
 	return pool.connection.Close()
 }
 
-func MockedConnector(connection *MockConnection) neo4j.Connector {
+func MockedConnector(connection *MockConnection) seabolt.Connector {
 	return &mockConnector{
 		pool: &mockPool{
 			connection: connection,
 		},
 	}
 }
-
