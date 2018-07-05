@@ -21,10 +21,10 @@
 // Source: neo4j-go-connector/neo4j (interfaces: Pool)
 
 // Package connector-mocks is a generated GoMock package.
-package connector_mocks
+package mockseabolt
 
 import (
-	seabolt "neo4j-go-connector"
+	"github.com/neo4j-drivers/neo4j-go-connector"
 	reflect "reflect"
 
 	gomock "github.com/golang/mock/gomock"

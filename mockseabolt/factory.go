@@ -16,9 +16,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package connector_mocks
 
-import seabolt "neo4j-go-connector"
+package mockseabolt
+
+import "github.com/neo4j-drivers/neo4j-go-connector"
 
 type mockConnector struct {
 	pool *mockPool
@@ -44,6 +45,7 @@ func (pool *mockPool) Close() error {
 	return pool.connection.Close()
 }
 
+// MockedConnector returns a mocked connector with the provided mocked connection
 func MockedConnector(connection *MockConnection) seabolt.Connector {
 	return &mockConnector{
 		pool: &mockPool{

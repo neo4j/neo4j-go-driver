@@ -21,7 +21,7 @@ package neo4j
 
 import (
 	"errors"
-	seabolt "neo4j-go-connector"
+	"github.com/neo4j-drivers/neo4j-go-connector"
 )
 
 type statementRunner struct {

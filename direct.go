@@ -20,7 +20,7 @@
 package neo4j
 
 import (
-	seabolt "neo4j-go-connector"
+	"github.com/neo4j-drivers/neo4j-go-connector"
 	"net/url"
 )
 

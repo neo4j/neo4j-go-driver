@@ -21,7 +21,7 @@ package neo4j
 
 import (
 	"fmt"
-	neo4j "neo4j-go-connector"
+	"github.com/neo4j-drivers/neo4j-go-connector"
 	"net/url"
 )
 
@@ -46,7 +46,7 @@ type Driver interface {
 	Close() error
 
 	configuration() *Config
-	acquire(mode AccessMode) (neo4j.Connection, error)
+	acquire(mode AccessMode) (seabolt.Connection, error)
 }
 
 // NewDriver is the entry method to the neo4j driver to create an instance of a Driver

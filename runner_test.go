@@ -20,7 +20,7 @@
 package neo4j
 
 import (
-	"neo4j-go-driver/connector-mocks"
+	"github.com/neo4j/neo4j-go-driver/mockseabolt"
 	"testing"
 
 	"github.com/golang/mock/gomock"
@@ -31,8 +31,8 @@ func TestRunner(t *testing.T) {
 		mockCtrl := gomock.NewController(t)
 		defer mockCtrl.Finish()
 
-		mockConnection := connector_mocks.NewMockConnection(mockCtrl)
-		mockConnector := connector_mocks.MockedConnector(mockConnection)
+		mockConnection := mockseabolt.NewMockConnection(mockCtrl)
+		mockConnector := mockseabolt.MockedConnector(mockConnection)
 		mockDriver := newDirectWithConnector("bolt://localhost", mockConnector)
 		runner := newRunner(mockDriver, AccessModeWrite, true)
 
