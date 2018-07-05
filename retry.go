@@ -34,9 +34,9 @@ type retryLogic struct {
 
 func newRetryLogic(config *Config) *retryLogic {
 	return &retryLogic{
-		logging:           config.log,
+		logging:           config.Log,
 		initialRetryDelay: 1 * time.Second,
-		maxRetryTime:      config.maxTransactionRetryDuration,
+		maxRetryTime:      config.MaxTransactionRetryDuration,
 		delayMultiplier:   2.0,
 		delayJitter:       0.2,
 	}

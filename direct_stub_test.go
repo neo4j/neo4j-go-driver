@@ -20,8 +20,9 @@
 package neo4j
 
 import (
-	"github.com/neo4j-drivers/neo4j-go-connector"
 	"testing"
+
+	"github.com/neo4j-drivers/neo4j-go-connector"
 )
 
 func TestDirect(t *testing.T) {
@@ -99,7 +100,9 @@ func shouldExecuteReturn1(t *testing.T) {
 }
 
 func createDirectDriver(t *testing.T) Driver {
-	driver, err := NewDriver("bolt://localhost:9001", NoAuth(), NewConfigBuilder().WithoutEncryption().Build())
+	driver, err := NewDriver("bolt://localhost:9001", NoAuth(), func(config *Config) {
+		config.Encrypted = false
+	})
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -21,8 +21,9 @@ package neo4j
 
 import (
 	"fmt"
-	"github.com/neo4j-drivers/neo4j-go-connector"
 	"net/url"
+
+	"github.com/neo4j-drivers/neo4j-go-connector"
 )
 
 // AccessMode defines modes that routing driver decides to which cluster member
@@ -50,13 +51,24 @@ type Driver interface {
 }
 
 // NewDriver is the entry method to the neo4j driver to create an instance of a Driver
-func NewDriver(target string, auth AuthToken, config *Config) (Driver, error) {
+func NewDriver(target string, auth AuthToken, configurers ...func(*Config)) (Driver, error) {
 	parsed, err := url.Parse(target)
 	if err != nil {
 		return nil, err
 	}
+
+	config := defaultConfig()
+	for _, configurer := range configurers {
+		configurer(config)
+	}
+
+	if err := validateConfig(config); err != nil {
+		return nil, err
+	}
+
 	if parsed.Scheme == "bolt" {
 		return newDirectDriver(parsed, auth, config)
 	}
+
 	return nil, fmt.Errorf("URL scheme %s is not supported", parsed.Scheme)
 }

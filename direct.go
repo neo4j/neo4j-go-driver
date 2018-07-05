@@ -20,8 +20,9 @@
 package neo4j
 
 import (
-	"github.com/neo4j-drivers/neo4j-go-connector"
 	"net/url"
+
+	"github.com/neo4j-drivers/neo4j-go-connector"
 )
 
 type directDriver struct {
@@ -32,8 +33,8 @@ type directDriver struct {
 
 func configToConnectorConfig(config *Config) *seabolt.Config {
 	return &seabolt.Config{
-		Encryption: config.encrypted,
-		Debug:      config.log.DebugEnabled(),
+		Encryption: config.Encrypted,
+		Debug:      config.Log.DebugEnabled(),
 	}
 }
 

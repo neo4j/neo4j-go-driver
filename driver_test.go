@@ -25,7 +25,7 @@ import (
 
 func TestDriverTarget(t *testing.T) {
 	uri := "bolt://localhost:7687"
-	driver, err := NewDriver(uri, NoAuth(), nil)
+	driver, err := NewDriver(uri, NoAuth())
 	assertNil(t, err)
 
 	driverTarget := driver.Target()
@@ -54,7 +54,7 @@ func TestDriver_Session(t *testing.T) {
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
 			verifySessionParameters(t, func() *Session {
-				driver, err := NewDriver(testCase.uri, NoAuth(), nil)
+				driver, err := NewDriver(testCase.uri, NoAuth())
 				if err != nil {
 					t.Fatalf("unable to construct driver: %s", err)
 				}
@@ -85,7 +85,7 @@ func TestDriver_SessionWithAccessMode(t *testing.T) {
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
 			verifySessionParameters(t, func() *Session {
-				driver, err := NewDriver(testCase.uri, NoAuth(), nil)
+				driver, err := NewDriver(testCase.uri, NoAuth())
 				if err != nil {
 					t.Fatalf("unable to construct driver: %s", err)
 				}
@@ -121,7 +121,7 @@ func TestDirectDriver_SessionWithBookmark(t *testing.T) {
 
 		t.Run(testCase.name, func(t *testing.T) {
 			verifySessionParameters(t, func() *Session {
-				driver, err := NewDriver(testCase.uri, NoAuth(), nil)
+				driver, err := NewDriver(testCase.uri, NoAuth())
 				if err != nil {
 					t.Fatalf("unable to construct driver: %s", err)
 				}
