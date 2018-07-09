@@ -17,21 +17,22 @@
  * limitations under the License.
  */
 
-package neo4j
+package drivertest
 
 import (
 	"fmt"
+	. "github.com/onsi/ginkgo"
 	"net"
 	"os"
 	"os/exec"
 	"path"
 	"runtime"
-	"testing"
+	"syscall"
 	"time"
 )
 
-type stubServer struct {
-	test    *testing.T
+// StubServer represents a running instance of a scripted bolt stub server
+type StubServer struct {
 	port    int
 	script  string
 	conn    net.Conn
@@ -46,22 +47,23 @@ var (
 	testDataDir = ""
 )
 
-func startStubServer(t *testing.T, port int, script string) *stubServer {
+// NewStubServer launches the stub server on the given port with the given script
+func NewStubServer(port int, script string) *StubServer {
 	if len(testDataDir) == 0 {
-		t.Fatalf("unable to locate bolt stub script folder")
+		Fail("unable to locate bolt stub script folder")
 	}
 
 	testScriptFile := path.Join(testDataDir, script)
 	if _, err := os.Stat(testScriptFile); os.IsNotExist(err) {
-		t.Fatalf("unable to locate bolt stub script file at '%s'", testScriptFile)
+		Fail(fmt.Sprintf("unable to locate bolt stub script file at '%s'", testScriptFile))
 	}
 
 	cmd := exec.Command("boltstub", fmt.Sprint(port), testScriptFile)
 	if err := cmd.Start(); err != nil {
-		t.Fatalf("unable to start boltstub: %g", err)
+		Fail(fmt.Sprintf("unable to start boltstub: %g", err))
 	}
 
-	server := &stubServer{test: t, port: port, script: testScriptFile, process: cmd}
+	server := &StubServer{port: port, script: testScriptFile, process: cmd}
 
 	// try to establish a connection to the stub server
 	for i := 0; i < connectionAttempts; i++ {
@@ -75,27 +77,44 @@ func startStubServer(t *testing.T, port int, script string) *stubServer {
 		return server
 	}
 
-	server.test.Fatalf("unable to open a connection to boltstub server at [:%d]", server.port)
+	Fail(fmt.Sprintf("unable to open a connection to boltstub server at [:%d]", server.port))
 
 	return nil
 }
 
-func (server *stubServer) waitForExit() bool {
+// Finished expects the stub server to already be exited returns whether it was exited
+// with success code. If the process did not exit as expected, it returns false (or fails the test)
+func (server *StubServer) Finished() bool {
+	// We don't have a well-defined way of checking whether a process is still
+	// running or not, so we query it via FindProcess and sending a 0-signal to
+	// test it
+	process, err := os.FindProcess(server.process.Process.Pid)
+	if err == nil {
+		err := process.Signal(syscall.Signal(0))
+
+		// If signal succeeds then we need to kill it
+		if err == nil {
+			if err := server.process.Process.Kill(); err != nil {
+				Fail(fmt.Sprintf("unable to kill boltstub server: %g", err))
+			}
+
+			Fail(fmt.Sprintf("manually killed boltstub server"))
+		}
+	}
+
 	if err := server.process.Wait(); err != nil {
-		server.test.Fatalf("unable to wait for boltstub server to exit: %g", err)
+		Fail(fmt.Sprintf("unable to wait for boltstub server to exit: %g", err))
 	}
 
 	if server.process.ProcessState.Exited() {
 		return server.process.ProcessState.Success()
 	}
 
-	if err := server.process.Process.Kill(); err != nil {
-		server.test.Fatalf("unable to kill boltstub server: %g", err)
-	}
-
-	server.test.Fatalf("manually killed boltstub server")
-
 	return false
+}
+
+func (server *StubServer) Close() {
+	server.process.Process.Kill()
 }
 
 func init() {

@@ -17,7 +17,7 @@
  * limitations under the License.
  */
 
-package mockseabolt
+package mocking
 
 import "github.com/neo4j-drivers/neo4j-go-connector"
 

@@ -20,30 +20,42 @@
 package neo4j
 
 import (
-	"github.com/neo4j/neo4j-go-driver/mockseabolt"
-	"testing"
+	"github.com/neo4j/neo4j-go-driver/internal/mocking"
 
 	"github.com/golang/mock/gomock"
+	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/gomega"
 )
 
-func TestRunner(t *testing.T) {
-	t.Run("runStatement should invoke run on connection", func(t *testing.T) {
-		mockCtrl := gomock.NewController(t)
-		defer mockCtrl.Finish()
+var _ = Describe("Runner", func() {
+	var (
+		mockCtrl *gomock.Controller
+	)
 
-		mockConnection := mockseabolt.NewMockConnection(mockCtrl)
-		mockConnector := mockseabolt.MockedConnector(mockConnection)
-		mockDriver := newDirectWithConnector("bolt://localhost", mockConnector)
-		runner := newRunner(mockDriver, AccessModeWrite, true)
-
-		gomock.InOrder(
-			mockConnection.EXPECT().Run("RETURN 1", nil).Times(1),
-			mockConnection.EXPECT().PullAll().Times(1),
-			mockConnection.EXPECT().Flush().Times(1),
-		)
-
-		_, err := runner.runStatement(Statement{cypher: "RETURN 1"})
-
-		assertNil(t, err)
+	BeforeEach(func() {
+		mockCtrl = gomock.NewController(GinkgoT())
 	})
-}
+
+	AfterEach(func() {
+		mockCtrl.Finish()
+	})
+
+	Context("runStatement", func() {
+		It("should invoke run on connection", func() {
+			mockConnection := mocking.NewMockConnection(mockCtrl)
+			mockConnector := mocking.MockedConnector(mockConnection)
+			mockDriver := newDirectWithConnector("bolt://localhost", mockConnector)
+			runner := newRunner(mockDriver, AccessModeWrite, true)
+
+			gomock.InOrder(
+				mockConnection.EXPECT().Run("RETURN 1", nil).Times(1),
+				mockConnection.EXPECT().PullAll().Times(1),
+				mockConnection.EXPECT().Flush().Times(1),
+			)
+
+			_, err := runner.runStatement(Statement{cypher: "RETURN 1"})
+
+			Expect(err).To(BeNil())
+		})
+	})
+})

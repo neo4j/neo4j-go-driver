@@ -20,9 +20,12 @@
 package neo4j
 
 import (
-	"github.com/neo4j-drivers/neo4j-go-connector"
+	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/gomega"
+	"testing"
 )
 
-func isRetriableError(err error) bool {
-	return seabolt.IsServiceUnavailable(err) || seabolt.IsTransientError(err)
+func TestDriver(t *testing.T) {
+	RegisterFailHandler(Fail)
+	RunSpecs(t, "Neo4j Go Driver Specs")
 }

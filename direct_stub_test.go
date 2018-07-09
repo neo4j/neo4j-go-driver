@@ -20,101 +20,89 @@
 package neo4j
 
 import (
-	"testing"
-
 	"github.com/neo4j-drivers/neo4j-go-connector"
+	"github.com/neo4j/neo4j-go-driver/internal/testing"
+	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/ginkgo/extensions/table"
+	. "github.com/onsi/gomega"
 )
 
-func TestDirect(t *testing.T) {
-	testCases := []struct {
-		name     string
+var _ = Describe("Direct Driver with Stub Server", func() {
+	type TestCase struct {
 		script   string
-		testFunc func(t *testing.T)
-	}{
-		{name: "should return error when server disconnects after RUN",
-			script:   "disconnect_on_run.script",
-			testFunc: consumeShouldFailOnServerDisconnects},
-		{name: "should return error when server disconnects after PULL_ALL",
-			script:   "disconnect_on_pull_all.script",
-			testFunc: consumeShouldFailOnServerDisconnects},
-		{name: "should execute simple query",
-			script:   "return_1.script",
-			testFunc: shouldExecuteReturn1},
+		testFunc func()
 	}
 
-	for _, testCase := range testCases {
-		t.Run(testCase.name, func(t *testing.T) {
-			stub := startStubServer(t, 9001, testCase.script)
+	DescribeTable("stub tests", func(testCase TestCase) {
+		stub := drivertest.NewStubServer(9001, testCase.script)
+		defer stub.Close()
 
-			testCase.testFunc(t)
+		testCase.testFunc()
 
-			assertTrue(t, stub.waitForExit())
-		})
-	}
-}
+		Expect(stub.Finished()).To(BeTrue())
+	}, Entry("should return error when server disconnects after RUN", TestCase{
+		script:   "disconnect_on_run.script",
+		testFunc: consumeShouldFailOnServerDisconnects,
+	}), Entry("should return error when server disconnects after PULL_ALL", TestCase{
+		script:   "disconnect_on_pull_all.script",
+		testFunc: consumeShouldFailOnServerDisconnects,
+	}), Entry("should execute simple query", TestCase{
+		script:   "return_1.script",
+		testFunc: shouldExecuteReturn1,
+	}))
 
-func consumeShouldFailOnServerDisconnects(t *testing.T) {
-	driver := createDirectDriver(t)
+})
+
+func consumeShouldFailOnServerDisconnects() {
+	driver := createDirectDriver()
 	defer driver.Close()
 
-	session := createSession(t, driver)
+	session := createSession(driver)
 	defer session.Close()
 
 	result, err := session.Run("RETURN $x", &map[string]interface{}{"x": 1})
-	if err != nil {
-		t.Error(err)
-	}
+	Expect(err).To(BeNil())
 
 	summary, err := result.Consume()
-	assertNil(t, summary)
-	assertNonNil(t, err)
-	assertTrue(t, seabolt.IsServiceUnavailable(err))
+
+	Expect(summary).To(BeNil())
+	Expect(err).ToNot(BeNil())
+	Expect(seabolt.IsServiceUnavailable(err)).To(BeTrue())
 }
 
-func shouldExecuteReturn1(t *testing.T) {
-	driver := createDirectDriver(t)
+func shouldExecuteReturn1() {
+	driver := createDirectDriver()
 	defer driver.Close()
 
-	session := createSession(t, driver)
+	session := createSession(driver)
 	defer session.Close()
 
 	result, err := session.Run("RETURN $x", &map[string]interface{}{"x": 1})
-	if err != nil {
-		t.Error(err)
-	}
+	Expect(err).To(BeNil())
 
-	count := int64(0)
+	var count int64
 	for result.Next() {
 		if x, ok := result.Record().Get("x"); ok {
 			count += x.(int64)
 		}
 	}
 
-	if err := result.Err(); err != nil {
-		t.Error(err)
-	}
-
-	if count != 1 {
-		t.Errorf("expected count to be 1, but found %d", count)
-	}
+	Expect(result.Err()).To(BeNil())
+	Expect(count).To(BeIdenticalTo(int64(1)))
 }
 
-func createDirectDriver(t *testing.T) Driver {
+func createDirectDriver() Driver {
 	driver, err := NewDriver("bolt://localhost:9001", NoAuth(), func(config *Config) {
 		config.Encrypted = false
 	})
-	if err != nil {
-		t.Fatal(err)
-	}
+	Expect(err).To(BeNil())
 
 	return driver
 }
 
-func createSession(t *testing.T, driver Driver) *Session {
+func createSession(driver Driver) *Session {
 	session, err := driver.Session(AccessModeWrite)
-	if err != nil {
-		t.Fatal(err)
-	}
+	Expect(err).To(BeNil())
 
 	return session
 }

@@ -20,58 +20,56 @@
 package neo4j
 
 import (
-	"testing"
+	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/gomega"
 )
 
-func TestNoAuth(t *testing.T) {
-	t.Run("token should contain only scheme=none", func(t *testing.T) {
+var _ = Describe("Authentication Tokens", func() {
+	Context("NoAuth", func() {
+		It("should only contain scheme=none", func() {
+			token := NoAuth()
 
-		token := NoAuth()
+			tokenMap := token.tokens
 
-		tokenMap := token.tokens
-
-		assertNonNil(t, tokenMap)
-		assertLen(t, &tokenMap, 1)
-		assertMapContainsKeyValue(t, &tokenMap, keyScheme, schemeNone)
-	})
-}
-
-func TestBasicAuth(t *testing.T) {
-	t.Run("should not include realm if not provided", func(t *testing.T) {
-		token := BasicAuth("test", "1234", "")
-
-		tokenMap := token.tokens
-
-		assertNonNil(t, tokenMap)
-		assertLen(t, &tokenMap, 3)
-		assertMapContainsKeyValue(t, &tokenMap, keyScheme, schemeBasic)
-		assertMapContainsKeyValue(t, &tokenMap, keyPrincipal, "test")
-		assertMapContainsKeyValue(t, &tokenMap, keyCredentials, "1234")
+			Expect(tokenMap).To(HaveLen(1))
+			Expect(tokenMap).To(HaveKeyWithValue(keyScheme, schemeNone))
+		})
 	})
 
-	t.Run("should include realm", func(t *testing.T) {
-		token := BasicAuth("test", "1234", "some_realm")
+	Context("BasicAuth", func() {
+		It("should include scheme, username and password only when realm is empty", func() {
+			token := BasicAuth("test", "1234", "")
 
-		tokenMap := token.tokens
+			tokenMap := token.tokens
 
-		assertNonNil(t, tokenMap)
-		assertLen(t, &tokenMap, 4)
-		assertMapContainsKeyValue(t, &tokenMap, keyScheme, schemeBasic)
-		assertMapContainsKeyValue(t, &tokenMap, keyPrincipal, "test")
-		assertMapContainsKeyValue(t, &tokenMap, keyCredentials, "1234")
-		assertMapContainsKeyValue(t, &tokenMap, keyRealm, "some_realm")
+			Expect(tokenMap).To(HaveLen(3))
+			Expect(tokenMap).To(HaveKeyWithValue(keyScheme, schemeBasic))
+			Expect(tokenMap).To(HaveKeyWithValue(keyPrincipal, "test"))
+			Expect(tokenMap).To(HaveKeyWithValue(keyCredentials, "1234"))
+		})
+
+		It("should include scheme, username, password and realm", func() {
+			token := BasicAuth("test", "1234", "a_realm")
+
+			tokenMap := token.tokens
+
+			Expect(tokenMap).To(HaveLen(4))
+			Expect(tokenMap).To(HaveKeyWithValue(keyScheme, schemeBasic))
+			Expect(tokenMap).To(HaveKeyWithValue(keyPrincipal, "test"))
+			Expect(tokenMap).To(HaveKeyWithValue(keyCredentials, "1234"))
+			Expect(tokenMap).To(HaveKeyWithValue(keyRealm, "a_realm"))
+		})
 	})
-}
 
-func TestKerberosAuth(t *testing.T) {
-	t.Run("should include provided ticket", func(t *testing.T) {
-		token := KerberosAuth("ticket_data")
+	Context("KerberosAuth", func() {
+		It("should include provided ticket", func() {
+			token := KerberosAuth("ticket_data")
 
-		tokenMap := token.tokens
+			tokenMap := token.tokens
 
-		assertNonNil(t, tokenMap)
-		assertLen(t, &tokenMap, 2)
-		assertMapContainsKeyValue(t, &tokenMap, keyScheme, schemeKerberos)
-		assertMapContainsKeyValue(t, &tokenMap, keyTicket, "ticket_data")
+			Expect(tokenMap).To(HaveLen(2))
+			Expect(tokenMap).To(HaveKeyWithValue(keyScheme, schemeKerberos))
+			Expect(tokenMap).To(HaveKeyWithValue(keyTicket, "ticket_data"))
+		})
 	})
-}
+})

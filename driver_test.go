@@ -20,137 +20,68 @@
 package neo4j
 
 import (
-	"testing"
+	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/ginkgo/extensions/table"
+	. "github.com/onsi/gomega"
 )
 
-func TestDriverTarget(t *testing.T) {
-	uri := "bolt://localhost:7687"
-	driver, err := NewDriver(uri, NoAuth())
-	assertNil(t, err)
+var _ = Describe("Driver", func() {
 
-	driverTarget := driver.Target()
-	if driverTarget.Scheme != "bolt" {
-		t.Errorf("driver.uri.scheme = %q", driver.Target().Scheme)
-	}
+	Context("Construction", func() {
+		It("Target should match provided URI", func() {
+			uri := "bolt://localhost:7687"
+			driver, err := NewDriver(uri, NoAuth())
+			Expect(err).To(BeNil())
 
-	if driverTarget.Hostname() != "localhost" {
-		t.Errorf("driver.uri.host = %q", driver.Target().Host)
-	}
+			driverTarget := driver.Target()
 
-	if driverTarget.Port() != "7687" {
-		t.Errorf("driver.uri.host = %q", driver.Target().Host)
-	}
-}
-
-func TestDriver_Session(t *testing.T) {
-	testCases := []struct {
-		name string
-		uri  string
-	}{
-		{"direct", "bolt://localhost:7687"},
-		//{"routing", "bolt+routing://localhost:7687"},
-	}
-
-	for _, testCase := range testCases {
-		t.Run(testCase.name, func(t *testing.T) {
-			verifySessionParameters(t, func() *Session {
-				driver, err := NewDriver(testCase.uri, NoAuth())
-				if err != nil {
-					t.Fatalf("unable to construct driver: %s", err)
-				}
-
-				session, err := driver.Session(AccessModeWrite)
-				if err != nil {
-					t.Fatalf("unable to obtain session: %s", err)
-				}
-
-				return session
-			}, AccessModeWrite, []string(nil))
+			Expect(driverTarget.Scheme).To(BeIdenticalTo("bolt"))
+			Expect(driverTarget.Hostname()).To(BeIdenticalTo("localhost"))
+			Expect(driverTarget.Port()).To(BeIdenticalTo("7687"))
 		})
-	}
-}
+	})
 
-func TestDriver_SessionWithAccessMode(t *testing.T) {
-	testCases := []struct {
-		name string
-		uri  string
-		mode AccessMode
-	}{
-		{"direct/read", "bolt://localhost:7687", AccessModeRead},
-		{"direct/write", "bolt://localhost:7687", AccessModeWrite},
-		//{"routing/read", "bolt+routing://localhost:7687", AccessModeRead},
-		//{"routing/write", "bolt+routing://localhost:7687", AccessModeWrite},
-	}
-
-	for _, testCase := range testCases {
-		t.Run(testCase.name, func(t *testing.T) {
-			verifySessionParameters(t, func() *Session {
-				driver, err := NewDriver(testCase.uri, NoAuth())
-				if err != nil {
-					t.Fatalf("unable to construct driver: %s", err)
-				}
-
-				session, err := driver.Session(testCase.mode)
-				if err != nil {
-					t.Fatalf("unable to obtain session: %s", err)
-				}
-
-				return session
-			}, testCase.mode, []string(nil))
-		})
-	}
-}
-
-func TestDirectDriver_SessionWithBookmark(t *testing.T) {
-	testCases := []struct {
-		name     string
-		uri      string
-		bookmark string
-	}{
-		{"direct/none", "bolt://localhost:7687", ""},
-		{"direct/b1", "bolt://localhost:7687", "B1"},
-		//{"routing/none", "bolt+routing://localhost:7687", ""},
-		//{"routing/b1", "bolt+routing://localhost:7687", "B1"},
-	}
-
-	for _, testCase := range testCases {
-		bookmarks := []string(nil)
-		if len(testCase.bookmark) > 0 {
-			bookmarks = append(bookmarks, testCase.bookmark)
+	Context("Session", func() {
+		type SessionTestCase struct {
+			uri       string
+			mode      AccessMode
+			bookmarks []string
 		}
 
-		t.Run(testCase.name, func(t *testing.T) {
-			verifySessionParameters(t, func() *Session {
-				driver, err := NewDriver(testCase.uri, NoAuth())
-				if err != nil {
-					t.Fatalf("unable to construct driver: %s", err)
-				}
+		DescribeTable("With Parameters", func(testCase SessionTestCase) {
+			driver, err := NewDriver(testCase.uri, NoAuth())
+			Expect(err).To(BeNil())
 
-				session, err := driver.Session(AccessModeWrite, testCase.bookmark)
-				if err != nil {
-					t.Fatalf("unable to obtain session: %s", err)
-				}
+			session, err := driver.Session(testCase.mode, testCase.bookmarks...)
+			Expect(err).To(BeNil())
 
-				return session
-			}, AccessModeWrite, bookmarks)
-		})
-	}
-}
-
-func verifySessionParameters(t *testing.T, sessionFactory func() *Session, expectedMode AccessMode, bookmarks []string) {
-	session := sessionFactory()
-
-	if session.accessMode != expectedMode {
-		t.Fatalf("expected session.accessMode [%d] to be %d", session.accessMode, expectedMode)
-	}
-
-	if len(session.bookmarks) != len(bookmarks) {
-		t.Fatalf("expected session.bookmarks to be of length %d", len(bookmarks))
-	}
-
-	for i, val := range bookmarks {
-		if val != session.bookmarks[i] {
-			t.Fatalf("expected session.bookmark[%d] to be %s, where it is %s", i, val, session.bookmarks[i])
-		}
-	}
-}
+			Expect(session.accessMode).To(BeIdenticalTo(testCase.mode))
+			Expect(session.bookmarks).To(HaveLen(len(testCase.bookmarks)))
+			Expect(session.bookmarks).To(ConsistOf(testCase.bookmarks))
+		}, Entry("direct/write/no_bookmark", SessionTestCase{
+			uri:       "bolt://localhost:7687",
+			mode:      AccessModeWrite,
+			bookmarks: []string(nil),
+		}), Entry("direct/read/no_bookmark", SessionTestCase{
+			uri:       "bolt://localhost:7687",
+			mode:      AccessModeRead,
+			bookmarks: []string(nil),
+		}), Entry("direct/write/one bookmark", SessionTestCase{
+			uri:       "bolt://localhost:7687",
+			mode:      AccessModeWrite,
+			bookmarks: []string{"B1"},
+		}), Entry("direct/read/one bookmark", SessionTestCase{
+			uri:       "bolt://localhost:7687",
+			mode:      AccessModeRead,
+			bookmarks: []string{"B1"},
+		}), Entry("direct/write/multiple bookmarks", SessionTestCase{
+			uri:       "bolt://localhost:7687",
+			mode:      AccessModeWrite,
+			bookmarks: []string{"B1", "B2"},
+		}), Entry("direct/read/multiple bookmarks", SessionTestCase{
+			uri:       "bolt://localhost:7687",
+			mode:      AccessModeRead,
+			bookmarks: []string{"B3", "B4"},
+		}))
+	})
+})
