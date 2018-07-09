@@ -72,4 +72,48 @@ var _ = Describe("Authentication Tokens", func() {
 			Expect(tokenMap).To(HaveKeyWithValue(keyTicket, "ticket_data"))
 		})
 	})
+
+	Context("CustomAuth", func() {
+		It("should include scheme, username, password", func() {
+			token := CustomAuth("custom", "un", "pw", "", nil)
+
+			tokenMap := token.tokens
+
+			Expect(tokenMap).To(HaveLen(3))
+			Expect(tokenMap).To(HaveKeyWithValue(keyScheme, "custom"))
+			Expect(tokenMap).To(HaveKeyWithValue(keyPrincipal, "un"))
+			Expect(tokenMap).To(HaveKeyWithValue(keyCredentials, "pw"))
+		})
+
+		It("should include scheme, username, password and realm", func() {
+			token := CustomAuth("custom", "un", "pw", "realm", nil)
+
+			tokenMap := token.tokens
+
+			Expect(tokenMap).To(HaveLen(4))
+			Expect(tokenMap).To(HaveKeyWithValue(keyScheme, "custom"))
+			Expect(tokenMap).To(HaveKeyWithValue(keyPrincipal, "un"))
+			Expect(tokenMap).To(HaveKeyWithValue(keyCredentials, "pw"))
+			Expect(tokenMap).To(HaveKeyWithValue(keyRealm, "realm"))
+		})
+
+		It("should include scheme, username, password, realm and parameters", func() {
+			token := CustomAuth("custom", "un", "pw", "realm", &map[string]interface{}{
+				"user_id":     "1234",
+				"user_emails": []string{"a@b.com", "b@c.com"},
+			})
+
+			tokenMap := token.tokens
+
+			Expect(tokenMap).To(HaveLen(5))
+			Expect(tokenMap).To(HaveKeyWithValue(keyScheme, "custom"))
+			Expect(tokenMap).To(HaveKeyWithValue(keyPrincipal, "un"))
+			Expect(tokenMap).To(HaveKeyWithValue(keyCredentials, "pw"))
+			Expect(tokenMap).To(HaveKeyWithValue(keyRealm, "realm"))
+			Expect(tokenMap).To(HaveKeyWithValue("parameters", map[string]interface{}{
+				"user_id":     "1234",
+				"user_emails": []string{"a@b.com", "b@c.com"},
+			}))
+		})
+	})
 })
