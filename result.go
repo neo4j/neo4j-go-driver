@@ -38,22 +38,14 @@ type Result struct {
 	resultCompleted bool
 }
 
-func extractIntValue(dict *map[string]interface{}, key string) int {
-	if value, ok := (*dict)[key]; ok {
-		return int(value.(int64))
-	}
-
-	return 0
-}
-
 func (result *Result) collectMetadata(metadata map[string]interface{}) {
 	if metadata != nil {
 		if resultAvailabilityTimer, ok := metadata["result_available_after"]; ok {
-			result.summary.resultAvailableAfter = time.Duration(resultAvailabilityTimer.(int64)) * time.Millisecond
+			result.summary.resultAvailableAfter = time.Duration(resultAvailabilityTimer.(int64)) / time.Millisecond
 		}
 
 		if resultConsumptionTimer, ok := metadata["result_consumed_after"]; ok {
-			result.summary.resultConsumedAfter = time.Duration(resultConsumptionTimer.(int64)) * time.Millisecond
+			result.summary.resultConsumedAfter = time.Duration(resultConsumptionTimer.(int64)) / time.Millisecond
 		}
 
 		if typeString, ok := metadata["type"]; ok {
@@ -67,25 +59,33 @@ func (result *Result) collectMetadata(metadata map[string]interface{}) {
 			case "s":
 				result.summary.statementType = StatementTypeSchemaWrite
 			default:
-				// TODO: Shall we expose this via Result.err?
+				result.summary.statementType = StatementTypeUnknown
 			}
 		}
 
 		if stats, ok := metadata["stats"]; ok {
 			if statsDict, ok := stats.(map[string]interface{}); ok {
-				result.summary.counters.nodesCreated = extractIntValue(&statsDict, "nodes-created")
-				result.summary.counters.nodesDeleted = extractIntValue(&statsDict, "nodes-deleted")
-				result.summary.counters.relationshipsCreated = extractIntValue(&statsDict, "relationships-created")
-				result.summary.counters.relationshipsDeleted = extractIntValue(&statsDict, "relationships-deleted")
-				result.summary.counters.propertiesSet = extractIntValue(&statsDict, "properties-set")
-				result.summary.counters.labelsAdded = extractIntValue(&statsDict, "labels-added")
-				result.summary.counters.labelsRemoved = extractIntValue(&statsDict, "labels-removed")
-				result.summary.counters.indexesAdded = extractIntValue(&statsDict, "indexes-added")
-				result.summary.counters.indexesRemoved = extractIntValue(&statsDict, "indexes-removed")
-				result.summary.counters.constraintsAdded = extractIntValue(&statsDict, "constraints-added")
-				result.summary.counters.constraintsRemoved = extractIntValue(&statsDict, "constraints-removed")
+				collectCounters(&statsDict, &result.summary.counters)
 			}
 		}
+
+		if plan, ok := metadata["plan"]; ok {
+			if plansDict, ok := plan.(map[string]interface{}); ok {
+				result.summary.plan = collectPlan(&plansDict)
+			}
+		}
+
+		if profile, ok := metadata["profile"]; ok {
+			if profileDict, ok := profile.(map[string]interface{}); ok {
+				result.summary.profile = collectProfile(&profileDict)
+			}
+		}
+
+        if notifications, ok := metadata["notifications"]; ok {
+            if notificationsList, ok := notifications.([]interface{}); ok {
+                collectNotification(&notificationsList, &result.summary.notifications)
+            }
+        }
 	}
 }
 
