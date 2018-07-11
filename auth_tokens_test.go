@@ -24,96 +24,173 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-var _ = Describe("Authentication Tokens", func() {
+var _ = Describe("AuthTokens", func() {
 	Context("NoAuth", func() {
-		It("should only contain scheme=none", func() {
-			token := NoAuth()
+		token := NoAuth()
 
-			tokenMap := token.tokens
+		tokenMap := token.tokens
 
+		It("should have 1 item", func() {
 			Expect(tokenMap).To(HaveLen(1))
+		})
+
+		It("should contain scheme=none", func() {
 			Expect(tokenMap).To(HaveKeyWithValue(keyScheme, schemeNone))
 		})
 	})
 
 	Context("BasicAuth", func() {
-		It("should include scheme, username and password only when realm is empty", func() {
+		Context("with username and password only", func() {
 			token := BasicAuth("test", "1234", "")
 
 			tokenMap := token.tokens
 
-			Expect(tokenMap).To(HaveLen(3))
-			Expect(tokenMap).To(HaveKeyWithValue(keyScheme, schemeBasic))
-			Expect(tokenMap).To(HaveKeyWithValue(keyPrincipal, "test"))
-			Expect(tokenMap).To(HaveKeyWithValue(keyCredentials, "1234"))
+			It("should have 3 items", func() {
+				Expect(tokenMap).To(HaveLen(3))
+			})
+
+			It("should contain scheme=basic", func() {
+				Expect(tokenMap).To(HaveKeyWithValue(keyScheme, schemeBasic))
+			})
+
+			It("should contain principal=test", func() {
+				Expect(tokenMap).To(HaveKeyWithValue(keyPrincipal, "test"))
+			})
+
+			It("should contain credentials=1234", func() {
+				Expect(tokenMap).To(HaveKeyWithValue(keyCredentials, "1234"))
+			})
 		})
 
-		It("should include scheme, username, password and realm", func() {
+		Context("with username, password and realm", func() {
 			token := BasicAuth("test", "1234", "a_realm")
 
 			tokenMap := token.tokens
 
-			Expect(tokenMap).To(HaveLen(4))
-			Expect(tokenMap).To(HaveKeyWithValue(keyScheme, schemeBasic))
-			Expect(tokenMap).To(HaveKeyWithValue(keyPrincipal, "test"))
-			Expect(tokenMap).To(HaveKeyWithValue(keyCredentials, "1234"))
-			Expect(tokenMap).To(HaveKeyWithValue(keyRealm, "a_realm"))
+			It("should have 4 items", func() {
+				Expect(tokenMap).To(HaveLen(4))
+			})
+
+			It("should contain scheme=basic", func() {
+				Expect(tokenMap).To(HaveKeyWithValue(keyScheme, schemeBasic))
+			})
+
+			It("should contain principal=test", func() {
+				Expect(tokenMap).To(HaveKeyWithValue(keyPrincipal, "test"))
+			})
+
+			It("should contain credentials=1234", func() {
+				Expect(tokenMap).To(HaveKeyWithValue(keyCredentials, "1234"))
+			})
+
+			It("should contain realm=a_realm", func() {
+				Expect(tokenMap).To(HaveKeyWithValue(keyRealm, "a_realm"))
+			})
 		})
 	})
 
 	Context("KerberosAuth", func() {
-		It("should include provided ticket", func() {
+		Context("with ticket data", func() {
 			token := KerberosAuth("ticket_data")
 
 			tokenMap := token.tokens
 
-			Expect(tokenMap).To(HaveLen(2))
-			Expect(tokenMap).To(HaveKeyWithValue(keyScheme, schemeKerberos))
-			Expect(tokenMap).To(HaveKeyWithValue(keyTicket, "ticket_data"))
+			It("should have 2 items", func() {
+				Expect(tokenMap).To(HaveLen(2))
+			})
+
+			It("should contain scheme=kerberos", func() {
+				Expect(tokenMap).To(HaveKeyWithValue(keyScheme, schemeKerberos))
+			})
+
+			It("should contain ticket=ticket_data", func() {
+				Expect(tokenMap).To(HaveKeyWithValue(keyTicket, "ticket_data"))
+			})
 		})
 	})
 
 	Context("CustomAuth", func() {
-		It("should include scheme, username, password", func() {
+		Context("with scheme, username and password", func() {
 			token := CustomAuth("custom", "un", "pw", "", nil)
 
 			tokenMap := token.tokens
 
-			Expect(tokenMap).To(HaveLen(3))
-			Expect(tokenMap).To(HaveKeyWithValue(keyScheme, "custom"))
-			Expect(tokenMap).To(HaveKeyWithValue(keyPrincipal, "un"))
-			Expect(tokenMap).To(HaveKeyWithValue(keyCredentials, "pw"))
+			It("should have 3 items", func() {
+				Expect(tokenMap).To(HaveLen(3))
+			})
+
+			It("should contain scheme=custom", func() {
+				Expect(tokenMap).To(HaveKeyWithValue(keyScheme, "custom"))
+			})
+
+			It("should contain principal=un", func() {
+				Expect(tokenMap).To(HaveKeyWithValue(keyPrincipal, "un"))
+			})
+
+			It("should contain credentials=pw", func() {
+				Expect(tokenMap).To(HaveKeyWithValue(keyCredentials, "pw"))
+			})
 		})
 
-		It("should include scheme, username, password and realm", func() {
+		Context("with scheme, username, password and realm", func() {
 			token := CustomAuth("custom", "un", "pw", "realm", nil)
 
 			tokenMap := token.tokens
 
-			Expect(tokenMap).To(HaveLen(4))
-			Expect(tokenMap).To(HaveKeyWithValue(keyScheme, "custom"))
-			Expect(tokenMap).To(HaveKeyWithValue(keyPrincipal, "un"))
-			Expect(tokenMap).To(HaveKeyWithValue(keyCredentials, "pw"))
-			Expect(tokenMap).To(HaveKeyWithValue(keyRealm, "realm"))
+			It("should have 4 items", func() {
+				Expect(tokenMap).To(HaveLen(4))
+			})
+
+			It("should contain scheme=custom", func() {
+				Expect(tokenMap).To(HaveKeyWithValue(keyScheme, "custom"))
+			})
+
+			It("should contain principal=un", func() {
+				Expect(tokenMap).To(HaveKeyWithValue(keyPrincipal, "un"))
+			})
+
+			It("should contain credentials=pw", func() {
+				Expect(tokenMap).To(HaveKeyWithValue(keyCredentials, "pw"))
+			})
+
+			It("should contain realm=realm", func() {
+				Expect(tokenMap).To(HaveKeyWithValue(keyRealm, "realm"))
+			})
 		})
 
-		It("should include scheme, username, password, realm and parameters", func() {
-			token := CustomAuth("custom", "un", "pw", "realm", &map[string]interface{}{
+		Context("with scheme, username, password, realm and parameters", func() {
+			params := map[string]interface{}{
 				"user_id":     "1234",
 				"user_emails": []string{"a@b.com", "b@c.com"},
-			})
+			}
+
+			token := CustomAuth("custom", "un", "pw", "realm", &params)
 
 			tokenMap := token.tokens
 
-			Expect(tokenMap).To(HaveLen(5))
-			Expect(tokenMap).To(HaveKeyWithValue(keyScheme, "custom"))
-			Expect(tokenMap).To(HaveKeyWithValue(keyPrincipal, "un"))
-			Expect(tokenMap).To(HaveKeyWithValue(keyCredentials, "pw"))
-			Expect(tokenMap).To(HaveKeyWithValue(keyRealm, "realm"))
-			Expect(tokenMap).To(HaveKeyWithValue("parameters", map[string]interface{}{
-				"user_id":     "1234",
-				"user_emails": []string{"a@b.com", "b@c.com"},
-			}))
+			It("should have 5 items", func() {
+				Expect(tokenMap).To(HaveLen(5))
+			})
+
+			It("should contain scheme=custom", func() {
+				Expect(tokenMap).To(HaveKeyWithValue(keyScheme, "custom"))
+			})
+
+			It("should contain principal=un", func() {
+				Expect(tokenMap).To(HaveKeyWithValue(keyPrincipal, "un"))
+			})
+
+			It("should contain credentials=pw", func() {
+				Expect(tokenMap).To(HaveKeyWithValue(keyCredentials, "pw"))
+			})
+
+			It("should contain realm=realm", func() {
+				Expect(tokenMap).To(HaveKeyWithValue(keyRealm, "realm"))
+			})
+
+			It("should contain parameters", func() {
+				Expect(tokenMap).To(HaveKeyWithValue("parameters", params))
+			})
 		})
 	})
 })

@@ -27,61 +27,74 @@ import (
 
 var _ = Describe("Driver", func() {
 
-	Context("Construction", func() {
-		It("Target should match provided URI", func() {
-			uri := "bolt://localhost:7687"
-			driver, err := NewDriver(uri, NoAuth())
+	When("constructed with bolt://localhost:7687", func() {
+		uri := "bolt://localhost:7687"
+		driver, err := NewDriver(uri, NoAuth())
+
+		It("no errors should be returned", func() {
 			Expect(err).To(BeNil())
+		})
 
-			driverTarget := driver.Target()
+		driverTarget := driver.Target()
 
+		It("target scheme should be bolt", func() {
 			Expect(driverTarget.Scheme).To(BeIdenticalTo("bolt"))
+		})
+
+		It("target hostname should be localhost", func() {
 			Expect(driverTarget.Hostname()).To(BeIdenticalTo("localhost"))
+		})
+
+		It("target port should be 7687", func() {
 			Expect(driverTarget.Port()).To(BeIdenticalTo("7687"))
 		})
 	})
 
-	Context("Session", func() {
-		type SessionTestCase struct {
-			uri       string
-			mode      AccessMode
-			bookmarks []string
-		}
+	Context("session should satisfy restrictions", func() {
+		When("it is constructed", func() {
+			type SessionTestCase struct {
+				uri       string
+				mode      AccessMode
+				bookmarks []string
+			}
 
-		DescribeTable("With Parameters", func(testCase SessionTestCase) {
-			driver, err := NewDriver(testCase.uri, NoAuth())
-			Expect(err).To(BeNil())
+			DescribeTable("on direct driver with parameters", func(testCase SessionTestCase) {
+				driver, err := NewDriver(testCase.uri, NoAuth())
+				Expect(err).To(BeNil())
 
-			session, err := driver.Session(testCase.mode, testCase.bookmarks...)
-			Expect(err).To(BeNil())
+				session, err := driver.Session(testCase.mode, testCase.bookmarks...)
+				Expect(err).To(BeNil())
 
-			Expect(session.accessMode).To(BeIdenticalTo(testCase.mode))
-			Expect(session.bookmarks).To(HaveLen(len(testCase.bookmarks)))
-			Expect(session.bookmarks).To(ConsistOf(testCase.bookmarks))
-		}, Entry("direct/write/no_bookmark", SessionTestCase{
-			uri:       "bolt://localhost:7687",
-			mode:      AccessModeWrite,
-			bookmarks: []string(nil),
-		}), Entry("direct/read/no_bookmark", SessionTestCase{
-			uri:       "bolt://localhost:7687",
-			mode:      AccessModeRead,
-			bookmarks: []string(nil),
-		}), Entry("direct/write/one bookmark", SessionTestCase{
-			uri:       "bolt://localhost:7687",
-			mode:      AccessModeWrite,
-			bookmarks: []string{"B1"},
-		}), Entry("direct/read/one bookmark", SessionTestCase{
-			uri:       "bolt://localhost:7687",
-			mode:      AccessModeRead,
-			bookmarks: []string{"B1"},
-		}), Entry("direct/write/multiple bookmarks", SessionTestCase{
-			uri:       "bolt://localhost:7687",
-			mode:      AccessModeWrite,
-			bookmarks: []string{"B1", "B2"},
-		}), Entry("direct/read/multiple bookmarks", SessionTestCase{
-			uri:       "bolt://localhost:7687",
-			mode:      AccessModeRead,
-			bookmarks: []string{"B3", "B4"},
-		}))
+				Expect(session.accessMode).To(BeIdenticalTo(testCase.mode))
+
+				Expect(session.bookmarks).To(HaveLen(len(testCase.bookmarks)))
+				Expect(session.bookmarks).To(ConsistOf(testCase.bookmarks))
+			}, Entry("(write, no_bookmark)", SessionTestCase{
+				uri:       "bolt://localhost:7687",
+				mode:      AccessModeWrite,
+				bookmarks: []string(nil),
+			}), Entry("(read, no_bookmark)", SessionTestCase{
+				uri:       "bolt://localhost:7687",
+				mode:      AccessModeRead,
+				bookmarks: []string(nil),
+			}), Entry("(write, one bookmark)", SessionTestCase{
+				uri:       "bolt://localhost:7687",
+				mode:      AccessModeWrite,
+				bookmarks: []string{"B1"},
+			}), Entry("(read, one bookmark)", SessionTestCase{
+				uri:       "bolt://localhost:7687",
+				mode:      AccessModeRead,
+				bookmarks: []string{"B1"},
+			}), Entry("(write, multiple bookmarks)", SessionTestCase{
+				uri:       "bolt://localhost:7687",
+				mode:      AccessModeWrite,
+				bookmarks: []string{"B1", "B2"},
+			}), Entry("(read, multiple bookmarks)", SessionTestCase{
+				uri:       "bolt://localhost:7687",
+				mode:      AccessModeRead,
+				bookmarks: []string{"B3", "B4"},
+			}))
+
+		})
 	})
 })

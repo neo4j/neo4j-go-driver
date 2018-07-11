@@ -17,35 +17,16 @@
  * limitations under the License.
  */
 
-package neo4j
+package integration_tests_test
 
 import (
+	"testing"
+
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-	"time"
 )
 
-var _ = Describe("Config", func() {
-	Context("DefaultConfig", func() {
-		config := defaultConfig()
-
-		It("should have encryption turned on", func() {
-			Expect(config.Encrypted).To(BeTrue())
-		})
-
-		It("should have max transaction retry duration as 30s", func() {
-			Expect(config.MaxTransactionRetryDuration).To(BeIdenticalTo(30 * time.Second))
-		})
-
-		It("should have non-nil logger", func() {
-			Expect(config.Log).NotTo(BeNil())
-		})
-
-		It("should have an internalLogger logger with level set to 0", func() {
-			logger, ok := config.Log.(*internalLogger)
-			Expect(ok).To(BeTrue())
-
-			Expect(logger.level).To(BeZero())
-		})
-	})
-})
+func TestIntegrationTests(t *testing.T) {
+	RegisterFailHandler(Fail)
+	RunSpecs(t, "IntegrationTests Suite")
+}

@@ -20,8 +20,7 @@
 package neo4j
 
 import (
-	"github.com/neo4j-drivers/neo4j-go-connector"
-	"github.com/neo4j/neo4j-go-driver/internal/testing"
+	. "github.com/neo4j/neo4j-go-driver/internal/testing"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/ginkgo/extensions/table"
 	. "github.com/onsi/gomega"
@@ -34,7 +33,7 @@ var _ = Describe("Direct Driver with Stub Server", func() {
 	}
 
 	DescribeTable("stub tests", func(testCase TestCase) {
-		stub := drivertest.NewStubServer(9001, testCase.script)
+		stub := NewStubServer(9001, testCase.script)
 		defer stub.Close()
 
 		testCase.testFunc()
@@ -65,9 +64,8 @@ func consumeShouldFailOnServerDisconnects() {
 
 	summary, err := result.Consume()
 
-	Expect(summary).To(BeNil())
-	Expect(err).ToNot(BeNil())
-	Expect(seabolt.IsServiceUnavailable(err)).To(BeTrue())
+	Expect(err).To(BeServiceUnavailableError())
+	Expect(summary).ToNot(BeNil())
 }
 
 func shouldExecuteReturn1() {

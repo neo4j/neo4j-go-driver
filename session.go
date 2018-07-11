@@ -128,7 +128,7 @@ func (session *Session) WriteTransaction(work TransactionWork) (interface{}, err
 
 // Run executes an auto-commit statement and returns a result
 func (session *Session) Run(cypher string, params *map[string]interface{}) (*Result, error) {
-	return session.runStatement(NewStatementWithParams(cypher, params))
+	return session.runStatement(&Statement{cypher: cypher, params: params})
 }
 
 // Close closes any open resources and marks this session as unusable

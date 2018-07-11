@@ -17,35 +17,37 @@
  * limitations under the License.
  */
 
-package neo4j
+package integration_tests
 
 import (
+	. "github.com/neo4j/neo4j-go-driver"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-	"time"
 )
 
-var _ = Describe("Config", func() {
-	Context("DefaultConfig", func() {
-		config := defaultConfig()
+const (
+	SingleInstanceUri string = "bolt://localhost:7687"
+	Username          string = "neo4j"
+	Password          string = "password"
+)
 
-		It("should have encryption turned on", func() {
-			Expect(config.Encrypted).To(BeTrue())
-		})
+var _ = BeforeSuite(func() {
+	driver, err := NewDriver(SingleInstanceUri, BasicAuth(Username, Password, ""))
+	if err != nil {
+		Expect(err).To(BeNil())
+	}
 
-		It("should have max transaction retry duration as 30s", func() {
-			Expect(config.MaxTransactionRetryDuration).To(BeIdenticalTo(30 * time.Second))
-		})
+	session, err := driver.Session(AccessModeRead)
+	if err != nil {
+		Expect(err).To(BeNil())
+	}
 
-		It("should have non-nil logger", func() {
-			Expect(config.Log).NotTo(BeNil())
-		})
+	result, err := session.Run("MATCH (n) DETACH DELETE n", nil)
+	if err != nil {
+		Expect(err).To(BeNil())
+	}
 
-		It("should have an internalLogger logger with level set to 0", func() {
-			logger, ok := config.Log.(*internalLogger)
-			Expect(ok).To(BeTrue())
-
-			Expect(logger.level).To(BeZero())
-		})
-	})
+	if _, err := result.Consume(); err != nil {
+		Expect(err).To(BeNil())
+	}
 })

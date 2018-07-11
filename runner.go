@@ -95,6 +95,12 @@ func (runner *statementRunner) receive() (*Result, error) {
 			return nil, errors.New("unexpected response received while waiting for a METADATA")
 		}
 
+		fields, err := runner.connection.Fields()
+		if err != nil {
+			return nil, err
+		}
+		activeResult.keys = fields
+
 		metadata, err := runner.connection.Metadata()
 		if err != nil {
 			return nil, err
@@ -175,6 +181,13 @@ func (runner *statementRunner) runStatement(statement Statement) (*Result, error
 		runner:       runner,
 		runHandle:    runHandle,
 		resultHandle: pullAllHandle,
+		summary: ResultSummary{
+			statement: statement,
+			server: ServerInfo{
+				address: runner.connection.RemoteAddress(),
+				version: runner.connection.Server(),
+			},
+		},
 	}
 
 	runner.pendingResults = append(runner.pendingResults, result)

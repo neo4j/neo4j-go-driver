@@ -51,6 +51,8 @@ var _ = Describe("Runner", func() {
 				mockConnection.EXPECT().Run("RETURN 1", nil).Times(1),
 				mockConnection.EXPECT().PullAll().Times(1),
 				mockConnection.EXPECT().Flush().Times(1),
+				mockConnection.EXPECT().RemoteAddress(),
+				mockConnection.EXPECT().Server(),
 			)
 
 			_, err := runner.runStatement(Statement{cypher: "RETURN 1"})

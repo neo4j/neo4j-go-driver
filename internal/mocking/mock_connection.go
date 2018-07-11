@@ -54,6 +54,30 @@ func (m *MockConnection) EXPECT() *MockConnectionMockRecorder {
 	return m.recorder
 }
 
+// RemoteAddress connector-mocks base method
+func (m *MockConnection) RemoteAddress() string {
+	ret := m.ctrl.Call(m, "RemoteAddress")
+	ret0, _ := ret[0].(string)
+	return ret0
+}
+
+// RemoteAddress indicates an expected call of RemoteAddress
+func (mr *MockConnectionMockRecorder) RemoteAddress() *gomock.Call {
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RemoteAddress", reflect.TypeOf((*MockConnection)(nil).RemoteAddress))
+}
+
+// Server connector-mocks base method
+func (m *MockConnection) Server() string {
+	ret := m.ctrl.Call(m, "Server")
+	ret0, _ := ret[0].(string)
+	return ret0
+}
+
+// Server indicates an expected call of Server
+func (mr *MockConnectionMockRecorder) Server() *gomock.Call {
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Server", reflect.TypeOf((*MockConnection)(nil).Server))
+}
+
 // Begin connector-mocks base method
 func (m *MockConnection) Begin(arg0 []string) (seabolt.RequestHandle, error) {
 	ret := m.ctrl.Call(m, "Begin", arg0)
@@ -166,6 +190,19 @@ func (m *MockConnection) LastBookmark() string {
 // LastBookmark indicates an expected call of LastBookmark
 func (mr *MockConnectionMockRecorder) LastBookmark() *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "LastBookmark", reflect.TypeOf((*MockConnection)(nil).LastBookmark))
+}
+
+// Metadata connector-mocks base method
+func (m *MockConnection) Fields() ([]string, error) {
+	ret := m.ctrl.Call(m, "Fields")
+	ret0, _ := ret[0].([]string)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// Metadata indicates an expected call of Metadata
+func (mr *MockConnectionMockRecorder) Fields() *gomock.Call {
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Fields", reflect.TypeOf((*MockConnection)(nil).Fields))
 }
 
 // Metadata connector-mocks base method

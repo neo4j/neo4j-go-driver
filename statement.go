@@ -27,21 +27,18 @@ type Statement struct {
 	params *map[string]interface{}
 }
 
+func (statement *Statement) Cypher() string {
+	return statement.cypher
+}
+
+func (statement *Statement) Params() *map[string]interface{} {
+	return statement.params
+}
+
 func (statement *Statement) validate() error {
 	if len(statement.cypher) == 0 {
 		return errors.New("cypher statement should not be empty")
 	}
 
 	return nil
-}
-
-// NewStatement creates a new Statement instance with given cypher statement
-func NewStatement(cypher string) *Statement {
-	return &Statement{cypher: cypher}
-}
-
-// NewStatementWithParams creates a new Statement instance with given cypher statement
-// and parameters
-func NewStatementWithParams(cypher string, params *map[string]interface{}) *Statement {
-	return &Statement{cypher: cypher, params: params}
 }

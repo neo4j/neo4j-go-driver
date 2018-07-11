@@ -21,6 +21,7 @@ package neo4j
 
 import (
 	"github.com/neo4j-drivers/neo4j-go-connector"
+	"time"
 )
 
 // Result provides access to the result of the executing statement
@@ -47,16 +48,12 @@ func extractIntValue(dict *map[string]interface{}, key string) int {
 
 func (result *Result) collectMetadata(metadata map[string]interface{}) {
 	if metadata != nil {
-		if fields, ok := metadata["fields"]; ok {
-			result.keys = fields.([]string)
-		}
-
 		if resultAvailabilityTimer, ok := metadata["result_available_after"]; ok {
-			result.summary.resultsAvailableAfter = resultAvailabilityTimer.(int64)
+			result.summary.resultAvailableAfter = time.Duration(resultAvailabilityTimer.(int64)) * time.Millisecond
 		}
 
 		if resultConsumptionTimer, ok := metadata["result_consumed_after"]; ok {
-			result.summary.resultsConsumedAfter = resultConsumptionTimer.(int64)
+			result.summary.resultConsumedAfter = time.Duration(resultConsumptionTimer.(int64)) * time.Millisecond
 		}
 
 		if typeString, ok := metadata["type"]; ok {
@@ -112,6 +109,10 @@ func (result *Result) Keys() ([]string, error) {
 
 // Next returns true only if there is a record to be processed
 func (result *Result) Next() bool {
+	if result.err != nil {
+		return false
+	}
+
 	for !result.runCompleted {
 		_, err := result.runner.receive()
 		if err != nil {
@@ -152,25 +153,23 @@ func (result *Result) Record() *Record {
 
 // Summary returns the summary information about the statement execution
 func (result *Result) Summary() (*ResultSummary, error) {
-	for !result.resultCompleted {
-		_, err := result.runner.receive()
-		if err != nil {
-			return nil, err
+	for result.err == nil && !result.resultCompleted {
+		if _, err := result.runner.receive(); err != nil {
+			result.err = err
+
+			break
 		}
 	}
 
-	return &result.summary, nil
+	return &result.summary, result.err
 }
 
 // Consume consumes the entire result and returns the summary information
 // about the statement execution
 func (result *Result) Consume() (*ResultSummary, error) {
-	for !result.resultCompleted {
-		_, err := result.runner.receive()
-		if err != nil {
-			return nil, err
-		}
+	for result.Next() {
+
 	}
 
-	return &result.summary, nil
+	return &result.summary, result.err
 }
