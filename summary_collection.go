@@ -66,6 +66,10 @@ func extractStringValue(dict *map[string]interface{}, key string, defaultValue s
 }
 
 func collectCounters(dict *map[string]interface{}, counters *Counters) {
+    if dict == nil {
+        return
+    }
+
 	counters.nodesCreated = int(extractIntValue(dict, "nodes-created", 0))
 	counters.nodesDeleted = int(extractIntValue(dict, "nodes-deleted", 0))
 	counters.relationshipsCreated = int(extractIntValue(dict, "relationships-created", 0))
@@ -80,6 +84,10 @@ func collectCounters(dict *map[string]interface{}, counters *Counters) {
 }
 
 func collectNotification(list *[]interface{}, target *[]Notification) {
+    if list == nil {
+        return
+    }
+
 	notificationsList := *list
 
 	notifications := make([]Notification, len(notificationsList))
@@ -113,14 +121,18 @@ func collectNotification(list *[]interface{}, target *[]Notification) {
 }
 
 func collectPlan(dict *map[string]interface{}) *Plan {
-	var (
+    var (
 		operationType string
 		args          map[string]interface{}
 		identifiers   []string
 		children      []Plan
 	)
 
-	plansDict := *dict
+    if dict == nil {
+        return nil
+    }
+
+    plansDict := *dict
 	operationType = extractStringValue(dict, "operatorType", "")
 
 	if argsValue, ok := plansDict["args"]; ok {
@@ -161,6 +173,10 @@ func collectProfile(dict *map[string]interface{}) *ProfiledPlan {
 		records       int64
 		children      []ProfiledPlan
 	)
+
+	if dict == nil {
+	    return nil
+    }
 
 	plansDict := *dict
 	operationType = extractStringValue(dict, "operatorType", "")
