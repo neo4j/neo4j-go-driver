@@ -81,11 +81,11 @@ func (result *Result) collectMetadata(metadata map[string]interface{}) {
 			}
 		}
 
-        if notifications, ok := metadata["notifications"]; ok {
-            if notificationsList, ok := notifications.([]interface{}); ok {
-                collectNotification(&notificationsList, &result.summary.notifications)
-            }
-        }
+		if notifications, ok := metadata["notifications"]; ok {
+			if notificationsList, ok := notifications.([]interface{}); ok {
+				collectNotification(&notificationsList, &result.summary.notifications)
+			}
+		}
 	}
 }
 

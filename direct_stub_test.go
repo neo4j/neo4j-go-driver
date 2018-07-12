@@ -20,36 +20,38 @@
 package neo4j
 
 import (
-	. "github.com/neo4j/neo4j-go-driver/internal/testing"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/ginkgo/extensions/table"
 	. "github.com/onsi/gomega"
+
+	. "github.com/neo4j/neo4j-go-driver/internal/testing"
 )
 
-var _ = Describe("Direct Driver with Stub Server", func() {
-	type TestCase struct {
-		script   string
-		testFunc func()
-	}
+var _ = Describe("Direct Driver", func() {
+	Context("with Stub Server", func() {
+		type TestCase struct {
+			script   string
+			testFunc func()
+		}
 
-	DescribeTable("stub tests", func(testCase TestCase) {
-		stub := NewStubServer(9001, testCase.script)
-		defer stub.Close()
+		DescribeTable("", func(testCase TestCase) {
+			stub := NewStubServer(9001, testCase.script)
+			defer stub.Close()
 
-		testCase.testFunc()
+			testCase.testFunc()
 
-		Expect(stub.Finished()).To(BeTrue())
-	}, Entry("should return error when server disconnects after RUN", TestCase{
-		script:   "disconnect_on_run.script",
-		testFunc: consumeShouldFailOnServerDisconnects,
-	}), Entry("should return error when server disconnects after PULL_ALL", TestCase{
-		script:   "disconnect_on_pull_all.script",
-		testFunc: consumeShouldFailOnServerDisconnects,
-	}), Entry("should execute simple query", TestCase{
-		script:   "return_1.script",
-		testFunc: shouldExecuteReturn1,
-	}))
-
+			Expect(stub.Finished()).To(BeTrue())
+		}, Entry("should return error when server disconnects after RUN", TestCase{
+			script:   "disconnect_on_run.script",
+			testFunc: consumeShouldFailOnServerDisconnects,
+		}), Entry("should return error when server disconnects after PULL_ALL", TestCase{
+			script:   "disconnect_on_pull_all.script",
+			testFunc: consumeShouldFailOnServerDisconnects,
+		}), Entry("should execute simple query", TestCase{
+			script:   "return_1.script",
+			testFunc: shouldExecuteReturn1,
+		}))
+	})
 })
 
 func consumeShouldFailOnServerDisconnects() {

@@ -25,9 +25,9 @@ import (
 )
 
 func extractIntValue(dict *map[string]interface{}, key string, defaultValue int64) int64 {
-    if dict == nil {
-        return defaultValue
-    }
+	if dict == nil {
+		return defaultValue
+	}
 
 	if value, ok := (*dict)[key]; ok {
 		if valueAsLong, ok := value.(int64); ok {
@@ -46,17 +46,17 @@ func extractIntValue(dict *map[string]interface{}, key string, defaultValue int6
 }
 
 func extractStringValue(dict *map[string]interface{}, key string, defaultValue string) string {
-    if dict == nil {
-        return defaultValue
-    }
+	if dict == nil {
+		return defaultValue
+	}
 
 	if value, ok := (*dict)[key]; ok {
 		if valueAsStr, ok := value.(string); ok {
 			return valueAsStr
 		} else {
-		    if isNil(value) {
-		        return defaultValue
-            }
+			if isNil(value) {
+				return defaultValue
+			}
 
 			return fmt.Sprintf("%v", value)
 		}
@@ -66,9 +66,9 @@ func extractStringValue(dict *map[string]interface{}, key string, defaultValue s
 }
 
 func collectCounters(dict *map[string]interface{}, counters *Counters) {
-    if dict == nil {
-        return
-    }
+	if dict == nil {
+		return
+	}
 
 	counters.nodesCreated = int(extractIntValue(dict, "nodes-created", 0))
 	counters.nodesDeleted = int(extractIntValue(dict, "nodes-deleted", 0))
@@ -84,9 +84,9 @@ func collectCounters(dict *map[string]interface{}, counters *Counters) {
 }
 
 func collectNotification(list *[]interface{}, target *[]Notification) {
-    if list == nil {
-        return
-    }
+	if list == nil {
+		return
+	}
 
 	notificationsList := *list
 
@@ -121,18 +121,18 @@ func collectNotification(list *[]interface{}, target *[]Notification) {
 }
 
 func collectPlan(dict *map[string]interface{}) *Plan {
-    var (
+	var (
 		operationType string
 		args          map[string]interface{}
 		identifiers   []string
 		children      []Plan
 	)
 
-    if dict == nil {
-        return nil
-    }
+	if dict == nil {
+		return nil
+	}
 
-    plansDict := *dict
+	plansDict := *dict
 	operationType = extractStringValue(dict, "operatorType", "")
 
 	if argsValue, ok := plansDict["args"]; ok {
@@ -175,8 +175,8 @@ func collectProfile(dict *map[string]interface{}) *ProfiledPlan {
 	)
 
 	if dict == nil {
-	    return nil
-    }
+		return nil
+	}
 
 	plansDict := *dict
 	operationType = extractStringValue(dict, "operatorType", "")

@@ -20,11 +20,11 @@
 package neo4j
 
 import (
-    "reflect"
+	"reflect"
 )
 
 func isNil(value interface{}) bool {
-    return value == nil || (reflect.ValueOf(value).Kind() == reflect.Ptr && !reflect.ValueOf(value).IsNil())
+	return value == nil || (reflect.ValueOf(value).Kind() == reflect.Ptr && !reflect.ValueOf(value).IsNil())
 }
 
 func filter(vs []string, f func(string) bool) []string {

@@ -26,7 +26,7 @@ import (
 )
 
 var _ = Describe("Config", func() {
-	Context("DefaultConfig", func() {
+	Context("defaultConfig", func() {
 		config := defaultConfig()
 
 		It("should have encryption turned on", func() {

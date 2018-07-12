@@ -20,21 +20,21 @@
 package integration_tests_test
 
 import (
-    "os"
-    "testing"
+	"os"
+	"testing"
 
 	. "github.com/onsi/ginkgo"
-    "github.com/onsi/ginkgo/reporters"
-    . "github.com/onsi/gomega"
+	"github.com/onsi/ginkgo/reporters"
+	. "github.com/onsi/gomega"
 )
 
 func TestIntegrationTests(t *testing.T) {
 	RegisterFailHandler(Fail)
 
-    customReporters := []Reporter(nil)
-    if os.Getenv("TEAMCITY_VERSION") != "" {
-        customReporters = append(customReporters, reporters.NewTeamCityReporter(os.Stdout))
-    }
+	customReporters := []Reporter(nil)
+	if os.Getenv("TEAMCITY_VERSION") != "" {
+		customReporters = append(customReporters, reporters.NewTeamCityReporter(os.Stdout))
+	}
 
-    RunSpecsWithDefaultAndCustomReporters(t, "Neo4j Go Driver Integration Tests", customReporters)
+	RunSpecsWithDefaultAndCustomReporters(t, "Neo4j Go Driver Integration Tests", customReporters)
 }

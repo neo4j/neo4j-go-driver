@@ -20,18 +20,18 @@
 package drivertest
 
 import (
-    "runtime"
-    "path"
+	"path"
+	"runtime"
 )
 
 func GetExecutingFile() string {
-    if _, file, _, ok := runtime.Caller(1); ok {
-        return file
-    }
+	if _, file, _, ok := runtime.Caller(1); ok {
+		return file
+	}
 
-    return ""
+	return ""
 }
 
 func GetExecutingFilesDir() string {
-    return path.Dir(GetExecutingFile())
+	return path.Dir(GetExecutingFile())
 }

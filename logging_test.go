@@ -38,8 +38,8 @@ var _ = Describe("Logging", func() {
 		mockCtrl.Finish()
 	})
 
-	Describe("errorf", func() {
-		Context("when Error level is not enabled", func() {
+	Context("errorf", func() {
+		When("Error level is not enabled", func() {
 			It("should not invoke Errorf on logger", func() {
 				logging := mocking.NewMockLogging(mockCtrl)
 
@@ -50,7 +50,7 @@ var _ = Describe("Logging", func() {
 			})
 		})
 
-		Context("when Error level is enabled", func() {
+		When("Error level is enabled", func() {
 			It("should invoke Errorf on logger", func() {
 				logging := mocking.NewMockLogging(mockCtrl)
 
@@ -63,8 +63,8 @@ var _ = Describe("Logging", func() {
 		})
 	})
 
-	Describe("warningf", func() {
-		Context("when Warning level is not enabled", func() {
+	Context("warningf", func() {
+		When("Warning level is not enabled", func() {
 			It("should not invoke Warningf on logger", func() {
 				logging := mocking.NewMockLogging(mockCtrl)
 
@@ -75,7 +75,7 @@ var _ = Describe("Logging", func() {
 			})
 		})
 
-		Context("when Warning level is enabled", func() {
+		When("Warning level is enabled", func() {
 			It("should invoke Warningf on logger", func() {
 				logging := mocking.NewMockLogging(mockCtrl)
 
@@ -87,8 +87,8 @@ var _ = Describe("Logging", func() {
 		})
 	})
 
-	Describe("infof", func() {
-		Context("when Info level is not enabled", func() {
+	Context("infof", func() {
+		When("Info level is not enabled", func() {
 			It("should not invoke Infof on logger", func() {
 				logging := mocking.NewMockLogging(mockCtrl)
 
@@ -99,7 +99,7 @@ var _ = Describe("Logging", func() {
 			})
 		})
 
-		Context("when Warning level is enabled", func() {
+		When("Info level is enabled", func() {
 			It("should invoke Infof on logger", func() {
 				logging := mocking.NewMockLogging(mockCtrl)
 
@@ -111,8 +111,8 @@ var _ = Describe("Logging", func() {
 		})
 	})
 
-	Describe("debugf", func() {
-		Context("when Debug level is not enabled", func() {
+	Context("debugf", func() {
+		When("Debug level is not enabled", func() {
 			It("should not invoke Debugf on logger", func() {
 				logging := mocking.NewMockLogging(mockCtrl)
 
@@ -123,7 +123,7 @@ var _ = Describe("Logging", func() {
 			})
 		})
 
-		Context("when Debug level is not enabled", func() {
+		When("Debug level is enabled", func() {
 			It("should invoke Debugf on logger", func() {
 				logging := mocking.NewMockLogging(mockCtrl)
 

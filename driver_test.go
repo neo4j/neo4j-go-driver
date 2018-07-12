@@ -37,28 +37,30 @@ var _ = Describe("Driver", func() {
 
 		driverTarget := driver.Target()
 
-		It("target scheme should be bolt", func() {
-			Expect(driverTarget.Scheme).To(BeIdenticalTo("bolt"))
-		})
+		Context("driver's", func() {
+			It("target scheme should be bolt", func() {
+				Expect(driverTarget.Scheme).To(BeIdenticalTo("bolt"))
+			})
 
-		It("target hostname should be localhost", func() {
-			Expect(driverTarget.Hostname()).To(BeIdenticalTo("localhost"))
-		})
+			It("target hostname should be localhost", func() {
+				Expect(driverTarget.Hostname()).To(BeIdenticalTo("localhost"))
+			})
 
-		It("target port should be 7687", func() {
-			Expect(driverTarget.Port()).To(BeIdenticalTo("7687"))
+			It("target port should be 7687", func() {
+				Expect(driverTarget.Port()).To(BeIdenticalTo("7687"))
+			})
 		})
 	})
 
-	Context("session should satisfy restrictions", func() {
-		When("it is constructed", func() {
+	Describe("Session", func() {
+		When("constructed", func() {
 			type SessionTestCase struct {
 				uri       string
 				mode      AccessMode
 				bookmarks []string
 			}
 
-			DescribeTable("on direct driver with parameters", func(testCase SessionTestCase) {
+			DescribeTable("should conform to given parameters", func(testCase SessionTestCase) {
 				driver, err := NewDriver(testCase.uri, NoAuth())
 				Expect(err).To(BeNil())
 
