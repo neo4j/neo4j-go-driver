@@ -20,19 +20,40 @@
 package integration_tests
 
 import (
-	. "github.com/neo4j/neo4j-go-driver"
+    "fmt"
+    "os"
+
+    . "github.com/neo4j/neo4j-go-driver"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
 
-const (
-	SingleInstanceUri string = "bolt://localhost:7687"
-	Username          string = "neo4j"
-	Password          string = "password"
+var (
+	singleInstanceUri string = "bolt://localhost:7687"
+	username          string = "neo4j"
+	password          string = "password"
 )
 
+func init()  {
+    boltPort := os.Getenv("BOLT_PORT")
+    boltUsername := os.Getenv("BOLT_USERNAME")
+    boltPassword := os.Getenv("BOLT_PASSWORD")
+
+    if boltPort != "" {
+        singleInstanceUri = fmt.Sprintf("bolt://localhost:%s", boltPort)
+    }
+
+    if boltUsername != "" {
+        username = boltUsername
+    }
+
+    if boltPassword != "" {
+        password = boltPassword
+    }
+}
+
 var _ = BeforeSuite(func() {
-	driver, err := NewDriver(SingleInstanceUri, BasicAuth(Username, Password, ""))
+	driver, err := NewDriver(singleInstanceUri, BasicAuth(username, password, ""))
 	if err != nil {
 		Expect(err).To(BeNil())
 	}

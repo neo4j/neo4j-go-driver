@@ -38,7 +38,7 @@ var _ = Describe("SessionIT", func() {
 		)
 
 		BeforeEach(func() {
-			driver, err = NewDriver(SingleInstanceUri, BasicAuth(Username, Password, ""))
+			driver, err = NewDriver(singleInstanceUri, BasicAuth(username, password, ""))
 			if err != nil {
 				Expect(err).To(BeNil())
 			}
@@ -152,7 +152,7 @@ var _ = Describe("SessionIT", func() {
 		)
 
 		BeforeEach(func() {
-			driver, err = NewDriver(SingleInstanceUri, BasicAuth(Username, Password, ""))
+			driver, err = NewDriver(singleInstanceUri, BasicAuth(username, password, ""))
 			if err != nil {
 				Expect(err).To(BeNil())
 			}
