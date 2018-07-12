@@ -21,18 +21,19 @@ package neo4j
 
 import (
 	. "github.com/onsi/ginkgo"
-	"github.com/onsi/ginkgo/reporters"
-	. "github.com/onsi/gomega"
-	"os"
-	"testing"
+    "github.com/onsi/ginkgo/reporters"
+    . "github.com/onsi/gomega"
+    "os"
+    "testing"
 )
 
 func TestDriver(t *testing.T) {
 	RegisterFailHandler(Fail)
 
+	customReporters := []Reporter(nil)
 	if os.Getenv("TEAMCITY_VERSION") != "" {
-		RunSpecsWithCustomReporters(t, "Neo4j Go Driver Unit Tests", []Reporter{reporters.NewTeamCityReporter(os.Stdout)})
-	} else {
-		RunSpecs(t, "Neo4j Go Driver Unit Tests")
-	}
+        customReporters = append(customReporters, reporters.NewTeamCityReporter(os.Stdout))
+    }
+
+	RunSpecsWithDefaultAndCustomReporters(t, "Neo4j Go Driver Unit Tests", customReporters)
 }
