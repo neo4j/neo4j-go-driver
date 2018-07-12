@@ -26,8 +26,6 @@ import (
 	"os"
 	"os/exec"
 	"path"
-	"runtime"
-	"syscall"
 	"time"
 )
 
@@ -43,17 +41,15 @@ const (
 	connectionAttempts = 10
 )
 
-var (
-	testDataDir = ""
-)
-
 // NewStubServer launches the stub server on the given port with the given script
 func NewStubServer(port int, script string) *StubServer {
-	if len(testDataDir) == 0 {
+	testScriptsDir := path.Join(GetExecutingFilesDir(), "scripts")
+
+	if len(testScriptsDir) == 0 {
 		Fail("unable to locate bolt stub script folder")
 	}
 
-	testScriptFile := path.Join(testDataDir, script)
+	testScriptFile := path.Join(testScriptsDir, script)
 	if _, err := os.Stat(testScriptFile); os.IsNotExist(err) {
 		Fail(fmt.Sprintf("unable to locate bolt stub script file at '%s'", testScriptFile))
 	}
@@ -85,21 +81,9 @@ func NewStubServer(port int, script string) *StubServer {
 // Finished expects the stub server to already be exited returns whether it was exited
 // with success code. If the process did not exit as expected, it returns false (or fails the test)
 func (server *StubServer) Finished() bool {
-	// We don't have a well-defined way of checking whether a process is still
-	// running or not, so we query it via FindProcess and sending a 0-signal to
-	// test it
-	process, err := os.FindProcess(server.process.Process.Pid)
-	if err == nil {
-		err := process.Signal(syscall.Signal(0))
-
-		// If signal succeeds then we need to kill it
-		if err == nil {
-			if err := server.process.Process.Kill(); err != nil {
-				Fail(fmt.Sprintf("unable to kill boltstub server: %g", err))
-			}
-
-			Fail(fmt.Sprintf("manually killed boltstub server"))
-		}
+	// Close our initial connection to make the stub server exit
+	if server.conn != nil {
+		server.conn.Close()
 	}
 
 	if err := server.process.Wait(); err != nil {
@@ -115,10 +99,4 @@ func (server *StubServer) Finished() bool {
 
 func (server *StubServer) Close() {
 	server.process.Process.Kill()
-}
-
-func init() {
-	if _, file, _, ok := runtime.Caller(1); ok {
-		testDataDir = path.Join(path.Dir(file), "boltstub-scripts")
-	}
 }
