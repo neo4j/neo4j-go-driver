@@ -78,7 +78,7 @@ var _ = Describe("SessionIT", func() {
 				Expect(summary.Statement().Cypher()).To(BeIdenticalTo(stmt))
 				Expect(summary.Statement().Params()).To(BeNil())
 
-				Expect(summary.StatementType()).To(BeIdenticalTo(StatementTypeReadOnly))
+				Expect(summary.StatementType()).To(BeEquivalentTo(StatementTypeReadOnly))
 			})
 		})
 
@@ -99,7 +99,7 @@ var _ = Describe("SessionIT", func() {
 				Expect(summary.Statement().Cypher()).To(BeIdenticalTo(stmt))
 				Expect(summary.Statement().Params()).To(BeNil())
 
-				Expect(summary.StatementType()).To(BeIdenticalTo(StatementTypeReadOnly))
+				Expect(summary.StatementType()).To(BeEquivalentTo(StatementTypeUnknown))
 			})
 		})
 
