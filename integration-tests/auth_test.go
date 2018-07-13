@@ -44,19 +44,19 @@ var _ = Describe("Authentication", func() {
 	//})
 
 	When("when credentials are provided as a basic token with realm", func() {
-		token := BasicAuth(username, password, "some_realm")
+		token := BasicAuth(username, password, "native")
 
 		Specify("it should be able to connect", verifyConnect(&token))
 	})
 
 	When("when credentials are provided as a custom token", func() {
-		token := CustomAuth("basic", username, password, "some_realm", nil)
+		token := CustomAuth("basic", username, password, "native", nil)
 
 		Specify("it should be able to connect", verifyConnect(&token))
 	})
 
 	When("when credentials are provided as a custom token with parameters", func() {
-		token := CustomAuth("basic", username, password, "some_realm", &map[string]interface{}{
+		token := CustomAuth("basic", username, password, "native", &map[string]interface{}{
 			"otp": "12345",
 		})
 
