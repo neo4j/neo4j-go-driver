@@ -91,9 +91,10 @@ func (session *Session) ensureRunner(mode AccessMode, autoClose bool) error {
 // updates bookmark before actual closure
 func (session *Session) closeRunner() error {
 	if session.runner != nil {
-		session.updateBookmark()
-
 		err := session.runner.closeConnection()
+
+		session.lastBookmark = session.runner.lastSeenBookmark()
+
 		session.runner = nil
 		return err
 	}
@@ -101,12 +102,12 @@ func (session *Session) closeRunner() error {
 	return nil
 }
 
-// This fetches latest bookmark from the connection and updates it to
-// the session if it's not empty
-func (session *Session) updateBookmark() {
-	if session.runner != nil && len(session.runner.lastBookmark) != 0 {
-		session.lastBookmark = session.runner.lastBookmark
+func (session *Session) LastBookmark() string {
+	if session.runner != nil {
+		return session.runner.lastSeenBookmark()
 	}
+
+	return session.lastBookmark
 }
 
 // BeginTransaction starts a new explicit transaction on this session

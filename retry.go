@@ -49,7 +49,9 @@ func (logic *retryLogic) computeDelayWithJitter(delay time.Duration) time.Durati
 }
 
 func (logic *retryLogic) retry(work func() (interface{}, error)) (interface{}, error) {
-	result := interface{}(nil)
+	var result interface{}
+
+	result = nil
 	err := error(nil)
 	startTime := time.Now()
 	nextDelay := logic.initialRetryDelay

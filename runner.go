@@ -37,6 +37,14 @@ func newRunner(driver Driver, accessMode AccessMode, autoClose bool) *statementR
 	return &statementRunner{driver: driver, accessMode: accessMode, autoClose: autoClose}
 }
 
+func (runner *statementRunner) lastSeenBookmark() string {
+	if runner.connection != nil {
+		return runner.connection.LastBookmark()
+	}
+
+	return runner.lastBookmark
+}
+
 // This ensures that we've a connection to run statements against
 func (runner *statementRunner) ensureConnection() error {
 	if runner.connection == nil {
