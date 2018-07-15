@@ -20,8 +20,9 @@
 package neo4j
 
 import (
-	"github.com/neo4j-drivers/neo4j-go-connector"
 	"net/url"
+
+	"github.com/neo4j-drivers/neo4j-go-connector"
 )
 
 func newDirectWithConnector(target string, connector seabolt.Connector) Driver {
@@ -33,5 +34,6 @@ func newDirectWithConnector(target string, connector seabolt.Connector) Driver {
 	return &directDriver{
 		target:    *targetURL,
 		connector: connector,
+		open:      1,
 	}
 }

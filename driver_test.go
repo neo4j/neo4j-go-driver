@@ -28,11 +28,34 @@ import (
 var _ = Describe("Driver", func() {
 
 	When("constructed with bolt://localhost:7687", func() {
-		uri := "bolt://localhost:7687"
-		driver, err := NewDriver(uri, NoAuth())
+		driver, err := NewDriver("bolt://localhost:7687", NoAuth())
 
 		It("no errors should be returned", func() {
 			Expect(err).To(BeNil())
+		})
+
+		When("closed", func() {
+			err := driver.Close()
+			It("no errors should be returned", func() {
+				Expect(err).To(BeNil())
+			})
+
+			It("should not allow new read mode sessions", func() {
+				session, err := driver.Session(AccessModeRead)
+				Expect(err).NotTo(BeNil())
+				Expect(session).To(BeNil())
+			})
+
+			It("should not allow new write mode sessions", func() {
+				session, err := driver.Session(AccessModeWrite)
+				Expect(err).NotTo(BeNil())
+				Expect(session).To(BeNil())
+			})
+
+			It("should allow more close calls", func() {
+				err := driver.Close()
+				Expect(err).To(BeNil())
+			})
 		})
 
 		driverTarget := driver.Target()

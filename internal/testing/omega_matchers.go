@@ -48,8 +48,20 @@ func BeArithmeticError() types.GomegaMatcher {
 	}
 }
 
+func BeSyntaxError() types.GomegaMatcher {
+	return &databaseErrorMatcher{
+		codeMatcher: gomega.ContainSubstring("SyntaxError"),
+	}
+}
+
 func BeServiceUnavailableError() types.GomegaMatcher {
 	return &serviceUnavailableErrorMatcher{}
+}
+
+func ContainMessage(part string) types.GomegaMatcher {
+	return &databaseErrorMatcher{
+		messageMatcher: gomega.ContainSubstring(part),
+	}
 }
 
 type databaseErrorMatcher struct {

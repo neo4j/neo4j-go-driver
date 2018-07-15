@@ -21,6 +21,7 @@ package neo4j
 
 import (
 	"errors"
+	"sync/atomic"
 )
 
 // Session represents a logical connection (which is not tied to a physical connection)
@@ -32,7 +33,7 @@ type Session struct {
 
 	lastBookmark string
 
-	open   bool
+	open   int32
 	tx     *Transaction
 	runner *statementRunner
 }
@@ -48,17 +49,25 @@ func newSession(driver Driver, accessMode AccessMode, bookmarks []string) *Sessi
 		accessMode:   accessMode,
 		bookmarks:    bookmarks,
 		lastBookmark: "",
-		open:         true,
+		open:         1,
 		tx:           nil,
 		runner:       nil,
 	}
 }
 
+func assertSessionOpen(session *Session) error {
+	if atomic.LoadInt32(&session.open) == 0 {
+		return errors.New("session is already closed")
+	}
+
+	return nil
+}
+
 // This ensures that we're in a good state to run statements on this
 // session
-func (session *Session) ensureReady() error {
-	if !session.open {
-		return errors.New("session is already closed")
+func ensureReady(session *Session) error {
+	if err := assertSessionOpen(session); err != nil {
+		return nil
 	}
 
 	if session.tx != nil {
@@ -75,9 +84,9 @@ func (session *Session) ensureReady() error {
 }
 
 // This ensures that we've a connection to run statements against
-func (session *Session) ensureRunner(mode AccessMode, autoClose bool) error {
+func ensureRunner(session *Session, mode AccessMode, autoClose bool) error {
 	if session.runner != nil && (session.runner.autoClose != autoClose || session.runner.accessMode != mode) {
-		session.closeRunner()
+		closeRunner(session)
 	}
 
 	if session.runner == nil {
@@ -89,11 +98,12 @@ func (session *Session) ensureRunner(mode AccessMode, autoClose bool) error {
 
 // This closes any active connection that's bound to this session and
 // updates bookmark before actual closure
-func (session *Session) closeRunner() error {
+func closeRunner(session *Session) error {
 	if session.runner != nil {
-		session.updateBookmark()
-
 		err := session.runner.closeConnection()
+
+		session.lastBookmark = session.runner.lastSeenBookmark()
+
 		session.runner = nil
 		return err
 	}
@@ -101,55 +111,53 @@ func (session *Session) closeRunner() error {
 	return nil
 }
 
-// This fetches latest bookmark from the connection and updates it to
-// the session if it's not empty
-func (session *Session) updateBookmark() {
-	if session.runner != nil && len(session.runner.lastBookmark) != 0 {
-		session.lastBookmark = session.runner.lastBookmark
+func (session *Session) LastBookmark() string {
+	if session.runner != nil {
+		return session.runner.lastSeenBookmark()
 	}
+
+	return session.lastBookmark
 }
 
 // BeginTransaction starts a new explicit transaction on this session
 func (session *Session) BeginTransaction() (*Transaction, error) {
-	return session.beginTransactionInternal(session.accessMode)
+	return beginTransactionInternal(session, session.accessMode)
 }
 
 // ReadTransaction executes the given unit of work in a AccessModeRead transaction with
 // retry logic in place
 func (session *Session) ReadTransaction(work TransactionWork) (interface{}, error) {
-	return session.runTransaction(AccessModeRead, work)
+	return runTransaction(session, AccessModeRead, work)
 }
 
 // WriteTransaction executes the given unit of work in a AccessModeWrite transaction with
 // retry logic in place
 func (session *Session) WriteTransaction(work TransactionWork) (interface{}, error) {
-	return session.runTransaction(AccessModeWrite, work)
+	return runTransaction(session, AccessModeWrite, work)
 }
 
 // Run executes an auto-commit statement and returns a result
 func (session *Session) Run(cypher string, params *map[string]interface{}) (*Result, error) {
-	return session.runStatement(&Statement{cypher: cypher, params: params})
+	return runStatementOnSession(session, &Statement{cypher: cypher, params: params})
 }
 
 // Close closes any open resources and marks this session as unusable
 func (session *Session) Close() error {
-	if err := session.closeRunner(); err != nil {
-		return err
+	if atomic.CompareAndSwapInt32(&session.open, 1, 0) {
+		if err := closeRunner(session); err != nil {
+			return err
+		}
 	}
-
-	session.open = false
 
 	return nil
 }
 
-func (session *Session) beginTransactionInternal(mode AccessMode) (*Transaction, error) {
-	if err := session.ensureReady(); err != nil {
+func beginTransactionInternal(session *Session, mode AccessMode) (*Transaction, error) {
+	if err := ensureReady(session); err != nil {
 		return nil, err
 	}
 
-	// TODO: ensure no active results
-
-	if err := session.ensureRunner(mode, false); err != nil {
+	if err := ensureRunner(session, mode, false); err != nil {
 		return nil, err
 	}
 
@@ -159,7 +167,7 @@ func (session *Session) beginTransactionInternal(mode AccessMode) (*Transaction,
 	}
 
 	if _, err := beginResult.Consume(); err != nil {
-		defer session.closeRunner()
+		defer closeRunner(session)
 
 		return nil, err
 	}
@@ -169,16 +177,16 @@ func (session *Session) beginTransactionInternal(mode AccessMode) (*Transaction,
 	return transaction, nil
 }
 
-func (session *Session) runStatement(statement *Statement) (*Result, error) {
+func runStatementOnSession(session *Session, statement *Statement) (*Result, error) {
 	if err := statement.validate(); err != nil {
 		return nil, err
 	}
 
-	if err := session.ensureReady(); err != nil {
+	if err := ensureReady(session); err != nil {
 		return nil, err
 	}
 
-	if err := session.ensureRunner(session.accessMode, true); err != nil {
+	if err := ensureRunner(session, session.accessMode, true); err != nil {
 		return nil, err
 	}
 
@@ -190,11 +198,11 @@ func (session *Session) runStatement(statement *Statement) (*Result, error) {
 	return result, nil
 }
 
-func (session *Session) runTransaction(mode AccessMode, work TransactionWork) (interface{}, error) {
+func runTransaction(session *Session, mode AccessMode, work TransactionWork) (interface{}, error) {
 	retry := newRetryLogic(session.driver.configuration())
 
 	result, err := retry.retry(func() (interface{}, error) {
-		tx, errWork := session.beginTransactionInternal(mode)
+		tx, errWork := beginTransactionInternal(session, mode)
 		if errWork != nil {
 			return nil, errWork
 		}

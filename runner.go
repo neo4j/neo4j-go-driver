@@ -37,6 +37,14 @@ func newRunner(driver Driver, accessMode AccessMode, autoClose bool) *statementR
 	return &statementRunner{driver: driver, accessMode: accessMode, autoClose: autoClose}
 }
 
+func (runner *statementRunner) lastSeenBookmark() string {
+	if runner.connection != nil {
+		return runner.connection.LastBookmark()
+	}
+
+	return runner.lastBookmark
+}
+
 // This ensures that we've a connection to run statements against
 func (runner *statementRunner) ensureConnection() error {
 	if runner.connection == nil {
@@ -67,8 +75,68 @@ func (runner *statementRunner) closeConnection() error {
 
 func (runner *statementRunner) receiveAll() error {
 	for len(runner.pendingResults) > 0 {
-		if _, err := runner.receive(); err != nil {
+		// we don't care for errors here, because the errors are saved
+		// into individual result objects
+		runner.receive()
+	}
+
+	return nil
+}
+
+func handleRunPhase(runner *statementRunner, activeResult *Result) error {
+	if !activeResult.runCompleted {
+		received, err := runner.connection.Fetch(activeResult.runHandle)
+		if err != nil {
 			return err
+		}
+
+		if received != seabolt.METADATA {
+			return errors.New("unexpected response received while waiting for a METADATA")
+		}
+
+		fields, err := runner.connection.Fields()
+		if err != nil {
+			return err
+		}
+		activeResult.keys = fields
+
+		metadata, err := runner.connection.Metadata()
+		if err != nil {
+			return err
+		}
+
+		activeResult.collectMetadata(metadata)
+		activeResult.runCompleted = true
+	}
+
+	return nil
+}
+
+func handleRecordsPhase(runner *statementRunner, activeResult *Result) error {
+	if !activeResult.resultCompleted {
+		received, err := runner.connection.Fetch(activeResult.resultHandle)
+		if err != nil {
+			return err
+		}
+
+		switch received {
+		case seabolt.METADATA:
+			metadata, err := runner.connection.Metadata()
+			if err != nil {
+				return err
+			}
+
+			activeResult.collectMetadata(metadata)
+			activeResult.resultCompleted = true
+		case seabolt.RECORD:
+			fields, err := runner.connection.Data()
+			if err != nil {
+				return err
+			}
+
+			activeResult.collectRecord(fields)
+		case seabolt.ERROR:
+			return errors.New("unable to fetch from connection")
 		}
 	}
 
@@ -85,58 +153,19 @@ func (runner *statementRunner) receive() (*Result, error) {
 	}
 
 	activeResult := runner.pendingResults[0]
-	if !activeResult.runCompleted {
-		received, err := runner.connection.Fetch(activeResult.runHandle)
-		if err != nil {
-			return nil, err
-		}
 
-		if received != seabolt.METADATA {
-			return nil, errors.New("unexpected response received while waiting for a METADATA")
-		}
-
-		fields, err := runner.connection.Fields()
-		if err != nil {
-			return nil, err
-		}
-		activeResult.keys = fields
-
-		metadata, err := runner.connection.Metadata()
-		if err != nil {
-			return nil, err
-		}
-
-		activeResult.collectMetadata(metadata)
+	if err := handleRunPhase(runner, activeResult); err != nil {
+		// record error on the result and return error
+		activeResult.err = err
 		activeResult.runCompleted = true
 
-		return activeResult, nil
+		return nil, err
 	}
 
-	if !activeResult.resultCompleted {
-		received, err := runner.connection.Fetch(activeResult.resultHandle)
-		if err != nil {
-			return nil, err
-		}
-
-		switch received {
-		case seabolt.METADATA:
-			metadata, err := runner.connection.Metadata()
-			if err != nil {
-				return nil, err
-			}
-
-			activeResult.collectMetadata(metadata)
-			activeResult.resultCompleted = true
-		case seabolt.RECORD:
-			fields, err := runner.connection.Data()
-			if err != nil {
-				return nil, err
-			}
-
-			activeResult.collectRecord(fields)
-		case seabolt.ERROR:
-			return nil, errors.New("unable to fetch from connection")
-		}
+	if err := handleRecordsPhase(runner, activeResult); err != nil {
+		// just record the error on the result
+		activeResult.err = err
+		activeResult.resultCompleted = true
 	}
 
 	if activeResult.resultCompleted {

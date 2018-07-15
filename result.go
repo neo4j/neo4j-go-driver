@@ -98,8 +98,7 @@ func (result *Result) collectRecord(fields []interface{}) {
 // Keys returns the keys available on the result set
 func (result *Result) Keys() ([]string, error) {
 	for !result.runCompleted {
-		_, err := result.runner.receive()
-		if err != nil {
+		if currentResult, err := result.runner.receive(); currentResult == result && err != nil {
 			return nil, err
 		}
 	}
@@ -114,19 +113,13 @@ func (result *Result) Next() bool {
 	}
 
 	for !result.runCompleted {
-		_, err := result.runner.receive()
-		if err != nil {
-			result.err = err
-
+		if currentResult, err := result.runner.receive(); currentResult == result && err != nil {
 			return false
 		}
 	}
 
 	if !result.resultCompleted && len(result.records) == 0 {
-		_, err := result.runner.receive()
-		if err != nil {
-			result.err = err
-
+		if currentResult, err := result.runner.receive(); currentResult == result && err != nil {
 			return false
 		}
 	}
