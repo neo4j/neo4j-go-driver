@@ -34,7 +34,7 @@ type Transaction struct {
 // transaction
 type TransactionWork func(transaction *Transaction) (interface{}, error)
 
-func (transaction *Transaction) ensureState() error {
+func ensureTxState(transaction *Transaction) error {
 	if transaction.outcomeApplied {
 		return errors.New("transaction is already committed or rolled back")
 	}
@@ -48,7 +48,7 @@ func (transaction *Transaction) ensureState() error {
 
 // Commit commits the transaction
 func (transaction *Transaction) Commit() error {
-	if err := transaction.ensureState(); err != nil {
+	if err := ensureTxState(transaction); err != nil {
 		return err
 	}
 
@@ -69,7 +69,7 @@ func (transaction *Transaction) Commit() error {
 
 // Rollback rolls back the transaction
 func (transaction *Transaction) Rollback() error {
-	if err := transaction.ensureState(); err != nil {
+	if err := ensureTxState(transaction); err != nil {
 		return err
 	}
 
@@ -108,15 +108,15 @@ func (transaction *Transaction) Close() error {
 
 // Run executes a statement on this transaction and returns a result
 func (transaction *Transaction) Run(cypher string, params *map[string]interface{}) (*Result, error) {
-	return transaction.runStatement(&Statement{cypher: cypher, params: params})
+	return runStatementOnTransaction(transaction, &Statement{cypher: cypher, params: params})
 }
 
-func (transaction *Transaction) runStatement(statement *Statement) (*Result, error) {
+func runStatementOnTransaction(transaction *Transaction, statement *Statement) (*Result, error) {
 	if err := statement.validate(); err != nil {
 		return nil, err
 	}
 
-	if err := transaction.ensureState(); err != nil {
+	if err := ensureTxState(transaction); err != nil {
 		return nil, err
 	}
 

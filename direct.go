@@ -21,14 +21,18 @@ package neo4j
 
 import (
 	"net/url"
+	"sync/atomic"
 
 	"github.com/neo4j-drivers/neo4j-go-connector"
+	"github.com/pkg/errors"
 )
 
 type directDriver struct {
 	config    *Config
 	target    url.URL
 	connector seabolt.Connector
+
+	open int32
 }
 
 func configToConnectorConfig(config *Config) *seabolt.Config {
@@ -52,8 +56,17 @@ func newDirectDriver(target *url.URL, token AuthToken, config *Config) (*directD
 		config:    config,
 		target:    *target,
 		connector: connector,
+		open:      1,
 	}
 	return &driver, nil
+}
+
+func assertDriverOpen(driver *directDriver) error {
+	if atomic.LoadInt32(&driver.open) == 0 {
+		return errors.New("cannot acquire a session on a closed driver")
+	}
+
+	return nil
 }
 
 func (driver *directDriver) Target() url.URL {
@@ -61,11 +74,19 @@ func (driver *directDriver) Target() url.URL {
 }
 
 func (driver *directDriver) Session(accessMode AccessMode, bookmarks ...string) (*Session, error) {
+	if err := assertDriverOpen(driver); err != nil {
+		return nil, err
+	}
+
 	return newSession(driver, accessMode, bookmarks), nil
 }
 
 func (driver *directDriver) Close() error {
-	return driver.connector.Close()
+	if atomic.CompareAndSwapInt32(&driver.open, 1, 0) {
+		return driver.connector.Close()
+	}
+
+	return nil
 }
 
 func (driver *directDriver) configuration() *Config {
@@ -73,6 +94,10 @@ func (driver *directDriver) configuration() *Config {
 }
 
 func (driver *directDriver) acquire(mode AccessMode) (seabolt.Connection, error) {
+	if err := assertDriverOpen(driver); err != nil {
+		return nil, err
+	}
+
 	pool, err := driver.connector.GetPool()
 	if err != nil {
 		return nil, err

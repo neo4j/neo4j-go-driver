@@ -21,6 +21,7 @@ package neo4j
 
 import (
 	"errors"
+	"sync/atomic"
 )
 
 // Session represents a logical connection (which is not tied to a physical connection)
@@ -32,7 +33,7 @@ type Session struct {
 
 	lastBookmark string
 
-	open   bool
+	open   int32
 	tx     *Transaction
 	runner *statementRunner
 }
@@ -48,17 +49,25 @@ func newSession(driver Driver, accessMode AccessMode, bookmarks []string) *Sessi
 		accessMode:   accessMode,
 		bookmarks:    bookmarks,
 		lastBookmark: "",
-		open:         true,
+		open:         1,
 		tx:           nil,
 		runner:       nil,
 	}
 }
 
+func assertSessionOpen(session *Session) error {
+	if atomic.LoadInt32(&session.open) == 0 {
+		return errors.New("session is already closed")
+	}
+
+	return nil
+}
+
 // This ensures that we're in a good state to run statements on this
 // session
 func ensureReady(session *Session) error {
-	if !session.open {
-		return errors.New("session is already closed")
+	if err := assertSessionOpen(session); err != nil {
+		return nil
 	}
 
 	if session.tx != nil {
@@ -129,16 +138,16 @@ func (session *Session) WriteTransaction(work TransactionWork) (interface{}, err
 
 // Run executes an auto-commit statement and returns a result
 func (session *Session) Run(cypher string, params *map[string]interface{}) (*Result, error) {
-	return runStatement(session, &Statement{cypher: cypher, params: params})
+	return runStatementOnSession(session, &Statement{cypher: cypher, params: params})
 }
 
 // Close closes any open resources and marks this session as unusable
 func (session *Session) Close() error {
-	if err := closeRunner(session); err != nil {
-		return err
+	if atomic.CompareAndSwapInt32(&session.open, 1, 0) {
+		if err := closeRunner(session); err != nil {
+			return err
+		}
 	}
-
-	session.open = false
 
 	return nil
 }
@@ -147,8 +156,6 @@ func beginTransactionInternal(session *Session, mode AccessMode) (*Transaction, 
 	if err := ensureReady(session); err != nil {
 		return nil, err
 	}
-
-	// TODO: ensure no active results
 
 	if err := ensureRunner(session, mode, false); err != nil {
 		return nil, err
@@ -170,7 +177,7 @@ func beginTransactionInternal(session *Session, mode AccessMode) (*Transaction, 
 	return transaction, nil
 }
 
-func runStatement(session *Session, statement *Statement) (*Result, error) {
+func runStatementOnSession(session *Session, statement *Statement) (*Result, error) {
 	if err := statement.validate(); err != nil {
 		return nil, err
 	}

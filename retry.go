@@ -42,7 +42,7 @@ func newRetryLogic(config *Config) *retryLogic {
 	}
 }
 
-func (logic *retryLogic) computeDelayWithJitter(delay time.Duration) time.Duration {
+func computeDelayWithJitter(logic *retryLogic, delay time.Duration) time.Duration {
 	jitter := time.Duration(float64(delay) * logic.delayJitter)
 	nextDelay := delay - jitter + time.Duration(2*float64(jitter)*rand.Float64())
 	return nextDelay
@@ -65,7 +65,7 @@ func (logic *retryLogic) retry(work func() (interface{}, error)) (interface{}, e
 		if isRetriableError(err) {
 			elapsed := time.Since(startTime)
 			if elapsed < logic.maxRetryTime {
-				delayWithJitter := logic.computeDelayWithJitter(nextDelay)
+				delayWithJitter := computeDelayWithJitter(logic, nextDelay)
 				warningf(logic.logging, "retriable operation failed to complete [error: %s] and will be retried in %dms", err.Error(), delayWithJitter.Nanoseconds()/int64(time.Millisecond))
 				time.Sleep(delayWithJitter)
 				nextDelay = delayWithJitter
