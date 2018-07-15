@@ -247,6 +247,49 @@ var _ = Describe("Session", func() {
 			Expect(summary.ResultAvailableAfter()).To(BeNumerically(">=", 0))
 			Expect(summary.ResultConsumedAfter()).To(BeNumerically(">=", 0))
 		})
+
+		Specify("when one statement fails, the next one should run successfully", func() {
+			result, err = session.Run("Invalid Cypher", nil)
+			Expect(err).To(BeNil())
+
+			summary, err = result.Consume()
+			Expect(err).To(BeSyntaxError())
+
+			result, err = session.Run("RETURN 1", nil)
+			Expect(err).To(BeNil())
+
+			if result.Next() {
+				Expect(result.Record().GetByIndex(0)).To(BeEquivalentTo(1))
+			}
+			Expect(result.Next()).To(BeFalse())
+			Expect(result.Err()).To(BeNil())
+		})
+
+		Specify("when two statements are queued, the second one should cause first one's results to be cached", func() {
+			result1, err := session.Run("UNWIND RANGE(1,10) AS N RETURN N", nil)
+			Expect(err).To(BeNil())
+			result2, err := session.Run("UNWIND RANGE(11,20) AS N RETURN N", nil)
+			Expect(err).To(BeNil())
+
+			result2Values := []int(nil)
+			for result2.Next() {
+				if val, ok := result2.Record().Get("N"); ok {
+					result2Values = append(result2Values, int(val.(int64)))
+				}
+			}
+			Expect(result2.Err()).To(BeNil())
+
+			result1Values := []int(nil)
+			for result1.Next() {
+				if val, ok := result1.Record().Get("N"); ok {
+					result1Values = append(result1Values, int(val.(int64)))
+				}
+			}
+			Expect(result1.Err()).To(BeNil())
+
+			Expect(result1Values).To(BeEquivalentTo([]int{1, 2, 3, 4, 5, 6, 7, 8, 9, 10}))
+			Expect(result2Values).To(BeEquivalentTo([]int{11, 12, 13, 14, 15, 16, 17, 18, 19, 20}))
+		})
 	})
 
 })

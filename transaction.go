@@ -97,7 +97,7 @@ func (transaction *Transaction) Close() error {
 		}
 	}
 
-	if err := transaction.session.closeRunner(); err != nil {
+	if err := closeRunner(transaction.session); err != nil {
 		return err
 	}
 

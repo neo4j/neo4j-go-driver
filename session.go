@@ -56,7 +56,7 @@ func newSession(driver Driver, accessMode AccessMode, bookmarks []string) *Sessi
 
 // This ensures that we're in a good state to run statements on this
 // session
-func (session *Session) ensureReady() error {
+func ensureReady(session *Session) error {
 	if !session.open {
 		return errors.New("session is already closed")
 	}
@@ -75,9 +75,9 @@ func (session *Session) ensureReady() error {
 }
 
 // This ensures that we've a connection to run statements against
-func (session *Session) ensureRunner(mode AccessMode, autoClose bool) error {
+func ensureRunner(session *Session, mode AccessMode, autoClose bool) error {
 	if session.runner != nil && (session.runner.autoClose != autoClose || session.runner.accessMode != mode) {
-		session.closeRunner()
+		closeRunner(session)
 	}
 
 	if session.runner == nil {
@@ -89,7 +89,7 @@ func (session *Session) ensureRunner(mode AccessMode, autoClose bool) error {
 
 // This closes any active connection that's bound to this session and
 // updates bookmark before actual closure
-func (session *Session) closeRunner() error {
+func closeRunner(session *Session) error {
 	if session.runner != nil {
 		err := session.runner.closeConnection()
 
@@ -112,29 +112,29 @@ func (session *Session) LastBookmark() string {
 
 // BeginTransaction starts a new explicit transaction on this session
 func (session *Session) BeginTransaction() (*Transaction, error) {
-	return session.beginTransactionInternal(session.accessMode)
+	return beginTransactionInternal(session, session.accessMode)
 }
 
 // ReadTransaction executes the given unit of work in a AccessModeRead transaction with
 // retry logic in place
 func (session *Session) ReadTransaction(work TransactionWork) (interface{}, error) {
-	return session.runTransaction(AccessModeRead, work)
+	return runTransaction(session, AccessModeRead, work)
 }
 
 // WriteTransaction executes the given unit of work in a AccessModeWrite transaction with
 // retry logic in place
 func (session *Session) WriteTransaction(work TransactionWork) (interface{}, error) {
-	return session.runTransaction(AccessModeWrite, work)
+	return runTransaction(session, AccessModeWrite, work)
 }
 
 // Run executes an auto-commit statement and returns a result
 func (session *Session) Run(cypher string, params *map[string]interface{}) (*Result, error) {
-	return session.runStatement(&Statement{cypher: cypher, params: params})
+	return runStatement(session, &Statement{cypher: cypher, params: params})
 }
 
 // Close closes any open resources and marks this session as unusable
 func (session *Session) Close() error {
-	if err := session.closeRunner(); err != nil {
+	if err := closeRunner(session); err != nil {
 		return err
 	}
 
@@ -143,14 +143,14 @@ func (session *Session) Close() error {
 	return nil
 }
 
-func (session *Session) beginTransactionInternal(mode AccessMode) (*Transaction, error) {
-	if err := session.ensureReady(); err != nil {
+func beginTransactionInternal(session *Session, mode AccessMode) (*Transaction, error) {
+	if err := ensureReady(session); err != nil {
 		return nil, err
 	}
 
 	// TODO: ensure no active results
 
-	if err := session.ensureRunner(mode, false); err != nil {
+	if err := ensureRunner(session, mode, false); err != nil {
 		return nil, err
 	}
 
@@ -160,7 +160,7 @@ func (session *Session) beginTransactionInternal(mode AccessMode) (*Transaction,
 	}
 
 	if _, err := beginResult.Consume(); err != nil {
-		defer session.closeRunner()
+		defer closeRunner(session)
 
 		return nil, err
 	}
@@ -170,16 +170,16 @@ func (session *Session) beginTransactionInternal(mode AccessMode) (*Transaction,
 	return transaction, nil
 }
 
-func (session *Session) runStatement(statement *Statement) (*Result, error) {
+func runStatement(session *Session, statement *Statement) (*Result, error) {
 	if err := statement.validate(); err != nil {
 		return nil, err
 	}
 
-	if err := session.ensureReady(); err != nil {
+	if err := ensureReady(session); err != nil {
 		return nil, err
 	}
 
-	if err := session.ensureRunner(session.accessMode, true); err != nil {
+	if err := ensureRunner(session, session.accessMode, true); err != nil {
 		return nil, err
 	}
 
@@ -191,11 +191,11 @@ func (session *Session) runStatement(statement *Statement) (*Result, error) {
 	return result, nil
 }
 
-func (session *Session) runTransaction(mode AccessMode, work TransactionWork) (interface{}, error) {
+func runTransaction(session *Session, mode AccessMode, work TransactionWork) (interface{}, error) {
 	retry := newRetryLogic(session.driver.configuration())
 
 	result, err := retry.retry(func() (interface{}, error) {
-		tx, errWork := session.beginTransactionInternal(mode)
+		tx, errWork := beginTransactionInternal(session, mode)
 		if errWork != nil {
 			return nil, errWork
 		}
