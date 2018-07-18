@@ -38,7 +38,7 @@ This package requires the following tools/libraries to be installed in order to 
 
 ## Versioning
 
-Although `master` branch contains the source code for the latest available release, we are also tagging releases after semantic versioning scheme so that `dep add github.com/neo4j/neo4j-go-driver` will find latest release and add the driver as a dependency on your project.
+Although `master` branch contains the source code for the latest available release, we are also tagging releases after semantic versioning scheme so that `dep` will find latest release and add the driver as a dependency on your project.
 
 ## Getting the Driver
 
