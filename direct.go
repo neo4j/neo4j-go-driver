@@ -37,8 +37,9 @@ type directDriver struct {
 
 func configToConnectorConfig(config *Config) *seabolt.Config {
 	return &seabolt.Config{
-		Encryption: config.Encrypted,
-		Debug:      config.Log.DebugEnabled(),
+		Encryption:  config.Encrypted,
+		Debug:       config.Log.DebugEnabled(),
+		MaxPoolSize: config.MaxConnectionPoolSize,
 	}
 }
 

@@ -32,6 +32,8 @@ type Config struct {
 	Log Logging
 	// Maximum amount of duration a retriable operation would continue retrying
 	MaxTransactionRetryDuration time.Duration
+	// Maximum number of connections per URL to allow on this driver
+	MaxConnectionPoolSize int
 }
 
 func defaultConfig() *Config {
@@ -39,6 +41,7 @@ func defaultConfig() *Config {
 		Encrypted: true,
 		Log:       NoOpLogger(),
 		MaxTransactionRetryDuration: 30 * time.Second,
+		MaxConnectionPoolSize:       100,
 	}
 }
 

@@ -22,6 +22,7 @@ package integration_tests
 
 import (
 	. "github.com/neo4j/neo4j-go-driver"
+	. "github.com/neo4j/neo4j-go-driver/internal/testing"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
@@ -92,6 +93,51 @@ var _ = Describe("Driver", func() {
 			Expect(err).NotTo(BeNil())
 		})
 
+	})
+
+	Context("Pooling", func() {
+		var (
+			err     error
+			driver  Driver
+		)
+
+		BeforeEach(func() {
+			driver, err = NewDriver(singleInstanceUri, BasicAuth(username, password, ""), func(config *Config) {
+				config.MaxConnectionPoolSize = 2
+			})
+			if err != nil {
+				Expect(err).To(BeNil())
+			}
+		})
+
+		AfterEach(func() {
+			if driver != nil {
+				driver.Close()
+			}
+		})
+
+		It("should return error when pool is full", func() {
+			// Open connection 1
+			session1, err := driver.Session(AccessModeWrite)
+			Expect(err).To(BeNil())
+
+			_, err = session1.Run("UNWIND RANGE(1, 100) AS N RETURN N", nil)
+			Expect(err).To(BeNil())
+
+			// Open connection 2
+			session2, err := driver.Session(AccessModeWrite)
+			Expect(err).To(BeNil())
+
+			_, err = session2.Run("UNWIND RANGE(1, 100) AS N RETURN N", nil)
+			Expect(err).To(BeNil())
+
+			// Try open connection 3
+			session3, err := driver.Session(AccessModeWrite)
+			Expect(err).To(BeNil())
+
+			_, err = session3.Run("UNWIND RANGE(1, 100) AS N RETURN N", nil)
+			Expect(err).To(BeServiceUnavailableError())
+		})
 	})
 
 })
