@@ -131,12 +131,12 @@ var _ = Describe("Driver", func() {
 			_, err = session2.Run("UNWIND RANGE(1, 100) AS N RETURN N", nil)
 			Expect(err).To(BeNil())
 
-			// Try open connection 3
+			// Try opening connection 3
 			session3, err := driver.Session(AccessModeWrite)
 			Expect(err).To(BeNil())
 
 			_, err = session3.Run("UNWIND RANGE(1, 100) AS N RETURN N", nil)
-			Expect(err).To(BeServiceUnavailableError())
+			Expect(err).To(BePoolFullError())
 		})
 	})
 

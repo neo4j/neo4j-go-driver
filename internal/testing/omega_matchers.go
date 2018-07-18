@@ -58,6 +58,20 @@ func BeServiceUnavailableError() types.GomegaMatcher {
 	return &serviceUnavailableErrorMatcher{}
 }
 
+func BePoolFullError() types.GomegaMatcher {
+	return &poolErrorMatcher{
+		expected: 1,
+		expectedText: "Pool full",
+	}
+}
+
+func BeAuthenticationError() types.GomegaMatcher {
+	return &connectorErrorMatcher{
+		stateMatcher: gomega.BeEquivalentTo(4),
+		codeMatcher: gomega.BeEquivalentTo(7),
+	}
+}
+
 func ContainMessage(part string) types.GomegaMatcher {
 	return &databaseErrorMatcher{
 		messageMatcher: gomega.ContainSubstring(part),
@@ -71,6 +85,16 @@ type databaseErrorMatcher struct {
 }
 
 type serviceUnavailableErrorMatcher struct {
+}
+
+type poolErrorMatcher struct {
+	expected uint32
+	expectedText string
+}
+
+type connectorErrorMatcher struct {
+	stateMatcher types.GomegaMatcher
+	codeMatcher  types.GomegaMatcher
 }
 
 func (matcher *databaseErrorMatcher) Match(actual interface{}) (success bool, err error) {
@@ -116,7 +140,7 @@ func (matcher *databaseErrorMatcher) FailureMessage(actual interface{}) (message
 }
 
 func (matcher *databaseErrorMatcher) NegatedFailureMessage(actual interface{}) (message string) {
-	databaseError, ok := actual.(seabolt.DatabaseError)
+	databaseError, ok := actual.(*seabolt.DatabaseError)
 	if !ok {
 		return fmt.Sprintf("Expected\n\t%#v\nnot to be a DatabaseError", actual)
 	}
@@ -161,4 +185,82 @@ func (matcher *serviceUnavailableErrorMatcher) NegatedFailureMessage(actual inte
 	}
 
 	return fmt.Sprintf("Expected\n\t%#v\nnot to be a ServiceUnavailableError", actual)
+}
+
+func (matcher *poolErrorMatcher) Match(actual interface{}) (success bool, err error) {
+	poolError, ok := actual.(*seabolt.PoolError)
+	if !ok {
+		return false, nil
+	}
+
+	return poolError.Code() == matcher.expected, nil
+}
+
+func (matcher *poolErrorMatcher) FailureMessage(actual interface{}) (message string) {
+	_, ok := actual.(*seabolt.PoolError)
+	if !ok {
+		return fmt.Sprintf("Expected\n\t%#v\nto be a pool error", actual)
+	}
+
+	return fmt.Sprintf("Expected\n\t%#v\nto be a pool error with code: %d (%s)", actual, matcher.expected, matcher.expectedText)
+}
+
+func (matcher *poolErrorMatcher) NegatedFailureMessage(actual interface{}) (message string) {
+	_, ok := actual.(*seabolt.PoolError)
+	if !ok {
+		return fmt.Sprintf("Expected\n\t%#v\nnot to be a pool error", actual)
+	}
+
+	return fmt.Sprintf("Expected\n\t%#v\nnot to be a pool error with code: %d (%s)", actual, matcher.expected, matcher.expectedText)
+}
+
+func (matcher *connectorErrorMatcher) Match(actual interface{}) (success bool, err error) {
+	connectorError, ok := actual.(*seabolt.ConnectorError)
+	if !ok {
+		return false, nil
+	}
+
+	if matcher.stateMatcher != nil {
+		return matcher.stateMatcher.Match(connectorError.State())
+	}
+
+	if matcher.codeMatcher != nil {
+		return matcher.codeMatcher.Match(connectorError.Code())
+	}
+
+	return true, nil
+}
+
+func (matcher *connectorErrorMatcher) FailureMessage(actual interface{}) (message string) {
+	connectorError, ok := actual.(*seabolt.ConnectorError)
+	if !ok {
+		return fmt.Sprintf("Expected\n\t%#v\nto be a ConnectorError", actual)
+	}
+
+	if matcher.stateMatcher != nil {
+		return fmt.Sprintf("Expected\n\t%#v\nto have its state to match %s", actual, matcher.stateMatcher.FailureMessage(connectorError.State()))
+	}
+
+	if matcher.codeMatcher != nil {
+		return fmt.Sprintf("Expected\n\t%#v\nto have its code to match %s", actual, matcher.codeMatcher.FailureMessage(connectorError.Code()))
+	}
+
+	return fmt.Sprintf("Unexpected condition in matcher")
+}
+
+func (matcher *connectorErrorMatcher) NegatedFailureMessage(actual interface{}) (message string) {
+	connectorError, ok := actual.(*seabolt.ConnectorError)
+	if !ok {
+		return fmt.Sprintf("Expected\n\t%#v\nnot to be a ConnectorError", actual)
+	}
+
+	if matcher.stateMatcher != nil {
+		return fmt.Sprintf("Expected\n\t%#v\nnot to have its state to match %s", actual, matcher.stateMatcher.FailureMessage(connectorError.State()))
+	}
+
+	if matcher.codeMatcher != nil {
+		return fmt.Sprintf("Expected\n\t%#v\nnot to have its code to match %s", actual, matcher.codeMatcher.FailureMessage(connectorError.Code()))
+	}
+
+	return fmt.Sprintf("Unexpected condition in matcher")
 }
