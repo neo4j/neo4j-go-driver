@@ -34,6 +34,7 @@ var _ = Describe("Summary", func() {
 			"key3": "456",
 			"key4": "456.123",
 			"key5": "some non-number value",
+			"key6": int64(12456),
 		}
 
 		When("map is nil", func() {
@@ -57,6 +58,14 @@ var _ = Describe("Summary", func() {
 
 			It("should return the int value", func() {
 				Expect(extracted).To(BeNumerically("==", 123))
+			})
+		})
+
+		When("given key is mapped to an int64 value", func() {
+			extracted := extractIntValue(&dict, "key6", -1)
+
+			It("should return the int value", func() {
+				Expect(extracted).To(BeNumerically("==", 12456))
 			})
 		})
 

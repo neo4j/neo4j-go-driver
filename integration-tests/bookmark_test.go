@@ -29,22 +29,22 @@ import (
 )
 
 var _ = Describe("Bookmark", func() {
-	getLastBookmark := func (driver Driver) string {
+	createNodeInTx := func(driver Driver) string {
 		session, err := driver.Session(AccessModeWrite)
 		Expect(err).To(BeNil())
 		defer session.Close()
 
 		_, err = session.WriteTransaction(func(tx *Transaction) (interface{}, error) {
-		result, err := tx.Run("CREATE ()", nil)
-		Expect(err).To(BeNil())
+			result, err := tx.Run("CREATE ()", nil)
+			Expect(err).To(BeNil())
 
-		summary, err := result.Consume()
-		Expect(err).To(BeNil())
+			summary, err := result.Consume()
+			Expect(err).To(BeNil())
 
-		Expect(summary.Counters().NodesCreated()).To(Equal(1))
+			Expect(summary.Counters().NodesCreated()).To(Equal(1))
 
-		return 0, nil
-	})
+			return 0, nil
+		})
 		Expect(err).To(BeNil())
 
 		return session.LastBookmark()
@@ -202,9 +202,9 @@ var _ = Describe("Bookmark", func() {
 
 	Context("session constructed with one bookmark", func() {
 		var (
-			err     error
-			driver  Driver
-			session *Session
+			err      error
+			driver   Driver
+			session  *Session
 			bookmark string
 		)
 
@@ -214,7 +214,7 @@ var _ = Describe("Bookmark", func() {
 				Expect(err).To(BeNil())
 			}
 
-			bookmark = getLastBookmark(driver)
+			bookmark = createNodeInTx(driver)
 
 			session, err = driver.Session(AccessModeWrite, bookmark)
 			if err != nil {
@@ -239,13 +239,62 @@ var _ = Describe("Bookmark", func() {
 
 			Expect(session.LastBookmark()).To(Equal(bookmark))
 		})
+
+		Specify("given bookmark should be accessible after ROLLBACK", func() {
+			tx, err := session.BeginTransaction()
+			Expect(err).To(BeNil())
+			defer tx.Close()
+
+			_, err = tx.Run("CREATE ()", nil)
+			Expect(err).To(BeNil())
+
+			err = tx.Rollback()
+			Expect(err).To(BeNil())
+
+			Expect(session.LastBookmark()).To(Equal(bookmark))
+		})
+
+		Specify("given bookmark should be accessible when transaction fails", func() {
+			tx, err := session.BeginTransaction()
+			Expect(err).To(BeNil())
+			defer tx.Close()
+
+			_, err = tx.Run("RETURN", nil)
+			Expect(err).To(BeNil())
+
+			err = tx.Close()
+			Expect(err).To(BeSyntaxError())
+
+			Expect(session.LastBookmark()).To(Equal(bookmark))
+		})
+
+		Specify("given bookmark should be accessible after run", func() {
+			result, err := session.Run("RETURN 1", nil)
+			Expect(err).To(BeNil())
+
+			_, err = result.Consume()
+			Expect(err).To(BeNil())
+
+			Expect(session.LastBookmark()).To(Equal(bookmark))
+		})
+
+		Specify("given bookmark should be accessible after failed run", func() {
+			result, err := session.Run("RETURN", nil)
+			Expect(err).To(BeNil())
+
+			_, err = result.Consume()
+			Expect(err).To(BeSyntaxError())
+
+			Expect(session.LastBookmark()).To(Equal(bookmark))
+		})
+
 	})
 
 	Context("session constructed with two bookmarks", func() {
 		var (
-			err     error
-			driver  Driver
-			session *Session
+			err       error
+			driver    Driver
+			session   *Session
 			bookmark1 string
 			bookmark2 string
 		)
@@ -256,8 +305,8 @@ var _ = Describe("Bookmark", func() {
 				Expect(err).To(BeNil())
 			}
 
-			bookmark1 = getLastBookmark(driver)
-			bookmark2 = getLastBookmark(driver)
+			bookmark1 = createNodeInTx(driver)
+			bookmark2 = createNodeInTx(driver)
 			Expect(bookmark1).NotTo(Equal(bookmark2))
 
 			session, err = driver.Session(AccessModeWrite, bookmark1, bookmark2)
@@ -307,9 +356,9 @@ var _ = Describe("Bookmark", func() {
 
 	Context("session constructed with unreachable bookmark", func() {
 		var (
-			err     error
-			driver  Driver
-			session *Session
+			err      error
+			driver   Driver
+			session  *Session
 			bookmark string
 		)
 
@@ -319,9 +368,9 @@ var _ = Describe("Bookmark", func() {
 				Expect(err).To(BeNil())
 			}
 
-			bookmark = getLastBookmark(driver)
+			bookmark = createNodeInTx(driver)
 
-			session, err = driver.Session(AccessModeWrite, bookmark + "0")
+			session, err = driver.Session(AccessModeWrite, bookmark+"0")
 			if err != nil {
 				Expect(err).To(BeNil())
 			}
@@ -347,4 +396,3 @@ var _ = Describe("Bookmark", func() {
 	})
 
 })
-

@@ -118,7 +118,7 @@ func (result *Result) Next() bool {
 		}
 	}
 
-	if !result.resultCompleted && len(result.records) == 0 {
+	for !result.resultCompleted && len(result.records) == 0 {
 		if currentResult, err := result.runner.receive(); currentResult == result && err != nil {
 			return false
 		}
