@@ -123,7 +123,7 @@ The mapping between Cypher types and the types used by this driver (to represent
 | *null* | null |
 | List | []interface{} |
 | Map  | map[string]interface{} |
-| Boolean| boolean |
+| Boolean| bool |
 | Integer| int64 |
 | Float| float |
 | String| string |
