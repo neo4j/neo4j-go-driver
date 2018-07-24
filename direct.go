@@ -40,6 +40,11 @@ func configToConnectorConfig(config *Config) *seabolt.Config {
 		Encryption:  config.Encrypted,
 		Debug:       config.Log.DebugEnabled(),
 		MaxPoolSize: config.MaxConnectionPoolSize,
+		ValueHandlers: []seabolt.ValueHandler{
+			&nodeValueHandler{},
+			&relationshipValueHandler{},
+			&pathValueHandler{},
+		},
 	}
 }
 
