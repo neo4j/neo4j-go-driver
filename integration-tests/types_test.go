@@ -330,5 +330,69 @@ var _ = Describe("Types", func() {
 		Expect(result.Err()).To(BeNil())
 	})
 
+	It("should be able to receive a path with two nodes and one relationship", func() {
+		result, err = session.Run("CREATE p=(e:Person:Employee {id: 1, name: 'employee 1'})-[w:WORKS_FOR { from: '2017-01-01' }]->(m:Person:Manager {id: 2, name: 'manager 1'}) RETURN p, e, w, m", nil)
+		Expect(err).To(BeNil())
+
+		if result.Next() {
+			path := result.Record().GetByIndex(0).(Path)
+			employee := result.Record().GetByIndex(1).(Node)
+			worksFor := result.Record().GetByIndex(2).(Relationship)
+			manager := result.Record().GetByIndex(3).(Node)
+
+			Expect(path).NotTo(BeNil())
+			Expect(path.Nodes()).To(HaveLen(2))
+			Expect(path.Nodes()).To(ContainElement(employee))
+			Expect(path.Nodes()).To(ContainElement(manager))
+			Expect(path.Relationships()).To(HaveLen(1))
+			Expect(path.Relationships()).To(ContainElement(worksFor))
+		}
+		Expect(result.Next()).To(BeFalse())
+		Expect(result.Err()).To(BeNil())
+	})
+
+	It("should be able to receive a path with three nodes and two relationship", func() {
+		result, err = session.Run(`CREATE (e1:Person:Employee $employee) 
+				CREATE (l1:Person:Lead $lead) 
+				CREATE (m1:Person:Manager $manager) 
+				CREATE p = (e1)-[r1:LED_BY { from: '2017-01-01' }]->(l1)-[r2:REPORTS_TO { from: '2017-01-01' }]->(m1)
+				RETURN p, e1, l1, m1, r1, r2`, &map[string]interface{}{
+					"employee": map[string]interface{}{
+						"id": 1,
+						"name": "employee 1",
+					},
+					"lead": map[string]interface{}{
+						"id": 2,
+						"name": "lead 1",
+					},
+					"manager": map[string]interface{}{
+						"id": 3,
+						"name": "manager 1",
+					},
+		})
+		Expect(err).To(BeNil())
+
+		if result.Next() {
+			path := result.Record().GetByIndex(0).(Path)
+			employee := result.Record().GetByIndex(1).(Node)
+			lead := result.Record().GetByIndex(2).(Node)
+			manager := result.Record().GetByIndex(3).(Node)
+			ledBy := result.Record().GetByIndex(4).(Relationship)
+			reportsTo := result.Record().GetByIndex(5).(Relationship)
+
+			Expect(path).NotTo(BeNil())
+			Expect(path.Nodes()).To(HaveLen(3))
+			Expect(path.Nodes()).To(ContainElement(employee))
+			Expect(path.Nodes()).To(ContainElement(lead))
+			Expect(path.Nodes()).To(ContainElement(manager))
+			Expect(path.Relationships()).To(HaveLen(2))
+			Expect(path.Relationships()).To(ContainElement(ledBy))
+			Expect(path.Relationships()).To(ContainElement(reportsTo))
+		}
+		Expect(result.Next()).To(BeFalse())
+		Expect(result.Err()).To(BeNil())
+	})
+
+
 })
 

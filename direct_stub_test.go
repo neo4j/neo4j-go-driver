@@ -94,6 +94,7 @@ func shouldExecuteReturn1() {
 func createDirectDriver() Driver {
 	driver, err := NewDriver("bolt://localhost:9001", NoAuth(), func(config *Config) {
 		config.Encrypted = false
+		config.Log = ConsoleLogger(DEBUG)
 	})
 	Expect(err).To(BeNil())
 
