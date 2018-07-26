@@ -232,10 +232,11 @@ func (mr *MockConnectionMockRecorder) PullAll() *gomock.Call {
 }
 
 // Reset connector-mocks base method
-func (m *MockConnection) Reset() error {
+func (m *MockConnection) Reset() (seabolt.RequestHandle, error) {
 	ret := m.ctrl.Call(m, "Reset")
-	ret0, _ := ret[0].(error)
-	return ret0
+	ret0, _ := ret[0].(seabolt.RequestHandle)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
 }
 
 // Reset indicates an expected call of Reset
