@@ -20,8 +20,6 @@
 package neo4j
 
 import (
-	"math"
-
 	. "github.com/neo4j/neo4j-go-driver/internal/testing"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -31,7 +29,7 @@ var _ = Describe("Spatial Types", func() {
 
 	Context("Point", func() {
 		When("constructed with 2 coordinates", func() {
-			point := NewPoint(1, 1.0, 2.0, math.NaN())
+			point := NewPoint(1, 1.0, 2.0)
 
 			It("should have a dimension of 2", func() {
 				Expect(point.dimension).To(Equal(2))
@@ -59,7 +57,7 @@ var _ = Describe("Spatial Types", func() {
 		})
 
 		When("constructed with 3 coordinates", func() {
-			point := NewPoint(1, 1.0, 2.0, 3.0)
+			point := NewPoint3D(1, 1.0, 2.0, 3.0)
 
 			It("should have a dimension of 3", func() {
 				Expect(point.dimension).To(Equal(3))
