@@ -19,33 +19,36 @@
 
 package neo4j
 
-import "math"
+import (
+	"fmt"
+	"math"
+)
 
 type Point struct {
 	dimension int
-	srId int
-	x float64
-	y float64
-	z float64
+	srId      int
+	x         float64
+	y         float64
+	z         float64
 }
 
 func NewPoint(srId int, x float64, y float64) *Point {
 	return &Point{
 		dimension: 2,
-		srId: srId,
-		x: x,
-		y: y,
-		z: math.NaN(),
+		srId:      srId,
+		x:         x,
+		y:         y,
+		z:         math.NaN(),
 	}
 }
 
 func NewPoint3D(srId int, x float64, y float64, z float64) *Point {
 	return &Point{
 		dimension: 3,
-		srId: srId,
-		x: x,
-		y: y,
-		z: z,
+		srId:      srId,
+		x:         x,
+		y:         y,
+		z:         z,
 	}
 }
 
@@ -63,4 +66,12 @@ func (point *Point) Y() float64 {
 
 func (point *Point) Z() float64 {
 	return point.z
+}
+
+func (point *Point) String() string {
+	if point.dimension == 2 {
+		return fmt.Sprintf("Point{srId=%d, x=%f, y=%f}", point.srId, point.x, point.y)
+	} else {
+		return fmt.Sprintf("Point{srId=%d, x=%f, y=%f, z=%f}", point.srId, point.x, point.y, point.z)
+	}
 }

@@ -25,6 +25,7 @@ import (
 	"time"
 
 	. "github.com/neo4j/neo4j-go-driver"
+	. "github.com/neo4j/neo4j-go-driver/internal/testing"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
@@ -50,6 +51,10 @@ var _ = Describe("Spatial Types", func() {
 		driver, err = NewDriver(singleInstanceUri, BasicAuth(username, password, ""))
 		Expect(err).To(BeNil())
 		Expect(driver).NotTo(BeNil())
+
+		if VersionOfDriver(driver).LessThan(V3_4_0) {
+			Skip("spatial types are only available after neo4j 3.4.0 release")
+		}
 
 		session, err = driver.Session(AccessModeRead)
 		Expect(err).To(BeNil())
@@ -80,7 +85,7 @@ var _ = Describe("Spatial Types", func() {
 			Expect(pointReceived.X()).To(Equal(point.X()))
 			Expect(pointReceived.Y()).To(Equal(point.Y()))
 			if math.IsNaN(point.Z()) {
-				Expect(math.IsNaN(pointReceived.Z())).To(BeTrue())
+				Expect(pointReceived.Z()).To(BeNaN())
 			} else {
 				Expect(pointReceived.Z()).To(Equal(point.Z()))
 			}
@@ -108,7 +113,7 @@ var _ = Describe("Spatial Types", func() {
 				Expect(pointReceived.X()).To(Equal(pointSent.X()))
 				Expect(pointReceived.Y()).To(Equal(pointSent.Y()))
 				if math.IsNaN(pointSent.Z()) {
-					Expect(math.IsNaN(pointReceived.Z())).To(BeTrue())
+					Expect(pointReceived.Z()).To(BeNaN())
 				} else {
 					Expect(pointReceived.Z()).To(Equal(pointSent.Z()))
 				}
@@ -157,7 +162,7 @@ var _ = Describe("Spatial Types", func() {
 			Expect(point1.SrId()).To(Equal(CartesianSrId))
 			Expect(point1.X()).To(Equal(39.111748))
 			Expect(point1.Y()).To(Equal(-76.775635))
-			Expect(math.IsNaN(point1.Z())).To(BeTrue())
+			Expect(point1.Z()).To(BeNaN())
 
 			Expect(point2).NotTo(BeNil())
 			Expect(point2.SrId()).To(Equal(Cartesian3DSrId))
@@ -188,7 +193,7 @@ var _ = Describe("Spatial Types", func() {
 			Expect(point1Received.SrId()).To(Equal(point1.SrId()))
 			Expect(point1Received.X()).To(Equal(point1.X()))
 			Expect(point1Received.Y()).To(Equal(point1.Y()))
-			Expect(math.IsNaN(point1Received.Z())).To(BeTrue())
+			Expect(point1Received.Z()).To(BeNaN())
 
 			Expect(point2Received).NotTo(BeNil())
 			Expect(point2Received.SrId()).To(Equal(point2.SrId()))
@@ -219,7 +224,7 @@ var _ = Describe("Spatial Types", func() {
 			Expect(point1Received.SrId()).To(Equal(point1.SrId()))
 			Expect(point1Received.X()).To(Equal(point1.X()))
 			Expect(point1Received.Y()).To(Equal(point1.Y()))
-			Expect(math.IsNaN(point1Received.Z())).To(BeTrue())
+			Expect(point1Received.Z()).To(BeNaN())
 
 			Expect(point2Received).NotTo(BeNil())
 			Expect(point2Received.SrId()).To(Equal(point2.SrId()))

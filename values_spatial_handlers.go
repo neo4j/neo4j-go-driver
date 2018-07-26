@@ -27,11 +27,18 @@ import (
 	"github.com/neo4j-drivers/neo4j-go-connector"
 )
 
+const (
+	point2DSignature int8 = 'X'
+	point2DSize           = 3
+	point3DSignature int8 = 'Y'
+	point3DSize           = 4
+)
+
 type pointValueHandler struct {
 }
 
 func (handler *pointValueHandler) ReadableStructs() []int8 {
-	return []int8{'X', 'Y'}
+	return []int8{point2DSignature, point3DSignature}
 }
 
 func (handler *pointValueHandler) WritableTypes() []reflect.Type {
@@ -39,28 +46,29 @@ func (handler *pointValueHandler) WritableTypes() []reflect.Type {
 }
 
 func (handler *pointValueHandler) Read(signature int8, values []interface{}) (interface{}, error) {
-	dimension := 2
-	srId := 0
-	x := math.NaN()
-	y := math.NaN()
-	z := math.NaN()
+	var (
+		dimension int
+		srId int
+		x, y, z float64
+	)
 
 	switch signature {
-	case 'X':
-		if len(values) != 3 {
-			return nil, seabolt.NewValueHandlerError(fmt.Sprintf("expected Point2D struct to have %d fields but received %d", 3, len(values)))
+	case point2DSignature:
+		if len(values) != point2DSize {
+			return nil, seabolt.NewValueHandlerError(fmt.Sprintf("expected Point2D struct to have %d fields but received %d", point2DSize, len(values)))
 		}
 
 		dimension = 2
 		srId = int(values[0].(int64))
 		x = values[1].(float64)
 		y = values[2].(float64)
-	case 'Y':
-		if len(values) != 4 {
-			return nil, seabolt.NewValueHandlerError(fmt.Sprintf("expected Point3D struct to have %d fields but received %d", 4, len(values)))
+		z = math.NaN()
+	case point3DSignature:
+		if len(values) != point3DSize {
+			return nil, seabolt.NewValueHandlerError(fmt.Sprintf("expected Point3D struct to have %d fields but received %d", point3DSize, len(values)))
 		}
 
-		dimension = 2
+		dimension = 3
 		srId = int(values[0].(int64))
 		x = values[1].(float64)
 		y = values[2].(float64)
@@ -91,13 +99,13 @@ func (handler *pointValueHandler) Write(value interface{}) (int8, []interface{},
 	if point != nil {
 		switch point.dimension {
 		case 2:
-			return 'X', []interface{}{
+			return point2DSignature, []interface{}{
 				point.srId,
 				point.x,
 				point.y,
 			}, nil
 		case 3:
-			return 'Y', []interface{}{
+			return point3DSignature, []interface{}{
 				point.srId,
 				point.x,
 				point.y,
