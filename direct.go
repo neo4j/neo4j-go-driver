@@ -44,6 +44,13 @@ func configToConnectorConfig(config *Config) *seabolt.Config {
 			&nodeValueHandler{},
 			&relationshipValueHandler{},
 			&pathValueHandler{},
+			&pointValueHandler{},
+			&dateValueHandler{},
+			&localTimeValueHandler{},
+			&offsetTimeValueHandler{},
+			&localDateTimeValueHandler{},
+			&dateTimeValueHandler{},
+			&durationValueHandler{},
 		},
 	}
 }
