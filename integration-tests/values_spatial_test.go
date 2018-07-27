@@ -56,7 +56,7 @@ var _ = Describe("Spatial Types", func() {
 			Skip("spatial types are only available after neo4j 3.4.0 release")
 		}
 
-		session, err = driver.Session(AccessModeRead)
+		session, err = driver.Session(AccessModeWrite)
 		Expect(err).To(BeNil())
 		Expect(session).NotTo(BeNil())
 	})
