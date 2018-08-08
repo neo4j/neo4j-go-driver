@@ -61,14 +61,10 @@ var _ = Describe("Bookmark", func() {
 
 		BeforeEach(func() {
 			driver, err = NewDriver(singleInstanceUri, BasicAuth(username, password, ""))
-			if err != nil {
-				Expect(err).To(BeNil())
-			}
+			Expect(err).To(BeNil())
 
 			session, err = driver.Session(AccessModeWrite)
-			if err != nil {
-				Expect(err).To(BeNil())
-			}
+			Expect(err).To(BeNil())
 		})
 
 		AfterEach(func() {
@@ -210,16 +206,12 @@ var _ = Describe("Bookmark", func() {
 
 		BeforeEach(func() {
 			driver, err = NewDriver(singleInstanceUri, BasicAuth(username, password, ""))
-			if err != nil {
-				Expect(err).To(BeNil())
-			}
+			Expect(err).To(BeNil())
 
 			bookmark = createNodeInTx(driver)
 
 			session, err = driver.Session(AccessModeWrite, bookmark)
-			if err != nil {
-				Expect(err).To(BeNil())
-			}
+			Expect(err).To(BeNil())
 		})
 
 		AfterEach(func() {
@@ -301,18 +293,14 @@ var _ = Describe("Bookmark", func() {
 
 		BeforeEach(func() {
 			driver, err = NewDriver(singleInstanceUri, BasicAuth(username, password, ""))
-			if err != nil {
-				Expect(err).To(BeNil())
-			}
+			Expect(err).To(BeNil())
 
 			bookmark1 = createNodeInTx(driver)
 			bookmark2 = createNodeInTx(driver)
 			Expect(bookmark1).NotTo(Equal(bookmark2))
 
 			session, err = driver.Session(AccessModeWrite, bookmark1, bookmark2)
-			if err != nil {
-				Expect(err).To(BeNil())
-			}
+			Expect(err).To(BeNil())
 		})
 
 		AfterEach(func() {
@@ -364,16 +352,12 @@ var _ = Describe("Bookmark", func() {
 
 		BeforeEach(func() {
 			driver, err = NewDriver(singleInstanceUri, BasicAuth(username, password, ""))
-			if err != nil {
-				Expect(err).To(BeNil())
-			}
+			Expect(err).To(BeNil())
 
 			bookmark = createNodeInTx(driver)
 
 			session, err = driver.Session(AccessModeWrite, bookmark+"0")
-			if err != nil {
-				Expect(err).To(BeNil())
-			}
+			Expect(err).To(BeNil())
 		})
 
 		AfterEach(func() {

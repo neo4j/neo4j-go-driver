@@ -19,7 +19,6 @@
 
 package integration_tests
 
-
 import (
 	. "github.com/neo4j/neo4j-go-driver"
 	. "github.com/neo4j/neo4j-go-driver/internal/testing"
@@ -39,14 +38,10 @@ var _ = Describe("Driver", func() {
 
 		BeforeEach(func() {
 			driver, err = NewDriver(singleInstanceUri, BasicAuth(username, password, ""))
-			if err != nil {
-				Expect(err).To(BeNil())
-			}
+			Expect(err).To(BeNil())
 
 			session, err = driver.Session(AccessModeWrite)
-			if err != nil {
-				Expect(err).To(BeNil())
-			}
+			Expect(err).To(BeNil())
 		})
 
 		AfterEach(func() {
@@ -97,17 +92,15 @@ var _ = Describe("Driver", func() {
 
 	Context("Pooling", func() {
 		var (
-			err     error
-			driver  Driver
+			err    error
+			driver Driver
 		)
 
 		BeforeEach(func() {
 			driver, err = NewDriver(singleInstanceUri, BasicAuth(username, password, ""), func(config *Config) {
 				config.MaxConnectionPoolSize = 2
 			})
-			if err != nil {
-				Expect(err).To(BeNil())
-			}
+			Expect(err).To(BeNil())
 		})
 
 		AfterEach(func() {
