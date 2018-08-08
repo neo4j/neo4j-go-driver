@@ -54,21 +54,14 @@ func init() {
 
 var _ = BeforeSuite(func() {
 	driver, err := NewDriver(singleInstanceUri, BasicAuth(username, password, ""))
-	if err != nil {
-		Expect(err).To(BeNil())
-	}
+	Expect(err).To(BeNil())
 
 	session, err := driver.Session(AccessModeRead)
-	if err != nil {
-		Expect(err).To(BeNil())
-	}
+	Expect(err).To(BeNil())
 
 	result, err := session.Run("MATCH (n) DETACH DELETE n", nil)
-	if err != nil {
-		Expect(err).To(BeNil())
-	}
+	Expect(err).To(BeNil())
 
-	if _, err := result.Consume(); err != nil {
-		Expect(err).To(BeNil())
-	}
+	_, err = result.Consume()
+	Expect(err).To(BeNil())
 })

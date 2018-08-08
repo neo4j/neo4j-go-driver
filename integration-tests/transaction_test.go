@@ -40,14 +40,10 @@ var _ = Describe("Transaction", func() {
 
 	BeforeEach(func() {
 		driver, err = NewDriver(singleInstanceUri, BasicAuth(username, password, ""))
-		if err != nil {
-			Expect(err).To(BeNil())
-		}
+		Expect(err).To(BeNil())
 
 		session, err = driver.Session(AccessModeWrite)
-		if err != nil {
-			Expect(err).To(BeNil())
-		}
+		Expect(err).To(BeNil())
 	})
 
 	AfterEach(func() {
@@ -242,4 +238,3 @@ var _ = Describe("Transaction", func() {
 		Expect(result1.Keys()).To(BeEquivalentTo([]string{"N", "M"}))
 	})
 })
-

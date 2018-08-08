@@ -164,14 +164,10 @@ var _ = Describe("Session", func() {
 
 		BeforeEach(func() {
 			driver, err = NewDriver(singleInstanceUri, BasicAuth(username, password, ""))
-			if err != nil {
-				Expect(err).To(BeNil())
-			}
+			Expect(err).To(BeNil())
 
 			session, err = driver.Session(AccessModeWrite)
-			if err != nil {
-				Expect(err).To(BeNil())
-			}
+			Expect(err).To(BeNil())
 		})
 
 		AfterEach(func() {

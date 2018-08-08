@@ -60,7 +60,7 @@ func newDirectDriver(target *url.URL, token AuthToken, config *Config) (*directD
 		config = defaultConfig()
 	}
 
-	connector, err := seabolt.NewConnector(target.String(), token.tokens, configToConnectorConfig(config))
+	connector, err := seabolt.NewConnector(target, token.tokens, configToConnectorConfig(config))
 	if err != nil {
 		return nil, err
 	}
