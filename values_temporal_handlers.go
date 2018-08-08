@@ -43,10 +43,6 @@ const (
 	dateTimeSize                int  = 3
 )
 
-var (
-	epochUtc time.Time = time.Date(1970, 1, 1, 0, 0, 0, 0, time.UTC)
-)
-
 type dateTimeValueHandler struct {
 }
 

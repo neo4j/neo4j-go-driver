@@ -49,12 +49,20 @@ type Duration struct {
 	nanos   int
 }
 
-func DateOf(of time.Time) Date {
-	epoch := time.Date(1970, 1, 1, 0, 0, 0, 0, of.Location())
-	diff := of.Sub(epoch)
-	epochDays := int64(diff.Seconds() / (60 * 60 * 24))
+const (
+	nanosPerDay int64 = 24 * int64(time.Hour)
+)
 
-	return Date{epochDays: epochDays}
+var (
+	epochUtc time.Time = time.Date(1970, 1, 1, 0, 0, 0, 0, time.UTC)
+)
+
+func DateOf(of time.Time) Date {
+	ofUtc := time.Date(of.Year(), of.Month(), of.Day(), 0, 0, 0, 0, time.UTC)
+	diffHours := ofUtc.Sub(epochUtc).Hours()
+	epochDays := diffHours / 24
+
+	return Date{epochDays: int64(epochDays)}
 }
 
 func (date Date) Time() time.Time {
