@@ -65,6 +65,24 @@ func BePoolFullError() types.GomegaMatcher {
 	}
 }
 
+func BeConnectorErrorWithState(state uint32) types.GomegaMatcher {
+	return &connectorErrorMatcher{
+		stateMatcher: gomega.BeNumerically("==", state),
+	}
+}
+
+func BeConnectorErrorWithCode(code uint32) types.GomegaMatcher {
+	return &connectorErrorMatcher{
+		codeMatcher: gomega.BeNumerically("==", code),
+	}
+}
+
+func BeConnectorErrorWithDescription(description string) types.GomegaMatcher {
+	return &connectorErrorMatcher{
+		descriptionMatcher: gomega.ContainSubstring(description),
+	}
+}
+
 func BeAuthenticationError() types.GomegaMatcher {
 	return &connectorErrorMatcher{
 		stateMatcher: gomega.BeEquivalentTo(4),
@@ -95,6 +113,7 @@ type poolErrorMatcher struct {
 type connectorErrorMatcher struct {
 	stateMatcher types.GomegaMatcher
 	codeMatcher  types.GomegaMatcher
+	descriptionMatcher types.GomegaMatcher
 }
 
 func (matcher *databaseErrorMatcher) Match(actual interface{}) (success bool, err error) {
@@ -228,6 +247,10 @@ func (matcher *connectorErrorMatcher) Match(actual interface{}) (success bool, e
 		return matcher.codeMatcher.Match(connectorError.Code())
 	}
 
+	if matcher.descriptionMatcher != nil {
+		return matcher.descriptionMatcher.Match(connectorError.Description())
+	}
+
 	return true, nil
 }
 
@@ -245,6 +268,10 @@ func (matcher *connectorErrorMatcher) FailureMessage(actual interface{}) (messag
 		return fmt.Sprintf("Expected\n\t%#v\nto have its code to match %s", actual, matcher.codeMatcher.FailureMessage(connectorError.Code()))
 	}
 
+	if matcher.descriptionMatcher != nil {
+		return fmt.Sprintf("Expected\n\t%#v\nto have its description to match %s", actual, matcher.descriptionMatcher.FailureMessage(connectorError.Description()))
+	}
+
 	return fmt.Sprintf("Unexpected condition in matcher")
 }
 
@@ -260,6 +287,10 @@ func (matcher *connectorErrorMatcher) NegatedFailureMessage(actual interface{}) 
 
 	if matcher.codeMatcher != nil {
 		return fmt.Sprintf("Expected\n\t%#v\nnot to have its code to match %s", actual, matcher.codeMatcher.FailureMessage(connectorError.Code()))
+	}
+
+	if matcher.descriptionMatcher != nil {
+		return fmt.Sprintf("Expected\n\t%#v\nnot to have its description to match %s", actual, matcher.descriptionMatcher.FailureMessage(connectorError.Description()))
 	}
 
 	return fmt.Sprintf("Unexpected condition in matcher")
