@@ -5,12 +5,14 @@ if [ -z "$BASE" ]; then
     BASE=$(dirname $0)
 fi
 
+DATE_FORMAT="%Y-%m-%dT%H:%M:%S"
 BOLT_PASSWORD="password"
 BOLT_PORT=7699
 HTTPS_PORT=7698
 HTTP_PORT=7697
 PYTHON="python"
-TEST_ARGS=$@
+TEST_ARGS="$@"
+SEABOLT_LIBDIR=$(pkg-config --variable=libdir seabolt)
 
 BOLTKIT_NOT_AVAILABLE=11
 SERVER_INSTALL_FAILED=13
@@ -50,7 +52,7 @@ function run_tests
     SERVER=${BASE}/build/server
     rm -r ${SERVER} 2> /dev/null
 
-    echo "Testing against Neo4j ${NEO4J_VERSION}"
+    echo "Testing against Neo4j \"${NEO4J_VERSION}\""
 
     echo "-- Installing server"
     NEO4J_DIR=$(neoctrl-install ${NEO4J_VERSION} ${SERVER})
@@ -112,7 +114,7 @@ function run_tests
     echo "-- Server is listening at ${NEO4J_BOLT_URI}"
 
     echo "-- Running tests"
-    BOLT_PORT="${BOLT_PORT}" go test ${TEST_ARGS}
+    BOLT_PORT="${BOLT_PORT}" go test -ldflags "-r ${SEABOLT_LIBDIR}" -args "${TEST_ARGS}"
     if [ "$?" -ne "0" ]
     then
         echo "FATAL: Test execution failed."
@@ -122,7 +124,7 @@ function run_tests
     stop_server "${NEO4J_DIR}"
 }
 
-echo "Seabolt test run started at $(date -Ins)"
+echo "Seabolt test run started at $(date +$DATE_FORMAT)"
 check_boltkit
 if [ -z "${NEO4J_VERSION}" ]
 then
@@ -135,4 +137,4 @@ then
     echo "FATAL: Test execution failed."
     exit ${TESTS_FAILED}
 fi
-echo "Seabolt test run completed at $(date -Ins)"
+echo "Seabolt test run completed at $(date +$DATE_FORMAT)"
