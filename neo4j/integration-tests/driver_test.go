@@ -20,13 +20,22 @@
 package integration_tests
 
 import (
-	. "github.com/neo4j/neo4j-go-driver"
-	. "github.com/neo4j/neo4j-go-driver/internal/testing"
+	. "github.com/neo4j/neo4j-go-driver/neo4j"
+	"github.com/neo4j/neo4j-go-driver/neo4j/integration-tests/control"
+	. "github.com/neo4j/neo4j-go-driver/neo4j/internal/testing"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
 
 var _ = Describe("Driver", func() {
+	var server *control.SingleInstance
+	var err error
+
+	BeforeEach(func() {
+		server, err = control.EnsureSingleInstance()
+		Expect(err).To(BeNil())
+		Expect(server).NotTo(BeNil())
+	})
 
 	Context("Direct", func() {
 		var (
@@ -37,7 +46,7 @@ var _ = Describe("Driver", func() {
 		)
 
 		BeforeEach(func() {
-			driver, err = NewDriver(singleInstanceUri, BasicAuth(username, password, ""))
+			driver, err = server.Driver()
 			Expect(err).To(BeNil())
 
 			session, err = driver.Session(AccessModeWrite)
@@ -97,7 +106,7 @@ var _ = Describe("Driver", func() {
 		)
 
 		BeforeEach(func() {
-			driver, err = NewDriver(singleInstanceUri, BasicAuth(username, password, ""), func(config *Config) {
+			driver, err = NewDriver(server.BoltUri(), server.AuthToken(), server.Config(), func(config *Config) {
 				config.MaxConnectionPoolSize = 2
 			})
 			Expect(err).To(BeNil())

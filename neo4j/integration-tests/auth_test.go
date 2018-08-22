@@ -20,17 +20,26 @@
 package integration_tests
 
 import (
-	. "github.com/neo4j/neo4j-go-driver"
-	. "github.com/neo4j/neo4j-go-driver/internal/testing"
+	. "github.com/neo4j/neo4j-go-driver/neo4j"
+	"github.com/neo4j/neo4j-go-driver/neo4j/integration-tests/control"
+	. "github.com/neo4j/neo4j-go-driver/neo4j/internal/testing"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
 
 var _ = Describe("Authentication", func() {
+	var server *control.SingleInstance
+	var err error
+
+	BeforeEach(func() {
+		server, err = control.EnsureSingleInstance()
+		Expect(err).To(BeNil())
+		Expect(server).NotTo(BeNil())
+	})
 
 	Specify("when wrong credentials are provided, it should fail with authentication error", func() {
 		token := BasicAuth("wrong", "wrong", "")
-		driver, err := NewDriver(singleInstanceUri, token)
+		driver, err := NewDriver(server.BoltUri(), token, server.Config())
 		Expect(err).To(BeNil())
 		defer driver.Close()
 
@@ -42,44 +51,44 @@ var _ = Describe("Authentication", func() {
 		Expect(err).To(BeAuthenticationError())
 	})
 
+	verifyConnect := func(token *AuthToken) func() {
+		return func() {
+			driver, err := NewDriver(server.BoltUri(), *token)
+			Expect(err).To(BeNil())
+			defer driver.Close()
+
+			session, err := driver.Session(AccessModeRead)
+			Expect(err).To(BeNil())
+			defer session.Close()
+
+			result, err := session.Run("RETURN 1", nil)
+			Expect(err).To(BeNil())
+
+			if result.Next() {
+				Expect(result.Record().GetByIndex(0)).Should(BeEquivalentTo(1))
+			}
+			Expect(result.Next()).To(BeFalse())
+			Expect(result.Err()).To(BeNil())
+		}
+	}
+
 	When("when credentials are provided as a basic token with realm", func() {
-		token := BasicAuth(username, password, "native")
+		token := BasicAuth(server.Username(), server.Password(), "native")
 
 		Specify("it should be able to connect", verifyConnect(&token))
 	})
 
 	When("when credentials are provided as a custom token", func() {
-		token := CustomAuth("basic", username, password, "native", nil)
+		token := CustomAuth("basic", server.Username(), server.Password(), "native", nil)
 
 		Specify("it should be able to connect", verifyConnect(&token))
 	})
 
 	When("when credentials are provided as a custom token with parameters", func() {
-		token := CustomAuth("basic", username, password, "native", &map[string]interface{}{
+		token := CustomAuth("basic", server.Username(), server.Password(), "native", &map[string]interface{}{
 			"otp": "12345",
 		})
 
 		Specify("it should be able to connect", verifyConnect(&token))
 	})
 })
-
-func verifyConnect(token *AuthToken) func() {
-	return func() {
-		driver, err := NewDriver(singleInstanceUri, *token)
-		Expect(err).To(BeNil())
-		defer driver.Close()
-
-		session, err := driver.Session(AccessModeRead)
-		Expect(err).To(BeNil())
-		defer session.Close()
-
-		result, err := session.Run("RETURN 1", nil)
-		Expect(err).To(BeNil())
-
-		if result.Next() {
-			Expect(result.Record().GetByIndex(0)).Should(BeEquivalentTo(1))
-		}
-		Expect(result.Next()).To(BeFalse())
-		Expect(result.Err()).To(BeNil())
-	}
-}

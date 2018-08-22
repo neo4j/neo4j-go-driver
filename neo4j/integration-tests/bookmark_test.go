@@ -22,13 +22,23 @@ package integration_tests
 import (
 	"fmt"
 
-	. "github.com/neo4j/neo4j-go-driver"
-	. "github.com/neo4j/neo4j-go-driver/internal/testing"
+	. "github.com/neo4j/neo4j-go-driver/neo4j"
+	"github.com/neo4j/neo4j-go-driver/neo4j/integration-tests/control"
+	. "github.com/neo4j/neo4j-go-driver/neo4j/internal/testing"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
 
 var _ = Describe("Bookmark", func() {
+	var server *control.SingleInstance
+	var err error
+
+	BeforeEach(func() {
+		server, err = control.EnsureSingleInstance()
+		Expect(err).To(BeNil())
+		Expect(server).NotTo(BeNil())
+	})
+
 	createNodeInTx := func(driver Driver) string {
 		session, err := driver.Session(AccessModeWrite)
 		Expect(err).To(BeNil())
@@ -60,7 +70,7 @@ var _ = Describe("Bookmark", func() {
 		)
 
 		BeforeEach(func() {
-			driver, err = NewDriver(singleInstanceUri, BasicAuth(username, password, ""))
+			driver, err = server.Driver()
 			Expect(err).To(BeNil())
 
 			session, err = driver.Session(AccessModeWrite)
@@ -205,7 +215,7 @@ var _ = Describe("Bookmark", func() {
 		)
 
 		BeforeEach(func() {
-			driver, err = NewDriver(singleInstanceUri, BasicAuth(username, password, ""))
+			driver, err = server.Driver()
 			Expect(err).To(BeNil())
 
 			bookmark = createNodeInTx(driver)
@@ -292,7 +302,7 @@ var _ = Describe("Bookmark", func() {
 		)
 
 		BeforeEach(func() {
-			driver, err = NewDriver(singleInstanceUri, BasicAuth(username, password, ""))
+			driver, err = server.Driver()
 			Expect(err).To(BeNil())
 
 			bookmark1 = createNodeInTx(driver)
@@ -351,7 +361,7 @@ var _ = Describe("Bookmark", func() {
 		)
 
 		BeforeEach(func() {
-			driver, err = NewDriver(singleInstanceUri, BasicAuth(username, password, ""))
+			driver, err = server.Driver()
 			Expect(err).To(BeNil())
 
 			bookmark = createNodeInTx(driver)

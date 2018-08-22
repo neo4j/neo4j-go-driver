@@ -24,8 +24,9 @@ import (
 	"math/rand"
 	"time"
 
-	. "github.com/neo4j/neo4j-go-driver"
-	. "github.com/neo4j/neo4j-go-driver/internal/testing"
+	. "github.com/neo4j/neo4j-go-driver/neo4j"
+	"github.com/neo4j/neo4j-go-driver/neo4j/integration-tests/control"
+	. "github.com/neo4j/neo4j-go-driver/neo4j/internal/testing"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
@@ -38,17 +39,20 @@ var _ = Describe("Spatial Types", func() {
 		Cartesian3DSrId int = 9157
 	)
 
-	var (
-		err     error
-		driver  Driver
-		session *Session
-		result  *Result
-	)
+	var server *control.SingleInstance
+	var err error
+	var	driver  Driver
+	var	session *Session
+	var	result  *Result
 
 	rand.Seed(time.Now().UnixNano())
 
 	BeforeEach(func() {
-		driver, err = NewDriver(singleInstanceUri, BasicAuth(username, password, ""))
+		server, err = control.EnsureSingleInstance()
+		Expect(err).To(BeNil())
+		Expect(server).NotTo(BeNil())
+
+		driver, err = server.Driver()
 		Expect(err).To(BeNil())
 		Expect(driver).NotTo(BeNil())
 

@@ -24,7 +24,7 @@ import (
 	. "github.com/onsi/ginkgo/extensions/table"
 	. "github.com/onsi/gomega"
 
-	. "github.com/neo4j/neo4j-go-driver/internal/testing"
+	. "github.com/neo4j/neo4j-go-driver/neo4j/internal/testing"
 )
 
 var _ = Describe("Gobolt Driver", func() {

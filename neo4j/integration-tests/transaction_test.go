@@ -23,23 +23,27 @@ import (
 	"time"
 
 	"github.com/neo4j-drivers/gobolt"
-	. "github.com/neo4j/neo4j-go-driver"
+	. "github.com/neo4j/neo4j-go-driver/neo4j"
+	"github.com/neo4j/neo4j-go-driver/neo4j/integration-tests/control"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"github.com/pkg/errors"
 )
 
 var _ = Describe("Transaction", func() {
-	var (
-		err     error
-		driver  Driver
-		session *Session
-		tx      *Transaction
-		result  *Result
-	)
+	var server *control.SingleInstance
+	var err error
+	var driver Driver
+	var session *Session
+	var tx *Transaction
+	var result *Result
 
 	BeforeEach(func() {
-		driver, err = NewDriver(singleInstanceUri, BasicAuth(username, password, ""))
+		server, err = control.EnsureSingleInstance()
+		Expect(err).To(BeNil())
+		Expect(server).NotTo(BeNil())
+
+		driver, err = server.Driver()
 		Expect(err).To(BeNil())
 
 		session, err = driver.Session(AccessModeWrite)

@@ -20,9 +20,9 @@
 package integration_tests
 
 import (
-	"github.com/neo4j/neo4j-go-driver"
-	"github.com/neo4j/neo4j-go-driver/integration-tests/control"
-	"github.com/neo4j/neo4j-go-driver/internal/testing"
+	"github.com/neo4j/neo4j-go-driver/neo4j"
+	"github.com/neo4j/neo4j-go-driver/neo4j/integration-tests/control"
+	"github.com/neo4j/neo4j-go-driver/neo4j/internal/testing"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )

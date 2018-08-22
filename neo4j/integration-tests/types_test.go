@@ -20,21 +20,25 @@
 package integration_tests
 
 import (
-	. "github.com/neo4j/neo4j-go-driver"
+	. "github.com/neo4j/neo4j-go-driver/neo4j"
+	"github.com/neo4j/neo4j-go-driver/neo4j/integration-tests/control"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
 
 var _ = Describe("Types", func() {
-	var (
-		err     error
-		driver  Driver
-		session *Session
-		result  *Result
-	)
+	var server *control.SingleInstance
+	var err error
+	var driver Driver
+	var session *Session
+	var result *Result
 
 	BeforeEach(func() {
-		driver, err = NewDriver(singleInstanceUri, BasicAuth(username, password, ""))
+		server, err = control.EnsureSingleInstance()
+		Expect(err).To(BeNil())
+		Expect(server).NotTo(BeNil())
+
+		driver, err = server.Driver()
 		Expect(err).To(BeNil())
 		Expect(driver).NotTo(BeNil())
 
@@ -357,18 +361,18 @@ var _ = Describe("Types", func() {
 				CREATE (m1:Person:Manager $manager) 
 				CREATE p = (e1)-[r1:LED_BY { from: '2017-01-01' }]->(l1)-[r2:REPORTS_TO { from: '2017-01-01' }]->(m1)
 				RETURN p, e1, l1, m1, r1, r2`, &map[string]interface{}{
-					"employee": map[string]interface{}{
-						"id": 1,
-						"name": "employee 1",
-					},
-					"lead": map[string]interface{}{
-						"id": 2,
-						"name": "lead 1",
-					},
-					"manager": map[string]interface{}{
-						"id": 3,
-						"name": "manager 1",
-					},
+			"employee": map[string]interface{}{
+				"id":   1,
+				"name": "employee 1",
+			},
+			"lead": map[string]interface{}{
+				"id":   2,
+				"name": "lead 1",
+			},
+			"manager": map[string]interface{}{
+				"id":   3,
+				"name": "manager 1",
+			},
 		})
 		Expect(err).To(BeNil())
 
@@ -393,6 +397,4 @@ var _ = Describe("Types", func() {
 		Expect(result.Err()).To(BeNil())
 	})
 
-
 })
-

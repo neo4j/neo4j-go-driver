@@ -24,14 +24,11 @@ import (
 	"fmt"
 	"math/rand"
 	"net/url"
-	"os"
-	"path"
-	"runtime"
 	"strings"
 	"sync"
 	"time"
 
-	"github.com/neo4j/neo4j-go-driver"
+	"github.com/neo4j/neo4j-go-driver/neo4j"
 )
 
 type ClusterMemberRole string
@@ -66,27 +63,16 @@ type clusterDrivers struct {
 	config    configFunc
 }
 
-const (
-	clusterStartupTimeout = 120 * time.Second
-	clusterCheckInterval  = 500 * time.Millisecond
-)
-
-var lock sync.Mutex
 var cluster *Cluster
 var clusterErr error
+var clusterLock sync.Mutex
 
 func EnsureCluster() (*Cluster, error) {
 	if cluster == nil && clusterErr == nil {
-		lock.Lock()
-		defer lock.Unlock()
+		clusterLock.Lock()
+		defer clusterLock.Unlock()
 		if cluster == nil {
-			var clusterPath string = os.TempDir()
-
-			if _, file, _, ok := runtime.Caller(1); ok {
-				clusterPath = path.Join(path.Dir(file), "build")
-			}
-
-			cluster, clusterErr = newCluster(clusterPath)
+			cluster, clusterErr = newCluster(resolveServerPath(true))
 		}
 	}
 
@@ -95,10 +81,12 @@ func EnsureCluster() (*Cluster, error) {
 
 func StopCluster() {
 	if cluster != nil {
-		lock.Lock()
-		defer lock.Unlock()
+		clusterLock.Lock()
+		defer clusterLock.Unlock()
 
-		stopCluster(cluster.path)
+		if cluster != nil {
+			stopCluster(cluster.path)
+		}
 	}
 }
 
@@ -108,9 +96,9 @@ func newCluster(path string) (*Cluster, error) {
 	var clusterMember *ClusterMember
 	var clusterMembers []*ClusterMember
 
-	if _, err = os.Stat(path); os.IsNotExist(err) {
+	if !isClusterInstalled(path) {
 		// there isn't any cluster installation
-		if err = installCluster(neo4jVersionToTestAgainst(), 3, 2, "password", 20000, path); err != nil {
+		if err = installCluster(versionToTestAgainst(), clusterCoreCount, clusterReadReplicaCount, password, clusterPort, path); err != nil {
 			return nil, err
 		}
 	}
@@ -155,9 +143,9 @@ func newCluster(path string) (*Cluster, error) {
 		return nil, err
 	}
 
-	authToken := neo4j.BasicAuth("neo4j", "password", "")
+	authToken := neo4j.BasicAuth(username, password, "")
 	config := func(config *neo4j.Config) {
-
+		config.Log = neo4j.ConsoleLogger(logLevel())
 	}
 
 	result := &Cluster{
@@ -189,9 +177,7 @@ func (cluster *Cluster) AuthToken() neo4j.AuthToken {
 }
 
 func (cluster *Cluster) Config() func(config *neo4j.Config) {
-	return func(config *neo4j.Config) {
-		config.Log = neo4j.ConsoleLogger(neo4j.DEBUG)
-	}
+	return cluster.config
 }
 
 func (cluster *Cluster) Leader() *ClusterMember {
@@ -255,31 +241,7 @@ func (cluster *Cluster) deleteData() error {
 		return err
 	}
 
-	session, err := driver.Session(neo4j.AccessModeWrite)
-	if err != nil {
-		return err
-	}
-	defer session.Close()
-
-	for {
-		result, err := session.Run("MATCH (n) WITH n LIMIT 10000 DETACH DELETE n RETURN count(n)", nil)
-		if err != nil {
-			return err
-		}
-
-		if result.Next() {
-			deleted := result.Record().GetByIndex(0).(int64)
-			if deleted == 0 {
-				break
-			}
-		}
-
-		if err := result.Err(); err != nil {
-			return err
-		}
-	}
-
-	return nil
+	return deleteData(driver)
 }
 
 func (cluster *Cluster) waitMembersToBeOnline() error {

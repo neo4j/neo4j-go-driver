@@ -17,24 +17,27 @@
  * limitations under the License.
  */
 
-package integration_tests_test
+package control
 
 import (
-	"os"
-	"testing"
+	"time"
 
-	. "github.com/onsi/ginkgo"
-	"github.com/onsi/ginkgo/reporters"
-	. "github.com/onsi/gomega"
+	"github.com/neo4j/neo4j-go-driver/neo4j"
 )
 
-func TestIntegrationTests(t *testing.T) {
-	RegisterFailHandler(Fail)
+const (
+	communityEdition  = "community"
+	enterpriseEdition = "enterprise"
 
-	customReporters := []Reporter(nil)
-	if os.Getenv("TEAMCITY_VERSION") != "" {
-		customReporters = append(customReporters, reporters.NewTeamCityReporter(os.Stdout))
-	}
+	defaultVersionAndEdition = "-e 3.4.6"
+	defaultLogLevel          = neo4j.ERROR
 
-	RunSpecsWithDefaultAndCustomReporters(t, "Neo4j Go Driver Integration Tests", customReporters)
-}
+	username = "neo4j"
+	password = "password"
+
+	clusterCoreCount        = 3
+	clusterReadReplicaCount = 2
+	clusterPort             = 20000
+	clusterStartupTimeout   = 120 * time.Second
+	clusterCheckInterval    = 500 * time.Millisecond
+)

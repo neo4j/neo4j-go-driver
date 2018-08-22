@@ -19,44 +19,55 @@
 
 package control
 
-import "strconv"
+import (
+	"os"
+	"strconv"
+)
 
-func installCluster(version string, cores int, readReplicas int, password string, port int, path string) error {
+func isClusterInstalled(at string) bool {
+	if _, err := os.Stat(at); os.IsNotExist(err) {
+		return false
+	}
+
+	return true
+}
+
+func installCluster(version string, cores int, readReplicas int, password string, port int, to string) error {
 	_, err := executeCommand("neoctrl-cluster", "install",
 		"--cores", strconv.Itoa(cores),
 		"--read-replicas", strconv.Itoa(readReplicas),
 		"--password", password,
 		"--initial-port", strconv.Itoa(port),
 		version,
-		path)
+		to)
 
 	return err
 }
 
-func startCluster(path string) (string, error) {
-	return executeCommand("neoctrl-cluster", "start", path)
+func startCluster(at string) (string, error) {
+	return executeCommand("neoctrl-cluster", "start", at)
 }
 
-func startClusterMember(path string) (string, error) {
-	return executeCommand("neoctrl-start", path)
+func startClusterMember(at string) (string, error) {
+	return executeCommand("neoctrl-start", at)
 }
 
-func stopCluster(path string) error {
-	_, err := executeCommand("neoctrl-cluster", "stop", path)
+func stopCluster(at string) error {
+	_, err := executeCommand("neoctrl-cluster", "stop", at)
 	return err
 }
 
-func stopClusterMember(path string) error {
-	_, err := executeCommand("neoctrl-stop", path)
+func stopClusterMember(at string) error {
+	_, err := executeCommand("neoctrl-stop", at)
 	return err
 }
 
-func killCluster(path string) error {
-	_, err := executeCommand("neoctrl-cluster", "stop", "--kill", path)
+func killCluster(at string) error {
+	_, err := executeCommand("neoctrl-cluster", "stop", "--kill", at)
 	return err
 }
 
-func killClusterMember(path string) error {
-	_, err := executeCommand("neoctrl-stop", "--kill", path)
+func killClusterMember(at string) error {
+	_, err := executeCommand("neoctrl-stop", "--kill", at)
 	return err
 }
