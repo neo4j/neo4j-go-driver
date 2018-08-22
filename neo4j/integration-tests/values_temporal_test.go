@@ -172,7 +172,7 @@ var _ = Describe("Temporal Types", func() {
 			rand.Intn(300)+1900,
 			time.Month(rand.Intn(12)+1),
 			rand.Intn(28)+1,
-			rand.Intn(24),
+			rand.Intn(17)+6, // to be safe from DST changes
 			rand.Intn(60),
 			rand.Intn(60),
 			rand.Intn(1000000000),
