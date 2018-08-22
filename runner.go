@@ -21,12 +21,12 @@ package neo4j
 
 import (
 	"errors"
-	"github.com/neo4j-drivers/neo4j-go-connector"
+	"github.com/neo4j-drivers/gobolt"
 )
 
 type statementRunner struct {
 	driver         Driver
-	connection     seabolt.Connection
+	connection     gobolt.Connection
 	autoClose      bool
 	accessMode     AccessMode
 	lastBookmark   string
@@ -90,7 +90,7 @@ func handleRunPhase(runner *statementRunner, activeResult *Result) error {
 			return err
 		}
 
-		if received != seabolt.FetchTypeMetadata {
+		if received != gobolt.FetchTypeMetadata {
 			return errors.New("unexpected response received while waiting for a METADATA")
 		}
 
@@ -120,7 +120,7 @@ func handleRecordsPhase(runner *statementRunner, activeResult *Result) error {
 		}
 
 		switch received {
-		case seabolt.FetchTypeMetadata:
+		case gobolt.FetchTypeMetadata:
 			metadata, err := runner.connection.Metadata()
 			if err != nil {
 				return err
@@ -128,14 +128,14 @@ func handleRecordsPhase(runner *statementRunner, activeResult *Result) error {
 
 			activeResult.collectMetadata(metadata)
 			activeResult.resultCompleted = true
-		case seabolt.FetchTypeRecord:
+		case gobolt.FetchTypeRecord:
 			fields, err := runner.connection.Data()
 			if err != nil {
 				return err
 			}
 
 			activeResult.collectRecord(fields)
-		case seabolt.FetchTypeError:
+		case gobolt.FetchTypeError:
 			return errors.New("unable to fetch from connection")
 		}
 	}

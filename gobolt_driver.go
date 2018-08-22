@@ -23,24 +23,24 @@ import (
 	"net/url"
 	"sync/atomic"
 
-	"github.com/neo4j-drivers/neo4j-go-connector"
+	"github.com/neo4j-drivers/gobolt"
 	"github.com/pkg/errors"
 )
 
-type seaboltDriver struct {
+type goboltDriver struct {
 	config    *Config
 	target    url.URL
-	connector seabolt.Connector
+	connector gobolt.Connector
 
 	open int32
 }
 
-func configToSeaboltConfig(config *Config) *seabolt.Config {
-	return &seabolt.Config{
+func configToGoboltConfig(config *Config) *gobolt.Config {
+	return &gobolt.Config{
 		Encryption:  config.Encrypted,
 		Log:         config.Log,
 		MaxPoolSize: config.MaxConnectionPoolSize,
-		ValueHandlers: []seabolt.ValueHandler{
+		ValueHandlers: []gobolt.ValueHandler{
 			&nodeValueHandler{},
 			&relationshipValueHandler{},
 			&pathValueHandler{},
@@ -55,17 +55,17 @@ func configToSeaboltConfig(config *Config) *seabolt.Config {
 	}
 }
 
-func newSeaboltDriver(target *url.URL, token AuthToken, config *Config) (*seaboltDriver, error) {
+func newGoboltDriver(target *url.URL, token AuthToken, config *Config) (*goboltDriver, error) {
 	if config == nil {
 		config = defaultConfig()
 	}
 
-	connector, err := seabolt.NewConnector(target, token.tokens, configToSeaboltConfig(config))
+	connector, err := gobolt.NewConnector(target, token.tokens, configToGoboltConfig(config))
 	if err != nil {
 		return nil, err
 	}
 
-	driver := seaboltDriver{
+	driver := goboltDriver{
 		config:    config,
 		target:    *target,
 		connector: connector,
@@ -74,7 +74,7 @@ func newSeaboltDriver(target *url.URL, token AuthToken, config *Config) (*seabol
 	return &driver, nil
 }
 
-func assertDriverOpen(driver *seaboltDriver) error {
+func assertDriverOpen(driver *goboltDriver) error {
 	if atomic.LoadInt32(&driver.open) == 0 {
 		return errors.New("cannot acquire a session on a closed driver")
 	}
@@ -82,11 +82,11 @@ func assertDriverOpen(driver *seaboltDriver) error {
 	return nil
 }
 
-func (driver *seaboltDriver) Target() url.URL {
+func (driver *goboltDriver) Target() url.URL {
 	return driver.target
 }
 
-func (driver *seaboltDriver) Session(accessMode AccessMode, bookmarks ...string) (*Session, error) {
+func (driver *goboltDriver) Session(accessMode AccessMode, bookmarks ...string) (*Session, error) {
 	if err := assertDriverOpen(driver); err != nil {
 		return nil, err
 	}
@@ -94,7 +94,7 @@ func (driver *seaboltDriver) Session(accessMode AccessMode, bookmarks ...string)
 	return newSession(driver, accessMode, bookmarks), nil
 }
 
-func (driver *seaboltDriver) Close() error {
+func (driver *goboltDriver) Close() error {
 	if atomic.CompareAndSwapInt32(&driver.open, 1, 0) {
 		return driver.connector.Close()
 	}
@@ -102,18 +102,18 @@ func (driver *seaboltDriver) Close() error {
 	return nil
 }
 
-func (driver *seaboltDriver) configuration() *Config {
+func (driver *goboltDriver) configuration() *Config {
 	return driver.config
 }
 
-func (driver *seaboltDriver) acquire(mode AccessMode) (seabolt.Connection, error) {
+func (driver *goboltDriver) acquire(mode AccessMode) (gobolt.Connection, error) {
 	if err := assertDriverOpen(driver); err != nil {
 		return nil, err
 	}
 
-	seaboltMode := seabolt.AccessModeWrite
+	seaboltMode := gobolt.AccessModeWrite
 	if mode == AccessModeRead {
-		seaboltMode = seabolt.AccessModeRead
+		seaboltMode = gobolt.AccessModeRead
 	}
 
 	return driver.connector.Acquire(seaboltMode)

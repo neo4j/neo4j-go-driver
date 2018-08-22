@@ -22,16 +22,16 @@ package neo4j
 import (
 	"net/url"
 
-	"github.com/neo4j-drivers/neo4j-go-connector"
+	"github.com/neo4j-drivers/gobolt"
 )
 
-func newSeaboltWithConnector(target string, connector seabolt.Connector) Driver {
+func newGoboltWithConnector(target string, connector gobolt.Connector) Driver {
 	targetURL, err := url.Parse(target)
 	if err != nil {
 		return nil
 	}
 
-	return &seaboltDriver{
+	return &goboltDriver{
 		target:    *targetURL,
 		connector: connector,
 		open:      1,

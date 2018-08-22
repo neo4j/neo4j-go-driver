@@ -20,9 +20,9 @@
 package neo4j
 
 import (
-	"github.com/neo4j-drivers/neo4j-go-connector"
+	"github.com/neo4j-drivers/gobolt"
 )
 
 func isRetriableError(err error) bool {
-	return seabolt.IsServiceUnavailable(err) || seabolt.IsTransientError(err)
+	return gobolt.IsServiceUnavailable(err) || gobolt.IsTransientError(err)
 }

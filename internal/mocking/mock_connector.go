@@ -26,7 +26,7 @@ package mocking
 import (
 	reflect "reflect"
 
-	"github.com/neo4j-drivers/neo4j-go-connector"
+	"github.com/neo4j-drivers/gobolt"
 
 	gomock "github.com/golang/mock/gomock"
 )
@@ -67,14 +67,14 @@ func (mr *MockConnectorMockRecorder) Close() *gomock.Call {
 }
 
 // GetPool connector-mocks base method
-func (m *MockConnector) Acquire(arg0 seabolt.AccessMode) (seabolt.Connection, error) {
+func (m *MockConnector) Acquire(arg0 gobolt.AccessMode) (gobolt.Connection, error) {
 	ret := m.ctrl.Call(m, "Acquire", arg0)
-	ret0, _ := ret[0].(seabolt.Connection)
+	ret0, _ := ret[0].(gobolt.Connection)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // GetPool indicates an expected call of GetPool
-func (mr *MockConnectorMockRecorder) Acquire(arg0 seabolt.AccessMode) *gomock.Call {
+func (mr *MockConnectorMockRecorder) Acquire(arg0 gobolt.AccessMode) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Acquire", reflect.TypeOf((*MockConnector)(nil).Acquire), arg0)
 }

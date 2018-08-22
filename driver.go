@@ -23,7 +23,7 @@ import (
 	"fmt"
 	"net/url"
 
-	"github.com/neo4j-drivers/neo4j-go-connector"
+	"github.com/neo4j-drivers/gobolt"
 )
 
 // AccessMode defines modes that routing driver decides to which cluster member
@@ -47,7 +47,7 @@ type Driver interface {
 	Close() error
 
 	configuration() *Config
-	acquire(mode AccessMode) (seabolt.Connection, error)
+	acquire(mode AccessMode) (gobolt.Connection, error)
 }
 
 // NewDriver is the entry method to the neo4j driver to create an instance of a Driver
@@ -74,5 +74,5 @@ func NewDriver(target string, auth AuthToken, configurers ...func(*Config)) (Dri
 		return nil, err
 	}
 
-	return newSeaboltDriver(parsed, auth, config)
+	return newGoboltDriver(parsed, auth, config)
 }

@@ -22,7 +22,7 @@ package integration_tests
 import (
 	"time"
 
-	"github.com/neo4j-drivers/neo4j-go-connector"
+	"github.com/neo4j-drivers/gobolt"
 	. "github.com/neo4j/neo4j-go-driver"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -87,7 +87,7 @@ var _ = Describe("Transaction", func() {
 	}
 
 	Context("Retry Mechanism", func() {
-		transientError := seabolt.NewDatabaseError(map[string]interface{}{
+		transientError := gobolt.NewDatabaseError(map[string]interface{}{
 			"code":    "Neo.TransientError.Transaction.Outdated",
 			"message": "some transient error",
 		})

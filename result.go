@@ -20,7 +20,7 @@
 package neo4j
 
 import (
-	"github.com/neo4j-drivers/neo4j-go-connector"
+	"github.com/neo4j-drivers/gobolt"
 	"time"
 )
 
@@ -32,9 +32,9 @@ type Result struct {
 	summary         ResultSummary
 	runner          *statementRunner
 	err             error
-	runHandle       seabolt.RequestHandle
+	runHandle       gobolt.RequestHandle
 	runCompleted    bool
-	resultHandle    seabolt.RequestHandle
+	resultHandle    gobolt.RequestHandle
 	resultCompleted bool
 }
 

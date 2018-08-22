@@ -23,7 +23,7 @@ import (
 	"fmt"
 	"reflect"
 
-	"github.com/neo4j-drivers/neo4j-go-connector"
+	"github.com/neo4j-drivers/gobolt"
 )
 
 type nodeValueHandler struct {
@@ -45,7 +45,7 @@ func (handler *nodeValueHandler) WritableTypes() []reflect.Type {
 
 func (handler *nodeValueHandler) Read(signature int8, values []interface{}) (interface{}, error) {
 	if len(values) != 3 {
-		return nil, seabolt.NewValueHandlerError(fmt.Sprintf("expected node struct to have %d fields but received %d", 3, len(values)))
+		return nil, gobolt.NewValueHandlerError(fmt.Sprintf("expected node struct to have %d fields but received %d", 3, len(values)))
 	}
 
 	idValue := values[0].(int64)
@@ -66,7 +66,7 @@ func (handler *nodeValueHandler) Read(signature int8, values []interface{}) (int
 }
 
 func (handler *nodeValueHandler) Write(value interface{}) (int8, []interface{}, error) {
-	return 0, nil, &seabolt.ValueHandlerNotSupportedError{}
+	return 0, nil, &gobolt.ValueHandlerNotSupportedError{}
 }
 
 func (handler *relationshipValueHandler) ReadableStructs() []int8 {
@@ -80,7 +80,7 @@ func (handler *relationshipValueHandler) WritableTypes() []reflect.Type {
 func (handler *relationshipValueHandler) Read(signature int8, values []interface{}) (interface{}, error) {
 	if signature == 'R' {
 		if len(values) != 5 {
-			return nil, seabolt.NewValueHandlerError(fmt.Sprintf("expected relationship struct to have %d fields but received %d", 5, len(values)))
+			return nil, gobolt.NewValueHandlerError(fmt.Sprintf("expected relationship struct to have %d fields but received %d", 5, len(values)))
 		}
 
 		idValue := values[0].(int64)
@@ -98,7 +98,7 @@ func (handler *relationshipValueHandler) Read(signature int8, values []interface
 		}, nil
 	} else {
 		if len(values) != 3 {
-			return nil, seabolt.NewValueHandlerError(fmt.Sprintf("expected unbound relationship struct to have %d fields but received %d", 3, len(values)))
+			return nil, gobolt.NewValueHandlerError(fmt.Sprintf("expected unbound relationship struct to have %d fields but received %d", 3, len(values)))
 		}
 
 		idValue := values[0].(int64)
@@ -116,7 +116,7 @@ func (handler *relationshipValueHandler) Read(signature int8, values []interface
 }
 
 func (handler *relationshipValueHandler) Write(value interface{}) (int8, []interface{}, error) {
-	return 0, nil, &seabolt.ValueHandlerNotSupportedError{}
+	return 0, nil, &gobolt.ValueHandlerNotSupportedError{}
 }
 
 func (handler *pathValueHandler) ReadableStructs() []int8 {
@@ -129,7 +129,7 @@ func (handler *pathValueHandler) WritableTypes() []reflect.Type {
 
 func (handler *pathValueHandler) Read(signature int8, values []interface{}) (interface{}, error) {
 	if len(values) != 3 {
-		return nil, seabolt.NewValueHandlerError(fmt.Sprintf("expected path struct to have %d fields but received %d", 3, len(values)))
+		return nil, gobolt.NewValueHandlerError(fmt.Sprintf("expected path struct to have %d fields but received %d", 3, len(values)))
 	}
 
 	uniqueNodesValue := values[0].([]interface{})
@@ -181,5 +181,5 @@ func (handler *pathValueHandler) Read(signature int8, values []interface{}) (int
 }
 
 func (handler *pathValueHandler) Write(value interface{}) (int8, []interface{}, error) {
-	return 0, nil, &seabolt.ValueHandlerNotSupportedError{}
+	return 0, nil, &gobolt.ValueHandlerNotSupportedError{}
 }

@@ -24,7 +24,7 @@ import (
 	"math"
 	"reflect"
 
-	"github.com/neo4j-drivers/neo4j-go-connector"
+	"github.com/neo4j-drivers/gobolt"
 )
 
 const (
@@ -55,7 +55,7 @@ func (handler *pointValueHandler) Read(signature int8, values []interface{}) (in
 	switch signature {
 	case point2DSignature:
 		if len(values) != point2DSize {
-			return nil, seabolt.NewValueHandlerError(fmt.Sprintf("expected Point2D struct to have %d fields but received %d", point2DSize, len(values)))
+			return nil, gobolt.NewValueHandlerError(fmt.Sprintf("expected Point2D struct to have %d fields but received %d", point2DSize, len(values)))
 		}
 
 		dimension = 2
@@ -65,7 +65,7 @@ func (handler *pointValueHandler) Read(signature int8, values []interface{}) (in
 		z = math.NaN()
 	case point3DSignature:
 		if len(values) != point3DSize {
-			return nil, seabolt.NewValueHandlerError(fmt.Sprintf("expected Point3D struct to have %d fields but received %d", point3DSize, len(values)))
+			return nil, gobolt.NewValueHandlerError(fmt.Sprintf("expected Point3D struct to have %d fields but received %d", point3DSize, len(values)))
 		}
 
 		dimension = 3
@@ -74,7 +74,7 @@ func (handler *pointValueHandler) Read(signature int8, values []interface{}) (in
 		y = values[2].(float64)
 		z = values[3].(float64)
 	default:
-		return nil, seabolt.NewValueHandlerError(fmt.Sprintf("unexpected struct signature provided to PointValueHandler: %#x", signature))
+		return nil, gobolt.NewValueHandlerError(fmt.Sprintf("unexpected struct signature provided to PointValueHandler: %#x", signature))
 	}
 
 	return &Point{
@@ -114,5 +114,5 @@ func (handler *pointValueHandler) Write(value interface{}) (int8, []interface{},
 		}
 	}
 
-	return 0, nil, seabolt.NewValueHandlerError(fmt.Sprintf("passed in value %v is not supported by PointValueHandler", value))
+	return 0, nil, gobolt.NewValueHandlerError(fmt.Sprintf("passed in value %v is not supported by PointValueHandler", value))
 }

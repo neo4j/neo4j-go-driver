@@ -27,7 +27,7 @@ import (
 	. "github.com/neo4j/neo4j-go-driver/internal/testing"
 )
 
-var _ = Describe("Seabolt Driver", func() {
+var _ = Describe("Gobolt Driver", func() {
 	Context("with Stub Server", func() {
 		type TestCase struct {
 			script   string

@@ -19,13 +19,13 @@
 
 package mocking
 
-import "github.com/neo4j-drivers/neo4j-go-connector"
+import "github.com/neo4j-drivers/gobolt"
 
 type mockConnector struct {
 	connection *MockConnection
 }
 
-func (connector *mockConnector) Acquire(mode seabolt.AccessMode) (seabolt.Connection, error) {
+func (connector *mockConnector) Acquire(mode gobolt.AccessMode) (gobolt.Connection, error) {
 	return connector.connection, nil
 }
 
@@ -34,7 +34,7 @@ func (connector *mockConnector) Close() error {
 }
 
 // MockedConnector returns a mocked connector with the provided mocked connection
-func MockedConnector(connection *MockConnection) seabolt.Connector {
+func MockedConnector(connection *MockConnection) gobolt.Connector {
 	return &mockConnector{
 		connection: connection,
 	}

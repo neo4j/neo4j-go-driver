@@ -21,7 +21,7 @@ package drivertest
 
 import (
 	"fmt"
-	"github.com/neo4j-drivers/neo4j-go-connector"
+	"github.com/neo4j-drivers/gobolt"
 	"github.com/onsi/gomega"
 	"github.com/onsi/gomega/types"
 )
@@ -105,7 +105,7 @@ type connectorErrorMatcher struct {
 }
 
 func (matcher *databaseErrorMatcher) Match(actual interface{}) (success bool, err error) {
-	databaseError, ok := actual.(*seabolt.DatabaseError)
+	databaseError, ok := actual.(*gobolt.DatabaseError)
 	if !ok {
 		return false, nil
 	}
@@ -126,7 +126,7 @@ func (matcher *databaseErrorMatcher) Match(actual interface{}) (success bool, er
 }
 
 func (matcher *databaseErrorMatcher) FailureMessage(actual interface{}) (message string) {
-	databaseError, ok := actual.(*seabolt.DatabaseError)
+	databaseError, ok := actual.(*gobolt.DatabaseError)
 	if !ok {
 		return fmt.Sprintf("Expected\n\t%#v\nto be a DatabaseError", actual)
 	}
@@ -147,7 +147,7 @@ func (matcher *databaseErrorMatcher) FailureMessage(actual interface{}) (message
 }
 
 func (matcher *databaseErrorMatcher) NegatedFailureMessage(actual interface{}) (message string) {
-	databaseError, ok := actual.(*seabolt.DatabaseError)
+	databaseError, ok := actual.(*gobolt.DatabaseError)
 	if !ok {
 		return fmt.Sprintf("Expected\n\t%#v\nnot to be a DatabaseError", actual)
 	}
@@ -173,7 +173,7 @@ func (matcher *serviceUnavailableErrorMatcher) Match(actual interface{}) (succes
 		return false, nil
 	}
 
-	return seabolt.IsServiceUnavailable(err), nil
+	return gobolt.IsServiceUnavailable(err), nil
 }
 
 func (matcher *serviceUnavailableErrorMatcher) FailureMessage(actual interface{}) (message string) {
@@ -195,7 +195,7 @@ func (matcher *serviceUnavailableErrorMatcher) NegatedFailureMessage(actual inte
 }
 
 func (matcher *connectorErrorMatcher) Match(actual interface{}) (success bool, err error) {
-	connectorError, ok := actual.(*seabolt.ConnectorError)
+	connectorError, ok := actual.(*gobolt.ConnectorError)
 	if !ok {
 		return false, nil
 	}
@@ -216,7 +216,7 @@ func (matcher *connectorErrorMatcher) Match(actual interface{}) (success bool, e
 }
 
 func (matcher *connectorErrorMatcher) FailureMessage(actual interface{}) (message string) {
-	connectorError, ok := actual.(*seabolt.ConnectorError)
+	connectorError, ok := actual.(*gobolt.ConnectorError)
 	if !ok {
 		return fmt.Sprintf("Expected\n\t%#v\nto be a ConnectorError", actual)
 	}
@@ -237,7 +237,7 @@ func (matcher *connectorErrorMatcher) FailureMessage(actual interface{}) (messag
 }
 
 func (matcher *connectorErrorMatcher) NegatedFailureMessage(actual interface{}) (message string) {
-	connectorError, ok := actual.(*seabolt.ConnectorError)
+	connectorError, ok := actual.(*gobolt.ConnectorError)
 	if !ok {
 		return fmt.Sprintf("Expected\n\t%#v\nnot to be a ConnectorError", actual)
 	}

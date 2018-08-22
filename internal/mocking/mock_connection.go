@@ -26,7 +26,7 @@ package mocking
 import (
 	reflect "reflect"
 
-	"github.com/neo4j-drivers/neo4j-go-connector"
+	"github.com/neo4j-drivers/gobolt"
 
 	gomock "github.com/golang/mock/gomock"
 )
@@ -79,9 +79,9 @@ func (mr *MockConnectionMockRecorder) Server() *gomock.Call {
 }
 
 // Begin connector-mocks base method
-func (m *MockConnection) Begin(arg0 []string) (seabolt.RequestHandle, error) {
+func (m *MockConnection) Begin(arg0 []string) (gobolt.RequestHandle, error) {
 	ret := m.ctrl.Call(m, "Begin", arg0)
-	ret0, _ := ret[0].(seabolt.RequestHandle)
+	ret0, _ := ret[0].(gobolt.RequestHandle)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -104,9 +104,9 @@ func (mr *MockConnectionMockRecorder) Close() *gomock.Call {
 }
 
 // Commit connector-mocks base method
-func (m *MockConnection) Commit() (seabolt.RequestHandle, error) {
+func (m *MockConnection) Commit() (gobolt.RequestHandle, error) {
 	ret := m.ctrl.Call(m, "Commit")
-	ret0, _ := ret[0].(seabolt.RequestHandle)
+	ret0, _ := ret[0].(gobolt.RequestHandle)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -130,9 +130,9 @@ func (mr *MockConnectionMockRecorder) Data() *gomock.Call {
 }
 
 // DiscardAll connector-mocks base method
-func (m *MockConnection) DiscardAll() (seabolt.RequestHandle, error) {
+func (m *MockConnection) DiscardAll() (gobolt.RequestHandle, error) {
 	ret := m.ctrl.Call(m, "DiscardAll")
-	ret0, _ := ret[0].(seabolt.RequestHandle)
+	ret0, _ := ret[0].(gobolt.RequestHandle)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -143,9 +143,9 @@ func (mr *MockConnectionMockRecorder) DiscardAll() *gomock.Call {
 }
 
 // Fetch connector-mocks base method
-func (m *MockConnection) Fetch(arg0 seabolt.RequestHandle) (seabolt.FetchType, error) {
+func (m *MockConnection) Fetch(arg0 gobolt.RequestHandle) (gobolt.FetchType, error) {
 	ret := m.ctrl.Call(m, "Fetch", arg0)
-	ret0, _ := ret[0].(seabolt.FetchType)
+	ret0, _ := ret[0].(gobolt.FetchType)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -156,7 +156,7 @@ func (mr *MockConnectionMockRecorder) Fetch(arg0 interface{}) *gomock.Call {
 }
 
 // FetchSummary connector-mocks base method
-func (m *MockConnection) FetchSummary(arg0 seabolt.RequestHandle) (int, error) {
+func (m *MockConnection) FetchSummary(arg0 gobolt.RequestHandle) (int, error) {
 	ret := m.ctrl.Call(m, "FetchSummary", arg0)
 	ret0, _ := ret[0].(int)
 	ret1, _ := ret[1].(error)
@@ -219,9 +219,9 @@ func (mr *MockConnectionMockRecorder) Metadata() *gomock.Call {
 }
 
 // PullAll connector-mocks base method
-func (m *MockConnection) PullAll() (seabolt.RequestHandle, error) {
+func (m *MockConnection) PullAll() (gobolt.RequestHandle, error) {
 	ret := m.ctrl.Call(m, "PullAll")
-	ret0, _ := ret[0].(seabolt.RequestHandle)
+	ret0, _ := ret[0].(gobolt.RequestHandle)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -232,9 +232,9 @@ func (mr *MockConnectionMockRecorder) PullAll() *gomock.Call {
 }
 
 // Reset connector-mocks base method
-func (m *MockConnection) Reset() (seabolt.RequestHandle, error) {
+func (m *MockConnection) Reset() (gobolt.RequestHandle, error) {
 	ret := m.ctrl.Call(m, "Reset")
-	ret0, _ := ret[0].(seabolt.RequestHandle)
+	ret0, _ := ret[0].(gobolt.RequestHandle)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -245,9 +245,9 @@ func (mr *MockConnectionMockRecorder) Reset() *gomock.Call {
 }
 
 // Rollback connector-mocks base method
-func (m *MockConnection) Rollback() (seabolt.RequestHandle, error) {
+func (m *MockConnection) Rollback() (gobolt.RequestHandle, error) {
 	ret := m.ctrl.Call(m, "Rollback")
-	ret0, _ := ret[0].(seabolt.RequestHandle)
+	ret0, _ := ret[0].(gobolt.RequestHandle)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -258,9 +258,9 @@ func (mr *MockConnectionMockRecorder) Rollback() *gomock.Call {
 }
 
 // Run connector-mocks base method
-func (m *MockConnection) Run(arg0 string, arg1 *map[string]interface{}) (seabolt.RequestHandle, error) {
+func (m *MockConnection) Run(arg0 string, arg1 *map[string]interface{}) (gobolt.RequestHandle, error) {
 	ret := m.ctrl.Call(m, "Run", arg0, arg1)
-	ret0, _ := ret[0].(seabolt.RequestHandle)
+	ret0, _ := ret[0].(gobolt.RequestHandle)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }

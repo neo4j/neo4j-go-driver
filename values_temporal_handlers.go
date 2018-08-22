@@ -24,7 +24,7 @@ import (
 	"reflect"
 	"time"
 
-	"github.com/neo4j-drivers/neo4j-go-connector"
+	"github.com/neo4j-drivers/gobolt"
 )
 
 const (
@@ -73,13 +73,13 @@ func (handler *dateValueHandler) Read(signature int8, values []interface{}) (int
 	switch signature {
 	case dateSignature:
 		if len(values) != dateSize {
-			return nil, seabolt.NewValueHandlerError(fmt.Sprintf("expected date struct to have %d fields but received %d", dateSize, len(values)))
+			return nil, gobolt.NewValueHandlerError(fmt.Sprintf("expected date struct to have %d fields but received %d", dateSize, len(values)))
 		}
 		epochDays := values[0].(int64)
 		return Date{epochDays}, nil
 	}
 
-	return nil, seabolt.NewValueHandlerError(fmt.Sprintf("unexpected struct signature provided to dateTimeValueHandler: %#x", signature))
+	return nil, gobolt.NewValueHandlerError(fmt.Sprintf("unexpected struct signature provided to dateTimeValueHandler: %#x", signature))
 }
 
 func (handler *dateValueHandler) Write(value interface{}) (int8, []interface{}, error) {
@@ -87,7 +87,7 @@ func (handler *dateValueHandler) Write(value interface{}) (int8, []interface{}, 
 	var ok bool
 
 	if date, ok = value.(Date); !ok {
-		return 0, nil, seabolt.NewValueHandlerError(fmt.Sprintf("passed in value %v is not supported by dateValueHandler", value))
+		return 0, nil, gobolt.NewValueHandlerError(fmt.Sprintf("passed in value %v is not supported by dateValueHandler", value))
 	}
 
 	return dateSignature, []interface{}{date.epochDays}, nil
@@ -105,13 +105,13 @@ func (handler *localTimeValueHandler) Read(signature int8, values []interface{})
 	switch signature {
 	case localTimeSignature:
 		if len(values) != localTimeSize {
-			return nil, seabolt.NewValueHandlerError(fmt.Sprintf("expected local time struct to have %d fields but received %d", localTimeSize, len(values)))
+			return nil, gobolt.NewValueHandlerError(fmt.Sprintf("expected local time struct to have %d fields but received %d", localTimeSize, len(values)))
 		}
 		nanosOfDay := values[0].(int64)
 		return LocalTime{time.Duration(nanosOfDay)}, nil
 	}
 
-	return nil, seabolt.NewValueHandlerError(fmt.Sprintf("unexpected struct signature provided to localTimeValueHandler: %#x", signature))
+	return nil, gobolt.NewValueHandlerError(fmt.Sprintf("unexpected struct signature provided to localTimeValueHandler: %#x", signature))
 }
 
 func (handler *localTimeValueHandler) Write(value interface{}) (int8, []interface{}, error) {
@@ -119,7 +119,7 @@ func (handler *localTimeValueHandler) Write(value interface{}) (int8, []interfac
 	var ok bool
 
 	if localTime, ok = value.(LocalTime); !ok {
-		return 0, nil, seabolt.NewValueHandlerError(fmt.Sprintf("passed in value %v is not supported by localTimeValueHandler", value))
+		return 0, nil, gobolt.NewValueHandlerError(fmt.Sprintf("passed in value %v is not supported by localTimeValueHandler", value))
 	}
 
 	return localTimeSignature, []interface{}{int64(localTime.nanosOfDay)}, nil
@@ -137,14 +137,14 @@ func (handler *offsetTimeValueHandler) Read(signature int8, values []interface{}
 	switch signature {
 	case offsetTimeSignature:
 		if len(values) != offsetTimeSize {
-			return nil, seabolt.NewValueHandlerError(fmt.Sprintf("expected offset time struct to have %d fields but received %d", offsetTimeSize, len(values)))
+			return nil, gobolt.NewValueHandlerError(fmt.Sprintf("expected offset time struct to have %d fields but received %d", offsetTimeSize, len(values)))
 		}
 		nanosOfDay := values[0].(int64)
 		offset := values[1].(int64)
 		return OffsetTime{time.Duration(nanosOfDay), int(offset)}, nil
 	}
 
-	return nil, seabolt.NewValueHandlerError(fmt.Sprintf("unexpected struct signature provided to offsetTimeValueHandler: %#x", signature))
+	return nil, gobolt.NewValueHandlerError(fmt.Sprintf("unexpected struct signature provided to offsetTimeValueHandler: %#x", signature))
 }
 
 func (handler *offsetTimeValueHandler) Write(value interface{}) (int8, []interface{}, error) {
@@ -152,7 +152,7 @@ func (handler *offsetTimeValueHandler) Write(value interface{}) (int8, []interfa
 	var ok bool
 
 	if offsetTime, ok = value.(OffsetTime); !ok {
-		return 0, nil, seabolt.NewValueHandlerError(fmt.Sprintf("passed in value %v is not supported by offsetTimeValueHandler", value))
+		return 0, nil, gobolt.NewValueHandlerError(fmt.Sprintf("passed in value %v is not supported by offsetTimeValueHandler", value))
 	}
 
 	return offsetTimeSignature, []interface{}{int64(offsetTime.nanosOfDay), offsetTime.offset}, nil
@@ -170,7 +170,7 @@ func (handler *durationValueHandler) Read(signature int8, values []interface{}) 
 	switch signature {
 	case durationSignature:
 		if len(values) != durationSize {
-			return nil, seabolt.NewValueHandlerError(fmt.Sprintf("expected duration struct to have %d fields but received %d", durationSize, len(values)))
+			return nil, gobolt.NewValueHandlerError(fmt.Sprintf("expected duration struct to have %d fields but received %d", durationSize, len(values)))
 		}
 		months := values[0].(int64)
 		days := values[1].(int64)
@@ -179,7 +179,7 @@ func (handler *durationValueHandler) Read(signature int8, values []interface{}) 
 		return Duration{months, days, seconds, int(nanos)}, nil
 	}
 
-	return nil, seabolt.NewValueHandlerError(fmt.Sprintf("unexpected struct signature provided to durationValueHandler: %#x", signature))
+	return nil, gobolt.NewValueHandlerError(fmt.Sprintf("unexpected struct signature provided to durationValueHandler: %#x", signature))
 }
 
 func (handler *durationValueHandler) Write(value interface{}) (int8, []interface{}, error) {
@@ -187,7 +187,7 @@ func (handler *durationValueHandler) Write(value interface{}) (int8, []interface
 	var ok bool
 
 	if duration, ok = value.(Duration); !ok {
-		return 0, nil, seabolt.NewValueHandlerError(fmt.Sprintf("passed in value %v is not supported by durationValueHandler", value))
+		return 0, nil, gobolt.NewValueHandlerError(fmt.Sprintf("passed in value %v is not supported by durationValueHandler", value))
 	}
 
 	return durationSignature, []interface{}{duration.months, duration.days, duration.seconds, duration.nanos}, nil
@@ -205,7 +205,7 @@ func (handler *localDateTimeValueHandler) Read(signature int8, values []interfac
 	switch signature {
 	case localDateTimeSignature:
 		if len(values) != localDateTimeSize {
-			return nil, seabolt.NewValueHandlerError(fmt.Sprintf("expected local date time struct to have %d fields but received %d", localDateTimeSize, len(values)))
+			return nil, gobolt.NewValueHandlerError(fmt.Sprintf("expected local date time struct to have %d fields but received %d", localDateTimeSize, len(values)))
 		}
 
 		sec := values[0].(int64)
@@ -214,7 +214,7 @@ func (handler *localDateTimeValueHandler) Read(signature int8, values []interfac
 		return LocalDateTime{sec, int(nsec)}, nil
 	}
 
-	return nil, seabolt.NewValueHandlerError(fmt.Sprintf("unexpected struct signature provided to localDateTimeValueHandler: %#x", signature))
+	return nil, gobolt.NewValueHandlerError(fmt.Sprintf("unexpected struct signature provided to localDateTimeValueHandler: %#x", signature))
 }
 
 func (handler *localDateTimeValueHandler) Write(value interface{}) (int8, []interface{}, error) {
@@ -222,7 +222,7 @@ func (handler *localDateTimeValueHandler) Write(value interface{}) (int8, []inte
 	var ok bool
 
 	if localDateTime, ok = value.(LocalDateTime); !ok {
-		return 0, nil, seabolt.NewValueHandlerError(fmt.Sprintf("passed in value %v is not supported by localDateTimeValueHandler", value))
+		return 0, nil, gobolt.NewValueHandlerError(fmt.Sprintf("passed in value %v is not supported by localDateTimeValueHandler", value))
 	}
 
 	return localDateTimeSignature, []interface{}{
@@ -243,7 +243,7 @@ func (handler *dateTimeValueHandler) Read(signature int8, values []interface{}) 
 	switch signature {
 	case dateTimeWithZoneIdSignature:
 		if len(values) != dateTimeSize {
-			return nil, seabolt.NewValueHandlerError(fmt.Sprintf("expected date time with zone id struct to have %d fields but received %d", dateTimeSize, len(values)))
+			return nil, gobolt.NewValueHandlerError(fmt.Sprintf("expected date time with zone id struct to have %d fields but received %d", dateTimeSize, len(values)))
 		}
 
 		sec := values[0].(int64)
@@ -251,7 +251,7 @@ func (handler *dateTimeValueHandler) Read(signature int8, values []interface{}) 
 		zone := values[2].(string)
 		location, err := time.LoadLocation(zone)
 		if err != nil {
-			return nil, seabolt.NewValueHandlerError(fmt.Sprintf("Unable to load time zone '%s'", zone))
+			return nil, gobolt.NewValueHandlerError(fmt.Sprintf("Unable to load time zone '%s'", zone))
 		}
 
 		utcTime := epochUtc.Add(time.Duration(sec)*time.Second + time.Duration(nsec))
@@ -259,7 +259,7 @@ func (handler *dateTimeValueHandler) Read(signature int8, values []interface{}) 
 		return time.Date(utcTime.Year(), utcTime.Month(), utcTime.Day(), utcTime.Hour(), utcTime.Minute(), utcTime.Second(), utcTime.Nanosecond(), location), nil
 	case dateTimeWithOffsetSignature:
 		if len(values) != dateTimeSize {
-			return nil, seabolt.NewValueHandlerError(fmt.Sprintf("expected date time with offset struct to have %d fields but received %d", dateTimeSize, len(values)))
+			return nil, gobolt.NewValueHandlerError(fmt.Sprintf("expected date time with offset struct to have %d fields but received %d", dateTimeSize, len(values)))
 		}
 
 		sec := values[0].(int64)
@@ -272,7 +272,7 @@ func (handler *dateTimeValueHandler) Read(signature int8, values []interface{}) 
 		return time.Date(utcTime.Year(), utcTime.Month(), utcTime.Day(), utcTime.Hour(), utcTime.Minute(), utcTime.Second(), utcTime.Nanosecond(), location), nil
 	}
 
-	return nil, seabolt.NewValueHandlerError(fmt.Sprintf("unexpected struct signature provided to dateTimeValueHandler: %#x", signature))
+	return nil, gobolt.NewValueHandlerError(fmt.Sprintf("unexpected struct signature provided to dateTimeValueHandler: %#x", signature))
 }
 
 func (handler *dateTimeValueHandler) Write(value interface{}) (int8, []interface{}, error) {
@@ -280,7 +280,7 @@ func (handler *dateTimeValueHandler) Write(value interface{}) (int8, []interface
 	var ok bool
 
 	if dateTime, ok = value.(time.Time); !ok {
-		return 0, nil, seabolt.NewValueHandlerError(fmt.Sprintf("passed in value %v is not supported by dateTimeValueHandler", value))
+		return 0, nil, gobolt.NewValueHandlerError(fmt.Sprintf("passed in value %v is not supported by dateTimeValueHandler", value))
 	}
 
 	location := dateTime.Location()
