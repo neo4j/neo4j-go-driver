@@ -28,6 +28,7 @@ import (
 )
 
 var _ = Describe("Gobolt Driver", func() {
+
 	Context("with Stub Server", func() {
 		type TestCase struct {
 			script   string
@@ -35,6 +36,8 @@ var _ = Describe("Gobolt Driver", func() {
 		}
 
 		DescribeTable("", func(testCase TestCase) {
+			Skip("Disabled these tests temporarily")
+
 			stub := NewStubServer(9001, testCase.script)
 			defer stub.Close()
 
