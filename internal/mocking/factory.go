@@ -22,34 +22,20 @@ package mocking
 import "github.com/neo4j-drivers/neo4j-go-connector"
 
 type mockConnector struct {
-	pool *mockPool
-}
-
-type mockPool struct {
 	connection *MockConnection
 }
 
-func (connector *mockConnector) GetPool() (seabolt.Pool, error) {
-	return connector.pool, nil
+func (connector *mockConnector) Acquire(mode seabolt.AccessMode) (seabolt.Connection, error) {
+	return connector.connection, nil
 }
 
 func (connector *mockConnector) Close() error {
-	return connector.pool.Close()
-}
-
-func (pool *mockPool) Acquire() (seabolt.Connection, error) {
-	return pool.connection, nil
-}
-
-func (pool *mockPool) Close() error {
-	return pool.connection.Close()
+	return connector.connection.Close()
 }
 
 // MockedConnector returns a mocked connector with the provided mocked connection
 func MockedConnector(connection *MockConnection) seabolt.Connector {
 	return &mockConnector{
-		pool: &mockPool{
-			connection: connection,
-		},
+		connection: connection,
 	}
 }

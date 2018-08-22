@@ -56,10 +56,10 @@ func NoOpLogger() Logging {
 func ConsoleLogger(level LogLevel) Logging {
 	return &internalLogger{
 		level:         level,
-		errorLogger:   log.New(os.Stderr, "ERROR: ", log.Ldate|log.Ltime|log.Lmicroseconds),
+		errorLogger:   log.New(os.Stderr, "ERROR  : ", log.Ldate|log.Ltime|log.Lmicroseconds),
 		warningLogger: log.New(os.Stdout, "WARNING: ", log.Ldate|log.Ltime|log.Lmicroseconds),
-		infoLogger:    log.New(os.Stdout, "INFO: ", log.Ldate|log.Ltime|log.Lmicroseconds),
-		debugLogger:   log.New(os.Stdout, "DEBUG: ", log.Ldate|log.Ltime|log.Lmicroseconds),
+		infoLogger:    log.New(os.Stdout, "INFO   : ", log.Ldate|log.Ltime|log.Lmicroseconds),
+		debugLogger:   log.New(os.Stdout, "DEBUG  : ", log.Ldate|log.Ltime|log.Lmicroseconds),
 	}
 }
 

@@ -57,6 +57,14 @@ func NewDriver(target string, auth AuthToken, configurers ...func(*Config)) (Dri
 		return nil, err
 	}
 
+	if parsed.Scheme != "bolt" && parsed.Scheme != "bolt+routing" {
+		return nil, fmt.Errorf("url scheme %s is not supported", parsed.Scheme)
+	}
+
+	if parsed.Scheme == "bolt" && len(parsed.RawQuery) > 0 {
+		return nil, fmt.Errorf("routing context is not supported for direct driver")
+	}
+
 	config := defaultConfig()
 	for _, configurer := range configurers {
 		configurer(config)
@@ -66,9 +74,5 @@ func NewDriver(target string, auth AuthToken, configurers ...func(*Config)) (Dri
 		return nil, err
 	}
 
-	if parsed.Scheme == "bolt" {
-		return newDirectDriver(parsed, auth, config)
-	}
-
-	return nil, fmt.Errorf("URL scheme %s is not supported", parsed.Scheme)
+	return newSeaboltDriver(parsed, auth, config)
 }

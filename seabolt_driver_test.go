@@ -25,13 +25,13 @@ import (
 	"github.com/neo4j-drivers/neo4j-go-connector"
 )
 
-func newDirectWithConnector(target string, connector seabolt.Connector) Driver {
+func newSeaboltWithConnector(target string, connector seabolt.Connector) Driver {
 	targetURL, err := url.Parse(target)
 	if err != nil {
 		return nil
 	}
 
-	return &directDriver{
+	return &seaboltDriver{
 		target:    *targetURL,
 		connector: connector,
 		open:      1,

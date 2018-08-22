@@ -44,7 +44,7 @@ var _ = Describe("Runner", func() {
 		It("should invoke run on connection", func() {
 			mockConnection := mocking.NewMockConnection(mockCtrl)
 			mockConnector := mocking.MockedConnector(mockConnection)
-			mockDriver := newDirectWithConnector("bolt://localhost", mockConnector)
+			mockDriver := newSeaboltWithConnector("bolt://localhost", mockConnector)
 			runner := newRunner(mockDriver, AccessModeWrite, true)
 
 			gomock.InOrder(
