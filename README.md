@@ -128,7 +128,65 @@ The mapping between Cypher types and the types used by this driver (to represent
 | Float| float |
 | String| string |
 | ByteArray| []byte |
-| Node| Node |
-| Relationship| Relationship |
-| Path| _not supported yet_ |
+| Node| neo4j.Node |
+| Relationship| neo4j.Relationship |
+| Path| neo4j.Path |
 
+#### Spatial Types - Point
+
+| Cypher Type | Driver Type
+| ---: | :--- |
+| Point| neo4j.Point |
+
+The temporal types are introduced in Neo4j 3.4 series.
+
+You can create a 2-dimensional `Point` value using;
+
+```go
+point := NewPoint(srId, 1.0, 2.0)
+```
+
+or a 3-dimensional `Point` value using;
+
+```go
+point := NewPoint3D(srId, 1.0, 2.0, 3.0)
+```
+
+NOTE:
+* For a list of supported `srId` values, please refer to the docs [here](https://neo4j.com/docs/developer-manual/current/cypher/functions/spatial/).
+
+#### Temporal Types - Date and Time
+
+The temporal types are introduced in Neo4j 3.4 series. Given the fact that database supports a range of different temporal types, most of them are backed by custom types defined at the driver level.
+
+The mapping among the Cypher temporal types and actual exposed types are as follows:
+
+| Cypher Type | Driver Type |
+| :----------: | :-----------: |
+| Date | neo4j.Date | 
+| Time | neo4j.OffsetTime |
+| LocalTime| neo4j.LocalTime |
+| DateTime | time.Time |
+| LocalDateTime | neo4j.LocalDateTime |
+| Duration | neo4j.Duration |
+
+
+Receiving a temporal value as driver type:
+```go
+dateValue := record.GetByIndex(0).(neo4j.Date)
+```
+
+All custom temporal types can be constructing from a `time.Time` value using `<Type>Of()` (`DateOf`, `OffsetTimeOf`, ...) functions.
+
+```go
+dateValue := DateOf(time.Date(2005, time.December, 16, 0, 0, 0, 0, time.Local)`
+```
+
+Converting a custom temporal value into `time.Time` (all `neo4j` temporal types expose `Time()` function to gets its corresponding `time.Time` value):
+```go
+dateValueAsTime := dateValue.Time()
+```
+
+Note:
+* When `neo4j.OffsetTime` is converted into `time.Time` or constructed through `OffsetTimeOf(time.Time)`, its `Location` is given a fixed name of `Offset` (i.e. assigned `time.FixedZone("Offset", offsetTime.offset)`).
+* When `time.Time` values are sent/received through the driver, if its `Zone()` returns a name of `Offset` the value is stored with its offset value and with its zone name otherwise.

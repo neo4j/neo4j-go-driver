@@ -67,14 +67,14 @@ func (mr *MockConnectorMockRecorder) Close() *gomock.Call {
 }
 
 // GetPool connector-mocks base method
-func (m *MockConnector) GetPool() (seabolt.Pool, error) {
-	ret := m.ctrl.Call(m, "GetPool")
-	ret0, _ := ret[0].(seabolt.Pool)
+func (m *MockConnector) Acquire(arg0 seabolt.AccessMode) (seabolt.Connection, error) {
+	ret := m.ctrl.Call(m, "Acquire", arg0)
+	ret0, _ := ret[0].(seabolt.Connection)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // GetPool indicates an expected call of GetPool
-func (mr *MockConnectorMockRecorder) GetPool() *gomock.Call {
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetPool", reflect.TypeOf((*MockConnector)(nil).GetPool))
+func (mr *MockConnectorMockRecorder) Acquire(arg0 seabolt.AccessMode) *gomock.Call {
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Acquire", reflect.TypeOf((*MockConnector)(nil).Acquire), arg0)
 }

@@ -27,7 +27,7 @@ import (
 	. "github.com/neo4j/neo4j-go-driver/internal/testing"
 )
 
-var _ = Describe("Direct Driver", func() {
+var _ = Describe("Seabolt Driver", func() {
 	Context("with Stub Server", func() {
 		type TestCase struct {
 			script   string
@@ -55,7 +55,7 @@ var _ = Describe("Direct Driver", func() {
 })
 
 func consumeShouldFailOnServerDisconnects() {
-	driver := createDirectDriver()
+	driver := createSeaboltDriver()
 	defer driver.Close()
 
 	session := createSession(driver)
@@ -71,7 +71,7 @@ func consumeShouldFailOnServerDisconnects() {
 }
 
 func shouldExecuteReturn1() {
-	driver := createDirectDriver()
+	driver := createSeaboltDriver()
 	defer driver.Close()
 
 	session := createSession(driver)
@@ -91,7 +91,7 @@ func shouldExecuteReturn1() {
 	Expect(count).To(BeIdenticalTo(int64(1)))
 }
 
-func createDirectDriver() Driver {
+func createSeaboltDriver() Driver {
 	driver, err := NewDriver("bolt://localhost:9001", NoAuth(), func(config *Config) {
 		config.Encrypted = false
 		config.Log = ConsoleLogger(DEBUG)

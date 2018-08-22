@@ -129,7 +129,7 @@ var _ = Describe("Driver", func() {
 			Expect(err).To(BeNil())
 
 			_, err = session3.Run("UNWIND RANGE(1, 100) AS N RETURN N", nil)
-			Expect(err).To(BePoolFullError())
+			Expect(err).To(BeConnectorErrorWithCode(0x600))
 		})
 	})
 

@@ -17,25 +17,4 @@
  * limitations under the License.
  */
 
-package mocking
-
-import "github.com/neo4j-drivers/neo4j-go-connector"
-
-type mockConnector struct {
-	connection *MockConnection
-}
-
-func (connector *mockConnector) Acquire(mode seabolt.AccessMode) (seabolt.Connection, error) {
-	return connector.connection, nil
-}
-
-func (connector *mockConnector) Close() error {
-	return connector.connection.Close()
-}
-
-// MockedConnector returns a mocked connector with the provided mocked connection
-func MockedConnector(connection *MockConnection) seabolt.Connector {
-	return &mockConnector{
-		connection: connection,
-	}
-}
+package control

@@ -27,7 +27,7 @@ import (
 	"github.com/pkg/errors"
 )
 
-type directDriver struct {
+type seaboltDriver struct {
 	config    *Config
 	target    url.URL
 	connector seabolt.Connector
@@ -35,10 +35,10 @@ type directDriver struct {
 	open int32
 }
 
-func configToConnectorConfig(config *Config) *seabolt.Config {
+func configToSeaboltConfig(config *Config) *seabolt.Config {
 	return &seabolt.Config{
 		Encryption:  config.Encrypted,
-		Debug:       config.Log.DebugEnabled(),
+		Log:         config.Log,
 		MaxPoolSize: config.MaxConnectionPoolSize,
 		ValueHandlers: []seabolt.ValueHandler{
 			&nodeValueHandler{},
@@ -55,17 +55,17 @@ func configToConnectorConfig(config *Config) *seabolt.Config {
 	}
 }
 
-func newDirectDriver(target *url.URL, token AuthToken, config *Config) (*directDriver, error) {
+func newSeaboltDriver(target *url.URL, token AuthToken, config *Config) (*seaboltDriver, error) {
 	if config == nil {
 		config = defaultConfig()
 	}
 
-	connector, err := seabolt.NewConnector(target, token.tokens, configToConnectorConfig(config))
+	connector, err := seabolt.NewConnector(target, token.tokens, configToSeaboltConfig(config))
 	if err != nil {
 		return nil, err
 	}
 
-	driver := directDriver{
+	driver := seaboltDriver{
 		config:    config,
 		target:    *target,
 		connector: connector,
@@ -74,7 +74,7 @@ func newDirectDriver(target *url.URL, token AuthToken, config *Config) (*directD
 	return &driver, nil
 }
 
-func assertDriverOpen(driver *directDriver) error {
+func assertDriverOpen(driver *seaboltDriver) error {
 	if atomic.LoadInt32(&driver.open) == 0 {
 		return errors.New("cannot acquire a session on a closed driver")
 	}
@@ -82,11 +82,11 @@ func assertDriverOpen(driver *directDriver) error {
 	return nil
 }
 
-func (driver *directDriver) Target() url.URL {
+func (driver *seaboltDriver) Target() url.URL {
 	return driver.target
 }
 
-func (driver *directDriver) Session(accessMode AccessMode, bookmarks ...string) (*Session, error) {
+func (driver *seaboltDriver) Session(accessMode AccessMode, bookmarks ...string) (*Session, error) {
 	if err := assertDriverOpen(driver); err != nil {
 		return nil, err
 	}
@@ -94,7 +94,7 @@ func (driver *directDriver) Session(accessMode AccessMode, bookmarks ...string) 
 	return newSession(driver, accessMode, bookmarks), nil
 }
 
-func (driver *directDriver) Close() error {
+func (driver *seaboltDriver) Close() error {
 	if atomic.CompareAndSwapInt32(&driver.open, 1, 0) {
 		return driver.connector.Close()
 	}
@@ -102,19 +102,19 @@ func (driver *directDriver) Close() error {
 	return nil
 }
 
-func (driver *directDriver) configuration() *Config {
+func (driver *seaboltDriver) configuration() *Config {
 	return driver.config
 }
 
-func (driver *directDriver) acquire(mode AccessMode) (seabolt.Connection, error) {
+func (driver *seaboltDriver) acquire(mode AccessMode) (seabolt.Connection, error) {
 	if err := assertDriverOpen(driver); err != nil {
 		return nil, err
 	}
 
-	pool, err := driver.connector.GetPool()
-	if err != nil {
-		return nil, err
+	seaboltMode := seabolt.AccessModeWrite
+	if mode == AccessModeRead {
+		seaboltMode = seabolt.AccessModeRead
 	}
 
-	return pool.Acquire()
+	return driver.connector.Acquire(seaboltMode)
 }

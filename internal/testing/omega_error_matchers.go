@@ -58,13 +58,6 @@ func BeServiceUnavailableError() types.GomegaMatcher {
 	return &serviceUnavailableErrorMatcher{}
 }
 
-func BePoolFullError() types.GomegaMatcher {
-	return &poolErrorMatcher{
-		expected: 1,
-		expectedText: "Pool full",
-	}
-}
-
 func BeConnectorErrorWithState(state uint32) types.GomegaMatcher {
 	return &connectorErrorMatcher{
 		stateMatcher: gomega.BeNumerically("==", state),
@@ -103,11 +96,6 @@ type databaseErrorMatcher struct {
 }
 
 type serviceUnavailableErrorMatcher struct {
-}
-
-type poolErrorMatcher struct {
-	expected uint32
-	expectedText string
 }
 
 type connectorErrorMatcher struct {
@@ -204,33 +192,6 @@ func (matcher *serviceUnavailableErrorMatcher) NegatedFailureMessage(actual inte
 	}
 
 	return fmt.Sprintf("Expected\n\t%#v\nnot to be a ServiceUnavailableError", actual)
-}
-
-func (matcher *poolErrorMatcher) Match(actual interface{}) (success bool, err error) {
-	poolError, ok := actual.(*seabolt.PoolError)
-	if !ok {
-		return false, nil
-	}
-
-	return poolError.Code() == matcher.expected, nil
-}
-
-func (matcher *poolErrorMatcher) FailureMessage(actual interface{}) (message string) {
-	_, ok := actual.(*seabolt.PoolError)
-	if !ok {
-		return fmt.Sprintf("Expected\n\t%#v\nto be a pool error", actual)
-	}
-
-	return fmt.Sprintf("Expected\n\t%#v\nto be a pool error with code: %d (%s)", actual, matcher.expected, matcher.expectedText)
-}
-
-func (matcher *poolErrorMatcher) NegatedFailureMessage(actual interface{}) (message string) {
-	_, ok := actual.(*seabolt.PoolError)
-	if !ok {
-		return fmt.Sprintf("Expected\n\t%#v\nnot to be a pool error", actual)
-	}
-
-	return fmt.Sprintf("Expected\n\t%#v\nnot to be a pool error with code: %d (%s)", actual, matcher.expected, matcher.expectedText)
 }
 
 func (matcher *connectorErrorMatcher) Match(actual interface{}) (success bool, err error) {

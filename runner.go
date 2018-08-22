@@ -90,7 +90,7 @@ func handleRunPhase(runner *statementRunner, activeResult *Result) error {
 			return err
 		}
 
-		if received != seabolt.METADATA {
+		if received != seabolt.FetchTypeMetadata {
 			return errors.New("unexpected response received while waiting for a METADATA")
 		}
 
@@ -120,7 +120,7 @@ func handleRecordsPhase(runner *statementRunner, activeResult *Result) error {
 		}
 
 		switch received {
-		case seabolt.METADATA:
+		case seabolt.FetchTypeMetadata:
 			metadata, err := runner.connection.Metadata()
 			if err != nil {
 				return err
@@ -128,14 +128,14 @@ func handleRecordsPhase(runner *statementRunner, activeResult *Result) error {
 
 			activeResult.collectMetadata(metadata)
 			activeResult.resultCompleted = true
-		case seabolt.RECORD:
+		case seabolt.FetchTypeRecord:
 			fields, err := runner.connection.Data()
 			if err != nil {
 				return err
 			}
 
 			activeResult.collectRecord(fields)
-		case seabolt.ERROR:
+		case seabolt.FetchTypeError:
 			return errors.New("unable to fetch from connection")
 		}
 	}
