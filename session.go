@@ -161,7 +161,13 @@ func beginTransactionInternal(session *Session, mode AccessMode) (*Transaction, 
 		return nil, err
 	}
 
-	beginResult, err := session.runner.beginTransaction(session.bookmarks)
+	var computedBookmarks []string
+	computedBookmarks = append(computedBookmarks, session.bookmarks...)
+	if session.lastBookmark != "" {
+		computedBookmarks = append(computedBookmarks, session.lastBookmark)
+	}
+
+	beginResult, err := session.runner.beginTransaction(computedBookmarks)
 	if err != nil {
 		return nil, err
 	}

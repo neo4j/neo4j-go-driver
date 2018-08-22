@@ -24,6 +24,7 @@ import (
 	"os"
 
 	. "github.com/neo4j/neo4j-go-driver"
+	"github.com/neo4j/neo4j-go-driver/integration-tests/control"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
@@ -64,4 +65,8 @@ var _ = BeforeSuite(func() {
 
 	_, err = result.Consume()
 	Expect(err).To(BeNil())
+})
+
+var _ = AfterSuite(func() {
+	control.StopCluster()
 })
