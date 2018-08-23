@@ -18,7 +18,7 @@ This package requires the following tools/libraries to be installed in order to 
 2. Clone [seabolt](http://github.com/neo4j-drivers/seabolt) (assume `<seabolt_dir>` to be the absolute path in which the clone resides) and make sure you can build it successfully (follow it's own instructions)
 3. Add/Update environment variable `PKG_CONFIG_PATH` to include `<seabolt_dir>/build`
 4. Add/Update environment variable `LD_LIBRARY_PATH` to include `<seabolt_dir>/build/lib`
-5. Get this package via `go get github.com/neo4j/neo4j-go-driver`
+5. Get this package via `go get github.com/neo4j/neo4j-go-driver/neo4j`
 
 ### MacOS
 
@@ -26,7 +26,7 @@ This package requires the following tools/libraries to be installed in order to 
 2. Clone [seabolt](http://github.com/neo4j-drivers/seabolt) (assume `<seabolt_dir>` to be the absolute path in which the clone resides) and make sure you can build it successfully,
 3. Add/Update environment variable `PKG_CONFIG_PATH` to include `build` subdirectory of seabolt, i.e. `$PKG_CONFIG_PATH:<seabolt_dir>/build`
 4. Add/Update environment variable `LD_LIBRARY_PATH` to include `<seabolt_dir>/build/lib`
-5. Go Get this package via `go get github.com/neo4j/neo4j-go-driver`
+5. Go Get this package via `go get github.com/neo4j/neo4j-go-driver/neo4j`
 
 ### Windows
 
@@ -34,7 +34,7 @@ This package requires the following tools/libraries to be installed in order to 
 2. Clone [seabolt](http://github.com/neo4j-drivers/seabolt) (assume `<seabolt_dir>` to be the absolute path in which the clone resides) and make sure you can build it successfully,
 3. Add/Update environment variable `PKG_CONFIG_PATH` to include `build` subdirectory of seabolt, i.e. `%PKG_CONFIG_PATH%;<seabolt_dir>/build`
 4. Update environment variable `PATH` to include `<seabolt_dir>/build/bin`
-5. Go Get this package via `go get github.com/neo4j/neo4j-go-driver`
+5. Go Get this package via `go get github.com/neo4j/neo4j-go-driver/neo4j`
 
 ## Versioning
 
@@ -45,7 +45,7 @@ Although `master` branch contains the source code for the latest available relea
 Add the driver as a dependency with `dep`.
 
 ```
-dep ensure -add github.com/neo4j/neo4j-go-driver
+dep ensure -add github.com/neo4j/neo4j-go-driver/neo4j
 ```
 
 ## Minimum Viable Snippet
@@ -84,6 +84,16 @@ for result.Next() {
 	fmt.Printf("Created Item with Id = '%d' and Name = '%s'\n", result.Record().GetByIndex(0).(int64), result.Record().GetByIndex(1).(string))
 }
 if err = result.Err(); err != nil {
+	return err // handle error
+}
+```
+
+## Connecting to a causal cluster
+
+You just need to use `bolt+routing` as the URL scheme and set host of the URL to one of your core members of the cluster.
+
+```go
+if driver, err = neo4j.NewDriver("bolt+routing://localhost:7687", neo4j.BasicAuth("username", "password", "")); err != nil {
 	return err // handle error
 }
 ```
@@ -143,7 +153,7 @@ The temporal types are introduced in Neo4j 3.4 series.
 You can create a 2-dimensional `Point` value using;
 
 ```go
-point := NewPoint(srId, 1.0, 2.0)
+point := NewPoint2D(srId, 1.0, 2.0)
 ```
 
 or a 3-dimensional `Point` value using;
