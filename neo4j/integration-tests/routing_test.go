@@ -76,7 +76,7 @@ var _ = Describe("Routing", func() {
 			testReadAndWriteOnSameSession(cluster.AnyFollower(), "Jack")
 		})
 
-		FSpecify("should successfully execute read/write when initial address contains unusable items", func() {
+		Specify("should successfully execute read/write when initial address contains unusable items", func() {
 			var resolvedTo []neo4j.ServerAddress
 			resolvedTo = append(resolvedTo, cluster.ReadReplicaAddresses()...)
 			resolvedTo = append(resolvedTo, cluster.LeaderAddress())
