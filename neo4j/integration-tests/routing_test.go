@@ -27,7 +27,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-var _ = Describe("Causal Clustering", func() {
+var _ = Describe("Routing", func() {
 	var cluster *control.Cluster
 
 	var driver neo4j.Driver
@@ -74,6 +74,31 @@ var _ = Describe("Causal Clustering", func() {
 
 		Specify("should successfully execute read/write when initial address points to follower", func() {
 			testReadAndWriteOnSameSession(cluster.AnyFollower(), "Jack")
+		})
+
+		FSpecify("should successfully execute read/write when initial address contains unusable items", func() {
+			var resolvedTo []neo4j.ServerAddress
+			resolvedTo = append(resolvedTo, cluster.ReadReplicaAddresses()...)
+			resolvedTo = append(resolvedTo, cluster.LeaderAddress())
+
+			driver, err := neo4j.NewDriver("bolt+routing://localhost", cluster.AuthToken(), cluster.Config(), func(config *neo4j.Config) {
+				config.AddressResolver = &testResolver{
+					addresses: resolvedTo,
+				}
+			})
+			Expect(err).To(BeNil())
+			defer driver.Close()
+
+			session, err = driver.Session(neo4j.AccessModeRead)
+			Expect(err).To(BeNil())
+			defer session.Close()
+
+			result, err = session.Run("RETURN 1", nil)
+			Expect(err).To(BeNil())
+
+			summary, err = result.Consume()
+			Expect(err).To(BeNil())
+			Expect(summary).NotTo(BeNil())
 		})
 
 		Specify("should fail if initial address points to read-replica", func() {
@@ -146,3 +171,11 @@ var _ = Describe("Causal Clustering", func() {
 	})
 
 })
+
+type testResolver struct {
+	addresses []neo4j.ServerAddress
+}
+
+func (resolver *testResolver) Resolve(address neo4j.ServerAddress) []neo4j.ServerAddress {
+	return resolver.addresses
+}

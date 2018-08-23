@@ -37,9 +37,10 @@ type goboltDriver struct {
 
 func configToGoboltConfig(config *Config) *gobolt.Config {
 	return &gobolt.Config{
-		Encryption:  config.Encrypted,
-		Log:         config.Log,
-		MaxPoolSize: config.MaxConnectionPoolSize,
+		Encryption:      config.Encrypted,
+		Log:             config.Log,
+		AddressResolver: wrapAddressResolverOrNil(config.AddressResolver),
+		MaxPoolSize:     config.MaxConnectionPoolSize,
 		ValueHandlers: []gobolt.ValueHandler{
 			&nodeValueHandler{},
 			&relationshipValueHandler{},

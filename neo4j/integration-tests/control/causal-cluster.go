@@ -188,6 +188,10 @@ func (cluster *Cluster) Leader() *ClusterMember {
 	return nil
 }
 
+func (cluster *Cluster) LeaderAddress() neo4j.ServerAddress {
+	return &url.URL{Host: cluster.Leader().hostnameAndPort}
+}
+
 func (cluster *Cluster) Cores() []*ClusterMember {
 	var cores []*ClusterMember
 
@@ -195,6 +199,16 @@ func (cluster *Cluster) Cores() []*ClusterMember {
 	cores = append(cores, cluster.Followers()...)
 
 	return cores
+}
+
+func (cluster *Cluster) CoreAddresses() []neo4j.ServerAddress {
+	var urls []neo4j.ServerAddress
+
+	for _, core := range cluster.Cores() {
+		urls = append(urls, &url.URL{Host: core.hostnameAndPort})
+	}
+
+	return urls
 }
 
 func (cluster *Cluster) Followers() []*ClusterMember {
@@ -214,6 +228,16 @@ func (cluster *Cluster) AnyFollower() *ClusterMember {
 func (cluster *Cluster) ReadReplicas() []*ClusterMember {
 	filtered, _ := cluster.membersWithRole(READ_REPLICA)
 	return filtered
+}
+
+func (cluster *Cluster) ReadReplicaAddresses() []neo4j.ServerAddress {
+	var urls []neo4j.ServerAddress
+
+	for _, replica := range cluster.ReadReplicas() {
+		urls = append(urls, &url.URL{Host: replica.hostnameAndPort})
+	}
+
+	return urls
 }
 
 func (cluster *Cluster) AnyReadReplica() *ClusterMember {

@@ -30,6 +30,11 @@ type Config struct {
 	Encrypted bool
 	// Logging target the driver will send its log outputs
 	Log Logging
+	// Resolver that would be used to resolve initial router address. This may
+	// be useful if you want to provide more than one URL for initial router.
+	// If not specified, the provided 	// bolt+routing URL is used as the initial
+	// router.
+	AddressResolver ServerAddressResolver
 	// Maximum amount of duration a retriable operation would continue retrying
 	MaxTransactionRetryDuration time.Duration
 	// Maximum number of connections per URL to allow on this driver
@@ -38,8 +43,9 @@ type Config struct {
 
 func defaultConfig() *Config {
 	return &Config{
-		Encrypted: true,
-		Log:       NoOpLogger(),
+		Encrypted:                   true,
+		Log:                         NoOpLogger(),
+		AddressResolver:             nil,
 		MaxTransactionRetryDuration: 30 * time.Second,
 		MaxConnectionPoolSize:       100,
 	}
