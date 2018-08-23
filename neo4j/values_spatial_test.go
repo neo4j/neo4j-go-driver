@@ -29,7 +29,7 @@ var _ = Describe("Spatial Types", func() {
 
 	Context("Point", func() {
 		When("constructed with 2 coordinates", func() {
-			point := NewPoint(1, 1.0, 2.0)
+			point := NewPoint2D(1, 1.0, 2.0)
 
 			It("should have a dimension of 2", func() {
 				Expect(point.dimension).To(Equal(2))

@@ -21,6 +21,7 @@ package neo4j
 
 import (
 	"errors"
+
 	"github.com/neo4j-drivers/gobolt"
 )
 
@@ -143,6 +144,14 @@ func handleRecordsPhase(runner *statementRunner, activeResult *Result) error {
 	return nil
 }
 
+func transformError(runner *statementRunner, err error) error {
+	if gobolt.IsWriteError(err) && runner.accessMode == AccessModeRead {
+		return errors.New("write queries cannot be performed in read access mode")
+	}
+
+	return err
+}
+
 func (runner *statementRunner) receive() (*Result, error) {
 	if len(runner.pendingResults) <= 0 {
 		return nil, errors.New("unexpected state: no pending results registered on session")
@@ -156,15 +165,15 @@ func (runner *statementRunner) receive() (*Result, error) {
 
 	if err := handleRunPhase(runner, activeResult); err != nil {
 		// record error on the result and return error
-		activeResult.err = err
+		activeResult.err = transformError(runner, err)
 		activeResult.runCompleted = true
 
-		return nil, err
+		return nil, activeResult.err
 	}
 
 	if err := handleRecordsPhase(runner, activeResult); err != nil {
 		// just record the error on the result
-		activeResult.err = err
+		activeResult.err = transformError(runner, err)
 		activeResult.resultCompleted = true
 	}
 

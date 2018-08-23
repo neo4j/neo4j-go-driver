@@ -134,11 +134,11 @@ var _ = Describe("Spatial Types", func() {
 
 		switch sequence % 4 {
 		case 0:
-			return NewPoint(WGS84SrId, randomDouble(), randomDouble())
+			return NewPoint2D(WGS84SrId, randomDouble(), randomDouble())
 		case 1:
 			return NewPoint3D(WGS843DSrId, randomDouble(), randomDouble(), randomDouble())
 		case 2:
-			return NewPoint(CartesianSrId, randomDouble(), randomDouble())
+			return NewPoint2D(CartesianSrId, randomDouble(), randomDouble())
 		case 3:
 			return NewPoint3D(Cartesian3DSrId, randomDouble(), randomDouble(), randomDouble())
 		default:
@@ -179,7 +179,7 @@ var _ = Describe("Spatial Types", func() {
 	})
 
 	It("should be able to send points", func() {
-		point1 := NewPoint(WGS84SrId, 51.5044585, -0.105658)
+		point1 := NewPoint2D(WGS84SrId, 51.5044585, -0.105658)
 		point2 := NewPoint3D(WGS843DSrId, 51.5044585, -0.105658, 35.120)
 
 		result, err = session.Run("CREATE (n:POI { location1: $point1, location2: $point2 }) RETURN n", &map[string]interface{}{
@@ -210,7 +210,7 @@ var _ = Describe("Spatial Types", func() {
 	})
 
 	It("should be able to send points - pass by value", func() {
-		point1 := NewPoint(WGS84SrId, 51.5044585, -0.105658)
+		point1 := NewPoint2D(WGS84SrId, 51.5044585, -0.105658)
 		point2 := NewPoint3D(WGS843DSrId, 51.5044585, -0.105658, 35.120)
 
 		result, err = session.Run("CREATE (n:POI { location1: $point1, location2: $point2 }) RETURN n", &map[string]interface{}{
@@ -241,9 +241,9 @@ var _ = Describe("Spatial Types", func() {
 	})
 
 	It("should send and receive point", func() {
-		testSendAndReceive(NewPoint(WGS84SrId, 51.24923585, 0.92723724))
+		testSendAndReceive(NewPoint2D(WGS84SrId, 51.24923585, 0.92723724))
 		testSendAndReceive(NewPoint3D(WGS843DSrId, 22.86211019, 171.61820439, 0.1230987))
-		testSendAndReceive(NewPoint(CartesianSrId, 39.111748, -76.775635))
+		testSendAndReceive(NewPoint2D(CartesianSrId, 39.111748, -76.775635))
 		testSendAndReceive(NewPoint3D(Cartesian3DSrId, 39.111748, -76.775635, 19.2937302840))
 	})
 
