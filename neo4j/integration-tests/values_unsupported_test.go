@@ -79,7 +79,7 @@ var _ = Describe("Unsupported Types [V1]", func() {
 
 	Context("Send", func() {
 		It("should fail sending Point (2D)", func() {
-			testSend(NewPoint(WGS84SrId, 1.0, 1.0))
+			testSend(NewPoint2D(WGS84SrId, 1.0, 1.0))
 		})
 
 		It("should fail sending Point (3D)", func() {

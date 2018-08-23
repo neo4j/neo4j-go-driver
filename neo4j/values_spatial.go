@@ -32,7 +32,7 @@ type Point struct {
 	z         float64
 }
 
-func NewPoint(srId int, x float64, y float64) *Point {
+func NewPoint2D(srId int, x float64, y float64) *Point {
 	return &Point{
 		dimension: 2,
 		srId:      srId,
