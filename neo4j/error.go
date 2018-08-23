@@ -24,5 +24,5 @@ import (
 )
 
 func isRetriableError(err error) bool {
-	return gobolt.IsServiceUnavailable(err) || gobolt.IsTransientError(err)
+	return gobolt.IsServiceUnavailable(err) || gobolt.IsTransientError(err) || gobolt.IsWriteError(err)
 }
