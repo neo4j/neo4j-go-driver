@@ -107,7 +107,7 @@ func (transaction *Transaction) Close() error {
 }
 
 // Run executes a statement on this transaction and returns a result
-func (transaction *Transaction) Run(cypher string, params *map[string]interface{}) (*Result, error) {
+func (transaction *Transaction) Run(cypher string, params map[string]interface{}) (*Result, error) {
 	return runStatementOnTransaction(transaction, &Statement{cypher: cypher, params: params})
 }
 

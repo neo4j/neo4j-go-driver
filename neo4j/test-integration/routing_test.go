@@ -51,14 +51,14 @@ var _ = Describe("Routing", func() {
 		session, err = driver.Session(neo4j.AccessModeWrite)
 		Expect(err).To(BeNil())
 
-		result, err = session.Run("CREATE (n:Person {name: $name})", &map[string]interface{}{"name": name})
+		result, err = session.Run("CREATE (n:Person {name: $name})", map[string]interface{}{"name": name})
 		Expect(err).To(BeNil())
 
 		summary, err = result.Consume()
 		Expect(err).To(BeNil())
 		Expect(summary).NotTo(BeNil())
 
-		result, err = session.Run("MATCH (n:Person {name: $name}) RETURN COUNT(*) AS count", &map[string]interface{}{"name": name})
+		result, err = session.Run("MATCH (n:Person {name: $name}) RETURN COUNT(*) AS count", map[string]interface{}{"name": name})
 		Expect(err).To(BeNil())
 
 		if result.Next() {

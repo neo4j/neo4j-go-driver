@@ -60,7 +60,7 @@ var _ = Describe("Transaction", func() {
 		}
 	})
 
-	singleResultWork := func(query string, params *map[string]interface{}) TransactionWork {
+	singleResultWork := func(query string, params map[string]interface{}) TransactionWork {
 		return func(tx *Transaction) (interface{}, error) {
 			create, err := tx.Run(query, params)
 			Expect(err).To(BeNil())

@@ -64,7 +64,7 @@ func consumeShouldFailOnServerDisconnects() {
 	session := createSession(driver)
 	defer session.Close()
 
-	result, err := session.Run("RETURN $x", &map[string]interface{}{"x": 1})
+	result, err := session.Run("RETURN $x", map[string]interface{}{"x": 1})
 	Expect(err).To(BeNil())
 
 	summary, err := result.Consume()
@@ -80,7 +80,7 @@ func shouldExecuteReturn1() {
 	session := createSession(driver)
 	defer session.Close()
 
-	result, err := session.Run("RETURN $x", &map[string]interface{}{"x": 1})
+	result, err := session.Run("RETURN $x", map[string]interface{}{"x": 1})
 	Expect(err).To(BeNil())
 
 	var count int64

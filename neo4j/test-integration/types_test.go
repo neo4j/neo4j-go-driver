@@ -59,7 +59,7 @@ var _ = Describe("Types", func() {
 
 	It("should be able to send and receive boolean property", func() {
 		value := true
-		result, err = session.Run("CREATE (n {value: $value}) RETURN n.value", &map[string]interface{}{"value": value})
+		result, err = session.Run("CREATE (n {value: $value}) RETURN n.value", map[string]interface{}{"value": value})
 		Expect(err).To(BeNil())
 
 		if result.Next() {
@@ -71,7 +71,7 @@ var _ = Describe("Types", func() {
 
 	It("should be able to send and receive byte property", func() {
 		value := byte(1)
-		result, err = session.Run("CREATE (n {value: $value}) RETURN n.value", &map[string]interface{}{"value": value})
+		result, err = session.Run("CREATE (n {value: $value}) RETURN n.value", map[string]interface{}{"value": value})
 		Expect(err).To(BeNil())
 
 		if result.Next() {
@@ -84,7 +84,7 @@ var _ = Describe("Types", func() {
 
 	It("should be able to send and receive int8 property", func() {
 		value := int8(2)
-		result, err = session.Run("CREATE (n {value: $value}) RETURN n.value", &map[string]interface{}{"value": value})
+		result, err = session.Run("CREATE (n {value: $value}) RETURN n.value", map[string]interface{}{"value": value})
 		Expect(err).To(BeNil())
 
 		if result.Next() {
@@ -97,7 +97,7 @@ var _ = Describe("Types", func() {
 
 	It("should be able to send and receive int16 property", func() {
 		value := int16(3)
-		result, err = session.Run("CREATE (n {value: $value}) RETURN n.value", &map[string]interface{}{"value": value})
+		result, err = session.Run("CREATE (n {value: $value}) RETURN n.value", map[string]interface{}{"value": value})
 		Expect(err).To(BeNil())
 
 		if result.Next() {
@@ -110,7 +110,7 @@ var _ = Describe("Types", func() {
 
 	It("should be able to send and receive int property", func() {
 		value := int(4)
-		result, err = session.Run("CREATE (n {value: $value}) RETURN n.value", &map[string]interface{}{"value": value})
+		result, err = session.Run("CREATE (n {value: $value}) RETURN n.value", map[string]interface{}{"value": value})
 		Expect(err).To(BeNil())
 
 		if result.Next() {
@@ -123,7 +123,7 @@ var _ = Describe("Types", func() {
 
 	It("should be able to send and receive int32 property", func() {
 		value := int32(5)
-		result, err = session.Run("CREATE (n {value: $value}) RETURN n.value", &map[string]interface{}{"value": value})
+		result, err = session.Run("CREATE (n {value: $value}) RETURN n.value", map[string]interface{}{"value": value})
 		Expect(err).To(BeNil())
 
 		if result.Next() {
@@ -136,7 +136,7 @@ var _ = Describe("Types", func() {
 
 	It("should be able to send and receive int64 property", func() {
 		value := int64(6)
-		result, err = session.Run("CREATE (n {value: $value}) RETURN n.value", &map[string]interface{}{"value": value})
+		result, err = session.Run("CREATE (n {value: $value}) RETURN n.value", map[string]interface{}{"value": value})
 		Expect(err).To(BeNil())
 
 		if result.Next() {
@@ -149,7 +149,7 @@ var _ = Describe("Types", func() {
 
 	It("should be able to send and receive float32 property", func() {
 		value := float32(7.1)
-		result, err = session.Run("CREATE (n {value: $value}) RETURN n.value", &map[string]interface{}{"value": value})
+		result, err = session.Run("CREATE (n {value: $value}) RETURN n.value", map[string]interface{}{"value": value})
 		Expect(err).To(BeNil())
 
 		if result.Next() {
@@ -162,7 +162,7 @@ var _ = Describe("Types", func() {
 
 	It("should be able to send and receive float64 property", func() {
 		value := float64(81.9224)
-		result, err = session.Run("CREATE (n {value: $value}) RETURN n.value", &map[string]interface{}{"value": value})
+		result, err = session.Run("CREATE (n {value: $value}) RETURN n.value", map[string]interface{}{"value": value})
 		Expect(err).To(BeNil())
 
 		if result.Next() {
@@ -175,7 +175,7 @@ var _ = Describe("Types", func() {
 
 	It("should be able to send and receive string property", func() {
 		value := "a string"
-		result, err = session.Run("CREATE (n {value: $value}) RETURN n.value", &map[string]interface{}{"value": value})
+		result, err = session.Run("CREATE (n {value: $value}) RETURN n.value", map[string]interface{}{"value": value})
 		Expect(err).To(BeNil())
 
 		if result.Next() {
@@ -188,7 +188,7 @@ var _ = Describe("Types", func() {
 
 	It("should be able to send and receive byte array property", func() {
 		value := []byte{1, 2, 3, 4, 5}
-		result, err = session.Run("CREATE (n {value: $value}) RETURN n.value", &map[string]interface{}{"value": value})
+		result, err = session.Run("CREATE (n {value: $value}) RETURN n.value", map[string]interface{}{"value": value})
 		Expect(err).To(BeNil())
 
 		if result.Next() {
@@ -201,7 +201,7 @@ var _ = Describe("Types", func() {
 
 	It("should be able to send and receive boolean array property", func() {
 		value := []bool{true, false, false, true}
-		result, err = session.Run("CREATE (n {value: $value}) RETURN n.value", &map[string]interface{}{"value": value})
+		result, err = session.Run("CREATE (n {value: $value}) RETURN n.value", map[string]interface{}{"value": value})
 		Expect(err).To(BeNil())
 
 		if result.Next() {
@@ -214,7 +214,7 @@ var _ = Describe("Types", func() {
 
 	It("should be able to send and receive int array property", func() {
 		value := []int{1, 2, 3, 4, 5}
-		result, err = session.Run("CREATE (n {value: $value}) RETURN n.value", &map[string]interface{}{"value": value})
+		result, err = session.Run("CREATE (n {value: $value}) RETURN n.value", map[string]interface{}{"value": value})
 		Expect(err).To(BeNil())
 
 		if result.Next() {
@@ -227,7 +227,7 @@ var _ = Describe("Types", func() {
 
 	It("should be able to send and receive float64 array property", func() {
 		value := []float64{1.11, 2.22, 3.33, 4.44, 5.55}
-		result, err = session.Run("CREATE (n {value: $value}) RETURN n.value", &map[string]interface{}{"value": value})
+		result, err = session.Run("CREATE (n {value: $value}) RETURN n.value", map[string]interface{}{"value": value})
 		Expect(err).To(BeNil())
 
 		if result.Next() {
@@ -240,7 +240,7 @@ var _ = Describe("Types", func() {
 
 	It("should be able to send and receive string array property", func() {
 		value := []string{"a", "b", "c", "d", "e"}
-		result, err = session.Run("CREATE (n {value: $value}) RETURN n.value", &map[string]interface{}{"value": value})
+		result, err = session.Run("CREATE (n {value: $value}) RETURN n.value", map[string]interface{}{"value": value})
 		Expect(err).To(BeNil())
 
 		if result.Next() {
@@ -360,7 +360,7 @@ var _ = Describe("Types", func() {
 				CREATE (l1:Person:Lead $lead) 
 				CREATE (m1:Person:Manager $manager) 
 				CREATE p = (e1)-[r1:LED_BY { from: '2017-01-01' }]->(l1)-[r2:REPORTS_TO { from: '2017-01-01' }]->(m1)
-				RETURN p, e1, l1, m1, r1, r2`, &map[string]interface{}{
+				RETURN p, e1, l1, m1, r1, r2`, map[string]interface{}{
 			"employee": map[string]interface{}{
 				"id":   1,
 				"name": "employee 1",

@@ -47,8 +47,10 @@ var _ = Describe("Runner", func() {
 			mockDriver := newGoboltWithConnector("bolt://localhost", mockConnector)
 			runner := newRunner(mockDriver, AccessModeWrite, true)
 
+			emptyMap := map[string]interface{}(nil)
+
 			gomock.InOrder(
-				mockConnection.EXPECT().Run("RETURN 1", nil).Times(1),
+				mockConnection.EXPECT().Run("RETURN 1", &emptyMap).Times(1),
 				mockConnection.EXPECT().PullAll().Times(1),
 				mockConnection.EXPECT().Flush().Times(1),
 				mockConnection.EXPECT().RemoteAddress(),
