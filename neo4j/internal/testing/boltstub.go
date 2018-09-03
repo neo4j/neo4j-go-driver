@@ -20,6 +20,7 @@
 package drivertest
 
 import (
+	"bytes"
 	"fmt"
 	. "github.com/onsi/ginkgo"
 	"net"
@@ -31,10 +32,13 @@ import (
 
 // StubServer represents a running instance of a scripted bolt stub server
 type StubServer struct {
-	port    int
-	script  string
-	conn    net.Conn
-	process *exec.Cmd
+	port            int
+	script          string
+	conn            net.Conn
+	stub            *exec.Cmd
+	stubExited      bool
+	stubExitChannel chan string
+	stubExitError   error
 }
 
 const (
@@ -54,23 +58,52 @@ func NewStubServer(port int, script string) *StubServer {
 		Fail(fmt.Sprintf("unable to locate bolt stub script file at '%s'", testScriptFile))
 	}
 
+	var stdoutBuf, stderrBuf bytes.Buffer
+	var cmdErr error
 	cmd := exec.Command("boltstub", fmt.Sprint(port), testScriptFile)
-	if err := cmd.Start(); err != nil {
-		Fail(fmt.Sprintf("unable to start boltstub: %g", err))
+	cmd.Stdout = &stdoutBuf
+	cmd.Stderr = &stderrBuf
+
+	server := &StubServer{
+		port:            port,
+		script:          testScriptFile,
+		stub:            cmd,
+		stubExitChannel: make(chan string),
+		stubExited:      false,
+		stubExitError:   nil,
 	}
 
-	server := &StubServer{port: port, script: testScriptFile, process: cmd}
+	go func(channel chan string) {
+		cmdErr = cmd.Run()
 
-	// try to establish a connection to the stub server
-	for i := 0; i < connectionAttempts; i++ {
-		conn, err := net.Dial("tcp", fmt.Sprintf(":%d", server.port))
-		if err != nil {
-			time.Sleep(200 * time.Millisecond)
+		server.stubExited = true
+
+		if cmdErr != nil {
+			server.stubExitError = fmt.Errorf("command execution (%v) failed with error %s", cmd.Args, cmdErr.Error())
+		} else {
+			if cmd.ProcessState.Success() {
+				server.stubExitError = nil
+			} else {
+				server.stubExitError = fmt.Errorf("command execution (%v) failed with error %s", cmd.Args, stderrBuf.String())
+			}
 		}
 
-		server.conn = conn
+		channel <- "done"
+	}(server.stubExitChannel)
 
-		return server
+	// try to establish a connection to the stub server
+	for i := 0; i < connectionAttempts && cmdErr == nil; i++ {
+		if conn, err := net.Dial("tcp", fmt.Sprintf(":%d", server.port)); err == nil {
+			server.conn = conn
+
+			return server
+		}
+
+		time.Sleep(200 * time.Millisecond)
+	}
+
+	if server.stubExited && server.stubExitError != nil {
+		Fail(server.stubExitError.Error())
 	}
 
 	Fail(fmt.Sprintf("unable to open a connection to boltstub server at [:%d]", server.port))
@@ -86,17 +119,27 @@ func (server *StubServer) Finished() bool {
 		server.conn.Close()
 	}
 
-	if err := server.process.Wait(); err != nil {
-		Fail(fmt.Sprintf("unable to wait for boltstub server to exit: %g", err))
+	// Wait for some time for the boltstub to exit
+	time.Sleep(500 * time.Millisecond)
+
+	// Terminate if it's still running
+	if !server.stubExited {
+		server.stub.Process.Kill()
 	}
 
-	if server.process.ProcessState.Exited() {
-		return server.process.ProcessState.Success()
+	// Wait for exit to complete
+	<-server.stubExitChannel
+
+	// Check if an error occurred
+	if server.stubExitError != nil {
+		Fail(server.stubExitError.Error())
 	}
 
-	return false
+	return true
 }
 
 func (server *StubServer) Close() {
-	server.process.Process.Kill()
+	if !server.stubExited {
+		server.stub.Process.Kill()
+	}
 }

@@ -36,8 +36,6 @@ var _ = Describe("Gobolt Driver", func() {
 		}
 
 		DescribeTable("", func(testCase TestCase) {
-			Skip("Disabled these tests temporarily")
-
 			stub := NewStubServer(9001, testCase.script)
 			defer stub.Close()
 

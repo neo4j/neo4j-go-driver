@@ -93,7 +93,7 @@ func executeCommand(command string, arguments ...string) (string, error) {
 
 	err := cmd.Run()
 	if err != nil {
-		return "", fmt.Errorf("command execution (program: %s, arguments: %v) failed with error %s", command, arguments, stderrBuf.String())
+		return "", fmt.Errorf("command execution (%v) failed with error %s", cmd.Args, stderrBuf.String())
 	}
 
 	return stdoutBuf.String(), nil
