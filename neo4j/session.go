@@ -137,7 +137,7 @@ func (session *Session) WriteTransaction(work TransactionWork) (interface{}, err
 }
 
 // Run executes an auto-commit statement and returns a result
-func (session *Session) Run(cypher string, params *map[string]interface{}) (*Result, error) {
+func (session *Session) Run(cypher string, params map[string]interface{}) (*Result, error) {
 	return runStatementOnSession(session, &Statement{cypher: cypher, params: params})
 }
 

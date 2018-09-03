@@ -76,7 +76,7 @@ var _ = Describe("Spatial Types", func() {
 	})
 
 	testSendAndReceive := func(point *Point) {
-		result, err = session.Run("CREATE (n:Node { point: $point }) RETURN n.point", &map[string]interface{}{
+		result, err = session.Run("CREATE (n:Node { point: $point }) RETURN n.point", map[string]interface{}{
 			"point": point,
 		})
 		Expect(err).To(BeNil())
@@ -99,7 +99,7 @@ var _ = Describe("Spatial Types", func() {
 	}
 
 	testSendAndReceiveList := func(points []*Point) {
-		result, err = session.Run("CREATE (n:Node { points: $points }) RETURN n.points", &map[string]interface{}{
+		result, err = session.Run("CREATE (n:Node { points: $points }) RETURN n.points", map[string]interface{}{
 			"points": points,
 		})
 		Expect(err).To(BeNil())
@@ -182,7 +182,7 @@ var _ = Describe("Spatial Types", func() {
 		point1 := NewPoint2D(WGS84SrId, 51.5044585, -0.105658)
 		point2 := NewPoint3D(WGS843DSrId, 51.5044585, -0.105658, 35.120)
 
-		result, err = session.Run("CREATE (n:POI { location1: $point1, location2: $point2 }) RETURN n", &map[string]interface{}{
+		result, err = session.Run("CREATE (n:POI { location1: $point1, location2: $point2 }) RETURN n", map[string]interface{}{
 			"point1": point1,
 			"point2": point2,
 		})
@@ -213,7 +213,7 @@ var _ = Describe("Spatial Types", func() {
 		point1 := NewPoint2D(WGS84SrId, 51.5044585, -0.105658)
 		point2 := NewPoint3D(WGS843DSrId, 51.5044585, -0.105658, 35.120)
 
-		result, err = session.Run("CREATE (n:POI { location1: $point1, location2: $point2 }) RETURN n", &map[string]interface{}{
+		result, err = session.Run("CREATE (n:POI { location1: $point1, location2: $point2 }) RETURN n", map[string]interface{}{
 			"point1": *point1,
 			"point2": *point2,
 		})

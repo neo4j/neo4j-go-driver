@@ -194,7 +194,7 @@ var _ = Describe("Temporal Types", func() {
 	}
 
 	testSendAndReceive := func(query string, data interface{}, expected []interface{}) {
-		result, err = session.Run(query, &map[string]interface{}{"x": data})
+		result, err = session.Run(query, map[string]interface{}{"x": data})
 		Expect(err).To(BeNil())
 
 		if result.Next() {
@@ -207,7 +207,7 @@ var _ = Describe("Temporal Types", func() {
 	}
 
 	testSendAndReceiveValue := func(value interface{}) {
-		result, err = session.Run("CREATE (n:Node {value: $value}) RETURN n.value", &map[string]interface{}{"value": value})
+		result, err = session.Run("CREATE (n:Node {value: $value}) RETURN n.value", map[string]interface{}{"value": value})
 		Expect(err).To(BeNil())
 
 		if result.Next() {

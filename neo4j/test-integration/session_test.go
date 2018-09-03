@@ -86,7 +86,7 @@ var _ = Describe("Session", func() {
 		Specify("when a query is executed, it should run and return summary with correct statement and params", func() {
 			stmt := "UNWIND RANGE(0, $x) AS n RETURN n"
 			params := map[string]interface{}{"x": 1000}
-			result, err = session.Run(stmt, &params)
+			result, err = session.Run(stmt, params)
 			Expect(err).To(BeNil())
 			Expect(result).NotTo(BeNil())
 
@@ -98,7 +98,7 @@ var _ = Describe("Session", func() {
 			Expect(result.Err()).To(BeNil())
 
 			Expect(summary.Statement().Cypher()).To(Equal(stmt))
-			Expect(summary.Statement().Params()).To(Equal(&params))
+			Expect(summary.Statement().Params()).To(Equal(params))
 		})
 
 		Specify("when a query is executed, it should run and return summary when consumed", func() {

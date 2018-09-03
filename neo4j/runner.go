@@ -195,7 +195,7 @@ func (runner *statementRunner) runStatement(statement Statement) (*Result, error
 		return nil, err
 	}
 
-	runHandle, err := runner.connection.Run(statement.cypher, statement.params)
+	runHandle, err := runner.connection.Run(statement.cypher, &statement.params)
 	if err != nil {
 		defer runner.closeConnection()
 

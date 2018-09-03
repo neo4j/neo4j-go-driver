@@ -24,14 +24,14 @@ import "errors"
 // Statement represents a statement along with its parameters (if any)
 type Statement struct {
 	cypher string
-	params *map[string]interface{}
+	params map[string]interface{}
 }
 
 func (statement *Statement) Cypher() string {
 	return statement.cypher
 }
 
-func (statement *Statement) Params() *map[string]interface{} {
+func (statement *Statement) Params() map[string]interface{} {
 	return statement.params
 }
 

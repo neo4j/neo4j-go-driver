@@ -72,7 +72,7 @@ var _ = Describe("Unsupported Types [V1]", func() {
 	})
 
 	testSend := func(data interface{}) {
-		result, err = session.Run("WITH $x RETURN 1", &map[string]interface{}{"x": data})
+		result, err = session.Run("WITH $x RETURN 1", map[string]interface{}{"x": data})
 		Expect(err).To(BeConnectorErrorWithCode(0x501))
 		Expect(err).To(BeConnectorErrorWithDescription("unable to generate RUN message"))
 	}
