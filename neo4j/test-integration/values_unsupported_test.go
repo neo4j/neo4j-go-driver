@@ -17,14 +17,14 @@
  * limitations under the License.
  */
 
-package integration_tests
+package test_integration
 
 import (
 	"time"
 
 	. "github.com/neo4j/neo4j-go-driver/neo4j"
-	"github.com/neo4j/neo4j-go-driver/neo4j/integration-tests/control"
-	"github.com/neo4j/neo4j-go-driver/neo4j/internal/testing"
+	"github.com/neo4j/neo4j-go-driver/neo4j/test-integration/control"
+	. "github.com/neo4j/neo4j-go-driver/neo4j/test"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
@@ -73,8 +73,8 @@ var _ = Describe("Unsupported Types [V1]", func() {
 
 	testSend := func(data interface{}) {
 		result, err = session.Run("WITH $x RETURN 1", &map[string]interface{}{"x": data})
-		Expect(err).To(drivertest.BeConnectorErrorWithCode(0x501))
-		Expect(err).To(drivertest.BeConnectorErrorWithDescription("unable to generate RUN message"))
+		Expect(err).To(BeConnectorErrorWithCode(0x501))
+		Expect(err).To(BeConnectorErrorWithDescription("unable to generate RUN message"))
 	}
 
 	Context("Send", func() {

@@ -17,14 +17,16 @@
  * limitations under the License.
  */
 
-package neo4j
+package test_stub
 
 import (
+	"github.com/neo4j/neo4j-go-driver/neo4j"
+	"github.com/neo4j/neo4j-go-driver/neo4j/test"
+	"github.com/neo4j/neo4j-go-driver/neo4j/test-stub/control"
+
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/ginkgo/extensions/table"
 	. "github.com/onsi/gomega"
-
-	. "github.com/neo4j/neo4j-go-driver/neo4j/internal/testing"
 )
 
 var _ = Describe("Gobolt Driver", func() {
@@ -36,9 +38,7 @@ var _ = Describe("Gobolt Driver", func() {
 		}
 
 		DescribeTable("", func(testCase TestCase) {
-			Skip("Disabled these tests temporarily")
-
-			stub := NewStubServer(9001, testCase.script)
+			stub := control.NewStubServer(9001, testCase.script)
 			defer stub.Close()
 
 			testCase.testFunc()
@@ -69,7 +69,7 @@ func consumeShouldFailOnServerDisconnects() {
 
 	summary, err := result.Consume()
 
-	Expect(err).To(BeServiceUnavailableError())
+	Expect(err).To(test.BeServiceUnavailableError())
 	Expect(summary).ToNot(BeNil())
 }
 
@@ -94,18 +94,18 @@ func shouldExecuteReturn1() {
 	Expect(count).To(BeIdenticalTo(int64(1)))
 }
 
-func createSeaboltDriver() Driver {
-	driver, err := NewDriver("bolt://localhost:9001", NoAuth(), func(config *Config) {
+func createSeaboltDriver() neo4j.Driver {
+	driver, err := neo4j.NewDriver("bolt://localhost:9001", neo4j.NoAuth(), func(config *neo4j.Config) {
 		config.Encrypted = false
-		config.Log = ConsoleLogger(DEBUG)
+		config.Log = neo4j.ConsoleLogger(neo4j.DEBUG)
 	})
 	Expect(err).To(BeNil())
 
 	return driver
 }
 
-func createSession(driver Driver) *Session {
-	session, err := driver.Session(AccessModeWrite)
+func createSession(driver neo4j.Driver) *neo4j.Session {
+	session, err := driver.Session(neo4j.AccessModeWrite)
 	Expect(err).To(BeNil())
 
 	return session

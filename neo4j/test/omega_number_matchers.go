@@ -17,7 +17,7 @@
  * limitations under the License.
  */
 
-package drivertest
+package test
 
 import (
 	"fmt"
