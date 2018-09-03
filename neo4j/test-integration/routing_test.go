@@ -22,7 +22,7 @@ package test_integration
 import (
 	"github.com/neo4j/neo4j-go-driver/neo4j"
 	"github.com/neo4j/neo4j-go-driver/neo4j/test-integration/control"
-	"github.com/neo4j/neo4j-go-driver/neo4j/internal/testing"
+	. "github.com/neo4j/neo4j-go-driver/neo4j/test"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
@@ -112,7 +112,7 @@ var _ = Describe("Routing", func() {
 			Expect(err).To(BeNil())
 
 			result, err = session.Run("RETURN 1", nil)
-			Expect(err).To(drivertest.BeConnectorErrorWithCode(0x800))
+			Expect(err).To(BeConnectorErrorWithCode(0x800))
 		})
 	})
 
