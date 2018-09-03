@@ -17,7 +17,7 @@
  * limitations under the License.
  */
 
-package integration_tests
+package test_stub
 
 import (
 	"os"
@@ -36,5 +36,5 @@ func TestIntegrationTests(t *testing.T) {
 		customReporters = append(customReporters, reporters.NewTeamCityReporter(os.Stdout))
 	}
 
-	RunSpecsWithDefaultAndCustomReporters(t, "Neo4j Go Driver Integration Tests", customReporters)
+	RunSpecsWithDefaultAndCustomReporters(t, "Neo4j Go Driver Stub Server Tests", customReporters)
 }

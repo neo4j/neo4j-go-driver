@@ -17,11 +17,11 @@
  * limitations under the License.
  */
 
-package integration_tests
+package test_integration
 
 import (
 	. "github.com/neo4j/neo4j-go-driver/neo4j"
-	"github.com/neo4j/neo4j-go-driver/neo4j/integration-tests/control"
+	"github.com/neo4j/neo4j-go-driver/neo4j/test-integration/control"
 	. "github.com/neo4j/neo4j-go-driver/neo4j/internal/testing"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"

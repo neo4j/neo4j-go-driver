@@ -20,7 +20,7 @@
 package neo4j
 
 import (
-	"github.com/neo4j/neo4j-go-driver/neo4j/internal/mocking"
+	"github.com/neo4j/neo4j-go-driver/neo4j/test/mocking"
 
 	"github.com/golang/mock/gomock"
 	. "github.com/onsi/ginkgo"

@@ -17,7 +17,7 @@
  * limitations under the License.
  */
 
-package drivertest
+package control
 
 import (
 	"bytes"
@@ -27,6 +27,7 @@ import (
 	"os"
 	"os/exec"
 	"path"
+	"runtime"
 	"time"
 )
 
@@ -47,7 +48,11 @@ const (
 
 // NewStubServer launches the stub server on the given port with the given script
 func NewStubServer(port int, script string) *StubServer {
-	testScriptsDir := path.Join(GetExecutingFilesDir(), "scripts")
+	var testScriptsDir string = os.TempDir()
+
+	if _, file, _, ok := runtime.Caller(1); ok {
+		testScriptsDir = path.Join(path.Dir(file), "scripts")
+	}
 
 	if len(testScriptsDir) == 0 {
 		Fail("unable to locate bolt stub script folder")

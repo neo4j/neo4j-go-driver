@@ -17,21 +17,24 @@
  * limitations under the License.
  */
 
-package drivertest
+package test_integration
 
 import (
-	"path"
-	"runtime"
+	"os"
+	"testing"
+
+	. "github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/reporters"
+	. "github.com/onsi/gomega"
 )
 
-func GetExecutingFile() string {
-	if _, file, _, ok := runtime.Caller(1); ok {
-		return file
+func TestIntegrationTests(t *testing.T) {
+	RegisterFailHandler(Fail)
+
+	customReporters := []Reporter(nil)
+	if os.Getenv("TEAMCITY_VERSION") != "" {
+		customReporters = append(customReporters, reporters.NewTeamCityReporter(os.Stdout))
 	}
 
-	return ""
-}
-
-func GetExecutingFilesDir() string {
-	return path.Dir(GetExecutingFile())
+	RunSpecsWithDefaultAndCustomReporters(t, "Neo4j Go Driver Integration Tests", customReporters)
 }
