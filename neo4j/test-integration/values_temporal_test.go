@@ -24,8 +24,9 @@ import (
 	"math/rand"
 	"time"
 
-	. "github.com/neo4j/neo4j-go-driver/neo4j"
+	"github.com/neo4j/neo4j-go-driver/neo4j"
 	"github.com/neo4j/neo4j-go-driver/neo4j/test-integration/control"
+
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
@@ -37,9 +38,9 @@ var _ = Describe("Temporal Types", func() {
 
 	var server *control.SingleInstance
 	var err error
-	var	driver  Driver
-	var	session *Session
-	var	result  *Result
+	var driver neo4j.Driver
+	var session *neo4j.Session
+	var result *neo4j.Result
 
 	rand.Seed(time.Now().UnixNano())
 
@@ -56,7 +57,7 @@ var _ = Describe("Temporal Types", func() {
 			Skip("temporal types are only available after neo4j 3.4.0 release")
 		}
 
-		session, err = driver.Session(AccessModeWrite)
+		session, err = driver.Session(neo4j.AccessModeWrite)
 		Expect(err).To(BeNil())
 		Expect(session).NotTo(BeNil())
 	})
@@ -71,26 +72,26 @@ var _ = Describe("Temporal Types", func() {
 		}
 	})
 
-	randomDuration := func() Duration {
+	randomDuration := func() neo4j.Duration {
 		sign := int64(1)
 		if rand.Intn(2) == 0 {
 			sign = -sign
 		}
 
-		return DurationOf(
+		return neo4j.DurationOf(
 			sign*rand.Int63n(math.MaxInt32),
 			sign*rand.Int63n(math.MaxInt32),
 			sign*rand.Int63n(math.MaxInt32),
 			rand.Intn(1000000000))
 	}
 
-	randomLocalDate := func() Date {
+	randomLocalDate := func() neo4j.Date {
 		sign := 1
 		if rand.Intn(2) == 0 {
 			sign = -sign
 		}
 
-		return DateOf(
+		return neo4j.DateOf(
 			time.Date(
 				sign*rand.Intn(9999),
 				time.Month(rand.Intn(12)+1),
@@ -98,13 +99,13 @@ var _ = Describe("Temporal Types", func() {
 				0, 0, 0, 0, time.Local))
 	}
 
-	randomLocalDateTime := func() LocalDateTime {
+	randomLocalDateTime := func() neo4j.LocalDateTime {
 		sign := 1
 		if rand.Intn(2) == 0 {
 			sign = -sign
 		}
 
-		return LocalDateTimeOf(
+		return neo4j.LocalDateTimeOf(
 			time.Date(
 				sign*rand.Intn(9999),
 				time.Month(rand.Intn(12)+1),
@@ -116,8 +117,8 @@ var _ = Describe("Temporal Types", func() {
 				time.Local))
 	}
 
-	randomLocalTime := func() LocalTime {
-		return LocalTimeOf(
+	randomLocalTime := func() neo4j.LocalTime {
+		return neo4j.LocalTimeOf(
 			time.Date(
 				0, 0, 0,
 				rand.Intn(24),
@@ -127,13 +128,13 @@ var _ = Describe("Temporal Types", func() {
 				time.Local))
 	}
 
-	randomOffsetTime := func() OffsetTime {
+	randomOffsetTime := func() neo4j.OffsetTime {
 		sign := 1
 		if rand.Intn(2) == 0 {
 			sign = -sign
 		}
 
-		return OffsetTimeOf(
+		return neo4j.OffsetTimeOf(
 			time.Date(
 				0, 0, 0,
 				rand.Intn(24),
@@ -221,27 +222,27 @@ var _ = Describe("Temporal Types", func() {
 
 	Context("Receive", func() {
 		It("duration", func() {
-			testReceive("RETURN duration({ months: 16, days: 45, seconds: 120, nanoseconds: 187309812 })", DurationOf(16, 45, 120, 187309812))
+			testReceive("RETURN duration({ months: 16, days: 45, seconds: 120, nanoseconds: 187309812 })", neo4j.DurationOf(16, 45, 120, 187309812))
 		})
 
 		It("date", func() {
-			testReceive("RETURN date({ year: 1994, month: 11, day: 15 })", DateOf(time.Date(1994, 11, 15, 0, 0, 0, 0, time.Local)))
+			testReceive("RETURN date({ year: 1994, month: 11, day: 15 })", neo4j.DateOf(time.Date(1994, 11, 15, 0, 0, 0, 0, time.Local)))
 		})
 
 		It("local time", func() {
-			testReceive("RETURN localtime({ hour: 23, minute: 49, second: 59, nanosecond: 999999999 })", LocalTimeOf(time.Date(0, 0, 0, 23, 49, 59, 999999999, time.Local)))
+			testReceive("RETURN localtime({ hour: 23, minute: 49, second: 59, nanosecond: 999999999 })", neo4j.LocalTimeOf(time.Date(0, 0, 0, 23, 49, 59, 999999999, time.Local)))
 		})
 
 		It("offset time", func() {
-			testReceive("RETURN time({ hour: 23, minute: 49, second: 59, nanosecond: 999999999, timezone:'+03:00' })", OffsetTimeOf(time.Date(0, 0, 0, 23, 49, 59, 999999999, time.FixedZone("Offset", 3*60*60))))
+			testReceive("RETURN time({ hour: 23, minute: 49, second: 59, nanosecond: 999999999, timezone:'+03:00' })", neo4j.OffsetTimeOf(time.Date(0, 0, 0, 23, 49, 59, 999999999, time.FixedZone("Offset", 3*60*60))))
 		})
 
 		It("local date time (test location = UTC)", func() {
-			testReceive("RETURN localdatetime({ year: 1859, month: 5, day: 31, hour: 23, minute: 49, second: 59, nanosecond: 999999999 })", LocalDateTimeOf(time.Date(1859, 5, 31, 23, 49, 59, 999999999, time.UTC)))
+			testReceive("RETURN localdatetime({ year: 1859, month: 5, day: 31, hour: 23, minute: 49, second: 59, nanosecond: 999999999 })", neo4j.LocalDateTimeOf(time.Date(1859, 5, 31, 23, 49, 59, 999999999, time.UTC)))
 		})
 
 		It("local date time (test location = local)", func() {
-			testReceive("RETURN localdatetime({ year: 1859, month: 5, day: 31, hour: 23, minute: 49, second: 59, nanosecond: 999999999 })", LocalDateTimeOf(time.Date(1859, 5, 31, 23, 49, 59, 999999999, time.Local)))
+			testReceive("RETURN localdatetime({ year: 1859, month: 5, day: 31, hour: 23, minute: 49, second: 59, nanosecond: 999999999 })", neo4j.LocalDateTimeOf(time.Date(1859, 5, 31, 23, 49, 59, 999999999, time.Local)))
 		})
 
 		It("offset date time", func() {
@@ -258,7 +259,7 @@ var _ = Describe("Temporal Types", func() {
 
 	Context("Send and Receive", func() {
 		It("duration", func() {
-			data := DurationOf(14, 35, 75, 789012587)
+			data := neo4j.DurationOf(14, 35, 75, 789012587)
 
 			testSendAndReceive("WITH $x AS x RETURN x, x.months, x.days, x.seconds, x.millisecondsOfSecond, x.microsecondsOfSecond, x.nanosecondsOfSecond",
 				data,
@@ -274,7 +275,7 @@ var _ = Describe("Temporal Types", func() {
 		})
 
 		It("date", func() {
-			data := DateOf(time.Date(1976, 6, 13, 0, 0, 0, 0, time.Local))
+			data := neo4j.DateOf(time.Date(1976, 6, 13, 0, 0, 0, 0, time.Local))
 
 			testSendAndReceive("WITH $x AS x RETURN x, x.year, x.month, x.day",
 				data,
@@ -287,7 +288,7 @@ var _ = Describe("Temporal Types", func() {
 		})
 
 		It("local time", func() {
-			data := LocalTimeOf(time.Date(0, 0, 0, 12, 34, 56, 789012587, time.Local))
+			data := neo4j.LocalTimeOf(time.Date(0, 0, 0, 12, 34, 56, 789012587, time.Local))
 
 			testSendAndReceive("WITH $x AS x RETURN x, x.hour, x.minute, x.second, x.millisecond, x.microsecond, x.nanosecond",
 				data,
@@ -303,7 +304,7 @@ var _ = Describe("Temporal Types", func() {
 		})
 
 		It("offset time", func() {
-			data := OffsetTimeOf(time.Date(0, 0, 0, 12, 34, 56, 789012587, time.FixedZone("Offset", 90*60)))
+			data := neo4j.OffsetTimeOf(time.Date(0, 0, 0, 12, 34, 56, 789012587, time.FixedZone("Offset", 90*60)))
 
 			testSendAndReceive("WITH $x AS x RETURN x, x.hour, x.minute, x.second, x.millisecond, x.microsecond, x.nanosecond, x.offset",
 				data,
@@ -320,7 +321,7 @@ var _ = Describe("Temporal Types", func() {
 		})
 
 		It("local date time", func() {
-			data := LocalDateTimeOf(time.Date(1976, 6, 13, 12, 34, 56, 789012587, time.Local))
+			data := neo4j.LocalDateTimeOf(time.Date(1976, 6, 13, 12, 34, 56, 789012587, time.Local))
 
 			testSendAndReceive("WITH $x AS x RETURN x, x.year, x.month, x.day, x.hour, x.minute, x.second, x.millisecond, x.microsecond, x.nanosecond",
 				data,

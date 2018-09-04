@@ -20,9 +20,10 @@
 package test_integration
 
 import (
-	. "github.com/neo4j/neo4j-go-driver/neo4j"
+	"github.com/neo4j/neo4j-go-driver/neo4j"
 	"github.com/neo4j/neo4j-go-driver/neo4j/test-integration/control"
-	. "github.com/neo4j/neo4j-go-driver/neo4j/test"
+
+	. "github.com/neo4j/neo4j-go-driver/neo4j/utils/test"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
@@ -40,16 +41,16 @@ var _ = Describe("Driver", func() {
 	Context("Direct", func() {
 		var (
 			err     error
-			driver  Driver
-			session *Session
-			result  *Result
+			driver  neo4j.Driver
+			session *neo4j.Session
+			result  *neo4j.Result
 		)
 
 		BeforeEach(func() {
 			driver, err = server.Driver()
 			Expect(err).To(BeNil())
 
-			session, err = driver.Session(AccessModeWrite)
+			session, err = driver.Session(neo4j.AccessModeWrite)
 			Expect(err).To(BeNil())
 		})
 
@@ -93,7 +94,7 @@ var _ = Describe("Driver", func() {
 			err := driver.Close()
 			Expect(err).To(BeNil())
 
-			_, err = driver.Session(AccessModeWrite)
+			_, err = driver.Session(neo4j.AccessModeWrite)
 			Expect(err).NotTo(BeNil())
 		})
 
@@ -102,11 +103,11 @@ var _ = Describe("Driver", func() {
 	Context("Pooling", func() {
 		var (
 			err    error
-			driver Driver
+			driver neo4j.Driver
 		)
 
 		BeforeEach(func() {
-			driver, err = NewDriver(server.BoltUri(), server.AuthToken(), server.Config(), func(config *Config) {
+			driver, err = neo4j.NewDriver(server.BoltUri(), server.AuthToken(), server.Config(), func(config *neo4j.Config) {
 				config.MaxConnectionPoolSize = 2
 			})
 			Expect(err).To(BeNil())
@@ -120,21 +121,21 @@ var _ = Describe("Driver", func() {
 
 		It("should return error when pool is full", func() {
 			// Open connection 1
-			session1, err := driver.Session(AccessModeWrite)
+			session1, err := driver.Session(neo4j.AccessModeWrite)
 			Expect(err).To(BeNil())
 
 			_, err = session1.Run("UNWIND RANGE(1, 100) AS N RETURN N", nil)
 			Expect(err).To(BeNil())
 
 			// Open connection 2
-			session2, err := driver.Session(AccessModeWrite)
+			session2, err := driver.Session(neo4j.AccessModeWrite)
 			Expect(err).To(BeNil())
 
 			_, err = session2.Run("UNWIND RANGE(1, 100) AS N RETURN N", nil)
 			Expect(err).To(BeNil())
 
 			// Try opening connection 3
-			session3, err := driver.Session(AccessModeWrite)
+			session3, err := driver.Session(neo4j.AccessModeWrite)
 			Expect(err).To(BeNil())
 
 			_, err = session3.Run("UNWIND RANGE(1, 100) AS N RETURN N", nil)

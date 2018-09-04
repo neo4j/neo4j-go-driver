@@ -40,7 +40,7 @@ func NoAuth() AuthToken {
 	}}
 }
 
-// BasicAuth generates a basic authentication token with provided username and password
+// BasicAuth generates a basic authentication token with provided username, password and realm
 func BasicAuth(username string, password string, realm string) AuthToken {
 	tokens := map[string]interface{}{
 		keyScheme:      schemeBasic,

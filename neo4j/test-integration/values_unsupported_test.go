@@ -22,26 +22,27 @@ package test_integration
 import (
 	"time"
 
-	. "github.com/neo4j/neo4j-go-driver/neo4j"
+	"github.com/neo4j/neo4j-go-driver/neo4j"
 	"github.com/neo4j/neo4j-go-driver/neo4j/test-integration/control"
-	. "github.com/neo4j/neo4j-go-driver/neo4j/test"
+
+	. "github.com/neo4j/neo4j-go-driver/neo4j/utils/test"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
 
 var _ = Describe("Unsupported Types [V1]", func() {
 	const (
-		WGS84SrId int = 4326
-		WGS843DSrId int = 4979
-		CartesianSrId int = 7203
+		WGS84SrId       int = 4326
+		WGS843DSrId     int = 4979
+		CartesianSrId   int = 7203
 		Cartesian3DSrId int = 9157
 	)
 
 	var server *control.SingleInstance
 	var err error
-	var	driver  Driver
-	var	session *Session
-	var	result  *Result
+	var driver neo4j.Driver
+	var session *neo4j.Session
+	var result *neo4j.Result
 
 	BeforeEach(func() {
 		server, err = control.EnsureSingleInstance()
@@ -56,7 +57,7 @@ var _ = Describe("Unsupported Types [V1]", func() {
 			Skip("this test is targeted for server version less than neo4j 3.4.0")
 		}
 
-		session, err = driver.Session(AccessModeWrite)
+		session, err = driver.Session(neo4j.AccessModeWrite)
 		Expect(err).To(BeNil())
 		Expect(session).NotTo(BeNil())
 	})
@@ -79,31 +80,31 @@ var _ = Describe("Unsupported Types [V1]", func() {
 
 	Context("Send", func() {
 		It("should fail sending Point (2D)", func() {
-			testSend(NewPoint2D(WGS84SrId, 1.0, 1.0))
+			testSend(neo4j.NewPoint2D(WGS84SrId, 1.0, 1.0))
 		})
 
 		It("should fail sending Point (3D)", func() {
-			testSend(NewPoint3D(WGS843DSrId, 1.0, 1.0, 1.0))
+			testSend(neo4j.NewPoint3D(WGS843DSrId, 1.0, 1.0, 1.0))
 		})
 
 		It("should fail sending Duration", func() {
-			testSend(DurationOf(1, 1, 1, 1))
+			testSend(neo4j.DurationOf(1, 1, 1, 1))
 		})
 
 		It("should fail sending Date", func() {
-			testSend(DateOf(time.Now()))
+			testSend(neo4j.DateOf(time.Now()))
 		})
 
 		It("should fail sending LocalDateTime", func() {
-			testSend(LocalDateTimeOf(time.Now()))
+			testSend(neo4j.LocalDateTimeOf(time.Now()))
 		})
 
 		It("should fail sending LocalTime", func() {
-			testSend(LocalTimeOf(time.Now()))
+			testSend(neo4j.LocalTimeOf(time.Now()))
 		})
 
 		It("should fail sending OffsetTime", func() {
-			testSend(OffsetTimeOf(time.Now()))
+			testSend(neo4j.OffsetTimeOf(time.Now()))
 		})
 
 		It("should fail sending DateTime with Offset", func() {

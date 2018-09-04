@@ -21,7 +21,7 @@
 // Source: neo4j-go-connector/neo4j (interfaces: Connection)
 
 // Package connector-mocks is a generated GoMock package.
-package mocking
+package mocks
 
 import (
 	reflect "reflect"

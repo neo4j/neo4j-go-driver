@@ -20,11 +20,12 @@
 package neo4j
 
 import (
+	"os"
+	"testing"
+
 	. "github.com/onsi/ginkgo"
 	"github.com/onsi/ginkgo/reporters"
 	. "github.com/onsi/gomega"
-	"os"
-	"testing"
 )
 
 func TestDriver(t *testing.T) {

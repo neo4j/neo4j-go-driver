@@ -20,9 +20,10 @@
 package test_integration
 
 import (
-	. "github.com/neo4j/neo4j-go-driver/neo4j"
+	"github.com/neo4j/neo4j-go-driver/neo4j"
 	"github.com/neo4j/neo4j-go-driver/neo4j/test-integration/control"
-	. "github.com/neo4j/neo4j-go-driver/neo4j/test"
+
+	. "github.com/neo4j/neo4j-go-driver/neo4j/utils/test"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
@@ -40,10 +41,10 @@ var _ = Describe("Session", func() {
 	Context("with read access mode", func() {
 		var (
 			err     error
-			driver  Driver
-			session *Session
-			result  *Result
-			summary *ResultSummary
+			driver  neo4j.Driver
+			session *neo4j.Session
+			result  *neo4j.Result
+			summary *neo4j.ResultSummary
 		)
 
 		BeforeEach(func() {
@@ -51,7 +52,7 @@ var _ = Describe("Session", func() {
 			Expect(err).To(BeNil())
 			Expect(driver).NotTo(BeNil())
 
-			session, err = driver.Session(AccessModeRead)
+			session, err = driver.Session(neo4j.AccessModeRead)
 			Expect(err).To(BeNil())
 			Expect(session).NotTo(BeNil())
 		})
@@ -114,7 +115,7 @@ var _ = Describe("Session", func() {
 			Expect(result.Next()).To(BeFalse())
 			Expect(result.Err()).To(BeNil())
 
-			Expect(summary.StatementType()).To(BeEquivalentTo(StatementTypeReadOnly))
+			Expect(summary.StatementType()).To(BeEquivalentTo(neo4j.StatementTypeReadOnly))
 		})
 
 		Specify("when an invalid query is executed, it should return error when consuming", func() {
@@ -130,7 +131,7 @@ var _ = Describe("Session", func() {
 			Expect(result.Next()).To(BeFalse())
 			Expect(result.Err()).To(BeSyntaxError())
 
-			Expect(summary.StatementType()).To(BeEquivalentTo(StatementTypeUnknown))
+			Expect(summary.StatementType()).To(BeEquivalentTo(neo4j.StatementTypeUnknown))
 		})
 
 		Specify("when a fail-on-streaming query is executed, it should run and return error when consuming", func() {
@@ -146,7 +147,7 @@ var _ = Describe("Session", func() {
 			Expect(result.Next()).To(BeFalse())
 			Expect(result.Err()).To(BeArithmeticError())
 
-			Expect(summary.StatementType()).To(BeEquivalentTo(StatementTypeUnknown))
+			Expect(summary.StatementType()).To(BeEquivalentTo(neo4j.StatementTypeUnknown))
 		})
 
 		Specify("when a query is executed, the returned summary should contain correct timer values", func() {
@@ -166,17 +167,17 @@ var _ = Describe("Session", func() {
 	Context("with write access mode", func() {
 		var (
 			err     error
-			driver  Driver
-			session *Session
-			result  *Result
-			summary *ResultSummary
+			driver  neo4j.Driver
+			session *neo4j.Session
+			result  *neo4j.Result
+			summary *neo4j.ResultSummary
 		)
 
 		BeforeEach(func() {
 			driver, err = server.Driver()
 			Expect(err).To(BeNil())
 
-			session, err = driver.Session(AccessModeWrite)
+			session, err = driver.Session(neo4j.AccessModeWrite)
 			Expect(err).To(BeNil())
 		})
 

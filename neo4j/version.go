@@ -41,9 +41,9 @@ type Version struct {
 }
 
 var (
-	V3_4_0       Version = Version{3, 4, 0}
-	noVersion    Version = Version{-1, -1, -1}
-	inDevVersion Version = Version{0, 0, 0}
+	noVersion      Version = Version{-1, -1, -1}
+	inDevVersion   Version = Version{0, 0, 0}
+	defaultVersion Version = Version{3, 0, 0}
 )
 
 func compareInt(num1 int, num2 int) int {
@@ -59,7 +59,6 @@ func compareInt(num1 int, num2 int) int {
 }
 
 func compareVersions(version1 Version, version2 Version) int {
-
 	comp := compareInt(version1.major, version2.major)
 	if comp == 0 {
 		comp = compareInt(version1.minor, version2.minor)
@@ -73,7 +72,7 @@ func compareVersions(version1 Version, version2 Version) int {
 
 func VersionOf(server string) Version {
 	if server == "" {
-		return Version{3, 0, 0}
+		return defaultVersion
 	} else {
 		matches := versionMatcher.FindStringSubmatch(server)
 		if matches != nil {
@@ -90,28 +89,12 @@ func VersionOf(server string) Version {
 	return noVersion
 }
 
-func VersionOfDriver(driver Driver) Version {
-	session, err := driver.Session(AccessModeRead)
-	if err != nil {
-		return noVersion
-	}
-	defer session.Close()
-
-	result, err := session.Run("RETURN 1", nil)
-	if err != nil {
-		return noVersion
-	}
-
-	summary, err := result.Consume()
-	if err != nil {
-		return noVersion
-	}
-
-	return VersionOf(summary.Server().Version())
-}
-
 func (version Version) String() string {
 	return fmt.Sprintf("%d.%d.%d", version.major, version.minor, version.patch)
+}
+
+func (version Version) Equals(other Version) bool {
+	return compareVersions(version, other) == 0
 }
 
 func (version Version) GreaterThan(other Version) bool {

@@ -24,26 +24,27 @@ import (
 	"math/rand"
 	"time"
 
-	. "github.com/neo4j/neo4j-go-driver/neo4j"
+	"github.com/neo4j/neo4j-go-driver/neo4j"
 	"github.com/neo4j/neo4j-go-driver/neo4j/test-integration/control"
-	. "github.com/neo4j/neo4j-go-driver/neo4j/test"
+
+	. "github.com/neo4j/neo4j-go-driver/neo4j/utils/test"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
 
 var _ = Describe("Spatial Types", func() {
 	const (
-		WGS84SrId int = 4326
-		WGS843DSrId int = 4979
-		CartesianSrId int = 7203
+		WGS84SrId       int = 4326
+		WGS843DSrId     int = 4979
+		CartesianSrId   int = 7203
 		Cartesian3DSrId int = 9157
 	)
 
 	var server *control.SingleInstance
 	var err error
-	var	driver  Driver
-	var	session *Session
-	var	result  *Result
+	var driver neo4j.Driver
+	var session *neo4j.Session
+	var result *neo4j.Result
 
 	rand.Seed(time.Now().UnixNano())
 
@@ -60,7 +61,7 @@ var _ = Describe("Spatial Types", func() {
 			Skip("spatial types are only available after neo4j 3.4.0 release")
 		}
 
-		session, err = driver.Session(AccessModeWrite)
+		session, err = driver.Session(neo4j.AccessModeWrite)
 		Expect(err).To(BeNil())
 		Expect(session).NotTo(BeNil())
 	})
@@ -75,14 +76,14 @@ var _ = Describe("Spatial Types", func() {
 		}
 	})
 
-	testSendAndReceive := func(point *Point) {
+	testSendAndReceive := func(point *neo4j.Point) {
 		result, err = session.Run("CREATE (n:Node { point: $point }) RETURN n.point", map[string]interface{}{
 			"point": point,
 		})
 		Expect(err).To(BeNil())
 
 		if result.Next() {
-			var pointReceived = result.Record().GetByIndex(0).(*Point)
+			var pointReceived = result.Record().GetByIndex(0).(*neo4j.Point)
 
 			Expect(pointReceived).NotTo(BeNil())
 			Expect(pointReceived.SrId()).To(Equal(point.SrId()))
@@ -98,7 +99,7 @@ var _ = Describe("Spatial Types", func() {
 		Expect(result.Next()).To(BeFalse())
 	}
 
-	testSendAndReceiveList := func(points []*Point) {
+	testSendAndReceiveList := func(points []*neo4j.Point) {
 		result, err = session.Run("CREATE (n:Node { points: $points }) RETURN n.points", map[string]interface{}{
 			"points": points,
 		})
@@ -110,7 +111,7 @@ var _ = Describe("Spatial Types", func() {
 			Expect(pointsList).To(HaveLen(len(points)))
 			for index, point := range pointsList {
 				pointSent := points[index]
-				pointReceived := point.(*Point)
+				pointReceived := point.(*neo4j.Point)
 
 				Expect(pointReceived).NotTo(BeNil())
 				Expect(pointReceived.SrId()).To(Equal(pointSent.SrId()))
@@ -127,27 +128,27 @@ var _ = Describe("Spatial Types", func() {
 		Expect(result.Next()).To(BeFalse())
 	}
 
-	randomPoint := func(sequence int) *Point {
-		randomDouble := func() float64  {
-			return float64(rand.Intn(360) - 180) + rand.Float64()
+	randomPoint := func(sequence int) *neo4j.Point {
+		randomDouble := func() float64 {
+			return float64(rand.Intn(360)-180) + rand.Float64()
 		}
 
 		switch sequence % 4 {
 		case 0:
-			return NewPoint2D(WGS84SrId, randomDouble(), randomDouble())
+			return neo4j.NewPoint2D(WGS84SrId, randomDouble(), randomDouble())
 		case 1:
-			return NewPoint3D(WGS843DSrId, randomDouble(), randomDouble(), randomDouble())
+			return neo4j.NewPoint3D(WGS843DSrId, randomDouble(), randomDouble(), randomDouble())
 		case 2:
-			return NewPoint2D(CartesianSrId, randomDouble(), randomDouble())
+			return neo4j.NewPoint2D(CartesianSrId, randomDouble(), randomDouble())
 		case 3:
-			return NewPoint3D(Cartesian3DSrId, randomDouble(), randomDouble(), randomDouble())
+			return neo4j.NewPoint3D(Cartesian3DSrId, randomDouble(), randomDouble(), randomDouble())
 		default:
 			panic("not expected")
 		}
 	}
 
-	randomPointList := func(sequence int, count int) []*Point {
-		result := make([]*Point, count)
+	randomPointList := func(sequence int, count int) []*neo4j.Point {
+		result := make([]*neo4j.Point, count)
 		for i := 0; i < count; i++ {
 			result[i] = randomPoint(sequence)
 		}
@@ -159,8 +160,8 @@ var _ = Describe("Spatial Types", func() {
 		Expect(err).To(BeNil())
 
 		if result.Next() {
-			var point1 = result.Record().GetByIndex(0).(*Point)
-			var point2 = result.Record().GetByIndex(1).(*Point)
+			var point1 = result.Record().GetByIndex(0).(*neo4j.Point)
+			var point2 = result.Record().GetByIndex(1).(*neo4j.Point)
 
 			Expect(point1).NotTo(BeNil())
 			Expect(point1.SrId()).To(Equal(CartesianSrId))
@@ -179,8 +180,8 @@ var _ = Describe("Spatial Types", func() {
 	})
 
 	It("should be able to send points", func() {
-		point1 := NewPoint2D(WGS84SrId, 51.5044585, -0.105658)
-		point2 := NewPoint3D(WGS843DSrId, 51.5044585, -0.105658, 35.120)
+		point1 := neo4j.NewPoint2D(WGS84SrId, 51.5044585, -0.105658)
+		point2 := neo4j.NewPoint3D(WGS843DSrId, 51.5044585, -0.105658, 35.120)
 
 		result, err = session.Run("CREATE (n:POI { location1: $point1, location2: $point2 }) RETURN n", map[string]interface{}{
 			"point1": point1,
@@ -189,9 +190,9 @@ var _ = Describe("Spatial Types", func() {
 		Expect(err).To(BeNil())
 
 		if result.Next() {
-			var node = result.Record().GetByIndex(0).(Node)
-			var point1Received = node.Props()["location1"].(*Point)
-			var point2Received = node.Props()["location2"].(*Point)
+			var node = result.Record().GetByIndex(0).(neo4j.Node)
+			var point1Received = node.Props()["location1"].(*neo4j.Point)
+			var point2Received = node.Props()["location2"].(*neo4j.Point)
 
 			Expect(point1Received).NotTo(BeNil())
 			Expect(point1Received.SrId()).To(Equal(point1.SrId()))
@@ -210,8 +211,8 @@ var _ = Describe("Spatial Types", func() {
 	})
 
 	It("should be able to send points - pass by value", func() {
-		point1 := NewPoint2D(WGS84SrId, 51.5044585, -0.105658)
-		point2 := NewPoint3D(WGS843DSrId, 51.5044585, -0.105658, 35.120)
+		point1 := neo4j.NewPoint2D(WGS84SrId, 51.5044585, -0.105658)
+		point2 := neo4j.NewPoint3D(WGS843DSrId, 51.5044585, -0.105658, 35.120)
 
 		result, err = session.Run("CREATE (n:POI { location1: $point1, location2: $point2 }) RETURN n", map[string]interface{}{
 			"point1": *point1,
@@ -220,9 +221,9 @@ var _ = Describe("Spatial Types", func() {
 		Expect(err).To(BeNil())
 
 		if result.Next() {
-			var node = result.Record().GetByIndex(0).(Node)
-			var point1Received = node.Props()["location1"].(*Point)
-			var point2Received = node.Props()["location2"].(*Point)
+			var node = result.Record().GetByIndex(0).(neo4j.Node)
+			var point1Received = node.Props()["location1"].(*neo4j.Point)
+			var point2Received = node.Props()["location2"].(*neo4j.Point)
 
 			Expect(point1Received).NotTo(BeNil())
 			Expect(point1Received.SrId()).To(Equal(point1.SrId()))
@@ -241,10 +242,10 @@ var _ = Describe("Spatial Types", func() {
 	})
 
 	It("should send and receive point", func() {
-		testSendAndReceive(NewPoint2D(WGS84SrId, 51.24923585, 0.92723724))
-		testSendAndReceive(NewPoint3D(WGS843DSrId, 22.86211019, 171.61820439, 0.1230987))
-		testSendAndReceive(NewPoint2D(CartesianSrId, 39.111748, -76.775635))
-		testSendAndReceive(NewPoint3D(Cartesian3DSrId, 39.111748, -76.775635, 19.2937302840))
+		testSendAndReceive(neo4j.NewPoint2D(WGS84SrId, 51.24923585, 0.92723724))
+		testSendAndReceive(neo4j.NewPoint3D(WGS843DSrId, 22.86211019, 171.61820439, 0.1230987))
+		testSendAndReceive(neo4j.NewPoint2D(CartesianSrId, 39.111748, -76.775635))
+		testSendAndReceive(neo4j.NewPoint3D(Cartesian3DSrId, 39.111748, -76.775635, 19.2937302840))
 	})
 
 	It("should send and receive points - randomised", func() {

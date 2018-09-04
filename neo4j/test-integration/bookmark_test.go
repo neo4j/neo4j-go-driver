@@ -22,9 +22,10 @@ package test_integration
 import (
 	"fmt"
 
-	. "github.com/neo4j/neo4j-go-driver/neo4j"
+	"github.com/neo4j/neo4j-go-driver/neo4j"
 	"github.com/neo4j/neo4j-go-driver/neo4j/test-integration/control"
-	. "github.com/neo4j/neo4j-go-driver/neo4j/test"
+
+	. "github.com/neo4j/neo4j-go-driver/neo4j/utils/test"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
@@ -39,12 +40,12 @@ var _ = Describe("Bookmark", func() {
 		Expect(server).NotTo(BeNil())
 	})
 
-	createNodeInTx := func(driver Driver) string {
-		session, err := driver.Session(AccessModeWrite)
+	createNodeInTx := func(driver neo4j.Driver) string {
+		session, err := driver.Session(neo4j.AccessModeWrite)
 		Expect(err).To(BeNil())
 		defer session.Close()
 
-		_, err = session.WriteTransaction(func(tx *Transaction) (interface{}, error) {
+		_, err = session.WriteTransaction(func(tx *neo4j.Transaction) (interface{}, error) {
 			result, err := tx.Run("CREATE ()", nil)
 			Expect(err).To(BeNil())
 
@@ -63,17 +64,17 @@ var _ = Describe("Bookmark", func() {
 	Context("session constructed with no bookmarks", func() {
 		var (
 			err     error
-			driver  Driver
-			session *Session
-			result  *Result
-			summary *ResultSummary
+			driver  neo4j.Driver
+			session *neo4j.Session
+			result  *neo4j.Result
+			summary *neo4j.ResultSummary
 		)
 
 		BeforeEach(func() {
 			driver, err = server.Driver()
 			Expect(err).To(BeNil())
 
-			session, err = driver.Session(AccessModeWrite)
+			session, err = driver.Session(neo4j.AccessModeWrite)
 			Expect(err).To(BeNil())
 		})
 
@@ -134,7 +135,7 @@ var _ = Describe("Bookmark", func() {
 		})
 
 		Specify("when a node is created in transaction function, last bookmark should not be empty", func() {
-			result, err := session.WriteTransaction(func(tx *Transaction) (interface{}, error) {
+			result, err := session.WriteTransaction(func(tx *neo4j.Transaction) (interface{}, error) {
 				result, err := tx.Run("CREATE (p:Person { Name: 'Test'})", nil)
 				Expect(err).To(BeNil())
 
@@ -151,7 +152,7 @@ var _ = Describe("Bookmark", func() {
 
 		Specify("when a node is created in transaction function and rolled back, last bookmark should be empty", func() {
 			failWith := fmt.Errorf("some error")
-			result, err := session.WriteTransaction(func(tx *Transaction) (interface{}, error) {
+			result, err := session.WriteTransaction(func(tx *neo4j.Transaction) (interface{}, error) {
 				result, err := tx.Run("CREATE (p:Person { Name: 'Test'})", nil)
 				Expect(err).To(BeNil())
 
@@ -167,7 +168,7 @@ var _ = Describe("Bookmark", func() {
 		})
 
 		Specify("when a node is queried in transaction function, last bookmark should not be empty", func() {
-			result, err := session.ReadTransaction(func(tx *Transaction) (interface{}, error) {
+			result, err := session.ReadTransaction(func(tx *neo4j.Transaction) (interface{}, error) {
 				result, err := tx.Run("MATCH (p:Person) RETURN count(p)", nil)
 				Expect(err).To(BeNil())
 
@@ -187,7 +188,7 @@ var _ = Describe("Bookmark", func() {
 
 		Specify("when a node is created in transaction function and rolled back, last bookmark should be empty", func() {
 			failWith := fmt.Errorf("some error")
-			result, err := session.ReadTransaction(func(tx *Transaction) (interface{}, error) {
+			result, err := session.ReadTransaction(func(tx *neo4j.Transaction) (interface{}, error) {
 				result, err := tx.Run("MATCH (p:Person) RETURN count(p)", nil)
 				Expect(err).To(BeNil())
 
@@ -209,8 +210,8 @@ var _ = Describe("Bookmark", func() {
 	Context("session constructed with one bookmark", func() {
 		var (
 			err      error
-			driver   Driver
-			session  *Session
+			driver   neo4j.Driver
+			session  *neo4j.Session
 			bookmark string
 		)
 
@@ -220,7 +221,7 @@ var _ = Describe("Bookmark", func() {
 
 			bookmark = createNodeInTx(driver)
 
-			session, err = driver.Session(AccessModeWrite, bookmark)
+			session, err = driver.Session(neo4j.AccessModeWrite, bookmark)
 			Expect(err).To(BeNil())
 		})
 
@@ -295,8 +296,8 @@ var _ = Describe("Bookmark", func() {
 	Context("session constructed with two bookmarks", func() {
 		var (
 			err       error
-			driver    Driver
-			session   *Session
+			driver    neo4j.Driver
+			session   *neo4j.Session
 			bookmark1 string
 			bookmark2 string
 		)
@@ -309,7 +310,7 @@ var _ = Describe("Bookmark", func() {
 			bookmark2 = createNodeInTx(driver)
 			Expect(bookmark1).NotTo(Equal(bookmark2))
 
-			session, err = driver.Session(AccessModeWrite, bookmark1, bookmark2)
+			session, err = driver.Session(neo4j.AccessModeWrite, bookmark1, bookmark2)
 			Expect(err).To(BeNil())
 		})
 
@@ -355,8 +356,8 @@ var _ = Describe("Bookmark", func() {
 	Context("session constructed with unreachable bookmark", func() {
 		var (
 			err      error
-			driver   Driver
-			session  *Session
+			driver   neo4j.Driver
+			session  *neo4j.Session
 			bookmark string
 		)
 
@@ -366,7 +367,7 @@ var _ = Describe("Bookmark", func() {
 
 			bookmark = createNodeInTx(driver)
 
-			session, err = driver.Session(AccessModeWrite, bookmark+"0")
+			session, err = driver.Session(neo4j.AccessModeWrite, bookmark+"0")
 			Expect(err).To(BeNil())
 		})
 

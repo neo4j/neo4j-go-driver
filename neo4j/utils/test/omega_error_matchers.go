@@ -21,6 +21,7 @@ package test
 
 import (
 	"fmt"
+
 	"github.com/neo4j-drivers/gobolt"
 	"github.com/onsi/gomega"
 	"github.com/onsi/gomega/types"
@@ -79,7 +80,7 @@ func BeConnectorErrorWithDescription(description string) types.GomegaMatcher {
 func BeAuthenticationError() types.GomegaMatcher {
 	return &connectorErrorMatcher{
 		stateMatcher: gomega.BeEquivalentTo(4),
-		codeMatcher: gomega.BeEquivalentTo(7),
+		codeMatcher:  gomega.BeEquivalentTo(7),
 	}
 }
 
@@ -99,8 +100,8 @@ type serviceUnavailableErrorMatcher struct {
 }
 
 type connectorErrorMatcher struct {
-	stateMatcher types.GomegaMatcher
-	codeMatcher  types.GomegaMatcher
+	stateMatcher       types.GomegaMatcher
+	codeMatcher        types.GomegaMatcher
 	descriptionMatcher types.GomegaMatcher
 }
 

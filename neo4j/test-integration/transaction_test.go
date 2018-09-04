@@ -23,8 +23,9 @@ import (
 	"time"
 
 	"github.com/neo4j-drivers/gobolt"
-	. "github.com/neo4j/neo4j-go-driver/neo4j"
+	"github.com/neo4j/neo4j-go-driver/neo4j"
 	"github.com/neo4j/neo4j-go-driver/neo4j/test-integration/control"
+
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"github.com/pkg/errors"
@@ -33,10 +34,10 @@ import (
 var _ = Describe("Transaction", func() {
 	var server *control.SingleInstance
 	var err error
-	var driver Driver
-	var session *Session
-	var tx *Transaction
-	var result *Result
+	var driver neo4j.Driver
+	var session *neo4j.Session
+	var tx *neo4j.Transaction
+	var result *neo4j.Result
 
 	BeforeEach(func() {
 		server, err = control.EnsureSingleInstance()
@@ -46,7 +47,7 @@ var _ = Describe("Transaction", func() {
 		driver, err = server.Driver()
 		Expect(err).To(BeNil())
 
-		session, err = driver.Session(AccessModeWrite)
+		session, err = driver.Session(neo4j.AccessModeWrite)
 		Expect(err).To(BeNil())
 	})
 
@@ -60,8 +61,8 @@ var _ = Describe("Transaction", func() {
 		}
 	})
 
-	singleResultWork := func(query string, params map[string]interface{}) TransactionWork {
-		return func(tx *Transaction) (interface{}, error) {
+	singleResultWork := func(query string, params map[string]interface{}) neo4j.TransactionWork {
+		return func(tx *neo4j.Transaction) (interface{}, error) {
 			create, err := tx.Run(query, params)
 			Expect(err).To(BeNil())
 
@@ -76,14 +77,14 @@ var _ = Describe("Transaction", func() {
 		}
 	}
 
-	writeAndGetSingleIntResult := func(work TransactionWork) int {
+	writeAndGetSingleIntResult := func(work neo4j.TransactionWork) int {
 		result, err := session.WriteTransaction(work)
 		Expect(err).To(BeNil())
 
 		return result.(int)
 	}
 
-	readAndGetSingleIntResult := func(work TransactionWork) int {
+	readAndGetSingleIntResult := func(work neo4j.TransactionWork) int {
 		result, err := session.ReadTransaction(work)
 		Expect(err).To(BeNil())
 
@@ -98,7 +99,7 @@ var _ = Describe("Transaction", func() {
 
 		It("should work on WriteTransaction", func() {
 			times := 0
-			_, err = session.WriteTransaction(func(transaction *Transaction) (interface{}, error) {
+			_, err = session.WriteTransaction(func(transaction *neo4j.Transaction) (interface{}, error) {
 				times++
 				time.Sleep(1 * time.Second)
 				return nil, transientError
@@ -110,7 +111,7 @@ var _ = Describe("Transaction", func() {
 
 		It("should work on ReadTransaction", func() {
 			times := 0
-			_, err = session.ReadTransaction(func(transaction *Transaction) (interface{}, error) {
+			_, err = session.ReadTransaction(func(transaction *neo4j.Transaction) (interface{}, error) {
 				times++
 				time.Sleep(1 * time.Second)
 				return nil, transientError
@@ -131,7 +132,7 @@ var _ = Describe("Transaction", func() {
 
 	It("should rollback if work function returns error", func() {
 		createWork := singleResultWork("CREATE (n:Person2) RETURN count(n)", nil)
-		createResult, err := session.WriteTransaction(func(tx *Transaction) (interface{}, error) {
+		createResult, err := session.WriteTransaction(func(tx *neo4j.Transaction) (interface{}, error) {
 			innerResult, err := createWork(tx)
 			Expect(err).To(BeNil())
 			Expect(innerResult).To(BeEquivalentTo(1))

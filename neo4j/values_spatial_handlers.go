@@ -48,8 +48,8 @@ func (handler *pointValueHandler) WritableTypes() []reflect.Type {
 func (handler *pointValueHandler) Read(signature int8, values []interface{}) (interface{}, error) {
 	var (
 		dimension int
-		srId int
-		x, y, z float64
+		srId      int
+		x, y, z   float64
 	)
 
 	switch signature {

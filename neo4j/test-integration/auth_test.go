@@ -20,9 +20,10 @@
 package test_integration
 
 import (
-	. "github.com/neo4j/neo4j-go-driver/neo4j"
+	"github.com/neo4j/neo4j-go-driver/neo4j"
 	"github.com/neo4j/neo4j-go-driver/neo4j/test-integration/control"
-	. "github.com/neo4j/neo4j-go-driver/neo4j/test"
+
+	. "github.com/neo4j/neo4j-go-driver/neo4j/utils/test"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
@@ -38,12 +39,12 @@ var _ = Describe("Authentication", func() {
 	})
 
 	Specify("when wrong credentials are provided, it should fail with authentication error", func() {
-		token := BasicAuth("wrong", "wrong", "")
-		driver, err := NewDriver(server.BoltUri(), token, server.Config())
+		token := neo4j.BasicAuth("wrong", "wrong", "")
+		driver, err := neo4j.NewDriver(server.BoltUri(), token, server.Config())
 		Expect(err).To(BeNil())
 		defer driver.Close()
 
-		session, err := driver.Session(AccessModeRead)
+		session, err := driver.Session(neo4j.AccessModeRead)
 		Expect(err).To(BeNil())
 		defer session.Close()
 
@@ -51,13 +52,13 @@ var _ = Describe("Authentication", func() {
 		Expect(err).To(BeAuthenticationError())
 	})
 
-	verifyConnect := func(token *AuthToken) func() {
+	verifyConnect := func(token neo4j.AuthToken) func() {
 		return func() {
-			driver, err := NewDriver(server.BoltUri(), *token)
+			driver, err := neo4j.NewDriver(server.BoltUri(), token)
 			Expect(err).To(BeNil())
 			defer driver.Close()
 
-			session, err := driver.Session(AccessModeRead)
+			session, err := driver.Session(neo4j.AccessModeRead)
 			Expect(err).To(BeNil())
 			defer session.Close()
 
@@ -73,22 +74,22 @@ var _ = Describe("Authentication", func() {
 	}
 
 	When("when credentials are provided as a basic token with realm", func() {
-		token := BasicAuth(server.Username(), server.Password(), "native")
+		token := neo4j.BasicAuth(server.Username(), server.Password(), "native")
 
-		Specify("it should be able to connect", verifyConnect(&token))
+		Specify("it should be able to connect", verifyConnect(token))
 	})
 
 	When("when credentials are provided as a custom token", func() {
-		token := CustomAuth("basic", server.Username(), server.Password(), "native", nil)
+		token := neo4j.CustomAuth("basic", server.Username(), server.Password(), "native", nil)
 
-		Specify("it should be able to connect", verifyConnect(&token))
+		Specify("it should be able to connect", verifyConnect(token))
 	})
 
 	When("when credentials are provided as a custom token with parameters", func() {
-		token := CustomAuth("basic", server.Username(), server.Password(), "native", &map[string]interface{}{
+		token := neo4j.CustomAuth("basic", server.Username(), server.Password(), "native", &map[string]interface{}{
 			"otp": "12345",
 		})
 
-		Specify("it should be able to connect", verifyConnect(&token))
+		Specify("it should be able to connect", verifyConnect(token))
 	})
 })

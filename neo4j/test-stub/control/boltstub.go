@@ -22,13 +22,14 @@ package control
 import (
 	"bytes"
 	"fmt"
-	. "github.com/onsi/ginkgo"
 	"net"
 	"os"
 	"os/exec"
 	"path"
 	"runtime"
 	"time"
+
+	. "github.com/onsi/ginkgo"
 )
 
 // StubServer represents a running instance of a scripted bolt stub server

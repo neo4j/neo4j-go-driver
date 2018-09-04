@@ -21,7 +21,7 @@ package neo4j
 
 import (
 	"github.com/golang/mock/gomock"
-	"github.com/neo4j/neo4j-go-driver/neo4j/test/mocking"
+	"github.com/neo4j/neo4j-go-driver/neo4j/utils/mocks"
 	. "github.com/onsi/ginkgo"
 )
 
@@ -41,7 +41,7 @@ var _ = Describe("Logging", func() {
 	Context("errorf", func() {
 		When("Error level is not enabled", func() {
 			It("should not invoke Errorf on logger", func() {
-				logging := mocking.NewMockLogging(mockCtrl)
+				logging := mocks.NewMockLogging(mockCtrl)
 
 				logging.EXPECT().ErrorEnabled().Times(1).Return(false)
 				logging.EXPECT().Errorf(gomock.Any(), gomock.Any()).Times(0)
@@ -52,7 +52,7 @@ var _ = Describe("Logging", func() {
 
 		When("Error level is enabled", func() {
 			It("should invoke Errorf on logger", func() {
-				logging := mocking.NewMockLogging(mockCtrl)
+				logging := mocks.NewMockLogging(mockCtrl)
 
 				logging.EXPECT().ErrorEnabled().Times(1).Return(true)
 				// TODO: Add some custom matcher to match message itself?
@@ -66,7 +66,7 @@ var _ = Describe("Logging", func() {
 	Context("warningf", func() {
 		When("Warning level is not enabled", func() {
 			It("should not invoke Warningf on logger", func() {
-				logging := mocking.NewMockLogging(mockCtrl)
+				logging := mocks.NewMockLogging(mockCtrl)
 
 				logging.EXPECT().WarningEnabled().Times(1).Return(false)
 				logging.EXPECT().Warningf(gomock.Any(), gomock.Any()).Times(0)
@@ -77,7 +77,7 @@ var _ = Describe("Logging", func() {
 
 		When("Warning level is enabled", func() {
 			It("should invoke Warningf on logger", func() {
-				logging := mocking.NewMockLogging(mockCtrl)
+				logging := mocks.NewMockLogging(mockCtrl)
 
 				logging.EXPECT().WarningEnabled().Times(1).Return(true)
 				logging.EXPECT().Warningf(gomock.Any(), "str1", 1).Times(1)
@@ -90,7 +90,7 @@ var _ = Describe("Logging", func() {
 	Context("infof", func() {
 		When("Info level is not enabled", func() {
 			It("should not invoke Infof on logger", func() {
-				logging := mocking.NewMockLogging(mockCtrl)
+				logging := mocks.NewMockLogging(mockCtrl)
 
 				logging.EXPECT().InfoEnabled().Times(1).Return(false)
 				logging.EXPECT().Infof(gomock.Any(), gomock.Any()).Times(0)
@@ -101,7 +101,7 @@ var _ = Describe("Logging", func() {
 
 		When("Info level is enabled", func() {
 			It("should invoke Infof on logger", func() {
-				logging := mocking.NewMockLogging(mockCtrl)
+				logging := mocks.NewMockLogging(mockCtrl)
 
 				logging.EXPECT().InfoEnabled().Times(1).Return(true)
 				logging.EXPECT().Infof(gomock.Any(), "str1", 1).Times(1)
@@ -114,7 +114,7 @@ var _ = Describe("Logging", func() {
 	Context("debugf", func() {
 		When("Debug level is not enabled", func() {
 			It("should not invoke Debugf on logger", func() {
-				logging := mocking.NewMockLogging(mockCtrl)
+				logging := mocks.NewMockLogging(mockCtrl)
 
 				logging.EXPECT().DebugEnabled().Times(1).Return(false)
 				logging.EXPECT().Debugf(gomock.Any(), gomock.Any()).Times(0)
@@ -125,7 +125,7 @@ var _ = Describe("Logging", func() {
 
 		When("Debug level is enabled", func() {
 			It("should invoke Debugf on logger", func() {
-				logging := mocking.NewMockLogging(mockCtrl)
+				logging := mocks.NewMockLogging(mockCtrl)
 
 				logging.EXPECT().DebugEnabled().Times(1).Return(true)
 				logging.EXPECT().Debugf(gomock.Any(), "str1", 1).Times(1)
