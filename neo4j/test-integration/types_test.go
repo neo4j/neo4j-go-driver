@@ -20,8 +20,9 @@
 package test_integration
 
 import (
-	. "github.com/neo4j/neo4j-go-driver/neo4j"
+	"github.com/neo4j/neo4j-go-driver/neo4j"
 	"github.com/neo4j/neo4j-go-driver/neo4j/test-integration/control"
+
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
@@ -29,9 +30,9 @@ import (
 var _ = Describe("Types", func() {
 	var server *control.SingleInstance
 	var err error
-	var driver Driver
-	var session *Session
-	var result *Result
+	var driver neo4j.Driver
+	var session *neo4j.Session
+	var result *neo4j.Result
 
 	BeforeEach(func() {
 		server, err = control.EnsureSingleInstance()
@@ -42,7 +43,7 @@ var _ = Describe("Types", func() {
 		Expect(err).To(BeNil())
 		Expect(driver).NotTo(BeNil())
 
-		session, err = driver.Session(AccessModeRead)
+		session, err = driver.Session(neo4j.AccessModeRead)
 		Expect(err).To(BeNil())
 		Expect(session).NotTo(BeNil())
 	})
@@ -280,7 +281,7 @@ var _ = Describe("Types", func() {
 		Expect(err).To(BeNil())
 
 		if result.Next() {
-			node := result.Record().GetByIndex(0).(Node)
+			node := result.Record().GetByIndex(0).(neo4j.Node)
 
 			Expect(node).NotTo(BeNil())
 			Expect(node.Id()).NotTo(BeNil())
@@ -300,9 +301,9 @@ var _ = Describe("Types", func() {
 		Expect(err).To(BeNil())
 
 		if result.Next() {
-			employee := result.Record().GetByIndex(0).(Node)
-			worksFor := result.Record().GetByIndex(1).(Relationship)
-			manager := result.Record().GetByIndex(2).(Node)
+			employee := result.Record().GetByIndex(0).(neo4j.Node)
+			worksFor := result.Record().GetByIndex(1).(neo4j.Relationship)
+			manager := result.Record().GetByIndex(2).(neo4j.Node)
 
 			Expect(employee).NotTo(BeNil())
 			Expect(employee.Id()).NotTo(BeNil())
@@ -339,10 +340,10 @@ var _ = Describe("Types", func() {
 		Expect(err).To(BeNil())
 
 		if result.Next() {
-			path := result.Record().GetByIndex(0).(Path)
-			employee := result.Record().GetByIndex(1).(Node)
-			worksFor := result.Record().GetByIndex(2).(Relationship)
-			manager := result.Record().GetByIndex(3).(Node)
+			path := result.Record().GetByIndex(0).(neo4j.Path)
+			employee := result.Record().GetByIndex(1).(neo4j.Node)
+			worksFor := result.Record().GetByIndex(2).(neo4j.Relationship)
+			manager := result.Record().GetByIndex(3).(neo4j.Node)
 
 			Expect(path).NotTo(BeNil())
 			Expect(path.Nodes()).To(HaveLen(2))
@@ -377,12 +378,12 @@ var _ = Describe("Types", func() {
 		Expect(err).To(BeNil())
 
 		if result.Next() {
-			path := result.Record().GetByIndex(0).(Path)
-			employee := result.Record().GetByIndex(1).(Node)
-			lead := result.Record().GetByIndex(2).(Node)
-			manager := result.Record().GetByIndex(3).(Node)
-			ledBy := result.Record().GetByIndex(4).(Relationship)
-			reportsTo := result.Record().GetByIndex(5).(Relationship)
+			path := result.Record().GetByIndex(0).(neo4j.Path)
+			employee := result.Record().GetByIndex(1).(neo4j.Node)
+			lead := result.Record().GetByIndex(2).(neo4j.Node)
+			manager := result.Record().GetByIndex(3).(neo4j.Node)
+			ledBy := result.Record().GetByIndex(4).(neo4j.Relationship)
+			reportsTo := result.Record().GetByIndex(5).(neo4j.Relationship)
 
 			Expect(path).NotTo(BeNil())
 			Expect(path.Nodes()).To(HaveLen(3))

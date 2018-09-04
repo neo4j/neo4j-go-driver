@@ -20,9 +20,10 @@
 package neo4j
 
 import (
+	"time"
+
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-	"time"
 )
 
 var _ = Describe("Config", func() {

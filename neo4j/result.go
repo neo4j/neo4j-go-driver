@@ -20,8 +20,9 @@
 package neo4j
 
 import (
-	"github.com/neo4j-drivers/gobolt"
 	"time"
+
+	"github.com/neo4j-drivers/gobolt"
 )
 
 // Result provides access to the result of the executing statement

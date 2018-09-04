@@ -17,7 +17,7 @@
  * limitations under the License.
  */
 
-package mocking
+package mocks
 
 import "github.com/neo4j-drivers/gobolt"
 

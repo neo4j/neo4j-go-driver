@@ -20,7 +20,7 @@
 package neo4j
 
 import (
-	. "github.com/neo4j/neo4j-go-driver/neo4j/test"
+	. "github.com/neo4j/neo4j-go-driver/neo4j/utils/test"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )

@@ -32,7 +32,7 @@ type Config struct {
 	Log Logging
 	// Resolver that would be used to resolve initial router address. This may
 	// be useful if you want to provide more than one URL for initial router.
-	// If not specified, the provided 	// bolt+routing URL is used as the initial
+	// If not specified, the provided bolt+routing URL is used as the initial
 	// router.
 	AddressResolver ServerAddressResolver
 	// Maximum amount of duration a retriable operation would continue retrying

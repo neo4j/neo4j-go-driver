@@ -30,7 +30,7 @@ func BeNaN() types.GomegaMatcher {
 	return &floatNaNMatcher{}
 }
 
-type floatNaNMatcher struct {}
+type floatNaNMatcher struct{}
 
 func (matcher *floatNaNMatcher) Match(actual interface{}) (success bool, err error) {
 	var f32 float32

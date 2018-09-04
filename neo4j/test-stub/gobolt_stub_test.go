@@ -21,8 +21,8 @@ package test_stub
 
 import (
 	"github.com/neo4j/neo4j-go-driver/neo4j"
-	"github.com/neo4j/neo4j-go-driver/neo4j/test"
 	"github.com/neo4j/neo4j-go-driver/neo4j/test-stub/control"
+	"github.com/neo4j/neo4j-go-driver/neo4j/utils/test"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/ginkgo/extensions/table"
