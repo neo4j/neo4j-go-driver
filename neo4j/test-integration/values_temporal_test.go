@@ -20,6 +20,7 @@
 package test_integration
 
 import (
+	"math"
 	"math/rand"
 	"time"
 
@@ -77,9 +78,9 @@ var _ = Describe("Temporal Types", func() {
 		}
 
 		return DurationOf(
-			sign*rand.Int63(),
-			sign*rand.Int63(),
-			sign*rand.Int63(),
+			sign*rand.Int63n(math.MaxInt32),
+			sign*rand.Int63n(math.MaxInt32),
+			sign*rand.Int63n(math.MaxInt32),
 			rand.Intn(1000000000))
 	}
 
