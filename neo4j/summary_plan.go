@@ -19,12 +19,34 @@
 
 package neo4j
 
-type Session interface {
-	LastBookmark() string
-	BeginTransaction(configurers ...func(*TransactionConfig)) (Transaction, error)
-	ReadTransaction(work TransactionWork, configurers ...func(*TransactionConfig)) (interface{}, error)
-	WriteTransaction(work TransactionWork, configurers ...func(*TransactionConfig)) (interface{}, error)
-	Run(cypher string, params map[string]interface{}, configurers ...func(*TransactionConfig)) (Result, error)
-	Close() error
+// Plan describes the plan that the database planner produced
+type Plan interface {
+	Operator() string
+	Arguments() map[string]interface{}
+	Identifiers() []string
+	Children() []Plan
+}
+
+type neoPlan struct {
+	operator    string
+	arguments   map[string]interface{}
+	identifiers []string
+	children    []Plan
+}
+
+func (plan *neoPlan) Operator() string {
+	return plan.operator
+}
+
+func (plan *neoPlan) Arguments() map[string]interface{} {
+	return plan.arguments
+}
+
+func (plan *neoPlan) Identifiers() []string {
+	return plan.identifiers
+}
+
+func (plan *neoPlan) Children() []Plan {
+	return plan.children
 }
 

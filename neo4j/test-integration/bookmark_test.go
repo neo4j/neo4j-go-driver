@@ -45,7 +45,7 @@ var _ = Describe("Bookmark", func() {
 		Expect(err).To(BeNil())
 		defer session.Close()
 
-		_, err = session.WriteTransaction(func(tx *neo4j.Transaction) (interface{}, error) {
+		_, err = session.WriteTransaction(func(tx neo4j.Transaction) (interface{}, error) {
 			result, err := tx.Run("CREATE ()", nil)
 			Expect(err).To(BeNil())
 
@@ -65,9 +65,9 @@ var _ = Describe("Bookmark", func() {
 		var (
 			err     error
 			driver  neo4j.Driver
-			session *neo4j.Session
-			result  *neo4j.Result
-			summary *neo4j.ResultSummary
+			session neo4j.Session
+			result  neo4j.Result
+			summary neo4j.ResultSummary
 		)
 
 		BeforeEach(func() {
@@ -135,7 +135,7 @@ var _ = Describe("Bookmark", func() {
 		})
 
 		Specify("when a node is created in transaction function, last bookmark should not be empty", func() {
-			result, err := session.WriteTransaction(func(tx *neo4j.Transaction) (interface{}, error) {
+			result, err := session.WriteTransaction(func(tx neo4j.Transaction) (interface{}, error) {
 				result, err := tx.Run("CREATE (p:Person { Name: 'Test'})", nil)
 				Expect(err).To(BeNil())
 
@@ -152,7 +152,7 @@ var _ = Describe("Bookmark", func() {
 
 		Specify("when a node is created in transaction function and rolled back, last bookmark should be empty", func() {
 			failWith := fmt.Errorf("some error")
-			result, err := session.WriteTransaction(func(tx *neo4j.Transaction) (interface{}, error) {
+			result, err := session.WriteTransaction(func(tx neo4j.Transaction) (interface{}, error) {
 				result, err := tx.Run("CREATE (p:Person { Name: 'Test'})", nil)
 				Expect(err).To(BeNil())
 
@@ -168,7 +168,7 @@ var _ = Describe("Bookmark", func() {
 		})
 
 		Specify("when a node is queried in transaction function, last bookmark should not be empty", func() {
-			result, err := session.ReadTransaction(func(tx *neo4j.Transaction) (interface{}, error) {
+			result, err := session.ReadTransaction(func(tx neo4j.Transaction) (interface{}, error) {
 				result, err := tx.Run("MATCH (p:Person) RETURN count(p)", nil)
 				Expect(err).To(BeNil())
 
@@ -188,7 +188,7 @@ var _ = Describe("Bookmark", func() {
 
 		Specify("when a node is created in transaction function and rolled back, last bookmark should be empty", func() {
 			failWith := fmt.Errorf("some error")
-			result, err := session.ReadTransaction(func(tx *neo4j.Transaction) (interface{}, error) {
+			result, err := session.ReadTransaction(func(tx neo4j.Transaction) (interface{}, error) {
 				result, err := tx.Run("MATCH (p:Person) RETURN count(p)", nil)
 				Expect(err).To(BeNil())
 
@@ -211,7 +211,7 @@ var _ = Describe("Bookmark", func() {
 		var (
 			err      error
 			driver   neo4j.Driver
-			session  *neo4j.Session
+			session  neo4j.Session
 			bookmark string
 		)
 
@@ -297,7 +297,7 @@ var _ = Describe("Bookmark", func() {
 		var (
 			err       error
 			driver    neo4j.Driver
-			session   *neo4j.Session
+			session   neo4j.Session
 			bookmark1 string
 			bookmark2 string
 		)
@@ -357,7 +357,7 @@ var _ = Describe("Bookmark", func() {
 		var (
 			err      error
 			driver   neo4j.Driver
-			session  *neo4j.Session
+			session  neo4j.Session
 			bookmark string
 		)
 

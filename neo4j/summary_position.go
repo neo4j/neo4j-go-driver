@@ -19,12 +19,27 @@
 
 package neo4j
 
-type Session interface {
-	LastBookmark() string
-	BeginTransaction(configurers ...func(*TransactionConfig)) (Transaction, error)
-	ReadTransaction(work TransactionWork, configurers ...func(*TransactionConfig)) (interface{}, error)
-	WriteTransaction(work TransactionWork, configurers ...func(*TransactionConfig)) (interface{}, error)
-	Run(cypher string, params map[string]interface{}, configurers ...func(*TransactionConfig)) (Result, error)
-	Close() error
+// InputPosition contains information about a specific position in a statement
+type InputPosition interface {
+	Offset() int
+	Line() int
+	Column() int
 }
 
+type neoInputPosition struct {
+	offset int
+	line   int
+	column int
+}
+
+func (pos *neoInputPosition) Offset() int {
+	return pos.offset
+}
+
+func (pos *neoInputPosition) Line() int {
+	return pos.line
+}
+
+func (pos *neoInputPosition) Column() int {
+	return pos.column
+}

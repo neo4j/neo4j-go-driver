@@ -35,9 +35,9 @@ var _ = Describe("Transaction", func() {
 	var server *control.SingleInstance
 	var err error
 	var driver neo4j.Driver
-	var session *neo4j.Session
-	var tx *neo4j.Transaction
-	var result *neo4j.Result
+	var session neo4j.Session
+	var tx neo4j.Transaction
+	var result neo4j.Result
 
 	BeforeEach(func() {
 		server, err = control.EnsureSingleInstance()
@@ -62,7 +62,7 @@ var _ = Describe("Transaction", func() {
 	})
 
 	singleResultWork := func(query string, params map[string]interface{}) neo4j.TransactionWork {
-		return func(tx *neo4j.Transaction) (interface{}, error) {
+		return func(tx neo4j.Transaction) (interface{}, error) {
 			create, err := tx.Run(query, params)
 			Expect(err).To(BeNil())
 
@@ -99,7 +99,7 @@ var _ = Describe("Transaction", func() {
 
 		It("should work on WriteTransaction", func() {
 			times := 0
-			_, err = session.WriteTransaction(func(transaction *neo4j.Transaction) (interface{}, error) {
+			_, err = session.WriteTransaction(func(transaction neo4j.Transaction) (interface{}, error) {
 				times++
 				time.Sleep(1 * time.Second)
 				return nil, transientError
@@ -111,7 +111,7 @@ var _ = Describe("Transaction", func() {
 
 		It("should work on ReadTransaction", func() {
 			times := 0
-			_, err = session.ReadTransaction(func(transaction *neo4j.Transaction) (interface{}, error) {
+			_, err = session.ReadTransaction(func(transaction neo4j.Transaction) (interface{}, error) {
 				times++
 				time.Sleep(1 * time.Second)
 				return nil, transientError
@@ -132,7 +132,7 @@ var _ = Describe("Transaction", func() {
 
 	It("should rollback if work function returns error", func() {
 		createWork := singleResultWork("CREATE (n:Person2) RETURN count(n)", nil)
-		createResult, err := session.WriteTransaction(func(tx *neo4j.Transaction) (interface{}, error) {
+		createResult, err := session.WriteTransaction(func(tx neo4j.Transaction) (interface{}, error) {
 			innerResult, err := createWork(tx)
 			Expect(err).To(BeNil())
 			Expect(innerResult).To(BeEquivalentTo(1))

@@ -42,7 +42,7 @@ const (
 type Driver interface {
 	// The url this driver is bootstrapped
 	Target() url.URL
-	Session(accessMode AccessMode, bookmarks ...string) (*Session, error)
+	Session(accessMode AccessMode, bookmarks ...string) (Session, error)
 	// Close the driver and all underlying connections
 	Close() error
 

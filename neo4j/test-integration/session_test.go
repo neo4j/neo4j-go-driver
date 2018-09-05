@@ -42,9 +42,9 @@ var _ = Describe("Session", func() {
 		var (
 			err     error
 			driver  neo4j.Driver
-			session *neo4j.Session
-			result  *neo4j.Result
-			summary *neo4j.ResultSummary
+			session neo4j.Session
+			result  neo4j.Result
+			summary neo4j.ResultSummary
 		)
 
 		BeforeEach(func() {
@@ -168,9 +168,9 @@ var _ = Describe("Session", func() {
 		var (
 			err     error
 			driver  neo4j.Driver
-			session *neo4j.Session
-			result  *neo4j.Result
-			summary *neo4j.ResultSummary
+			session neo4j.Session
+			result  neo4j.Result
+			summary neo4j.ResultSummary
 		)
 
 		BeforeEach(func() {

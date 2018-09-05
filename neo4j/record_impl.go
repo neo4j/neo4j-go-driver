@@ -19,11 +19,41 @@
 
 package neo4j
 
+import "errors"
+
 // Record contains ordered keys and values that are returned from a statement executed
 // on the server
-type Record interface {
-	Keys() []string
-	Values() []interface{}
-	Get(key string) (interface{}, bool)
-	GetByIndex(index int) interface{}
+type neoRecord struct {
+	keys   []string
+	values []interface{}
+}
+
+// Keys returns the keys available
+func (record *neoRecord) Keys() []string {
+	return record.keys
+}
+
+// Values returns the values
+func (record *neoRecord) Values() []interface{} {
+	return record.values
+}
+
+// Get returns the value (if any) corresponding to the given key
+func (record *neoRecord) Get(key string) (interface{}, bool) {
+	for i := range record.keys {
+		if record.keys[i] == key {
+			return record.values[i], true
+		}
+	}
+
+	return nil, false
+}
+
+// GetByIndex returns the value at given index
+func (record *neoRecord) GetByIndex(index int) interface{} {
+	if len(record.values) <= index {
+		panic(errors.New("index out of bounds"))
+	}
+
+	return record.values[index]
 }

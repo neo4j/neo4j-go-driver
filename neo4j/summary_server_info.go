@@ -19,12 +19,21 @@
 
 package neo4j
 
-type Session interface {
-	LastBookmark() string
-	BeginTransaction(configurers ...func(*TransactionConfig)) (Transaction, error)
-	ReadTransaction(work TransactionWork, configurers ...func(*TransactionConfig)) (interface{}, error)
-	WriteTransaction(work TransactionWork, configurers ...func(*TransactionConfig)) (interface{}, error)
-	Run(cypher string, params map[string]interface{}, configurers ...func(*TransactionConfig)) (Result, error)
-	Close() error
+// ServerInfo contains basic information of the server
+type ServerInfo interface {
+	Address() string
+	Version() string
 }
 
+type neoServerInfo struct {
+	address string
+	version string
+}
+
+func (server *neoServerInfo) Address() string {
+	return server.address
+}
+
+func (server *neoServerInfo) Version() string {
+	return server.version
+}

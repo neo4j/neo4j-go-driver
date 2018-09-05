@@ -104,7 +104,7 @@ func createSeaboltDriver() neo4j.Driver {
 	return driver
 }
 
-func createSession(driver neo4j.Driver) *neo4j.Session {
+func createSession(driver neo4j.Driver) neo4j.Session {
 	session, err := driver.Session(neo4j.AccessModeWrite)
 	Expect(err).To(BeNil())
 

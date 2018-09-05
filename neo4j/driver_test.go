@@ -90,10 +90,12 @@ var _ = Describe("Driver", func() {
 				session, err := driver.Session(testCase.mode, testCase.bookmarks...)
 				Expect(err).To(BeNil())
 
-				Expect(session.accessMode).To(BeIdenticalTo(testCase.mode))
+				neoSession := session.(*neoSession)
 
-				Expect(session.bookmarks).To(HaveLen(len(testCase.bookmarks)))
-				Expect(session.bookmarks).To(ConsistOf(testCase.bookmarks))
+				Expect(neoSession.accessMode).To(BeIdenticalTo(testCase.mode))
+
+				Expect(neoSession.bookmarks).To(HaveLen(len(testCase.bookmarks)))
+				Expect(neoSession.bookmarks).To(ConsistOf(testCase.bookmarks))
 			}, Entry("(write, no_bookmark)", SessionTestCase{
 				uri:       "bolt://localhost:7687",
 				mode:      AccessModeWrite,

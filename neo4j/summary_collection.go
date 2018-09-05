@@ -65,22 +65,24 @@ func extractStringValue(dict *map[string]interface{}, key string, defaultValue s
 	return defaultValue
 }
 
-func collectCounters(dict *map[string]interface{}, counters *Counters) {
-	if dict == nil {
-		return
+func collectCounters(dict *map[string]interface{}) Counters {
+	counters := &neoCounters{}
+
+	if dict != nil {
+		counters.nodesCreated = int(extractIntValue(dict, "nodes-created", 0))
+		counters.nodesDeleted = int(extractIntValue(dict, "nodes-deleted", 0))
+		counters.relationshipsCreated = int(extractIntValue(dict, "relationships-created", 0))
+		counters.relationshipsDeleted = int(extractIntValue(dict, "relationships-deleted", 0))
+		counters.propertiesSet = int(extractIntValue(dict, "properties-set", 0))
+		counters.labelsAdded = int(extractIntValue(dict, "labels-added", 0))
+		counters.labelsRemoved = int(extractIntValue(dict, "labels-removed", 0))
+		counters.indexesAdded = int(extractIntValue(dict, "indexes-added", 0))
+		counters.indexesRemoved = int(extractIntValue(dict, "indexes-removed", 0))
+		counters.constraintsAdded = int(extractIntValue(dict, "constraints-added", 0))
+		counters.constraintsRemoved = int(extractIntValue(dict, "constraints-removed", 0))
 	}
 
-	counters.nodesCreated = int(extractIntValue(dict, "nodes-created", 0))
-	counters.nodesDeleted = int(extractIntValue(dict, "nodes-deleted", 0))
-	counters.relationshipsCreated = int(extractIntValue(dict, "relationships-created", 0))
-	counters.relationshipsDeleted = int(extractIntValue(dict, "relationships-deleted", 0))
-	counters.propertiesSet = int(extractIntValue(dict, "properties-set", 0))
-	counters.labelsAdded = int(extractIntValue(dict, "labels-added", 0))
-	counters.labelsRemoved = int(extractIntValue(dict, "labels-removed", 0))
-	counters.indexesAdded = int(extractIntValue(dict, "indexes-added", 0))
-	counters.indexesRemoved = int(extractIntValue(dict, "indexes-removed", 0))
-	counters.constraintsAdded = int(extractIntValue(dict, "constraints-added", 0))
-	counters.constraintsRemoved = int(extractIntValue(dict, "constraints-removed", 0))
+	return counters
 }
 
 func collectNotification(list *[]interface{}, target *[]Notification) {
@@ -98,7 +100,7 @@ func collectNotification(list *[]interface{}, target *[]Notification) {
 			description := extractStringValue(&notificationDict, "description", "")
 			severity := extractStringValue(&notificationDict, "severity", "")
 
-			position := InputPosition{}
+			position := &neoInputPosition{}
 			if positionData, ok := notificationDict["position"]; ok {
 				if positionDict, ok := positionData.(map[string]interface{}); ok {
 					position.offset = int(extractIntValue(&positionDict, "offset", 0))
@@ -107,7 +109,7 @@ func collectNotification(list *[]interface{}, target *[]Notification) {
 				}
 			}
 
-			notifications[i] = Notification{
+			notifications[i] = &neoNotification{
 				code:        code,
 				title:       title,
 				description: description,
@@ -120,7 +122,7 @@ func collectNotification(list *[]interface{}, target *[]Notification) {
 	*target = notifications
 }
 
-func collectPlan(dict *map[string]interface{}) *Plan {
+func collectPlan(dict *map[string]interface{}) Plan {
 	var (
 		operationType string
 		args          map[string]interface{}
@@ -152,11 +154,11 @@ func collectPlan(dict *map[string]interface{}) *Plan {
 		children = make([]Plan, len(childrenList))
 		for i, child := range childrenList {
 			childMap := child.(map[string]interface{})
-			children[i] = *collectPlan(&childMap)
+			children[i] = collectPlan(&childMap)
 		}
 	}
 
-	return &Plan{
+	return &neoPlan{
 		operator:    operationType,
 		arguments:   args,
 		identifiers: identifiers,
@@ -164,7 +166,7 @@ func collectPlan(dict *map[string]interface{}) *Plan {
 	}
 }
 
-func collectProfile(dict *map[string]interface{}) *ProfiledPlan {
+func collectProfile(dict *map[string]interface{}) ProfiledPlan {
 	var (
 		operationType string
 		args          map[string]interface{}
@@ -200,11 +202,11 @@ func collectProfile(dict *map[string]interface{}) *ProfiledPlan {
 		children = make([]ProfiledPlan, len(childrenList))
 		for i, child := range childrenList {
 			childMap := child.(map[string]interface{})
-			children[i] = *collectProfile(&childMap)
+			children[i] = collectProfile(&childMap)
 		}
 	}
 
-	return &ProfiledPlan{
+	return &neoProfiledPlan{
 		operator:    operationType,
 		arguments:   args,
 		identifiers: identifiers,

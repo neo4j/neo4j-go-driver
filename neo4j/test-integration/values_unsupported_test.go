@@ -41,8 +41,8 @@ var _ = Describe("Unsupported Types [V1]", func() {
 	var server *control.SingleInstance
 	var err error
 	var driver neo4j.Driver
-	var session *neo4j.Session
-	var result *neo4j.Result
+	var session neo4j.Session
+	var result neo4j.Result
 
 	BeforeEach(func() {
 		server, err = control.EnsureSingleInstance()

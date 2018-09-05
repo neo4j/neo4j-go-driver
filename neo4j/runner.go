@@ -31,7 +31,7 @@ type statementRunner struct {
 	autoClose      bool
 	accessMode     AccessMode
 	lastBookmark   string
-	pendingResults []*Result
+	pendingResults []*neoResult
 }
 
 func newRunner(driver Driver, accessMode AccessMode, autoClose bool) *statementRunner {
@@ -84,7 +84,7 @@ func (runner *statementRunner) receiveAll() error {
 	return nil
 }
 
-func handleRunPhase(runner *statementRunner, activeResult *Result) error {
+func handleRunPhase(runner *statementRunner, activeResult *neoResult) error {
 	if !activeResult.runCompleted {
 		received, err := runner.connection.Fetch(activeResult.runHandle)
 		if err != nil {
@@ -113,7 +113,7 @@ func handleRunPhase(runner *statementRunner, activeResult *Result) error {
 	return nil
 }
 
-func handleRecordsPhase(runner *statementRunner, activeResult *Result) error {
+func handleRecordsPhase(runner *statementRunner, activeResult *neoResult) error {
 	if !activeResult.resultCompleted {
 		received, err := runner.connection.Fetch(activeResult.resultHandle)
 		if err != nil {
@@ -152,7 +152,7 @@ func transformError(runner *statementRunner, err error) error {
 	return err
 }
 
-func (runner *statementRunner) receive() (*Result, error) {
+func (runner *statementRunner) receive() (Result, error) {
 	if len(runner.pendingResults) <= 0 {
 		return nil, errors.New("unexpected state: no pending results registered on session")
 	}
@@ -188,7 +188,7 @@ func (runner *statementRunner) receive() (*Result, error) {
 	return activeResult, nil
 }
 
-func (runner *statementRunner) runStatement(statement Statement) (*Result, error) {
+func (runner *statementRunner) runStatement(statement *neoStatement) (Result, error) {
 	if err := runner.ensureConnection(); err != nil {
 		defer runner.closeConnection()
 
@@ -215,13 +215,13 @@ func (runner *statementRunner) runStatement(statement Statement) (*Result, error
 		return nil, err
 	}
 
-	result := &Result{
+	result := &neoResult{
 		runner:       runner,
 		runHandle:    runHandle,
 		resultHandle: pullAllHandle,
-		summary: ResultSummary{
+		summary: &neoResultSummary{
 			statement: statement,
-			server: ServerInfo{
+			server: &neoServerInfo{
 				address: runner.connection.RemoteAddress(),
 				version: runner.connection.Server(),
 			},
@@ -233,7 +233,7 @@ func (runner *statementRunner) runStatement(statement Statement) (*Result, error
 	return result, nil
 }
 
-func (runner *statementRunner) beginTransaction(bookmarks []string) (*Result, error) {
+func (runner *statementRunner) beginTransaction(bookmarks []string) (Result, error) {
 	// TODO: assert no connection
 
 	if err := runner.ensureConnection(); err != nil {
@@ -256,14 +256,14 @@ func (runner *statementRunner) beginTransaction(bookmarks []string) (*Result, er
 		return nil, err
 	}
 
-	beginResult := &Result{runner: runner, runCompleted: true, resultHandle: beginHandle}
+	beginResult := &neoResult{runner: runner, runCompleted: true, resultHandle: beginHandle}
 
 	runner.pendingResults = append(runner.pendingResults, beginResult)
 
 	return beginResult, nil
 }
 
-func (runner *statementRunner) commitTransaction() (*Result, error) {
+func (runner *statementRunner) commitTransaction() (Result, error) {
 	// TODO: assert connection
 
 	commitHandle, err := runner.connection.Commit()
@@ -278,14 +278,14 @@ func (runner *statementRunner) commitTransaction() (*Result, error) {
 		return nil, err
 	}
 
-	rollbackResult := &Result{runner: runner, runCompleted: true, resultHandle: commitHandle}
+	rollbackResult := &neoResult{runner: runner, runCompleted: true, resultHandle: commitHandle}
 
 	runner.pendingResults = append(runner.pendingResults, rollbackResult)
 
 	return rollbackResult, nil
 }
 
-func (runner *statementRunner) rollbackTransaction() (*Result, error) {
+func (runner *statementRunner) rollbackTransaction() (Result, error) {
 	// TODO: assert connection
 
 	rollbackHandle, err := runner.connection.Rollback()
@@ -297,7 +297,7 @@ func (runner *statementRunner) rollbackTransaction() (*Result, error) {
 		return nil, err
 	}
 
-	rollbackResult := &Result{runner: runner, runCompleted: true, resultHandle: rollbackHandle}
+	rollbackResult := &neoResult{runner: runner, runCompleted: true, resultHandle: rollbackHandle}
 
 	runner.pendingResults = append(runner.pendingResults, rollbackResult)
 

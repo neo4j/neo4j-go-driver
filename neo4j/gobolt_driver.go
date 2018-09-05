@@ -87,7 +87,7 @@ func (driver *goboltDriver) Target() url.URL {
 	return driver.target
 }
 
-func (driver *goboltDriver) Session(accessMode AccessMode, bookmarks ...string) (*Session, error) {
+func (driver *goboltDriver) Session(accessMode AccessMode, bookmarks ...string) (Session, error) {
 	if err := assertDriverOpen(driver); err != nil {
 		return nil, err
 	}
