@@ -32,7 +32,7 @@ type neoTransaction struct {
 
 // TransactionWork represents a unit of work that will be executed against the provided
 // transaction
-type TransactionWork func(transaction Transaction) (interface{}, error)
+type TransactionWork func(tx Transaction) (interface{}, error)
 
 func ensureTxState(transaction *neoTransaction) error {
 	if transaction.outcomeApplied {

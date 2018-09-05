@@ -178,7 +178,7 @@ var _ = Describe("AuthTokens", func() {
 				"user_emails": []string{"a@b.com", "b@c.com"},
 			}
 
-			token := CustomAuth("custom", "un", "pw", "realm", &params)
+			token := CustomAuth("custom", "un", "pw", "realm", params)
 
 			tokenMap := token.tokens
 
