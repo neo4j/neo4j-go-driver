@@ -86,7 +86,7 @@ var _ = Describe("Authentication", func() {
 	})
 
 	When("when credentials are provided as a custom token with parameters", func() {
-		token := neo4j.CustomAuth("basic", server.Username(), server.Password(), "native", &map[string]interface{}{
+		token := neo4j.CustomAuth("basic", server.Username(), server.Password(), "native", map[string]interface{}{
 			"otp": "12345",
 		})
 

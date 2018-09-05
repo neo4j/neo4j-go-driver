@@ -68,7 +68,7 @@ func KerberosAuth(ticket string) AuthToken {
 }
 
 // CustomAuth generates a custom authentication token with provided parameters
-func CustomAuth(scheme string, username string, password string, realm string, parameters *map[string]interface{}) AuthToken {
+func CustomAuth(scheme string, username string, password string, realm string, parameters map[string]interface{}) AuthToken {
 	tokens := map[string]interface{}{
 		keyScheme:      scheme,
 		keyPrincipal:   username,
@@ -80,7 +80,7 @@ func CustomAuth(scheme string, username string, password string, realm string, p
 	}
 
 	if parameters != nil {
-		tokens["parameters"] = *parameters
+		tokens["parameters"] = parameters
 	}
 
 	return AuthToken{tokens: tokens}
