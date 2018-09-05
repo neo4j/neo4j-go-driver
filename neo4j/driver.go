@@ -22,8 +22,6 @@ package neo4j
 import (
 	"fmt"
 	"net/url"
-
-	"github.com/neo4j-drivers/gobolt"
 )
 
 // AccessMode defines modes that routing driver decides to which cluster member
@@ -45,9 +43,6 @@ type Driver interface {
 	Session(accessMode AccessMode, bookmarks ...string) (Session, error)
 	// Close the driver and all underlying connections
 	Close() error
-
-	configuration() *Config
-	acquire(mode AccessMode) (gobolt.Connection, error)
 }
 
 // NewDriver is the entry method to the neo4j driver to create an instance of a Driver

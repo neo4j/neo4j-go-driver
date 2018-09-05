@@ -27,7 +27,7 @@ import (
 // Session represents a logical connection (which is not tied to a physical connection)
 // to the server
 type neoSession struct {
-	driver     Driver
+	driver     *goboltDriver
 	accessMode AccessMode
 	bookmarks  []string
 
@@ -38,7 +38,7 @@ type neoSession struct {
 	runner *statementRunner
 }
 
-func newSession(driver Driver, accessMode AccessMode, bookmarks []string) Session {
+func newSession(driver *goboltDriver, accessMode AccessMode, bookmarks []string) Session {
 	// filter out bookmarks with empty string
 	bookmarks = filter(bookmarks, func(s string) bool {
 		return len(s) > 0
