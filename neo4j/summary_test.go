@@ -172,9 +172,8 @@ var _ = Describe("Summary", func() {
 	Context("collectCounters", func() {
 		When("map is nil", func() {
 			It("should not collect anything", func() {
-				counters := Counters{}
-				collectCounters(nil, &counters)
-				Expect(counters).To(BeIdenticalTo(Counters{}))
+				counters := collectCounters(nil)
+				Expect(counters).To(BeEquivalentTo(&neoCounters{}))
 			})
 		})
 
@@ -193,8 +192,7 @@ var _ = Describe("Summary", func() {
 				"constraints-removed":   11,
 			}
 
-			counters := Counters{}
-			collectCounters(&dict, &counters)
+			counters := collectCounters(&dict)
 
 			It("should have NodesCreated = 1", func() {
 				Expect(counters.NodesCreated()).To(BeNumerically("==", 1))

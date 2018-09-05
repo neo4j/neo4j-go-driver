@@ -43,8 +43,8 @@ var _ = Describe("Spatial Types", func() {
 	var server *control.SingleInstance
 	var err error
 	var driver neo4j.Driver
-	var session *neo4j.Session
-	var result *neo4j.Result
+	var session neo4j.Session
+	var result neo4j.Result
 
 	rand.Seed(time.Now().UnixNano())
 

@@ -32,9 +32,9 @@ var _ = Describe("Routing", func() {
 	var cluster *control.Cluster
 
 	var driver neo4j.Driver
-	var session *neo4j.Session
-	var result *neo4j.Result
-	var summary *neo4j.ResultSummary
+	var session neo4j.Session
+	var result neo4j.Result
+	var summary neo4j.ResultSummary
 	var err error
 
 	BeforeEach(func() {
@@ -130,7 +130,7 @@ var _ = Describe("Routing", func() {
 			session, err = driver.Session(neo4j.AccessModeWrite)
 			Expect(err).To(BeNil())
 
-			writeCount, err = session.WriteTransaction(func(tx *neo4j.Transaction) (interface{}, error) {
+			writeCount, err = session.WriteTransaction(func(tx neo4j.Transaction) (interface{}, error) {
 				writeResult, err := tx.Run("MERGE (n:Person {name: 'John'}) RETURN 1", nil)
 				if err != nil {
 					return nil, err
@@ -149,7 +149,7 @@ var _ = Describe("Routing", func() {
 			Expect(err).To(BeNil())
 			Expect(writeCount).To(BeNumerically("==", 1))
 
-			readCount, err = session.ReadTransaction(func(tx *neo4j.Transaction) (interface{}, error) {
+			readCount, err = session.ReadTransaction(func(tx neo4j.Transaction) (interface{}, error) {
 				readResult, err := tx.Run("MATCH (n:Person {name: 'John'}) RETURN COUNT(*) AS count", nil)
 				if err != nil {
 					return nil, err

@@ -19,11 +19,26 @@
 
 package neo4j
 
-// Record contains ordered keys and values that are returned from a statement executed
-// on the server
-type Record interface {
-	Keys() []string
-	Values() []interface{}
-	Get(key string) (interface{}, bool)
-	GetByIndex(index int) interface{}
+import "errors"
+
+// Statement represents a statement along with its parameters (if any)
+type neoStatement struct {
+	cypher string
+	params map[string]interface{}
+}
+
+func (statement *neoStatement) Cypher() string {
+	return statement.cypher
+}
+
+func (statement *neoStatement) Params() map[string]interface{} {
+	return statement.params
+}
+
+func (statement *neoStatement) validate() error {
+	if len(statement.cypher) == 0 {
+		return errors.New("cypher statement should not be empty")
+	}
+
+	return nil
 }

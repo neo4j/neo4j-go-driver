@@ -42,8 +42,8 @@ var _ = Describe("Driver", func() {
 		var (
 			err     error
 			driver  neo4j.Driver
-			session *neo4j.Session
-			result  *neo4j.Result
+			session neo4j.Session
+			result  neo4j.Result
 		)
 
 		BeforeEach(func() {
