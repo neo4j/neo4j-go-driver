@@ -26,7 +26,7 @@ import (
 )
 
 type statementRunner struct {
-	driver         Driver
+	driver         *goboltDriver
 	connection     gobolt.Connection
 	autoClose      bool
 	accessMode     AccessMode
@@ -34,7 +34,7 @@ type statementRunner struct {
 	pendingResults []*neoResult
 }
 
-func newRunner(driver Driver, accessMode AccessMode, autoClose bool) *statementRunner {
+func newRunner(driver *goboltDriver, accessMode AccessMode, autoClose bool) *statementRunner {
 	return &statementRunner{driver: driver, accessMode: accessMode, autoClose: autoClose}
 }
 

@@ -25,7 +25,7 @@ import (
 	"github.com/neo4j-drivers/gobolt"
 )
 
-func newGoboltWithConnector(target string, connector gobolt.Connector) Driver {
+func newGoboltWithConnector(target string, connector gobolt.Connector) *goboltDriver {
 	targetURL, err := url.Parse(target)
 	if err != nil {
 		return nil
