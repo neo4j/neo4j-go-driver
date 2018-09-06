@@ -173,7 +173,6 @@ func createDriverWithoutEncryption(uri, username, password string) (neo4j.Driver
 
 // end::config-unencrypted[]
 
-
 // tag::config-trust[]
 
 // end::config-trust[]
