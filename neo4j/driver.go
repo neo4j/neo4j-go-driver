@@ -17,6 +17,7 @@
  * limitations under the License.
  */
 
+// Package neo4j provides required functionality to connect and execute statements against a Neo4j Database.
 package neo4j
 
 import (
@@ -45,7 +46,21 @@ type Driver interface {
 	Close() error
 }
 
-// NewDriver is the entry method to the neo4j driver to create an instance of a Driver
+// NewDriver is the entry point to the neo4j driver to create an instance of a Driver. It is the first function to
+// be called in order to establish a connection to a neo4j database. It requires a Bolt URI and an authentication
+// token as parameters and can also take optional configuration function(s) as variadic parameters.
+//
+// In order to connect to a single instance database, you need to pass a URI with scheme 'bolt'
+//	driver, err = NewDriver("bolt://db.server:7687", BasicAuth(username, password))
+//
+// In order to connect to a causal cluster database, you need to pass a URI with scheme 'bolt+routing' and its host
+// part set to be one of the core cluster members.
+//	driver, err = NewDriver("bolt+routing://core.db.server:7687", BasicAuth(username, password))
+//
+// You can override default configuration options by providing a configuration function(s)
+//	driver, err = NewDriver(uri, BasicAuth(username, password), function (config *Config) {
+// 		config.MaxConnectionPoolSize = 10
+// 	})
 func NewDriver(target string, auth AuthToken, configurers ...func(*Config)) (Driver, error) {
 	parsed, err := url.Parse(target)
 	if err != nil {

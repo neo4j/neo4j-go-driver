@@ -19,9 +19,15 @@
 
 package neo4j
 
+// Transaction represents a transaction in the Neo4j database
 type Transaction interface {
+	// Run executes a statement on this transaction and returns a result
 	Run(cypher string, params map[string]interface{}) (Result, error)
+	// Commit commits the transaction
 	Commit() error
+	// Rollback rolls back the transaction
 	Rollback() error
+	// Close rolls back the actual transaction if it's not already committed/rolled back
+	// and closes all resources associated with this transaction
 	Close() error
 }

@@ -19,7 +19,10 @@
 
 package neo4j
 
+// Statement represents an executable statement, i.e. the statements' text and its parameters.
 type Statement interface {
-	Cypher() string
+	// Text returns the statement's text.
+	Text() string
+	// Params returns the statement's parameters.
 	Params() map[string]interface{}
 }

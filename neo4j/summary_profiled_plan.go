@@ -19,13 +19,24 @@
 
 package neo4j
 
-// ProfiledPlan describes the plan that the database planner produced and executed
+// ProfiledPlan is the same as a regular Plan - except this plan has been executed, meaning it also
+// contains detailed information about how much work each step of the plan incurred on the database.
 type ProfiledPlan interface {
+	// Operator returns the operation this plan is performing.
 	Operator() string
+	// Arguments returns the arguments for the operator used.
+	// Many operators have arguments defining their specific behavior. This map contains those arguments.
 	Arguments() map[string]interface{}
+	// Identifiers returns a list of identifiers used by this plan. Identifiers used by this part of the plan.
+	// These can be both identifiers introduced by you, or automatically generated.
 	Identifiers() []string
+	// DbHits returns the number of times this part of the plan touched the underlying data stores/
 	DbHits() int64
+	// Records returns the number of records this part of the plan produced.
 	Records() int64
+	// Children returns zero or more child plans. A plan is a tree, where each child is another plan.
+	// The children are where this part of the plan gets its input records - unless this is an operator that
+	// introduces new records on its own.
 	Children() []ProfiledPlan
 }
 

@@ -57,7 +57,7 @@ var _ = Describe("Runner", func() {
 				mockConnection.EXPECT().Server(),
 			)
 
-			_, err := runner.runStatement(&neoStatement{cypher: "RETURN 1"})
+			_, err := runner.runStatement(&neoStatement{text: "RETURN 1"})
 
 			Expect(err).To(BeNil())
 		})

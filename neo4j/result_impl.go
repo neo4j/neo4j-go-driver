@@ -25,7 +25,6 @@ import (
 	"github.com/neo4j-drivers/gobolt"
 )
 
-// Result provides access to the result of the executing statement
 type neoResult struct {
 	keys            []string
 	records         []Record
@@ -96,7 +95,6 @@ func (result *neoResult) collectRecord(fields []interface{}) {
 	}
 }
 
-// Keys returns the keys available on the result set
 func (result *neoResult) Keys() ([]string, error) {
 	for !result.runCompleted {
 		if currentResult, err := result.runner.receive(); currentResult == result && err != nil {
@@ -107,7 +105,6 @@ func (result *neoResult) Keys() ([]string, error) {
 	return result.keys, nil
 }
 
-// Next returns true only if there is a record to be processed
 func (result *neoResult) Next() bool {
 	if result.err != nil {
 		return false
@@ -135,17 +132,14 @@ func (result *neoResult) Next() bool {
 	return result.current != nil
 }
 
-// Err returns the latest error that caused this Next to return false
 func (result *neoResult) Err() error {
 	return result.err
 }
 
-// Record returns the current record
 func (result *neoResult) Record() Record {
 	return result.current
 }
 
-// Summary returns the summary information about the statement execution
 func (result *neoResult) Summary() (ResultSummary, error) {
 	for result.err == nil && !result.resultCompleted {
 		if _, err := result.runner.receive(); err != nil {

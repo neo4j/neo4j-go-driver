@@ -149,7 +149,7 @@ func (handler *pathValueHandler) Read(signature int8, values []interface{}) (int
 	}
 
 	segmentsSize := len(segmentsValue) / 2
-	segments := make([]Segment, segmentsSize)
+	segments := make([]segment, segmentsSize)
 	nodes := make([]Node, segmentsSize+1)
 	rels := make([]Relationship, segmentsSize)
 

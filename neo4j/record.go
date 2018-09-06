@@ -22,8 +22,12 @@ package neo4j
 // Record contains ordered keys and values that are returned from a statement executed
 // on the server
 type Record interface {
+	// Keys returns the keys available
 	Keys() []string
+	// Values returns the values
 	Values() []interface{}
+	// Get returns the value (if any) corresponding to the given key
 	Get(key string) (interface{}, bool)
+	// GetByIndex returns the value at given index
 	GetByIndex(index int) interface{}
 }

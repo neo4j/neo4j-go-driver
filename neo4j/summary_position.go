@@ -21,8 +21,11 @@ package neo4j
 
 // InputPosition contains information about a specific position in a statement
 type InputPosition interface {
+	// Offset returns the character offset referred to by this position; offset numbers start at 0.
 	Offset() int
+	// Line returns the line number referred to by this position; line numbers start at 1.
 	Line() int
+	// Column returns the column number referred to by this position; column numbers start at 1.
 	Column() int
 }
 

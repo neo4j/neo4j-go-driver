@@ -21,28 +21,42 @@ package neo4j
 
 // Node represents a node in the neo4j graph database
 type Node interface {
+	// Id returns the identity of this Node.
 	Id() int64
+	// Labels returns the labels attached to this Node.
 	Labels() []string
+	// Props returns the properties of this Node.
 	Props() map[string]interface{}
 }
 
 // Relationship represents a relationship in the neo4j graph database
 type Relationship interface {
+	// Id returns the identity of this Relationship.
 	Id() int64
+	// StartId returns the identity of the start node of this Relationship.
 	StartId() int64
+	// EndId returns the identity of the end node of this Relationship.
 	EndId() int64
+	// Type returns the type of this Relationship.
 	Type() string
+	// Props returns the properties of this Relationship.
 	Props() map[string]interface{}
 }
 
-type Segment interface {
+type segment interface {
 	Start() Node
 	Relationship() Relationship
 	End() Node
 }
 
+// Path represents a directed sequence of relationships between two nodes.
+// This generally represents a traversal or walk through a graph and maintains a direction separate from that of any
+// relationships traversed. It is allowed to be of size 0, meaning there are no relationships in it. In this case,
+// it contains only a single node which is both the start and the end of the path.
 type Path interface {
+	// Nodes returns all the nodes in the path.
 	Nodes() []Node
+	// Relationships returns all the relationships in the path.
 	Relationships() []Relationship
 }
 
@@ -67,7 +81,7 @@ type segmentValue struct {
 }
 
 type pathValue struct {
-	segments      []Segment
+	segments      []segment
 	nodes         []Node
 	relationships []Relationship
 }

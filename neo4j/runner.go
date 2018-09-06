@@ -195,7 +195,7 @@ func (runner *statementRunner) runStatement(statement *neoStatement) (Result, er
 		return nil, err
 	}
 
-	runHandle, err := runner.connection.Run(statement.cypher, &statement.params)
+	runHandle, err := runner.connection.Run(statement.text, &statement.params)
 	if err != nil {
 		defer runner.closeConnection()
 

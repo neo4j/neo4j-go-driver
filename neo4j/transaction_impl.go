@@ -23,7 +23,6 @@ import (
 	"errors"
 )
 
-// Transaction represents a transaction in the Neo4j database
 type neoTransaction struct {
 	session        *neoSession
 	outcomeApplied bool
@@ -46,7 +45,6 @@ func ensureTxState(transaction *neoTransaction) error {
 	return nil
 }
 
-// Commit commits the transaction
 func (transaction *neoTransaction) Commit() error {
 	if err := ensureTxState(transaction); err != nil {
 		return err
@@ -67,7 +65,6 @@ func (transaction *neoTransaction) Commit() error {
 	return nil
 }
 
-// Rollback rolls back the transaction
 func (transaction *neoTransaction) Rollback() error {
 	if err := ensureTxState(transaction); err != nil {
 		return err
@@ -88,8 +85,6 @@ func (transaction *neoTransaction) Rollback() error {
 	return nil
 }
 
-// Close rolls back the actual transaction if it's not already committed/rolled back
-// and closes all resources associated with this transaction
 func (transaction *neoTransaction) Close() error {
 	if !transaction.outcomeApplied {
 		if err := transaction.Rollback(); err != nil {
@@ -106,9 +101,8 @@ func (transaction *neoTransaction) Close() error {
 	return nil
 }
 
-// Run executes a statement on this transaction and returns a result
 func (transaction *neoTransaction) Run(cypher string, params map[string]interface{}) (Result, error) {
-	return runStatementOnTransaction(transaction, &neoStatement{cypher: cypher, params: params})
+	return runStatementOnTransaction(transaction, &neoStatement{text: cypher, params: params})
 }
 
 func runStatementOnTransaction(transaction *neoTransaction, statement *neoStatement) (Result, error) {

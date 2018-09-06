@@ -22,16 +22,28 @@ package neo4j
 // Counters contains statistics about the changes made to the database made as part
 // of the statement execution.
 type Counters interface {
+	// Whether there were any updates at all, eg. any of the counters are greater than 0.
+	ContainsUpdates() bool
+	// The number of nodes created.
 	NodesCreated() int
+	// The number of nodes deleted.
 	NodesDeleted() int
+	// The number of relationships created.
 	RelationshipsCreated() int
+	// The number of relationships deleted.
 	RelationshipsDeleted() int
 	PropertiesSet() int
+	// The number of labels added to nodes.
 	LabelsAdded() int
+	// The number of labels removed from nodes.
 	LabelsRemoved() int
+	// The number of indexes added to the schema.
 	IndexesAdded() int
+	// The number of indexes removed from the schema.
 	IndexesRemoved() int
+	// The number of constraints added to the schema.
 	ConstraintsAdded() int
+	// The number of constraints removed from the schema.
 	ConstraintsRemoved() int
 }
 
@@ -91,4 +103,18 @@ func (counters *neoCounters) ConstraintsAdded() int {
 
 func (counters *neoCounters) ConstraintsRemoved() int {
 	return counters.constraintsRemoved
+}
+
+func (counters *neoCounters) ContainsUpdates() bool {
+	return counters.nodesCreated > 0 ||
+		counters.nodesDeleted > 0 ||
+		counters.relationshipsCreated > 0 ||
+		counters.relationshipsDeleted > 0 ||
+		counters.propertiesSet > 0 ||
+		counters.labelsAdded > 0 ||
+		counters.labelsRemoved > 0 ||
+		counters.indexesAdded > 0 ||
+		counters.indexesRemoved > 0 ||
+		counters.constraintsAdded > 0 ||
+		counters.constraintsRemoved > 0
 }
