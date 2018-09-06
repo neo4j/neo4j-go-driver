@@ -55,8 +55,8 @@ Connect, execute a statement and handle results
 ```go
 var (
 	driver neo4j.Driver
-	session *neo4j.Session
-	result *neo4j.Result
+	session neo4j.Session
+	result neo4j.Result
 	err error
 )
 
@@ -72,7 +72,7 @@ if session, err = driver.Session(neo4j.AccessModeWrite); err != nil {
 }
 defer session.Close() 
 
-result, err = session.Run("CREATE (n:Item { id: $id, name: $name }) RETURN n.id, n.name", &map[string]interface{}{
+result, err = session.Run("CREATE (n:Item { id: $id, name: $name }) RETURN n.id, n.name", map[string]interface{}{
 	"id": 1,
 	"name": "Item 1",
 })
