@@ -49,4 +49,3 @@ func (plan *neoPlan) Identifiers() []string {
 func (plan *neoPlan) Children() []Plan {
 	return plan.children
 }
-

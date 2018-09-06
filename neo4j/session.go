@@ -27,4 +27,3 @@ type Session interface {
 	Run(cypher string, params map[string]interface{}, configurers ...func(*TransactionConfig)) (Result, error)
 	Close() error
 }
-

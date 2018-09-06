@@ -61,4 +61,3 @@ func (plan *neoProfiledPlan) Records() int64 {
 func (plan *neoProfiledPlan) Children() []ProfiledPlan {
 	return plan.children
 }
-

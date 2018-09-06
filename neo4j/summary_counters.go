@@ -19,7 +19,6 @@
 
 package neo4j
 
-
 // Counters contains statistics about the changes made to the database made as part
 // of the statement execution.
 type Counters interface {
@@ -35,7 +34,6 @@ type Counters interface {
 	ConstraintsAdded() int
 	ConstraintsRemoved() int
 }
-
 
 type neoCounters struct {
 	nodesCreated         int
@@ -94,4 +92,3 @@ func (counters *neoCounters) ConstraintsAdded() int {
 func (counters *neoCounters) ConstraintsRemoved() int {
 	return counters.constraintsRemoved
 }
-
