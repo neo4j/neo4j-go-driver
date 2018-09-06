@@ -30,13 +30,13 @@ const (
 	// StatementTypeUnknown identifies an unknown statement type
 	StatementTypeUnknown StatementType = 0
 	// StatementTypeReadOnly identifies a read-only statement
-	StatementTypeReadOnly = 1
+	StatementTypeReadOnly StatementType = 1
 	// StatementTypeReadWrite identifies a read-write statement
-	StatementTypeReadWrite = 2
+	StatementTypeReadWrite StatementType = 2
 	// StatementTypeWriteOnly identifies a write-only statement
-	StatementTypeWriteOnly = 3
+	StatementTypeWriteOnly StatementType = 3
 	// StatementTypeSchemaWrite identifies a schema-write statement
-	StatementTypeSchemaWrite = 4
+	StatementTypeSchemaWrite StatementType = 4
 )
 
 // ResultSummary contains information about statement execution.
