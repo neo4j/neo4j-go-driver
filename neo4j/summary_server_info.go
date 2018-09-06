@@ -19,9 +19,11 @@
 
 package neo4j
 
-// ServerInfo contains basic information of the server
+// ServerInfo contains basic information of the server.
 type ServerInfo interface {
+	// Address returns the address of the server.
 	Address() string
+	// Version returns the version of Neo4j running at the server.
 	Version() string
 }
 

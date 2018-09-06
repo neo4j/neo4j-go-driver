@@ -25,12 +25,20 @@ import (
 	"github.com/neo4j-drivers/gobolt"
 )
 
+// ServerAddress represents a host and port. Host can either be an IP address or a DNS name.
+// Both IPv4 and IPv6 hosts are supported.
 type ServerAddress interface {
+	// Hostname returns the host portion of this ServerAddress.
 	Hostname() string
+	// Port returns the port portion of this ServerAddress.
 	Port() string
 }
 
+// ServerAddressResolver is an interface that defines a resolver function used by the routing driver to
+// resolve the initial address used to create the driver.
 type ServerAddressResolver interface {
+	// Resolve resolves the given address to a set of other addresses. If the returned slice is empty, the driver
+	// will continue using the original address.
 	Resolve(address ServerAddress) []ServerAddress
 }
 
@@ -51,6 +59,7 @@ func newServerAddressUrl(hostname string, port string) *url.URL {
 	return &url.URL{Host: hostAndPort}
 }
 
+// A helper function that generates a ServerAddress with provided hostname and port information.
 func NewServerAddress(hostname string, port string) ServerAddress {
 	return newServerAddressUrl(hostname, port)
 }

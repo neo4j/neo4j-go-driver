@@ -23,12 +23,12 @@ import "errors"
 
 // Statement represents a statement along with its parameters (if any)
 type neoStatement struct {
-	cypher string
+	text   string
 	params map[string]interface{}
 }
 
-func (statement *neoStatement) Cypher() string {
-	return statement.cypher
+func (statement *neoStatement) Text() string {
+	return statement.text
 }
 
 func (statement *neoStatement) Params() map[string]interface{} {
@@ -36,8 +36,8 @@ func (statement *neoStatement) Params() map[string]interface{} {
 }
 
 func (statement *neoStatement) validate() error {
-	if len(statement.cypher) == 0 {
-		return errors.New("cypher statement should not be empty")
+	if len(statement.text) == 0 {
+		return errors.New("statement text should not be empty")
 	}
 
 	return nil

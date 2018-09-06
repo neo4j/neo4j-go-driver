@@ -24,6 +24,7 @@ import (
 	"math"
 )
 
+// Point represents a single two or three dimensional point in a particular coordinate reference system.
 type Point struct {
 	dimension int
 	srId      int
@@ -32,6 +33,7 @@ type Point struct {
 	z         float64
 }
 
+// NewPoint2D creates a two dimensional Point with provided coordinates and coordinate reference system.
 func NewPoint2D(srId int, x float64, y float64) *Point {
 	return &Point{
 		dimension: 2,
@@ -42,6 +44,7 @@ func NewPoint2D(srId int, x float64, y float64) *Point {
 	}
 }
 
+// NewPoint3D creates a three dimensional Point with provided coordinates and coordinate reference system.
 func NewPoint3D(srId int, x float64, y float64, z float64) *Point {
 	return &Point{
 		dimension: 3,
@@ -52,22 +55,28 @@ func NewPoint3D(srId int, x float64, y float64, z float64) *Point {
 	}
 }
 
+// SrId returns the Point's coordinate reference system.
 func (point *Point) SrId() int {
 	return point.srId
 }
 
+// X returns the Point's X coordinate.
 func (point *Point) X() float64 {
 	return point.x
 }
 
+// Y returns the Point's Y coordinate.
 func (point *Point) Y() float64 {
 	return point.y
 }
 
+// Z returns the Point's Z coordinate.
+// math.NaN is returned when the Point is two dimensional.
 func (point *Point) Z() float64 {
 	return point.z
 }
 
+// String returns the string representation of this Point.
 func (point *Point) String() string {
 	if point.dimension == 2 {
 		return fmt.Sprintf("Point{srId=%d, x=%f, y=%f}", point.srId, point.x, point.y)

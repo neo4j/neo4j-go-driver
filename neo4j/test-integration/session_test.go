@@ -80,7 +80,7 @@ var _ = Describe("Session", func() {
 			Expect(result.Next()).To(BeFalse())
 			Expect(result.Err()).To(BeNil())
 
-			Expect(summary.Statement().Cypher()).To(BeIdenticalTo(stmt))
+			Expect(summary.Statement().Text()).To(BeIdenticalTo(stmt))
 			Expect(summary.Statement().Params()).To(BeNil())
 		})
 
@@ -98,7 +98,7 @@ var _ = Describe("Session", func() {
 			Expect(result.Next()).To(BeFalse())
 			Expect(result.Err()).To(BeNil())
 
-			Expect(summary.Statement().Cypher()).To(Equal(stmt))
+			Expect(summary.Statement().Text()).To(Equal(stmt))
 			Expect(summary.Statement().Params()).To(Equal(params))
 		})
 

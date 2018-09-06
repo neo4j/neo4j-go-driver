@@ -21,18 +21,49 @@ package neo4j
 
 import "time"
 
+// TransactionConfig holds the settings for explicit and auto-commit transactions. Actual configuration is expected
+// to be done using configuration functions that are predefined, i.e. 'WithTxTimeout' and 'WithTxMetadata', or one
+// that you could write by your own.
 type TransactionConfig struct {
-	Timeout  time.Duration
+	// Timeout is the configured transaction timeout.
+	Timeout time.Duration
+	// Metadata is the configured transaction metadata that will be attached to the underlying transaction.
 	Metadata map[string]interface{}
 }
 
-func WithTransactionTimeout(timeout time.Duration) func(*TransactionConfig) {
+// WithTxTimeout returns a transaction configuration function that applies a timeout to a transaction.
+//
+// To apply a transaction timeout to an explicit transaction:
+//	session.BeginTransaction(WithTxTimeout(5*time.Seconds))
+//
+// To apply a transaction timeout to an auto-commit transaction:
+//	session.Run("RETURN 1", nil, WithTxTimeout(5*time.Seconds))
+//
+// To apply a transaction timeout to a read transaction function:
+//	session.ReadTransaction(DoWork, WithTxTimeout(5*time.Seconds))
+//
+// To apply a transaction timeout to a write transaction function:
+//	session.WriteTransaction(DoWork, WithTxTimeout(5*time.Seconds))
+func WithTxTimeout(timeout time.Duration) func(*TransactionConfig) {
 	return func(config *TransactionConfig) {
 		config.Timeout = timeout
 	}
 }
 
-func WithTransactionMetadata(metadata map[string]interface{}) func(*TransactionConfig) {
+// WithTxMetadata returns a transaction configuration function that attaches metadata to a transaction.
+//
+// To attach a metadata to an explicit transaction:
+//	session.BeginTransaction(WithTxMetadata(map[string)interface{}{"work-id": 1}))
+//
+// To attach a metadata to an auto-commit transaction:
+//	session.Run("RETURN 1", nil, WithTxMetadata(map[string)interface{}{"work-id": 1}))
+//
+// To attach a metadata to a read transaction function:
+//	session.ReadTransaction(DoWork, WithTxMetadata(map[string)interface{}{"work-id": 1}))
+//
+// To attach a metadata to a write transaction function:
+//	session.WriteTransaction(DoWork, WithTxMetadata(map[string)interface{}{"work-id": 1}))
+func WithTxMetadata(metadata map[string]interface{}) func(*TransactionConfig) {
 	return func(config *TransactionConfig) {
 		config.Metadata = metadata
 	}

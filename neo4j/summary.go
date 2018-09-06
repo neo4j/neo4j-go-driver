@@ -41,14 +41,24 @@ const (
 
 // ResultSummary contains information about statement execution.
 type ResultSummary interface {
+	// Server returns basic information about the server where the statement is carried out.
 	Server() ServerInfo
+	// Statement returns statement that has been executed.
 	Statement() Statement
+	// StatementType returns type of statement that has been executed.
 	StatementType() StatementType
+	// Counters returns statistics counts for the statement.
 	Counters() Counters
+	// Plan returns statement plan for the executed statement if available, otherwise null.
 	Plan() Plan
+	// Profile returns profiled statement plan for the executed statement if available, otherwise null.
 	Profile() ProfiledPlan
+	// Notifications returns a slice of notifications produced while executing the statement.
+	// The list will be empty if no notifications produced while executing the statement.
 	Notifications() []Notification
+	// ResultAvailableAfter returns the time it took for the server to make the result available for consumption.
 	ResultAvailableAfter() time.Duration
+	// ResultConsumedAfter returns the time it took the server to consume the result.
 	ResultConsumedAfter() time.Duration
 }
 

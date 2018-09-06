@@ -24,8 +24,6 @@ import (
 	"sync/atomic"
 )
 
-// Session represents a logical connection (which is not tied to a physical connection)
-// to the server
 type neoSession struct {
 	driver     *goboltDriver
 	accessMode AccessMode
@@ -119,29 +117,22 @@ func (session *neoSession) LastBookmark() string {
 	return session.lastBookmark
 }
 
-// BeginTransaction starts a new explicit transaction on this session
 func (session *neoSession) BeginTransaction(configurers ...func(*TransactionConfig)) (Transaction, error) {
 	return beginTransactionInternal(session, session.accessMode, configurers...)
 }
 
-// ReadTransaction executes the given unit of work in a AccessModeRead transaction with
-// retry logic in place
 func (session *neoSession) ReadTransaction(work TransactionWork, configurers ...func(*TransactionConfig)) (interface{}, error) {
 	return runTransaction(session, AccessModeRead, work, configurers...)
 }
 
-// WriteTransaction executes the given unit of work in a AccessModeWrite transaction with
-// retry logic in place
 func (session *neoSession) WriteTransaction(work TransactionWork, configurers ...func(*TransactionConfig)) (interface{}, error) {
 	return runTransaction(session, AccessModeWrite, work, configurers...)
 }
 
-// Run executes an auto-commit statement and returns a result
 func (session *neoSession) Run(cypher string, params map[string]interface{}, configurers ...func(*TransactionConfig)) (Result, error) {
-	return runStatementOnSession(session, &neoStatement{cypher: cypher, params: params}, configurers...)
+	return runStatementOnSession(session, &neoStatement{text: cypher, params: params}, configurers...)
 }
 
-// Close closes any open resources and marks this session as unusable
 func (session *neoSession) Close() error {
 	if atomic.CompareAndSwapInt32(&session.open, 1, 0) {
 		if err := closeRunner(session); err != nil {
