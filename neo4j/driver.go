@@ -33,7 +33,7 @@ const (
 	// AccessModeWrite tells the driver to use a connection to 'Leader'
 	AccessModeWrite AccessMode = 0
 	// AccessModeRead tells the driver to use a connection to one of the 'Follower' or 'Read Replica'.
-	AccessModeRead = 1
+	AccessModeRead AccessMode = 1
 )
 
 // Driver represents a pool(s) of connections to a neo4j server or cluster. It's
