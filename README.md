@@ -189,7 +189,7 @@ dateValue := record.GetByIndex(0).(neo4j.Date)
 All custom temporal types can be constructing from a `time.Time` value using `<Type>Of()` (`DateOf`, `OffsetTimeOf`, ...) functions.
 
 ```go
-dateValue := DateOf(time.Date(2005, time.December, 16, 0, 0, 0, 0, time.Local)`
+dateValue := DateOf(time.Date(2005, time.December, 16, 0, 0, 0, 0, time.Local)
 ```
 
 Converting a custom temporal value into `time.Time` (all `neo4j` temporal types expose `Time()` function to gets its corresponding `time.Time` value):
