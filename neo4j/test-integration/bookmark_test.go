@@ -93,6 +93,10 @@ var _ = Describe("Bookmark", func() {
 		})
 
 		Specify("when a node is created in auto-commit mode, last bookmark should be empty", func() {
+			if VersionOfDriver(driver).GreaterThanOrEqual(V3_5_0) {
+				Skip("this test is targeted for server version less than neo4j 3.5.0")
+			}
+
 			result, err = session.Run("CREATE (p:Person { Name: 'Test'})", nil)
 			Expect(err).To(BeNil())
 
@@ -100,6 +104,20 @@ var _ = Describe("Bookmark", func() {
 			Expect(err).To(BeNil())
 
 			Expect(session.LastBookmark()).To(BeEmpty())
+		})
+
+		Specify("when a node is created in auto-commit mode, last bookmark should not be empty", func() {
+			if VersionOfDriver(driver).LessThan(V3_5_0) {
+				Skip("this test is targeted for server version after neo4j 3.5.0")
+			}
+
+			result, err = session.Run("CREATE (p:Person { Name: 'Test'})", nil)
+			Expect(err).To(BeNil())
+
+			summary, err = result.Consume()
+			Expect(err).To(BeNil())
+
+			Expect(session.LastBookmark()).NotTo(BeEmpty())
 		})
 
 		Specify("when a node is created in explicit transaction and committed, last bookmark should not be empty", func() {

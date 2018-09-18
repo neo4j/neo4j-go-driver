@@ -21,7 +21,6 @@ package neo4j
 
 import (
 	"errors"
-
 	"github.com/neo4j-drivers/gobolt"
 )
 
@@ -188,14 +187,14 @@ func (runner *statementRunner) receive() (Result, error) {
 	return activeResult, nil
 }
 
-func (runner *statementRunner) runStatement(statement *neoStatement) (Result, error) {
+func (runner *statementRunner) runStatement(statement *neoStatement, bookmarks []string, txConfig TransactionConfig) (Result, error) {
 	if err := runner.ensureConnection(); err != nil {
 		defer runner.closeConnection()
 
 		return nil, err
 	}
 
-	runHandle, err := runner.connection.Run(statement.text, &statement.params)
+	runHandle, err := runner.connection.Run(statement.text, statement.params, bookmarks, txConfig.Timeout, txConfig.Metadata)
 	if err != nil {
 		defer runner.closeConnection()
 
@@ -233,7 +232,7 @@ func (runner *statementRunner) runStatement(statement *neoStatement) (Result, er
 	return result, nil
 }
 
-func (runner *statementRunner) beginTransaction(bookmarks []string) (Result, error) {
+func (runner *statementRunner) beginTransaction(bookmarks []string, txConfig TransactionConfig) (Result, error) {
 	// TODO: assert no connection
 
 	if err := runner.ensureConnection(); err != nil {
@@ -242,7 +241,7 @@ func (runner *statementRunner) beginTransaction(bookmarks []string) (Result, err
 		return nil, err
 	}
 
-	beginHandle, err := runner.connection.Begin(bookmarks)
+	beginHandle, err := runner.connection.Begin(bookmarks, txConfig.Timeout, txConfig.Metadata)
 	if err != nil {
 		defer runner.closeConnection()
 
