@@ -7,6 +7,7 @@ import (
 
 var (
 	V3_4_0 = utils.VersionOf("3.4.0")
+	V3_5_0 = utils.VersionOf("3.5.0")
 )
 
 func VersionOfDriver(driver neo4j.Driver) utils.Version {

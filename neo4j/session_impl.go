@@ -143,6 +143,27 @@ func (session *neoSession) Close() error {
 	return nil
 }
 
+func computeTransactionConfig(configurers ...func(config *TransactionConfig)) TransactionConfig {
+	config := TransactionConfig{Timeout: 0, Metadata: nil}
+
+	for _, configurer := range configurers {
+		configurer(&config)
+	}
+
+	return config
+}
+
+func computeBookmarks(session *neoSession) []string {
+	var computedBookmarks []string
+
+	computedBookmarks = append(computedBookmarks, session.bookmarks...)
+	if session.lastBookmark != "" {
+		computedBookmarks = append(computedBookmarks, session.lastBookmark)
+	}
+
+	return computedBookmarks
+}
+
 func beginTransactionInternal(session *neoSession, mode AccessMode, configurers ...func(*TransactionConfig)) (Transaction, error) {
 	if err := ensureReady(session); err != nil {
 		return nil, err
@@ -152,13 +173,7 @@ func beginTransactionInternal(session *neoSession, mode AccessMode, configurers 
 		return nil, err
 	}
 
-	var computedBookmarks []string
-	computedBookmarks = append(computedBookmarks, session.bookmarks...)
-	if session.lastBookmark != "" {
-		computedBookmarks = append(computedBookmarks, session.lastBookmark)
-	}
-
-	beginResult, err := session.runner.beginTransaction(computedBookmarks)
+	beginResult, err := session.runner.beginTransaction(computeBookmarks(session), computeTransactionConfig(configurers...))
 	if err != nil {
 		return nil, err
 	}
@@ -187,7 +202,7 @@ func runStatementOnSession(session *neoSession, statement *neoStatement, configu
 		return nil, err
 	}
 
-	result, err := session.runner.runStatement(statement)
+	result, err := session.runner.runStatement(statement, computeBookmarks(session), computeTransactionConfig(configurers...))
 	if err != nil {
 		return nil, err
 	}
