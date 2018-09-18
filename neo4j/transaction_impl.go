@@ -114,7 +114,7 @@ func runStatementOnTransaction(transaction *neoTransaction, statement *neoStatem
 		return nil, err
 	}
 
-	result, err := transaction.session.runner.runStatement(statement)
+	result, err := transaction.session.runner.runStatement(statement, nil, TransactionConfig{})
 	if err != nil {
 		return nil, err
 	}
