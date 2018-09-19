@@ -24,11 +24,12 @@
 package mocks
 
 import (
-	reflect "reflect"
+	"reflect"
+	"time"
 
 	"github.com/neo4j-drivers/gobolt"
 
-	gomock "github.com/golang/mock/gomock"
+	"github.com/golang/mock/gomock"
 )
 
 // MockConnection is a mock of Connection interface
@@ -79,16 +80,16 @@ func (mr *MockConnectionMockRecorder) Server() *gomock.Call {
 }
 
 // Begin connector-mocks base method
-func (m *MockConnection) Begin(arg0 []string) (gobolt.RequestHandle, error) {
-	ret := m.ctrl.Call(m, "Begin", arg0)
+func (m *MockConnection) Begin(arg0 []string, arg1 time.Duration, arg2 map[string]interface{}) (gobolt.RequestHandle, error) {
+	ret := m.ctrl.Call(m, "Begin", arg0, arg1, arg2)
 	ret0, _ := ret[0].(gobolt.RequestHandle)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // Begin indicates an expected call of Begin
-func (mr *MockConnectionMockRecorder) Begin(arg0 interface{}) *gomock.Call {
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Begin", reflect.TypeOf((*MockConnection)(nil).Begin), arg0)
+func (mr *MockConnectionMockRecorder) Begin(arg0 interface{}, arg1 interface{}, arg2 interface{}) *gomock.Call {
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Begin", reflect.TypeOf((*MockConnection)(nil).Begin), arg0, arg1, arg2)
 }
 
 // Close connector-mocks base method
@@ -258,14 +259,14 @@ func (mr *MockConnectionMockRecorder) Rollback() *gomock.Call {
 }
 
 // Run connector-mocks base method
-func (m *MockConnection) Run(arg0 string, arg1 *map[string]interface{}) (gobolt.RequestHandle, error) {
-	ret := m.ctrl.Call(m, "Run", arg0, arg1)
+func (m *MockConnection) Run(arg0 string, arg1 map[string]interface{}, arg2 []string, arg3 time.Duration, arg4 map[string]interface{}) (gobolt.RequestHandle, error) {
+	ret := m.ctrl.Call(m, "Run", arg0, arg1, arg2, arg3, arg4)
 	ret0, _ := ret[0].(gobolt.RequestHandle)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // Run indicates an expected call of Run
-func (mr *MockConnectionMockRecorder) Run(arg0, arg1 interface{}) *gomock.Call {
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Run", reflect.TypeOf((*MockConnection)(nil).Run), arg0, arg1)
+func (mr *MockConnectionMockRecorder) Run(arg0, arg1 interface{}, arg2 interface{}, arg3 interface{}, arg4 interface{}) *gomock.Call {
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Run", reflect.TypeOf((*MockConnection)(nil).Run), arg0, arg1, arg2, arg3, arg4)
 }

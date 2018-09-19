@@ -20,11 +20,11 @@
 package neo4j
 
 import (
-	"github.com/neo4j/neo4j-go-driver/neo4j/utils/mocks"
-
 	"github.com/golang/mock/gomock"
+	"github.com/neo4j/neo4j-go-driver/neo4j/utils/mocks"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	"time"
 )
 
 var _ = Describe("Runner", func() {
@@ -50,14 +50,14 @@ var _ = Describe("Runner", func() {
 			emptyMap := map[string]interface{}(nil)
 
 			gomock.InOrder(
-				mockConnection.EXPECT().Run("RETURN 1", &emptyMap).Times(1),
+				mockConnection.EXPECT().Run("RETURN 1", emptyMap, nil, 0*time.Second, nil).Times(1),
 				mockConnection.EXPECT().PullAll().Times(1),
 				mockConnection.EXPECT().Flush().Times(1),
 				mockConnection.EXPECT().RemoteAddress(),
 				mockConnection.EXPECT().Server(),
 			)
 
-			_, err := runner.runStatement(&neoStatement{text: "RETURN 1"})
+			_, err := runner.runStatement(&neoStatement{text: "RETURN 1"}, nil, TransactionConfig{})
 
 			Expect(err).To(BeNil())
 		})
