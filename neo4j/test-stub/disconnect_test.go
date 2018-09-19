@@ -27,7 +27,7 @@ import (
 	"path"
 )
 
-var _ = FDescribe("Disconnect", func() {
+var _ = Describe("Disconnect", func() {
 	var stub *control.StubServer
 
 	AfterEach(func() {
