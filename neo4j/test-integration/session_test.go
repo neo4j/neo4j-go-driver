@@ -20,8 +20,11 @@
 package test_integration
 
 import (
+	"fmt"
 	"github.com/neo4j/neo4j-go-driver/neo4j"
 	"github.com/neo4j/neo4j-go-driver/neo4j/test-integration/control"
+	"reflect"
+	"time"
 
 	. "github.com/neo4j/neo4j-go-driver/neo4j/utils/test"
 	. "github.com/onsi/ginkgo"
@@ -296,6 +299,123 @@ var _ = Describe("Session", func() {
 
 			Expect(result1Values).To(BeEquivalentTo([]int{1, 2, 3, 4, 5, 6, 7, 8, 9, 10}))
 			Expect(result2Values).To(BeEquivalentTo([]int{11, 12, 13, 14, 15, 16, 17, 18, 19, 20}))
+		})
+	})
+
+	Context("V3", func() {
+		var (
+			err     error
+			driver  neo4j.Driver
+			session neo4j.Session
+			result  neo4j.Result
+		)
+
+		BeforeEach(func() {
+			driver, err = server.Driver()
+			Expect(err).To(BeNil())
+			Expect(driver).NotTo(BeNil())
+
+			if VersionOfDriver(driver).LessThan(V3_5_0) {
+				Skip("this test is targeted for server version after neo4j 3.5.0")
+			}
+
+			session, err = driver.Session(neo4j.AccessModeRead)
+			Expect(err).To(BeNil())
+			Expect(session).NotTo(BeNil())
+		})
+
+		AfterEach(func() {
+			if session != nil {
+				session.Close()
+			}
+
+			if driver != nil {
+				driver.Close()
+			}
+		})
+
+		It("should set transaction metadata on Session.Run", func() {
+			metadata := map[string]interface{}{
+				"m1": int64(1),
+				"m2": "some string",
+				"m3": 4.0,
+				"m4": neo4j.LocalDateTimeOf(time.Now()),
+			}
+
+			result, err = session.Run("CALL dbms.listTransactions()", nil, neo4j.WithTxMetadata(metadata))
+			Expect(err).To(BeNil())
+
+			var matched bool = false
+			for result.Next() {
+				if txMetadataInt, ok := result.Record().Get("metaData"); ok {
+					if txMetadata, ok := txMetadataInt.(map[string]interface{}); ok {
+						if reflect.DeepEqual(metadata, txMetadata) {
+							matched = true
+							break
+						}
+					}
+				}
+			}
+			Expect(result.Err()).To(BeNil())
+
+			Expect(matched).To(BeTrue(), fmt.Sprintf("dbms.listTransactions did not include a metadata of %v", metadata))
+		})
+
+		It("should set transaction metadata on ReadTransaction", func() {
+			metadata := map[string]interface{}{
+				"m1": int64(1),
+				"m2": "some string",
+				"m3": []interface{}{"a", "b", "c"},
+				"m4": neo4j.DateOf(time.Now()),
+			}
+
+			matched, err := session.ReadTransaction(listTransactionsAndMatchMetadataWork(metadata), neo4j.WithTxMetadata(metadata))
+			Expect(err).To(BeNil())
+			Expect(matched).To(BeTrue(), fmt.Sprintf("dbms.listTransactions did not include a metadata of %v", metadata))
+		})
+
+		It("should set transaction metadata on WriteTransaction", func() {
+			metadata := map[string]interface{}{
+				"m1": true,
+				"m2": []byte{0x00, 0x01, 0x02},
+				"m3": []interface{}{"a", "b", "c"},
+				"m4": neo4j.OffsetTimeOf(time.Now()),
+			}
+
+			matched, err := session.WriteTransaction(listTransactionsAndMatchMetadataWork(metadata), neo4j.WithTxMetadata(metadata))
+			Expect(err).To(BeNil())
+			Expect(matched).To(BeTrue(), fmt.Sprintf("dbms.listTransactions did not include a metadata of %v", metadata))
+		})
+
+		It("should set transaction timeout", func() {
+			createNode(session, "RunTxTimeOut", nil)
+
+			session2, tx2 := newSessionAndTx(driver, neo4j.AccessModeWrite)
+			defer session2.Close()
+			defer tx2.Close()
+			updateNodeInTx(tx2, "RunTxTimeOut", map[string]interface{}{"id": 1})
+
+			session3 := newSession(driver, neo4j.AccessModeWrite)
+
+			result3, err := session3.Run("MATCH (n:RunTxTimeOut) SET n.id = 2", nil, neo4j.WithTxTimeout(1*time.Second))
+			Expect(err).To(BeNil())
+
+			_, err = result3.Consume()
+			Expect(err).To(BeTransientError(nil, ContainSubstring("terminated")))
+		})
+
+		It("should set transaction timeout on WriteTransaction", func() {
+			createNode(session, "WriteTransactionTxTimeOut", nil)
+
+			session2, tx2 := newSessionAndTx(driver, neo4j.AccessModeWrite)
+			defer session2.Close()
+			defer tx2.Close()
+			updateNodeInTx(tx2, "WriteTransactionTxTimeOut", map[string]interface{}{"id": 1})
+
+			session3 := newSession(driver, neo4j.AccessModeWrite)
+
+			_, err := session3.WriteTransaction(updateNodeWork("WriteTransactionTxTimeOut", map[string]interface{}{"id": 2}), neo4j.WithTxTimeout(1*time.Second))
+			Expect(err).To(BeTransientError(nil, ContainSubstring("terminated")))
 		})
 	})
 

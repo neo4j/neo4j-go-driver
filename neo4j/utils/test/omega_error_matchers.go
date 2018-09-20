@@ -31,9 +31,11 @@ func BeDatabaseError() types.GomegaMatcher {
 	return &databaseErrorMatcher{}
 }
 
-func BeTransientError() types.GomegaMatcher {
+func BeTransientError(codeMatcher types.GomegaMatcher, messageMatcher types.GomegaMatcher) types.GomegaMatcher {
 	return &databaseErrorMatcher{
 		classificationMatcher: gomega.BeEquivalentTo("TransientError"),
+		codeMatcher:           codeMatcher,
+		messageMatcher:        messageMatcher,
 	}
 }
 

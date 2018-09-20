@@ -20,6 +20,7 @@
 package test_integration
 
 import (
+	"github.com/neo4j/neo4j-go-driver/neo4j/utils/test"
 	"time"
 
 	"github.com/neo4j-drivers/gobolt"
@@ -61,36 +62,6 @@ var _ = Describe("Transaction", func() {
 		}
 	})
 
-	singleResultWork := func(query string, params map[string]interface{}) neo4j.TransactionWork {
-		return func(tx neo4j.Transaction) (interface{}, error) {
-			create, err := tx.Run(query, params)
-			Expect(err).To(BeNil())
-
-			returnValue := 0
-			if create.Next() {
-				returnValue = int(create.Record().GetByIndex(0).(int64))
-			}
-			Expect(create.Next()).To(BeFalse())
-			Expect(create.Err()).To(BeNil())
-
-			return returnValue, nil
-		}
-	}
-
-	writeAndGetSingleIntResult := func(work neo4j.TransactionWork) int {
-		result, err := session.WriteTransaction(work)
-		Expect(err).To(BeNil())
-
-		return result.(int)
-	}
-
-	readAndGetSingleIntResult := func(work neo4j.TransactionWork) int {
-		result, err := session.ReadTransaction(work)
-		Expect(err).To(BeNil())
-
-		return result.(int)
-	}
-
 	Context("Retry Mechanism", func() {
 		transientError := gobolt.NewDatabaseError(map[string]interface{}{
 			"code":    "Neo.TransientError.Transaction.Outdated",
@@ -123,15 +94,15 @@ var _ = Describe("Transaction", func() {
 	})
 
 	It("should commit if work function doesn't return error", func() {
-		createResult := writeAndGetSingleIntResult(singleResultWork("CREATE (n:Person1) RETURN count(n)", nil))
+		createResult := writeTransactionWithIntWork(session, intReturningWork("CREATE (n:Person1) RETURN count(n)", nil))
 		Expect(createResult).To(BeEquivalentTo(1))
 
-		matchResult := readAndGetSingleIntResult(singleResultWork("MATCH (n:Person1) RETURN count(n)", nil))
+		matchResult := readTransactionWithIntWork(session, intReturningWork("MATCH (n:Person1) RETURN count(n)", nil))
 		Expect(matchResult).To(BeEquivalentTo(1))
 	})
 
 	It("should rollback if work function returns error", func() {
-		createWork := singleResultWork("CREATE (n:Person2) RETURN count(n)", nil)
+		createWork := intReturningWork("CREATE (n:Person2) RETURN count(n)", nil)
 		createResult, err := session.WriteTransaction(func(tx neo4j.Transaction) (interface{}, error) {
 			innerResult, err := createWork(tx)
 			Expect(err).To(BeNil())
@@ -142,7 +113,7 @@ var _ = Describe("Transaction", func() {
 		Expect(err).NotTo(BeNil())
 		Expect(createResult).To(BeNil())
 
-		matchResult := readAndGetSingleIntResult(singleResultWork("MATCH (n:Person2) RETURN count(n)", nil))
+		matchResult := readTransactionWithIntWork(session, intReturningWork("MATCH (n:Person2) RETURN count(n)", nil))
 		Expect(matchResult).To(BeEquivalentTo(0))
 	})
 
@@ -241,5 +212,54 @@ var _ = Describe("Transaction", func() {
 
 		Expect(result2.Keys()).To(BeEquivalentTo([]string{"X", "Y"}))
 		Expect(result1.Keys()).To(BeEquivalentTo([]string{"N", "M"}))
+	})
+
+	Context("V3", func() {
+
+		BeforeEach(func() {
+			if VersionOfDriver(driver).LessThan(V3_5_0) {
+				Skip("this test is targeted for server version after neo4j 3.5.0")
+			}
+		})
+
+		It("should set transaction metadata", func() {
+			metadata := map[string]interface{}{
+				"m1": int64(1),
+				"m2": "some string",
+				"m3": 4.0,
+				"m4": neo4j.LocalDateTimeOf(time.Now()),
+			}
+
+			tx, err = session.BeginTransaction(neo4j.WithTxMetadata(metadata))
+			Expect(err).To(BeNil())
+			defer tx.Close()
+
+			number := transactionWithIntWork(tx, intReturningWork("RETURN $x", map[string]interface{}{"x": 1}))
+			Expect(number).To(BeEquivalentTo(1))
+
+			session2 := newSession(driver, neo4j.AccessModeRead)
+			defer session2.Close()
+			matched, err := session2.ReadTransaction(listTransactionsAndMatchMetadataWork(metadata))
+			Expect(err).To(BeNil())
+			Expect(matched).To(BeTrue())
+		})
+
+		It("should set transaction timeout", func() {
+			createNode(session, "TxTimeOut", nil)
+
+			session2, tx2 := newSessionAndTx(driver, neo4j.AccessModeWrite)
+			defer session2.Close()
+			defer tx2.Close()
+
+			updateNodeInTx(tx2, "TxTimeOut", map[string]interface{}{"id": 1})
+
+			session3, tx3 := newSessionAndTx(driver, neo4j.AccessModeWrite, neo4j.WithTxTimeout(1*time.Second))
+			defer session3.Close()
+			defer tx3.Close()
+
+			_, err := updateNodeWork("TxTimeOut", map[string]interface{}{"id": 2})(tx3)
+			Expect(err).To(test.BeTransientError(nil, ContainSubstring("terminated")))
+		})
+
 	})
 })
