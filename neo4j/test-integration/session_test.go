@@ -419,4 +419,68 @@ var _ = Describe("Session", func() {
 		})
 	})
 
+	Context("V3 API on V1 & V2", func() {
+		var (
+			err     error
+			driver  neo4j.Driver
+			session neo4j.Session
+		)
+
+		metadata := map[string]interface{}{"id": 4, "name": "x"}
+
+		BeforeEach(func() {
+			driver, err = server.Driver()
+			Expect(err).To(BeNil())
+			Expect(driver).NotTo(BeNil())
+
+			if VersionOfDriver(driver).GreaterThanOrEqual(V3_5_0) {
+				Skip("this test is targeted for server versions less than neo4j 3.5.0")
+			}
+
+			session, err = driver.Session(neo4j.AccessModeRead)
+			Expect(err).To(BeNil())
+			Expect(session).NotTo(BeNil())
+		})
+
+		AfterEach(func() {
+			if session != nil {
+				session.Close()
+			}
+
+			if driver != nil {
+				driver.Close()
+			}
+		})
+
+		It("should fail when transaction timeout is set for Session.Run", func() {
+			_, err := session.Run("RETURN 1", nil, neo4j.WithTxTimeout(1*time.Second))
+			Expect(err).To(BeConnectorErrorWithCode(0x504))
+		})
+
+		It("should fail when transaction timeout is set for Session.ReadTransaction", func() {
+			_, err := session.ReadTransaction(createNodeWork("Test", nil), neo4j.WithTxTimeout(1*time.Second))
+			Expect(err).To(BeConnectorErrorWithCode(0x504))
+		})
+
+		It("should fail when transaction timeout is set for Session.WriteTransaction", func() {
+			_, err := session.WriteTransaction(createNodeWork("Test", nil), neo4j.WithTxTimeout(1*time.Second))
+			Expect(err).To(BeConnectorErrorWithCode(0x504))
+		})
+
+		It("should fail when transaction metadata is set for Session.Run", func() {
+			_, err := session.Run("RETURN 1", nil, neo4j.WithTxMetadata(metadata))
+			Expect(err).To(BeConnectorErrorWithCode(0x504))
+		})
+
+		It("should fail when transaction metadata is set for Session.ReadTransaction", func() {
+			_, err := session.ReadTransaction(createNodeWork("Test", nil), neo4j.WithTxMetadata(metadata))
+			Expect(err).To(BeConnectorErrorWithCode(0x504))
+		})
+
+		It("should fail when transaction metadata is set for Session.WriteTransaction", func() {
+			_, err := session.WriteTransaction(createNodeWork("Test", nil), neo4j.WithTxMetadata(metadata))
+			Expect(err).To(BeConnectorErrorWithCode(0x504))
+		})
+	})
+
 })
