@@ -224,6 +224,7 @@ func (runner *statementRunner) runStatement(statement *neoStatement, bookmarks [
 				address: runner.connection.RemoteAddress(),
 				version: runner.connection.Server(),
 			},
+			counters: &neoCounters{},
 		},
 	}
 
