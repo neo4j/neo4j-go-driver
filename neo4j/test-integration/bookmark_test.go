@@ -403,7 +403,7 @@ var _ = Describe("Bookmark", func() {
 			tx, err := session.BeginTransaction()
 
 			Expect(tx).To(BeNil())
-			Expect(err).To(BeTransientError())
+			Expect(err).To(BeTransientError(nil, nil))
 			Expect(err).To(ContainMessage("Database not up to the requested version"))
 		})
 	})
