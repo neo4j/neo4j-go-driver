@@ -263,7 +263,7 @@ var _ = Describe("Transaction", func() {
 
 	})
 
-	FContext("V3 API on V1 & V2", func() {
+	Context("V3 API on V1 & V2", func() {
 		BeforeEach(func() {
 			if VersionOfDriver(driver).GreaterThanOrEqual(V3_5_0) {
 				Skip("this test is targeted for server versions less than neo4j 3.5.0")
