@@ -20,16 +20,16 @@
 package test_integration
 
 import (
-	"github.com/neo4j/neo4j-go-driver/neo4j/utils/test"
+	"fmt"
 	"time"
 
 	"github.com/neo4j-drivers/gobolt"
 	"github.com/neo4j/neo4j-go-driver/neo4j"
 	"github.com/neo4j/neo4j-go-driver/neo4j/test-integration/control"
 
+	. "github.com/neo4j/neo4j-go-driver/neo4j/utils/test"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-	"github.com/pkg/errors"
 )
 
 var _ = Describe("Transaction", func() {
@@ -108,7 +108,7 @@ var _ = Describe("Transaction", func() {
 			Expect(err).To(BeNil())
 			Expect(innerResult).To(BeEquivalentTo(1))
 
-			return nil, errors.New("some error")
+			return nil, fmt.Errorf("some error")
 		})
 		Expect(err).NotTo(BeNil())
 		Expect(createResult).To(BeNil())
@@ -258,8 +258,26 @@ var _ = Describe("Transaction", func() {
 			defer tx3.Close()
 
 			_, err := updateNodeWork("TxTimeOut", map[string]interface{}{"id": 2})(tx3)
-			Expect(err).To(test.BeTransientError(nil, ContainSubstring("terminated")))
+			Expect(err).To(BeTransientError(nil, ContainSubstring("terminated")))
 		})
 
+	})
+
+	FContext("V3 API on V1 & V2", func() {
+		BeforeEach(func() {
+			if VersionOfDriver(driver).GreaterThanOrEqual(V3_5_0) {
+				Skip("this test is targeted for server versions less than neo4j 3.5.0")
+			}
+		})
+
+		It("should fail when transaction timeout is set for Session.BeginTransaction", func() {
+			_, err := session.BeginTransaction(neo4j.WithTxTimeout(1 * time.Second))
+			Expect(err).To(BeConnectorErrorWithCode(0x504))
+		})
+
+		It("should fail when transaction metadata is set for Session.BeginTransaction", func() {
+			_, err := session.BeginTransaction(neo4j.WithTxMetadata(map[string]interface{}{"x": 1}))
+			Expect(err).To(BeConnectorErrorWithCode(0x504))
+		})
 	})
 })

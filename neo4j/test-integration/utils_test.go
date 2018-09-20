@@ -120,6 +120,26 @@ func createNodeInTx(tx neo4j.Transaction, label string, props map[string]interfa
 	Expect(summary.Counters().ContainsUpdates()).To(BeTrue())
 }
 
+func createNodeWork(label string, props map[string]interface{}) neo4j.TransactionWork {
+	return func(tx neo4j.Transaction) (interface{}, error) {
+		var (
+			err    error
+			result neo4j.Result
+		)
+
+		if len(props) > 0 {
+			result, err = tx.Run(fmt.Sprintf("CREATE (n:%s) SET n = $props", label), map[string]interface{}{"props": props})
+		} else {
+			result, err = tx.Run(fmt.Sprintf("CREATE (n:%s)", label), nil)
+		}
+		if err != nil {
+			return nil, err
+		}
+
+		return result.Consume()
+	}
+}
+
 func updateNode(session neo4j.Session, label string, newProps map[string]interface{}) {
 	var (
 		err     error
