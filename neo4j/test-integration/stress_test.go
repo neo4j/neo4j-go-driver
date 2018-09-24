@@ -31,7 +31,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-var _ = FDescribe("Stress Test", func() {
+var _ = Describe("Stress Test", func() {
 	const TestDuration = 1 * time.Minute
 	const TestNumberOfGoRoutines = 20
 
@@ -125,7 +125,7 @@ var _ = FDescribe("Stress Test", func() {
 		})
 	})
 
-	FContext("Causal Cluster", func() {
+	Context("Causal Cluster", func() {
 		var ctx *stress.TestContext
 		var driver neo4j.Driver
 		var cluster *control.Cluster

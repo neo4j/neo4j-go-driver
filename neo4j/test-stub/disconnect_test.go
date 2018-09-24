@@ -54,7 +54,7 @@ var _ = Describe("Disconnect", func() {
 			summary, err := result.Consume()
 
 			Expect(err).To(test.BeServiceUnavailableError())
-			Expect(summary).ToNot(BeNil())
+			Expect(summary).To(BeNil())
 		})
 
 		It("should return error when server disconnects after RUN", func() {
@@ -72,7 +72,7 @@ var _ = Describe("Disconnect", func() {
 			summary, err := result.Consume()
 
 			Expect(err).To(test.BeServiceUnavailableError())
-			Expect(summary).ToNot(BeNil())
+			Expect(summary).To(BeNil())
 		})
 
 		It("should return error when server disconnects after PULL_ALL", func() {
@@ -90,7 +90,7 @@ var _ = Describe("Disconnect", func() {
 			summary, err := result.Consume()
 
 			Expect(err).To(test.BeServiceUnavailableError())
-			Expect(summary).ToNot(BeNil())
+			Expect(summary).To(BeNil())
 		})
 	})
 
@@ -110,7 +110,7 @@ var _ = Describe("Disconnect", func() {
 			summary, err := result.Consume()
 
 			Expect(err).To(test.BeServiceUnavailableError())
-			Expect(summary).ToNot(BeNil())
+			Expect(summary).To(BeNil())
 		})
 
 		It("should return error when server disconnects after RUN", func() {
@@ -128,7 +128,7 @@ var _ = Describe("Disconnect", func() {
 			summary, err := result.Consume()
 
 			Expect(err).To(test.BeServiceUnavailableError())
-			Expect(summary).ToNot(BeNil())
+			Expect(summary).To(BeNil())
 		})
 
 		It("should return error when server disconnects after PULL_ALL", func() {
@@ -146,7 +146,7 @@ var _ = Describe("Disconnect", func() {
 			summary, err := result.Consume()
 
 			Expect(err).To(test.BeServiceUnavailableError())
-			Expect(summary).ToNot(BeNil())
+			Expect(summary).To(BeNil())
 		})
 	})
 
