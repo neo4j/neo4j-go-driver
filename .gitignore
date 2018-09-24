@@ -4,6 +4,9 @@
 *.so
 *.dylib
 
+# Core dumps
+core
+
 # Test binary, build with `go test -c`
 *.test
 
