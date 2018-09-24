@@ -20,7 +20,8 @@
 package neo4j
 
 import (
-	. "github.com/neo4j/neo4j-go-driver/neo4j/utils/test"
+	"math"
+
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
@@ -48,7 +49,7 @@ var _ = Describe("Spatial Types", func() {
 			})
 
 			It("should report z as NaN", func() {
-				Expect(point.Z()).To(BeNaN())
+				Expect(math.IsNaN(point.Z())).To(BeTrue())
 			})
 
 			It("should generate correct string", func() {
