@@ -130,11 +130,10 @@ var _ = Describe("Session", func() {
 
 			summary, err = result.Consume()
 			Expect(err).To(BeSyntaxError())
+			Expect(summary).To(BeNil())
 
 			Expect(result.Next()).To(BeFalse())
 			Expect(result.Err()).To(BeSyntaxError())
-
-			Expect(summary.StatementType()).To(BeEquivalentTo(neo4j.StatementTypeUnknown))
 		})
 
 		Specify("when a fail-on-streaming query is executed, it should run and return error when consuming", func() {
@@ -146,11 +145,10 @@ var _ = Describe("Session", func() {
 
 			summary, err = result.Consume()
 			Expect(err).To(BeArithmeticError())
+			Expect(summary).To(BeNil())
 
 			Expect(result.Next()).To(BeFalse())
 			Expect(result.Err()).To(BeArithmeticError())
-
-			Expect(summary.StatementType()).To(BeEquivalentTo(neo4j.StatementTypeUnknown))
 		})
 
 		Specify("when a query is executed, the returned summary should contain correct timer values", func() {
