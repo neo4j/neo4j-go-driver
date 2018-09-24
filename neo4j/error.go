@@ -23,6 +23,23 @@ import (
 	"github.com/neo4j-drivers/gobolt"
 )
 
+type driverError struct {
+	message string
+}
+
 func isRetriableError(err error) bool {
 	return gobolt.IsServiceUnavailable(err) || gobolt.IsTransientError(err) || gobolt.IsWriteError(err)
+}
+
+func (err *driverError) Error() string {
+	return err.message
+}
+
+func IsDriverError(err error) bool {
+	_, ok := err.(*driverError)
+	return ok
+}
+
+func IsTransientError(err error) bool {
+	return gobolt.IsTransientError(err)
 }
