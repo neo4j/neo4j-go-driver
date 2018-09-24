@@ -149,15 +149,21 @@ func (result *neoResult) Summary() (ResultSummary, error) {
 		}
 	}
 
-	return result.summary, result.err
+	if result.err != nil {
+		return nil, result.err
+	}
+
+	return result.summary, nil
 }
 
-// Consume consumes the entire result and returns the summary information
-// about the statement execution
 func (result *neoResult) Consume() (ResultSummary, error) {
 	for result.Next() {
 
 	}
 
-	return result.summary, result.err
+	if result.err != nil {
+		return nil, result.err
+	}
+
+	return result.summary, nil
 }
