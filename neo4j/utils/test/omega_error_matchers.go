@@ -21,11 +21,18 @@ package test
 
 import (
 	"fmt"
+	"github.com/neo4j/neo4j-go-driver/neo4j"
 
 	"github.com/neo4j-drivers/gobolt"
 	"github.com/onsi/gomega"
 	"github.com/onsi/gomega/types"
 )
+
+func BeDriverError(messageMatcher types.GomegaMatcher) types.GomegaMatcher {
+	return &driverErrorMatcher{
+		messageMatcher: messageMatcher,
+	}
+}
 
 func BeDatabaseError() types.GomegaMatcher {
 	return &databaseErrorMatcher{}
@@ -90,6 +97,10 @@ func ContainMessage(part string) types.GomegaMatcher {
 	return &databaseErrorMatcher{
 		messageMatcher: gomega.ContainSubstring(part),
 	}
+}
+
+type driverErrorMatcher struct {
+	messageMatcher types.GomegaMatcher
 }
 
 type databaseErrorMatcher struct {
@@ -255,6 +266,45 @@ func (matcher *connectorErrorMatcher) NegatedFailureMessage(actual interface{}) 
 
 	if matcher.descriptionMatcher != nil {
 		return fmt.Sprintf("Expected\n\t%#v\nnot to have its description to match %s", actual, matcher.descriptionMatcher.FailureMessage(connectorError.Description()))
+	}
+
+	return fmt.Sprintf("Unexpected condition in matcher")
+}
+
+func (matcher *driverErrorMatcher) Match(actual interface{}) (success bool, err error) {
+	err, ok := actual.(error)
+	if !ok || !neo4j.IsDriverError(err) {
+		return false, nil
+	}
+
+	if matcher.messageMatcher != nil {
+		return matcher.messageMatcher.Match(err.Error())
+	}
+
+	return true, nil
+}
+
+func (matcher *driverErrorMatcher) FailureMessage(actual interface{}) (message string) {
+	err, ok := actual.(error)
+	if !ok || !neo4j.IsDriverError(err) {
+		return fmt.Sprintf("Expected\n\t%#v\nto be a DriverError", actual)
+	}
+
+	if matcher.messageMatcher != nil {
+		return fmt.Sprintf("Expected\n\t%#v\nto have its description to match %s", actual, matcher.messageMatcher.FailureMessage(err.Error()))
+	}
+
+	return fmt.Sprintf("Unexpected condition in matcher")
+}
+
+func (matcher *driverErrorMatcher) NegatedFailureMessage(actual interface{}) (message string) {
+	err, ok := actual.(error)
+	if !ok || !neo4j.IsDriverError(err) {
+		return fmt.Sprintf("Expected\n\t%#v\nnot to be a DriverError", actual)
+	}
+
+	if matcher.messageMatcher != nil {
+		return fmt.Sprintf("Expected\n\t%#v\nnot to have its description to match %s", actual, matcher.messageMatcher.FailureMessage(err.Error()))
 	}
 
 	return fmt.Sprintf("Unexpected condition in matcher")
