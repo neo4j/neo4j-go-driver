@@ -37,7 +37,10 @@ type goboltDriver struct {
 
 func configToGoboltConfig(config *Config) *gobolt.Config {
 	return &gobolt.Config{
-		Encryption:      config.Encrypted,
+		Encryption:            config.Encrypted,
+		TLSCertificates:       config.TrustStrategy.certificates,
+		TLSSkipVerify:         config.TrustStrategy.skipVerify,
+		TLSSkipVerifyHostname: config.TrustStrategy.skipVerifyHostname,
 		Log:             config.Log,
 		AddressResolver: wrapAddressResolverOrNil(config.AddressResolver),
 		MaxPoolSize:     config.MaxConnectionPoolSize,
