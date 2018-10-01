@@ -28,6 +28,9 @@ import (
 type Config struct {
 	// Whether to turn on/off TLS encryption (default: true)
 	Encrypted bool
+	// Sets how the driver establishes trust with the Neo4j instance
+	// it is connected to.
+	TrustStrategy TrustStrategy
 	// Logging target the driver will send its log outputs
 	Log Logging
 	// Resolver that would be used to resolve initial router address. This may
@@ -44,6 +47,7 @@ type Config struct {
 func defaultConfig() *Config {
 	return &Config{
 		Encrypted:                   true,
+		TrustStrategy:               TrustAny(false),
 		Log:                         NoOpLogger(),
 		AddressResolver:             nil,
 		MaxTransactionRetryDuration: 30 * time.Second,
