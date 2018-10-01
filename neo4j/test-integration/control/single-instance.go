@@ -21,6 +21,10 @@ package control
 
 import (
 	"bufio"
+	"crypto/x509"
+	"encoding/pem"
+	"io/ioutil"
+	"path"
 	"strings"
 	"sync"
 
@@ -107,6 +111,29 @@ func newSingleInstance(path string) (*SingleInstance, error) {
 	}
 
 	return result, nil
+}
+
+func (server *SingleInstance) Path() string {
+	return server.path
+}
+
+func (server *SingleInstance) TLSCertificate() *x509.Certificate {
+	bytes, err := ioutil.ReadFile(path.Join(server.path, "neo4jhome", "certificates", "neo4j.cert"))
+	if err != nil {
+		return nil
+	}
+
+	der, _ := pem.Decode(bytes)
+	if der == nil {
+		return nil
+	}
+
+	cert, err := x509.ParseCertificate(der.Bytes)
+	if err != nil {
+		return nil
+	}
+
+	return cert
 }
 
 func (server *SingleInstance) BoltUri() string {
