@@ -25,15 +25,16 @@ import (
 	. "github.com/neo4j/neo4j-go-driver/neo4j/utils/test"
 	. "github.com/onsi/gomega"
 	"strings"
+	"sync"
 	"sync/atomic"
 )
 
 type TestContext struct {
 	driver   neo4j.Driver
 	stop     int32
-	bookmark string
+	bookmark atomic.Value
 
-	readNodeCountsByServer map[string]*int32
+	readNodeCountsByServer sync.Map
 
 	readNodeCount       int32
 	createdNodeCount    int32
@@ -42,16 +43,20 @@ type TestContext struct {
 }
 
 func NewTestContext(driver neo4j.Driver) *TestContext {
-	return &TestContext{
+	result := &TestContext{
 		driver:                 driver,
 		stop:                   0,
-		bookmark:               "",
-		readNodeCountsByServer: make(map[string]*int32, 0),
+		bookmark:               atomic.Value{},
+		readNodeCountsByServer: sync.Map{},
 		readNodeCount:          0,
 		createdNodeCount:       0,
 		failedBookmarkCount:    0,
 		leaderSwitchCount:      0,
 	}
+
+	result.bookmark.Store("")
+
+	return result
 }
 
 func (ctx *TestContext) ShouldStop() bool {
@@ -74,6 +79,14 @@ func (ctx *TestContext) addBookmarkFailure() {
 	atomic.AddInt32(&ctx.failedBookmarkCount, 1)
 }
 
+func (ctx *TestContext) getBookmark() string {
+	return ctx.bookmark.Load().(string)
+}
+
+func (ctx *TestContext) setBookmark(bookmark string) {
+	ctx.bookmark.Store(bookmark)
+}
+
 func (ctx *TestContext) processSummary(summary neo4j.ResultSummary) {
 	ctx.addRead()
 
@@ -81,13 +94,11 @@ func (ctx *TestContext) processSummary(summary neo4j.ResultSummary) {
 		return
 	}
 
-	if _, found := ctx.readNodeCountsByServer[summary.Server().Address()]; !found {
-		var count int32 = 0
+	var count int32 = 0
+	lastCountInt, _ := ctx.readNodeCountsByServer.LoadOrStore(summary.Server().Address(), &count)
+	lastCount := lastCountInt.(*int32)
 
-		ctx.readNodeCountsByServer[summary.Server().Address()] = &count
-	}
-
-	atomic.AddInt32(ctx.readNodeCountsByServer[summary.Server().Address()], 1)
+	atomic.AddInt32(lastCount, 1)
 }
 
 func (ctx *TestContext) handleFailure(err error) bool {
@@ -106,13 +117,11 @@ func (ctx *TestContext) PrintStats() {
 	fmt.Printf("\tBookmarks Failed: %d\n", ctx.failedBookmarkCount)
 	fmt.Printf("\tLeader Switches: %d\n", ctx.leaderSwitchCount)
 	fmt.Printf("\tRead Counts By Server:\n")
-	for k, v := range ctx.readNodeCountsByServer {
-		fmt.Printf("\t\t%s: %d\n", k, *v)
-	}
-}
 
-func (ctx *TestContext) String() string {
-	return fmt.Sprintf("{ Nodes Created: %d, Nodes Read: %d, Failed Bookmarks: %d, Leader Switches: %d, Counts By Server: %v }", ctx.createdNodeCount, ctx.readNodeCount, ctx.failedBookmarkCount, ctx.leaderSwitchCount, ctx.readNodeCountsByServer)
+	ctx.readNodeCountsByServer.Range(func(key, value interface{}) bool {
+		fmt.Printf("\t\t%s: %d\n", key.(string), *(value.(*int32)))
+		return true
+	})
 }
 
 func newStressSession(driver neo4j.Driver, useBookmark bool, accessMode neo4j.AccessMode, ctx *TestContext) neo4j.Session {
@@ -120,7 +129,7 @@ func newStressSession(driver neo4j.Driver, useBookmark bool, accessMode neo4j.Ac
 	var err error
 
 	if useBookmark {
-		session, err = driver.Session(accessMode, ctx.bookmark)
+		session, err = driver.Session(accessMode, ctx.getBookmark())
 	} else {
 		session, err = driver.Session(accessMode)
 	}
@@ -255,7 +264,7 @@ func WriteQueryExecutor(driver neo4j.Driver, useBookmark bool) func(ctx *TestCon
 			Expect(err).To(BeNil())
 			Expect(summary.Counters().NodesCreated()).To(BeEquivalentTo(1))
 
-			ctx.bookmark = session.LastBookmark()
+			ctx.setBookmark(session.LastBookmark())
 
 			ctx.addCreated()
 		}
@@ -281,7 +290,7 @@ func WriteQueryInTxExecutor(driver neo4j.Driver, useBookmark bool) func(ctx *Tes
 			err = tx.Commit()
 			Expect(err).To(BeNil())
 
-			ctx.bookmark = session.LastBookmark()
+			ctx.setBookmark(session.LastBookmark())
 
 			ctx.addCreated()
 		}
@@ -305,7 +314,7 @@ func WriteQueryWithWriteTransactionExecutor(driver neo4j.Driver, useBookmark boo
 			Expect(summary).NotTo(BeNil())
 			Expect(summary.(neo4j.ResultSummary).Counters().NodesCreated()).To(BeEquivalentTo(1))
 
-			ctx.bookmark = session.LastBookmark()
+			ctx.setBookmark(session.LastBookmark())
 
 			ctx.addCreated()
 		}

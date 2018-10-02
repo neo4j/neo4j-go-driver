@@ -20,7 +20,6 @@
 package control
 
 import (
-	"bytes"
 	"fmt"
 	"net"
 	"os"
@@ -45,6 +44,7 @@ type StubServer struct {
 
 const (
 	connectionAttempts = 10
+	exitAttempts       = 10
 )
 
 // NewStubServer launches the stub server on the given port with the given script
@@ -64,41 +64,40 @@ func NewStubServer(port int, script string) *StubServer {
 		Fail(fmt.Sprintf("unable to locate bolt stub script file at '%s'", testScriptFile))
 	}
 
-	var stdoutBuf, stderrBuf bytes.Buffer
-	var cmdErr error
 	cmd := exec.Command("boltstub", fmt.Sprint(port), testScriptFile)
-	cmd.Stdout = &stdoutBuf
-	cmd.Stderr = &stderrBuf
 
 	server := &StubServer{
 		port:            port,
 		script:          testScriptFile,
 		stub:            cmd,
-		stubExitChannel: make(chan string),
 		stubExited:      false,
+		stubExitChannel: make(chan string),
 		stubExitError:   nil,
 	}
 
 	go func(channel chan string) {
-		cmdErr = cmd.Run()
+		var cmdErr error
+		var output []byte
 
-		server.stubExited = true
+		output, cmdErr = cmd.CombinedOutput()
 
 		if cmdErr != nil {
-			server.stubExitError = fmt.Errorf("command execution (%v) failed with error %s", cmd.Args, cmdErr.Error())
+			server.stubExitError = fmt.Errorf("command execution (%v) failed with error %s, output is %s", cmd.Args, cmdErr.Error(), output)
 		} else {
 			if cmd.ProcessState.Success() {
 				server.stubExitError = nil
 			} else {
-				server.stubExitError = fmt.Errorf("command execution (%v) failed with error %s", cmd.Args, stderrBuf.String())
+				server.stubExitError = fmt.Errorf("command execution (%v) failed with output %s", cmd.Args, output)
 			}
 		}
+
+		server.stubExited = true
 
 		channel <- "done"
 	}(server.stubExitChannel)
 
 	// try to establish a connection to the stub server
-	for i := 0; i < connectionAttempts && cmdErr == nil; i++ {
+	for i := 0; i < connectionAttempts && !server.stubExited; i++ {
 		if conn, err := net.Dial("tcp", fmt.Sprintf(":%d", server.port)); err == nil {
 			server.conn = conn
 
@@ -125,11 +124,17 @@ func (server *StubServer) Finished() bool {
 		server.conn.Close()
 	}
 
-	// Wait for some time for the boltstub to exit
-	time.Sleep(500 * time.Millisecond)
+	// wait for the stub process to exit
+	for i := 0; i < exitAttempts; i++ {
+		if server.stubExited {
+			break
+		}
+
+		time.Sleep(200 * time.Millisecond)
+	}
 
 	// Terminate if it's still running
-	if !server.stubExited {
+	if !server.stub.ProcessState.Exited() {
 		server.stub.Process.Kill()
 	}
 
@@ -145,7 +150,5 @@ func (server *StubServer) Finished() bool {
 }
 
 func (server *StubServer) Close() {
-	if !server.stubExited {
-		server.stub.Process.Kill()
-	}
+	server.stub.Process.Release()
 }
