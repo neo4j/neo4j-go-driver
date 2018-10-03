@@ -78,13 +78,12 @@ var _ = Describe("Routing", func() {
 		})
 
 		Specify("should successfully execute read/write when initial address contains unusable items", func() {
-			var resolvedTo []neo4j.ServerAddress
-			resolvedTo = append(resolvedTo, cluster.ReadReplicaAddresses()...)
-			resolvedTo = append(resolvedTo, cluster.LeaderAddress())
-
 			driver, err := neo4j.NewDriver("bolt+routing://localhost", cluster.AuthToken(), cluster.Config(), func(config *neo4j.Config) {
-				config.AddressResolver = &testResolver{
-					addresses: resolvedTo,
+				config.AddressResolver = func(address neo4j.ServerAddress) []neo4j.ServerAddress {
+					var resolvedTo []neo4j.ServerAddress
+					resolvedTo = append(resolvedTo, cluster.ReadReplicaAddresses()...)
+					resolvedTo = append(resolvedTo, cluster.LeaderAddress())
+					return resolvedTo
 				}
 			})
 			Expect(err).To(BeNil())
@@ -172,11 +171,3 @@ var _ = Describe("Routing", func() {
 	})
 
 })
-
-type testResolver struct {
-	addresses []neo4j.ServerAddress
-}
-
-func (resolver *testResolver) Resolve(address neo4j.ServerAddress) []neo4j.ServerAddress {
-	return resolver.addresses
-}

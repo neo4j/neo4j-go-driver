@@ -34,17 +34,9 @@ type ServerAddress interface {
 	Port() string
 }
 
-// ServerAddressResolver is an interface that defines a resolver function used by the routing driver to
+// ServerAddressResolver is a function type that defines the resolver function used by the routing driver to
 // resolve the initial address used to create the driver.
-type ServerAddressResolver interface {
-	// Resolve resolves the given address to a set of other addresses. If the returned slice is empty, the driver
-	// will continue using the original address.
-	Resolve(address ServerAddress) []ServerAddress
-}
-
-type serverAddressResolverWrapper struct {
-	actualResolver ServerAddressResolver
-}
+type ServerAddressResolver func(address ServerAddress) []ServerAddress
 
 func newServerAddressUrl(hostname string, port string) *url.URL {
 	if hostname == "" {
@@ -69,15 +61,14 @@ func wrapAddressResolverOrNil(addressResolver ServerAddressResolver) gobolt.UrlA
 		return nil
 	}
 
-	return &serverAddressResolverWrapper{actualResolver: addressResolver}
-}
+	return func(address *url.URL) []*url.URL {
+		var result []*url.URL
 
-func (wrapper *serverAddressResolverWrapper) Resolve(address *url.URL) []*url.URL {
-	var result []*url.URL
+		for _, address := range addressResolver(address) {
+			result = append(result, newServerAddressUrl(address.Hostname(), address.Port()))
+		}
 
-	for _, address := range wrapper.actualResolver.Resolve(address) {
-		result = append(result, newServerAddressUrl(address.Hostname(), address.Port()))
+		return result
 	}
-
-	return result
 }
+
