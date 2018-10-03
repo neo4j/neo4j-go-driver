@@ -104,6 +104,16 @@ var _ = Describe("Examples", func() {
 			Expect(err).To(BeNil())
 		})
 
+		Specify("Config - Address Resolver", func() {
+			driver, err := createDriverWithAddressResolver(uri, username, password)
+			Expect(err).To(BeNil())
+			Expect(driver).NotTo(BeNil())
+
+			err = driver.Close()
+			Expect(err).To(BeNil())
+		})
+
+
 		Specify("Service Unavailable", func() {
 			driver, err := createDriverWithMaxRetryTime("bolt://localhost:8080", username, password)
 			Expect(err).To(BeNil())
@@ -178,7 +188,7 @@ var _ = Describe("Examples", func() {
 			Expect(id).To(BeNumerically(">=", 0))
 		})
 
-		FSpecify("Get People", func() {
+		Specify("Get People", func() {
 			driver, err := createDriverWithMaxRetryTime(uri, username, password)
 			Expect(err).To(BeNil())
 			Expect(driver).NotTo(BeNil())
@@ -296,6 +306,22 @@ func createDriverWithTrustStrategy(uri, username, password string) (neo4j.Driver
 }
 
 // end::config-trust[]
+
+// tag::config-custom-resolver[]
+func createDriverWithAddressResolver(uri, username, password string) (neo4j.Driver, error) {
+	// Address resolver is only valid for bolt+routing uri
+	return neo4j.NewDriver(uri, neo4j.BasicAuth(username, password, ""), func(config *neo4j.Config) {
+		config.AddressResolver = func(address neo4j.ServerAddress) []neo4j.ServerAddress {
+			return []neo4j.ServerAddress{
+				neo4j.NewServerAddress("server1.my.domain", "7675"),
+				neo4j.NewServerAddress("server2.my.domain", "7675"),
+				neo4j.NewServerAddress("server3.my.domain", "7675"),
+			}
+		}
+	})
+}
+
+// end::config-custom-resolver[]
 
 // tag::config-connection-pool[]
 
@@ -660,7 +686,3 @@ func getPeople(driver neo4j.Driver) ([]string, error) {
 // tag::result-retain[]
 
 // end::result-retain[]
-
-// tag::custom-resolver[]
-
-// end::custom-resolver[]
