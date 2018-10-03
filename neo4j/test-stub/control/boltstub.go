@@ -26,6 +26,7 @@ import (
 	"os/exec"
 	"path"
 	"runtime"
+	"sync/atomic"
 	"time"
 
 	. "github.com/onsi/ginkgo"
@@ -37,15 +38,35 @@ type StubServer struct {
 	script          string
 	conn            net.Conn
 	stub            *exec.Cmd
-	stubExited      bool
+	stubExited      int32
 	stubExitChannel chan string
-	stubExitError   error
+	stubExitError   atomic.Value
 }
 
 const (
 	connectionAttempts = 10
 	exitAttempts       = 10
 )
+
+func (server *StubServer) markExited() {
+	atomic.CompareAndSwapInt32(&server.stubExited, 0, 1)
+}
+
+func (server *StubServer) exited() bool {
+	return atomic.LoadInt32(&server.stubExited) == 1;
+}
+
+func (server *StubServer) markExitError(text string) {
+	server.stubExitError.Store(text)
+}
+
+func (server *StubServer) exitError() string {
+	value := server.stubExitError.Load()
+	if text, ok := value.(string); ok {
+		return text
+	}
+	return ""
+}
 
 // NewStubServer launches the stub server on the given port with the given script
 func NewStubServer(port int, script string) *StubServer {
@@ -70,10 +91,13 @@ func NewStubServer(port int, script string) *StubServer {
 		port:            port,
 		script:          testScriptFile,
 		stub:            cmd,
-		stubExited:      false,
+		stubExited:      0,
 		stubExitChannel: make(chan string),
-		stubExitError:   nil,
+		stubExitError:   atomic.Value{},
 	}
+
+	// set empty
+	server.markExitError("")
 
 	go func(channel chan string) {
 		var cmdErr error
@@ -82,22 +106,22 @@ func NewStubServer(port int, script string) *StubServer {
 		output, cmdErr = cmd.CombinedOutput()
 
 		if cmdErr != nil {
-			server.stubExitError = fmt.Errorf("command execution (%v) failed with error %s, output is %s", cmd.Args, cmdErr.Error(), output)
+			server.markExitError(fmt.Sprintf("command execution (%v) failed with error %s, output is %s", cmd.Args, cmdErr.Error(), output))
 		} else {
 			if cmd.ProcessState.Success() {
-				server.stubExitError = nil
+				server.markExitError("")
 			} else {
-				server.stubExitError = fmt.Errorf("command execution (%v) failed with output %s", cmd.Args, output)
+				server.markExitError(fmt.Sprintf("command execution (%v) failed with output %s", cmd.Args, output))
 			}
 		}
 
-		server.stubExited = true
+		server.markExited()
 
 		channel <- "done"
 	}(server.stubExitChannel)
 
 	// try to establish a connection to the stub server
-	for i := 0; i < connectionAttempts && !server.stubExited; i++ {
+	for i := 0; i < connectionAttempts && !server.exited(); i++ {
 		if conn, err := net.Dial("tcp", fmt.Sprintf(":%d", server.port)); err == nil {
 			server.conn = conn
 
@@ -107,8 +131,8 @@ func NewStubServer(port int, script string) *StubServer {
 		time.Sleep(200 * time.Millisecond)
 	}
 
-	if server.stubExited && server.stubExitError != nil {
-		Fail(server.stubExitError.Error())
+	if server.exited() && server.exitError() != "" {
+		Fail(server.exitError())
 	}
 
 	Fail(fmt.Sprintf("unable to open a connection to boltstub server at [:%d]", server.port))
@@ -126,7 +150,7 @@ func (server *StubServer) Finished() bool {
 
 	// wait for the stub process to exit
 	for i := 0; i < exitAttempts; i++ {
-		if server.stubExited {
+		if server.exited() {
 			break
 		}
 
@@ -142,8 +166,8 @@ func (server *StubServer) Finished() bool {
 	<-server.stubExitChannel
 
 	// Check if an error occurred
-	if server.stubExitError != nil {
-		Fail(server.stubExitError.Error())
+	if server.exitError() != "" {
+		Fail(server.exitError())
 	}
 
 	return true
