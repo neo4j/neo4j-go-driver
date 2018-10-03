@@ -97,7 +97,7 @@ var _ = Describe("Bookmark", func() {
 				Skip("this test is targeted for server version less than neo4j 3.5.0")
 			}
 
-			result, err = session.Run("CREATE (p:Person { Name: 'Test'})", nil)
+			result, err = session.Run("CREATE (p:Person { name: 'Test'})", nil)
 			Expect(err).To(BeNil())
 
 			summary, err = result.Consume()
@@ -111,7 +111,7 @@ var _ = Describe("Bookmark", func() {
 				Skip("this test is targeted for server version after neo4j 3.5.0")
 			}
 
-			result, err = session.Run("CREATE (p:Person { Name: 'Test'})", nil)
+			result, err = session.Run("CREATE (p:Person { name: 'Test'})", nil)
 			Expect(err).To(BeNil())
 
 			summary, err = result.Consume()
@@ -124,7 +124,7 @@ var _ = Describe("Bookmark", func() {
 			tx, err := session.BeginTransaction()
 			Expect(err).To(BeNil())
 
-			result, err = tx.Run("CREATE (p:Person { Name: 'Test'})", nil)
+			result, err = tx.Run("CREATE (p:Person { name: 'Test'})", nil)
 			Expect(err).To(BeNil())
 
 			summary, err = result.Consume()
@@ -140,7 +140,7 @@ var _ = Describe("Bookmark", func() {
 			tx, err := session.BeginTransaction()
 			Expect(err).To(BeNil())
 
-			result, err = tx.Run("CREATE (p:Person { Name: 'Test'})", nil)
+			result, err = tx.Run("CREATE (p:Person { name: 'Test'})", nil)
 			Expect(err).To(BeNil())
 
 			summary, err = result.Consume()
@@ -154,7 +154,7 @@ var _ = Describe("Bookmark", func() {
 
 		Specify("when a node is created in transaction function, last bookmark should not be empty", func() {
 			result, err := session.WriteTransaction(func(tx neo4j.Transaction) (interface{}, error) {
-				result, err := tx.Run("CREATE (p:Person { Name: 'Test'})", nil)
+				result, err := tx.Run("CREATE (p:Person { name: 'Test'})", nil)
 				Expect(err).To(BeNil())
 
 				summary, err = result.Consume()
@@ -171,7 +171,7 @@ var _ = Describe("Bookmark", func() {
 		Specify("when a node is created in transaction function and rolled back, last bookmark should be empty", func() {
 			failWith := fmt.Errorf("some error")
 			result, err := session.WriteTransaction(func(tx neo4j.Transaction) (interface{}, error) {
-				result, err := tx.Run("CREATE (p:Person { Name: 'Test'})", nil)
+				result, err := tx.Run("CREATE (p:Person { name: 'Test'})", nil)
 				Expect(err).To(BeNil())
 
 				summary, err = result.Consume()
