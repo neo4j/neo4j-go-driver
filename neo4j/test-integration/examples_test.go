@@ -20,8 +20,11 @@
 package test_integration
 
 import (
+	"fmt"
 	"github.com/neo4j/neo4j-go-driver/neo4j"
 	"github.com/neo4j/neo4j-go-driver/neo4j/test-integration/control"
+	"github.com/neo4j/neo4j-go-driver/neo4j/utils/test"
+	"time"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -81,6 +84,118 @@ var _ = Describe("Examples", func() {
 
 			err = driver.Close()
 			Expect(err).To(BeNil())
+		})
+
+		Specify("Config - With Trust Strategy", func() {
+			driver, err := createDriverWithTrustStrategy(uri, username, password)
+			Expect(err).To(BeNil())
+			Expect(driver).NotTo(BeNil())
+
+			err = driver.Close()
+			Expect(err).To(BeNil())
+		})
+
+		Specify("Config - With Max Retry Time", func() {
+			driver, err := createDriverWithMaxRetryTime(uri, username, password)
+			Expect(err).To(BeNil())
+			Expect(driver).NotTo(BeNil())
+
+			err = driver.Close()
+			Expect(err).To(BeNil())
+		})
+
+		Specify("Service Unavailable", func() {
+			driver, err := createDriverWithMaxRetryTime("bolt://localhost:8080", username, password)
+			Expect(err).To(BeNil())
+			Expect(driver).NotTo(BeNil())
+			defer driver.Close()
+
+			err = createItem(driver)
+			Expect(err).To(test.BeServiceUnavailableError())
+		})
+
+		Specify("Session", func() {
+			driver, err := createDriverWithMaxRetryTime(uri, username, password)
+			Expect(err).To(BeNil())
+			Expect(driver).NotTo(BeNil())
+			defer driver.Close()
+
+			err = addPersonInSession(driver, "Tom")
+			Expect(err).To(BeNil())
+			count, err := countNodes(driver, "Person", "name", "Tom")
+			Expect(err).To(BeNil())
+			Expect(count).To(BeNumerically("==", 1))
+
+		})
+
+		Specify("Autocommit Transaction", func() {
+			driver, err := createDriverWithMaxRetryTime(uri, username, password)
+			Expect(err).To(BeNil())
+			Expect(driver).NotTo(BeNil())
+			defer driver.Close()
+
+			err = addPersonInAutoCommitTx(driver, "Shanon")
+			Expect(err).To(BeNil())
+			count, err := countNodes(driver, "Person", "name", "Shanon")
+			Expect(err).To(BeNil())
+			Expect(count).To(BeNumerically("==", 1))
+		})
+
+		Specify("Pass Bookmarks", func() {
+			driver, err := createDriverWithMaxRetryTime(uri, username, password)
+			Expect(err).To(BeNil())
+			Expect(driver).NotTo(BeNil())
+			defer driver.Close()
+
+			err = addEmployAndMakeFriends(driver)
+			Expect(err).To(BeNil())
+
+			count, err := countNodes(driver, "Person", "name", "Alice")
+			Expect(err).To(BeNil())
+			Expect(count).To(BeNumerically("==", 1))
+
+			count, err = countNodes(driver, "Person", "name", "Bob")
+			Expect(err).To(BeNil())
+			Expect(count).To(BeNumerically("==", 1))
+
+			count, err = countNodes(driver, "Company", "name", "LexCorp")
+			Expect(err).To(BeNil())
+			Expect(count).To(BeNumerically("==", 1))
+
+			count, err = countNodes(driver, "Company", "name", "Wayne Enterprises")
+			Expect(err).To(BeNil())
+			Expect(count).To(BeNumerically("==", 1))
+		})
+
+		Specify("Read/Write Transaction", func() {
+			driver, err := createDriverWithMaxRetryTime(uri, username, password)
+			Expect(err).To(BeNil())
+			Expect(driver).NotTo(BeNil())
+			defer driver.Close()
+
+			id, err := addPersonNode(driver, "Jason")
+			Expect(err).To(BeNil())
+			Expect(id).To(BeNumerically(">=", 0))
+		})
+
+		FSpecify("Get People", func() {
+			driver, err := createDriverWithMaxRetryTime(uri, username, password)
+			Expect(err).To(BeNil())
+			Expect(driver).NotTo(BeNil())
+			defer driver.Close()
+
+			id, err := addPersonNode(driver, "Annie")
+			Expect(err).To(BeNil())
+			Expect(id).To(BeNumerically(">=", 0))
+
+			id, err = addPersonNode(driver, "Joe")
+			Expect(err).To(BeNil())
+			Expect(id).To(BeNumerically(">=", 0))
+
+			people, err := getPeople(driver)
+			Expect(err).To(BeNil())
+			Expect(people).To(ContainElement("Annie"))
+			Expect(people).To(ContainElement("Joe"))
 		})
 	})
 
@@ -174,6 +289,11 @@ func createDriverWithoutEncryption(uri, username, password string) (neo4j.Driver
 // end::config-unencrypted[]
 
 // tag::config-trust[]
+func createDriverWithTrustStrategy(uri, username, password string) (neo4j.Driver, error) {
+	return neo4j.NewDriver(uri, neo4j.BasicAuth(username, password, ""), func(config *neo4j.Config) {
+		config.TrustStrategy = neo4j.TrustAny(true)
+	})
+}
 
 // end::config-trust[]
 
@@ -186,37 +306,361 @@ func createDriverWithoutEncryption(uri, username, password string) (neo4j.Driver
 // end::config-connection-timeout[]
 
 // tag::config-max-retry-time[]
+func createDriverWithMaxRetryTime(uri, username, password string) (neo4j.Driver, error) {
+	return neo4j.NewDriver(uri, neo4j.BasicAuth(username, password, ""), func(config *neo4j.Config) {
+		config.MaxTransactionRetryDuration = 15 * time.Second
+	})
+}
 
 // end::config-max-retry-time[]
 
 // tag::service-unavailable[]
+func createItem(driver neo4j.Driver) error {
+	var err error
+	var session neo4j.Session
+	var result neo4j.Result
+
+	if session, err = driver.Session(neo4j.AccessModeWrite); err != nil {
+		return err
+	}
+	defer session.Close()
+
+	_, err = session.WriteTransaction(func(tx neo4j.Transaction) (interface{}, error) {
+		if result, err = tx.Run("CREATE (a:Item)", nil); err != nil {
+			return nil, err
+		}
+
+		return result.Consume()
+	})
+
+	return err
+}
+
+func addItem(driver neo4j.Driver) bool {
+	if err := createItem(driver); err != nil {
+		if neo4j.IsServiceUnavailable(err) {
+			// perform some action
+		}
+
+		return false
+	}
+
+	return true
+}
 
 // end::service-unavailable[]
 
+func countNodes(driver neo4j.Driver, label string, property string, value string) (int64, error) {
+	var err error
+	var session neo4j.Session
+	var result neo4j.Result
+
+	if session, err = driver.Session(neo4j.AccessModeRead); err != nil {
+		return -1, err
+	}
+	defer session.Close()
+
+	if result, err = session.Run(fmt.Sprintf("MATCH (a:%s {%s: $value}) RETURN count(a)", label, property), map[string]interface{}{"value": value}); err != nil {
+		return -1, err
+	}
+
+	if result.Next() {
+		return result.Record().GetByIndex(0).(int64), nil
+	}
+
+	return -1, fmt.Errorf("expected at least one record")
+}
+
 // tag::session[]
+func addPersonInSession(driver neo4j.Driver, name string) error {
+	var err error
+	var session neo4j.Session
+	var result neo4j.Result
+
+	if session, err = driver.Session(neo4j.AccessModeWrite); err != nil {
+		return err
+	}
+	defer session.Close()
+
+	if result, err = session.Run("CREATE (a:Person {name: $name})", map[string]interface{}{"name": name}); err != nil {
+		return err
+	}
+
+	if _, err = result.Consume(); err != nil {
+		return err
+	}
+
+	return nil
+}
 
 // end::session[]
 
 // tag::autocommit-transaction[]
+func addPersonInAutoCommitTx(driver neo4j.Driver, name string) error {
+	var err error
+	var session neo4j.Session
+	var result neo4j.Result
+
+	if session, err = driver.Session(neo4j.AccessModeWrite); err != nil {
+		return err
+	}
+	defer session.Close()
+
+	if result, err = session.Run("CREATE (a:Person {name: $name})", map[string]interface{}{"name": name}); err != nil {
+		return err
+	}
+
+	if _, err = result.Consume(); err != nil {
+		return err
+	}
+
+	return nil
+}
 
 // end::autocommit-transaction[]
 
 // tag::transaction-function[]
+func addPersonInTxFunc(driver neo4j.Driver, name string) error {
+	var err error
+	var session neo4j.Session
+	var result neo4j.Result
+
+	if session, err = driver.Session(neo4j.AccessModeWrite); err != nil {
+		return err
+	}
+	defer session.Close()
+
+	_, err = session.WriteTransaction(func(tx neo4j.Transaction) (interface{}, error) {
+		if result, err = tx.Run("CREATE (a:Person {name: $name})", map[string]interface{}{"name": name}); err != nil {
+			return nil, err
+		}
+
+		return result.Consume()
+	})
+
+	return err
+}
 
 // end::transaction-function[]
 
 // tag::pass-bookmarks[]
+func createTxFunc(query string, params map[string]interface{}) neo4j.TransactionWork {
+	return func(tx neo4j.Transaction) (interface{}, error) {
+		var err error
+		var result neo4j.Result
+
+		if result, err = tx.Run(query, params); err != nil {
+			return nil, err
+		}
+
+		return result.Consume()
+	}
+}
+
+func addCompanyTxFunc(name string) neo4j.TransactionWork {
+	return createTxFunc("CREATE (a:Company {name: $name})", map[string]interface{}{"name": name})
+}
+
+func addPersonTxFunc(name string) neo4j.TransactionWork {
+	return createTxFunc("CREATE (a:Person {name: $name})", map[string]interface{}{"name": name})
+}
+
+func employTxFunc(person string, company string) neo4j.TransactionWork {
+	return createTxFunc(
+		"MATCH (person:Person {name: $personName}) "+
+			"MATCH (company:Company {name: $companyName}) "+
+			"CREATE (person)-[:WORKS_FOR]->(company)", map[string]interface{}{"personName": person, "companyName": company})
+}
+
+func makeFriendTxFunc(person1 string, person2 string) neo4j.TransactionWork {
+	return createTxFunc(
+		"MATCH (a:Person {name: $name1}) "+
+			"MATCH (b:Person {name: $name2}) "+
+			"MERGE (a)-[:KNOWS]->(b)", map[string]interface{}{"name1": person1, "name2": person2})
+}
+
+func printFriendsTxFunc() neo4j.TransactionWork {
+	return func(tx neo4j.Transaction) (interface{}, error) {
+		var err error
+		var result neo4j.Result
+
+		if result, err = tx.Run("MATCH (a)-[:KNOWS]->(b) RETURN a.name, b.name", nil); err != nil {
+			return nil, err
+		}
+
+		for result.Next() {
+			fmt.Printf("%s knows %s\n", result.Record().GetByIndex(0), result.Record().GetByIndex(1))
+		}
+
+		return result.Summary()
+	}
+}
+
+func addAndEmploy(driver neo4j.Driver, person string, company string) (string, error) {
+	var err error
+	var session neo4j.Session
+
+	if session, err = driver.Session(neo4j.AccessModeWrite); err != nil {
+		return "", err
+	}
+	defer session.Close()
+
+	if _, err = session.WriteTransaction(addCompanyTxFunc(company)); err != nil {
+		return "", err
+	}
+	if _, err = session.WriteTransaction(addPersonTxFunc(person)); err != nil {
+		return "", err
+	}
+	if _, err = session.WriteTransaction(employTxFunc(person, company)); err != nil {
+		return "", err
+	}
+
+	return session.LastBookmark(), nil
+}
+
+func makeFriend(driver neo4j.Driver, person1 string, person2 string, bookmarks ...string) (string, error) {
+	var err error
+	var session neo4j.Session
+
+	if session, err = driver.Session(neo4j.AccessModeWrite); err != nil {
+		return "", err
+	}
+	defer session.Close()
+
+	if _, err = session.WriteTransaction(makeFriendTxFunc(person1, person2)); err != nil {
+		return "", err
+	}
+
+	return session.LastBookmark(), nil
+}
+
+func addEmployAndMakeFriends(driver neo4j.Driver) error {
+	var bookmark1, bookmark2, bookmark3 string
+	var err error
+	var session neo4j.Session
+
+	if bookmark1, err = addAndEmploy(driver, "Alice", "Wayne Enterprises"); err != nil {
+		return err
+	}
+
+	if bookmark2, err = addAndEmploy(driver, "Bob", "LexCorp"); err != nil {
+		return err
+	}
+
+	if bookmark3, err = makeFriend(driver, "Bob", "Alice", bookmark1, bookmark2); err != nil {
+		return err
+	}
+
+	if session, err = driver.Session(neo4j.AccessModeRead, bookmark1, bookmark2, bookmark3); err != nil {
+		return err
+	}
+	defer session.Close()
+
+	if _, err = session.ReadTransaction(printFriendsTxFunc()); err != nil {
+		return err
+	}
+
+	return nil
+}
 
 // end::pass-bookmarks[]
 
 // tag::read-write-transaction[]
+func addPersonNodeTxFunc(name string) neo4j.TransactionWork {
+	return func(tx neo4j.Transaction) (interface{}, error) {
+		var err error
+		var result neo4j.Result
+
+		if result, err = tx.Run("CREATE (a:Person {name: $name})", map[string]interface{}{"name": name}); err != nil {
+			return nil, err
+		}
+
+		return result.Consume()
+	}
+}
+
+func matchPersonNodeTxFunc(name string) neo4j.TransactionWork {
+	return func(tx neo4j.Transaction) (interface{}, error) {
+		var err error
+		var result neo4j.Result
+
+		if result, err = tx.Run("MATCH (a:Person {name: $name}) RETURN id(a)", map[string]interface{}{"name": name}); err != nil {
+			return nil, err
+		}
+
+		if result.Next() {
+			return result.Record().GetByIndex(0), nil
+		}
+
+		return nil, fmt.Errorf("one record was expected")
+	}
+}
+
+func addPersonNode(driver neo4j.Driver, name string) (int64, error) {
+	var err error
+	var id interface{}
+	var session neo4j.Session
+
+	if session, err = driver.Session(neo4j.AccessModeWrite); err != nil {
+		return -1, err
+	}
+	defer session.Close()
+
+	if _, err = session.WriteTransaction(addPersonNodeTxFunc(name)); err != nil {
+		return -1, err
+	}
+
+	if id, err = session.ReadTransaction(matchPersonNodeTxFunc(name)); err != nil {
+		return -1, err
+	}
+
+	return id.(int64), nil
+}
 
 // end::read-write-transaction[]
 
 // tag::result-consume[]
+func getPeople(driver neo4j.Driver) ([]string, error) {
+	var people interface{}
+	var err error
+	var session neo4j.Session
+
+	if session, err = driver.Session(neo4j.AccessModeWrite); err != nil {
+		return nil, err
+	}
+	defer session.Close()
+
+	people, err = session.ReadTransaction(func(tx neo4j.Transaction) (interface{}, error) {
+		var list []string
+		var result neo4j.Result
+
+		if result, err = tx.Run("MATCH (a:Person) RETURN a.name ORDER BY a.name", nil); err != nil {
+			return nil, err
+		}
+
+		for result.Next() {
+			list = append(list, result.Record().GetByIndex(0).(string))
+		}
+
+		if err = result.Err(); err != nil {
+			return nil, err
+		}
+
+		return list, nil
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return people.([]string), nil
+}
 
 // end::result-consume[]
 
 // tag::result-retain[]
 
 // end::result-retain[]
+
+// tag::custom-resolver[]
+
+// end::custom-resolver[]

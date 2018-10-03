@@ -35,6 +35,10 @@ func (err *driverError) Error() string {
 	return err.message
 }
 
+func IsServiceUnavailable(err error) bool {
+	return gobolt.IsServiceUnavailable(err)
+}
+
 func IsDriverError(err error) bool {
 	_, ok := err.(*driverError)
 	return ok
