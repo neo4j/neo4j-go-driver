@@ -226,7 +226,7 @@ var _ = Describe("Session", func() {
 		})
 
 		Specify("when a node is created, summary should contain correct counter values", func() {
-			result, err = session.Run("CREATE (p:Person { Name: 'Test'})", nil)
+			result, err = session.Run("CREATE (p:Person { name: 'Test'})", nil)
 			Expect(err).To(BeNil())
 
 			summary, err = result.Consume()
@@ -246,7 +246,7 @@ var _ = Describe("Session", func() {
 		})
 
 		Specify("when a node is created, summary should contain correct timer values", func() {
-			result, err = session.Run("CREATE (p:Person { Name: 'Test'})", nil)
+			result, err = session.Run("CREATE (p:Person { name: 'Test'})", nil)
 			Expect(err).To(BeNil())
 
 			summary, err = result.Consume()
