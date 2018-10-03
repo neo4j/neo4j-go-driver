@@ -158,7 +158,7 @@ func (server *StubServer) Finished() bool {
 	}
 
 	// Terminate if it's still running
-	if !server.stub.ProcessState.Exited() {
+	if !server.exited() {
 		server.stub.Process.Kill()
 	}
 
