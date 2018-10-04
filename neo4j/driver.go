@@ -80,7 +80,7 @@ func NewDriver(target string, auth AuthToken, configurers ...func(*Config)) (Dri
 		configurer(config)
 	}
 
-	if err := validateConfig(config); err != nil {
+	if err := validateAndNormaliseConfig(config); err != nil {
 		return nil, err
 	}
 

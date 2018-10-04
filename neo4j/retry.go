@@ -36,7 +36,7 @@ func newRetryLogic(config *Config) *retryLogic {
 	return &retryLogic{
 		logging:           config.Log,
 		initialRetryDelay: 1 * time.Second,
-		maxRetryTime:      config.MaxTransactionRetryDuration,
+		maxRetryTime:      config.MaxTransactionRetryTime,
 		delayMultiplier:   2.0,
 		delayJitter:       0.2,
 	}
