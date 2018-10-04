@@ -53,7 +53,7 @@ func (server *StubServer) markExited() {
 }
 
 func (server *StubServer) exited() bool {
-	return atomic.LoadInt32(&server.stubExited) == 1;
+	return atomic.LoadInt32(&server.stubExited) == 1
 }
 
 func (server *StubServer) markExitError(text string) {

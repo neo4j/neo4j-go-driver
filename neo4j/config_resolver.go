@@ -71,4 +71,3 @@ func wrapAddressResolverOrNil(addressResolver ServerAddressResolver) gobolt.UrlA
 		return result
 	}
 }
-
