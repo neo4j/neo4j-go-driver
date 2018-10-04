@@ -114,29 +114,29 @@ var _ = Describe("Timeout and Lifetime", func() {
 		Expect(err).To(test.BeConnectorErrorWithCode(6))
 	})
 
-	It("should timeout receive when SocketReceiveTimeout is hit on encrypted connection", func() {
-		var err error
-		var driver neo4j.Driver
-		var session neo4j.Session
-		var result neo4j.Result
-
-		driver, err = neo4j.NewDriver(server.BoltUri(), server.AuthToken(), server.Config(), func(config *neo4j.Config) {
-			config.Log = log
-			config.SocketReceiveTimeout = 1 * time.Second
-		})
-		Expect(err).To(BeNil())
-		Expect(driver).NotTo(BeNil())
-		defer driver.Close()
-
-		session = newSession(driver, neo4j.AccessModeRead)
-		defer session.Close()
-
-		result, err = session.Run("UNWIND RANGE(1,100000000) AS N RETURN SUM(N)", nil)
-		Expect(err).To(BeNil())
-
-		_, err = result.Consume()
-		Expect(err).To(test.BeConnectorErrorWithCode(6))
-	})
+	//It("should timeout receive when SocketReceiveTimeout is hit on encrypted connection", func() {
+	//	var err error
+	//	var driver neo4j.Driver
+	//	var session neo4j.Session
+	//	var result neo4j.Result
+	//
+	//	driver, err = neo4j.NewDriver(server.BoltUri(), server.AuthToken(), server.Config(), func(config *neo4j.Config) {
+	//		config.Log = log
+	//		config.SocketReceiveTimeout = 1 * time.Second
+	//	})
+	//	Expect(err).To(BeNil())
+	//	Expect(driver).NotTo(BeNil())
+	//	defer driver.Close()
+	//
+	//	session = newSession(driver, neo4j.AccessModeRead)
+	//	defer session.Close()
+	//
+	//	result, err = session.Run("UNWIND RANGE(1,100000000) AS N RETURN SUM(N)", nil)
+	//	Expect(err).To(BeNil())
+	//
+	//	_, err = result.Consume()
+	//	Expect(err).To(test.BeConnectorErrorWithCode(6))
+	//})
 
 	It("should timeout receive when SocketReceiveTimeout is hit on plaintext connection", func() {
 		var err error
