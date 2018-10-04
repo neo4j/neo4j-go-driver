@@ -35,7 +35,7 @@ var _ = Describe("Config", func() {
 		})
 
 		It("should have max transaction retry duration as 30s", func() {
-			Expect(config.MaxTransactionRetryDuration).To(BeIdenticalTo(30 * time.Second))
+			Expect(config.MaxTransactionRetryTime).To(BeIdenticalTo(30 * time.Second))
 		})
 
 		It("should have non-nil logger", func() {
