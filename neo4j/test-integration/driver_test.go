@@ -22,6 +22,7 @@ package test_integration
 import (
 	"github.com/neo4j/neo4j-go-driver/neo4j"
 	"github.com/neo4j/neo4j-go-driver/neo4j/test-integration/control"
+	"time"
 
 	. "github.com/neo4j/neo4j-go-driver/neo4j/utils/test"
 	. "github.com/onsi/ginkgo"
@@ -100,7 +101,7 @@ var _ = Describe("Driver", func() {
 
 	})
 
-	Context("Pooling", func() {
+	Context("Pooling without Connection Acquisition Timeout", func() {
 		var (
 			err    error
 			driver neo4j.Driver
@@ -109,6 +110,7 @@ var _ = Describe("Driver", func() {
 		BeforeEach(func() {
 			driver, err = neo4j.NewDriver(server.BoltUri(), server.AuthToken(), server.Config(), func(config *neo4j.Config) {
 				config.MaxConnectionPoolSize = 2
+				config.ConnectionAcquisitionTimeout = 0
 			})
 			Expect(err).To(BeNil())
 		})
@@ -143,4 +145,50 @@ var _ = Describe("Driver", func() {
 		})
 	})
 
+	Context("Pooling with Connection Acquisition Timeout", func() {
+		var (
+			err    error
+			driver neo4j.Driver
+		)
+
+		BeforeEach(func() {
+			driver, err = neo4j.NewDriver(server.BoltUri(), server.AuthToken(), server.Config(), func(config *neo4j.Config) {
+				config.MaxConnectionPoolSize = 2
+				config.ConnectionAcquisitionTimeout = 10 * time.Second
+			})
+			Expect(err).To(BeNil())
+		})
+
+		AfterEach(func() {
+			if driver != nil {
+				driver.Close()
+			}
+		})
+
+		It("should return error when pool is full", func() {
+			// Open connection 1
+			session1, err := driver.Session(neo4j.AccessModeWrite)
+			Expect(err).To(BeNil())
+
+			_, err = session1.Run("UNWIND RANGE(1, 100) AS N RETURN N", nil)
+			Expect(err).To(BeNil())
+
+			// Open connection 2
+			session2, err := driver.Session(neo4j.AccessModeWrite)
+			Expect(err).To(BeNil())
+
+			_, err = session2.Run("UNWIND RANGE(1, 100) AS N RETURN N", nil)
+			Expect(err).To(BeNil())
+
+			// Try opening connection 3
+			session3, err := driver.Session(neo4j.AccessModeWrite)
+			Expect(err).To(BeNil())
+
+			start := time.Now()
+			_, err = session3.Run("UNWIND RANGE(1, 100) AS N RETURN N", nil)
+			elapsed := time.Since(start)
+			Expect(err).To(BeConnectorErrorWithCode(0x601))
+			Expect(elapsed / time.Second).To(BeNumerically(">=", 10))
+		})
+	})
 })

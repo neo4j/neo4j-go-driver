@@ -20,11 +20,16 @@
 package neo4j
 
 import (
+	"fmt"
 	"github.com/neo4j-drivers/gobolt"
 )
 
 type driverError struct {
 	message string
+}
+
+func newDriverError(format string, args ...interface{}) error {
+	return &driverError{message: fmt.Sprintf(format, args...)}
 }
 
 func isRetriableError(err error) bool {
