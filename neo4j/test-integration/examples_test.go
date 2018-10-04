@@ -113,7 +113,6 @@ var _ = Describe("Examples", func() {
 			Expect(err).To(BeNil())
 		})
 
-
 		Specify("Service Unavailable", func() {
 			driver, err := createDriverWithMaxRetryTime("bolt://localhost:8080", username, password)
 			Expect(err).To(BeNil())

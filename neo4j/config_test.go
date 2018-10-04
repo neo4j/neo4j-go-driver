@@ -20,6 +20,7 @@
 package neo4j
 
 import (
+	"math"
 	"time"
 
 	. "github.com/onsi/ginkgo"
@@ -34,8 +35,40 @@ var _ = Describe("Config", func() {
 			Expect(config.Encrypted).To(BeTrue())
 		})
 
+		It("should have trust strategy equal to TrustAny(false)", func() {
+			Expect(config.TrustStrategy).To(Equal(TrustAny(false)))
+		})
+
 		It("should have max transaction retry duration as 30s", func() {
 			Expect(config.MaxTransactionRetryTime).To(BeIdenticalTo(30 * time.Second))
+		})
+
+		It("should have max connection pool size to be 100", func() {
+			Expect(config.MaxConnectionPoolSize).To(BeEquivalentTo(100))
+		})
+
+		It("should have max connection lifetime to be 1h", func() {
+			Expect(config.MaxConnectionLifetime).To(BeIdenticalTo(1 * time.Hour))
+		})
+
+		It("should have connection acquisition timeout to be 1m", func() {
+			Expect(config.ConnectionAcquisitionTimeout).To(BeIdenticalTo(1 * time.Minute))
+		})
+
+		It("should have socket connect timeout to be 5s", func() {
+			Expect(config.SocketConnectTimeout).To(BeIdenticalTo(5 * time.Second))
+		})
+
+		It("should have socket receive timeout to be 0", func() {
+			Expect(config.SocketReceiveTimeout).To(BeIdenticalTo(0 * time.Second))
+		})
+
+		It("should have socket send timeout to be 0", func() {
+			Expect(config.SocketSendTimeout).To(BeIdenticalTo(0 * time.Second))
+		})
+
+		It("should have socket keep alive enabled", func() {
+			Expect(config.SocketKeepalive).To(BeTrue())
 		})
 
 		It("should have non-nil logger", func() {
@@ -49,4 +82,75 @@ var _ = Describe("Config", func() {
 			Expect(logger.level).To(BeZero())
 		})
 	})
+
+	Context("validateAndNormaliseConfig", func() {
+		It("should return error when MaxTransactionRetryTime is less than 0", func() {
+			config := defaultConfig()
+			config.MaxTransactionRetryTime = -1 * time.Second
+
+			err := validateAndNormaliseConfig(config)
+			Expect(err).NotTo(BeNil())
+			Expect(err.Error()).To(ContainSubstring("maximum transaction retry time cannot be smaller than 0"))
+		})
+
+		It("should return error when MaxConnectionPoolSize is 0", func() {
+			config := defaultConfig()
+			config.MaxConnectionPoolSize = 0
+
+			err := validateAndNormaliseConfig(config)
+			Expect(err).NotTo(BeNil())
+			Expect(err.Error()).To(ContainSubstring("maximum connection pool size cannot be 0"))
+		})
+
+		It("should normalize MaxConnectionPoolSize to MaxInt32 when negative", func() {
+			config := defaultConfig()
+			config.MaxConnectionPoolSize = -1
+
+			err := validateAndNormaliseConfig(config)
+			Expect(err).To(BeNil())
+
+			Expect(config.MaxConnectionPoolSize).To(Equal(math.MaxInt32))
+		})
+
+		It("should normalize ConnectionAcquisitionTimeout to -1ns when negative", func() {
+			config := defaultConfig()
+			config.ConnectionAcquisitionTimeout = -1 * time.Second
+
+			err := validateAndNormaliseConfig(config)
+			Expect(err).To(BeNil())
+
+			Expect(config.ConnectionAcquisitionTimeout).To(Equal(-1 * time.Nanosecond))
+		})
+
+		It("should normalize SocketConnectTimeout to 0 when negative", func() {
+			config := defaultConfig()
+			config.SocketConnectTimeout = -1 * time.Second
+
+			err := validateAndNormaliseConfig(config)
+			Expect(err).To(BeNil())
+
+			Expect(config.SocketConnectTimeout).To(Equal(0 * time.Nanosecond))
+		})
+
+		It("should normalize SocketReceiveTimeout to 0 when negative", func() {
+			config := defaultConfig()
+			config.SocketReceiveTimeout = -1 * time.Second
+
+			err := validateAndNormaliseConfig(config)
+			Expect(err).To(BeNil())
+
+			Expect(config.SocketReceiveTimeout).To(Equal(0 * time.Nanosecond))
+		})
+
+		It("should normalize SocketSendTimeout to 0 when negative", func() {
+			config := defaultConfig()
+			config.SocketSendTimeout = -1 * time.Second
+
+			err := validateAndNormaliseConfig(config)
+			Expect(err).To(BeNil())
+
+			Expect(config.SocketSendTimeout).To(Equal(0 * time.Nanosecond))
+		})
+	})
+
 })
