@@ -343,7 +343,7 @@ func createDriverWithAddressResolver(virtualUri, username, password string, addr
 	})
 }
 
-func createPerson(name string) error {
+func addPerson(name string) error {
 	var (
 		err      error
 		driver   neo4j.Driver
