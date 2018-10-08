@@ -50,6 +50,8 @@ type ClusterMember struct {
 
 type Cluster struct {
 	path           string
+	username       string
+	password       string
 	authToken      neo4j.AuthToken
 	config         configFunc
 	members        []*ClusterMember
@@ -151,6 +153,8 @@ func newCluster(path string) (*Cluster, error) {
 	result := &Cluster{
 		path:           path,
 		authToken:      authToken,
+		username:       username,
+		password:       password,
 		config:         config,
 		members:        clusterMembers,
 		offlineMembers: nil,
@@ -170,6 +174,14 @@ func newCluster(path string) (*Cluster, error) {
 	}
 
 	return result, nil
+}
+
+func (cluster *Cluster) Username() string {
+	return cluster.username
+}
+
+func (cluster *Cluster) Password() string {
+	return cluster.password
 }
 
 func (cluster *Cluster) AuthToken() neo4j.AuthToken {
@@ -417,6 +429,17 @@ func (member *ClusterMember) BoltUri() string {
 
 func (member *ClusterMember) RoutingUri() string {
 	return member.routingUri
+}
+
+func (member *ClusterMember) Address() neo4j.ServerAddress {
+	var uri *url.URL
+	var err error
+
+	if uri, err = url.Parse(member.boltUri); err != nil {
+		return nil
+	}
+
+	return uri
 }
 
 func (member *ClusterMember) String() string {

@@ -104,15 +104,6 @@ var _ = Describe("Examples", func() {
 			Expect(err).To(BeNil())
 		})
 
-		Specify("Config - Address Resolver", func() {
-			driver, err := createDriverWithAddressResolver(uri, username, password)
-			Expect(err).To(BeNil())
-			Expect(driver).NotTo(BeNil())
-
-			err = driver.Close()
-			Expect(err).To(BeNil())
-		})
-
 		Specify("Service Unavailable", func() {
 			driver, err := createDriverWithMaxRetryTime("bolt://localhost:8080", username, password)
 			Expect(err).To(BeNil())
@@ -206,6 +197,42 @@ var _ = Describe("Examples", func() {
 			Expect(people).To(ContainElement("Annie"))
 			Expect(people).To(ContainElement("Joe"))
 		})
+	})
+
+	Context("Causal Cluster", func() {
+		var (
+			err      error
+			cluster  *control.Cluster
+			username string
+			password string
+		)
+
+		BeforeEach(func() {
+			if cluster, err = control.EnsureCluster(); err != nil {
+				Fail(err.Error())
+			}
+
+			username = cluster.Username()
+			password = cluster.Password()
+		})
+
+		Specify("Config - Address Resolver", func() {
+			var addresses []neo4j.ServerAddress
+			for _, server := range cluster.Cores() {
+				addresses = append(addresses, server.Address())
+			}
+
+			driver, err := createDriverWithAddressResolver("bolt+routing://x.acme.com", username, password, addresses...)
+			Expect(err).To(BeNil())
+			Expect(driver).NotTo(BeNil())
+
+			err = createItem(driver)
+			Expect(err).To(BeNil())
+
+			err = driver.Close()
+			Expect(err).To(BeNil())
+		})
+
 	})
 
 })
@@ -307,17 +334,51 @@ func createDriverWithTrustStrategy(uri, username, password string) (neo4j.Driver
 // end::config-trust[]
 
 // tag::config-custom-resolver[]
-func createDriverWithAddressResolver(uri, username, password string) (neo4j.Driver, error) {
+func createDriverWithAddressResolver(virtualUri, username, password string, addresses ...neo4j.ServerAddress) (neo4j.Driver, error) {
 	// Address resolver is only valid for bolt+routing uri
-	return neo4j.NewDriver(uri, neo4j.BasicAuth(username, password, ""), func(config *neo4j.Config) {
+	return neo4j.NewDriver(virtualUri, neo4j.BasicAuth(username, password, ""), func(config *neo4j.Config) {
 		config.AddressResolver = func(address neo4j.ServerAddress) []neo4j.ServerAddress {
-			return []neo4j.ServerAddress{
-				neo4j.NewServerAddress("server1.my.domain", "7675"),
-				neo4j.NewServerAddress("server2.my.domain", "7675"),
-				neo4j.NewServerAddress("server3.my.domain", "7675"),
-			}
+			return addresses
 		}
 	})
+}
+
+func createPerson(name string) error {
+	var (
+		err      error
+		driver   neo4j.Driver
+		session  neo4j.Session
+		result   neo4j.Result
+		username string = "neo4j"
+		password string = "some password"
+	)
+
+	driver, err = createDriverWithAddressResolver("bolt+routing://x.acme.com", username, password,
+		neo4j.NewServerAddress("a.acme.com", "7676"),
+		neo4j.NewServerAddress("b.acme.com", "8787"),
+		neo4j.NewServerAddress("c.acme.com", "9898"))
+	if err != nil {
+		return err
+	}
+	defer driver.Close()
+
+	session, err = driver.Session(neo4j.AccessModeWrite)
+	if err != nil {
+		return err
+	}
+	defer session.Close()
+
+	result, err = session.Run("CREATE (n:Person { name: $name})", map[string]interface{}{"name": name})
+	if err != nil {
+		return err
+	}
+
+	_, err = result.Consume()
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 // end::config-custom-resolver[]
