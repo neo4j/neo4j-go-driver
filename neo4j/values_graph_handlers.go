@@ -20,7 +20,6 @@
 package neo4j
 
 import (
-	"fmt"
 	"reflect"
 
 	"github.com/neo4j-drivers/gobolt"
@@ -45,7 +44,7 @@ func (handler *nodeValueHandler) WritableTypes() []reflect.Type {
 
 func (handler *nodeValueHandler) Read(signature int8, values []interface{}) (interface{}, error) {
 	if len(values) != 3 {
-		return nil, gobolt.NewValueHandlerError(fmt.Sprintf("expected node struct to have %d fields but received %d", 3, len(values)))
+		return nil, gobolt.NewValueHandlerError("expected node struct to have %d fields but received %d", 3, len(values))
 	}
 
 	idValue := values[0].(int64)
@@ -66,7 +65,7 @@ func (handler *nodeValueHandler) Read(signature int8, values []interface{}) (int
 }
 
 func (handler *nodeValueHandler) Write(value interface{}) (int8, []interface{}, error) {
-	return 0, nil, &gobolt.ValueHandlerNotSupportedError{}
+	return 0, nil, gobolt.NewValueHandlerError("Write is not supported for node values")
 }
 
 func (handler *relationshipValueHandler) ReadableStructs() []int8 {
@@ -80,7 +79,7 @@ func (handler *relationshipValueHandler) WritableTypes() []reflect.Type {
 func (handler *relationshipValueHandler) Read(signature int8, values []interface{}) (interface{}, error) {
 	if signature == 'R' {
 		if len(values) != 5 {
-			return nil, gobolt.NewValueHandlerError(fmt.Sprintf("expected relationship struct to have %d fields but received %d", 5, len(values)))
+			return nil, gobolt.NewValueHandlerError("expected relationship struct to have %d fields but received %d", 5, len(values))
 		}
 
 		idValue := values[0].(int64)
@@ -96,27 +95,27 @@ func (handler *relationshipValueHandler) Read(signature int8, values []interface
 			relType: relTypeValue,
 			props:   propsValue,
 		}, nil
-	} else {
-		if len(values) != 3 {
-			return nil, gobolt.NewValueHandlerError(fmt.Sprintf("expected unbound relationship struct to have %d fields but received %d", 3, len(values)))
-		}
-
-		idValue := values[0].(int64)
-		relTypeValue := values[1].(string)
-		propsValue := values[2].(map[string]interface{})
-
-		return &relationshipValue{
-			id:      idValue,
-			startId: int64(-1),
-			endId:   int64(-1),
-			relType: relTypeValue,
-			props:   propsValue,
-		}, nil
 	}
+
+	if len(values) != 3 {
+		return nil, gobolt.NewValueHandlerError("expected unbound relationship struct to have %d fields but received %d", 3, len(values))
+	}
+
+	idValue := values[0].(int64)
+	relTypeValue := values[1].(string)
+	propsValue := values[2].(map[string]interface{})
+
+	return &relationshipValue{
+		id:      idValue,
+		startId: int64(-1),
+		endId:   int64(-1),
+		relType: relTypeValue,
+		props:   propsValue,
+	}, nil
 }
 
 func (handler *relationshipValueHandler) Write(value interface{}) (int8, []interface{}, error) {
-	return 0, nil, &gobolt.ValueHandlerNotSupportedError{}
+	return 0, nil, gobolt.NewValueHandlerError("Write is not supported for relationship values")
 }
 
 func (handler *pathValueHandler) ReadableStructs() []int8 {
@@ -129,7 +128,7 @@ func (handler *pathValueHandler) WritableTypes() []reflect.Type {
 
 func (handler *pathValueHandler) Read(signature int8, values []interface{}) (interface{}, error) {
 	if len(values) != 3 {
-		return nil, gobolt.NewValueHandlerError(fmt.Sprintf("expected path struct to have %d fields but received %d", 3, len(values)))
+		return nil, gobolt.NewValueHandlerError("expected path struct to have %d fields but received %d", 3, len(values))
 	}
 
 	uniqueNodesValue := values[0].([]interface{})
@@ -181,5 +180,5 @@ func (handler *pathValueHandler) Read(signature int8, values []interface{}) (int
 }
 
 func (handler *pathValueHandler) Write(value interface{}) (int8, []interface{}, error) {
-	return 0, nil, &gobolt.ValueHandlerNotSupportedError{}
+	return 0, nil, gobolt.NewValueHandlerError("Write is not supported for path values")
 }

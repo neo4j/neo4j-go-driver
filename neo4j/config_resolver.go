@@ -38,7 +38,7 @@ type ServerAddress interface {
 // resolve the initial address used to create the driver.
 type ServerAddressResolver func(address ServerAddress) []ServerAddress
 
-func newServerAddressUrl(hostname string, port string) *url.URL {
+func newServerAddressURL(hostname string, port string) *url.URL {
 	if hostname == "" {
 		return nil
 	}
@@ -51,12 +51,12 @@ func newServerAddressUrl(hostname string, port string) *url.URL {
 	return &url.URL{Host: hostAndPort}
 }
 
-// A helper function that generates a ServerAddress with provided hostname and port information.
+// NewServerAddress generates a ServerAddress with provided hostname and port information.
 func NewServerAddress(hostname string, port string) ServerAddress {
-	return newServerAddressUrl(hostname, port)
+	return newServerAddressURL(hostname, port)
 }
 
-func wrapAddressResolverOrNil(addressResolver ServerAddressResolver) gobolt.UrlAddressResolver {
+func wrapAddressResolverOrNil(addressResolver ServerAddressResolver) gobolt.URLAddressResolver {
 	if addressResolver == nil {
 		return nil
 	}
@@ -65,7 +65,7 @@ func wrapAddressResolverOrNil(addressResolver ServerAddressResolver) gobolt.UrlA
 		var result []*url.URL
 
 		for _, address := range addressResolver(address) {
-			result = append(result, newServerAddressUrl(address.Hostname(), address.Port()))
+			result = append(result, newServerAddressURL(address.Hostname(), address.Port()))
 		}
 
 		return result
