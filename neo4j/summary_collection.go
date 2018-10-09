@@ -32,14 +32,14 @@ func extractIntValue(dict *map[string]interface{}, key string, defaultValue int6
 	if value, ok := (*dict)[key]; ok {
 		if valueAsLong, ok := value.(int64); ok {
 			return valueAsLong
-		} else {
-			valueAsLong, err := strconv.ParseInt(fmt.Sprintf("%v", value), 10, 64)
-			if err != nil {
-				return defaultValue
-			}
-
-			return valueAsLong
 		}
+
+		valueAsLong, err := strconv.ParseInt(fmt.Sprintf("%v", value), 10, 64)
+		if err != nil {
+			return defaultValue
+		}
+
+		return valueAsLong
 	}
 
 	return defaultValue
@@ -53,13 +53,13 @@ func extractStringValue(dict *map[string]interface{}, key string, defaultValue s
 	if value, ok := (*dict)[key]; ok {
 		if valueAsStr, ok := value.(string); ok {
 			return valueAsStr
-		} else {
-			if isNil(value) {
-				return defaultValue
-			}
-
-			return fmt.Sprintf("%v", value)
 		}
+
+		if isNil(value) {
+			return defaultValue
+		}
+
+		return fmt.Sprintf("%v", value)
 	}
 
 	return defaultValue

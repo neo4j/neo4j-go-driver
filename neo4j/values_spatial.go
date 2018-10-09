@@ -80,7 +80,7 @@ func (point *Point) Z() float64 {
 func (point *Point) String() string {
 	if point.dimension == 2 {
 		return fmt.Sprintf("Point{srId=%d, x=%f, y=%f}", point.srId, point.x, point.y)
-	} else {
-		return fmt.Sprintf("Point{srId=%d, x=%f, y=%f, z=%f}", point.srId, point.x, point.y, point.z)
 	}
+
+	return fmt.Sprintf("Point{srId=%d, x=%f, y=%f, z=%f}", point.srId, point.x, point.y, point.z)
 }

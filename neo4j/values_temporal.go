@@ -59,7 +59,7 @@ const (
 )
 
 var (
-	epochUtc time.Time = time.Date(1970, 1, 1, 0, 0, 0, 0, time.UTC)
+	epochUtc = time.Date(1970, 1, 1, 0, 0, 0, 0, time.UTC)
 )
 
 // DateOf creates a local date from the provided instant by extracting year, month and day fields.
@@ -269,7 +269,7 @@ func (duration Duration) Nanos() int {
 func (duration Duration) String() string {
 	sign := ""
 	if duration.seconds < 0 && duration.nanos > 0 {
-		duration.seconds += 1
+		duration.seconds++
 		duration.nanos = int(time.Second) - duration.nanos
 
 		if duration.seconds == 0 {
