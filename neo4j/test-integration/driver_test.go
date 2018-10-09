@@ -108,7 +108,7 @@ var _ = Describe("Driver", func() {
 		)
 
 		BeforeEach(func() {
-			driver, err = neo4j.NewDriver(server.BoltUri(), server.AuthToken(), server.Config(), func(config *neo4j.Config) {
+			driver, err = neo4j.NewDriver(server.BoltURI(), server.AuthToken(), server.Config(), func(config *neo4j.Config) {
 				config.MaxConnectionPoolSize = 2
 				config.ConnectionAcquisitionTimeout = 0
 			})
@@ -152,7 +152,7 @@ var _ = Describe("Driver", func() {
 		)
 
 		BeforeEach(func() {
-			driver, err = neo4j.NewDriver(server.BoltUri(), server.AuthToken(), server.Config(), func(config *neo4j.Config) {
+			driver, err = neo4j.NewDriver(server.BoltURI(), server.AuthToken(), server.Config(), func(config *neo4j.Config) {
 				config.MaxConnectionPoolSize = 2
 				config.ConnectionAcquisitionTimeout = 10 * time.Second
 			})

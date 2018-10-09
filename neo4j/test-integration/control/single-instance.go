@@ -31,17 +31,19 @@ import (
 	"github.com/neo4j/neo4j-go-driver/neo4j"
 )
 
+// SingleInstance holds information about the single instance server
 type SingleInstance struct {
 	path      string
 	authToken neo4j.AuthToken
 	config    configFunc
-	boltUri   string
+	boltURI   string
 }
 
 var singleInstance *SingleInstance
 var singleInstanceErr error
 var singleInstanceLock sync.Mutex
 
+// EnsureSingleInstance either returns an existing server instance or starts up a new one
 func EnsureSingleInstance() (*SingleInstance, error) {
 	if singleInstance == nil && singleInstanceErr == nil {
 		singleInstanceLock.Lock()
@@ -54,6 +56,7 @@ func EnsureSingleInstance() (*SingleInstance, error) {
 	return singleInstance, singleInstanceErr
 }
 
+// StopSingleInstance stops the server
 func StopSingleInstance() {
 	if singleInstance != nil {
 		singleInstanceLock.Lock()
@@ -80,12 +83,12 @@ func newSingleInstance(path string) (*SingleInstance, error) {
 		return nil, err
 	}
 
-	boltUri := ""
+	boltURI := ""
 	scanner := bufio.NewScanner(strings.NewReader(output))
 	scannerIndex := 0
 	for scanner.Scan() {
 		if scannerIndex == 1 {
-			boltUri = scanner.Text()
+			boltURI = scanner.Text()
 		}
 
 		scannerIndex++
@@ -103,7 +106,7 @@ func newSingleInstance(path string) (*SingleInstance, error) {
 		path:      path,
 		authToken: authToken,
 		config:    config,
-		boltUri:   boltUri,
+		boltURI:   boltURI,
 	}
 
 	if err = result.deleteData(); err != nil {
@@ -113,10 +116,12 @@ func newSingleInstance(path string) (*SingleInstance, error) {
 	return result, nil
 }
 
+// Path returns the folder where the server is installed
 func (server *SingleInstance) Path() string {
 	return server.path
 }
 
+// TLSCertificate returns the installed certificate used by the server
 func (server *SingleInstance) TLSCertificate() *x509.Certificate {
 	bytes, err := ioutil.ReadFile(path.Join(server.path, "neo4jhome", "certificates", "neo4j.cert"))
 	if err != nil {
@@ -136,28 +141,34 @@ func (server *SingleInstance) TLSCertificate() *x509.Certificate {
 	return cert
 }
 
-func (server *SingleInstance) BoltUri() string {
-	return server.boltUri
+// BoltURI returns the bolt uri used to connect to the member
+func (server *SingleInstance) BoltURI() string {
+	return server.boltURI
 }
 
+// Username returns the configured username
 func (server *SingleInstance) Username() string {
 	return username
 }
 
+// Password returns the configured password
 func (server *SingleInstance) Password() string {
 	return password
 }
 
+// AuthToken returns the configured authentication token
 func (server *SingleInstance) AuthToken() neo4j.AuthToken {
 	return server.authToken
 }
 
+// Config returns the configured configurer function
 func (server *SingleInstance) Config() func(config *neo4j.Config) {
 	return server.config
 }
 
+// Driver returns a driver instance to the server
 func (server *SingleInstance) Driver() (neo4j.Driver, error) {
-	return neo4j.NewDriver(server.boltUri, server.authToken, server.config)
+	return neo4j.NewDriver(server.boltURI, server.authToken, server.config)
 }
 
 func (server *SingleInstance) deleteData() error {

@@ -46,7 +46,7 @@ var _ = Describe("Routing", func() {
 	testReadAndWriteOnSameSession := func(member *control.ClusterMember, name string) {
 		Expect(member).NotTo(BeNil())
 
-		driver, err = neo4j.NewDriver(member.RoutingUri(), cluster.AuthToken(), cluster.Config())
+		driver, err = neo4j.NewDriver(member.RoutingURI(), cluster.AuthToken(), cluster.Config())
 		Expect(err).To(BeNil())
 
 		session, err = driver.Session(neo4j.AccessModeWrite)
@@ -105,7 +105,7 @@ var _ = Describe("Routing", func() {
 			readReplica := cluster.AnyReadReplica()
 			Expect(readReplica).NotTo(BeNil())
 
-			driver, err = neo4j.NewDriver(readReplica.RoutingUri(), cluster.AuthToken(), cluster.Config())
+			driver, err = neo4j.NewDriver(readReplica.RoutingURI(), cluster.AuthToken(), cluster.Config())
 			Expect(err).To(BeNil())
 
 			session, err = driver.Session(neo4j.AccessModeRead)
@@ -123,7 +123,7 @@ var _ = Describe("Routing", func() {
 			leader := cluster.Leader()
 			Expect(leader).NotTo(BeNil())
 
-			driver, err = neo4j.NewDriver(leader.RoutingUri(), cluster.AuthToken(), cluster.Config())
+			driver, err = neo4j.NewDriver(leader.RoutingURI(), cluster.AuthToken(), cluster.Config())
 			Expect(err).To(BeNil())
 
 			session, err = driver.Session(neo4j.AccessModeWrite)
