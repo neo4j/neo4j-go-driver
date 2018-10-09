@@ -69,7 +69,7 @@ func logLevel() neo4j.LogLevel {
 }
 
 func resolveServerPath(isCluster bool) string {
-	var serverPath string = os.TempDir()
+	var serverPath = os.TempDir()
 
 	if _, file, _, ok := runtime.Caller(1); ok {
 		serverPath = path.Join(path.Dir(file), "..", "..", "..", "build", "server")

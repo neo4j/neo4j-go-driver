@@ -34,10 +34,10 @@ import (
 
 var _ = Describe("Spatial Types", func() {
 	const (
-		WGS84SrId       int = 4326
-		WGS843DSrId     int = 4979
-		CartesianSrId   int = 7203
-		Cartesian3DSrId int = 9157
+		WGS84SrID       int = 4326
+		WGS843DSrID     int = 4979
+		CartesianSrID   int = 7203
+		Cartesian3DSrID int = 9157
 	)
 
 	var server *control.SingleInstance
@@ -57,7 +57,7 @@ var _ = Describe("Spatial Types", func() {
 		Expect(err).To(BeNil())
 		Expect(driver).NotTo(BeNil())
 
-		if VersionOfDriver(driver).LessThan(V3_4_0) {
+		if versionOfDriver(driver).LessThan(V340) {
 			Skip("spatial types are only available after neo4j 3.4.0 release")
 		}
 
@@ -135,13 +135,13 @@ var _ = Describe("Spatial Types", func() {
 
 		switch sequence % 4 {
 		case 0:
-			return neo4j.NewPoint2D(WGS84SrId, randomDouble(), randomDouble())
+			return neo4j.NewPoint2D(WGS84SrID, randomDouble(), randomDouble())
 		case 1:
-			return neo4j.NewPoint3D(WGS843DSrId, randomDouble(), randomDouble(), randomDouble())
+			return neo4j.NewPoint3D(WGS843DSrID, randomDouble(), randomDouble(), randomDouble())
 		case 2:
-			return neo4j.NewPoint2D(CartesianSrId, randomDouble(), randomDouble())
+			return neo4j.NewPoint2D(CartesianSrID, randomDouble(), randomDouble())
 		case 3:
-			return neo4j.NewPoint3D(Cartesian3DSrId, randomDouble(), randomDouble(), randomDouble())
+			return neo4j.NewPoint3D(Cartesian3DSrID, randomDouble(), randomDouble(), randomDouble())
 		default:
 			panic("not expected")
 		}
@@ -164,13 +164,13 @@ var _ = Describe("Spatial Types", func() {
 			var point2 = result.Record().GetByIndex(1).(*neo4j.Point)
 
 			Expect(point1).NotTo(BeNil())
-			Expect(point1.SrId()).To(Equal(CartesianSrId))
+			Expect(point1.SrId()).To(Equal(CartesianSrID))
 			Expect(point1.X()).To(Equal(39.111748))
 			Expect(point1.Y()).To(Equal(-76.775635))
 			Expect(point1.Z()).To(BeNaN())
 
 			Expect(point2).NotTo(BeNil())
-			Expect(point2.SrId()).To(Equal(Cartesian3DSrId))
+			Expect(point2.SrId()).To(Equal(Cartesian3DSrID))
 			Expect(point2.X()).To(Equal(39.111748))
 			Expect(point2.Y()).To(Equal(-76.775635))
 			Expect(point2.Z()).To(Equal(35.120))
@@ -180,8 +180,8 @@ var _ = Describe("Spatial Types", func() {
 	})
 
 	It("should be able to send points", func() {
-		point1 := neo4j.NewPoint2D(WGS84SrId, 51.5044585, -0.105658)
-		point2 := neo4j.NewPoint3D(WGS843DSrId, 51.5044585, -0.105658, 35.120)
+		point1 := neo4j.NewPoint2D(WGS84SrID, 51.5044585, -0.105658)
+		point2 := neo4j.NewPoint3D(WGS843DSrID, 51.5044585, -0.105658, 35.120)
 
 		result, err = session.Run("CREATE (n:POI { location1: $point1, location2: $point2 }) RETURN n", map[string]interface{}{
 			"point1": point1,
@@ -211,8 +211,8 @@ var _ = Describe("Spatial Types", func() {
 	})
 
 	It("should be able to send points - pass by value", func() {
-		point1 := neo4j.NewPoint2D(WGS84SrId, 51.5044585, -0.105658)
-		point2 := neo4j.NewPoint3D(WGS843DSrId, 51.5044585, -0.105658, 35.120)
+		point1 := neo4j.NewPoint2D(WGS84SrID, 51.5044585, -0.105658)
+		point2 := neo4j.NewPoint3D(WGS843DSrID, 51.5044585, -0.105658, 35.120)
 
 		result, err = session.Run("CREATE (n:POI { location1: $point1, location2: $point2 }) RETURN n", map[string]interface{}{
 			"point1": *point1,
@@ -242,10 +242,10 @@ var _ = Describe("Spatial Types", func() {
 	})
 
 	It("should send and receive point", func() {
-		testSendAndReceive(neo4j.NewPoint2D(WGS84SrId, 51.24923585, 0.92723724))
-		testSendAndReceive(neo4j.NewPoint3D(WGS843DSrId, 22.86211019, 171.61820439, 0.1230987))
-		testSendAndReceive(neo4j.NewPoint2D(CartesianSrId, 39.111748, -76.775635))
-		testSendAndReceive(neo4j.NewPoint3D(Cartesian3DSrId, 39.111748, -76.775635, 19.2937302840))
+		testSendAndReceive(neo4j.NewPoint2D(WGS84SrID, 51.24923585, 0.92723724))
+		testSendAndReceive(neo4j.NewPoint3D(WGS843DSrID, 22.86211019, 171.61820439, 0.1230987))
+		testSendAndReceive(neo4j.NewPoint2D(CartesianSrID, 39.111748, -76.775635))
+		testSendAndReceive(neo4j.NewPoint3D(Cartesian3DSrID, 39.111748, -76.775635, 19.2937302840))
 	})
 
 	It("should send and receive points - randomised", func() {

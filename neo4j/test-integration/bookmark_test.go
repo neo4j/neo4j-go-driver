@@ -93,7 +93,7 @@ var _ = Describe("Bookmark", func() {
 		})
 
 		Specify("when a node is created in auto-commit mode, last bookmark should be empty", func() {
-			if VersionOfDriver(driver).GreaterThanOrEqual(V3_5_0) {
+			if versionOfDriver(driver).GreaterThanOrEqual(V350) {
 				Skip("this test is targeted for server version less than neo4j 3.5.0")
 			}
 
@@ -107,7 +107,7 @@ var _ = Describe("Bookmark", func() {
 		})
 
 		Specify("when a node is created in auto-commit mode, last bookmark should not be empty", func() {
-			if VersionOfDriver(driver).LessThan(V3_5_0) {
+			if versionOfDriver(driver).LessThan(V350) {
 				Skip("this test is targeted for server version after neo4j 3.5.0")
 			}
 

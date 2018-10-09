@@ -53,7 +53,7 @@ var _ = Describe("Temporal Types", func() {
 		Expect(err).To(BeNil())
 		Expect(driver).NotTo(BeNil())
 
-		if VersionOfDriver(driver).LessThan(V3_4_0) {
+		if versionOfDriver(driver).LessThan(V340) {
 			Skip("temporal types are only available after neo4j 3.4.0 release")
 		}
 

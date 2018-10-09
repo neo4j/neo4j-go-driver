@@ -81,7 +81,7 @@ var _ = Describe("Stress Test", func() {
 			Expect(err).To(BeNil())
 			Expect(server).NotTo(BeNil())
 
-			driver, err = neo4j.NewDriver(server.BoltUri(), server.AuthToken(), server.Config())
+			driver, err = neo4j.NewDriver(server.BoltURI(), server.AuthToken(), server.Config())
 			Expect(err).To(BeNil())
 			Expect(driver).NotTo(BeNil())
 
@@ -138,7 +138,7 @@ var _ = Describe("Stress Test", func() {
 			Expect(err).To(BeNil())
 			Expect(cluster).NotTo(BeNil())
 
-			driver, err = neo4j.NewDriver(cluster.AnyFollower().RoutingUri(), cluster.AuthToken(), cluster.Config())
+			driver, err = neo4j.NewDriver(cluster.AnyFollower().RoutingURI(), cluster.AuthToken(), cluster.Config())
 			Expect(err).To(BeNil())
 			Expect(driver).NotTo(BeNil())
 

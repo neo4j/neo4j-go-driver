@@ -31,23 +31,29 @@ import (
 	"github.com/neo4j/neo4j-go-driver/neo4j"
 )
 
+// ClusterMemberRole is the type of the server that's part of the causal cluster
 type ClusterMemberRole string
 
 const (
-	LEADER       ClusterMemberRole = "LEADER"
-	FOLLOWER     ClusterMemberRole = "FOLLOWER"
-	READ_REPLICA ClusterMemberRole = "READ_REPLICA"
+	// Leader role
+	Leader ClusterMemberRole = "LEADER"
+	// Follower role
+	Follower ClusterMemberRole = "FOLLOWER"
+	// ReadReplica role
+	ReadReplica ClusterMemberRole = "READ_REPLICA"
 )
 
 type configFunc func(config *neo4j.Config)
 
+// ClusterMember holds information about a single server in the cluster
 type ClusterMember struct {
 	path            string
 	hostnameAndPort string
-	boltUri         string
-	routingUri      string
+	boltURI         string
+	routingURI      string
 }
 
+// Cluster holds information about the cluster
 type Cluster struct {
 	path           string
 	username       string
@@ -69,6 +75,7 @@ var cluster *Cluster
 var clusterErr error
 var clusterLock sync.Mutex
 
+// EnsureCluster either returns an existing cluster instance or starts up a new one
 func EnsureCluster() (*Cluster, error) {
 	if cluster == nil && clusterErr == nil {
 		clusterLock.Lock()
@@ -81,6 +88,7 @@ func EnsureCluster() (*Cluster, error) {
 	return cluster, clusterErr
 }
 
+// StopCluster stops the cluster
 func StopCluster() {
 	if cluster != nil {
 		clusterLock.Lock()
@@ -115,14 +123,14 @@ func newCluster(path string) (*Cluster, error) {
 		paramsScanner.Split(bufio.ScanWords)
 
 		index := 0
-		memberBoltUri := ""
+		memberBoltURI := ""
 		memberPath := ""
 		for paramsScanner.Scan() {
 			switch index {
 			case 0:
 				break
 			case 1:
-				memberBoltUri = paramsScanner.Text()
+				memberBoltURI = paramsScanner.Text()
 			case 2:
 				memberPath = paramsScanner.Text()
 			default:
@@ -135,7 +143,7 @@ func newCluster(path string) (*Cluster, error) {
 			return nil, err
 		}
 
-		if clusterMember, err = newClusterMember(memberBoltUri, memberPath); err != nil {
+		if clusterMember, err = newClusterMember(memberBoltURI, memberPath); err != nil {
 			return nil, err
 		}
 
@@ -176,34 +184,41 @@ func newCluster(path string) (*Cluster, error) {
 	return result, nil
 }
 
+// Username returns the configured username
 func (cluster *Cluster) Username() string {
 	return cluster.username
 }
 
+// Password returns the configured password
 func (cluster *Cluster) Password() string {
 	return cluster.password
 }
 
+// AuthToken returns the configured authentication token
 func (cluster *Cluster) AuthToken() neo4j.AuthToken {
 	return cluster.authToken
 }
 
+// Config returns the configured configurer function
 func (cluster *Cluster) Config() func(config *neo4j.Config) {
 	return cluster.config
 }
 
+// Leader returns the current leader in the cluster
 func (cluster *Cluster) Leader() *ClusterMember {
-	var leaders, _ = cluster.membersWithRole(LEADER)
+	var leaders, _ = cluster.membersWithRole(Leader)
 	if len(leaders) > 0 {
 		return leaders[0]
 	}
 	return nil
 }
 
+// LeaderAddress returns the current leader's address
 func (cluster *Cluster) LeaderAddress() neo4j.ServerAddress {
 	return &url.URL{Host: cluster.Leader().hostnameAndPort}
 }
 
+// Cores returns the current core members in the cluster
 func (cluster *Cluster) Cores() []*ClusterMember {
 	var cores []*ClusterMember
 
@@ -213,6 +228,7 @@ func (cluster *Cluster) Cores() []*ClusterMember {
 	return cores
 }
 
+// CoreAddresses returns the current core members' addresses
 func (cluster *Cluster) CoreAddresses() []neo4j.ServerAddress {
 	var urls []neo4j.ServerAddress
 
@@ -223,11 +239,13 @@ func (cluster *Cluster) CoreAddresses() []neo4j.ServerAddress {
 	return urls
 }
 
+// Followers returns the current follower members in the cluster
 func (cluster *Cluster) Followers() []*ClusterMember {
-	filtered, _ := cluster.membersWithRole(FOLLOWER)
+	filtered, _ := cluster.membersWithRole(Follower)
 	return filtered
 }
 
+// AnyFollower returns a follower from the list of current followers
 func (cluster *Cluster) AnyFollower() *ClusterMember {
 	followers := cluster.Followers()
 	if len(followers) > 0 {
@@ -237,11 +255,13 @@ func (cluster *Cluster) AnyFollower() *ClusterMember {
 	return nil
 }
 
+// ReadReplicas returns the current read replica members in the cluster
 func (cluster *Cluster) ReadReplicas() []*ClusterMember {
-	filtered, _ := cluster.membersWithRole(READ_REPLICA)
+	filtered, _ := cluster.membersWithRole(ReadReplica)
 	return filtered
 }
 
+// ReadReplicaAddresses returns the current read replica members' addresses
 func (cluster *Cluster) ReadReplicaAddresses() []neo4j.ServerAddress {
 	var urls []neo4j.ServerAddress
 
@@ -252,6 +272,7 @@ func (cluster *Cluster) ReadReplicaAddresses() []neo4j.ServerAddress {
 	return urls
 }
 
+// AnyReadReplica returns a read replica from the list of current read replicas
 func (cluster *Cluster) AnyReadReplica() *ClusterMember {
 	readReplicas := cluster.ReadReplicas()
 	if len(readReplicas) > 0 {
@@ -263,7 +284,7 @@ func (cluster *Cluster) AnyReadReplica() *ClusterMember {
 
 func (cluster *Cluster) memberWithAddress(address string) *ClusterMember {
 	for _, member := range cluster.members {
-		if member.BoltUri() == address {
+		if member.BoltURI() == address {
 			return member
 		}
 	}
@@ -290,13 +311,13 @@ func (cluster *Cluster) waitMembersToBeOnline() error {
 	for time.Since(startTime) < clusterStartupTimeout {
 		allMembers = make(map[string]bool, len(cluster.members))
 		for _, member := range cluster.members {
-			allMembers[member.boltUri] = false
+			allMembers[member.boltURI] = false
 		}
 
 		if onlineMembers, err = cluster.discoverOnlineMembers(); err != nil {
 			lastErr = err
 		} else {
-			for memberBoltAddress, _ := range onlineMembers {
+			for memberBoltAddress := range onlineMembers {
 				delete(allMembers, memberBoltAddress)
 			}
 
@@ -391,7 +412,7 @@ func (cluster *Cluster) driverToAnyCore() (neo4j.Driver, error) {
 
 		if result.Next() {
 			role, _ := result.Record().Get("role")
-			if role.(string) != string(READ_REPLICA) {
+			if role.(string) != string(ReadReplica) {
 				return driver, nil
 			}
 		}
@@ -405,7 +426,7 @@ func (drivers *clusterDrivers) driverFor(member *ClusterMember) (neo4j.Driver, e
 		return stored.(neo4j.Driver), nil
 	}
 
-	driver, err := neo4j.NewDriver(member.BoltUri(), drivers.authToken, drivers.config)
+	driver, err := neo4j.NewDriver(member.BoltURI(), drivers.authToken, drivers.config)
 	if err != nil {
 		return nil, err
 	}
@@ -419,23 +440,28 @@ func (drivers *clusterDrivers) driverFor(member *ClusterMember) (neo4j.Driver, e
 	return driver, nil
 }
 
+// Path returns the folder where the member is installed
 func (member *ClusterMember) Path() string {
 	return member.path
 }
 
-func (member *ClusterMember) BoltUri() string {
-	return member.boltUri
+// BoltURI returns the bolt:// uri used to connect to the member
+func (member *ClusterMember) BoltURI() string {
+	return member.boltURI
 }
 
-func (member *ClusterMember) RoutingUri() string {
-	return member.routingUri
+// RoutingURI returns the bolt+routing:// uri used to connect to the cluster with this member
+// as the initial router
+func (member *ClusterMember) RoutingURI() string {
+	return member.routingURI
 }
 
+// Address returns hostname:port identifier for the member
 func (member *ClusterMember) Address() neo4j.ServerAddress {
 	var uri *url.URL
 	var err error
 
-	if uri, err = url.Parse(member.boltUri); err != nil {
+	if uri, err = url.Parse(member.boltURI); err != nil {
 		return nil
 	}
 
@@ -443,24 +469,24 @@ func (member *ClusterMember) Address() neo4j.ServerAddress {
 }
 
 func (member *ClusterMember) String() string {
-	return fmt.Sprintf("ClusterMember{boltUri=%s, boltAddress=%s, path=%s}", member.boltUri, member.hostnameAndPort, member.path)
+	return fmt.Sprintf("ClusterMember{boltURI=%s, boltAddress=%s, path=%s}", member.boltURI, member.hostnameAndPort, member.path)
 }
 
 func newClusterMember(uri string, path string) (*ClusterMember, error) {
-	parsedUri, err := url.Parse(uri)
+	parsedURI, err := url.Parse(uri)
 	if err != nil {
 		return nil, err
 	}
 
-	port := parsedUri.Port()
+	port := parsedURI.Port()
 	if port == "" {
 		port = "7687"
 	}
 
 	return &ClusterMember{
 		path:            path,
-		hostnameAndPort: fmt.Sprintf("%s:%s", parsedUri.Hostname(), port),
-		boltUri:         fmt.Sprintf("bolt://%s:%s", parsedUri.Hostname(), port),
-		routingUri:      fmt.Sprintf("bolt+routing://%s:%s", parsedUri.Hostname(), port),
+		hostnameAndPort: fmt.Sprintf("%s:%s", parsedURI.Hostname(), port),
+		boltURI:         fmt.Sprintf("bolt://%s:%s", parsedURI.Hostname(), port),
+		routingURI:      fmt.Sprintf("bolt+routing://%s:%s", parsedURI.Hostname(), port),
 	}, nil
 }

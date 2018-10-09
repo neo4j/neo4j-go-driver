@@ -32,10 +32,8 @@ import (
 
 var _ = Describe("Unsupported Types [V1]", func() {
 	const (
-		WGS84SrId       int = 4326
-		WGS843DSrId     int = 4979
-		CartesianSrId   int = 7203
-		Cartesian3DSrId int = 9157
+		WGS84SrID   int = 4326
+		WGS843DSrID int = 4979
 	)
 
 	var server *control.SingleInstance
@@ -53,7 +51,7 @@ var _ = Describe("Unsupported Types [V1]", func() {
 		Expect(err).To(BeNil())
 		Expect(driver).NotTo(BeNil())
 
-		if VersionOfDriver(driver).GreaterThanOrEqual(V3_4_0) {
+		if versionOfDriver(driver).GreaterThanOrEqual(V340) {
 			Skip("this test is targeted for server version less than neo4j 3.4.0")
 		}
 
@@ -80,11 +78,11 @@ var _ = Describe("Unsupported Types [V1]", func() {
 
 	Context("Send", func() {
 		It("should fail sending Point (2D)", func() {
-			testSend(neo4j.NewPoint2D(WGS84SrId, 1.0, 1.0))
+			testSend(neo4j.NewPoint2D(WGS84SrID, 1.0, 1.0))
 		})
 
 		It("should fail sending Point (3D)", func() {
-			testSend(neo4j.NewPoint3D(WGS843DSrId, 1.0, 1.0, 1.0))
+			testSend(neo4j.NewPoint3D(WGS843DSrID, 1.0, 1.0, 1.0))
 		})
 
 		It("should fail sending Duration", func() {

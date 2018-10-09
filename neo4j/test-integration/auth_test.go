@@ -40,7 +40,7 @@ var _ = Describe("Authentication", func() {
 
 	Specify("when wrong credentials are provided, it should fail with authentication error", func() {
 		token := neo4j.BasicAuth("wrong", "wrong", "")
-		driver, err := neo4j.NewDriver(server.BoltUri(), token, server.Config())
+		driver, err := neo4j.NewDriver(server.BoltURI(), token, server.Config())
 		Expect(err).To(BeNil())
 		defer driver.Close()
 
@@ -54,7 +54,7 @@ var _ = Describe("Authentication", func() {
 
 	verifyConnect := func(token neo4j.AuthToken) func() {
 		return func() {
-			driver, err := neo4j.NewDriver(server.BoltUri(), token)
+			driver, err := neo4j.NewDriver(server.BoltURI(), token)
 			Expect(err).To(BeNil())
 			defer driver.Close()
 

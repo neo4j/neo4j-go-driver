@@ -70,7 +70,7 @@ func (server *StubServer) exitError() string {
 
 // NewStubServer launches the stub server on the given port with the given script
 func NewStubServer(port int, script string) *StubServer {
-	var testScriptsDir string = os.TempDir()
+	var testScriptsDir = os.TempDir()
 
 	if _, file, _, ok := runtime.Caller(1); ok {
 		testScriptsDir = path.Join(path.Dir(file), "scripts")
@@ -173,6 +173,7 @@ func (server *StubServer) Finished() bool {
 	return true
 }
 
+// Close releases all process related resources
 func (server *StubServer) Close() {
 	server.stub.Process.Release()
 }

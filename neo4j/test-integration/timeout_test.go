@@ -49,7 +49,7 @@ var _ = Describe("Timeout and Lifetime", func() {
 		var driver neo4j.Driver
 		var session1, session2 neo4j.Session
 
-		driver, err = neo4j.NewDriver(server.BoltUri(), server.AuthToken(), server.Config(), func(config *neo4j.Config) {
+		driver, err = neo4j.NewDriver(server.BoltURI(), server.AuthToken(), server.Config(), func(config *neo4j.Config) {
 			config.Log = log
 			config.ConnectionAcquisitionTimeout = 1 * time.Second
 			config.MaxConnectionPoolSize = 1
@@ -75,7 +75,7 @@ var _ = Describe("Timeout and Lifetime", func() {
 		var driver neo4j.Driver
 		var session1, session2 neo4j.Session
 
-		driver, err = neo4j.NewDriver(server.BoltUri(), server.AuthToken(), server.Config(), func(config *neo4j.Config) {
+		driver, err = neo4j.NewDriver(server.BoltURI(), server.AuthToken(), server.Config(), func(config *neo4j.Config) {
 			config.Log = log
 			config.MaxConnectionLifetime = 5 * time.Second
 			config.MaxConnectionPoolSize = 1
@@ -120,7 +120,7 @@ var _ = Describe("Timeout and Lifetime", func() {
 	//	var session neo4j.Session
 	//	var result neo4j.Result
 	//
-	//	driver, err = neo4j.NewDriver(server.BoltUri(), server.AuthToken(), server.Config(), func(config *neo4j.Config) {
+	//	driver, err = neo4j.NewDriver(server.BoltURI(), server.AuthToken(), server.Config(), func(config *neo4j.Config) {
 	//		config.Log = log
 	//		config.SocketReceiveTimeout = 1 * time.Second
 	//	})
@@ -144,7 +144,7 @@ var _ = Describe("Timeout and Lifetime", func() {
 		var session neo4j.Session
 		var result neo4j.Result
 
-		driver, err = neo4j.NewDriver(server.BoltUri(), server.AuthToken(), server.Config(), func(config *neo4j.Config) {
+		driver, err = neo4j.NewDriver(server.BoltURI(), server.AuthToken(), server.Config(), func(config *neo4j.Config) {
 			config.Encrypted = false
 			config.Log = log
 			config.SocketReceiveTimeout = 1 * time.Second

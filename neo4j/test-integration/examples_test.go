@@ -47,7 +47,7 @@ var _ = Describe("Examples", func() {
 				Fail(err.Error())
 			}
 
-			uri = singleInstance.BoltUri()
+			uri = singleInstance.BoltURI()
 			username = singleInstance.Username()
 			password = singleInstance.Password()
 		})
@@ -334,9 +334,9 @@ func createDriverWithTrustStrategy(uri, username, password string) (neo4j.Driver
 // end::config-trust[]
 
 // tag::config-custom-resolver[]
-func createDriverWithAddressResolver(virtualUri, username, password string, addresses ...neo4j.ServerAddress) (neo4j.Driver, error) {
+func createDriverWithAddressResolver(virtualURI, username, password string, addresses ...neo4j.ServerAddress) (neo4j.Driver, error) {
 	// Address resolver is only valid for bolt+routing uri
-	return neo4j.NewDriver(virtualUri, neo4j.BasicAuth(username, password, ""), func(config *neo4j.Config) {
+	return neo4j.NewDriver(virtualURI, neo4j.BasicAuth(username, password, ""), func(config *neo4j.Config) {
 		config.AddressResolver = func(address neo4j.ServerAddress) []neo4j.ServerAddress {
 			return addresses
 		}
@@ -349,8 +349,8 @@ func addPerson(name string) error {
 		driver   neo4j.Driver
 		session  neo4j.Session
 		result   neo4j.Result
-		username string = "neo4j"
-		password string = "some password"
+		username = "neo4j"
+		password = "some password"
 	)
 
 	driver, err = createDriverWithAddressResolver("bolt+routing://x.acme.com", username, password,

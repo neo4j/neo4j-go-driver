@@ -6,11 +6,13 @@ import (
 )
 
 var (
-	V3_4_0 = utils.VersionOf("3.4.0")
-	V3_5_0 = utils.VersionOf("3.5.0")
+	// V340 identifies server version 3.4.0
+	V340 = utils.VersionOf("3.4.0")
+	// V350 identifies server version 3.5.0
+	V350 = utils.VersionOf("3.5.0")
 )
 
-func VersionOfDriver(driver neo4j.Driver) utils.Version {
+func versionOfDriver(driver neo4j.Driver) utils.Version {
 	session, err := driver.Session(neo4j.AccessModeRead)
 	if err != nil {
 		return utils.VersionOf("0.0.0")
