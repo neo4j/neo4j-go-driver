@@ -108,6 +108,10 @@ func newDriverError(format string, args ...interface{}) gobolt.GenericError {
 	return &driverError{message: fmt.Sprintf(format, args...)}
 }
 
+func newSessionExpiredError(format string, args ...interface{}) error {
+	return &sessionExpiredError{message: fmt.Sprintf(format, args...)}
+}
+
 func newDatabaseError(classification, code, message string) gobolt.DatabaseError {
 	return &databaseError{code: code, message: message, classification: classification}
 }
