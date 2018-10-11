@@ -40,6 +40,10 @@ type testDriverError struct {
 	message string
 }
 
+func (failure *testDatabaseError) BoltError() bool {
+	return true
+}
+
 func (failure *testDatabaseError) Classification() string {
 	return failure.classification
 }
@@ -56,6 +60,10 @@ func (failure *testDatabaseError) Error() string {
 	return fmt.Sprintf("database returned error [%s]: %s", failure.code, failure.message)
 }
 
+func (failure *testConnectorError) BoltError() bool {
+	return true
+}
+
 func (failure *testConnectorError) State() int {
 	return failure.state
 }
@@ -70,6 +78,14 @@ func (failure *testConnectorError) Description() string {
 
 func (failure *testConnectorError) Error() string {
 	return fmt.Sprintf("expected connection to be in READY state, where it is %d [error is %d]", failure.state, failure.code)
+}
+
+func (failure *testDriverError) BoltError() bool {
+	return true
+}
+
+func (failure *testDriverError) Message() string {
+	return failure.message
 }
 
 func (failure *testDriverError) Error() string {
