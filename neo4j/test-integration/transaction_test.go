@@ -21,9 +21,9 @@ package test_integration
 
 import (
 	"fmt"
+	"github.com/neo4j/neo4j-go-driver/neo4j/test-integration/utils"
 	"time"
 
-	"github.com/neo4j-drivers/gobolt"
 	"github.com/neo4j/neo4j-go-driver/neo4j"
 	"github.com/neo4j/neo4j-go-driver/neo4j/test-integration/control"
 
@@ -63,10 +63,7 @@ var _ = Describe("Transaction", func() {
 	})
 
 	Context("Retry Mechanism", func() {
-		transientError := gobolt.NewDatabaseError(map[string]interface{}{
-			"code":    "Neo.TransientError.Transaction.Outdated",
-			"message": "some transient error",
-		})
+		transientError := utils.NewDatabaseErrorForTest("TransientError", "Neo.TransientError.Transaction.Outdated", "some transient error")
 
 		It("should work on WriteTransaction", func() {
 			times := 0
