@@ -144,8 +144,12 @@ func handleRecordsPhase(runner *statementRunner, activeResult *neoResult) error 
 }
 
 func transformError(runner *statementRunner, err error) error {
-	if gobolt.IsWriteError(err) && runner.accessMode == AccessModeRead {
-		return &sessionExpiredError{"write queries cannot be performed in read access mode"}
+	if gobolt.IsWriteError(err) {
+		if runner.accessMode == AccessModeRead {
+			return newDriverError("write queries cannot be performed in read access mode")
+		}
+
+		return newSessionExpiredError("server at %s no longer accepts writes", runner.connection.RemoteAddress())
 	}
 
 	return err
