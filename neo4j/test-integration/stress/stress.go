@@ -342,7 +342,7 @@ func WriteQueryInReadSessionExecutor(driver neo4j.Driver, useBookmark bool) func
 		Expect(err).To(BeNil())
 
 		summary, err := result.Consume()
-		Expect(err).To(BeDriverError(ContainSubstring("write queries cannot be performed in read access mode")))
+		Expect(err).To(BeGenericError(ContainSubstring("write queries cannot be performed in read access mode")))
 		Expect(summary).To(BeNil())
 	}
 }
@@ -360,7 +360,7 @@ func WriteQueryInTxInReadSessionExecutor(driver neo4j.Driver, useBookmark bool) 
 		Expect(err).To(BeNil())
 
 		summary, err := result.Consume()
-		Expect(err).To(BeDriverError(ContainSubstring("write queries cannot be performed in read access mode")))
+		Expect(err).To(BeGenericError(ContainSubstring("write queries cannot be performed in read access mode")))
 		Expect(summary).To(BeNil())
 	}
 }
