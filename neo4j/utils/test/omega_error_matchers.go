@@ -21,15 +21,13 @@ package test
 
 import (
 	"fmt"
-	"github.com/neo4j/neo4j-go-driver/neo4j"
-
 	"github.com/neo4j-drivers/gobolt"
 	"github.com/onsi/gomega"
 	"github.com/onsi/gomega/types"
 )
 
-func BeDriverError(messageMatcher types.GomegaMatcher) types.GomegaMatcher {
-	return &driverErrorMatcher{
+func BeGenericError(messageMatcher types.GomegaMatcher) types.GomegaMatcher {
+	return &genericErrorMatcher{
 		messageMatcher: messageMatcher,
 	}
 }
@@ -99,7 +97,7 @@ func ContainMessage(part string) types.GomegaMatcher {
 	}
 }
 
-type driverErrorMatcher struct {
+type genericErrorMatcher struct {
 	messageMatcher types.GomegaMatcher
 }
 
@@ -271,40 +269,40 @@ func (matcher *connectorErrorMatcher) NegatedFailureMessage(actual interface{}) 
 	return fmt.Sprintf("Unexpected condition in matcher")
 }
 
-func (matcher *driverErrorMatcher) Match(actual interface{}) (success bool, err error) {
-	err, ok := actual.(error)
-	if !ok || !neo4j.IsDriverError(err) {
+func (matcher *genericErrorMatcher) Match(actual interface{}) (success bool, err error) {
+	genericError, ok := actual.(gobolt.GenericError)
+	if !ok {
 		return false, nil
 	}
 
 	if matcher.messageMatcher != nil {
-		return matcher.messageMatcher.Match(err.Error())
+		return matcher.messageMatcher.Match(genericError.Error())
 	}
 
 	return true, nil
 }
 
-func (matcher *driverErrorMatcher) FailureMessage(actual interface{}) (message string) {
-	err, ok := actual.(error)
-	if !ok || !neo4j.IsDriverError(err) {
-		return fmt.Sprintf("Expected\n\t%#v\nto be a DriverError", actual)
+func (matcher *genericErrorMatcher) FailureMessage(actual interface{}) (message string) {
+	genericError, ok := actual.(gobolt.GenericError)
+	if !ok {
+		return fmt.Sprintf("Expected\n\t%#v\nto be a GenericError", actual)
 	}
 
 	if matcher.messageMatcher != nil {
-		return fmt.Sprintf("Expected\n\t%#v\nto have its description to match %s", actual, matcher.messageMatcher.FailureMessage(err.Error()))
+		return fmt.Sprintf("Expected\n\t%#v\nto have its description to match %s", actual, matcher.messageMatcher.FailureMessage(genericError.Error()))
 	}
 
 	return fmt.Sprintf("Unexpected condition in matcher")
 }
 
-func (matcher *driverErrorMatcher) NegatedFailureMessage(actual interface{}) (message string) {
-	err, ok := actual.(error)
-	if !ok || !neo4j.IsDriverError(err) {
-		return fmt.Sprintf("Expected\n\t%#v\nnot to be a DriverError", actual)
+func (matcher *genericErrorMatcher) NegatedFailureMessage(actual interface{}) (message string) {
+	genericError, ok := actual.(gobolt.GenericError)
+	if ok {
+		return fmt.Sprintf("Expected\n\t%#v\nnot to be a GenericError", actual)
 	}
 
 	if matcher.messageMatcher != nil {
-		return fmt.Sprintf("Expected\n\t%#v\nnot to have its description to match %s", actual, matcher.messageMatcher.FailureMessage(err.Error()))
+		return fmt.Sprintf("Expected\n\t%#v\nnot to have its description to match %s", actual, matcher.messageMatcher.NegatedFailureMessage(genericError.Error()))
 	}
 
 	return fmt.Sprintf("Unexpected condition in matcher")
