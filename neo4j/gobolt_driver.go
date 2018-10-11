@@ -62,6 +62,9 @@ func configToGoboltConfig(config *Config) *gobolt.Config {
 			&dateTimeValueHandler{},
 			&durationValueHandler{},
 		},
+		GenericErrorFactory:   newDriverError,
+		ConnectorErrorFactory: newConnectorError,
+		DatabaseErrorFactory:  newDatabaseError,
 	}
 }
 

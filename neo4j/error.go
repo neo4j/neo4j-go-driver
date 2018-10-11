@@ -24,20 +24,72 @@ import (
 	"github.com/neo4j-drivers/gobolt"
 )
 
+type databaseError struct {
+	classification string
+	code           string
+	message        string
+}
+
+type connectorError struct {
+	state       int
+	code        int
+	description string
+}
+
 type driverError struct {
 	message string
 }
 
-func newDriverError(format string, args ...interface{}) error {
+func (failure *databaseError) Classification() string {
+	return failure.classification
+}
+
+func (failure *databaseError) Code() string {
+	return failure.code
+}
+
+func (failure *databaseError) Message() string {
+	return failure.message
+}
+
+func (failure *databaseError) Error() string {
+	return fmt.Sprintf("database returned error [%s]: %s", failure.code, failure.message)
+}
+
+func (failure *connectorError) State() int {
+	return failure.state
+}
+
+func (failure *connectorError) Code() int {
+	return failure.code
+}
+
+func (failure *connectorError) Description() string {
+	return failure.description
+}
+
+func (failure *connectorError) Error() string {
+	return fmt.Sprintf("expected connection to be in READY state, where it is %d [error is %d]", failure.state, failure.code)
+}
+
+func (failure *driverError) Error() string {
+	return failure.message
+}
+
+func newDriverError(format string, args ...interface{}) gobolt.GenericError {
 	return &driverError{message: fmt.Sprintf(format, args...)}
+}
+
+func newDatabaseError(classification, code, message string) gobolt.DatabaseError {
+	return &databaseError{code: code, message: message, classification: classification}
+}
+
+func newConnectorError(state int, code int, description string) gobolt.ConnectorError {
+	return &connectorError{state: state, code: code, description: description}
 }
 
 func isRetriableError(err error) bool {
 	return gobolt.IsServiceUnavailable(err) || gobolt.IsTransientError(err) || gobolt.IsWriteError(err)
-}
-
-func (err *driverError) Error() string {
-	return err.message
 }
 
 // IsServiceUnavailable is a utility method to check if the provided error can be classified
