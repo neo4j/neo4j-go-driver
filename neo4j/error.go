@@ -19,6 +19,7 @@
 
 package neo4j
 
+import "C"
 import (
 	"fmt"
 	"github.com/neo4j-drivers/gobolt"
@@ -33,6 +34,8 @@ type databaseError struct {
 type connectorError struct {
 	state       int
 	code        int
+	codeText    string
+	context     string
 	description string
 }
 
@@ -76,12 +79,20 @@ func (failure *connectorError) Code() int {
 	return failure.code
 }
 
+func (failure *connectorError) Context() string {
+	return failure.context
+}
+
 func (failure *connectorError) Description() string {
 	return failure.description
 }
 
 func (failure *connectorError) Error() string {
-	return fmt.Sprintf("expected connection to be in READY state, where it is %d [error is %d]", failure.state, failure.code)
+	if failure.description != "" {
+		return fmt.Sprintf("%s: error: [%d] %s, state: %d, context: %s", failure.description, failure.code, failure.codeText, failure.state, failure.context)
+	} else {
+		return fmt.Sprintf("error: [%d] %s, state: %d, context: %s", failure.code, failure.codeText, failure.state, failure.context)
+	}
 }
 
 func (failure *driverError) BoltError() bool {
@@ -116,8 +127,8 @@ func newDatabaseError(classification, code, message string) gobolt.DatabaseError
 	return &databaseError{code: code, message: message, classification: classification}
 }
 
-func newConnectorError(state int, code int, description string) gobolt.ConnectorError {
-	return &connectorError{state: state, code: code, description: description}
+func newConnectorError(state int, code int, codeText, context, description string) gobolt.ConnectorError {
+	return &connectorError{state: state, code: code, codeText: codeText, context: context, description: description}
 }
 
 func isRetriableError(err error) bool {

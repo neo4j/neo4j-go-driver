@@ -20,7 +20,6 @@
 package neo4j
 
 import (
-	"errors"
 	"github.com/neo4j-drivers/gobolt"
 )
 
@@ -91,7 +90,7 @@ func handleRunPhase(runner *statementRunner, activeResult *neoResult) error {
 		}
 
 		if received != gobolt.FetchTypeMetadata {
-			return errors.New("unexpected response received while waiting for a METADATA")
+			return newDriverError("unexpected response received while waiting for a METADATA")
 		}
 
 		fields, err := runner.connection.Fields()
@@ -136,7 +135,7 @@ func handleRecordsPhase(runner *statementRunner, activeResult *neoResult) error 
 
 			activeResult.collectRecord(fields)
 		case gobolt.FetchTypeError:
-			return errors.New("unable to fetch from connection")
+			return newDriverError("unable to fetch from connection")
 		}
 	}
 
@@ -157,11 +156,11 @@ func transformError(runner *statementRunner, err error) error {
 
 func (runner *statementRunner) receive() (Result, error) {
 	if len(runner.pendingResults) <= 0 {
-		return nil, errors.New("unexpected state: no pending results registered on session")
+		return nil, newDriverError("unexpected state: no pending results registered on session")
 	}
 
 	if runner.connection == nil {
-		return nil, errors.New("unexpected state: no open connection to perform receive")
+		return nil, newDriverError("unexpected state: no open connection to perform receive")
 	}
 
 	activeResult := runner.pendingResults[0]

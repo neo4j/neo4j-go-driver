@@ -24,7 +24,6 @@ import (
 	"sync/atomic"
 
 	"github.com/neo4j-drivers/gobolt"
-	"github.com/pkg/errors"
 )
 
 type goboltDriver struct {
@@ -89,7 +88,7 @@ func newGoboltDriver(target *url.URL, token AuthToken, config *Config) (*goboltD
 
 func assertDriverOpen(driver *goboltDriver) error {
 	if atomic.LoadInt32(&driver.open) == 0 {
-		return errors.New("cannot acquire a session on a closed driver")
+		return newDriverError("cannot acquire a session on a closed driver")
 	}
 
 	return nil

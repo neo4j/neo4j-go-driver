@@ -20,7 +20,7 @@
 package test_integration
 
 import (
-	"fmt"
+	"github.com/pkg/errors"
 
 	"github.com/neo4j/neo4j-go-driver/neo4j"
 	"github.com/neo4j/neo4j-go-driver/neo4j/test-integration/control"
@@ -169,7 +169,7 @@ var _ = Describe("Bookmark", func() {
 		})
 
 		Specify("when a node is created in transaction function and rolled back, last bookmark should be empty", func() {
-			failWith := fmt.Errorf("some error")
+			failWith := errors.New("some error")
 			result, err := session.WriteTransaction(func(tx neo4j.Transaction) (interface{}, error) {
 				result, err := tx.Run("CREATE (p:Person { name: 'Test'})", nil)
 				Expect(err).To(BeNil())
@@ -205,7 +205,7 @@ var _ = Describe("Bookmark", func() {
 		})
 
 		Specify("when a node is created in transaction function and rolled back, last bookmark should be empty", func() {
-			failWith := fmt.Errorf("some error")
+			failWith := errors.New("some error")
 			result, err := session.ReadTransaction(func(tx neo4j.Transaction) (interface{}, error) {
 				result, err := tx.Run("MATCH (p:Person) RETURN count(p)", nil)
 				Expect(err).To(BeNil())

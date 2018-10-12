@@ -20,7 +20,6 @@
 package neo4j
 
 import (
-	"errors"
 	"sync/atomic"
 )
 
@@ -55,7 +54,7 @@ func newSession(driver *goboltDriver, accessMode AccessMode, bookmarks []string)
 
 func assertSessionOpen(session *neoSession) error {
 	if atomic.LoadInt32(&session.open) == 0 {
-		return errors.New("session is already closed")
+		return newDriverError("session is already closed")
 	}
 
 	return nil
@@ -69,7 +68,7 @@ func ensureReady(session *neoSession) error {
 	}
 
 	if session.tx != nil {
-		return errors.New("there's already an open transaction on this session")
+		return newDriverError("there's already an open transaction on this session")
 	}
 
 	if session.runner != nil {

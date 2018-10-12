@@ -20,8 +20,8 @@
 package test_integration
 
 import (
-	"fmt"
 	"github.com/neo4j/neo4j-go-driver/neo4j/test-integration/utils"
+	"github.com/pkg/errors"
 	"time"
 
 	"github.com/neo4j/neo4j-go-driver/neo4j"
@@ -105,7 +105,7 @@ var _ = Describe("Transaction", func() {
 			Expect(err).To(BeNil())
 			Expect(innerResult).To(BeEquivalentTo(1))
 
-			return nil, fmt.Errorf("some error")
+			return nil, errors.New("some error")
 		})
 		Expect(err).NotTo(BeNil())
 		Expect(createResult).To(BeNil())

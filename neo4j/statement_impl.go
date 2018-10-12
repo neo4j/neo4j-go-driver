@@ -19,8 +19,6 @@
 
 package neo4j
 
-import "errors"
-
 // Statement represents a statement along with its parameters (if any)
 type neoStatement struct {
 	text   string
@@ -37,7 +35,7 @@ func (statement *neoStatement) Params() map[string]interface{} {
 
 func (statement *neoStatement) validate() error {
 	if len(statement.text) == 0 {
-		return errors.New("statement text should not be empty")
+		return newDriverError("statement text should not be empty")
 	}
 
 	return nil

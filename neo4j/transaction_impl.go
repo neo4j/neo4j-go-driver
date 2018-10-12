@@ -19,10 +19,6 @@
 
 package neo4j
 
-import (
-	"errors"
-)
-
 type neoTransaction struct {
 	session        *neoSession
 	outcomeApplied bool
@@ -35,11 +31,11 @@ type TransactionWork func(tx Transaction) (interface{}, error)
 
 func ensureTxState(transaction *neoTransaction) error {
 	if transaction.outcomeApplied {
-		return errors.New("transaction is already committed or rolled back")
+		return newDriverError("transaction is already committed or rolled back")
 	}
 
 	if transaction.session.runner == nil {
-		return errors.New("transaction is closed")
+		return newDriverError("transaction is closed")
 	}
 
 	return nil
