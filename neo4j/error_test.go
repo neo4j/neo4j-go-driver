@@ -36,7 +36,7 @@ var _ = Describe("Error", func() {
 				BOLT_DEFUNCT   = 4
 			)
 
-			err := newConnectorError(BOLT_DEFUNCT, BOLT_TLS_ERROR, "some description")
+			err := newConnectorError(BOLT_DEFUNCT, BOLT_TLS_ERROR, "BOLT_TLS_ERROR", "some context", "some description")
 
 			It("should return true", func() {
 				Expect(IsSecurityError(err)).To(BeTrue())
@@ -56,7 +56,7 @@ var _ = Describe("Error", func() {
 				BOLT_CONNECTION_RESET = 4
 				BOLT_DEFUNCT          = 4
 			)
-			err := newConnectorError(BOLT_DEFUNCT, BOLT_CONNECTION_RESET, "some description")
+			err := newConnectorError(BOLT_DEFUNCT, BOLT_CONNECTION_RESET, "BOLT_CONNECTION_RESET", "some context", "some description")
 
 			It("should return false", func() {
 				Expect(IsSecurityError(err)).To(BeFalse())
@@ -95,7 +95,7 @@ var _ = Describe("Error", func() {
 				BOLT_DEFUNCT           = 4
 			)
 
-			err := newConnectorError(BOLT_DEFUNCT, BOLT_PERMISSION_DENIED, "some description")
+			err := newConnectorError(BOLT_DEFUNCT, BOLT_PERMISSION_DENIED, "BOLT_PERMISSION_DENIED", "some context", "some description")
 
 			It("should return true", func() {
 				Expect(IsAuthenticationError(err)).To(BeTrue())
@@ -115,7 +115,7 @@ var _ = Describe("Error", func() {
 				BOLT_CONNECTION_RESET = 4
 				BOLT_DEFUNCT          = 4
 			)
-			err := newConnectorError(BOLT_DEFUNCT, BOLT_CONNECTION_RESET, "some description")
+			err := newConnectorError(BOLT_DEFUNCT, BOLT_CONNECTION_RESET, "BOLT_CONNECTION_RESET", "some context", "some description")
 
 			It("should return false", func() {
 				Expect(IsAuthenticationError(err)).To(BeFalse())
@@ -173,7 +173,7 @@ var _ = Describe("Error", func() {
 		})
 
 		When("provided with a ConnectorError", func() {
-			err := newConnectorError(0, 13, "some connector error")
+			err := newConnectorError(0, 13, "some text", "some context", "some description")
 
 			It("should return false", func() {
 				Expect(IsClientError(err)).To(BeFalse())
@@ -224,7 +224,7 @@ var _ = Describe("Error", func() {
 		})
 
 		When("provided with a ConnectorError", func() {
-			err := newConnectorError(0, 13, "some connector error")
+			err := newConnectorError(0, 13, "some text", "some context", "some description")
 
 			It("should return false", func() {
 				Expect(IsTransientError(err)).To(BeFalse())
@@ -255,7 +255,7 @@ var _ = Describe("Error", func() {
 				BOLT_DEFUNCT                      = 4
 			)
 
-			err := newConnectorError(BOLT_DEFUNCT, BOLT_ROUTING_NO_SERVERS_TO_SELECT, "some description")
+			err := newConnectorError(BOLT_DEFUNCT, BOLT_ROUTING_NO_SERVERS_TO_SELECT, "BOLT_ROUTING_NO_SERVERS_TO_SELECT", "some context", "some description")
 
 			It("should return true", func() {
 				Expect(IsSessionExpired(err)).To(BeTrue())
@@ -268,7 +268,7 @@ var _ = Describe("Error", func() {
 				BOLT_DEFUNCT   = 4
 			)
 
-			err := newConnectorError(BOLT_DEFUNCT, BOLT_TLS_ERROR, "some description")
+			err := newConnectorError(BOLT_DEFUNCT, BOLT_TLS_ERROR, "BOLT_TLS_ERROR", "some context", "some description")
 
 			It("should return true", func() {
 				Expect(IsSessionExpired(err)).To(BeFalse())
@@ -292,7 +292,7 @@ var _ = Describe("Error", func() {
 		})
 
 		When("provided with a ConnectorError", func() {
-			err := newConnectorError(0, 13, "some connector error")
+			err := newConnectorError(0, 13, "some text", "some context", "some description")
 
 			It("should return false", func() {
 				Expect(IsSessionExpired(err)).To(BeFalse())
@@ -312,7 +312,7 @@ var _ = Describe("Error", func() {
 		Context("should return true", func() {
 			DescribeTable("when provided with a connector error code",
 				func(code int) {
-					err := newConnectorError(4, code, "some description")
+					err := newConnectorError(4, code, "some text", "some context", "some description")
 
 					Expect(IsServiceUnavailable(err)).To(BeTrue())
 				},
@@ -335,7 +335,7 @@ var _ = Describe("Error", func() {
 		Context("should return false", func() {
 			DescribeTable("when provided with an unrelevant connector error code",
 				func(code int) {
-					err := newConnectorError(4, code, "some description")
+					err := newConnectorError(4, code, "some text", "some context", "some description")
 
 					Expect(IsServiceUnavailable(err)).To(BeFalse())
 				},

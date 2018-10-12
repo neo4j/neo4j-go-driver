@@ -33,6 +33,8 @@ type testDatabaseError struct {
 type testConnectorError struct {
 	state       int
 	code        int
+	codeText    string
+	context     string
 	description string
 }
 
@@ -72,6 +74,10 @@ func (failure *testConnectorError) Code() int {
 	return failure.code
 }
 
+func (failure *testConnectorError) Context() string {
+	return failure.context
+}
+
 func (failure *testConnectorError) Description() string {
 	return failure.description
 }
@@ -100,6 +106,6 @@ func NewDatabaseErrorForTest(classification, code, message string) gobolt.Databa
 	return &testDatabaseError{code: code, message: message, classification: classification}
 }
 
-func NewConnectorErrorForTest(state int, code int, description string) gobolt.ConnectorError {
-	return &testConnectorError{state: state, code: code, description: description}
+func NewConnectorErrorForTest(state int, code int, codeText, context, description string) gobolt.ConnectorError {
+	return &testConnectorError{state: state, code: code, codeText: codeText, context: context, description: description}
 }
