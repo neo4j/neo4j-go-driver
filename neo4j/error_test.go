@@ -20,7 +20,7 @@
 package neo4j
 
 import (
-	"fmt"
+	"github.com/pkg/errors"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/ginkgo/extensions/table"
@@ -80,7 +80,7 @@ var _ = Describe("Error", func() {
 		})
 
 		When("provided with another error type", func() {
-			err := fmt.Errorf("some error")
+			err := errors.New("some error")
 
 			It("should return false", func() {
 				Expect(IsSecurityError(err)).To(BeFalse())
@@ -139,7 +139,7 @@ var _ = Describe("Error", func() {
 		})
 
 		When("provided with another error type", func() {
-			err := fmt.Errorf("some error")
+			err := errors.New("some error")
 
 			It("should return false", func() {
 				Expect(IsAuthenticationError(err)).To(BeFalse())
@@ -181,7 +181,7 @@ var _ = Describe("Error", func() {
 		})
 
 		When("provided with another error type", func() {
-			err := fmt.Errorf("some error")
+			err := errors.New("some error")
 
 			It("should return false", func() {
 				Expect(IsClientError(err)).To(BeFalse())
@@ -232,7 +232,7 @@ var _ = Describe("Error", func() {
 		})
 
 		When("provided with another error type", func() {
-			err := fmt.Errorf("some error")
+			err := errors.New("some error")
 
 			It("should return false", func() {
 				Expect(IsTransientError(err)).To(BeFalse())
@@ -300,7 +300,7 @@ var _ = Describe("Error", func() {
 		})
 
 		When("provided with another error type", func() {
-			err := fmt.Errorf("some error")
+			err := errors.New("some error")
 
 			It("should return false", func() {
 				Expect(IsSessionExpired(err)).To(BeFalse())
@@ -363,7 +363,7 @@ var _ = Describe("Error", func() {
 		})
 
 		When("provided with another error type", func() {
-			err := fmt.Errorf("some error")
+			err := errors.New("some error")
 
 			It("should return false", func() {
 				Expect(IsServiceUnavailable(err)).To(BeFalse())

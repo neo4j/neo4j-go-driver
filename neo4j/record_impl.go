@@ -19,8 +19,6 @@
 
 package neo4j
 
-import "errors"
-
 type neoRecord struct {
 	keys   []string
 	values []interface{}
@@ -45,9 +43,5 @@ func (record *neoRecord) Get(key string) (interface{}, bool) {
 }
 
 func (record *neoRecord) GetByIndex(index int) interface{} {
-	if len(record.values) <= index {
-		panic(errors.New("index out of bounds"))
-	}
-
 	return record.values[index]
 }

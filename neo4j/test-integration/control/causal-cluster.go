@@ -22,6 +22,7 @@ package control
 import (
 	"bufio"
 	"fmt"
+	"github.com/pkg/errors"
 	"math/rand"
 	"net/url"
 	"strings"
@@ -390,7 +391,7 @@ func (cluster *Cluster) driverToLeader() (neo4j.Driver, error) {
 
 func (cluster *Cluster) driverToAnyCore() (neo4j.Driver, error) {
 	if len(cluster.members) == 0 {
-		return nil, fmt.Errorf("there are no members present in the cluster")
+		return nil, errors.New("there are no members present in the cluster")
 	}
 
 	for _, member := range cluster.members {
@@ -418,7 +419,7 @@ func (cluster *Cluster) driverToAnyCore() (neo4j.Driver, error) {
 		}
 	}
 
-	return nil, fmt.Errorf("unable to get a driver to a core")
+	return nil, errors.New("unable to get a driver to a core")
 }
 
 func (drivers *clusterDrivers) driverFor(member *ClusterMember) (neo4j.Driver, error) {

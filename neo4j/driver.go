@@ -21,7 +21,6 @@
 package neo4j
 
 import (
-	"fmt"
 	"net/url"
 )
 
@@ -68,11 +67,11 @@ func NewDriver(target string, auth AuthToken, configurers ...func(*Config)) (Dri
 	}
 
 	if parsed.Scheme != "bolt" && parsed.Scheme != "bolt+routing" {
-		return nil, fmt.Errorf("url scheme %s is not supported", parsed.Scheme)
+		return nil, newDriverError("url scheme %s is not supported", parsed.Scheme)
 	}
 
 	if parsed.Scheme == "bolt" && len(parsed.RawQuery) > 0 {
-		return nil, fmt.Errorf("routing context is not supported for direct driver")
+		return nil, newDriverError("routing context is not supported for direct driver")
 	}
 
 	config := defaultConfig()

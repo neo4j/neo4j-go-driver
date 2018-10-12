@@ -24,6 +24,7 @@ import (
 	"github.com/neo4j/neo4j-go-driver/neo4j"
 	"github.com/neo4j/neo4j-go-driver/neo4j/test-integration/control"
 	"github.com/neo4j/neo4j-go-driver/neo4j/utils/test"
+	"github.com/pkg/errors"
 	"time"
 
 	. "github.com/onsi/ginkgo"
@@ -454,7 +455,7 @@ func countNodes(driver neo4j.Driver, label string, property string, value string
 		return result.Record().GetByIndex(0).(int64), nil
 	}
 
-	return -1, fmt.Errorf("expected at least one record")
+	return -1, errors.New("expected at least one record")
 }
 
 // tag::session[]
@@ -678,7 +679,7 @@ func matchPersonNodeTxFunc(name string) neo4j.TransactionWork {
 			return result.Record().GetByIndex(0), nil
 		}
 
-		return nil, fmt.Errorf("one record was expected")
+		return nil, errors.New("one record was expected")
 	}
 }
 
