@@ -40,7 +40,6 @@ var _ = Describe("Unsupported Types [V1]", func() {
 	var err error
 	var driver neo4j.Driver
 	var session neo4j.Session
-	var result neo4j.Result
 
 	BeforeEach(func() {
 		server, err = control.EnsureSingleInstance()
@@ -71,7 +70,7 @@ var _ = Describe("Unsupported Types [V1]", func() {
 	})
 
 	testSend := func(data interface{}) {
-		result, err = session.Run("WITH $x RETURN 1", map[string]interface{}{"x": data})
+		_, err = session.Run("WITH $x RETURN 1", map[string]interface{}{"x": data})
 		Expect(err).To(BeConnectorErrorWithCode(0x501))
 		Expect(err).To(BeConnectorErrorWithDescription("unable to generate run message"))
 	}
