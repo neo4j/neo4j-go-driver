@@ -94,7 +94,7 @@ var _ = Describe("Timeout and Lifetime", func() {
 		Expect(log.Infos).Should(ContainElement(ContainSubstring("reached its maximum lifetime")))
 	})
 
-	It("should timeout connection when SocketConnectTimeout is hit", func() {
+	XIt("should timeout connection when SocketConnectTimeout is hit", func() {
 		var err error
 		var driver neo4j.Driver
 		var session neo4j.Session
