@@ -40,8 +40,6 @@ This package requires the following tools/libraries to be installed in order to 
 
 #### With seabolt binary
 
-#### With seabolt binary
-
 1. Install pkg-config via `brew install pkg-config`
 2. Get the most recent binary package matching your platform [here](https://github.com/neo4j-drivers/seabolt/releases) and install it (the default installation path is configured as `/usr/local` which requires no additional configuration), if you happen to install it to an alternative destination please set your `PKG_CONFIG_PATH` and `LD_LIBRARY_PATH` accordingly.
 3. Get this package via `go get github.com/neo4j/neo4j-go-driver/neo4j`
