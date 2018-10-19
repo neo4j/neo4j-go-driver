@@ -14,13 +14,23 @@ This package requires the following tools/libraries to be installed in order to 
 
 ### Linux
 
+#### With seabolt source
+
 1. Make sure you have pkg-config installed via `apt install pkg-config`
 2. Clone [seabolt](http://github.com/neo4j-drivers/seabolt) (assume `<seabolt_dir>` to be the absolute path in which the clone resides) and make sure you can build it successfully (follow it's own instructions)
 3. Add/Update environment variable `PKG_CONFIG_PATH` to include `<seabolt_dir>/build/dist/share/pkgconfig`
 4. Add/Update environment variable `LD_LIBRARY_PATH` to include `<seabolt_dir>/build/dist/lib`
 5. Get this package via `go get github.com/neo4j/neo4j-go-driver/neo4j`
 
+#### With seabolt binary
+
+1. Make sure you have pkg-config installed via `apt install pkg-config`
+2. Get the most recent binary package matching your platform [here](https://github.com/neo4j-drivers/seabolt/releases) and install it (the default installation path is configured as `/usr/local` which requires no additional configuration), if you happen to install it to an alternative destination please set your `PKG_CONFIG_PATH` and `LD_LIBRARY_PATH` accordingly.
+3. Get this package via `go get github.com/neo4j/neo4j-go-driver/neo4j`
+
 ### MacOS
+
+#### With seabolt source
 
 1. Install pkg-config via `brew install pkg-config`
 2. Clone [seabolt](http://github.com/neo4j-drivers/seabolt) (assume `<seabolt_dir>` to be the absolute path in which the clone resides) and make sure you can build it successfully,
@@ -28,13 +38,32 @@ This package requires the following tools/libraries to be installed in order to 
 4. Add/Update environment variable `LD_LIBRARY_PATH` to include `<seabolt_dir>/build/dist/lib`
 5. Go Get this package via `go get github.com/neo4j/neo4j-go-driver/neo4j`
 
+#### With seabolt binary
+
+#### With seabolt binary
+
+1. Install pkg-config via `brew install pkg-config`
+2. Get the most recent binary package matching your platform [here](https://github.com/neo4j-drivers/seabolt/releases) and install it (the default installation path is configured as `/usr/local` which requires no additional configuration), if you happen to install it to an alternative destination please set your `PKG_CONFIG_PATH` and `LD_LIBRARY_PATH` accordingly.
+3. Get this package via `go get github.com/neo4j/neo4j-go-driver/neo4j`
+
 ### Windows
+
+#### With seabolt source
 
 1. Install a mingw toolchain (for instance MSYS2 from https://www.msys2.org/) for cgo support (seabolt include some instructions),
 2. Install pkg-config following [these instructions](https://stackoverflow.com/questions/1710922/how-to-install-pkg-config-in-windows?answertab=active#tab-top), make the `bin` folder available in PATH before any MSYS2 PATH entries, 
 3. Clone [seabolt](http://github.com/neo4j-drivers/seabolt) (assume `<seabolt_dir>` to be the absolute path in which the clone resides) and make sure you can build it successfully,
 4. Add/Update environment variable `PKG_CONFIG_PATH` to include `<seabolt_dir>/build/dist` subdirectory of seabolt, i.e. `%PKG_CONFIG_PATH%;<seabolt_dir>/build`
 5. Update environment variable `PATH` to include `<seabolt_dir>/build/dist/bin`
+6. Go Get this package via `go get github.com/neo4j/neo4j-go-driver/neo4j`
+
+#### With seabolt binary
+
+1. Install a mingw toolchain (for instance MSYS2 from https://www.msys2.org/) for cgo support (seabolt include some instructions),
+2. Install pkg-config following [these instructions](https://stackoverflow.com/questions/1710922/how-to-install-pkg-config-in-windows?answertab=active#tab-top), make the `bin` folder available in PATH before any MSYS2 PATH entries, 
+3. Get the most recent binary package matching your platform [here](https://github.com/neo4j-drivers/seabolt/releases) and install it (extract it to a directory with no spaces in its name).
+4. Add/Update environment variable `PKG_CONFIG_PATH` to include `<seabolt_extracted_dir>`, i.e. `%PKG_CONFIG_PATH%;<seabolt_extracted_dir>`
+5. Update environment variable `PATH` to include `<seabolt_extracted_dir>\bin`
 6. Go Get this package via `go get github.com/neo4j/neo4j-go-driver/neo4j`
 
 ## Versioning
