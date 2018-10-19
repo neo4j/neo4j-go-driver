@@ -12,33 +12,34 @@ This package requires the following tools/libraries to be installed in order to 
 
 ## Building
 
-### Linux (Ubuntu)
+### Linux
 
 1. Make sure you have pkg-config installed via `apt install pkg-config`
 2. Clone [seabolt](http://github.com/neo4j-drivers/seabolt) (assume `<seabolt_dir>` to be the absolute path in which the clone resides) and make sure you can build it successfully (follow it's own instructions)
-3. Add/Update environment variable `PKG_CONFIG_PATH` to include `<seabolt_dir>/build`
-4. Add/Update environment variable `LD_LIBRARY_PATH` to include `<seabolt_dir>/build/lib`
+3. Add/Update environment variable `PKG_CONFIG_PATH` to include `<seabolt_dir>/build/dist/share/pkgconfig`
+4. Add/Update environment variable `LD_LIBRARY_PATH` to include `<seabolt_dir>/build/dist/lib`
 5. Get this package via `go get github.com/neo4j/neo4j-go-driver/neo4j`
 
 ### MacOS
 
 1. Install pkg-config via `brew install pkg-config`
 2. Clone [seabolt](http://github.com/neo4j-drivers/seabolt) (assume `<seabolt_dir>` to be the absolute path in which the clone resides) and make sure you can build it successfully,
-3. Add/Update environment variable `PKG_CONFIG_PATH` to include `build` subdirectory of seabolt, i.e. `$PKG_CONFIG_PATH:<seabolt_dir>/build`
-4. Add/Update environment variable `LD_LIBRARY_PATH` to include `<seabolt_dir>/build/lib`
+3. Add/Update environment variable `PKG_CONFIG_PATH` to include `<seabolt_dir>/build/dist/share/pkgconfig` subdirectory of seabolt, i.e. `$PKG_CONFIG_PATH:<seabolt_dir>/build`
+4. Add/Update environment variable `LD_LIBRARY_PATH` to include `<seabolt_dir>/build/dist/lib`
 5. Go Get this package via `go get github.com/neo4j/neo4j-go-driver/neo4j`
 
 ### Windows
 
 1. Install a mingw toolchain (for instance MSYS2 from https://www.msys2.org/) for cgo support (seabolt include some instructions),
-2. Clone [seabolt](http://github.com/neo4j-drivers/seabolt) (assume `<seabolt_dir>` to be the absolute path in which the clone resides) and make sure you can build it successfully,
-3. Add/Update environment variable `PKG_CONFIG_PATH` to include `build` subdirectory of seabolt, i.e. `%PKG_CONFIG_PATH%;<seabolt_dir>/build`
-4. Update environment variable `PATH` to include `<seabolt_dir>/build/bin`
-5. Go Get this package via `go get github.com/neo4j/neo4j-go-driver/neo4j`
+2. Install pkg-config following [these instructions](https://stackoverflow.com/questions/1710922/how-to-install-pkg-config-in-windows?answertab=active#tab-top), make the `bin` folder available in PATH before any MSYS2 PATH entries, 
+3. Clone [seabolt](http://github.com/neo4j-drivers/seabolt) (assume `<seabolt_dir>` to be the absolute path in which the clone resides) and make sure you can build it successfully,
+4. Add/Update environment variable `PKG_CONFIG_PATH` to include `<seabolt_dir>/build/dist` subdirectory of seabolt, i.e. `%PKG_CONFIG_PATH%;<seabolt_dir>/build`
+5. Update environment variable `PATH` to include `<seabolt_dir>/build/dist/bin`
+6. Go Get this package via `go get github.com/neo4j/neo4j-go-driver/neo4j`
 
 ## Versioning
 
-Although `master` branch contains the source code for the latest available release, we are also tagging releases after semantic versioning scheme so that `dep` will find latest release and add the driver as a dependency on your project.
+Although `1.7` branch contains the source code for the latest available release, we are also tagging releases after semantic versioning scheme so that `dep` will find latest release and add the driver as a dependency on your project.
 
 ## Getting the Driver
 
