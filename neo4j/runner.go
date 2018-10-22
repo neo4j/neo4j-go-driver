@@ -44,6 +44,22 @@ func (runner *statementRunner) lastSeenBookmark() string {
 	return runner.lastBookmark
 }
 
+func (runner *statementRunner) assertConnection() error {
+	if runner.connection == nil {
+		return newDriverError("unexpected state: expected an active connection bound to this runner")
+	}
+
+	return nil
+}
+
+func (runner *statementRunner) assertNoConnection() error {
+	if runner.connection != nil {
+		return newDriverError("unexpected state: expected no connection bound to this runner")
+	}
+
+	return nil
+}
+
 // This ensures that we've a connection to run statements against
 func (runner *statementRunner) ensureConnection() error {
 	if runner.connection == nil {
@@ -237,7 +253,9 @@ func (runner *statementRunner) runStatement(statement *neoStatement, bookmarks [
 }
 
 func (runner *statementRunner) beginTransaction(bookmarks []string, txConfig TransactionConfig) (Result, error) {
-	// TODO: assert no connection
+	if err := runner.assertNoConnection(); err != nil {
+		return nil, err
+	}
 
 	if err := runner.ensureConnection(); err != nil {
 		defer runner.closeConnection()
@@ -267,7 +285,9 @@ func (runner *statementRunner) beginTransaction(bookmarks []string, txConfig Tra
 }
 
 func (runner *statementRunner) commitTransaction() (Result, error) {
-	// TODO: assert connection
+	if err := runner.assertConnection(); err != nil {
+		return nil, err
+	}
 
 	commitHandle, err := runner.connection.Commit()
 	if err != nil {
@@ -289,7 +309,9 @@ func (runner *statementRunner) commitTransaction() (Result, error) {
 }
 
 func (runner *statementRunner) rollbackTransaction() (Result, error) {
-	// TODO: assert connection
+	if err := runner.assertConnection(); err != nil {
+		return nil, err
+	}
 
 	rollbackHandle, err := runner.connection.Rollback()
 	if err != nil {

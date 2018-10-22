@@ -69,7 +69,6 @@ func (logic *retryLogic) retry(work func() (interface{}, error)) (interface{}, e
 				warningf(logic.logging, "retriable operation failed to complete [error: %s] and will be retried in %dms", err.Error(), delayWithJitter.Nanoseconds()/int64(time.Millisecond))
 				time.Sleep(delayWithJitter)
 				nextDelay = delayWithJitter
-				// TODO: record error
 				continue
 			}
 		}

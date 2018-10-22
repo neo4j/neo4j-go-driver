@@ -22,7 +22,9 @@ package neo4j
 import (
 	"github.com/golang/mock/gomock"
 	"github.com/neo4j/neo4j-go-driver/neo4j/utils/mocks"
+	"github.com/neo4j/neo4j-go-driver/neo4j/utils/test"
 	. "github.com/onsi/ginkgo"
+	"github.com/onsi/gomega"
 )
 
 var _ = Describe("Logging", func() {
@@ -55,8 +57,7 @@ var _ = Describe("Logging", func() {
 				logging := mocks.NewMockLogging(mockCtrl)
 
 				logging.EXPECT().ErrorEnabled().Times(1).Return(true)
-				// TODO: Add some custom matcher to match message itself?
-				logging.EXPECT().Errorf(gomock.Any(), "str1", 1).Times(1)
+				logging.EXPECT().Errorf(test.WrapMatcher(gomega.ContainSubstring("some error")), "str1", 1).Times(1)
 
 				errorf(logging, "some error", "str1", 1)
 			})
@@ -80,7 +81,7 @@ var _ = Describe("Logging", func() {
 				logging := mocks.NewMockLogging(mockCtrl)
 
 				logging.EXPECT().WarningEnabled().Times(1).Return(true)
-				logging.EXPECT().Warningf(gomock.Any(), "str1", 1).Times(1)
+				logging.EXPECT().Warningf(test.WrapMatcher(gomega.ContainSubstring("some warning")), "str1", 1).Times(1)
 
 				warningf(logging, "some warning", "str1", 1)
 			})
@@ -104,7 +105,7 @@ var _ = Describe("Logging", func() {
 				logging := mocks.NewMockLogging(mockCtrl)
 
 				logging.EXPECT().InfoEnabled().Times(1).Return(true)
-				logging.EXPECT().Infof(gomock.Any(), "str1", 1).Times(1)
+				logging.EXPECT().Infof(test.WrapMatcher(gomega.ContainSubstring("some info")), "str1", 1).Times(1)
 
 				infof(logging, "some info", "str1", 1)
 			})
@@ -128,7 +129,7 @@ var _ = Describe("Logging", func() {
 				logging := mocks.NewMockLogging(mockCtrl)
 
 				logging.EXPECT().DebugEnabled().Times(1).Return(true)
-				logging.EXPECT().Debugf(gomock.Any(), "str1", 1).Times(1)
+				logging.EXPECT().Debugf(test.WrapMatcher(gomega.ContainSubstring("some debug")), "str1", 1).Times(1)
 
 				debugf(logging, "some debug", "str1", 1)
 			})

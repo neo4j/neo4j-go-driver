@@ -55,6 +55,18 @@ func (m *MockConnection) EXPECT() *MockConnectionMockRecorder {
 	return m.recorder
 }
 
+// Id connector-mocks base method
+func (m *MockConnection) Id() string {
+	ret := m.ctrl.Call(m, "Id")
+	ret0, _ := ret[0].(string)
+	return ret0
+}
+
+// Id indicates an expected call of Id
+func (mr *MockConnectionMockRecorder) Id() *gomock.Call {
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Id", reflect.TypeOf((*MockConnection)(nil).Id))
+}
+
 // RemoteAddress connector-mocks base method
 func (m *MockConnection) RemoteAddress() string {
 	ret := m.ctrl.Call(m, "RemoteAddress")
