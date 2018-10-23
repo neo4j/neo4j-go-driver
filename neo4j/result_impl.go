@@ -44,7 +44,15 @@ func (result *neoResult) collectMetadata(metadata map[string]interface{}) {
 			result.summary.resultAvailableAfter = time.Duration(resultAvailabilityTimer.(int64)) / time.Millisecond
 		}
 
+		if resultAvailabilityTimer, ok := metadata["t_first"]; ok {
+			result.summary.resultAvailableAfter = time.Duration(resultAvailabilityTimer.(int64)) / time.Millisecond
+		}
+
 		if resultConsumptionTimer, ok := metadata["result_consumed_after"]; ok {
+			result.summary.resultConsumedAfter = time.Duration(resultConsumptionTimer.(int64)) / time.Millisecond
+		}
+
+		if resultConsumptionTimer, ok := metadata["t_last"]; ok {
 			result.summary.resultConsumedAfter = time.Duration(resultConsumptionTimer.(int64)) / time.Millisecond
 		}
 
