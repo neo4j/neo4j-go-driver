@@ -17,12 +17,10 @@
  *  limitations under the License.
  */
 
-package test
+package neo4j
 
 import (
 	"github.com/golang/mock/gomock"
-	"github.com/neo4j/neo4j-go-driver/neo4j"
-	"github.com/neo4j/neo4j-go-driver/neo4j/utils/mocks"
 	. "github.com/neo4j/neo4j-go-driver/neo4j/utils/test"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -32,8 +30,8 @@ import (
 var _ = Describe("Result Helpers", func() {
 	var (
 		mockCtrl   *gomock.Controller
-		mockResult *mocks.MockResult
-		mockRecord *mocks.MockRecord
+		mockResult *MockResult
+		mockRecord *MockRecord
 	)
 
 	BeforeEach(func() {
@@ -48,35 +46,35 @@ var _ = Describe("Result Helpers", func() {
 		var fixedError = errors.New("some error")
 
 		It("should return error when error is passed", func() {
-			record, err := neo4j.Single(nil, fixedError)
+			record, err := Single(nil, fixedError)
 
 			Expect(record).To(BeNil())
 			Expect(err).To(Equal(fixedError))
 		})
 
 		It("should return error when from is not record", func() {
-			record, err := neo4j.Single("i'm not a record", nil)
+			record, err := Single("i'm not a record", nil)
 
 			Expect(record).To(BeNil())
 			Expect(err).To(BeGenericError(ContainSubstring("expected from to be a result but it was 'i'm not a record'")))
 		})
 
 		It("should return error if result returns error", func() {
-			mockResult = mocks.NewMockResult(mockCtrl)
+			mockResult = NewMockResult(mockCtrl)
 			gomock.InOrder(
 				mockResult.EXPECT().Next().Return(false),
 				mockResult.EXPECT().Err().Return(fixedError),
 			)
 
-			record, err := neo4j.Single(mockResult, nil)
+			record, err := Single(mockResult, nil)
 
 			Expect(record).To(BeNil())
 			Expect(err).To(Equal(fixedError))
 		})
 
 		It("should return error if result returns error after first Next", func() {
-			mockRecord = mocks.NewMockRecord(mockCtrl)
-			mockResult = mocks.NewMockResult(mockCtrl)
+			mockRecord = NewMockRecord(mockCtrl)
+			mockResult = NewMockResult(mockCtrl)
 
 			gomock.InOrder(
 				mockResult.EXPECT().Next().Return(true),
@@ -84,29 +82,29 @@ var _ = Describe("Result Helpers", func() {
 				mockResult.EXPECT().Err().Return(fixedError),
 			)
 
-			record, err := neo4j.Single(mockResult, nil)
+			record, err := Single(mockResult, nil)
 
 			Expect(record).To(BeNil())
 			Expect(err).To(Equal(fixedError))
 		})
 
 		It("should return nil when there's no elements", func() {
-			mockResult = mocks.NewMockResult(mockCtrl)
+			mockResult = NewMockResult(mockCtrl)
 
 			gomock.InOrder(
 				mockResult.EXPECT().Next().Return(false),
 				mockResult.EXPECT().Err().Return(nil),
 			)
 
-			record, err := neo4j.Single(mockResult, nil)
+			record, err := Single(mockResult, nil)
 
 			Expect(record).To(BeNil())
 			Expect(err).Should(BeGenericError(ContainSubstring("result contains no records")))
 		})
 
 		It("should return record when there's only one element", func() {
-			mockRecord = mocks.NewMockRecord(mockCtrl)
-			mockResult = mocks.NewMockResult(mockCtrl)
+			mockRecord = NewMockRecord(mockCtrl)
+			mockResult = NewMockResult(mockCtrl)
 
 			gomock.InOrder(
 				mockResult.EXPECT().Next().Return(true),
@@ -115,15 +113,15 @@ var _ = Describe("Result Helpers", func() {
 				mockResult.EXPECT().Next().Return(false),
 			)
 
-			record, err := neo4j.Single(mockResult, nil)
+			record, err := Single(mockResult, nil)
 
 			Expect(record).To(Equal(mockRecord))
 			Expect(err).To(BeNil())
 		})
 
 		It("should return error when there's more than one element", func() {
-			mockRecord = mocks.NewMockRecord(mockCtrl)
-			mockResult = mocks.NewMockResult(mockCtrl)
+			mockRecord = NewMockRecord(mockCtrl)
+			mockResult = NewMockResult(mockCtrl)
 
 			gomock.InOrder(
 				mockResult.EXPECT().Next().Return(true),
@@ -132,7 +130,7 @@ var _ = Describe("Result Helpers", func() {
 				mockResult.EXPECT().Next().Return(true),
 			)
 
-			record, err := neo4j.Single(mockResult, nil)
+			record, err := Single(mockResult, nil)
 
 			Expect(record).To(BeNil())
 			Expect(err).Should(BeGenericError(ContainSubstring("result contains more than one record")))
@@ -143,35 +141,35 @@ var _ = Describe("Result Helpers", func() {
 		var fixedError = errors.New("some error")
 
 		It("should return error when error is passed", func() {
-			records, err := neo4j.Collect(nil, fixedError)
+			records, err := Collect(nil, fixedError)
 
 			Expect(records).To(BeNil())
 			Expect(err).To(Equal(fixedError))
 		})
 
 		It("should return error when from is not record", func() {
-			record, err := neo4j.Collect("i'm not a record", nil)
+			record, err := Collect("i'm not a record", nil)
 
 			Expect(record).To(BeNil())
 			Expect(err).To(BeGenericError(ContainSubstring("expected from to be a result but it was 'i'm not a record'")))
 		})
 
 		It("should return error if result returns error", func() {
-			mockResult = mocks.NewMockResult(mockCtrl)
+			mockResult = NewMockResult(mockCtrl)
 			gomock.InOrder(
 				mockResult.EXPECT().Next().Return(false),
 				mockResult.EXPECT().Err().Return(fixedError),
 			)
 
-			records, err := neo4j.Collect(mockResult, nil)
+			records, err := Collect(mockResult, nil)
 
 			Expect(records).To(BeNil())
 			Expect(err).To(Equal(fixedError))
 		})
 
 		It("should return error if result returns error after first Next", func() {
-			mockRecord = mocks.NewMockRecord(mockCtrl)
-			mockResult = mocks.NewMockResult(mockCtrl)
+			mockRecord = NewMockRecord(mockCtrl)
+			mockResult = NewMockResult(mockCtrl)
 
 			gomock.InOrder(
 				mockResult.EXPECT().Next().Return(true),
@@ -180,15 +178,15 @@ var _ = Describe("Result Helpers", func() {
 				mockResult.EXPECT().Err().Return(fixedError),
 			)
 
-			records, err := neo4j.Collect(mockResult, nil)
+			records, err := Collect(mockResult, nil)
 
 			Expect(records).To(BeNil())
 			Expect(err).To(Equal(fixedError))
 		})
 
 		It("should return one record", func() {
-			mockRecord = mocks.NewMockRecord(mockCtrl)
-			mockResult = mocks.NewMockResult(mockCtrl)
+			mockRecord = NewMockRecord(mockCtrl)
+			mockResult = NewMockResult(mockCtrl)
 
 			gomock.InOrder(
 				mockResult.EXPECT().Next().Return(true),
@@ -197,7 +195,7 @@ var _ = Describe("Result Helpers", func() {
 				mockResult.EXPECT().Err().Return(nil),
 			)
 
-			records, err := neo4j.Collect(mockResult, nil)
+			records, err := Collect(mockResult, nil)
 
 			Expect(records).To(HaveLen(1))
 			Expect(records[0]).To(Equal(mockRecord))
@@ -205,13 +203,13 @@ var _ = Describe("Result Helpers", func() {
 		})
 
 		It("should return five records", func() {
-			mockRecord1 := mocks.NewMockRecord(mockCtrl)
-			mockRecord2 := mocks.NewMockRecord(mockCtrl)
-			mockRecord3 := mocks.NewMockRecord(mockCtrl)
-			mockRecord4 := mocks.NewMockRecord(mockCtrl)
-			mockRecord5 := mocks.NewMockRecord(mockCtrl)
+			mockRecord1 := NewMockRecord(mockCtrl)
+			mockRecord2 := NewMockRecord(mockCtrl)
+			mockRecord3 := NewMockRecord(mockCtrl)
+			mockRecord4 := NewMockRecord(mockCtrl)
+			mockRecord5 := NewMockRecord(mockCtrl)
 
-			mockResult = mocks.NewMockResult(mockCtrl)
+			mockResult = NewMockResult(mockCtrl)
 
 			gomock.InOrder(
 				mockResult.EXPECT().Next().Return(true),
@@ -228,7 +226,7 @@ var _ = Describe("Result Helpers", func() {
 				mockResult.EXPECT().Err().Return(nil),
 			)
 
-			records, err := neo4j.Collect(mockResult, nil)
+			records, err := Collect(mockResult, nil)
 
 			Expect(records).To(HaveLen(5))
 			Expect(records[0]).To(Equal(mockRecord1))
