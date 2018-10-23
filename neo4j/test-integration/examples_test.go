@@ -105,6 +105,24 @@ var _ = Describe("Examples", func() {
 			Expect(err).To(BeNil())
 		})
 
+		Specify("Config - With Customized Connection Pool", func() {
+			driver, err := createDriverWithCustomizedConnectionPool(uri, username, password)
+			Expect(err).To(BeNil())
+			Expect(driver).NotTo(BeNil())
+
+			err = driver.Close()
+			Expect(err).To(BeNil())
+		})
+
+		Specify("Config - With Connection Timeout", func() {
+			driver, err := createDriverWithConnectionTimeout(uri, username, password)
+			Expect(err).To(BeNil())
+			Expect(driver).NotTo(BeNil())
+
+			err = driver.Close()
+			Expect(err).To(BeNil())
+		})
+
 		Specify("Service Unavailable", func() {
 			driver, err := createDriverWithMaxRetryTime("bolt://localhost:8080", username, password)
 			Expect(err).To(BeNil())
@@ -197,6 +215,25 @@ var _ = Describe("Examples", func() {
 			Expect(err).To(BeNil())
 			Expect(people).To(ContainElement("Annie"))
 			Expect(people).To(ContainElement("Joe"))
+		})
+
+		Specify("Result Retain", func() {
+			driver, err := createDriverWithMaxRetryTime(uri, username, password)
+			Expect(err).To(BeNil())
+			Expect(driver).NotTo(BeNil())
+			defer driver.Close()
+
+			id, err := addPersonNode(driver, "Carl")
+			Expect(err).To(BeNil())
+			Expect(id).To(BeNumerically(">=", 0))
+
+			id, err = addPersonNode(driver, "Thomas")
+			Expect(err).To(BeNil())
+			Expect(id).To(BeNumerically(">=", 0))
+
+			count, err := addPersonsAsEmployees(driver, "Acme")
+			Expect(err).To(BeNil())
+			Expect(count).To(BeNumerically(">=", 2))
 		})
 	})
 
@@ -385,10 +422,22 @@ func addPerson(name string) error {
 // end::config-custom-resolver[]
 
 // tag::config-connection-pool[]
+func createDriverWithCustomizedConnectionPool(uri, username, password string) (neo4j.Driver, error) {
+	return neo4j.NewDriver(uri, neo4j.BasicAuth(username, password, ""), func(config *neo4j.Config) {
+		config.MaxConnectionLifetime = 30 * time.Minute
+		config.MaxConnectionPoolSize = 50
+		config.ConnectionAcquisitionTimeout = 2 * time.Minute
+	})
+}
 
 // end::config-connection-pool[]
 
 // tag::config-connection-timeout[]
+func createDriverWithConnectionTimeout(uri, username, password string) (neo4j.Driver, error) {
+	return neo4j.NewDriver(uri, neo4j.BasicAuth(username, password, ""), func(config *neo4j.Config) {
+		config.SocketConnectTimeout = 15 * time.Second
+	})
+}
 
 // end::config-connection-timeout[]
 
@@ -396,6 +445,7 @@ func addPerson(name string) error {
 func createDriverWithMaxRetryTime(uri, username, password string) (neo4j.Driver, error) {
 	return neo4j.NewDriver(uri, neo4j.BasicAuth(username, password, ""), func(config *neo4j.Config) {
 		config.MaxTransactionRetryTime = 15 * time.Second
+		config.Log = neo4j.ConsoleLogger(neo4j.DEBUG)
 	})
 }
 
@@ -745,5 +795,38 @@ func getPeople(driver neo4j.Driver) ([]string, error) {
 // end::result-consume[]
 
 // tag::result-retain[]
+func addPersonsAsEmployees(driver neo4j.Driver, companyName string) (int, error) {
+	var session neo4j.Session
+	var err error
+	var persons []neo4j.Record
+	var employees int
+
+	if session, err = driver.Session(neo4j.AccessModeWrite); err != nil {
+		return 0, err
+	}
+	defer session.Close()
+
+	persons, err = neo4j.Collect(session.ReadTransaction(func(tx neo4j.Transaction) (interface{}, error) {
+		return tx.Run("MATCH (a:Person) RETURN a.name AS name", nil)
+	}))
+	if err != nil {
+		return 0, err
+	}
+
+	for _, person := range persons {
+		_, err = session.WriteTransaction(func(tx neo4j.Transaction) (interface{}, error) {
+			return tx.Run("MATCH (emp:Person {name: $person_name}) "+
+				"MERGE (com:Company {name: $company_name}) "+
+				"MERGE (emp)-[:WORKS_FOR]->(com)", map[string]interface{}{"person_name": person.GetByIndex(0), "company_name": companyName})
+		})
+		if err != nil {
+			return 0, err
+		}
+
+		employees++
+	}
+
+	return employees, nil
+}
 
 // end::result-retain[]

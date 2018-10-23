@@ -21,7 +21,6 @@ package neo4j
 
 import (
 	"github.com/golang/mock/gomock"
-	"github.com/neo4j/neo4j-go-driver/neo4j/utils/mocks"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"time"
@@ -42,8 +41,8 @@ var _ = Describe("Runner", func() {
 
 	Context("runStatement", func() {
 		It("should invoke run on connection", func() {
-			mockConnection := mocks.NewMockConnection(mockCtrl)
-			mockConnector := mocks.MockedConnector(mockConnection)
+			mockConnection := NewMockConnection(mockCtrl)
+			mockConnector := MockedConnector(mockConnection)
 			mockDriver := newGoboltWithConnector("bolt://localhost", mockConnector)
 			runner := newRunner(mockDriver, AccessModeWrite, true)
 
