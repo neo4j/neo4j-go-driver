@@ -46,8 +46,8 @@ func configToGoboltConfig(config *Config) *gobolt.Config {
 		MaxConnLifetime:        config.MaxConnectionLifetime,
 		ConnAcquisitionTimeout: config.ConnectionAcquisitionTimeout,
 		SockConnectTimeout:     config.SocketConnectTimeout,
-		SockRecvTimeout:        config.SocketReceiveTimeout,
-		SockSendTimeout:        config.SocketSendTimeout,
+		SockRecvTimeout:        0,
+		SockSendTimeout:        0,
 		SockKeepalive:          config.SocketKeepalive,
 		ValueHandlers: []gobolt.ValueHandler{
 			&nodeValueHandler{},

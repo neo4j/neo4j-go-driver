@@ -27,18 +27,18 @@ import (
 )
 
 const (
-	dateSignature               int8 = 'D'
+	dateSignature               int16 = 'D'
 	dateSize                         = 1
-	localTimeSignature          int8 = 't'
+	localTimeSignature          int16 = 't'
 	localTimeSize                    = 1
-	offsetTimeSignature         int8 = 'T'
+	offsetTimeSignature         int16 = 'T'
 	offsetTimeSize                   = 2
-	durationSignature           int8 = 'E'
+	durationSignature           int16 = 'E'
 	durationSize                     = 4
-	localDateTimeSignature      int8 = 'd'
+	localDateTimeSignature      int16 = 'd'
 	localDateTimeSize           int  = 2
-	dateTimeWithOffsetSignature int8 = 'F'
-	dateTimeWithZoneIdSignature int8 = 'f'
+	dateTimeWithOffsetSignature int16 = 'F'
+	dateTimeWithZoneIdSignature int16 = 'f'
 	dateTimeSize                int  = 3
 )
 
@@ -60,15 +60,15 @@ type localDateTimeValueHandler struct {
 type durationValueHandler struct {
 }
 
-func (handler *dateValueHandler) ReadableStructs() []int8 {
-	return []int8{dateSignature}
+func (handler *dateValueHandler) ReadableStructs() []int16 {
+	return []int16{dateSignature}
 }
 
 func (handler *dateValueHandler) WritableTypes() []reflect.Type {
 	return []reflect.Type{reflect.TypeOf(Date{})}
 }
 
-func (handler *dateValueHandler) Read(signature int8, values []interface{}) (interface{}, error) {
+func (handler *dateValueHandler) Read(signature int16, values []interface{}) (interface{}, error) {
 	switch signature {
 	case dateSignature:
 		if len(values) != dateSize {
@@ -81,7 +81,7 @@ func (handler *dateValueHandler) Read(signature int8, values []interface{}) (int
 	return nil, gobolt.NewValueHandlerError("unexpected struct signature provided to dateTimeValueHandler: %#x", signature)
 }
 
-func (handler *dateValueHandler) Write(value interface{}) (int8, []interface{}, error) {
+func (handler *dateValueHandler) Write(value interface{}) (int16, []interface{}, error) {
 	var date Date
 	var ok bool
 
@@ -92,15 +92,15 @@ func (handler *dateValueHandler) Write(value interface{}) (int8, []interface{}, 
 	return dateSignature, []interface{}{date.epochDays}, nil
 }
 
-func (handler *localTimeValueHandler) ReadableStructs() []int8 {
-	return []int8{localTimeSignature}
+func (handler *localTimeValueHandler) ReadableStructs() []int16 {
+	return []int16{localTimeSignature}
 }
 
 func (handler *localTimeValueHandler) WritableTypes() []reflect.Type {
 	return []reflect.Type{reflect.TypeOf(LocalTime{})}
 }
 
-func (handler *localTimeValueHandler) Read(signature int8, values []interface{}) (interface{}, error) {
+func (handler *localTimeValueHandler) Read(signature int16, values []interface{}) (interface{}, error) {
 	switch signature {
 	case localTimeSignature:
 		if len(values) != localTimeSize {
@@ -113,7 +113,7 @@ func (handler *localTimeValueHandler) Read(signature int8, values []interface{})
 	return nil, gobolt.NewValueHandlerError("unexpected struct signature provided to localTimeValueHandler: %#x", signature)
 }
 
-func (handler *localTimeValueHandler) Write(value interface{}) (int8, []interface{}, error) {
+func (handler *localTimeValueHandler) Write(value interface{}) (int16, []interface{}, error) {
 	var localTime LocalTime
 	var ok bool
 
@@ -124,15 +124,15 @@ func (handler *localTimeValueHandler) Write(value interface{}) (int8, []interfac
 	return localTimeSignature, []interface{}{int64(localTime.nanosOfDay)}, nil
 }
 
-func (handler *offsetTimeValueHandler) ReadableStructs() []int8 {
-	return []int8{offsetTimeSignature}
+func (handler *offsetTimeValueHandler) ReadableStructs() []int16 {
+	return []int16{offsetTimeSignature}
 }
 
 func (handler *offsetTimeValueHandler) WritableTypes() []reflect.Type {
 	return []reflect.Type{reflect.TypeOf(OffsetTime{})}
 }
 
-func (handler *offsetTimeValueHandler) Read(signature int8, values []interface{}) (interface{}, error) {
+func (handler *offsetTimeValueHandler) Read(signature int16, values []interface{}) (interface{}, error) {
 	switch signature {
 	case offsetTimeSignature:
 		if len(values) != offsetTimeSize {
@@ -146,7 +146,7 @@ func (handler *offsetTimeValueHandler) Read(signature int8, values []interface{}
 	return nil, gobolt.NewValueHandlerError("unexpected struct signature provided to offsetTimeValueHandler: %#x", signature)
 }
 
-func (handler *offsetTimeValueHandler) Write(value interface{}) (int8, []interface{}, error) {
+func (handler *offsetTimeValueHandler) Write(value interface{}) (int16, []interface{}, error) {
 	var offsetTime OffsetTime
 	var ok bool
 
@@ -157,15 +157,15 @@ func (handler *offsetTimeValueHandler) Write(value interface{}) (int8, []interfa
 	return offsetTimeSignature, []interface{}{int64(offsetTime.nanosOfDay), offsetTime.offset}, nil
 }
 
-func (handler *durationValueHandler) ReadableStructs() []int8 {
-	return []int8{durationSignature}
+func (handler *durationValueHandler) ReadableStructs() []int16 {
+	return []int16{durationSignature}
 }
 
 func (handler *durationValueHandler) WritableTypes() []reflect.Type {
 	return []reflect.Type{reflect.TypeOf(Duration{})}
 }
 
-func (handler *durationValueHandler) Read(signature int8, values []interface{}) (interface{}, error) {
+func (handler *durationValueHandler) Read(signature int16, values []interface{}) (interface{}, error) {
 	switch signature {
 	case durationSignature:
 		if len(values) != durationSize {
@@ -181,7 +181,7 @@ func (handler *durationValueHandler) Read(signature int8, values []interface{}) 
 	return nil, gobolt.NewValueHandlerError("unexpected struct signature provided to durationValueHandler: %#x", signature)
 }
 
-func (handler *durationValueHandler) Write(value interface{}) (int8, []interface{}, error) {
+func (handler *durationValueHandler) Write(value interface{}) (int16, []interface{}, error) {
 	var duration Duration
 	var ok bool
 
@@ -192,15 +192,15 @@ func (handler *durationValueHandler) Write(value interface{}) (int8, []interface
 	return durationSignature, []interface{}{duration.months, duration.days, duration.seconds, duration.nanos}, nil
 }
 
-func (handler *localDateTimeValueHandler) ReadableStructs() []int8 {
-	return []int8{localDateTimeSignature}
+func (handler *localDateTimeValueHandler) ReadableStructs() []int16 {
+	return []int16{localDateTimeSignature}
 }
 
 func (handler *localDateTimeValueHandler) WritableTypes() []reflect.Type {
 	return []reflect.Type{reflect.TypeOf(LocalDateTime{})}
 }
 
-func (handler *localDateTimeValueHandler) Read(signature int8, values []interface{}) (interface{}, error) {
+func (handler *localDateTimeValueHandler) Read(signature int16, values []interface{}) (interface{}, error) {
 	switch signature {
 	case localDateTimeSignature:
 		if len(values) != localDateTimeSize {
@@ -216,7 +216,7 @@ func (handler *localDateTimeValueHandler) Read(signature int8, values []interfac
 	return nil, gobolt.NewValueHandlerError("unexpected struct signature provided to localDateTimeValueHandler: %#x", signature)
 }
 
-func (handler *localDateTimeValueHandler) Write(value interface{}) (int8, []interface{}, error) {
+func (handler *localDateTimeValueHandler) Write(value interface{}) (int16, []interface{}, error) {
 	var localDateTime LocalDateTime
 	var ok bool
 
@@ -230,15 +230,15 @@ func (handler *localDateTimeValueHandler) Write(value interface{}) (int8, []inte
 	}, nil
 }
 
-func (handler *dateTimeValueHandler) ReadableStructs() []int8 {
-	return []int8{dateTimeWithOffsetSignature, dateTimeWithZoneIdSignature}
+func (handler *dateTimeValueHandler) ReadableStructs() []int16 {
+	return []int16{dateTimeWithOffsetSignature, dateTimeWithZoneIdSignature}
 }
 
 func (handler *dateTimeValueHandler) WritableTypes() []reflect.Type {
 	return []reflect.Type{reflect.TypeOf(time.Time{})}
 }
 
-func (handler *dateTimeValueHandler) Read(signature int8, values []interface{}) (interface{}, error) {
+func (handler *dateTimeValueHandler) Read(signature int16, values []interface{}) (interface{}, error) {
 	switch signature {
 	case dateTimeWithZoneIdSignature:
 		if len(values) != dateTimeSize {
@@ -274,7 +274,7 @@ func (handler *dateTimeValueHandler) Read(signature int8, values []interface{}) 
 	return nil, gobolt.NewValueHandlerError("unexpected struct signature provided to dateTimeValueHandler: %#x", signature)
 }
 
-func (handler *dateTimeValueHandler) Write(value interface{}) (int8, []interface{}, error) {
+func (handler *dateTimeValueHandler) Write(value interface{}) (int16, []interface{}, error) {
 	var dateTime time.Time
 	var ok bool
 

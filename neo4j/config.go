@@ -75,16 +75,6 @@ type Config struct {
 	//
 	// default: 5 * time.Second
 	SocketConnectTimeout time.Duration
-	// Receive timeout that will be set on underlying sockets. Values less than
-	// or equal to 0 results in no timeout being applied.
-	//
-	// default: 0
-	SocketReceiveTimeout time.Duration
-	// Send timeout that will be set on underlying sockets. Values less than
-	// or equal to 0 results in no timeout being applied.
-	//
-	// default: 0
-	SocketSendTimeout time.Duration
 	// Whether to enable TCP keep alive on underlying sockets.
 	//
 	// default: true
@@ -102,8 +92,6 @@ func defaultConfig() *Config {
 		MaxConnectionLifetime:        1 * time.Hour,
 		ConnectionAcquisitionTimeout: 1 * time.Minute,
 		SocketConnectTimeout:         5 * time.Second,
-		SocketReceiveTimeout:         0 * time.Second,
-		SocketSendTimeout:            0 * time.Second,
 		SocketKeepalive:              true,
 	}
 }
@@ -136,16 +124,6 @@ func validateAndNormaliseConfig(config *Config) error {
 	// Socket Connect Timeout
 	if config.SocketConnectTimeout < 0 {
 		config.SocketConnectTimeout = 0
-	}
-
-	// Socket Receive Timeout
-	if config.SocketReceiveTimeout < 0 {
-		config.SocketReceiveTimeout = 0
-	}
-
-	// Socket Send Timeout
-	if config.SocketSendTimeout < 0 {
-		config.SocketSendTimeout = 0
 	}
 
 	return nil
