@@ -34,15 +34,15 @@ type relationshipValueHandler struct {
 type pathValueHandler struct {
 }
 
-func (handler *nodeValueHandler) ReadableStructs() []int8 {
-	return []int8{'N'}
+func (handler *nodeValueHandler) ReadableStructs() []int16 {
+	return []int16{'N'}
 }
 
 func (handler *nodeValueHandler) WritableTypes() []reflect.Type {
 	return []reflect.Type(nil)
 }
 
-func (handler *nodeValueHandler) Read(signature int8, values []interface{}) (interface{}, error) {
+func (handler *nodeValueHandler) Read(signature int16, values []interface{}) (interface{}, error) {
 	if len(values) != 3 {
 		return nil, gobolt.NewValueHandlerError("expected node struct to have %d fields but received %d", 3, len(values))
 	}
@@ -64,19 +64,19 @@ func (handler *nodeValueHandler) Read(signature int8, values []interface{}) (int
 	}, nil
 }
 
-func (handler *nodeValueHandler) Write(value interface{}) (int8, []interface{}, error) {
+func (handler *nodeValueHandler) Write(value interface{}) (int16, []interface{}, error) {
 	return 0, nil, gobolt.NewValueHandlerError("Write is not supported for node values")
 }
 
-func (handler *relationshipValueHandler) ReadableStructs() []int8 {
-	return []int8{'R', 'r'}
+func (handler *relationshipValueHandler) ReadableStructs() []int16 {
+	return []int16{'R', 'r'}
 }
 
 func (handler *relationshipValueHandler) WritableTypes() []reflect.Type {
 	return []reflect.Type(nil)
 }
 
-func (handler *relationshipValueHandler) Read(signature int8, values []interface{}) (interface{}, error) {
+func (handler *relationshipValueHandler) Read(signature int16, values []interface{}) (interface{}, error) {
 	if signature == 'R' {
 		if len(values) != 5 {
 			return nil, gobolt.NewValueHandlerError("expected relationship struct to have %d fields but received %d", 5, len(values))
@@ -114,19 +114,19 @@ func (handler *relationshipValueHandler) Read(signature int8, values []interface
 	}, nil
 }
 
-func (handler *relationshipValueHandler) Write(value interface{}) (int8, []interface{}, error) {
+func (handler *relationshipValueHandler) Write(value interface{}) (int16, []interface{}, error) {
 	return 0, nil, gobolt.NewValueHandlerError("Write is not supported for relationship values")
 }
 
-func (handler *pathValueHandler) ReadableStructs() []int8 {
-	return []int8{'P'}
+func (handler *pathValueHandler) ReadableStructs() []int16 {
+	return []int16{'P'}
 }
 
 func (handler *pathValueHandler) WritableTypes() []reflect.Type {
 	return []reflect.Type(nil)
 }
 
-func (handler *pathValueHandler) Read(signature int8, values []interface{}) (interface{}, error) {
+func (handler *pathValueHandler) Read(signature int16, values []interface{}) (interface{}, error) {
 	if len(values) != 3 {
 		return nil, gobolt.NewValueHandlerError("expected path struct to have %d fields but received %d", 3, len(values))
 	}
@@ -179,6 +179,6 @@ func (handler *pathValueHandler) Read(signature int8, values []interface{}) (int
 	return &pathValue{segments: segments, nodes: nodes, relationships: rels}, nil
 }
 
-func (handler *pathValueHandler) Write(value interface{}) (int8, []interface{}, error) {
+func (handler *pathValueHandler) Write(value interface{}) (int16, []interface{}, error) {
 	return 0, nil, gobolt.NewValueHandlerError("Write is not supported for path values")
 }

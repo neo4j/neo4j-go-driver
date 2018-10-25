@@ -27,24 +27,24 @@ import (
 )
 
 const (
-	point2DSignature int8 = 'X'
+	point2DSignature int16 = 'X'
 	point2DSize           = 3
-	point3DSignature int8 = 'Y'
+	point3DSignature int16 = 'Y'
 	point3DSize           = 4
 )
 
 type pointValueHandler struct {
 }
 
-func (handler *pointValueHandler) ReadableStructs() []int8 {
-	return []int8{point2DSignature, point3DSignature}
+func (handler *pointValueHandler) ReadableStructs() []int16 {
+	return []int16{point2DSignature, point3DSignature}
 }
 
 func (handler *pointValueHandler) WritableTypes() []reflect.Type {
 	return []reflect.Type{reflect.TypeOf(Point{}), reflect.TypeOf(&Point{})}
 }
 
-func (handler *pointValueHandler) Read(signature int8, values []interface{}) (interface{}, error) {
+func (handler *pointValueHandler) Read(signature int16, values []interface{}) (interface{}, error) {
 	var (
 		dimension int
 		srId      int
@@ -85,7 +85,7 @@ func (handler *pointValueHandler) Read(signature int8, values []interface{}) (in
 	}, nil
 }
 
-func (handler *pointValueHandler) Write(value interface{}) (int8, []interface{}, error) {
+func (handler *pointValueHandler) Write(value interface{}) (int16, []interface{}, error) {
 	var point *Point
 	var ok bool
 
