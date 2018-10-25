@@ -59,14 +59,6 @@ var _ = Describe("Config", func() {
 			Expect(config.SocketConnectTimeout).To(BeIdenticalTo(5 * time.Second))
 		})
 
-		It("should have socket receive timeout to be 0", func() {
-			Expect(config.SocketReceiveTimeout).To(BeIdenticalTo(0 * time.Second))
-		})
-
-		It("should have socket send timeout to be 0", func() {
-			Expect(config.SocketSendTimeout).To(BeIdenticalTo(0 * time.Second))
-		})
-
 		It("should have socket keep alive enabled", func() {
 			Expect(config.SocketKeepalive).To(BeTrue())
 		})
@@ -130,26 +122,6 @@ var _ = Describe("Config", func() {
 			Expect(err).To(BeNil())
 
 			Expect(config.SocketConnectTimeout).To(Equal(0 * time.Nanosecond))
-		})
-
-		It("should normalize SocketReceiveTimeout to 0 when negative", func() {
-			config := defaultConfig()
-			config.SocketReceiveTimeout = -1 * time.Second
-
-			err := validateAndNormaliseConfig(config)
-			Expect(err).To(BeNil())
-
-			Expect(config.SocketReceiveTimeout).To(Equal(0 * time.Nanosecond))
-		})
-
-		It("should normalize SocketSendTimeout to 0 when negative", func() {
-			config := defaultConfig()
-			config.SocketSendTimeout = -1 * time.Second
-
-			err := validateAndNormaliseConfig(config)
-			Expect(err).To(BeNil())
-
-			Expect(config.SocketSendTimeout).To(Equal(0 * time.Nanosecond))
 		})
 	})
 
