@@ -445,7 +445,6 @@ func createDriverWithConnectionTimeout(uri, username, password string) (neo4j.Dr
 func createDriverWithMaxRetryTime(uri, username, password string) (neo4j.Driver, error) {
 	return neo4j.NewDriver(uri, neo4j.BasicAuth(username, password, ""), func(config *neo4j.Config) {
 		config.MaxTransactionRetryTime = 15 * time.Second
-		config.Log = neo4j.ConsoleLogger(neo4j.DEBUG)
 	})
 }
 
