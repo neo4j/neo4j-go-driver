@@ -94,14 +94,14 @@ var _ = Describe("Timeout and Lifetime", func() {
 		Expect(log.Infos).Should(ContainElement(ContainSubstring("reached its maximum lifetime")))
 	})
 
-	XIt("should timeout connection when SocketConnectTimeout is hit", func() {
+	It("should timeout connection when SocketConnectTimeout is hit", func() {
 		var err error
 		var driver neo4j.Driver
 		var session neo4j.Session
 
-		driver, err = neo4j.NewDriver("bolt://192.168.0.0:8080", server.AuthToken(), server.Config(), func(config *neo4j.Config) {
+		driver, err = neo4j.NewDriver("bolt://10.255.255.1:8080", server.AuthToken(), server.Config(), func(config *neo4j.Config) {
 			config.Log = log
-			config.SocketConnectTimeout = 5 * time.Second
+			config.SocketConnectTimeout = 1 * time.Second
 		})
 		Expect(err).To(BeNil())
 		Expect(driver).NotTo(BeNil())
