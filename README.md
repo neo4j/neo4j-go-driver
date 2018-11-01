@@ -1,80 +1,68 @@
 # neo4j-go-driver
 
-This is the pre-release version of the official Neo4j Go Driver. It is based on our C Connector, and depends on seabolt to be available on the host system.
+This is the the official Neo4j Go Driver. It is built on our C Connector, [seabolt](https://github.com/neo4j-drivers/seabolt) and depends on it to be available on the host system.
 
 ##  Requirements
 
 This package requires the following tools/libraries to be installed in order to be built.
 
-1. seabolt (see requirements [here](http://github.com/neo4j-drivers/seabolt))
-2. pkg-config tool for your platform
-3. working cgo environment for your platform
+1. C Compiler Toolchain  
+2. seabolt
+3. pkg-config tool for your platform
 
-## Building
+## Requirements
 
-### Linux
+### Compiler Toolchain
 
-#### With seabolt source
+Install C/C++ compiler toolchain supported by your operating system. You'll need a mingw toolchain (for instance MSYS2 from https://www.msys2.org/) for cgo support (seabolt include some instructions) on Windows.
 
-1. Make sure you have pkg-config installed via `apt install pkg-config`
-2. Clone [seabolt](http://github.com/neo4j-drivers/seabolt) (assume `<seabolt_dir>` to be the absolute path in which the clone resides) and make sure you can build it successfully (follow it's own instructions)
-3. Add/Update environment variable `PKG_CONFIG_PATH` to include `<seabolt_dir>/build/dist/share/pkgconfig`
-4. Add/Update environment variable `LD_LIBRARY_PATH` to include `<seabolt_dir>/build/dist/lib`
-5. Get this package via `go get github.com/neo4j/neo4j-go-driver/neo4j`
+### Pkg-Config
 
-#### With seabolt binary
+Linux distributions provide `pkg-config` as part of their package management systems (`apt install pkg-config` or `yum install pkgconfig`).
 
-1. Make sure you have pkg-config installed via `apt install pkg-config`
-2. Get the most recent binary package matching your platform [here](https://github.com/neo4j-drivers/seabolt/releases) and install it (the default installation path is configured as `/usr/local` which requires no additional configuration), if you happen to install it to an alternative destination please set your `PKG_CONFIG_PATH` and `LD_LIBRARY_PATH` accordingly.
-3. Get this package via `go get github.com/neo4j/neo4j-go-driver/neo4j`
+MacOS doesn't provide `pkg-config`, so have it installed through `brew install pkg-config`.
 
-### MacOS
+Windows doesn't provide `pkg-config`, so have it installed by following [these instructions](https://stackoverflow.com/questions/1710922/how-to-install-pkg-config-in-windows?answertab=active#tab-top), make the `bin` folder available in PATH before any MSYS2 PATH entries.
 
-#### With seabolt source
+### Seabolt
 
-1. Install pkg-config via `brew install pkg-config`
-2. Clone [seabolt](http://github.com/neo4j-drivers/seabolt) (assume `<seabolt_dir>` to be the absolute path in which the clone resides) and make sure you can build it successfully,
-3. Add/Update environment variable `PKG_CONFIG_PATH` to include `<seabolt_dir>/build/dist/share/pkgconfig` subdirectory of seabolt, i.e. `$PKG_CONFIG_PATH:<seabolt_dir>/build`
-4. Add/Update environment variable `LD_LIBRARY_PATH` to include `<seabolt_dir>/build/dist/lib`
-5. Go Get this package via `go get github.com/neo4j/neo4j-go-driver/neo4j`
+#### Binaries
 
-#### With seabolt binary
+We're now providing _**experimental**_ binaries for `Linux`, `MacOS` and `Windows` [here](https://github.com/neo4j-drivers/seabolt/releases). Please remember that `OpenSSL` is still a requirement for all of these systems. In order to link seabolt statically make sure you have static OpenSSL libraries, too.
 
-1. Install pkg-config via `brew install pkg-config`
-2. Get the most recent binary package matching your platform [here](https://github.com/neo4j-drivers/seabolt/releases) and install it (the default installation path is configured as `/usr/local` which requires no additional configuration), if you happen to install it to an alternative destination please set your `PKG_CONFIG_PATH` and `LD_LIBRARY_PATH` accordingly.
-3. Get this package via `go get github.com/neo4j/neo4j-go-driver/neo4j`
+Linux packages are being built on `Ubuntu 16.04` system and generated artifacts contain absolute paths to dependent static/dynamic libraries which are only applicable to `Ubuntu` file system layout. _**It may be better to compile seabolt from scratch if you are on a different Linux distribution.**_
 
-### Windows
+#### Source
 
-#### With seabolt source
+Clone [seabolt](http://github.com/neo4j-drivers/seabolt) (assume `<seabolt_dir>` to be the absolute path in which the clone resides) and build it using one the provided `make_debug.[sh|cmd]` or `make_release.[sh|cmd]` scripts. The scripts set the installation path to `<seabolt_dir>/build/dist` and `<seabolt_install_dir>` in the following steps refer to it.
 
-1. Install a mingw toolchain (for instance MSYS2 from https://www.msys2.org/) for cgo support (seabolt include some instructions),
-2. Install pkg-config following [these instructions](https://stackoverflow.com/questions/1710922/how-to-install-pkg-config-in-windows?answertab=active#tab-top), make the `bin` folder available in PATH before any MSYS2 PATH entries, 
-3. Clone [seabolt](http://github.com/neo4j-drivers/seabolt) (assume `<seabolt_dir>` to be the absolute path in which the clone resides) and make sure you can build it successfully,
-4. Add/Update environment variable `PKG_CONFIG_PATH` to include `<seabolt_dir>/build/dist` subdirectory of seabolt, i.e. `%PKG_CONFIG_PATH%;<seabolt_dir>/build`
-5. Update environment variable `PATH` to include `<seabolt_dir>/build/dist/bin`
-6. Go Get this package via `go get github.com/neo4j/neo4j-go-driver/neo4j`
+Set `PKG_CONFIG_PATH` to `<seabolt_install_dir>/share/pkgconfig` on Linux/MacOS or to `<seabolt_install_dir>` on Windows.
 
-#### With seabolt binary
+Set `LD_LIBRARY_PATH`/`DYLD_LIBRARY_PATH` to include `<seabolt_install_dir>/lib` on Linux/MacOS respectively. This is not necessary if you will link statically to seabolt or use `RPATH` feature on your platform (see below).
 
-1. Install a mingw toolchain (for instance MSYS2 from https://www.msys2.org/) for cgo support (seabolt include some instructions),
-2. Install pkg-config following [these instructions](https://stackoverflow.com/questions/1710922/how-to-install-pkg-config-in-windows?answertab=active#tab-top), make the `bin` folder available in PATH before any MSYS2 PATH entries, 
-3. Get the most recent binary package matching your platform [here](https://github.com/neo4j-drivers/seabolt/releases) and install it (extract it to a directory with no spaces in its name).
-4. Add/Update environment variable `PKG_CONFIG_PATH` to include `<seabolt_extracted_dir>`, i.e. `%PKG_CONFIG_PATH%;<seabolt_extracted_dir>`
-5. Update environment variable `PATH` to include `<seabolt_extracted_dir>\bin`
-6. Go Get this package via `go get github.com/neo4j/neo4j-go-driver/neo4j`
-
-## Versioning
-
-Although `1.7` branch contains the source code for the latest available release, we are also tagging releases after semantic versioning scheme so that `dep` will find latest release and add the driver as a dependency on your project.
+Add `<seabolt_install_dir>\bin` to `PATH` environment variable on Windows.
 
 ## Getting the Driver
 
-Add the driver as a dependency with `dep`.
+### With `dep`
+
+Add the driver as a dependency with `dep`
 
 ```
 dep ensure -add github.com/neo4j/neo4j-go-driver/neo4j
 ```
+
+### With `go get`
+
+Add the driver with `go get github.com/neo4j/neo4j-go-driver/neo4j`
+
+## Static Linking
+
+We provide `seabolt_static` build tag to support static linking against seabolt and its dependencies. You can just pass `--tags seabolt_static` to your `go` toolset (like `go build --tags seabolt_static`) for your project and the output will not have any runtime dependency to `seabolt` and `openssl`.
+
+## Setting RPATH on Linux/MacOS
+
+Both Linux and MacOS dynamic loader support `RPATH` entries into executables so that they can locate their dependent shared libraries based on those entries. To have a `RUNPATH` entry to be added to your executable, you can pass `-ldflags "-r $(pkg-config --variable=libdir seabolt17)"` to your `go` toolset (like `go build -ldflags "-r $(pkg-config --variable=libdir seabolt17)"`) and it will add an `RPATH` entry to your executable that points to the location where seabolt shared library resides.
 
 ## Minimum Viable Snippet
 
