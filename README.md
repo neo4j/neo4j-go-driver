@@ -30,7 +30,7 @@ Windows doesn't provide `pkg-config`, so have it installed by following [these i
 
 We're now providing _**experimental**_ binaries for `Linux`, `MacOS` and `Windows` [here](https://github.com/neo4j-drivers/seabolt/releases). Please remember that `OpenSSL` is still a requirement for all of these systems. In order to link seabolt statically make sure you have static OpenSSL libraries, too.
 
-Linux packages are being built on `Ubuntu 16.04` system and generated artifacts contain absolute paths to dependent static/dynamic libraries which are only applicable to `Ubuntu` file system layout. _**It may be better to compile seabolt from scratch if you are on a different Linux distribution.**_
+Linux packages are being built on `Ubuntu 16.04` system and generated artifacts contain symbol references/absolute paths to dependent static/dynamic libraries which are only applicable to `Ubuntu 16.04` package versions/file system layout. _**It may be better to compile seabolt from scratch if you are on a different Linux distribution or version.**_
 
 #### Source
 
