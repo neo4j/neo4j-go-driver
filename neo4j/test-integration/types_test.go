@@ -22,6 +22,7 @@ package test_integration
 import (
 	"github.com/neo4j/neo4j-go-driver/neo4j"
 	"github.com/neo4j/neo4j-go-driver/neo4j/test-integration/control"
+	"math/rand"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -252,29 +253,29 @@ var _ = Describe("Types", func() {
 		Expect(result.Err()).To(BeNil())
 	})
 
-	//It("should be able to send and receive large string property", func() {
-	//	var letters = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
-	//
-	//	randSeq := func (n int) string {
-	//		b := make([]rune, n)
-	//		for i := range b {
-	//		b[i] = letters[rand.Intn(len(letters))]
-	//	}
-	//		return string(b)
-	//	}
-	//
-	//	value := randSeq(20 * 1024)
-	//
-	//	result, err = session.Run("CREATE (n {value: $value}) RETURN n.value", &map[string]interface{}{"value": value})
-	//	Expect(err).To(BeNil())
-	//
-	//	if result.Next() {
-	//		Expect(result.Record().GetByIndex(0)).To(BeAssignableToTypeOf(""))
-	//		Expect(result.Record().GetByIndex(0)).To(Equal(value))
-	//	}
-	//	Expect(result.Next()).To(BeFalse())
-	//	Expect(result.Err()).To(BeNil())
-	//})
+	It("should be able to send and receive large string property", func() {
+		var letters = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
+
+		randSeq := func(n int) string {
+			b := make([]rune, n)
+			for i := range b {
+				b[i] = letters[rand.Intn(len(letters))]
+			}
+			return string(b)
+		}
+
+		value := randSeq(20 * 1024)
+
+		result, err = session.Run("CREATE (n {value: $value}) RETURN n.value", map[string]interface{}{"value": value})
+		Expect(err).To(BeNil())
+
+		if result.Next() {
+			Expect(result.Record().GetByIndex(0)).To(BeAssignableToTypeOf(""))
+			Expect(result.Record().GetByIndex(0)).To(Equal(value))
+		}
+		Expect(result.Next()).To(BeFalse())
+		Expect(result.Err()).To(BeNil())
+	})
 
 	It("should be able to receive a node with properties", func() {
 		result, err = session.Run("CREATE (n:Person:Manager {id: 1, name: 'a name'}) RETURN n", nil)
