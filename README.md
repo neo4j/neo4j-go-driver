@@ -46,11 +46,7 @@ Add `<seabolt_install_dir>\bin` to `PATH` environment variable on Windows.
 
 ### With `dep`
 
-Add the driver as a dependency with `dep`
-
-```
-dep ensure -add github.com/neo4j/neo4j-go-driver/neo4j
-```
+Add the driver as a dependency with `dep ensure -add github.com/neo4j/neo4j-go-driver/neo4j`
 
 ### With `go get`
 
