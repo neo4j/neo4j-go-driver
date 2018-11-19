@@ -29,6 +29,7 @@ import (
 
 	. "github.com/neo4j/neo4j-go-driver/neo4j/utils/test"
 	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/ginkgo/extensions/table"
 	. "github.com/onsi/gomega"
 )
 
@@ -259,4 +260,18 @@ var _ = Describe("Spatial Types", func() {
 			testSendAndReceiveList(randomPointList(i, 100))
 		}
 	})
+
+	DescribeTable("should be able to send and receive nil pointer property",
+		func(value interface{}) {
+			result, err = session.Run("CREATE (n {value: $value}) RETURN n.value", map[string]interface{}{"value": value})
+			Expect(err).To(BeNil())
+
+			if result.Next() {
+				Expect(result.Record().GetByIndex(0)).To(BeNil())
+			}
+			Expect(result.Next()).To(BeFalse())
+			Expect(result.Err()).To(BeNil())
+		},
+		Entry("Point", (*neo4j.Point)(nil)),
+	)
 })

@@ -22,10 +22,10 @@ package test_integration
 import (
 	"github.com/neo4j/neo4j-go-driver/neo4j"
 	"github.com/neo4j/neo4j-go-driver/neo4j/test-integration/control"
-	"math/rand"
-
 	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/ginkgo/extensions/table"
 	. "github.com/onsi/gomega"
+	"math/rand"
 )
 
 var _ = Describe("Types", func() {
@@ -399,4 +399,36 @@ var _ = Describe("Types", func() {
 		Expect(result.Err()).To(BeNil())
 	})
 
+	DescribeTable("should be able to send and receive nil pointer property",
+		func(value interface{}) {
+			result, err = session.Run("CREATE (n {value: $value}) RETURN n.value", map[string]interface{}{"value": value})
+			Expect(err).To(BeNil())
+
+			if result.Next() {
+				Expect(result.Record().GetByIndex(0)).To(BeNil())
+			}
+			Expect(result.Next()).To(BeFalse())
+			Expect(result.Err()).To(BeNil())
+		},
+		Entry("boolean", (*bool)(nil)),
+		Entry("byte", (*byte)(nil)),
+		Entry("int8", (*int8)(nil)),
+		Entry("int16", (*int16)(nil)),
+		Entry("int32", (*int32)(nil)),
+		Entry("int64", (*int64)(nil)),
+		Entry("int", (*int)(nil)),
+		Entry("float32", (*float32)(nil)),
+		Entry("float64", (*float64)(nil)),
+		Entry("string", (*string)(nil)),
+		Entry("boolean array", (*[]bool)(nil)),
+		Entry("byte array", (*[]byte)(nil)),
+		Entry("int8 array", (*[]int8)(nil)),
+		Entry("int16 array", (*[]int16)(nil)),
+		Entry("int32 array", (*[]int32)(nil)),
+		Entry("int64 array", (*[]int64)(nil)),
+		Entry("int array", (*[]int)(nil)),
+		Entry("float32 array", (*[]float32)(nil)),
+		Entry("float64 array", (*[]float64)(nil)),
+		Entry("string array", (*[]string)(nil)),
+	)
 })

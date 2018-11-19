@@ -28,6 +28,7 @@ import (
 	"github.com/neo4j/neo4j-go-driver/neo4j/test-integration/control"
 
 	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/ginkgo/extensions/table"
 	. "github.com/onsi/gomega"
 )
 
@@ -497,4 +498,23 @@ var _ = Describe("Temporal Types", func() {
 			testSendAndReceiveValue(list)
 		})
 	})
+
+	DescribeTable("should be able to send and receive nil pointer property",
+		func(value interface{}) {
+			result, err = session.Run("CREATE (n {value: $value}) RETURN n.value", map[string]interface{}{"value": value})
+			Expect(err).To(BeNil())
+
+			if result.Next() {
+				Expect(result.Record().GetByIndex(0)).To(BeNil())
+			}
+			Expect(result.Next()).To(BeFalse())
+			Expect(result.Err()).To(BeNil())
+		},
+		Entry("Duration", (*neo4j.Duration)(nil)),
+		Entry("Date", (*neo4j.Date)(nil)),
+		Entry("LocalTime", (*neo4j.LocalTime)(nil)),
+		Entry("OffsetTime", (*neo4j.OffsetTime)(nil)),
+		Entry("LocalDateTime", (*neo4j.LocalDateTime)(nil)),
+		Entry("DateTime{Offset|Zoned}", (*time.Time)(nil)),
+	)
 })
