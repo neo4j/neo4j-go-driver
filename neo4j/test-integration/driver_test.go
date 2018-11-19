@@ -22,6 +22,7 @@ package test_integration
 import (
 	"github.com/neo4j/neo4j-go-driver/neo4j"
 	"github.com/neo4j/neo4j-go-driver/neo4j/test-integration/control"
+	"math"
 	"time"
 
 	. "github.com/neo4j/neo4j-go-driver/neo4j/utils/test"
@@ -188,7 +189,7 @@ var _ = Describe("Driver", func() {
 			_, err = session3.Run("UNWIND RANGE(1, 100) AS N RETURN N", nil)
 			elapsed := time.Since(start)
 			Expect(err).To(BeConnectorErrorWithCode(0x601))
-			Expect(elapsed / time.Second).To(BeNumerically(">=", 10))
+			Expect(math.Round(float64(elapsed / time.Second))).To(BeNumerically(">=", 10))
 		})
 	})
 })
