@@ -468,7 +468,7 @@ var _ = Describe("Types", func() {
 			It("should fail when sending as tx metadata", func() {
 				tx, err = session.BeginTransaction(neo4j.WithTxMetadata(map[string]interface{}{"m1": unsupportedType{}}))
 				Expect(err).To(BeGenericError(ContainSubstring("unable to convert tx metadata to connector value for begin message")))
-				Expect(result).To(BeNil())
+				Expect(tx).To(BeNil())
 			})
 		})
 
@@ -478,7 +478,7 @@ var _ = Describe("Types", func() {
 			It("should fail when sending as tx metadata", func() {
 				tx, err = session.BeginTransaction(neo4j.WithTxMetadata(map[string]interface{}{"m1": unsupportedType{}}))
 				Expect(err).To(BeGenericError(ContainSubstring("unable to convert tx metadata to connector value for begin message")))
-				Expect(result).To(BeNil())
+				Expect(tx).To(BeNil())
 			})
 		})
 
