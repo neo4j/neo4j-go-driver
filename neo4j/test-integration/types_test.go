@@ -22,10 +22,12 @@ package test_integration
 import (
 	"github.com/neo4j/neo4j-go-driver/neo4j"
 	"github.com/neo4j/neo4j-go-driver/neo4j/test-integration/control"
+	. "github.com/neo4j/neo4j-go-driver/neo4j/utils/test"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/ginkgo/extensions/table"
 	. "github.com/onsi/gomega"
 	"math/rand"
+	"reflect"
 )
 
 var _ = Describe("Types", func() {
@@ -417,6 +419,11 @@ var _ = Describe("Types", func() {
 		Entry("int32", (*int32)(nil)),
 		Entry("int64", (*int64)(nil)),
 		Entry("int", (*int)(nil)),
+		Entry("uint8", (*uint8)(nil)),
+		Entry("uint16", (*uint16)(nil)),
+		Entry("uint32", (*uint32)(nil)),
+		Entry("uint64", (*uint64)(nil)),
+		Entry("uint", (*uint)(nil)),
 		Entry("float32", (*float32)(nil)),
 		Entry("float64", (*float64)(nil)),
 		Entry("string", (*string)(nil)),
@@ -427,8 +434,272 @@ var _ = Describe("Types", func() {
 		Entry("int32 array", (*[]int32)(nil)),
 		Entry("int64 array", (*[]int64)(nil)),
 		Entry("int array", (*[]int)(nil)),
+		Entry("uint8 array", (*[]uint8)(nil)),
+		Entry("uint16 array", (*[]uint16)(nil)),
+		Entry("uint32 array", (*[]uint32)(nil)),
+		Entry("uint64 array", (*[]uint64)(nil)),
+		Entry("uint array", (*[]uint)(nil)),
 		Entry("float32 array", (*[]float32)(nil)),
 		Entry("float64 array", (*[]float64)(nil)),
 		Entry("string array", (*[]string)(nil)),
 	)
+
+	Context("Un-convertible Go types", func() {
+		type unsupportedType struct {
+		}
+
+		Context("Session.Run", func() {
+			It("should fail when sending as parameter", func() {
+				result, err = session.Run("CREATE (n {value: $value}) RETURN n.value", map[string]interface{}{"value": unsupportedType{}})
+				Expect(err).To(BeGenericError(ContainSubstring("unable to convert parameter \"value\" to connector value for run message")))
+				Expect(result).To(BeNil())
+			})
+
+			It("should fail when sending as tx metadata", func() {
+				result, err = session.Run("CREATE (n)", nil, neo4j.WithTxMetadata(map[string]interface{}{"m1": unsupportedType{}}))
+				Expect(err).To(BeGenericError(ContainSubstring("unable to convert tx metadata to connector value for run message")))
+				Expect(result).To(BeNil())
+			})
+		})
+
+		Context("Session.BeginTransaction", func() {
+			var tx neo4j.Transaction
+
+			It("should fail when sending as tx metadata", func() {
+				tx, err = session.BeginTransaction(neo4j.WithTxMetadata(map[string]interface{}{"m1": unsupportedType{}}))
+				Expect(err).To(BeGenericError(ContainSubstring("unable to convert tx metadata to connector value for begin message")))
+				Expect(tx).To(BeNil())
+			})
+		})
+
+		Context("Session.BeginTransaction", func() {
+			var tx neo4j.Transaction
+
+			It("should fail when sending as tx metadata", func() {
+				tx, err = session.BeginTransaction(neo4j.WithTxMetadata(map[string]interface{}{"m1": unsupportedType{}}))
+				Expect(err).To(BeGenericError(ContainSubstring("unable to convert tx metadata to connector value for begin message")))
+				Expect(tx).To(BeNil())
+			})
+		})
+
+		Context("Session.ReadTransaction", func() {
+			It("should fail when sending as tx metadata", func() {
+				result, err := session.ReadTransaction(func(tx neo4j.Transaction) (i interface{}, e error) {
+					return nil, nil
+				}, neo4j.WithTxMetadata(map[string]interface{}{"m1": unsupportedType{}}))
+				Expect(err).To(BeGenericError(ContainSubstring("unable to convert tx metadata to connector value for begin message")))
+				Expect(result).To(BeNil())
+			})
+		})
+
+		Context("Session.WriteTransaction", func() {
+			It("should fail when sending as tx metadata", func() {
+				result, err := session.WriteTransaction(func(tx neo4j.Transaction) (i interface{}, e error) {
+					return nil, nil
+				}, neo4j.WithTxMetadata(map[string]interface{}{"m1": unsupportedType{}}))
+				Expect(err).To(BeGenericError(ContainSubstring("unable to convert tx metadata to connector value for begin message")))
+				Expect(result).To(BeNil())
+			})
+		})
+
+		Context("Transaction.Run", func() {
+			var tx neo4j.Transaction
+
+			It("should fail when sending as tx metadata", func() {
+				tx, err = session.BeginTransaction()
+				Expect(err).To(BeNil())
+				Expect(tx).NotTo(BeNil())
+
+				result, err = tx.Run("CREATE (n)", map[string]interface{}{"unsupported": unsupportedType{}})
+				Expect(err).To(BeGenericError(ContainSubstring("unable to convert parameter \"unsupported\" to connector value for run messag")))
+				Expect(result).To(BeNil())
+			})
+		})
+	})
+
+	Context("Aliased types", func() {
+		type (
+			booleanAlias bool
+			byteAlias byte
+			int8Alias int8
+			int16Alias int16
+			int32Alias int32
+			int64Alias int64
+			intAlias int
+			uint8Alias uint8
+			uint16Alias uint16
+			uint32Alias uint32
+			uint64Alias uint64
+			uintAlias uint
+			float32Alias float32
+			float64Alias float64
+			stringAlias string
+			booleanArrayAlias []bool
+			byteArrayAlias []byte
+			int8ArrayAlias []int8
+			int16ArrayAlias []int16
+			int32ArrayAlias []int32
+			int64ArrayAlias []int64
+			intArrayAlias []int
+			uint8ArrayAlias []uint8
+			uint16ArrayAlias []uint16
+			uint32ArrayAlias []uint32
+			uint64ArrayAlias []uint64
+			uintArrayAlias []uint
+			float32ArrayAlias []float32
+			float64ArrayAlias []float64
+			stringArrayAlias []string
+		)
+
+		var (
+			boolAliasValue    = booleanAlias(true)
+			byteAliasValue    = byteAlias('A')
+			int8AliasValue    = int8Alias(127)
+			int16AliasValue   = int16Alias(-512)
+			int32AliasValue   = int32Alias(-1024)
+			int64AliasValue   = int64Alias(-124798272)
+			intAliasValue     = intAlias(-98937323493)
+			uint8AliasValue   = uint8Alias(127)
+			uint16AliasValue  = uint16Alias(512)
+			uint32AliasValue  = uint32Alias(1024)
+			uint64AliasValue  = uint64Alias(124798272)
+			uintAliasValue    = uintAlias(98937323493)
+			float32AliasValue = float32Alias(12.5863)
+			float64AliasValue = float64Alias(873983.24239)
+			stringAliasValue  = stringAlias("a string with alias type")
+		)
+
+		DescribeTable("should be able to send and receive nil pointers",
+			func(value interface{}) {
+				result, err = session.Run("CREATE (n {value: $value}) RETURN n.value", map[string]interface{}{"value": value})
+				Expect(err).To(BeNil())
+
+				if result.Next() {
+					Expect(result.Record().GetByIndex(0)).To(BeNil())
+				}
+				Expect(result.Next()).To(BeFalse())
+				Expect(result.Err()).To(BeNil())
+			},
+			Entry("boolean", (*booleanAlias)(nil)),
+			Entry("byte", (*byteAlias)(nil)),
+			Entry("int8", (*int8Alias)(nil)),
+			Entry("int16", (*int16Alias)(nil)),
+			Entry("int32", (*int32Alias)(nil)),
+			Entry("int64", (*int64Alias)(nil)),
+			Entry("int", (*intAlias)(nil)),
+			Entry("uint8", (*uint8Alias)(nil)),
+			Entry("uint16", (*uint16Alias)(nil)),
+			Entry("uint32", (*uint32Alias)(nil)),
+			Entry("uint64", (*uint64Alias)(nil)),
+			Entry("uint", (*uintAlias)(nil)),
+			Entry("float32", (*float32Alias)(nil)),
+			Entry("float64", (*float64Alias)(nil)),
+			Entry("string", (*stringAlias)(nil)),
+			Entry("boolean array", (*[]booleanAlias)(nil)),
+			Entry("byte array", (*[]byteAlias)(nil)),
+			Entry("int8 array", (*[]int8Alias)(nil)),
+			Entry("int16 array", (*[]int16Alias)(nil)),
+			Entry("int32 array", (*[]int32Alias)(nil)),
+			Entry("int64 array", (*[]int64Alias)(nil)),
+			Entry("int array", (*[]intAlias)(nil)),
+			Entry("uint8 array", (*[]uint8Alias)(nil)),
+			Entry("uint16 array", (*[]uint16Alias)(nil)),
+			Entry("uint32 array", (*[]uint32Alias)(nil)),
+			Entry("uint64 array", (*[]uint64Alias)(nil)),
+			Entry("uint array", (*[]uintAlias)(nil)),
+			Entry("float32 array", (*[]float32Alias)(nil)),
+			Entry("float64 array", (*[]float64Alias)(nil)),
+			Entry("string array", (*[]stringAlias)(nil)),
+			Entry("boolean array alias", (*booleanArrayAlias)(nil)),
+			Entry("byte array alias", (*byteArrayAlias)(nil)),
+			Entry("int8 array alias", (*int8ArrayAlias)(nil)),
+			Entry("int16 array alias", (*int16ArrayAlias)(nil)),
+			Entry("int32 array alias", (*int32ArrayAlias)(nil)),
+			Entry("int64 array alias", (*int64ArrayAlias)(nil)),
+			Entry("int array alias", (*intArrayAlias)(nil)),
+			Entry("uint8 array alias", (*uint8ArrayAlias)(nil)),
+			Entry("uint16 array alias", (*uint16ArrayAlias)(nil)),
+			Entry("uint32 array alias", (*uint32ArrayAlias)(nil)),
+			Entry("uint64 array alias", (*uint64ArrayAlias)(nil)),
+			Entry("uint array alias", (*uintArrayAlias)(nil)),
+			Entry("float32 array alias", (*float32ArrayAlias)(nil)),
+			Entry("float64 array alias", (*float64ArrayAlias)(nil)),
+			Entry("string array alias", (*stringArrayAlias)(nil)),
+		)
+
+		DescribeTable("should be able to send aliased types",
+			func(value interface{}, expected interface{}) {
+				assertEquals := func(actual interface{}) {
+					actualValue := reflect.ValueOf(actual)
+
+					if actualValue.Kind() == reflect.Slice {
+						expectedItems := make([]interface{}, actualValue.Len())
+
+						for i := 0; i < actualValue.Len(); i++ {
+							expectedItems[i] = actualValue.Index(i).Interface()
+						}
+
+						Expect(actualValue.Interface()).Should(ConsistOf(expectedItems...))
+					} else {
+						Expect(actualValue.Interface()).Should(BeEquivalentTo(expected))
+					}
+				}
+
+				result, err = session.Run("CREATE (n {value1: $value1, value2: $value2}) RETURN n.value1, n.value2", map[string]interface{}{"value1": value, "value2": &value})
+				Expect(err).To(BeNil())
+
+				if result.Next() {
+					assertEquals(result.Record().GetByIndex(0))
+					assertEquals(result.Record().GetByIndex(1))
+				}
+				Expect(result.Next()).To(BeFalse())
+				Expect(result.Err()).To(BeNil())
+			},
+			Entry("boolean", boolAliasValue, bool(boolAliasValue)),
+			Entry("byte", byteAliasValue, byte(byteAliasValue)),
+			Entry("int8", int8AliasValue, int8(int8AliasValue)),
+			Entry("int16", int16AliasValue, int16(int16AliasValue)),
+			Entry("int32", int32AliasValue, int32(int32AliasValue)),
+			Entry("int64", int64AliasValue, int64(int64AliasValue)),
+			Entry("int", intAliasValue, int(intAliasValue)),
+			Entry("uint8", uint8AliasValue, uint8(uint8AliasValue)),
+			Entry("uint16", uint16AliasValue, uint16(uint16AliasValue)),
+			Entry("uint32", uint32AliasValue, uint32(uint32AliasValue)),
+			Entry("uint64", uint64AliasValue, uint64(uint64AliasValue)),
+			Entry("uint", uintAliasValue, uint(uintAliasValue)),
+			Entry("float32", float32AliasValue, float32(float32AliasValue)),
+			Entry("float64", float64AliasValue, float64(float64AliasValue)),
+			Entry("string", stringAliasValue, string(stringAliasValue)),
+			Entry("boolean array", []booleanAlias{true, false}, []bool{true, false}),
+			Entry("byte array", []byteAlias{'A', 'B', 'C'}, []byte{'A', 'B', 'C'}),
+			Entry("int8 array", []int8Alias{-5, -10, 1, 2, 45}, []int8{-5, -10, 1, 2, 45}),
+			Entry("int16 array", []int16Alias{-412, 9, 0, 124}, []int16{-412, 9, 0, 124}),
+			Entry("int32 array", []int32Alias{-138923, 3123, 2120021312}, []int32{-138923, 3123, 2120021312}),
+			Entry("int64 array", []int64Alias{-1322489234, 1239817239821, -1}, []int64{-1322489234, 1239817239821, -1}),
+			Entry("int array", []intAlias{1123213, -23423442, 83282347423}, []int{1123213, -23423442, 83282347423}),
+			Entry("uint8 array", []uint8Alias{0, 4, 128}, []uint8{0, 4, 128}),
+			Entry("uint16 array", []uint16Alias{12, 5534, 21333}, []uint16{12, 5534, 21333}),
+			Entry("uint32 array", []uint32Alias{21323, 12355343, 3545364}, []uint32{21323, 12355343, 3545364}),
+			Entry("uint64 array", []uint64Alias{129389, 123, 0, 24294323}, []uint64{129389, 123, 0, 24294323}),
+			Entry("uint array", []uintAlias{12309312, 120398213}, []uint{12309312, 120398213}),
+			Entry("float32 array", []float32Alias{12.5863, 32424.43534}, []float32{12.5863, 32424.43534}),
+			Entry("float64 array", []float64Alias{873983.24239, 249872384.9723}, []float64{873983.24239, 249872384.9723}),
+			Entry("string array", []stringAlias{"string 1", "string 2"}, []string{"string 1", "string 2"}),
+			Entry("boolean array alias", booleanArrayAlias{true, false}, []bool{true, false}),
+			Entry("byte array alias", byteArrayAlias{'A', 'B', 'C'}, []byte{'A', 'B', 'C'}),
+			Entry("int8 array alias", int8ArrayAlias{-5, -10, 1, 2, 45}, []int8{-5, -10, 1, 2, 45}),
+			Entry("int16 array alias", int16ArrayAlias{-412, 9, 0, 124}, []int16{-412, 9, 0, 124}),
+			Entry("int32 array alias", int32ArrayAlias{-138923, 3123, 2120021312}, []int32{-138923, 3123, 2120021312}),
+			Entry("int64 array alias", int64ArrayAlias{-1322489234, 1239817239821, -1}, []int64{-1322489234, 1239817239821, -1}),
+			Entry("int array alias", intArrayAlias{1123213, -23423442, 83282347423}, []int{1123213, -23423442, 83282347423}),
+			Entry("uint8 array alias", uint8ArrayAlias{0, 4, 128}, []uint8{0, 4, 128}),
+			Entry("uint16 array alias", uint16ArrayAlias{12, 5534, 21333}, []uint16{12, 5534, 21333}),
+			Entry("uint32 array alias", uint32ArrayAlias{21323, 12355343, 3545364}, []uint32{21323, 12355343, 3545364}),
+			Entry("uint64 array alias", uint64ArrayAlias{129389, 123, 0, 24294323}, []uint64{129389, 123, 0, 24294323}),
+			Entry("uint array alias", uintArrayAlias{12309312, 120398213}, []uint{12309312, 120398213}),
+			Entry("float32 array alias", float32ArrayAlias{12.5863, 32424.43534}, []float32{12.5863, 32424.43534}),
+			Entry("float64 array alias", float64ArrayAlias{873983.24239, 249872384.9723}, []float64{873983.24239, 249872384.9723}),
+			Entry("string array alias", stringArrayAlias{"string 1", "string 2"}, []string{"string 1", "string 2"}),
+		)
+	})
 })
