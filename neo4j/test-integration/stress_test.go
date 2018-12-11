@@ -45,8 +45,8 @@ var _ = Describe("Stress Test", func() {
 			waiter.Add(1)
 
 			go func() {
-				defer GinkgoRecover()
 				defer waiter.Done()
+				defer GinkgoRecover()
 
 				var executor func(*stress.TestContext)
 				for !ctx.ShouldStop() {

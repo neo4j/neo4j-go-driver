@@ -97,7 +97,7 @@ func ensureRunner(session *neoSession, mode AccessMode, autoClose bool) error {
 // updates bookmark before actual closure
 func closeRunner(session *neoSession) error {
 	if session.runner != nil {
-		err := session.runner.closeConnection()
+		err := session.runner.receiveAllAndClose()
 
 		session.lastBookmark = session.runner.lastSeenBookmark()
 

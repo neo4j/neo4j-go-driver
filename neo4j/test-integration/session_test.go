@@ -21,10 +21,11 @@ package test_integration
 
 import (
 	"fmt"
-	"github.com/neo4j/neo4j-go-driver/neo4j"
-	"github.com/neo4j/neo4j-go-driver/neo4j/test-integration/control"
 	"reflect"
 	"time"
+
+	"github.com/neo4j/neo4j-go-driver/neo4j"
+	"github.com/neo4j/neo4j-go-driver/neo4j/test-integration/control"
 
 	. "github.com/neo4j/neo4j-go-driver/neo4j/utils/test"
 	. "github.com/onsi/ginkgo"
@@ -297,6 +298,120 @@ var _ = Describe("Session", func() {
 
 			Expect(result1Values).To(BeEquivalentTo([]int{1, 2, 3, 4, 5, 6, 7, 8, 9, 10}))
 			Expect(result2Values).To(BeEquivalentTo([]int{11, 12, 13, 14, 15, 16, 17, 18, 19, 20}))
+		})
+
+		Specify("when session is closed, pending query should be executed", func() {
+			var result neo4j.Result
+			var err error
+
+			innerExecutor := func() error {
+				if session, err = driver.Session(neo4j.AccessModeRead); err != nil {
+					return err
+				}
+				defer session.Close()
+
+				if result, err = session.Run("UNWIND RANGE(1,100) AS N RETURN N", nil); err != nil {
+					return err
+				}
+
+				return nil
+			}
+
+			Expect(innerExecutor()).To(Succeed())
+
+			records, _ := neo4j.Collect(result, nil)
+			Expect(records).NotTo(BeNil())
+			Expect(records).To(HaveLen(100))
+			Expect(records[0].GetByIndex(0)).To(BeEquivalentTo(1))
+			Expect(records[99].GetByIndex(0)).To(BeEquivalentTo(100))
+		})
+
+		Specify("when session is closed, pending queries should be executed", func() {
+			var result1, result2 neo4j.Result
+			var err error
+
+			innerExecutor := func() error {
+				if session, err = driver.Session(neo4j.AccessModeRead); err != nil {
+					return err
+				}
+				defer session.Close()
+
+				if result1, err = session.Run("UNWIND RANGE(1,100) AS N RETURN N", nil); err != nil {
+					return err
+				}
+
+				if result2, err = session.Run("UNWIND RANGE(1,100) AS N RETURN 'Text ' + N", nil); err != nil {
+					return err
+				}
+
+				return nil
+			}
+
+			Expect(innerExecutor()).To(Succeed())
+
+			records1, _ := neo4j.Collect(result1, nil)
+			Expect(records1).NotTo(BeNil())
+			Expect(records1).To(HaveLen(100))
+			Expect(records1[0].GetByIndex(0)).To(BeEquivalentTo(1))
+			Expect(records1[99].GetByIndex(0)).To(BeEquivalentTo(100))
+
+			records2, _ := neo4j.Collect(result2, nil)
+			Expect(records2).NotTo(BeNil())
+			Expect(records2).To(HaveLen(100))
+			Expect(records2[0].GetByIndex(0)).Should(Equal("Text 1"))
+			Expect(records2[99].GetByIndex(0)).Should(Equal("Text 100"))
+		})
+
+		Specify("when session is closed, pending explicit transaction should be rolled-back", func() {
+			var result1, result2 neo4j.Result
+			var err error
+
+			innerExecutor := func() error {
+				var tx neo4j.Transaction
+
+				if session, err = driver.Session(neo4j.AccessModeWrite); err != nil {
+					return err
+				}
+				defer session.Close()
+
+				if tx, err = session.BeginTransaction(); err != nil {
+					return err
+				}
+
+				if result1, err = tx.Run("UNWIND RANGE(1,100) AS N CREATE (n:TxRollbackOnClose { id: N, text: 'Text '+N }) RETURN N", nil); err != nil {
+					return err
+				}
+
+				if result2, err = tx.Run("MATCH (n:TxRollbackOnClose) RETURN n.id, n.text ORDER BY n.id", nil); err != nil {
+					return err
+				}
+
+				return nil
+			}
+
+			Expect(innerExecutor()).To(Succeed())
+
+			records1, _ := neo4j.Collect(result1, nil)
+			Expect(records1).NotTo(BeNil())
+			Expect(records1).To(HaveLen(100))
+			Expect(records1[0].GetByIndex(0)).To(BeEquivalentTo(1))
+			Expect(records1[99].GetByIndex(0)).To(BeEquivalentTo(100))
+
+			records2, _ := neo4j.Collect(result2, nil)
+			Expect(records2).NotTo(BeNil())
+			Expect(records2).To(HaveLen(100))
+			Expect(records2[0].GetByIndex(0)).To(BeEquivalentTo(1))
+			Expect(records2[0].GetByIndex(1)).Should(Equal("Text 1"))
+			Expect(records2[99].GetByIndex(0)).To(BeEquivalentTo(100))
+			Expect(records2[99].GetByIndex(1)).Should(Equal("Text 100"))
+
+			newSession, err := driver.Session(neo4j.AccessModeRead)
+			Expect(err).To(BeNil())
+			Expect(newSession).NotTo(BeNil())
+			defer newSession.Close()
+
+			records3, _ := neo4j.Collect(newSession.Run("MATCH (n:TxRollbackOnClose) RETURN n.id, n.text", nil))
+			Expect(records3).To(HaveLen(0))
 		})
 	})
 
