@@ -142,7 +142,7 @@ The mapping between Cypher types and the types used by this driver (to represent
 
 | Cypher Type | Driver Type
 | ---: | :--- |
-| *null* | null |
+| *null* | nil |
 | List | []interface{} |
 | Map  | map[string]interface{} |
 | Boolean| bool |
