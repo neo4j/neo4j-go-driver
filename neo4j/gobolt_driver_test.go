@@ -20,11 +20,12 @@
 package neo4j
 
 import (
+	"net/url"
+
 	. "github.com/neo4j/neo4j-go-driver/neo4j/utils/test"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/ginkgo/extensions/table"
 	. "github.com/onsi/gomega"
-	"net/url"
 
 	"github.com/neo4j-drivers/gobolt"
 )
@@ -45,7 +46,7 @@ var _ = Describe("Driver", func() {
 				}
 
 				driver, err := newGoboltDriver(driverUrl, token, nil)
-				Expect(err).To(BeGenericError(ContainSubstring("unable to convert authentication token to connector value")))
+				Expect(err).To(BeGenericError(ContainSubstring("unable to convert authentication token:")))
 				Expect(driver).To(BeNil())
 			})
 		})

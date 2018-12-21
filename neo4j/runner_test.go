@@ -38,8 +38,8 @@ func TestRunner(t *testing.T) {
 		driver := newGoboltWithConnector("bolt://localhost", connector)
 		runner := newRunner(driver, mode, autoClose)
 
-		connection.EXPECT().RemoteAddress().Return("localhost:7687").AnyTimes()
-		connection.EXPECT().Server().Return("neo4j/3.5.0").AnyTimes()
+		connection.EXPECT().RemoteAddress().Return("localhost:7687", nil).AnyTimes()
+		connection.EXPECT().Server().Return("neo4j/3.5.0", nil).AnyTimes()
 
 		return ctrl, connection, runner
 	}
@@ -140,7 +140,7 @@ func TestRunner(t *testing.T) {
 		_ = runner.ensureConnection()
 
 		gomock.InOrder(
-			connection.EXPECT().LastBookmark().Return("a bookmark"),
+			connection.EXPECT().LastBookmark().Return("a bookmark", nil),
 			connection.EXPECT().Close(),
 		)
 
@@ -157,8 +157,9 @@ func TestRunner(t *testing.T) {
 		ctrl, _, runner := createMocks(t)
 		defer ctrl.Finish()
 
-		bookmark := runner.lastSeenBookmark()
+		bookmark, err := runner.lastSeenBookmark()
 
+		assert.NoError(t, err)
 		assert.Empty(t, bookmark)
 	})
 
@@ -168,8 +169,9 @@ func TestRunner(t *testing.T) {
 
 		runner.lastBookmark = "a bookmark"
 
-		bookmark := runner.lastSeenBookmark()
+		bookmark, err := runner.lastSeenBookmark()
 
+		assert.NoError(t, err)
 		assert.Equal(t, bookmark, "a bookmark")
 	})
 
@@ -180,10 +182,11 @@ func TestRunner(t *testing.T) {
 		_ = runner.ensureConnection()
 
 		runner.lastBookmark = "a bookmark 1"
-		connection.EXPECT().LastBookmark().Return("a bookmark 2")
+		connection.EXPECT().LastBookmark().Return("a bookmark 2", nil)
 
-		bookmark := runner.lastSeenBookmark()
+		bookmark, err := runner.lastSeenBookmark()
 
+		assert.NoError(t, err)
 		assert.Equal(t, bookmark, "a bookmark 2")
 	})
 

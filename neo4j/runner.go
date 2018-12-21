@@ -51,12 +51,45 @@ func newRunner(driver *goboltDriver, accessMode AccessMode, autoClose bool) *sta
 	}
 }
 
-func (runner *statementRunner) lastSeenBookmark() string {
+func (runner *statementRunner) lastSeenBookmark() (string, error) {
 	if runner.connection != nil {
-		return runner.connection.LastBookmark()
+		var err error
+		var bookmark string
+
+		if bookmark, err = runner.connection.LastBookmark(); err != nil {
+			runner.driver.config.Log.Errorf("LastBookmark call on connection failed: %v", err)
+		}
+
+		return bookmark, err
 	}
 
-	return runner.lastBookmark
+	return runner.lastBookmark, nil
+}
+
+func (runner *statementRunner) remoteAddress() string {
+	var remoteAddress = "unknown"
+	var err error
+
+	if runner.connection != nil {
+		if remoteAddress, err = runner.connection.RemoteAddress(); err != nil {
+			runner.driver.config.Log.Errorf("RemoteAddress call on connection failed: %v", err)
+			remoteAddress = "unknown[failed to get remote address]"
+		}
+	}
+	return remoteAddress
+}
+
+func (runner *statementRunner) version() string {
+	var version = "unknown"
+	var err error
+
+	if runner.connection != nil {
+		if version, err = runner.connection.Server(); err != nil {
+			runner.driver.config.Log.Errorf("Server call on connection failed: %v", err)
+			version = "unknown[failed to get version text]"
+		}
+	}
+	return version
 }
 
 func (runner *statementRunner) assertConnection() error {
@@ -119,11 +152,20 @@ func (runner *statementRunner) close() error {
 
 func closeHandler(runner *statementRunner) error {
 	if runner.connection != nil {
-		runner.lastBookmark = runner.connection.LastBookmark()
+		var bookmark string
+		var err error
 
-		err := runner.connection.Close()
+		if bookmark, err = runner.connection.LastBookmark(); err != nil {
+			runner.driver.config.Log.Errorf("LastBookmark call on connection failed: %v", err)
+		} else {
+			runner.lastBookmark = bookmark
+		}
+
+		if err = runner.connection.Close(); err != nil {
+			return err
+		}
+
 		runner.connection = nil
-		return err
 	}
 
 	return nil
@@ -233,12 +275,7 @@ func transformError(runner *statementRunner, err error) error {
 			return newDriverError("write queries cannot be performed in read access mode")
 		}
 
-		var remoteAddress = "unknown"
-		if runner.connection != nil {
-			remoteAddress = runner.connection.RemoteAddress()
-		}
-
-		return newSessionExpiredError("server at %s no longer accepts writes", remoteAddress)
+		return newSessionExpiredError("server at %s no longer accepts writes", runner.remoteAddress())
 	}
 
 	return err
@@ -323,8 +360,8 @@ func (runner *statementRunner) runStatement(statement *neoStatement, bookmarks [
 		summary: &neoResultSummary{
 			statement: statement,
 			server: &neoServerInfo{
-				address: runner.connection.RemoteAddress(),
-				version: runner.connection.Server(),
+				address: runner.remoteAddress(),
+				version: runner.version(),
 			},
 			counters: &neoCounters{},
 		},
