@@ -97,9 +97,14 @@ func ensureRunner(session *neoSession, mode AccessMode, autoClose bool) error {
 // updates bookmark before actual closure
 func closeRunner(session *neoSession) error {
 	if session.runner != nil {
-		err := session.runner.receiveAllAndClose()
+		var err error
+		var bookmark string
 
-		session.lastBookmark = session.runner.lastSeenBookmark()
+		err = session.runner.receiveAllAndClose()
+
+		if bookmark, err = session.runner.lastSeenBookmark(); err == nil {
+			session.lastBookmark = bookmark
+		}
 
 		session.runner = nil
 		return err
@@ -110,7 +115,12 @@ func closeRunner(session *neoSession) error {
 
 func (session *neoSession) LastBookmark() string {
 	if session.runner != nil {
-		return session.runner.lastSeenBookmark()
+		var err error
+		var bookmark string
+
+		if bookmark, err = session.runner.lastSeenBookmark(); err == nil {
+			return bookmark
+		}
 	}
 
 	return session.lastBookmark

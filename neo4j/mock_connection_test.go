@@ -56,10 +56,11 @@ func (m *MockConnection) EXPECT() *MockConnectionMockRecorder {
 }
 
 // Id connector-mocks base method
-func (m *MockConnection) Id() string {
+func (m *MockConnection) Id() (string, error) {
 	ret := m.ctrl.Call(m, "Id")
 	ret0, _ := ret[0].(string)
-	return ret0
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
 }
 
 // Id indicates an expected call of Id
@@ -68,10 +69,11 @@ func (mr *MockConnectionMockRecorder) Id() *gomock.Call {
 }
 
 // RemoteAddress connector-mocks base method
-func (m *MockConnection) RemoteAddress() string {
+func (m *MockConnection) RemoteAddress() (string, error) {
 	ret := m.ctrl.Call(m, "RemoteAddress")
 	ret0, _ := ret[0].(string)
-	return ret0
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
 }
 
 // RemoteAddress indicates an expected call of RemoteAddress
@@ -80,10 +82,11 @@ func (mr *MockConnectionMockRecorder) RemoteAddress() *gomock.Call {
 }
 
 // Server connector-mocks base method
-func (m *MockConnection) Server() string {
+func (m *MockConnection) Server() (string, error) {
 	ret := m.ctrl.Call(m, "Server")
 	ret0, _ := ret[0].(string)
-	return ret0
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
 }
 
 // Server indicates an expected call of Server
@@ -194,10 +197,11 @@ func (mr *MockConnectionMockRecorder) Flush() *gomock.Call {
 }
 
 // LastBookmark connector-mocks base method
-func (m *MockConnection) LastBookmark() string {
+func (m *MockConnection) LastBookmark() (string, error) {
 	ret := m.ctrl.Call(m, "LastBookmark")
 	ret0, _ := ret[0].(string)
-	return ret0
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
 }
 
 // LastBookmark indicates an expected call of LastBookmark
