@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2018 "Neo4j,"
+ * Copyright (c) 2002-2019 "Neo4j,"
  * Neo4j Sweden AB [http://neo4j.com]
  *
  * This file is part of Neo4j.
@@ -25,13 +25,13 @@ import "fmt"
 // be used in tests
 type MemoryLogging struct {
 	// Errors contains all log messages written at Error level
-	Errors   []string
+	Errors []string
 	// Warnings contains all log messages written at Warning level
 	Warnings []string
 	// Infos contains all log messages written at Info level
-	Infos    []string
+	Infos []string
 	// Debugs contains all log messages written at Debug level
-	Debugs   []string
+	Debugs []string
 }
 
 // ErrorEnabled returns whether Error level is enabled

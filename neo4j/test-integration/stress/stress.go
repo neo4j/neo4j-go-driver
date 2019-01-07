@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2018 "Neo4j,"
+ * Copyright (c) 2002-2019 "Neo4j,"
  * Neo4j Sweden AB [http://neo4j.com]
  *
  * This file is part of Neo4j.
@@ -21,12 +21,13 @@ package stress
 
 import (
 	"fmt"
-	"github.com/neo4j/neo4j-go-driver/neo4j"
-	. "github.com/neo4j/neo4j-go-driver/neo4j/utils/test"
-	. "github.com/onsi/gomega"
 	"strings"
 	"sync"
 	"sync/atomic"
+
+	"github.com/neo4j/neo4j-go-driver/neo4j"
+	. "github.com/neo4j/neo4j-go-driver/neo4j/utils/test"
+	. "github.com/onsi/gomega"
 )
 
 // TestContext provides state data shared across tests
