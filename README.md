@@ -56,6 +56,8 @@ Add the driver with `go get github.com/neo4j/neo4j-go-driver/neo4j`
 
 We provide `seabolt_static` build tag to support static linking against seabolt and its dependencies. You can just pass `--tags seabolt_static` to your `go` toolset (like `go build --tags seabolt_static`) for your project and the output will not have any runtime dependency to `seabolt` and `openssl`.
 
+_**Static linking is currently not supported on Windows.**_
+
 ## Setting RPATH on Linux/MacOS
 
 Both Linux and MacOS dynamic loader support `RPATH` entries into executables so that they can locate their dependent shared libraries based on those entries. To have a `RUNPATH` entry to be added to your executable, you can pass `-ldflags "-r $(pkg-config --variable=libdir seabolt17)"` to your `go` toolset (like `go build -ldflags "-r $(pkg-config --variable=libdir seabolt17)"`) and it will add an `RPATH` entry to your executable that points to the location where seabolt shared library resides.
