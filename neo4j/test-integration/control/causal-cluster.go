@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2018 "Neo4j,"
+ * Copyright (c) 2002-2019 "Neo4j,"
  * Neo4j Sweden AB [http://neo4j.com]
  *
  * This file is part of Neo4j.
@@ -22,12 +22,13 @@ package control
 import (
 	"bufio"
 	"fmt"
-	"github.com/pkg/errors"
 	"math/rand"
 	"net/url"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/pkg/errors"
 
 	"github.com/neo4j/neo4j-go-driver/neo4j"
 )

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2018 "Neo4j,"
+ * Copyright (c) 2002-2019 "Neo4j,"
  * Neo4j Sweden AB [http://neo4j.com]
  *
  * This file is part of Neo4j.
@@ -38,7 +38,7 @@ type neoResult struct {
 	resultCompleted bool
 }
 
-func (result *neoResult) collectMetadata(metadata map[string]interface{}) {
+var collectMetadata = func(result *neoResult, metadata map[string]interface{}) {
 	if metadata != nil {
 		if resultAvailabilityTimer, ok := metadata["result_available_after"]; ok {
 			result.summary.resultAvailableAfter = time.Duration(resultAvailabilityTimer.(int64)) / time.Millisecond
@@ -97,7 +97,7 @@ func (result *neoResult) collectMetadata(metadata map[string]interface{}) {
 	}
 }
 
-func (result *neoResult) collectRecord(fields []interface{}) {
+var collectRecord = func(result *neoResult, fields []interface{}) {
 	if fields != nil {
 		result.records = append(result.records, &neoRecord{keys: result.keys, values: fields})
 	}

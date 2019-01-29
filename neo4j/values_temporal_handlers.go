@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2018 "Neo4j,"
+ * Copyright (c) 2002-2019 "Neo4j,"
  * Neo4j Sweden AB [http://neo4j.com]
  *
  * This file is part of Neo4j.
@@ -28,18 +28,18 @@ import (
 
 const (
 	dateSignature               int16 = 'D'
-	dateSize                         = 1
+	dateSize                          = 1
 	localTimeSignature          int16 = 't'
-	localTimeSize                    = 1
+	localTimeSize                     = 1
 	offsetTimeSignature         int16 = 'T'
-	offsetTimeSize                   = 2
+	offsetTimeSize                    = 2
 	durationSignature           int16 = 'E'
-	durationSize                     = 4
+	durationSize                      = 4
 	localDateTimeSignature      int16 = 'd'
-	localDateTimeSize           int  = 2
+	localDateTimeSize           int   = 2
 	dateTimeWithOffsetSignature int16 = 'F'
 	dateTimeWithZoneIdSignature int16 = 'f'
-	dateTimeSize                int  = 3
+	dateTimeSize                int   = 3
 )
 
 type dateTimeValueHandler struct {

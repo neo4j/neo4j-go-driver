@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2018 "Neo4j,"
+ * Copyright (c) 2002-2019 "Neo4j,"
  * Neo4j Sweden AB [http://neo4j.com]
  *
  * This file is part of Neo4j.
@@ -20,12 +20,13 @@
 package test_stub
 
 import (
+	"path"
+	"time"
+
 	"github.com/neo4j/neo4j-go-driver/neo4j"
 	"github.com/neo4j/neo4j-go-driver/neo4j/test-stub/control"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-	"path"
-	"time"
 )
 
 var _ = Describe("Transaction", func() {

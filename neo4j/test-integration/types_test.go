@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2018 "Neo4j,"
+ * Copyright (c) 2002-2019 "Neo4j,"
  * Neo4j Sweden AB [http://neo4j.com]
  *
  * This file is part of Neo4j.
@@ -20,14 +20,15 @@
 package test_integration
 
 import (
+	"math/rand"
+	"reflect"
+
 	"github.com/neo4j/neo4j-go-driver/neo4j"
 	"github.com/neo4j/neo4j-go-driver/neo4j/test-integration/control"
 	. "github.com/neo4j/neo4j-go-driver/neo4j/utils/test"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/ginkgo/extensions/table"
 	. "github.com/onsi/gomega"
-	"math/rand"
-	"reflect"
 )
 
 var _ = Describe("Types", func() {
@@ -519,36 +520,36 @@ var _ = Describe("Types", func() {
 
 	Context("Aliased types", func() {
 		type (
-			booleanAlias bool
-			byteAlias byte
-			int8Alias int8
-			int16Alias int16
-			int32Alias int32
-			int64Alias int64
-			intAlias int
-			uint8Alias uint8
-			uint16Alias uint16
-			uint32Alias uint32
-			uint64Alias uint64
-			uintAlias uint
-			float32Alias float32
-			float64Alias float64
-			stringAlias string
+			booleanAlias      bool
+			byteAlias         byte
+			int8Alias         int8
+			int16Alias        int16
+			int32Alias        int32
+			int64Alias        int64
+			intAlias          int
+			uint8Alias        uint8
+			uint16Alias       uint16
+			uint32Alias       uint32
+			uint64Alias       uint64
+			uintAlias         uint
+			float32Alias      float32
+			float64Alias      float64
+			stringAlias       string
 			booleanArrayAlias []bool
-			byteArrayAlias []byte
-			int8ArrayAlias []int8
-			int16ArrayAlias []int16
-			int32ArrayAlias []int32
-			int64ArrayAlias []int64
-			intArrayAlias []int
-			uint8ArrayAlias []uint8
-			uint16ArrayAlias []uint16
-			uint32ArrayAlias []uint32
-			uint64ArrayAlias []uint64
-			uintArrayAlias []uint
+			byteArrayAlias    []byte
+			int8ArrayAlias    []int8
+			int16ArrayAlias   []int16
+			int32ArrayAlias   []int32
+			int64ArrayAlias   []int64
+			intArrayAlias     []int
+			uint8ArrayAlias   []uint8
+			uint16ArrayAlias  []uint16
+			uint32ArrayAlias  []uint32
+			uint64ArrayAlias  []uint64
+			uintArrayAlias    []uint
 			float32ArrayAlias []float32
 			float64ArrayAlias []float64
-			stringArrayAlias []string
+			stringArrayAlias  []string
 		)
 
 		var (

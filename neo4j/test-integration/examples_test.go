@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2018 "Neo4j,"
+ * Copyright (c) 2002-2019 "Neo4j,"
  * Neo4j Sweden AB [http://neo4j.com]
  *
  * This file is part of Neo4j.
@@ -21,11 +21,12 @@ package test_integration
 
 import (
 	"fmt"
+	"time"
+
 	"github.com/neo4j/neo4j-go-driver/neo4j"
 	"github.com/neo4j/neo4j-go-driver/neo4j/test-integration/control"
 	"github.com/neo4j/neo4j-go-driver/neo4j/utils/test"
 	"github.com/pkg/errors"
-	"time"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -580,39 +581,34 @@ func addPersonInTxFunc(driver neo4j.Driver, name string) error {
 // end::transaction-function[]
 
 // tag::pass-bookmarks[]
-func createTxFunc(query string, params map[string]interface{}) neo4j.TransactionWork {
+func addCompanyTxFunc(name string) neo4j.TransactionWork {
 	return func(tx neo4j.Transaction) (interface{}, error) {
-		var err error
-		var result neo4j.Result
-
-		if result, err = tx.Run(query, params); err != nil {
-			return nil, err
-		}
-
-		return result.Consume()
+		return tx.Run("CREATE (a:Company {name: $name})", map[string]interface{}{"name": name})
 	}
 }
 
-func addCompanyTxFunc(name string) neo4j.TransactionWork {
-	return createTxFunc("CREATE (a:Company {name: $name})", map[string]interface{}{"name": name})
-}
-
 func addPersonTxFunc(name string) neo4j.TransactionWork {
-	return createTxFunc("CREATE (a:Person {name: $name})", map[string]interface{}{"name": name})
+	return func(tx neo4j.Transaction) (interface{}, error) {
+		return tx.Run("CREATE (a:Person {name: $name})", map[string]interface{}{"name": name})
+	}
 }
 
 func employTxFunc(person string, company string) neo4j.TransactionWork {
-	return createTxFunc(
-		"MATCH (person:Person {name: $personName}) "+
-			"MATCH (company:Company {name: $companyName}) "+
-			"CREATE (person)-[:WORKS_FOR]->(company)", map[string]interface{}{"personName": person, "companyName": company})
+	return func(tx neo4j.Transaction) (interface{}, error) {
+		return tx.Run(
+			"MATCH (person:Person {name: $personName}) "+
+				"MATCH (company:Company {name: $companyName}) "+
+				"CREATE (person)-[:WORKS_FOR]->(company)", map[string]interface{}{"personName": person, "companyName": company})
+	}
 }
 
 func makeFriendTxFunc(person1 string, person2 string) neo4j.TransactionWork {
-	return createTxFunc(
-		"MATCH (a:Person {name: $name1}) "+
-			"MATCH (b:Person {name: $name2}) "+
-			"MERGE (a)-[:KNOWS]->(b)", map[string]interface{}{"name1": person1, "name2": person2})
+	return func(tx neo4j.Transaction) (interface{}, error) {
+		return tx.Run(
+			"MATCH (a:Person {name: $name1}) "+
+				"MATCH (b:Person {name: $name2}) "+
+				"MERGE (a)-[:KNOWS]->(b)", map[string]interface{}{"name1": person1, "name2": person2})
+	}
 }
 
 func printFriendsTxFunc() neo4j.TransactionWork {
@@ -658,7 +654,7 @@ func makeFriend(driver neo4j.Driver, person1 string, person2 string, bookmarks .
 	var err error
 	var session neo4j.Session
 
-	if session, err = driver.Session(neo4j.AccessModeWrite); err != nil {
+	if session, err = driver.Session(neo4j.AccessModeWrite, bookmarks...); err != nil {
 		return "", err
 	}
 	defer session.Close()
@@ -761,7 +757,7 @@ func getPeople(driver neo4j.Driver) ([]string, error) {
 	var err error
 	var session neo4j.Session
 
-	if session, err = driver.Session(neo4j.AccessModeWrite); err != nil {
+	if session, err = driver.Session(neo4j.AccessModeRead); err != nil {
 		return nil, err
 	}
 	defer session.Close()

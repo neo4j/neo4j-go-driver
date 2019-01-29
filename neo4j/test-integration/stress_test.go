@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2018 "Neo4j,"
+ * Copyright (c) 2002-2019 "Neo4j,"
  * Neo4j Sweden AB [http://neo4j.com]
  *
  * This file is part of Neo4j.
@@ -20,12 +20,13 @@
 package test_integration
 
 import (
-	"github.com/neo4j/neo4j-go-driver/neo4j"
-	"github.com/neo4j/neo4j-go-driver/neo4j/test-integration/control"
-	"github.com/neo4j/neo4j-go-driver/neo4j/test-integration/stress"
 	"math/rand"
 	"sync"
 	"time"
+
+	"github.com/neo4j/neo4j-go-driver/neo4j"
+	"github.com/neo4j/neo4j-go-driver/neo4j/test-integration/control"
+	"github.com/neo4j/neo4j-go-driver/neo4j/test-integration/stress"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -45,8 +46,8 @@ var _ = Describe("Stress Test", func() {
 			waiter.Add(1)
 
 			go func() {
-				defer GinkgoRecover()
 				defer waiter.Done()
+				defer GinkgoRecover()
 
 				var executor func(*stress.TestContext)
 				for !ctx.ShouldStop() {
