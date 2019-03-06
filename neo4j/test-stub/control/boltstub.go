@@ -27,9 +27,8 @@ import (
 	"path"
 	"runtime"
 	"sync/atomic"
+	"testing"
 	"time"
-
-	. "github.com/onsi/ginkgo"
 )
 
 // StubServer represents a running instance of a scripted bolt stub server
@@ -69,7 +68,7 @@ func (server *StubServer) exitError() string {
 }
 
 // NewStubServer launches the stub server on the given port with the given script
-func NewStubServer(port int, script string) *StubServer {
+func NewStubServer(t *testing.T, port int, script string) *StubServer {
 	var testScriptsDir = os.TempDir()
 
 	if _, file, _, ok := runtime.Caller(1); ok {
@@ -77,12 +76,12 @@ func NewStubServer(port int, script string) *StubServer {
 	}
 
 	if len(testScriptsDir) == 0 {
-		Fail("unable to locate bolt stub script folder")
+		t.Fatalf("unable to locate bolt stub script folder")
 	}
 
 	testScriptFile := path.Join(testScriptsDir, script)
 	if _, err := os.Stat(testScriptFile); os.IsNotExist(err) {
-		Fail(fmt.Sprintf("unable to locate bolt stub script file at '%s'", testScriptFile))
+		t.Fatalf("unable to locate bolt stub script file at '%s'", testScriptFile)
 	}
 
 	cmd := exec.Command("boltstub", fmt.Sprint(port), testScriptFile)
@@ -132,17 +131,17 @@ func NewStubServer(port int, script string) *StubServer {
 	}
 
 	if server.exited() && server.exitError() != "" {
-		Fail(server.exitError())
+		t.Fatalf(server.exitError())
 	}
 
-	Fail(fmt.Sprintf("unable to open a connection to boltstub server at [:%d]", server.port))
+	t.Fatalf("unable to open a connection to boltstub server at [:%d]", server.port)
 
 	return nil
 }
 
 // Finished expects the stub server to already be exited returns whether it was exited
 // with success code. If the process did not exit as expected, it returns false (or fails the test)
-func (server *StubServer) Finished() bool {
+func (server *StubServer) Finished(t *testing.T) bool {
 	// Close our initial connection to make the stub server exit
 	if server.conn != nil {
 		server.conn.Close()
@@ -167,7 +166,7 @@ func (server *StubServer) Finished() bool {
 
 	// Check if an error occurred
 	if server.exitError() != "" {
-		Fail(server.exitError())
+		t.Fatalf(server.exitError())
 	}
 
 	return true

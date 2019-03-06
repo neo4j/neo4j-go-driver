@@ -28,9 +28,9 @@ Windows doesn't provide `pkg-config`, so have it installed by following [these i
 
 #### Binaries
 
-We're now providing _**experimental**_ binaries for `Linux`, `MacOS` and `Windows` [here](https://github.com/neo4j-drivers/seabolt/releases). Please remember that `OpenSSL` is still a requirement for all of these systems. In order to link seabolt statically make sure you have static OpenSSL libraries, too.
+We're now providing _**experimental**_ binaries for `Linux`, `MacOS` and `Windows` [here](https://github.com/neo4j-drivers/seabolt/releases). Please remember that `OpenSSL` is still a requirement for all of these systems. 
 
-Linux packages are being built on `Ubuntu 16.04` system and generated artifacts contain symbol references/absolute paths to dependent static/dynamic libraries which are only applicable to `Ubuntu 16.04` package versions/file system layout. _**It may be better to compile seabolt from scratch if you are on a different Linux distribution or version.**_
+Static linking against seabolt is only supported on **_Linux_** and **_MacOS_** at this time, and in order to get it working make sure you have static OpenSSL libraries, too.
 
 #### Source
 
@@ -55,6 +55,8 @@ Add the driver with `go get github.com/neo4j/neo4j-go-driver/neo4j`
 ## Static Linking
 
 We provide `seabolt_static` build tag to support static linking against seabolt and its dependencies. You can just pass `--tags seabolt_static` to your `go` toolset (like `go build --tags seabolt_static`) for your project and the output will not have any runtime dependency to `seabolt` and `openssl`.
+
+_**Static linking is currently not supported on Windows.**_
 
 ## Setting RPATH on Linux/MacOS
 

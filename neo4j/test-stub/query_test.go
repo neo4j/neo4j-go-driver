@@ -21,143 +21,68 @@ package test_stub
 
 import (
 	"path"
+	"testing"
 	"time"
 
 	"github.com/neo4j/neo4j-go-driver/neo4j"
 	"github.com/neo4j/neo4j-go-driver/neo4j/test-stub/control"
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
-var _ = Describe("Query", func() {
-	var stub *control.StubServer
-
-	AfterEach(func() {
-		if stub != nil {
-			Expect(stub.Finished()).To(BeTrue())
-
-			stub.Close()
+func Test_Query(t *testing.T) {
+	var verifyReturn1 = func(t *testing.T, script string, bookmarks []string, txConfig ...func(*neo4j.TransactionConfig)) {
+		if bookmarks == nil {
+			bookmarks = []string{}
 		}
-	})
 
-	Context("V1", func() {
-		It("should execute simple query", func() {
-			stub = control.NewStubServer(9001, path.Join("v1", "return_1.script"))
+		stub := control.NewStubServer(t, 9001, script)
+		defer stub.Finished(t)
 
-			driver := newDriver("bolt://localhost:9001")
-			defer driver.Close()
+		driver := newDriver(t, "bolt://localhost:9001")
+		defer driver.Close()
 
-			session := createSession(driver)
-			defer session.Close()
+		session := createWriteSession(t, driver, bookmarks...)
+		defer session.Close()
 
-			result, err := session.Run("RETURN $x", map[string]interface{}{"x": 1})
-			Expect(err).To(BeNil())
+		result, err := session.Run("RETURN $x", map[string]interface{}{"x": 1}, txConfig...)
+		require.NoError(t, err)
+		require.NotNil(t, result)
 
-			var count int64
-			for result.Next() {
-				if x, ok := result.Record().Get("x"); ok {
-					count += x.(int64)
-				}
+		var count int64
+		for result.Next() {
+			if x, ok := result.Record().Get("x"); ok {
+				count += x.(int64)
 			}
+		}
 
-			Expect(result.Err()).To(BeNil())
-			Expect(count).To(BeIdenticalTo(int64(1)))
+		require.NoError(t, result.Err())
+		assert.Equal(t, count, int64(1))
+	}
+
+	t.Run("V1", func(t *testing.T) {
+		t.Run("shouldExecuteSimpleQuery", func(t *testing.T) {
+			verifyReturn1(t, path.Join("v1", "return_1.script"), nil)
 		})
 	})
 
-	Context("V3", func() {
-		It("should execute simple query", func() {
-			stub = control.NewStubServer(9001, path.Join("v3", "return_1.script"))
-
-			driver := newDriver("bolt://localhost:9001")
-			defer driver.Close()
-
-			session := createSession(driver)
-			defer session.Close()
-
-			result, err := session.Run("RETURN $x", map[string]interface{}{"x": 1})
-			Expect(err).To(BeNil())
-
-			var count int64
-			for result.Next() {
-				if x, ok := result.Record().Get("x"); ok {
-					count += x.(int64)
-				}
-			}
-
-			Expect(result.Err()).To(BeNil())
-			Expect(count).To(BeIdenticalTo(int64(1)))
+	t.Run("V3", func(t *testing.T) {
+		t.Run("shouldExecuteSimpleQuery", func(t *testing.T) {
+			verifyReturn1(t, path.Join("v3", "return_1.script"), nil)
 		})
 
-		It("should run with bookmarks", func() {
-			stub = control.NewStubServer(9001, path.Join("v3", "run_with_bookmarks.script"))
-
-			driver := newDriver("bolt://localhost:9001")
-			defer driver.Close()
-
-			session := createSession(driver, "foo", "bar")
-			defer session.Close()
-
-			result, err := session.Run("RETURN $x", map[string]interface{}{"x": 1})
-			Expect(err).To(BeNil())
-
-			var count int64
-			for result.Next() {
-				if x, ok := result.Record().Get("x"); ok {
-					count += x.(int64)
-				}
-			}
-
-			Expect(result.Err()).To(BeNil())
-			Expect(count).To(BeIdenticalTo(int64(1)))
+		t.Run("shouldRunWithBookmarks", func(t *testing.T) {
+			verifyReturn1(t, path.Join("v3", "return_with_bookmarks.script"), []string{"foo", "bar"})
 		})
 
-		It("should run with metadata", func() {
-			stub = control.NewStubServer(9001, path.Join("v3", "run_with_metadata.script"))
-
-			driver := newDriver("bolt://localhost:9001")
-			defer driver.Close()
-
-			session := createSession(driver)
-			defer session.Close()
-
-			result, err := session.Run("RETURN $x", map[string]interface{}{"x": 1}, neo4j.WithTxMetadata(map[string]interface{}{"mode": "r"}))
-			Expect(err).To(BeNil())
-
-			var count int64
-			for result.Next() {
-				if x, ok := result.Record().Get("x"); ok {
-					count += x.(int64)
-				}
-			}
-
-			Expect(result.Err()).To(BeNil())
-			Expect(count).To(BeIdenticalTo(int64(1)))
+		t.Run("shouldRunWithMetadata", func(t *testing.T) {
+			verifyReturn1(t, path.Join("v3", "return_with_metadata.script"), nil, neo4j.WithTxMetadata(map[string]interface{}{"user": "some-user"}))
 		})
 
-		It("should run with timeout", func() {
-			stub = control.NewStubServer(9001, path.Join("v3", "run_with_timeout.script"))
-
-			driver := newDriver("bolt://localhost:9001")
-			defer driver.Close()
-
-			session := createSession(driver)
-			defer session.Close()
-
-			result, err := session.Run("RETURN $x", map[string]interface{}{"x": 1}, neo4j.WithTxTimeout(12340*time.Millisecond))
-			Expect(err).To(BeNil())
-
-			var count int64
-			for result.Next() {
-				if x, ok := result.Record().Get("x"); ok {
-					count += x.(int64)
-				}
-			}
-
-			Expect(result.Err()).To(BeNil())
-			Expect(count).To(BeIdenticalTo(int64(1)))
+		t.Run("shouldRunWithTimeout", func(t *testing.T) {
+			verifyReturn1(t, path.Join("v3", "return_with_timeout.script"), nil, neo4j.WithTxTimeout(12340*time.Millisecond))
 		})
 
 	})
 
-})
+}
