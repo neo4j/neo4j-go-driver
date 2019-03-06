@@ -21,134 +21,55 @@ package test_stub
 
 import (
 	"path"
+	"testing"
 
+	"github.com/neo4j-drivers/gobolt"
 	"github.com/neo4j/neo4j-go-driver/neo4j/test-stub/control"
-	"github.com/neo4j/neo4j-go-driver/neo4j/utils/test"
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
+	"github.com/stretchr/testify/assert"
 )
 
-var _ = Describe("Disconnect", func() {
-	var stub *control.StubServer
+func Test_Disconnect(t *testing.T) {
+	var cases = []struct {
+		name     string
+		protocol string
+	}{
+		{"V1", "v1"},
+		{"V3", "v3"},
+	}
 
-	AfterEach(func() {
-		if stub != nil {
-			Expect(stub.Finished()).To(BeTrue())
+	for _, testCase := range cases {
+		t.Run(testCase.name, func(t *testing.T) {
+			var verifyServiceUnavailable = func(t *testing.T, script string) {
+				stub := control.NewStubServer(t, 9001, path.Join(testCase.protocol, script))
+				defer stub.Finished(t)
 
-			stub.Close()
-		}
-	})
+				driver := newDriver(t, "bolt://localhost:9001")
+				defer driver.Close()
 
-	Context("V1", func() {
-		It("should return error when server disconnects after INIT", func() {
-			stub = control.NewStubServer(9001, path.Join("v1", "disconnect_after_init.script"))
+				session := createWriteSession(t, driver)
+				defer session.Close()
 
-			driver := newDriver("bolt://localhost:9001")
-			defer driver.Close()
+				result, err := session.Run("RETURN $x", map[string]interface{}{"x": 1})
+				assert.NoError(t, err)
 
-			session := createSession(driver)
-			defer session.Close()
+				summary, err := result.Consume()
+				assert.Error(t, err)
+				assert.True(t, gobolt.IsServiceUnavailable(err))
+				assert.Nil(t, summary)
+			}
 
-			result, err := session.Run("RETURN $x", map[string]interface{}{"x": 1})
-			Expect(err).To(BeNil())
+			t.Run("shouldReturnErrorWhenServerDisconnectsAfterInit", func(t *testing.T) {
+				verifyServiceUnavailable(t, "disconnect_after_login.script")
+			})
 
-			summary, err := result.Consume()
+			t.Run("shouldReturnErrorWhenServerDisconnectsAfterRun", func(t *testing.T) {
+				verifyServiceUnavailable(t, "disconnect_on_run.script")
+			})
 
-			Expect(err).To(test.BeServiceUnavailableError())
-			Expect(summary).To(BeNil())
+			t.Run("shouldReturnErrorWhenServerDisconnectsAfterPullAll", func(t *testing.T) {
+				verifyServiceUnavailable(t, "disconnect_on_pull_all.script")
+			})
 		})
+	}
 
-		It("should return error when server disconnects after RUN", func() {
-			stub = control.NewStubServer(9001, path.Join("v1", "disconnect_on_run.script"))
-
-			driver := newDriver("bolt://localhost:9001")
-			defer driver.Close()
-
-			session := createSession(driver)
-			defer session.Close()
-
-			result, err := session.Run("RETURN $x", map[string]interface{}{"x": 1})
-			Expect(err).To(BeNil())
-
-			summary, err := result.Consume()
-
-			Expect(err).To(test.BeServiceUnavailableError())
-			Expect(summary).To(BeNil())
-		})
-
-		It("should return error when server disconnects after PULL_ALL", func() {
-			stub = control.NewStubServer(9001, path.Join("v1", "disconnect_on_pull_all.script"))
-
-			driver := newDriver("bolt://localhost:9001")
-			defer driver.Close()
-
-			session := createSession(driver)
-			defer session.Close()
-
-			result, err := session.Run("RETURN $x", map[string]interface{}{"x": 1})
-			Expect(err).To(BeNil())
-
-			summary, err := result.Consume()
-
-			Expect(err).To(test.BeServiceUnavailableError())
-			Expect(summary).To(BeNil())
-		})
-	})
-
-	Context("V3", func() {
-		It("should return error when server disconnects after HELLO", func() {
-			stub = control.NewStubServer(9001, path.Join("v3", "disconnect_after_hello.script"))
-
-			driver := newDriver("bolt://localhost:9001")
-			defer driver.Close()
-
-			session := createSession(driver)
-			defer session.Close()
-
-			result, err := session.Run("RETURN $x", map[string]interface{}{"x": 1})
-			Expect(err).To(BeNil())
-
-			summary, err := result.Consume()
-
-			Expect(err).To(test.BeServiceUnavailableError())
-			Expect(summary).To(BeNil())
-		})
-
-		It("should return error when server disconnects after RUN", func() {
-			stub = control.NewStubServer(9001, path.Join("v3", "disconnect_on_run.script"))
-
-			driver := newDriver("bolt://localhost:9001")
-			defer driver.Close()
-
-			session := createSession(driver)
-			defer session.Close()
-
-			result, err := session.Run("RETURN $x", map[string]interface{}{"x": 1})
-			Expect(err).To(BeNil())
-
-			summary, err := result.Consume()
-
-			Expect(err).To(test.BeServiceUnavailableError())
-			Expect(summary).To(BeNil())
-		})
-
-		It("should return error when server disconnects after PULL_ALL", func() {
-			stub = control.NewStubServer(9001, path.Join("v3", "disconnect_on_pull_all.script"))
-
-			driver := newDriver("bolt://localhost:9001")
-			defer driver.Close()
-
-			session := createSession(driver)
-			defer session.Close()
-
-			result, err := session.Run("RETURN $x", map[string]interface{}{"x": 1})
-			Expect(err).To(BeNil())
-
-			summary, err := result.Consume()
-
-			Expect(err).To(test.BeServiceUnavailableError())
-			Expect(summary).To(BeNil())
-		})
-	})
-
-})
+}

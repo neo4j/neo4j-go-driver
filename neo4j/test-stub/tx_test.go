@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2019 "Neo4j,"
+ * Copyright (c) 2002-2018 "Neo4j,"
  * Neo4j Sweden AB [http://neo4j.com]
  *
  * This file is part of Neo4j.
@@ -21,125 +21,67 @@ package test_stub
 
 import (
 	"path"
+	"testing"
 	"time"
 
 	"github.com/neo4j/neo4j-go-driver/neo4j"
 	"github.com/neo4j/neo4j-go-driver/neo4j/test-stub/control"
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
-var _ = Describe("Transaction", func() {
-	var stub *control.StubServer
-
-	AfterEach(func() {
-		if stub != nil {
-			Expect(stub.Finished()).To(BeTrue())
-
-			stub.Close()
+func Test_Transaction(t *testing.T) {
+	var verifyReturn1 = func(t *testing.T, script string, bookmarks []string, txConfig ...func(*neo4j.TransactionConfig)) {
+		if bookmarks == nil {
+			bookmarks = []string{}
 		}
-	})
 
-	Context("V3", func() {
-		It("should execute simple query in transaction", func() {
-			stub = control.NewStubServer(9001, path.Join("v3", "return_1_in_tx.script"))
+		stub := control.NewStubServer(t, 9001, script)
+		defer stub.Finished(t)
 
-			driver := newDriver("bolt://localhost:9001")
-			defer driver.Close()
+		driver := newDriver(t, "bolt://localhost:9001")
+		defer driver.Close()
 
-			session := createSession(driver)
-			defer session.Close()
+		session := createWriteSession(t, driver, bookmarks...)
+		defer session.Close()
 
-			tx := createTx(session)
-			defer tx.Close()
+		tx := createTx(t, session, txConfig...)
+		defer tx.Close()
 
-			result, err := tx.Run("RETURN $x", map[string]interface{}{"x": 1})
-			Expect(err).To(BeNil())
+		result, err := tx.Run("RETURN $x", map[string]interface{}{"x": 1})
+		require.NoError(t, err)
+		require.NotNil(t, result)
 
-			var count int64
-			for result.Next() {
-				if x, ok := result.Record().Get("x"); ok {
-					count += x.(int64)
-				}
+		var count int64
+		for result.Next() {
+			if x, ok := result.Record().Get("x"); ok {
+				count += x.(int64)
 			}
+		}
 
-			Expect(result.Err()).To(BeNil())
-			Expect(count).To(BeIdenticalTo(int64(1)))
+		require.NoError(t, result.Err())
 
-			Expect(session.LastBookmark()).To(BeEmpty())
+		assert.Equal(t, count, int64(1))
+		assert.Empty(t, session.LastBookmark())
 
-			err = tx.Commit()
-			Expect(err).To(BeNil())
+		err = tx.Commit()
+		require.NoError(t, err)
 
-			Expect(session.LastBookmark()).To(Equal("bookmark:1"))
+		assert.Equal(t, "bookmark:1", session.LastBookmark())
+	}
+
+	t.Run("V3", func(t *testing.T) {
+		t.Run("shouldExecuteSimpleQuery", func(t *testing.T) {
+			verifyReturn1(t, path.Join("v3", "return_1_in_tx.script"), nil)
 		})
 
-		It("should begin transaction with metadata", func() {
-			stub = control.NewStubServer(9001, path.Join("v3", "begin_with_metadata.script"))
-
-			driver := newDriver("bolt://localhost:9001")
-			defer driver.Close()
-
-			session := createSession(driver)
-			defer session.Close()
-
-			tx := createTx(session, neo4j.WithTxMetadata(map[string]interface{}{"mode": "r"}))
-			defer tx.Close()
-
-			result, err := tx.Run("RETURN $x", map[string]interface{}{"x": 1})
-			Expect(err).To(BeNil())
-
-			var count int64
-			for result.Next() {
-				if x, ok := result.Record().Get("x"); ok {
-					count += x.(int64)
-				}
-			}
-
-			Expect(result.Err()).To(BeNil())
-			Expect(count).To(BeIdenticalTo(int64(1)))
-
-			Expect(session.LastBookmark()).To(BeEmpty())
-
-			err = tx.Commit()
-			Expect(err).To(BeNil())
-
-			Expect(session.LastBookmark()).To(Equal("bookmark:1"))
+		t.Run("shouldBeginTransactionWithMetadata", func(t *testing.T) {
+			verifyReturn1(t, path.Join("v3", "begin_with_metadata.script"), nil, neo4j.WithTxMetadata(map[string]interface{}{"user": "some-user"}))
 		})
 
-		It("should begin transaction with timeout", func() {
-			stub = control.NewStubServer(9001, path.Join("v3", "begin_with_timeout.script"))
-
-			driver := newDriver("bolt://localhost:9001")
-			defer driver.Close()
-
-			session := createSession(driver)
-			defer session.Close()
-
-			tx := createTx(session, neo4j.WithTxTimeout(12340*time.Millisecond))
-			defer tx.Close()
-
-			result, err := tx.Run("RETURN $x", map[string]interface{}{"x": 1})
-			Expect(err).To(BeNil())
-
-			var count int64
-			for result.Next() {
-				if x, ok := result.Record().Get("x"); ok {
-					count += x.(int64)
-				}
-			}
-
-			Expect(result.Err()).To(BeNil())
-			Expect(count).To(BeIdenticalTo(int64(1)))
-
-			Expect(session.LastBookmark()).To(BeEmpty())
-
-			err = tx.Commit()
-			Expect(err).To(BeNil())
-
-			Expect(session.LastBookmark()).To(Equal("bookmark:1"))
+		t.Run("shouldBeginTransactionWithTimeout", func(t *testing.T) {
+			verifyReturn1(t, path.Join("v3", "begin_with_timeout.script"), nil, neo4j.WithTxTimeout(12340*time.Millisecond))
 		})
 
 	})
-
-})
+}

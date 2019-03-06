@@ -22,32 +22,39 @@ package test_stub
 import (
 	"os"
 	"strings"
+	"testing"
 
 	"github.com/neo4j/neo4j-go-driver/neo4j"
-
-	. "github.com/onsi/gomega"
+	"github.com/stretchr/testify/require"
 )
 
-func newDriver(uri string) neo4j.Driver {
+func newDriver(t *testing.T, uri string) neo4j.Driver {
 	driver, err := neo4j.NewDriver(uri, neo4j.NoAuth(), func(config *neo4j.Config) {
 		config.Encrypted = false
 		config.Log = neo4j.ConsoleLogger(logLevel())
 	})
-	Expect(err).To(BeNil())
+	require.NoError(t, err)
 
 	return driver
 }
 
-func createSession(driver neo4j.Driver, bookmarks ...string) neo4j.Session {
+func createWriteSession(t *testing.T, driver neo4j.Driver, bookmarks ...string) neo4j.Session {
 	session, err := driver.Session(neo4j.AccessModeWrite, bookmarks...)
-	Expect(err).To(BeNil())
+	require.NoError(t, err)
 
 	return session
 }
 
-func createTx(session neo4j.Session, configurers ...func(*neo4j.TransactionConfig)) neo4j.Transaction {
+func createReadSession(t *testing.T, driver neo4j.Driver, bookmarks ...string) neo4j.Session {
+	session, err := driver.Session(neo4j.AccessModeRead, bookmarks...)
+	require.NoError(t, err)
+
+	return session
+}
+
+func createTx(t *testing.T, session neo4j.Session, configurers ...func(*neo4j.TransactionConfig)) neo4j.Transaction {
 	tx, err := session.BeginTransaction(configurers...)
-	Expect(err).To(BeNil())
+	require.NoError(t, err)
 
 	return tx
 }

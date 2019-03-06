@@ -3,7 +3,7 @@
 !: AUTO GOODBYE
 !: AUTO RESET
 
-C: RUN "RETURN $x" {"x": 1} {"tx_metadata": {"mode": "r"}}
+C: RUN "RETURN $x" {"x": 1} {"tx_metadata": {"user": "some-user"}}
    PULL_ALL
 S: SUCCESS {"fields": ["x"]}
    RECORD [1]
