@@ -14,7 +14,7 @@ This package requires the following tools/libraries to be installed in order to 
 
 ### Compiler Toolchain
 
-Install C/C++ compiler toolchain supported by your operating system. You'll need a mingw toolchain (for instance MSYS2 from https://www.msys2.org/) for cgo support (seabolt include some instructions) on Windows.
+Install C/C++ compiler toolchain supported by your operating system. You'll need a mingw toolchain (for instance MSYS2 from https://www.msys2.org/) for cgo support (seabolt includes [instructions](https://github.com/neo4j-drivers/seabolt)) on Windows.
 
 ### Pkg-Config
 
@@ -22,15 +22,13 @@ Linux distributions provide `pkg-config` as part of their package management sys
 
 MacOS doesn't provide `pkg-config`, so have it installed through `brew install pkg-config`.
 
-Windows doesn't provide `pkg-config`, so have it installed by following [these instructions](https://stackoverflow.com/questions/1710922/how-to-install-pkg-config-in-windows?answertab=active#tab-top), make the `bin` folder available in PATH before any MSYS2 PATH entries.
+Windows doesn't provide `pkg-config`, so have it installed by following [these instructions](https://stackoverflow.com/questions/1710922/how-to-install-pkg-config-in-windows?answertab=active#tab-top), make the `bin` folder available in PATH before any MSYS2 PATH entries. *This is mandatory because `pkg-config` that ships with MSYS2 has some path handling problems*
 
 ### Seabolt
 
 #### Binaries
 
-We're now providing _**experimental**_ binaries for `Linux`, `MacOS` and `Windows` [here](https://github.com/neo4j-drivers/seabolt/releases). Please remember that `OpenSSL` is still a requirement for all of these systems. 
-
-Static linking against seabolt is only supported on **_Linux_** and **_MacOS_** at this time, and in order to get it working make sure you have static OpenSSL libraries, too.
+We're now providing _**experimental**_ binaries for `Linux`, `MacOS` and `Windows` [here](https://github.com/neo4j-drivers/seabolt/releases). Please remember that `OpenSSL` is a required dependency for `Linux` and `MacOS` - TLS on `Windows` depends on native SCHANNEL provider and doesn't require any additional third-party dependencies from version 1.7.3 onwards. 
 
 #### Source
 
@@ -54,9 +52,7 @@ Add the driver with `go get github.com/neo4j/neo4j-go-driver/neo4j`
 
 ## Static Linking
 
-We provide `seabolt_static` build tag to support static linking against seabolt and its dependencies. You can just pass `--tags seabolt_static` to your `go` toolset (like `go build --tags seabolt_static`) for your project and the output will not have any runtime dependency to `seabolt` and `openssl`.
-
-_**Static linking is currently not supported on Windows.**_
+We provide `seabolt_static` build tag to support static linking against seabolt and its dependencies. You can just pass `--tags seabolt_static` to your `go` toolset (like `go build --tags seabolt_static`) for your project and the generated binary will not have any runtime dependencies to `seabolt`.
 
 ## Setting RPATH on Linux/MacOS
 
