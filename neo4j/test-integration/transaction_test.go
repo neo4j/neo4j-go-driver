@@ -74,7 +74,7 @@ var _ = Describe("Transaction", func() {
 				return nil, transientError
 			})
 
-			Expect(err).To(Equal(transientError))
+			Expect(err).To(BeGenericError(And(ContainSubstring("retryable operation failed to complete after"), ContainSubstring("Neo.TransientError.Transaction.Outdated"))))
 			Expect(times).To(BeNumerically(">", 10))
 		})
 
@@ -86,7 +86,7 @@ var _ = Describe("Transaction", func() {
 				return nil, transientError
 			})
 
-			Expect(err).To(Equal(transientError))
+			Expect(err).To(BeGenericError(And(ContainSubstring("retryable operation failed to complete after"), ContainSubstring("Neo.TransientError.Transaction.Outdated"))))
 			Expect(times).To(BeNumerically(">", 10))
 		})
 	})
