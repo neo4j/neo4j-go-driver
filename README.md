@@ -221,7 +221,7 @@ For simplicity, we provide a predefined console logger which can be constructed 
 
 A simple code snippet that will enable console logging is as follows;
 
-```
+```go
 useConsoleLogger := func(level neo4j.LogLevel) func(config *neo4j.Config) {
 	return func(config *neo4j.Config) {
 		config.Log = neo4j.ConsoleLogger(level)
@@ -239,7 +239,7 @@ defer driver.Close()
 
 The `Log` field of the `neo4j.Config` struct is defined to be of interface `neo4j.Logging` which has the following definition.
 
-```
+```go
 type Logging interface {
 	ErrorEnabled() bool
 	WarningEnabled() bool
