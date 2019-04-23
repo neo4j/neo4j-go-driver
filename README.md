@@ -252,3 +252,5 @@ type Logging interface {
 	Debugf(message string, args ...interface{})
 }
 ```
+
+For a customised logging target, you can implement the above interface and pass an instance of that implementation to the `Log` field.
