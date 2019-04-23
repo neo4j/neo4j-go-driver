@@ -113,6 +113,14 @@ func closeRunner(session *neoSession) error {
 	return nil
 }
 
+func (session *neoSession) id() string {
+	id := "unknown"
+	if session.runner != nil {
+		id = session.runner.id()
+	}
+	return id
+}
+
 func (session *neoSession) LastBookmark() string {
 	if session.runner != nil {
 		var err error
@@ -222,24 +230,24 @@ func runStatementOnSession(session *neoSession, statement *neoStatement, configu
 func runTransaction(session *neoSession, mode AccessMode, work TransactionWork, configurers ...func(*TransactionConfig)) (interface{}, error) {
 	retry := newRetryLogic(session.driver.configuration())
 
-	result, err := retry.retry(func() (interface{}, error) {
+	result, err := retry.retry(func() (interface{}, string, error) {
 		tx, errWork := beginTransactionInternal(session, mode, configurers...)
 		if errWork != nil {
-			return nil, errWork
+			return nil, session.id(), errWork
 		}
 		defer tx.Close()
 
 		resultWork, errWork := work(tx)
 		if errWork != nil {
-			return nil, errWork
+			return nil, session.id(), errWork
 		}
 
 		errWork = tx.Commit()
 		if errWork != nil {
-			return nil, errWork
+			return nil, session.id(), errWork
 		}
 
-		return resultWork, nil
+		return resultWork, "", nil
 	})
 
 	return result, err

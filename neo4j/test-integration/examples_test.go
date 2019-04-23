@@ -131,7 +131,7 @@ var _ = Describe("Examples", func() {
 			defer driver.Close()
 
 			err = createItem(driver)
-			Expect(err).To(test.BeServiceUnavailableError())
+			Expect(err).To(test.BeGenericError(ContainSubstring("retryable operation failed to complete after")))
 		})
 
 		Specify("Session", func() {
