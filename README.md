@@ -113,12 +113,12 @@ There are a few points that need to be highlighted:
 * It is considerably cheap to create new sessions and transactions, as sessions and transactions do not create new connections as long as there are free connections available in the connection pool.
 * The driver is thread-safe, while the session or the transaction is not thread-safe.
 
-### Parsing Result Values
-#### Record Stream
+## Parsing Result Values
+### Record Stream
 A cypher execution result is comprised of a stream of records followed by a result summary.
 The records inside the result can be accessed via `Next()`/`Record()` functions defined on `Result`. It is important to check `Err()` after `Next()` returning `false` to find out whether it is end of result stream or an error that caused the end of result consumption.
 
-#### Accessing Values in a Record
+### Accessing Values in a Record
 Values in a `Record` can be accessed either by index or by alias. The return value is an `interface{}` which means you need to convert the interface to the type expected
 
 ```go
@@ -132,7 +132,7 @@ if value, ok := record.Get('field_name'); ok {
 }
 ```
 
-#### Value Types
+### Value Types
 The driver currently exposes values in the record as an `interface{}` type. 
 The underlying types of the returned values depend on the corresponding Cypher types.
 
@@ -152,7 +152,7 @@ The mapping between Cypher types and the types used by this driver (to represent
 | Relationship| neo4j.Relationship |
 | Path| neo4j.Path |
 
-#### Spatial Types - Point
+### Spatial Types - Point
 
 | Cypher Type | Driver Type
 | ---: | :--- |
@@ -175,7 +175,7 @@ point := NewPoint3D(srId, 1.0, 2.0, 3.0)
 NOTE:
 * For a list of supported `srId` values, please refer to the docs [here](https://neo4j.com/docs/developer-manual/current/cypher/functions/spatial/).
 
-#### Temporal Types - Date and Time
+### Temporal Types - Date and Time
 
 The temporal types are introduced in Neo4j 3.4 series. Given the fact that database supports a range of different temporal types, most of them are backed by custom types defined at the driver level.
 
@@ -210,3 +210,45 @@ dateValueAsTime := dateValue.Time()
 Note:
 * When `neo4j.OffsetTime` is converted into `time.Time` or constructed through `OffsetTimeOf(time.Time)`, its `Location` is given a fixed name of `Offset` (i.e. assigned `time.FixedZone("Offset", offsetTime.offset)`).
 * When `time.Time` values are sent/received through the driver, if its `Zone()` returns a name of `Offset` the value is stored with its offset value and with its zone name otherwise.
+
+## Logging
+
+Logging at the driver level can be configured by setting `Log` field of `neo4j.Config` through configuration functions that can be passed to `neo4j.NewDriver` function. 
+
+### Console Logger
+
+For simplicity, we provide a predefined console logger which can be constructed by `neo4j.ConsoleLogger` function. To enable console logger, you need to specify which level you need to enable (`neo4j.ERROR`, `neo4j.WARNING`, `neo4j.INFO` and `neo4j.DEBUG` which are ordered by the level of detail).
+
+A simple code snippet that will enable console logging is as follows;
+
+```
+useConsoleLogger := func(level neo4j.LogLevel) func(config *neo4j.Config) {
+	return func(config *neo4j.Config) {
+		config.Log = neo4j.ConsoleLogger(level)
+	}
+}
+
+// Construct a new driver
+if driver, err = neo4j.NewDriver(uri, neo4j.BasicAuth(username, password, ""), useConsoleLogger(neo4j.ERROR)); err != nil {
+	return err
+}
+defer driver.Close()
+```
+
+### Custom Logger
+
+The `Log` field of the `neo4j.Config` struct is defined to be of interface `neo4j.Logging` which has the following definition.
+
+```
+type Logging interface {
+	ErrorEnabled() bool
+	WarningEnabled() bool
+	InfoEnabled() bool
+	DebugEnabled() bool
+
+	Errorf(message string, args ...interface{})
+	Warningf(message string, args ...interface{})
+	Infof(message string, args ...interface{})
+	Debugf(message string, args ...interface{})
+}
+```
