@@ -66,6 +66,19 @@ func (runner *statementRunner) lastSeenBookmark() (string, error) {
 	return runner.lastBookmark, nil
 }
 
+func (runner *statementRunner) id() string {
+	var id = "unknown"
+	var err error
+
+	if runner.connection != nil {
+		if id, err = runner.connection.Id(); err != nil {
+			runner.driver.config.Log.Errorf("Id call on connection failed: %v", err)
+			id = "unknown[failed to get id]"
+		}
+	}
+	return id
+}
+
 func (runner *statementRunner) remoteAddress() string {
 	var remoteAddress = "unknown"
 	var err error
