@@ -70,6 +70,63 @@ func Test_Transaction(t *testing.T) {
 		assert.Equal(t, "bookmark:1", session.LastBookmark())
 	}
 
+	var verifyFailureOnExplicitCommit = func(t *testing.T, script string) {
+		stub := control.NewStubServer(t, 9001, script)
+		defer stub.Finished(t)
+
+		driver := newDriver(t, "bolt://localhost:9001")
+		defer driver.Close()
+
+		session := createWriteSession(t, driver)
+		defer session.Close()
+
+		tx := createTx(t, session)
+		defer tx.Close()
+
+		result, err := tx.Run("CREATE (n {name: 'Bob'})", nil)
+		require.NoError(t, err)
+		require.NotNil(t, result)
+
+		require.False(t, result.Next())
+		require.NoError(t, result.Err())
+
+		err = tx.Commit()
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "connection closed by remote peer")
+	}
+
+	var verifyFailureOnTxFuncCommit = func(t *testing.T, script string) {
+		stub := control.NewStubServer(t, 9001, script)
+		defer stub.Finished(t)
+
+		driver := newDriver(t, "bolt://localhost:9001")
+		defer driver.Close()
+
+		session := createWriteSession(t, driver)
+		defer session.Close()
+
+		result, err := session.WriteTransaction(func(tx neo4j.Transaction) (interface{}, error) {
+			innerResult, innerErr := tx.Run("CREATE (n {name: 'Bob'})", nil)
+			require.NoError(t, innerErr)
+			require.NotNil(t, innerResult)
+			return innerResult, innerErr
+		})
+
+		assert.Nil(t, result)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "connection closed by remote peer")
+	}
+
+	t.Run("V1", func(t *testing.T) {
+		t.Run("shouldFailOnConnectionFailureOnExplicitCommit", func(t *testing.T) {
+			verifyFailureOnExplicitCommit(t, path.Join("v1", "connection_error_on_commit.script"))
+		})
+
+		t.Run("shouldFailOnConnectionFailureOnTxFuncCommit", func(t *testing.T) {
+			verifyFailureOnTxFuncCommit(t, path.Join("v1", "connection_error_on_commit.script"))
+		})
+	})
+
 	t.Run("V3", func(t *testing.T) {
 		t.Run("shouldExecuteSimpleQuery", func(t *testing.T) {
 			verifyReturn1(t, path.Join("v3", "return_1_in_tx.script"), nil)
@@ -83,5 +140,12 @@ func Test_Transaction(t *testing.T) {
 			verifyReturn1(t, path.Join("v3", "begin_with_timeout.script"), nil, neo4j.WithTxTimeout(12340*time.Millisecond))
 		})
 
+		t.Run("shouldFailOnConnectionFailureOnExplicitCommit", func(t *testing.T) {
+			verifyFailureOnExplicitCommit(t, path.Join("v3", "connection_error_on_commit.script"))
+		})
+
+		t.Run("shouldFailOnConnectionFailureOnTxFuncCommit", func(t *testing.T) {
+			verifyFailureOnTxFuncCommit(t, path.Join("v3", "connection_error_on_commit.script"))
+		})
 	})
 }
