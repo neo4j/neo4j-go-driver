@@ -20,12 +20,46 @@
 package neo4j
 
 import (
+	. "github.com/neo4j/neo4j-go-driver/neo4j/utils/test"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/ginkgo/extensions/table"
 	. "github.com/onsi/gomega"
 )
 
 var _ = Describe("Driver", func() {
+
+	Context("URI", func() {
+		It("should support bolt:// scheme", func() {
+			driver, err := NewDriver("bolt://localhost:7687", NoAuth())
+
+			Expect(err).To(BeNil())
+			Expect(driver).NotTo(BeNil())
+			Expect(driver.Target().Scheme).To(BeIdenticalTo("bolt"))
+		})
+
+		It("should support bolt+routing:// scheme", func() {
+			driver, err := NewDriver("bolt+routing://localhost:7687", NoAuth())
+
+			Expect(err).To(BeNil())
+			Expect(driver).NotTo(BeNil())
+			Expect(driver.Target().Scheme).To(BeIdenticalTo("bolt+routing"))
+		})
+
+		It("should support neo4j:// scheme", func() {
+			driver, err := NewDriver("neo4j://localhost:7687", NoAuth())
+
+			Expect(err).To(BeNil())
+			Expect(driver).NotTo(BeNil())
+			Expect(driver.Target().Scheme).To(BeIdenticalTo("neo4j"))
+		})
+
+		It("should error anotherscheme:// scheme", func() {
+			driver, err := NewDriver("anotherscheme://localhost:7687", NoAuth())
+
+			Expect(driver).To(BeNil())
+			Expect(err).To(BeGenericError(ContainSubstring("url scheme anotherscheme is not supported")))
+		})
+	})
 
 	When("constructed with bolt://localhost:7687", func() {
 		driver, err := NewDriver("bolt://localhost:7687", NoAuth())

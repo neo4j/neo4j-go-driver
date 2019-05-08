@@ -52,8 +52,9 @@ type Driver interface {
 // In order to connect to a single instance database, you need to pass a URI with scheme 'bolt'
 //	driver, err = NewDriver("bolt://db.server:7687", BasicAuth(username, password))
 //
-// In order to connect to a causal cluster database, you need to pass a URI with scheme 'bolt+routing' and its host
-// part set to be one of the core cluster members.
+// In order to connect to a causal cluster database, you need to pass a URI with scheme 'bolt+routing' or 'neo4j'
+// and its host part set to be one of the core cluster members. Please note that 'bolt+routing' scheme will be
+// removed with 2.0 series of drivers.
 //	driver, err = NewDriver("bolt+routing://core.db.server:7687", BasicAuth(username, password))
 //
 // You can override default configuration options by providing a configuration function(s)
@@ -66,7 +67,7 @@ func NewDriver(target string, auth AuthToken, configurers ...func(*Config)) (Dri
 		return nil, err
 	}
 
-	if parsed.Scheme != "bolt" && parsed.Scheme != "bolt+routing" {
+	if parsed.Scheme != "bolt" && parsed.Scheme != "bolt+routing" && parsed.Scheme != "neo4j" {
 		return nil, newDriverError("url scheme %s is not supported", parsed.Scheme)
 	}
 
