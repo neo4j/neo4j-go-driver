@@ -28,11 +28,14 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func newDriver(t *testing.T, uri string) neo4j.Driver {
-	driver, err := neo4j.NewDriver(uri, neo4j.NoAuth(), func(config *neo4j.Config) {
+func newDriver(t *testing.T, uri string, configurers ...func(config *neo4j.Config)) neo4j.Driver {
+	stubConfig := func(config *neo4j.Config) {
 		config.Encrypted = false
 		config.Log = neo4j.ConsoleLogger(logLevel())
-	})
+
+	}
+
+	driver, err := neo4j.NewDriver(uri, neo4j.NoAuth(), append(configurers, stubConfig)...)
 	require.NoError(t, err)
 
 	return driver
