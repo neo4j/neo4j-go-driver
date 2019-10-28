@@ -26,9 +26,19 @@ Windows doesn't provide `pkg-config`, so have it installed by following [these i
 
 ### Seabolt
 
+[Seabolt](http://github.com/neo4j-drivers/seabolt) is the C Connector Library for Neo4j and is used by the Go driver as the base layer.
+Seabolt can either be installed from binaries or from source.
+
 #### Binaries
 
-We're now providing _**experimental**_ binaries for `Linux`, `MacOS` and `Windows` [here](https://github.com/neo4j-drivers/seabolt/releases). Please remember that `OpenSSL` is a required dependency for `Linux` and `MacOS` - TLS on `Windows` depends on native SCHANNEL provider and doesn't require any additional third-party dependencies from version 1.7.3 onwards. 
+We're provide _**experimental**_ binaries for `Linux`, `MacOS` and `Windows` [here](https://github.com/neo4j-drivers/seabolt/releases). Please remember that `OpenSSL` is a required dependency for `Linux` and `MacOS` - TLS on `Windows` depends on native SCHANNEL provider and doesn't require any additional third-party dependencies from version 1.7.3 onwards. 
+
+Download the binary matching your system and extract the package using the following command (assuming that you saved the package as ~/Downloads/seabolt.tar.gz).
+The command actually skips the top-level folder inside the tar.gz package and extracts its contents into the root folder `/`.:
+
+```
+tar zxvf ~/Downloads/seabolt.tar.gz --strip-components=1 -C /
+```
 
 #### Source
 
@@ -39,6 +49,12 @@ Set `PKG_CONFIG_PATH` to `<seabolt_install_dir>/share/pkgconfig` on Linux/MacOS 
 Set `LD_LIBRARY_PATH`/`DYLD_LIBRARY_PATH` to include `<seabolt_install_dir>/lib` on Linux/MacOS respectively. This is not necessary if you will link statically to seabolt or use `RPATH` feature on your platform (see below).
 
 Add `<seabolt_install_dir>\bin` to `PATH` environment variable on Windows.
+
+There's a 3rd party tap for [brew](https://brew.sh) that you can use to download, compile and install Seabolt into the correct place on macOS: [homebrew-seabolt/seabolt](https://github.com/michael-simons/homebrew-seabolt):
+
+```
+brew install michael-simons/homebrew-seabolt/seabolt
+```
 
 ## Getting the Driver
 
