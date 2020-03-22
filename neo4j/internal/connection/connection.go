@@ -17,33 +17,31 @@
  *  limitations under the License.
  */
 
-package packstream
+package connection
 
-type StructTag byte
+import (
+	"net"
 
-type Struct interface {
-	Tag() StructTag
-	Fields() []interface{}
+	"github.com/neo4j/neo4j-go-driver/neo4j/api"
+)
+
+type Connection interface {
+	RunAutoCommit(cypher string, params map[string]interface{} /*, timeout time.Duration, metadata map[string]interface{}*/) (api.Result, error)
+	IsAlive() bool
+	Close() error
+	// BeginTx
+	// CommitTx
+	// RollbackTx
+	// GetResult
+	// Run
 }
 
-type rawStruct struct {
-	tag    StructTag
-	fields []interface{}
+type Routable interface {
+	// GetRoutingTabe
 }
 
-func (s *rawStruct) Tag() StructTag {
-	return s.tag
-}
-
-func (s *rawStruct) Fields() []interface{} {
-	return s.fields
-}
-
-func (s *rawStruct) HydrateField(f interface{}) error {
-	s.fields = append(s.fields, f)
-	return nil
-}
-
-func (s *rawStruct) HydrationComplete() error {
-	return nil
+// Handles TLS handshake rules according to config
+func OpenTcp() (net.Conn, error) {
+	return net.Dial("tcp", "localhost:7687")
+	// TODO: DialTimeout ???
 }

@@ -17,33 +17,15 @@
  *  limitations under the License.
  */
 
-package packstream
+package api
 
-type StructTag byte
-
-type Struct interface {
-	Tag() StructTag
-	Fields() []interface{}
-}
-
-type rawStruct struct {
-	tag    StructTag
-	fields []interface{}
-}
-
-func (s *rawStruct) Tag() StructTag {
-	return s.tag
-}
-
-func (s *rawStruct) Fields() []interface{} {
-	return s.fields
-}
-
-func (s *rawStruct) HydrateField(f interface{}) error {
-	s.fields = append(s.fields, f)
-	return nil
-}
-
-func (s *rawStruct) HydrationComplete() error {
-	return nil
+type Record interface {
+	// Keys returns the keys available
+	Keys() []string
+	// Values returns the values
+	Values() []interface{}
+	// Get returns the value (if any) corresponding to the given key
+	//Get(key string) (interface{}, bool)
+	// GetByIndex returns the value at given index
+	//GetByIndex(index int) interface{}
 }

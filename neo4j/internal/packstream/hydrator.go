@@ -27,5 +27,10 @@ type HydratorFactory interface {
 }
 
 type Hydrator interface {
-	AddUnpackedField(field interface{}) error
+	// Called by unpacker to let receiver check and store the unpacked field in custom object.
+	// If the hydrator considers this field wrong it should return an error, this
+	// error will make the unpacker stop unpacking and return this error to the unpack caller.
+	HydrateField(field interface{}) error
+	// Called by unpacker when all fields has been unpacked. Same error rules apply as above.
+	HydrationComplete() error
 }

@@ -29,7 +29,7 @@ type Unpacker struct {
 	rd io.Reader
 }
 
-func NewUnpacker( rd io.Reader) *Unpacker {
+func NewUnpacker(rd io.Reader) *Unpacker {
 	return &Unpacker{
 		rd: rd,
 	}
@@ -59,7 +59,6 @@ func (u *Unpacker) readStruct(hf HydratorFactory, numFields int) (interface{}, e
 	// Reach out to get actual object to hydrate into
 	hydrator, err := hf.Hydrator(tag, numFields)
 	if err != nil {
-		// TODO: Wrap this error?
 		return nil, err
 	}
 
@@ -69,9 +68,17 @@ func (u *Unpacker) readStruct(hf HydratorFactory, numFields int) (interface{}, e
 		if err != nil {
 			return nil, err
 		}
-		//fields = append(fields, field)
-		hydrator.AddUnpackedField(field)
+		err = hydrator.HydrateField(field)
+		if err != nil {
+			return nil, err
+		}
 		numFields--
+	}
+
+	// All fields hydrated
+	err = hydrator.HydrationComplete()
+	if err != nil {
+		return nil, err
 	}
 
 	return hydrator, nil
@@ -143,7 +150,7 @@ func (u *Unpacker) Unpack(hf HydratorFactory) (interface{}, error) {
 	}
 	if marker > 0x90 && marker < 0xa0 {
 		// Tiny array
-		return u.readArr(hf, uint32(marker - 0x90))
+		return u.readArr(hf, uint32(marker-0x90))
 	}
 	if marker >= 0xf0 {
 		// Tiny negative int
@@ -151,10 +158,10 @@ func (u *Unpacker) Unpack(hf HydratorFactory) (interface{}, error) {
 	}
 	if marker > 0xa0 && marker < 0xb0 {
 		// Tiny map
-		return u.readMap(hf, uint32(marker - 0xa0))
+		return u.readMap(hf, uint32(marker-0xa0))
 	}
 	if marker >= 0xb0 && marker < 0xc0 {
-		return u.readStruct(hf, int(marker - 0xb0))
+		return u.readStruct(hf, int(marker-0xb0))
 	}
 
 	switch marker {
@@ -306,5 +313,5 @@ func (u *Unpacker) UnpackStruct(hf HydratorFactory) (interface{}, error) {
 	if err != nil {
 		return nil, err
 	}
-	return u.readStruct(hf, int(buf[0] - 0xb0))
+	return u.readStruct(hf, int(buf[0]-0xb0))
 }

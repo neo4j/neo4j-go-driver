@@ -17,33 +17,17 @@
  *  limitations under the License.
  */
 
-package packstream
+package bolt
 
-type StructTag byte
-
-type Struct interface {
-	Tag() StructTag
-	Fields() []interface{}
+type record struct {
+	values []interface{}
+	keys   []string
 }
 
-type rawStruct struct {
-	tag    StructTag
-	fields []interface{}
+func (r *record) Keys() []string {
+	return r.keys
 }
 
-func (s *rawStruct) Tag() StructTag {
-	return s.tag
-}
-
-func (s *rawStruct) Fields() []interface{} {
-	return s.fields
-}
-
-func (s *rawStruct) HydrateField(f interface{}) error {
-	s.fields = append(s.fields, f)
-	return nil
-}
-
-func (s *rawStruct) HydrationComplete() error {
-	return nil
+func (r *record) Values() []interface{} {
+	return r.values
 }
