@@ -17,33 +17,22 @@
  *  limitations under the License.
  */
 
-package packstream
+package bolt
 
-type StructTag byte
+// bolt3.connect is tested through Connect, no need to test it herekk
 
-type Struct interface {
-	Tag() StructTag
-	Fields() []interface{}
-}
-
-type rawStruct struct {
-	tag    StructTag
-	fields []interface{}
-}
-
-func (s *rawStruct) Tag() StructTag {
-	return s.tag
-}
-
-func (s *rawStruct) Fields() []interface{} {
-	return s.fields
-}
-
-func (s *rawStruct) HydrateField(f interface{}) error {
-	s.fields = append(s.fields, f)
-	return nil
-}
-
-func (s *rawStruct) HydrationComplete() error {
-	return nil
-}
+// TODO: test RunAutoCommit
+//       happy path
+//       syntax error, RUN fails with client error
+//       locking error, RUN fails with retryable error
+//       transaction open
+//       not alive
+//       unconsumed result
+//       no response
+//       unexpected response
+// TODO: test IsAlive
+//       different error condtions that can make it not be alive
+// TODO: test Close
+//       unconsumed result
+//       already closed
+//       goodbye failure

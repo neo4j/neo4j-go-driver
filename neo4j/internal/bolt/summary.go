@@ -17,33 +17,34 @@
  *  limitations under the License.
  */
 
-package packstream
+package bolt
 
-type StructTag byte
+import "github.com/neo4j/neo4j-go-driver/neo4j/api"
 
-type Struct interface {
-	Tag() StructTag
-	Fields() []interface{}
+type summary struct {
+	bookmark      string
+	stmntType     string
+	cypher        string
+	params        map[string]interface{}
+	serverVersion string
 }
 
-type rawStruct struct {
-	tag    StructTag
-	fields []interface{}
+func (s *summary) Server() api.ServerInfo {
+	return s
 }
 
-func (s *rawStruct) Tag() StructTag {
-	return s.tag
+func (s *summary) Statement() api.Statement {
+	return s
 }
 
-func (s *rawStruct) Fields() []interface{} {
-	return s.fields
+func (s *summary) Text() string {
+	return s.cypher
 }
 
-func (s *rawStruct) HydrateField(f interface{}) error {
-	s.fields = append(s.fields, f)
-	return nil
+func (s *summary) Params() map[string]interface{} {
+	return s.params
 }
 
-func (s *rawStruct) HydrationComplete() error {
-	return nil
+func (i *summary) Version() string {
+	return i.serverVersion
 }

@@ -39,6 +39,34 @@ func (f *testHydratorFactory) Hydrator(tag StructTag, n int) (Hydrator, error) {
 	return &rawStruct{tag: tag}, nil
 }
 
+type mockHydratorFactory struct {
+	hydrator Hydrator
+	err      error
+}
+
+func (f *mockHydratorFactory) Hydrator(tag StructTag, n int) (Hydrator, error) {
+	return f.hydrator, f.err
+}
+
+type testHydrationError struct{}
+
+func (e *testHydrationError) Error() string {
+	return ""
+}
+
+type mockHydrator struct {
+	fieldErr    error
+	completeErr error
+}
+
+func (h *mockHydrator) HydrateField(interface{}) error {
+	return h.fieldErr
+}
+
+func (h *mockHydrator) HydrationComplete() error {
+	return h.completeErr
+}
+
 type limitedWriter struct {
 	max int
 }
@@ -150,7 +178,6 @@ func TestPackStream(ot *testing.T) {
 	var i Struct = s
 
 	emptyStruct := &rawStruct{tag: 0x66}
-	//maxStruct := &rawStruct{tag: 0x67, fields: []interface{}{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15}}
 	maxStruct := &rawStruct{tag: 0x67, fields: []interface{}{"1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15"}}
 	structOfStruct := &rawStruct{tag: 0x66,
 		fields: []interface{}{&rawStruct{tag: 0x67, fields: []interface{}{"1", "2"}}, &rawStruct{tag: 0x68, fields: []interface{}{"3", "4"}}}}
@@ -611,21 +638,37 @@ func TestPackStream(ot *testing.T) {
 	}
 
 	// Unpacker error cases
-	// TODO: No hydrator for struct type
-	// TODO: No bytes available
 	unpackerErrorCases := []struct {
 		name        string
 		buf         []byte
 		expectedErr interface{}
+		hf          HydratorFactory
 	}{
 		{name: "read error", expectedErr: &IoError{}},
+		{name: "no hydrator",
+			hf:          &mockHydratorFactory{err: &testHydrationError{}},
+			buf:         []byte{0xb0, 0x66},
+			expectedErr: &testHydrationError{},
+		},
+		{name: "hydration field error",
+			hf:          &mockHydratorFactory{hydrator: &mockHydrator{fieldErr: &testHydrationError{}}},
+			buf:         []byte{0xb1, 0x66, 0x01},
+			expectedErr: &testHydrationError{},
+		},
+		{name: "hydration complete error",
+			hf:          &mockHydratorFactory{hydrator: &mockHydrator{completeErr: &testHydrationError{}}},
+			buf:         []byte{0xb1, 0x66, 0x01},
+			expectedErr: &testHydrationError{},
+		},
 	}
 	for _, c := range unpackerErrorCases {
 		ot.Run(fmt.Sprintf("Unpacking error of %s", c.name), func(t *testing.T) {
 			rd := bytes.NewBuffer(c.buf)
-			hf := &testHydratorFactory{}
+			if c.hf == nil {
+				c.hf = &testHydratorFactory{}
+			}
 			un := NewUnpacker(rd)
-			x, err := un.Unpack(hf)
+			x, err := un.Unpack(c.hf)
 			if err == nil {
 				t.Fatal("Should have gotten an error!")
 			}

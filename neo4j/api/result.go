@@ -17,33 +17,20 @@
  *  limitations under the License.
  */
 
-package packstream
+package api
 
-type StructTag byte
-
-type Struct interface {
-	Tag() StructTag
-	Fields() []interface{}
-}
-
-type rawStruct struct {
-	tag    StructTag
-	fields []interface{}
-}
-
-func (s *rawStruct) Tag() StructTag {
-	return s.tag
-}
-
-func (s *rawStruct) Fields() []interface{} {
-	return s.fields
-}
-
-func (s *rawStruct) HydrateField(f interface{}) error {
-	s.fields = append(s.fields, f)
-	return nil
-}
-
-func (s *rawStruct) HydrationComplete() error {
-	return nil
+type Result interface {
+	// Keys returns the keys available on the result set.
+	//Keys() ([]string, error)
+	// Next returns true only if there is a record to be processed.
+	Next() bool
+	// Err returns the latest error that caused this Next to return false.
+	Err() error
+	// Record returns the current record.
+	Record() Record
+	// Summary returns the summary information about the statement execution.
+	Summary() (ResultSummary, error)
+	// Consume consumes the entire result and returns the summary information
+	// about the statement execution.
+	//Consume() (ResultSummary, error)
 }
