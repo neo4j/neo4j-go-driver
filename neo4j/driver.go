@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2019 "Neo4j,"
+ * Copyright (c) 2002-2020 "Neo4j,"
  * Neo4j Sweden AB [http://neo4j.com]
  *
  * This file is part of Neo4j.
@@ -21,6 +21,10 @@
 package neo4j
 
 import (
+	"errors"
+	"github.com/neo4j/neo4j-go-driver/neo4j/internal/bolt"
+	conn "github.com/neo4j/neo4j-go-driver/neo4j/internal/connection"
+	"net"
 	"net/url"
 )
 
@@ -39,10 +43,10 @@ const (
 // safe for concurrent use.
 type Driver interface {
 	// The url this driver is bootstrapped
-	Target() url.URL
-	Session(accessMode AccessMode, bookmarks ...string) (Session, error)
+	//Target() url.URL
+	Session() (Session, error) //accessMode AccessMode, bookmarks ...string) (Session, error)
 	// Close the driver and all underlying connections
-	Close() error
+	//Close() error
 }
 
 // NewDriver is the entry point to the neo4j driver to create an instance of a Driver. It is the first function to
@@ -67,11 +71,18 @@ func NewDriver(target string, auth AuthToken, configurers ...func(*Config)) (Dri
 		return nil, err
 	}
 
-	if parsed.Scheme != "bolt" && parsed.Scheme != "bolt+routing" && parsed.Scheme != "neo4j" {
+	routing := false
+
+	switch parsed.Scheme {
+	case "bolt":
+	case "bolt+routing", "neo4j":
+		routing = true
+		return nil, errors.New("Routed schemed not implemented")
+	default:
 		return nil, newDriverError("url scheme %s is not supported", parsed.Scheme)
 	}
 
-	if parsed.Scheme == "bolt" && len(parsed.RawQuery) > 0 {
+	if !routing && len(parsed.RawQuery) > 0 {
 		return nil, newDriverError("routing context is not supported for direct driver")
 	}
 
@@ -79,10 +90,42 @@ func NewDriver(target string, auth AuthToken, configurers ...func(*Config)) (Dri
 	for _, configurer := range configurers {
 		configurer(config)
 	}
-
 	if err := validateAndNormaliseConfig(config); err != nil {
 		return nil, err
 	}
 
-	return newGoboltDriver(parsed, auth, config)
+	return &driver{
+		target: parsed,
+		config: config,
+	}, nil
+}
+
+type driver struct {
+	target *url.URL
+	config *Config
+}
+
+func (d *driver) connect() (conn.Connection, error) {
+	conn, err := net.Dial("tcp", d.target.Host)
+	if err != nil {
+		return nil, err
+	}
+
+	// Pass ownership of connection to bolt upon success
+	boltConn, err := bolt.Connect(conn)
+	if err != nil {
+		return nil, err
+	}
+	return boltConn, nil
+}
+
+func (d *driver) Session() (Session, error) {
+	// Make a new connection
+	// TODO: Use connection pool
+	conn, err := d.connect()
+	if err != nil {
+		return nil, err
+	}
+
+	return &session{conn: conn}, nil
 }

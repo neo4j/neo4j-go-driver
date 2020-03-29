@@ -18,33 +18,3 @@
  */
 
 package bolt
-
-import "github.com/neo4j/neo4j-go-driver/neo4j/api"
-
-type summary struct {
-	bookmark      string
-	stmntType     string
-	cypher        string
-	params        map[string]interface{}
-	serverVersion string
-}
-
-func (s *summary) Server() api.ServerInfo {
-	return s
-}
-
-func (s *summary) Statement() api.Statement {
-	return s
-}
-
-func (s *summary) Text() string {
-	return s.cypher
-}
-
-func (s *summary) Params() map[string]interface{} {
-	return s.params
-}
-
-func (i *summary) Version() string {
-	return i.serverVersion
-}

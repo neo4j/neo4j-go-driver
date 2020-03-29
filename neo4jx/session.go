@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2020 "Neo4j,"
+ * Copyright (c) 2002-2019 "Neo4j,"
  * Neo4j Sweden AB [http://neo4j.com]
  *
  * This file is part of Neo4j.
@@ -19,47 +19,22 @@
 
 package neo4j
 
-import (
-	conn "github.com/neo4j/neo4j-go-driver/neo4j/internal/connection"
-)
-
 // Session represents a logical connection (which is not tied to a physical connection)
 // to the server
 type Session interface {
 	// LastBookmark returns the bookmark received following the last successfully completed transaction.
 	// If no bookmark was received or if this transaction was rolled back, the bookmark value will not be changed.
-	//LastBookmark() string
+	LastBookmark() string
 	// BeginTransaction starts a new explicit transaction on this session
-	//BeginTransaction(configurers ...func(*TransactionConfig)) (Transaction, error)
+	BeginTransaction(configurers ...func(*TransactionConfig)) (Transaction, error)
 	// ReadTransaction executes the given unit of work in a AccessModeRead transaction with
 	// retry logic in place
-	//ReadTransaction(work TransactionWork, configurers ...func(*TransactionConfig)) (interface{}, error)
+	ReadTransaction(work TransactionWork, configurers ...func(*TransactionConfig)) (interface{}, error)
 	// WriteTransaction executes the given unit of work in a AccessModeWrite transaction with
 	// retry logic in place
-	//WriteTransaction(work TransactionWork, configurers ...func(*TransactionConfig)) (interface{}, error)
+	WriteTransaction(work TransactionWork, configurers ...func(*TransactionConfig)) (interface{}, error)
 	// Run executes an auto-commit statement and returns a result
-	Run(cypher string, params map[string]interface{}) (Result, error) //, configurers ...func(*TransactionConfig)) (Result, error)
+	Run(cypher string, params map[string]interface{}, configurers ...func(*TransactionConfig)) (Result, error)
 	// Close closes any open resources and marks this session as unusable
 	Close() error
-}
-
-type session struct {
-	conn conn.Connection
-}
-
-func (s *session) Run(
-	cypher string, params map[string]interface{}) (Result, error) {
-
-	stream, err := s.conn.Run(cypher, params)
-	if err != nil {
-		return nil, err
-	}
-	res := newResult(stream.Keys, s.conn)
-	res.cypher = cypher
-	res.params = params
-	return res, nil
-}
-
-func (s *session) Close() error {
-	return s.conn.Close()
 }

@@ -20,15 +20,11 @@
 package bolt
 
 import (
-	"fmt"
 	"io"
-	"math/rand"
 	"net"
 	"sync"
 	"testing"
 
-	"github.com/neo4j/neo4j-go-driver/neo4j/api"
-	"github.com/neo4j/neo4j-go-driver/neo4j/internal/connection"
 	"github.com/neo4j/neo4j-go-driver/neo4j/internal/packstream"
 )
 
@@ -150,78 +146,4 @@ func TestConnectBolt3(t *testing.T) {
 	boltconn.Close()
 
 	wg.Wait()
-}
-
-func dumpResult(res api.Result) error {
-	for res.Next() {
-		rec := res.Record()
-		keys := rec.Keys()
-		fmt.Println("RECORD")
-		for i, x := range rec.Values() {
-			fmt.Printf("    %s: %+v\n", keys[i], x)
-		}
-	}
-	err := res.Err()
-	if err != nil {
-		return err
-	}
-
-	sum, err := res.Summary()
-	if err != nil {
-		return err
-	}
-	fmt.Printf("Server version: %s\n", sum.Server().Version())
-
-	stmnt := sum.Statement()
-	fmt.Printf("Cypher: %s\nParams: %+v\n", stmnt.Text(), stmnt.Params())
-
-	return nil
-}
-
-func TestOnRealServer(t *testing.T) {
-	t.SkipNow()
-
-	tcpConn, err := connection.OpenTcp()
-	if err != nil {
-		t.Fatalf("%s", err)
-	}
-
-	// Pass ownership of TCP connection to bolt upon success
-	boltConn, err := Connect(tcpConn)
-	if err != nil {
-		t.Fatalf("Failed to connect: %s", err)
-	}
-
-	// Run query
-	fmt.Println("Match")
-	res, err := boltConn.RunAutoCommit("MATCH (n) RETURN n", nil)
-	if err != nil {
-		t.Fatalf("Run failed: %s", err)
-	}
-	err = dumpResult(res)
-	if err != nil {
-		t.Errorf("Got err: %s", err)
-	}
-
-	// Run create statement
-	fmt.Println("Create")
-	params := map[string]interface{}{"rnd": rand.Int()}
-	res, err = boltConn.RunAutoCommit("CREATE (n:Random {val: $rnd})", params)
-	if err != nil {
-		t.Fatalf("Run failed: %s", err)
-	}
-	err = dumpResult(res)
-	if err != nil {
-		t.Errorf("Got err: %s", err)
-	}
-
-	err = boltConn.Close()
-	if err != nil {
-		t.Errorf("Failed to close: %s", err)
-	}
-	if boltConn.IsAlive() {
-		t.Errorf("Connection should be dead")
-	}
-
-	//t.Fail()
 }

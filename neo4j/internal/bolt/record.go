@@ -19,15 +19,12 @@
 
 package bolt
 
-type record struct {
-	values []interface{}
-	keys   []string
-}
-
-func (r *record) Keys() []string {
+/*
+func (r *Record) Keys() []string {
 	return r.keys
 }
 
-func (r *record) Values() []interface{} {
+func (r *Record) Values() []interface{} {
 	return r.values
 }
+*/

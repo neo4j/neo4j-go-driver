@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2019 "Neo4j,"
+ * Copyright (c) 2002-2020 "Neo4j,"
  * Neo4j Sweden AB [http://neo4j.com]
  *
  * This file is part of Neo4j.
@@ -22,8 +22,6 @@ package neo4j
 import "C"
 import (
 	"fmt"
-
-	"github.com/neo4j-drivers/gobolt"
 )
 
 type databaseError struct {
@@ -116,22 +114,23 @@ func (failure *sessionExpiredError) Error() string {
 	return failure.message
 }
 
-func newDriverError(format string, args ...interface{}) gobolt.GenericError {
-	return &driverError{message: fmt.Sprintf(format, args...)}
-}
-
 func newSessionExpiredError(format string, args ...interface{}) error {
 	return &sessionExpiredError{message: fmt.Sprintf(format, args...)}
 }
 
-func newDatabaseError(classification, code, message string) gobolt.DatabaseError {
+func newDriverError(format string, args ...interface{}) *driverError {
+	return &driverError{message: fmt.Sprintf(format, args...)}
+}
+
+func newDatabaseError(classification, code, message string) *databaseError {
 	return &databaseError{code: code, message: message, classification: classification}
 }
 
-func newConnectorError(state int, code int, codeText, context, description string) gobolt.ConnectorError {
+func newConnectorError(state int, code int, codeText, context, description string) *connectorError {
 	return &connectorError{state: state, code: code, codeText: codeText, context: context, description: description}
 }
 
+/*
 func isRetriableError(err error) bool {
 	return gobolt.IsServiceUnavailable(err) || gobolt.IsTransientError(err) || gobolt.IsWriteError(err)
 }
@@ -175,3 +174,4 @@ func IsSessionExpired(err error) bool {
 func IsServiceUnavailable(err error) bool {
 	return gobolt.IsServiceUnavailable(err)
 }
+*/
