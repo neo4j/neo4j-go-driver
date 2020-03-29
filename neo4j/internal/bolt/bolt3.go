@@ -24,7 +24,7 @@ import (
 	"fmt"
 	"net"
 
-	"github.com/neo4j/neo4j-go-driver/neo4j/api"
+	conn "github.com/neo4j/neo4j-go-driver/neo4j/internal/connection"
 	"github.com/neo4j/neo4j-go-driver/neo4j/internal/packstream"
 )
 
@@ -49,11 +49,10 @@ const userAgent = "Go Driver/1.8"
 // State that belongs to a certain session. Upon reset this state is wiped.
 // All members should have a default value that gets a proper value with empty init.
 type sessionState struct {
-	//isInTx     bool
 	isMessedUp bool
-	result     *result
-	cypher     string
-	params     map[string]interface{}
+	//cypher     string
+	//params     map[string]interface{}
+	keys []string
 }
 
 type bolt3 struct {
@@ -137,19 +136,13 @@ func (b *bolt3) connect() error {
 	}
 }
 
-func (b *bolt3) RunAutoCommit(cypher string, params map[string]interface{} /*, timeout time.Duration, metadata map[string]interface{}*/) (api.Result, error) {
+func (b *bolt3) Run(cypher string, params map[string]interface{}) (*conn.Stream, error) {
 	if !b.connected || b.state.isMessedUp {
 		return nil, errors.New("Not alive")
 	}
 
+	// TODO: Ensure state
 	// TODO: Ensure no transaction open already
-
-	// If there is a pending result, ask the result to pull and discard all records before proceeding.
-	// TODO: Use DiscardAll message?
-	if b.state.result != nil {
-		b.state.result.ConsumeAll()
-		b.state.result = nil
-	}
 
 	// Send request to run query along with request to stream the result
 	// TODO: Meta data
@@ -177,14 +170,15 @@ func (b *bolt3) RunAutoCommit(cypher string, params map[string]interface{} /*, t
 	}
 	switch v := res.(type) {
 	case *successResponse:
-		b.state.result, err = b.successResponseToResult(v)
+		err = b.successResponseStreamStart(v)
 		if err != nil {
 			b.state.isMessedUp = true
 			return nil, err
 		}
-		b.state.cypher = cypher
-		b.state.params = params
-		return b.state.result, nil
+		//b.state.cypher = cypher
+		//b.state.params = params
+		stream := &conn.Stream{Keys: b.state.keys}
+		return stream, nil
 	case *failureResponse:
 		// Returning here assumes that we don't get any response on the pull message
 		// Check code to determine if we're messed up, retry logic should be handled in session.
@@ -196,22 +190,23 @@ func (b *bolt3) RunAutoCommit(cypher string, params map[string]interface{} /*, t
 }
 
 // Try to create a response from a success response.
-func (b *bolt3) successResponseToResult(r *successResponse) (*result, error) {
+func (b *bolt3) successResponseStreamStart(r *successResponse) error {
 	m := r.Map()
 	// Should be a list of keys returned from query
 	keysx, ok := m["fields"].([]interface{})
 	if !ok {
-		return nil, errors.New("Missing fields in success response")
+		return errors.New("Missing fields in success response")
 	}
 	// Transform keys to proper format
 	keys := make([]string, len(keysx))
 	for i, x := range keysx {
 		keys[i], ok = x.(string)
 		if !ok {
-			return nil, errors.New("Field is not string")
+			return errors.New("Field is not string")
 		}
 	}
-	return newResult(keys, b.readRecord), nil
+	b.state.keys = keys
+	return nil
 }
 
 func (b *bolt3) successResponseToConnectionInfo(r *successResponse) (string, string, error) {
@@ -227,7 +222,7 @@ func (b *bolt3) successResponseToConnectionInfo(r *successResponse) (string, str
 	return id, server, nil
 }
 
-func (b *bolt3) successResponseToSummary(r *successResponse) (*summary, error) {
+func (b *bolt3) successResponseToSummary(r *successResponse) (*conn.Summary, error) {
 	m := r.Map()
 	// Should be a bookmark
 	bm, ok := m["bookmark"].(string)
@@ -235,21 +230,21 @@ func (b *bolt3) successResponseToSummary(r *successResponse) (*summary, error) {
 		return nil, errors.New("Missing bookmark")
 	}
 	// Should be a statement type
-	st, ok := m["type"].(string)
-	if !ok {
-		return nil, errors.New("Missing stmnt type")
-	}
-	return &summary{
-		bookmark:      bm,
-		stmntType:     st,
-		cypher:        b.state.cypher,
-		params:        b.state.params,
-		serverVersion: b.serverVersion,
+	/*
+		st, ok := m["type"].(string)
+		if !ok {
+			return nil, errors.New("Missing stmnt type")
+		}
+	*/
+	return &conn.Summary{
+		Bookmark:      bm,
+		ServerVersion: b.serverVersion,
+		//stmntType:     st,
 	}, nil
 }
 
 // Reads one record from the stream.
-func (b *bolt3) readRecord() (*record, *summary, error) {
+func (b *bolt3) Next() (*conn.Record, *conn.Summary, error) {
 	res, err := b.unpacker.UnpackStruct(b)
 	if err != nil {
 		return nil, nil, err
@@ -257,7 +252,7 @@ func (b *bolt3) readRecord() (*record, *summary, error) {
 
 	switch x := res.(type) {
 	case *recordResponse:
-		rec := &record{keys: b.state.result.keys, values: x.fields[0].([]interface{})}
+		rec := &conn.Record{Keys: b.state.keys, Values: x.fields[0].([]interface{})}
 		return rec, nil, nil
 	case *successResponse:
 		sum, err := b.successResponseToSummary(x)
@@ -274,8 +269,13 @@ func (b *bolt3) readRecord() (*record, *summary, error) {
 	}
 }
 
+/*
 func (b *bolt3) IsAlive() bool {
 	return b.connected && !b.state.isMessedUp
+}
+*/
+func (b *bolt3) State() conn.State {
+	return conn.DISCONNECTED
 }
 
 func (b *bolt3) Close() error {

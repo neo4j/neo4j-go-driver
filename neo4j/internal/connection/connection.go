@@ -19,15 +19,59 @@
 
 package connection
 
-import (
-	"net"
+type Summary struct {
+	Bookmark string
+	//StmntType     string // Typed!
+	//Cypher        string
+	//Params        map[string]interface{}
+	ServerVersion string
+}
 
-	"github.com/neo4j/neo4j-go-driver/neo4j/api"
+type Record struct {
+	Values []interface{}
+	Keys   []string
+}
+
+/*
+type Result interface {
+	Next() bool
+	Record() *Record
+	Err() error
+	Summary() (*Summary, error)
+	FetchAll()
+	ConsumeAll()
+}
+*/
+
+type Stream struct {
+	Keys []string
+}
+
+type State int
+
+const (
+	DISCONNECTED State = -2
+	INVALID      State = -1 // Needed?
+	FREE         State = 0
+	READY        State = 1 // Bound to session
+	STREAMING    State = 2
+	TX           State = 3
+	STREAMINGTX  State = 4
 )
 
 type Connection interface {
-	RunAutoCommit(cypher string, params map[string]interface{} /*, timeout time.Duration, metadata map[string]interface{}*/) (api.Result, error)
-	IsAlive() bool
+	// State must be READY or TX.
+	// Upon success next state is STREAMING or STREAMINGTX.
+	// Upon error next state is READY, INVALID or DISCONNECTED depending on type of error.
+	// TODO: Timeout
+	// TODO: Metadata
+	Run(cypher string, params map[string]interface{}) (*Stream, error)
+	// State must be STREAMING or STREAMINGTX.
+	// If error is nil, either Record or Summary has a value, if Record is nil there are no more records.
+	// If error is non nil, neither Record or Summary has a value.
+	Next() (*Record, *Summary, error)
+	//State() State
+	//IsAlive() bool
 	Close() error
 	// BeginTx
 	// CommitTx
@@ -36,12 +80,6 @@ type Connection interface {
 	// Run
 }
 
-type Routable interface {
-	// GetRoutingTabe
-}
-
-// Handles TLS handshake rules according to config
-func OpenTcp() (net.Conn, error) {
-	return net.Dial("tcp", "localhost:7687")
-	// TODO: DialTimeout ???
-}
+//type Routable interface {
+// GetRoutingTabe
+//}

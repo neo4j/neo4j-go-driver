@@ -17,7 +17,27 @@
  *  limitations under the License.
  */
 
-package api
+package neo4j
+
+import (
+	conn "github.com/neo4j/neo4j-go-driver/neo4j/internal/connection"
+)
+
+// StatementType defines the type of the statement
+type StatementType int
+
+const (
+	// StatementTypeUnknown identifies an unknown statement type
+	StatementTypeUnknown StatementType = 0
+	// StatementTypeReadOnly identifies a read-only statement
+	StatementTypeReadOnly StatementType = 1
+	// StatementTypeReadWrite identifies a read-write statement
+	StatementTypeReadWrite StatementType = 2
+	// StatementTypeWriteOnly identifies a write-only statement
+	StatementTypeWriteOnly StatementType = 3
+	// StatementTypeSchemaWrite identifies a schema-write statement
+	StatementTypeSchemaWrite StatementType = 4
+)
 
 type ResultSummary interface {
 	// Server returns basic information about the server where the statement is carried out.
@@ -54,4 +74,30 @@ type ServerInfo interface {
 	//Address() string
 	// Version returns the version of Neo4j running at the server.
 	Version() string
+}
+
+type resultSummary struct {
+	sum    *conn.Summary
+	cypher string
+	params map[string]interface{}
+}
+
+func (s *resultSummary) Server() ServerInfo {
+	return s
+}
+
+func (s *resultSummary) Version() string {
+	return s.sum.ServerVersion
+}
+
+func (s *resultSummary) Statement() Statement {
+	return s
+}
+
+func (s *resultSummary) Text() string {
+	return s.cypher
+}
+
+func (s *resultSummary) Params() map[string]interface{} {
+	return s.params
 }

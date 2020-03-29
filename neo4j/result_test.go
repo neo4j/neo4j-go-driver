@@ -17,31 +17,31 @@
  *  limitations under the License.
  */
 
-package bolt
+package neo4j
 
 import (
 	"errors"
 	"fmt"
 	"testing"
-
-	"github.com/neo4j/neo4j-go-driver/neo4j/api"
+	//	"github.com/neo4j/neo4j-go-driver/neo4j/api"
+	conn "github.com/neo4j/neo4j-go-driver/neo4j/internal/connection"
 )
 
 type iter struct {
 	expectNext   bool
-	expectRec    api.Record
-	expectSum    api.ResultSummary
+	expectRec    *conn.Record
+	expectSum    *conn.Summary
 	expectSumErr error
 	expectErr    error
-	fetchAll     bool
+	//fetchAll     bool
 	consumeAll   bool
 	summary      bool
 	panicOnFetch bool
 }
 
 type fetchRet struct {
-	rec *record
-	sum *summary
+	rec *conn.Record
+	sum *conn.Summary
 	err error
 }
 
@@ -50,7 +50,7 @@ type testFetcher struct {
 	panicOnFetch bool
 }
 
-func (f *testFetcher) fetch() (*record, *summary, error) {
+func (f *testFetcher) Next() (*conn.Record, *conn.Summary, error) {
 	if len(f.rets) == 0 || f.panicOnFetch {
 		// If signalling is made correctly in test case this shouldn't happen and if it does
 		// it is an error in test setup.
@@ -63,13 +63,13 @@ func (f *testFetcher) fetch() (*record, *summary, error) {
 
 func TestResult(ot *testing.T) {
 	keys := []string{"key1", "key2"}
-	recs := []*record{
-		&record{},
-		&record{},
-		&record{},
+	recs := []*conn.Record{
+		&conn.Record{},
+		&conn.Record{},
+		&conn.Record{},
 	}
-	sums := []*summary{
-		&summary{},
+	sums := []*conn.Summary{
+		&conn.Summary{},
 	}
 	errs := []error{
 		errors.New("Whatever"),
@@ -78,7 +78,7 @@ func TestResult(ot *testing.T) {
 	// Initialization
 	ot.Run("Initialization", func(t *testing.T) {
 		fetcher := &testFetcher{}
-		res := newResult(keys, fetcher.fetch)
+		res := newResult(keys, fetcher)
 		rec := res.Record()
 		if rec != nil {
 			t.Errorf("Should be no record")
@@ -97,7 +97,7 @@ func TestResult(ot *testing.T) {
 		name   string
 		stream []fetchRet
 		iters  []iter
-		sum    api.ResultSummary
+		sum    conn.Summary
 	}{
 		{
 			name: "happy",
@@ -151,20 +151,22 @@ func TestResult(ot *testing.T) {
 				iter{panicOnFetch: true, summary: true, expectNext: true, expectRec: recs[2], expectSum: sums[0]},
 			},
 		},
-		{
-			name: "fetch all",
-			stream: []fetchRet{
-				fetchRet{rec: recs[0]},
-				fetchRet{rec: recs[1]},
-				fetchRet{rec: recs[2]},
-				fetchRet{sum: sums[0]},
+		/*
+			{
+				name: "fetch all",
+				stream: []fetchRet{
+					fetchRet{rec: recs[0]},
+					fetchRet{rec: recs[1]},
+					fetchRet{rec: recs[2]},
+					fetchRet{sum: sums[0]},
+				},
+				iters: []iter{
+					iter{expectNext: true, expectRec: recs[0]},
+					iter{fetchAll: true, expectNext: true, expectRec: recs[1]},
+					iter{panicOnFetch: true, summary: true, expectNext: true, expectRec: recs[2], expectSum: sums[0]},
+				},
 			},
-			iters: []iter{
-				iter{expectNext: true, expectRec: recs[0]},
-				iter{fetchAll: true, expectNext: true, expectRec: recs[1]},
-				iter{panicOnFetch: true, summary: true, expectNext: true, expectRec: recs[2], expectSum: sums[0]},
-			},
-		},
+		*/
 		{
 			name: "consume all",
 			stream: []fetchRet{
@@ -182,17 +184,19 @@ func TestResult(ot *testing.T) {
 	for _, c := range iterCases {
 		ot.Run(fmt.Sprintf("Iteration-%s", c.name), func(t *testing.T) {
 			fetcher := &testFetcher{rets: c.stream}
-			res := newResult(keys, fetcher.fetch)
+			res := newResult(keys, fetcher)
 			for i, call := range c.iters {
 				fetcher.panicOnFetch = call.panicOnFetch
-				if call.fetchAll {
-					res.FetchAll()
-					if len(fetcher.rets) > 0 {
-						t.Fatalf("FetchAll should have emptied stream")
+				/*
+					if call.fetchAll {
+						res.FetchAll()
+						if len(fetcher.rets) > 0 {
+							t.Fatalf("FetchAll should have emptied stream")
+						}
 					}
-				}
+				*/
 				if call.consumeAll {
-					res.ConsumeAll()
+					res.Consume()
 					if len(fetcher.rets) > 0 {
 						t.Fatalf("ConsumeAll should have emptied stream")
 					}
