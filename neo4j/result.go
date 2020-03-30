@@ -41,25 +41,27 @@ type Result interface {
 }
 
 type iterator interface {
-	Next() (*conn.Record, *conn.Summary, error)
+	Next(s conn.StreamHandle) (*conn.Record, *conn.Summary, error)
 }
 
 type result struct {
-	keys        []string
 	err         error
 	iter        iterator
+	stream      *conn.Stream
+	cypher      string
+	params      map[string]interface{}
 	allReceived bool
 	unconsumed  list.List
 	record      *conn.Record
 	summary     *conn.Summary
-	cypher      string
-	params      map[string]interface{}
 }
 
-func newResult(keys []string, iter iterator) *result {
+func newResult(iter iterator, str *conn.Stream, cypher string, params map[string]interface{}) *result {
 	return &result{
-		keys: keys,
-		iter: iter,
+		iter:   iter,
+		stream: str,
+		cypher: cypher,
+		params: params,
 	}
 }
 
@@ -67,7 +69,7 @@ func newResult(keys []string, iter iterator) *result {
 func (r *result) doFetch() *conn.Record {
 	var rec *conn.Record
 	var sum *conn.Summary
-	rec, sum, r.err = r.iter.Next()
+	rec, sum, r.err = r.iter.Next(r.stream.Handle)
 	r.allReceived = r.err != nil || rec == nil
 	r.summary = sum
 	return rec

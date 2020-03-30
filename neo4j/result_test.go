@@ -50,7 +50,7 @@ type testFetcher struct {
 	panicOnFetch bool
 }
 
-func (f *testFetcher) Next() (*conn.Record, *conn.Summary, error) {
+func (f *testFetcher) Next(s conn.StreamHandle) (*conn.Record, *conn.Summary, error) {
 	if len(f.rets) == 0 || f.panicOnFetch {
 		// If signalling is made correctly in test case this shouldn't happen and if it does
 		// it is an error in test setup.
@@ -62,7 +62,11 @@ func (f *testFetcher) Next() (*conn.Record, *conn.Summary, error) {
 }
 
 func TestResult(ot *testing.T) {
-	keys := []string{"key1", "key2"}
+	stream := &conn.Stream{
+		Keys: []string{"key1", "key2"},
+	}
+	cypher := ""
+	params := map[string]interface{}{}
 	recs := []*conn.Record{
 		&conn.Record{},
 		&conn.Record{},
@@ -78,7 +82,7 @@ func TestResult(ot *testing.T) {
 	// Initialization
 	ot.Run("Initialization", func(t *testing.T) {
 		fetcher := &testFetcher{}
-		res := newResult(keys, fetcher)
+		res := newResult(fetcher, stream, cypher, params)
 		rec := res.Record()
 		if rec != nil {
 			t.Errorf("Should be no record")
@@ -184,7 +188,7 @@ func TestResult(ot *testing.T) {
 	for _, c := range iterCases {
 		ot.Run(fmt.Sprintf("Iteration-%s", c.name), func(t *testing.T) {
 			fetcher := &testFetcher{rets: c.stream}
-			res := newResult(keys, fetcher)
+			res := newResult(fetcher, stream, cypher, params)
 			for i, call := range c.iters {
 				fetcher.panicOnFetch = call.panicOnFetch
 				/*

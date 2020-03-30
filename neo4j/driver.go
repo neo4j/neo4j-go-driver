@@ -44,7 +44,7 @@ const (
 type Driver interface {
 	// The url this driver is bootstrapped
 	//Target() url.URL
-	Session() (Session, error) //accessMode AccessMode, bookmarks ...string) (Session, error)
+	Session(accessMode AccessMode, bookmarks ...string) (Session, error)
 	// Close the driver and all underlying connections
 	//Close() error
 }
@@ -119,13 +119,13 @@ func (d *driver) connect() (conn.Connection, error) {
 	return boltConn, nil
 }
 
-func (d *driver) Session() (Session, error) {
+func (d *driver) Session(accessMode AccessMode, bookmarks ...string) (Session, error) {
 	// Make a new connection
 	// TODO: Use connection pool
-	conn, err := d.connect()
+	c, err := d.connect()
 	if err != nil {
 		return nil, err
 	}
 
-	return &session{conn: conn}, nil
+	return newSession(c, conn.AccessMode(accessMode), bookmarks), nil
 }

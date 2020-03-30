@@ -23,6 +23,10 @@ import (
 	conn "github.com/neo4j/neo4j-go-driver/neo4j/internal/connection"
 )
 
+// TransactionWork represents a unit of work that will be executed against the provided
+// transaction
+type TransactionWork func(tx Transaction) (interface{}, error)
+
 // Session represents a logical connection (which is not tied to a physical connection)
 // to the server
 type Session interface {
@@ -30,13 +34,13 @@ type Session interface {
 	// If no bookmark was received or if this transaction was rolled back, the bookmark value will not be changed.
 	//LastBookmark() string
 	// BeginTransaction starts a new explicit transaction on this session
-	//BeginTransaction(configurers ...func(*TransactionConfig)) (Transaction, error)
+	BeginTransaction(configurers ...func(*TransactionConfig)) (Transaction, error)
 	// ReadTransaction executes the given unit of work in a AccessModeRead transaction with
 	// retry logic in place
-	//ReadTransaction(work TransactionWork, configurers ...func(*TransactionConfig)) (interface{}, error)
+	ReadTransaction(work TransactionWork, configurers ...func(*TransactionConfig)) (interface{}, error)
 	// WriteTransaction executes the given unit of work in a AccessModeWrite transaction with
 	// retry logic in place
-	//WriteTransaction(work TransactionWork, configurers ...func(*TransactionConfig)) (interface{}, error)
+	WriteTransaction(work TransactionWork, configurers ...func(*TransactionConfig)) (interface{}, error)
 	// Run executes an auto-commit statement and returns a result
 	Run(cypher string, params map[string]interface{}) (Result, error) //, configurers ...func(*TransactionConfig)) (Result, error)
 	// Close closes any open resources and marks this session as unusable
@@ -44,7 +48,65 @@ type Session interface {
 }
 
 type session struct {
-	conn conn.Connection
+	conn      conn.Connection
+	mode      conn.AccessMode
+	bookmarks []string
+}
+
+func newSession(conn conn.Connection, mode conn.AccessMode, bookmarks []string) *session {
+	return &session{
+		conn: conn,
+		mode: mode,
+	}
+}
+
+func (s *session) BeginTransaction(configurers ...func(*TransactionConfig)) (Transaction, error) {
+	config := TransactionConfig{Timeout: 0, Metadata: nil}
+	for _, c := range configurers {
+		c(&config)
+	}
+
+	tx, err := s.conn.TxBegin(s.mode, s.bookmarks, config.Timeout, config.Metadata)
+	if err != nil {
+		return nil, err
+	}
+
+	return &transaction{
+		conn: s.conn,
+		tx:   tx,
+	}, nil
+}
+
+func (s *session) runRetriable(work TransactionWork, configurers ...func(*TransactionConfig)) (interface{}, error) {
+	// TODO: Retry
+	tx, err := s.BeginTransaction(configurers...)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Close()
+
+	x, err := work(tx)
+	if err != nil {
+		return nil, err
+	}
+
+	err = tx.Commit()
+	if err != nil {
+		return nil, err
+	}
+
+	return x, nil
+}
+
+func (s *session) ReadTransaction(work TransactionWork, configurers ...func(*TransactionConfig)) (interface{}, error) {
+	return s.runRetriable(work, configurers...)
+}
+
+func (s *session) WriteTransaction(work TransactionWork, configurers ...func(*TransactionConfig)) (interface{}, error) {
+	if s.mode == conn.ReadMode {
+		return nil, newDriverError("write queries cannot be performed in read access mode")
+	}
+	return s.runRetriable(work, configurers...)
 }
 
 func (s *session) Run(
@@ -54,12 +116,10 @@ func (s *session) Run(
 	if err != nil {
 		return nil, err
 	}
-	res := newResult(stream.Keys, s.conn)
-	res.cypher = cypher
-	res.params = params
-	return res, nil
+	return newResult(s.conn, stream, cypher, params), nil
 }
 
 func (s *session) Close() error {
+	// TODO: Give connection back to driver
 	return s.conn.Close()
 }
