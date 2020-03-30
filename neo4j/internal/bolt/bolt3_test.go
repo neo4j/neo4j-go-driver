@@ -19,10 +19,15 @@
 
 package bolt
 
-// bolt3.connect is tested through Connect, no need to test it herekk
+import (
+	"testing"
 
-// TODO: test RunAutoCommit
-//       happy path
+	conn "github.com/neo4j/neo4j-go-driver/neo4j/internal/connection"
+)
+
+// bolt3.connect is tested through Connect, no need to test it here
+
+// TODO:
 //       syntax error, RUN fails with client error
 //       locking error, RUN fails with retryable error
 //       transaction open
@@ -36,3 +41,152 @@ package bolt
 //       unconsumed result
 //       already closed
 //       goodbye failure
+
+func TestBolt3(ot *testing.T) {
+	assertOnlyRecord := func(t *testing.T, rec *conn.Record, sum *conn.Summary, err error) {
+		t.Helper()
+		if rec == nil {
+			t.Errorf("Expected record")
+		}
+		if sum != nil {
+			t.Errorf("Didn't expect summary")
+		}
+		if err != nil {
+			t.Errorf("Didn't expect error")
+		}
+	}
+
+	assertOnlySummary := func(t *testing.T, rec *conn.Record, sum *conn.Summary, err error) {
+		t.Helper()
+		if rec != nil {
+			t.Errorf("Didn't expect record")
+		}
+		if sum == nil {
+			t.Errorf("Expected summary")
+		}
+		if err != nil {
+			t.Errorf("Didn't expect error")
+		}
+	}
+
+	assertKeys := func(t *testing.T, ekeys []interface{}, s *conn.Stream) {
+		t.Helper()
+		if s == nil {
+			t.Fatal("No stream")
+		}
+		for i, k := range s.Keys {
+			if k != ekeys[i] {
+				t.Errorf("Stream keys differ")
+			}
+		}
+	}
+
+	// Test streams
+	keys := []interface{}{"f1", "f2"}
+	// Happy path non transactional stream
+	strm1 := []testStruct{
+		makeTestRunResp(keys),
+		makeTestRec([]interface{}{"1v1", "1v2"}),
+		makeTestRec([]interface{}{"2v1", "2v2"}),
+		makeTestRec([]interface{}{"3v1", "3v2"}),
+		makeTestSum("bm"),
+	}
+	// Happy path transactional stream
+	strm2 := []testStruct{
+		makeTestRunResp(keys),
+		makeTestRec([]interface{}{"1v1", "1v2"}),
+		makeTestRec([]interface{}{"2v1", "2v2"}),
+		makeTestRec([]interface{}{"3v1", "3v2"}),
+		makeTestSum("bm"),
+	}
+
+	ot.Run("Run auto-commit, happy path", func(t *testing.T) {
+		// Connect client+server
+		conn, srv, cleanup := setupBoltPipe(t)
+		defer cleanup()
+		go func() {
+			srv.connect()
+			srv.waitAndServeAutoCommit(strm1)
+		}()
+		bolt, _ := Connect(conn)
+		defer bolt.Close()
+
+		str, _ := bolt.Run("MATCH (n) RETURN n", nil)
+		assertKeys(t, keys, str)
+
+		// Retrieve the records
+		for i := 1; i < len(strm1)-1; i++ {
+			rec, sum, err := bolt.Next(str.Handle)
+			assertOnlyRecord(t, rec, sum, err)
+		}
+		// Retrieve the summary
+		rec, sum, err := bolt.Next(str.Handle)
+		assertOnlySummary(t, rec, sum, err)
+	})
+
+	ot.Run("Run transactional, happy path", func(t *testing.T) {
+		// Connect client+server
+		nconn, srv, cleanup := setupBoltPipe(t)
+		defer cleanup()
+		go func() {
+			srv.connect()
+			srv.waitAndServeTransRun(strm2, true)
+		}()
+		bolt, _ := Connect(nconn)
+		defer bolt.Close()
+
+		tx, err := bolt.TxBegin(conn.ReadMode, nil, 0, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		str, err := bolt.RunTx(tx, "MATCH (n) RETURN n", nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		assertKeys(t, keys, str)
+
+		// Retrieve the records
+		for i := 1; i < len(strm2)-1; i++ {
+			rec, sum, err := bolt.Next(str.Handle)
+			assertOnlyRecord(t, rec, sum, err)
+		}
+		// Retrieve the summary
+		rec, sum, err := bolt.Next(str.Handle)
+		assertOnlySummary(t, rec, sum, err)
+
+		bolt.TxCommit(tx)
+	})
+
+	ot.Run("Run transactional, rollback", func(t *testing.T) {
+		// Connect client+server
+		nconn, srv, cleanup := setupBoltPipe(t)
+		defer cleanup()
+		go func() {
+			srv.connect()
+			srv.waitAndServeTransRun(strm2, false)
+		}()
+		bolt, _ := Connect(nconn)
+		defer bolt.Close()
+
+		tx, err := bolt.TxBegin(conn.ReadMode, nil, 0, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		str, err := bolt.RunTx(tx, "MATCH (n) RETURN n", nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		assertKeys(t, keys, str)
+
+		// Retrieve the records
+		for i := 1; i < len(strm2)-1; i++ {
+			rec, sum, err := bolt.Next(str.Handle)
+			assertOnlyRecord(t, rec, sum, err)
+		}
+		// Retrieve the summary
+		rec, sum, err := bolt.Next(str.Handle)
+		assertOnlySummary(t, rec, sum, err)
+
+		bolt.TxRollback(tx)
+	})
+}

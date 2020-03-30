@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2019 "Neo4j,"
+ * Copyright (c) 2002-2020 "Neo4j,"
  * Neo4j Sweden AB [http://neo4j.com]
  *
  * This file is part of Neo4j.
@@ -19,6 +19,10 @@
 
 package neo4j
 
+import (
+	conn "github.com/neo4j/neo4j-go-driver/neo4j/internal/connection"
+)
+
 // Transaction represents a transaction in the Neo4j database
 type Transaction interface {
 	// Run executes a statement on this transaction and returns a result
@@ -30,4 +34,42 @@ type Transaction interface {
 	// Close rolls back the actual transaction if it's not already committed/rolled back
 	// and closes all resources associated with this transaction
 	Close() error
+}
+
+type transaction struct {
+	conn conn.Connection
+	tx   conn.Handle
+}
+
+func (t *transaction) Run(cypher string, params map[string]interface{}) (Result, error) {
+	stream, err := t.conn.RunTx(t.tx, cypher, params)
+	if err != nil {
+		return nil, err
+	}
+	return newResult(t.conn, stream, cypher, params), nil
+}
+
+func (t *transaction) Commit() error {
+	err := t.conn.TxCommit(t.tx)
+	if err != nil {
+		return err
+	}
+	t.tx = nil
+	return nil
+}
+
+func (t *transaction) Rollback() error {
+	err := t.conn.TxRollback(t.tx)
+	if err != nil {
+		return err
+	}
+	t.tx = nil
+	return nil
+}
+
+func (t *transaction) Close() error {
+	if t.tx != nil {
+		return t.conn.TxRollback(t.tx)
+	}
+	return nil
 }

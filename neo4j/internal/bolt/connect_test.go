@@ -20,34 +20,9 @@
 package bolt
 
 import (
-	"io"
-	"net"
 	"sync"
 	"testing"
-
-	"github.com/neo4j/neo4j-go-driver/neo4j/internal/packstream"
 )
-
-type testHydrator struct {
-}
-
-type testHydrated struct {
-	tag    packstream.StructTag
-	fields []interface{}
-}
-
-func (r *testHydrated) HydrateField(field interface{}) error {
-	r.fields = append(r.fields, field)
-	return nil
-}
-
-func (r *testHydrated) HydrationComplete() error {
-	return nil
-}
-
-func (h *testHydrator) Hydrator(tag packstream.StructTag, numFields int) (packstream.Hydrator, error) {
-	return &testHydrated{tag: tag}, nil
-}
 
 func TestConnectBolt3(t *testing.T) {
 	wg := sync.WaitGroup{}
@@ -57,27 +32,14 @@ func TestConnectBolt3(t *testing.T) {
 	// TODO: Test authentication failure, connection should close (bolt3 test?)
 	// TODO: Test connect timeout
 
-	// Use a real TCP connection. Alternative is to use net.Pipe but that works a bit different
-	// in regards to buffering, chunking causes some problems with pipe since number of reads
-	// doesn''t correspond to number of writes.
-	l, err := net.Listen("tcp", ":0")
-	if err != nil {
-		t.Fatalf("Unable to listen: %s", err)
-	}
+	conn, srv, cleanup := setupBoltPipe(t)
+	defer cleanup()
 
 	// Simulate server with a succesful connect
 	go func() {
-		conn, err := l.Accept()
-		if err != nil {
-			t.Fatalf("Accept error: %s", err)
-		}
-
 		// Wait for initial handshake
-		handshake := make([]byte, 4*5)
-		_, err = io.ReadFull(conn, handshake)
-		if err != nil {
-			t.Fatalf("Server got a read error: %s", err)
-		}
+		handshake := srv.waitForHandshake()
+
 		// There should be a version 3 somewhere
 		foundV3 := false
 		for i := 0; i < 5; i++ {
@@ -91,51 +53,16 @@ func TestConnectBolt3(t *testing.T) {
 		}
 
 		// Accept bolt version 3
-		ver3 := []byte{0x00, 0x00, 0x00, 0x03}
-		_, err = conn.Write(ver3)
-		if err != nil {
-			t.Fatalf("Failed to send version")
-		}
+		srv.acceptVersion(3)
 
 		// Need unpacker, hydrator and a dechunker now
-		dechunker := newDechunker(conn)
-		unpacker := packstream.NewUnpacker(dechunker)
-		hyd := &testHydrator{}
-
-		// Wait for hello
-		x, err := unpacker.UnpackStruct(hyd)
-		if err != nil {
-			t.Fatalf("Server couldn't parse hello")
-		}
-		hello := x.(*testHydrated)
-		m := hello.fields[0].(map[string]interface{})
-		// Hello should contain some musts
-		_, exists := m["scheme"]
-		if !exists {
-			t.Errorf("Missing scheme")
-		}
-		_, exists = m["user_agent"]
-		if !exists {
-			t.Errorf("Missing user_agent")
-		}
+		srv.waitForHello()
 
 		// Need packer and a chunker now
-		chunker := newChunker(conn, 4096)
-		packer := packstream.NewPacker(chunker)
-
-		// Accept
-		packer.PackStruct(msgV3Success, map[string]interface{}{
-			"connection_id": "cid",
-			"server":        "fake/3.5",
-		})
-		chunker.send()
+		srv.acceptHello()
 
 		wg.Done()
 	}()
-
-	// Connect to server
-	addr := l.Addr()
-	conn, err := net.Dial(addr.Network(), addr.String())
 
 	// Pass the connection to bolt connect
 	boltconn, err := Connect(conn)

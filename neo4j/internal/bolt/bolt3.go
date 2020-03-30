@@ -23,6 +23,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"time"
 
 	conn "github.com/neo4j/neo4j-go-driver/neo4j/internal/connection"
 	"github.com/neo4j/neo4j-go-driver/neo4j/internal/packstream"
@@ -46,22 +47,24 @@ const (
 
 const userAgent = "Go Driver/1.8"
 
-// State that belongs to a certain session. Upon reset this state is wiped.
-// All members should have a default value that gets a proper value with empty init.
-type sessionState struct {
-	isMessedUp bool
-	//cypher     string
-	//params     map[string]interface{}
-	keys []string
-}
+const (
+	ready        = iota // After connect and reset
+	disconnected        // Lost connection to server
+	corrupt             // Non recoverable protocol error
+	streaming           // Receiving result from auto commit query
+	tx                  // In a transaction
+	streamingtx         // Receiving result from a query within a transaction
+)
 
 type bolt3 struct {
+	state         int
+	txId          int64
+	streamId      int64
+	steamKeys     []string
 	conn          net.Conn
 	chunker       *chunker
-	connected     bool
 	packer        *packstream.Packer
 	unpacker      *packstream.Unpacker
-	state         sessionState
 	connId        string
 	serverVersion string
 }
@@ -72,6 +75,7 @@ func NewBolt3(conn net.Conn) *bolt3 {
 	dechunker := newDechunker(conn)
 
 	return &bolt3{
+		state:    disconnected,
 		conn:     conn,
 		chunker:  chunker,
 		packer:   packstream.NewPacker(chunker),
@@ -88,17 +92,56 @@ func (b *bolt3) appendMsg(tag packstream.StructTag, field ...interface{}) error 
 		// At this point we do not know the state of what has been written to the chunks.
 		// Either we should support rolling back whatever that has been written or just
 		// bail out this session.
-		b.state.isMessedUp = true
+		b.state = corrupt
 		return err
 	}
 	return nil
 }
 
+func (b *bolt3) sendMsg(tag packstream.StructTag, field ...interface{}) error {
+	err := b.appendMsg(tag, field...)
+	if err != nil {
+		return err
+	}
+	return b.chunker.send()
+}
+
+func (b *bolt3) invalidStateError(expected []int) error {
+	return errors.New(fmt.Sprintf("Invalid state %d, expected: %+v", b.state, expected))
+}
+
+func (b *bolt3) assertHandle(id int64, h conn.Handle) error {
+	hid, ok := h.(int64)
+	if !ok || hid != id {
+		return errors.New("Invalid handle")
+	}
+	return nil
+}
+
+func (b *bolt3) receiveSuccessResponse() (*successResponse, error) {
+	res, err := b.unpacker.UnpackStruct(b)
+	if err != nil {
+		return nil, err
+	}
+	switch v := res.(type) {
+	case *successResponse:
+		return v, nil
+	case *failureResponse:
+		return nil, errors.New("Received failure from server")
+	}
+	return nil, errors.New("Unknown response")
+}
+
 // TODO: Error types!
 func (b *bolt3) connect() error {
-	// Server is assumed to be in CONNECTED state, send hello message with proper authentication
-	// info to the server to make it transition into READY
-	err := b.appendMsg(
+	// Only allowed to connect when in disconnected state
+	if b.state != disconnected {
+		return b.invalidStateError([]int{disconnected})
+	}
+
+	// Send hello message with proper authentication
+	// TODO: Authentication
+	err := b.sendMsg(
 		msgV3Hello,
 		map[string]interface{}{
 			"user_agent":  userAgent,
@@ -109,41 +152,119 @@ func (b *bolt3) connect() error {
 	if err != nil {
 		return err
 	}
-	err = b.chunker.send()
-	if err != nil {
-		return err
-	}
 
-	// Read response from server
-	res, err := b.unpacker.UnpackStruct(b)
+	succRes, err := b.receiveSuccessResponse()
 	if err != nil {
 		return err
 	}
-	switch v := res.(type) {
-	case *successResponse:
-		b.connId, b.serverVersion, err = b.successResponseToConnectionInfo(v)
-		if err != nil {
-			return err
-		}
-		b.connected = true
-		return nil
-	case *failureResponse:
-		return errors.New("Received failure from server")
-	case *ignoredResponse:
-		return errors.New("Received ignored from server")
-	default:
-		return errors.New("Unknown response")
+	b.connId, b.serverVersion, err = b.successResponseToConnectionInfo(succRes)
+	if err != nil {
+		return err
 	}
+	// Transition into ready state
+	b.state = ready
+	return nil
 }
 
-func (b *bolt3) Run(cypher string, params map[string]interface{}) (*conn.Stream, error) {
-	if !b.connected || b.state.isMessedUp {
-		return nil, errors.New("Not alive")
+func (b *bolt3) TxBegin(
+	mode conn.AccessMode, bookmarks []string, timeout time.Duration, meta map[string]interface{}) (conn.Handle, error) {
+
+	// Only allowed to begin a transaction from ready state
+	if b.state != ready {
+		return nil, b.invalidStateError([]int{ready})
 	}
 
-	// TODO: Ensure state
-	// TODO: Ensure no transaction open already
+	// TODO: Lazy begin, defer this to when Run is called
+	smode := "WRITE"
+	if mode == conn.ReadMode {
+		smode = "READ"
+	}
+	params := map[string]interface{}{
+		"mode": smode,
+	}
+	if len(bookmarks) > 0 {
+		params["bookmarks"] = bookmarks
+	}
+	ts := int(timeout.Seconds())
+	if ts > 0 {
+		params["tx_timeout"] = ts
+	}
+	if len(meta) > 0 {
+		params["tx_metadata"] = meta
+	}
+	err := b.sendMsg(msgV3Begin, params)
+	if err != nil {
+		return nil, err
+	}
 
+	_, err = b.receiveSuccessResponse()
+	if err != nil {
+		return nil, err
+	}
+
+	b.txId = time.Now().Unix()
+	// Transition into tx state
+	b.state = tx
+
+	return b.txId, nil
+}
+
+func (b *bolt3) TxCommit(txh conn.Handle) error {
+	// Can only commit when in tx state
+	if b.state != tx {
+		return b.invalidStateError([]int{tx})
+	}
+	err := b.assertHandle(b.txId, txh)
+	if err != nil {
+		return err
+	}
+
+	err = b.sendMsg(msgV3Commit)
+	if err != nil {
+		return err
+	}
+
+	_, err = b.receiveSuccessResponse()
+	if err != nil {
+		return err
+	}
+
+	// Transition into ready state
+	b.state = ready
+	// TODO: Keep track of bookmark!
+	// bolt.successResponse: &{m:map[bookmark:neo4j:bookmark:v1:tx35]}
+	//fmt.Printf("Got commit response %T: %+v\n", res, res)
+	return nil
+}
+
+func (b *bolt3) TxRollback(txh conn.Handle) error {
+	// Can only commit when in tx state
+	if b.state != tx {
+		return b.invalidStateError([]int{tx})
+	}
+	err := b.assertHandle(b.txId, txh)
+	if err != nil {
+		return err
+	}
+
+	err = b.sendMsg(msgV3Rollback)
+	if err != nil {
+		return err
+	}
+
+	_, err = b.receiveSuccessResponse()
+	if err != nil {
+		return err
+	}
+
+	// Transition into ready state
+	b.state = ready
+
+	//  *bolt.successResponse: &{m:map[]}
+	return nil
+}
+
+func (b *bolt3) run(successState int, cypher string, params map[string]interface{}) (*conn.Stream, error) {
 	// Send request to run query along with request to stream the result
 	// TODO: Meta data
 	err := b.appendMsg(msgV3Run,
@@ -163,30 +284,42 @@ func (b *bolt3) Run(cypher string, params map[string]interface{}) (*conn.Stream,
 		return nil, err
 	}
 
-	// Read Run response from server
-	res, err := b.unpacker.UnpackStruct(b)
+	// Receive run response
+	succRes, err := b.receiveSuccessResponse()
 	if err != nil {
 		return nil, err
 	}
-	switch v := res.(type) {
-	case *successResponse:
-		err = b.successResponseStreamStart(v)
-		if err != nil {
-			b.state.isMessedUp = true
-			return nil, err
-		}
-		//b.state.cypher = cypher
-		//b.state.params = params
-		stream := &conn.Stream{Keys: b.state.keys}
-		return stream, nil
-	case *failureResponse:
-		// Returning here assumes that we don't get any response on the pull message
-		// Check code to determine if we're messed up, retry logic should be handled in session.
-		return nil, v
-	default:
-		b.state.isMessedUp = true
-		return nil, errors.New("Unexpected response")
+
+	err = b.successResponseStreamStart(succRes)
+	if err != nil {
+		b.state = corrupt
+		return nil, err
 	}
+
+	b.streamId = time.Now().Unix()
+	b.state = successState
+	stream := &conn.Stream{Keys: b.steamKeys, Handle: b.streamId}
+	return stream, nil
+}
+
+func (b *bolt3) Run(cypher string, params map[string]interface{}) (*conn.Stream, error) {
+	if b.state != ready {
+		return nil, b.invalidStateError([]int{ready})
+	}
+
+	return b.run(streaming, cypher, params)
+}
+
+func (b *bolt3) RunTx(txh conn.Handle, cypher string, params map[string]interface{}) (*conn.Stream, error) {
+	if b.state != tx {
+		return nil, b.invalidStateError([]int{tx})
+	}
+	err := b.assertHandle(b.txId, txh)
+	if err != nil {
+		return nil, err
+	}
+
+	return b.run(streamingtx, cypher, params)
 }
 
 // Try to create a response from a success response.
@@ -205,7 +338,7 @@ func (b *bolt3) successResponseStreamStart(r *successResponse) error {
 			return errors.New("Field is not string")
 		}
 	}
-	b.state.keys = keys
+	b.steamKeys = keys
 	return nil
 }
 
@@ -224,10 +357,17 @@ func (b *bolt3) successResponseToConnectionInfo(r *successResponse) (string, str
 
 func (b *bolt3) successResponseToSummary(r *successResponse) (*conn.Summary, error) {
 	m := r.Map()
+	sum := &conn.Summary{
+		ServerVersion: b.serverVersion,
+	}
+	// In tx
+	// TODO: Counters
+	// &{m:map[stats:map[labels-added:1 nodes-created:1 properties-set:1] t_last:0 type:w]}
+
 	// Should be a bookmark
 	bm, ok := m["bookmark"].(string)
-	if !ok {
-		return nil, errors.New("Missing bookmark")
+	if ok {
+		sum.Bookmark = &bm
 	}
 	// Should be a statement type
 	/*
@@ -236,15 +376,20 @@ func (b *bolt3) successResponseToSummary(r *successResponse) (*conn.Summary, err
 			return nil, errors.New("Missing stmnt type")
 		}
 	*/
-	return &conn.Summary{
-		Bookmark:      bm,
-		ServerVersion: b.serverVersion,
-		//stmntType:     st,
-	}, nil
+	return sum, nil
 }
 
 // Reads one record from the stream.
-func (b *bolt3) Next() (*conn.Record, *conn.Summary, error) {
+func (b *bolt3) Next(shandle conn.StreamHandle) (*conn.Record, *conn.Summary, error) {
+	if b.state != streaming && b.state != streamingtx {
+		return nil, nil, b.invalidStateError([]int{streaming, streamingtx})
+	}
+
+	err := b.assertHandle(b.streamId, shandle)
+	if err != nil {
+		return nil, nil, err
+	}
+
 	res, err := b.unpacker.UnpackStruct(b)
 	if err != nil {
 		return nil, nil, err
@@ -252,13 +397,19 @@ func (b *bolt3) Next() (*conn.Record, *conn.Summary, error) {
 
 	switch x := res.(type) {
 	case *recordResponse:
-		rec := &conn.Record{Keys: b.state.keys, Values: x.fields[0].([]interface{})}
+		rec := &conn.Record{Keys: b.steamKeys, Values: x.fields[0].([]interface{})}
 		return rec, nil, nil
 	case *successResponse:
 		sum, err := b.successResponseToSummary(x)
 		if err != nil {
-			b.state.isMessedUp = true
+			b.state = corrupt
 			return nil, nil, err
+		}
+		// End of stream
+		if b.state == streamingtx {
+			b.state = tx
+		} else {
+			b.state = ready
 		}
 		return nil, sum, nil
 	case *failureResponse:
@@ -274,40 +425,31 @@ func (b *bolt3) IsAlive() bool {
 	return b.connected && !b.state.isMessedUp
 }
 */
-func (b *bolt3) State() conn.State {
-	return conn.DISCONNECTED
-}
-
 func (b *bolt3) Close() error {
 	// Already closed?
-	if !b.connected {
+	if b.state == disconnected {
 		return nil
 	}
 
-	// TODO: Pending result?
+	// TODO: Active stream?
+	// TODO: Active tx?
 
 	var errs []error
 
 	// Append goodbye message to existing chunks
-	err := b.packer.PackStruct(msgV3Goodbye)
+	err := b.sendMsg(msgV3Goodbye)
 	if err != nil {
 		// Still need to close the connection and send all pending messages that might be critical.
 		// So just remember the error and continue. Should return this error to client!
 		errs = append(errs, err)
 	}
 
-	// Send all pending messages
-	err = b.chunker.send()
-	if err != nil {
-		errs = append(errs, err)
-	}
-
 	// Close the connection
 	err = b.conn.Close()
-	b.connected = false
 	if err != nil {
 		errs = append(errs, err)
 	}
+	b.state = disconnected
 
 	if len(errs) > 0 {
 		return errs[0]
