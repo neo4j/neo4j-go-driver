@@ -50,7 +50,7 @@ type testFetcher struct {
 	panicOnFetch bool
 }
 
-func (f *testFetcher) Next(s conn.StreamHandle) (*conn.Record, *conn.Summary, error) {
+func (f *testFetcher) Next(s conn.Handle) (*conn.Record, *conn.Summary, error) {
 	if len(f.rets) == 0 || f.panicOnFetch {
 		// If signalling is made correctly in test case this shouldn't happen and if it does
 		// it is an error in test setup.

@@ -31,7 +31,7 @@ import (
 
 // Negotiate version of bolt protocol.
 // Closes the provided connection if any error is encountered.
-func Connect(conn net.Conn) (connection.Connection, error) {
+func Connect(serverName string, conn net.Conn) (connection.Connection, error) {
 	// TODO: Use deadline read/write
 
 	// Perform Bolt handshake to negotiate version
@@ -59,7 +59,7 @@ func Connect(conn net.Conn) (connection.Connection, error) {
 	switch ver {
 	case 3:
 		// Handover rest of connection handshaking
-		boltConn := NewBolt3(conn)
+		boltConn := NewBolt3(serverName, conn)
 		err = boltConn.connect()
 		if err != nil {
 			// Make sure that the connection is closed!

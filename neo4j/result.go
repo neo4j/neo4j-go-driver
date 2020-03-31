@@ -41,7 +41,7 @@ type Result interface {
 }
 
 type iterator interface {
-	Next(s conn.StreamHandle) (*conn.Record, *conn.Summary, error)
+	Next(s conn.Handle) (*conn.Record, *conn.Summary, error)
 }
 
 type result struct {
