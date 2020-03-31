@@ -21,11 +21,14 @@
 package neo4j
 
 import (
+	"context"
 	"errors"
-	"github.com/neo4j/neo4j-go-driver/neo4j/internal/bolt"
-	conn "github.com/neo4j/neo4j-go-driver/neo4j/internal/connection"
 	"net"
 	"net/url"
+
+	"github.com/neo4j/neo4j-go-driver/neo4j/internal/bolt"
+	conn "github.com/neo4j/neo4j-go-driver/neo4j/internal/connection"
+	"github.com/neo4j/neo4j-go-driver/neo4j/internal/pool"
 )
 
 // AccessMode defines modes that routing driver decides to which cluster member
@@ -97,22 +100,25 @@ func NewDriver(target string, auth AuthToken, configurers ...func(*Config)) (Dri
 	return &driver{
 		target: parsed,
 		config: config,
+		pool:   pool.New(config.MaxConnectionPoolSize, connect),
 	}, nil
 }
 
 type driver struct {
 	target *url.URL
 	config *Config
+	pool   *pool.Pool
 }
 
-func (d *driver) connect() (conn.Connection, error) {
-	conn, err := net.Dial("tcp", d.target.Host)
+func connect(target string) (conn.Connection, error) {
+	// TODO: Handle SocketConnectTimeout
+	conn, err := net.Dial("tcp", target)
 	if err != nil {
 		return nil, err
 	}
 
 	// Pass ownership of connection to bolt upon success
-	boltConn, err := bolt.Connect(conn)
+	boltConn, err := bolt.Connect(target, conn)
 	if err != nil {
 		return nil, err
 	}
@@ -120,12 +126,13 @@ func (d *driver) connect() (conn.Connection, error) {
 }
 
 func (d *driver) Session(accessMode AccessMode, bookmarks ...string) (Session, error) {
-	// Make a new connection
-	// TODO: Use connection pool
-	c, err := d.connect()
+	ctx, cancel := context.WithTimeout(context.Background(), d.config.ConnectionAcquisitionTimeout)
+	defer cancel()
+
+	c, err := d.pool.Borrow(ctx, []string{d.target.Host})
 	if err != nil {
 		return nil, err
 	}
 
-	return newSession(c, conn.AccessMode(accessMode), bookmarks), nil
+	return newSession(c, d.pool.Return, conn.AccessMode(accessMode), bookmarks), nil
 }

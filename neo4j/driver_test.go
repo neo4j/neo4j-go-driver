@@ -6,6 +6,7 @@ import (
 	"math"
 	"math/big"
 	"testing"
+	"time"
 )
 
 type runInTxOrNot interface {
@@ -14,7 +15,10 @@ type runInTxOrNot interface {
 
 func TestDriverIntegration(ot *testing.T) {
 	makeDriver := func(t *testing.T) Driver {
-		driver, err := NewDriver("bolt://localhost:7687", BasicAuth("neo4j", "pass", ""))
+		driver, err := NewDriver("bolt://localhost:7687", BasicAuth("neo4j", "pass", ""), func(c *Config) {
+			c.MaxConnectionPoolSize = 2
+			c.ConnectionAcquisitionTimeout = time.Second * 1
+		})
 		if err != nil {
 			t.Fatalf("%s", err)
 		}

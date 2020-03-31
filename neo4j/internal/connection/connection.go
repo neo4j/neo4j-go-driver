@@ -43,8 +43,6 @@ type Record struct {
 
 type Handle interface{}
 
-type StreamHandle interface{}
-
 type Stream struct {
 	Handle Handle
 	Keys   []string
@@ -67,8 +65,9 @@ type Connection interface {
 	RunTx(tx Handle, cypher string, params map[string]interface{}) (*Stream, error)
 	// If error is nil, either Record or Summary has a value, if Record is nil there are no more records.
 	// If error is non nil, neither Record or Summary has a value.
-	Next(s StreamHandle) (*Record, *Summary, error)
-	//IsAlive() bool
+	Next(streamHandle Handle) (*Record, *Summary, error)
+	IsAlive() bool
+	ServerName() string
 	Close() error
 }
 

@@ -47,16 +47,20 @@ type Session interface {
 	Close() error
 }
 
+type closer func(c conn.Connection)
+
 type session struct {
 	conn      conn.Connection
+	closer    closer
 	mode      conn.AccessMode
 	bookmarks []string
 }
 
-func newSession(conn conn.Connection, mode conn.AccessMode, bookmarks []string) *session {
+func newSession(conn conn.Connection, closer closer, mode conn.AccessMode, bookmarks []string) *session {
 	return &session{
-		conn: conn,
-		mode: mode,
+		conn:   conn,
+		closer: closer,
+		mode:   mode,
 	}
 }
 
@@ -120,6 +124,6 @@ func (s *session) Run(
 }
 
 func (s *session) Close() error {
-	// TODO: Give connection back to driver
-	return s.conn.Close()
+	s.closer(s.conn)
+	return nil
 }

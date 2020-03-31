@@ -62,6 +62,7 @@ type bolt3 struct {
 	streamId      int64
 	steamKeys     []string
 	conn          net.Conn
+	serverName    string
 	chunker       *chunker
 	packer        *packstream.Packer
 	unpacker      *packstream.Unpacker
@@ -69,18 +70,23 @@ type bolt3 struct {
 	serverVersion string
 }
 
-func NewBolt3(conn net.Conn) *bolt3 {
+func NewBolt3(serverName string, conn net.Conn) *bolt3 {
 	// Wrap connection reading/writing in chunk reader/writer
 	chunker := newChunker(conn, 4096)
 	dechunker := newDechunker(conn)
 
 	return &bolt3{
-		state:    disconnected,
-		conn:     conn,
-		chunker:  chunker,
-		packer:   packstream.NewPacker(chunker),
-		unpacker: packstream.NewUnpacker(dechunker),
+		state:      disconnected,
+		conn:       conn,
+		serverName: serverName,
+		chunker:    chunker,
+		packer:     packstream.NewPacker(chunker),
+		unpacker:   packstream.NewUnpacker(dechunker),
 	}
+}
+
+func (b *bolt3) ServerName() string {
+	return b.serverName
 }
 
 func (b *bolt3) appendMsg(tag packstream.StructTag, field ...interface{}) error {
@@ -380,7 +386,7 @@ func (b *bolt3) successResponseToSummary(r *successResponse) (*conn.Summary, err
 }
 
 // Reads one record from the stream.
-func (b *bolt3) Next(shandle conn.StreamHandle) (*conn.Record, *conn.Summary, error) {
+func (b *bolt3) Next(shandle conn.Handle) (*conn.Record, *conn.Summary, error) {
 	if b.state != streaming && b.state != streamingtx {
 		return nil, nil, b.invalidStateError([]int{streaming, streamingtx})
 	}
@@ -420,11 +426,14 @@ func (b *bolt3) Next(shandle conn.StreamHandle) (*conn.Record, *conn.Summary, er
 	}
 }
 
-/*
 func (b *bolt3) IsAlive() bool {
-	return b.connected && !b.state.isMessedUp
+	switch b.state {
+	case disconnected, corrupt:
+		return false
+	}
+	return true
 }
-*/
+
 func (b *bolt3) Close() error {
 	// Already closed?
 	if b.state == disconnected {
