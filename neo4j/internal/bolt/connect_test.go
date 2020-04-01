@@ -65,7 +65,7 @@ func TestConnectBolt3(t *testing.T) {
 	}()
 
 	// Pass the connection to bolt connect
-	boltconn, err := Connect(conn)
+	boltconn, err := Connect("name", conn)
 	if err != nil {
 		t.Fatalf("Failed to connect bolt: %s", err)
 	}

@@ -108,7 +108,7 @@ func TestBolt3(ot *testing.T) {
 			srv.connect()
 			srv.waitAndServeAutoCommit(strm1)
 		}()
-		bolt, _ := Connect(conn)
+		bolt, _ := Connect("name", conn)
 		defer bolt.Close()
 
 		str, _ := bolt.Run("MATCH (n) RETURN n", nil)
@@ -132,7 +132,7 @@ func TestBolt3(ot *testing.T) {
 			srv.connect()
 			srv.waitAndServeTransRun(strm2, true)
 		}()
-		bolt, _ := Connect(nconn)
+		bolt, _ := Connect("name", nconn)
 		defer bolt.Close()
 
 		tx, err := bolt.TxBegin(conn.ReadMode, nil, 0, nil)
@@ -165,7 +165,7 @@ func TestBolt3(ot *testing.T) {
 			srv.connect()
 			srv.waitAndServeTransRun(strm2, false)
 		}()
-		bolt, _ := Connect(nconn)
+		bolt, _ := Connect("name", nconn)
 		defer bolt.Close()
 
 		tx, err := bolt.TxBegin(conn.ReadMode, nil, 0, nil)
