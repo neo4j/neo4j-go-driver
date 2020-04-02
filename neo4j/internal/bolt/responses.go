@@ -21,54 +21,122 @@ package bolt
 
 import (
 	"fmt"
+
+	conn "github.com/neo4j/neo4j-go-driver/neo4j/internal/connection"
 )
 
-// Ignored response from server
+// Server ignored request.
 type ignoredResponse struct {
-	fields []interface{}
-}
-
-func (r *ignoredResponse) HydrateField(field interface{}) error {
-	r.fields = append(r.fields, field)
-	return nil
-}
-
-func (r *ignoredResponse) HydrationComplete() error {
-	return nil
 }
 
 func (r *ignoredResponse) Error() string {
 	return "ignored"
 }
 
-// Failure response from server
+// Server failed to fullfill request.
 type failureResponse struct {
-	fields []interface{}
-}
-
-func (r *failureResponse) HydrateField(field interface{}) error {
-	r.fields = append(r.fields, field)
-	return nil
-}
-
-func (r *failureResponse) HydrationComplete() error {
-	return nil
+	code    string
+	message string
 }
 
 func (r *failureResponse) Error() string {
-	return fmt.Sprintf("failed: %+v", r.fields)
+	return fmt.Sprintf("code: %s, msg: %s", r.code, r.message)
 }
 
-// Record response from server
+// Record response from server.
 type recordResponse struct {
-	fields []interface{}
+	values []interface{}
 }
 
-func (r *recordResponse) HydrateField(field interface{}) error {
-	r.fields = append(r.fields, field)
-	return nil
+// Success response from server, success contains meta data that looks different depending
+// on what request the response is for.
+type successResponse struct {
+	meta map[string]interface{}
 }
 
-func (r *recordResponse) HydrationComplete() error {
-	return nil
+// Extracted from SuccessResponse.meta for a RUN request.
+type runSuccess struct {
+	fields  []string
+	t_first int64
+}
+
+func (s *successResponse) run() *runSuccess {
+	fieldsx, fok := s.meta["fields"].([]interface{})
+	t_first, _ := s.meta["t_first"].(int64)
+	if !fok {
+		return nil
+	}
+	fields := make([]string, len(fieldsx))
+	for i, x := range fieldsx {
+		s, ok := x.(string)
+		if !ok {
+			return nil
+		}
+		fields[i] = s
+	}
+	return &runSuccess{fields: fields, t_first: t_first}
+}
+
+// Extracted from SuccessResponse.meta for a HELLO request.
+type helloSuccess struct {
+	connectionId       string
+	credentialsExpired bool
+	server             string
+}
+
+func (s *successResponse) hello() *helloSuccess {
+	id, iok := s.meta["connection_id"].(string)
+	server, sok := s.meta["server"].(string)
+	if !iok || !sok {
+		return nil
+	}
+	exp, _ := s.meta["credentials_expired"].(bool)
+	return &helloSuccess{connectionId: id, server: server, credentialsExpired: exp}
+}
+
+// Extracted from SuccessResponse.meta on end of stream.
+// Maps directly to shared internal summary type to avoid unnecessary conversions.
+func (s *successResponse) summary() *conn.Summary {
+	t_last, _ := s.meta["t_last"].(int64)
+	qtype, tok := s.meta["type"].(string)
+	bookmark, _ := s.meta["bookmark"].(string) // Optional ?
+	if !tok {
+		return nil
+	}
+
+	// Map statement type received to internal type
+	stmntType := conn.StatementTypeUnknown
+	switch qtype {
+	case "r":
+		stmntType = conn.StatementTypeRead
+	case "w":
+		stmntType = conn.StatementTypeWrite
+	case "rw":
+		stmntType = conn.StatementTypeReadWrite
+	case "s":
+		stmntType = conn.StatementTypeSchemaWrite
+	}
+
+	// Optional statistics
+	var counts map[string]int
+	statsx, _ := s.meta["stats"].(map[string]interface{})
+	if len(statsx) > 0 {
+		// Convert from ugly interface{} to ints
+		counts = make(map[string]int, len(statsx))
+		for k, v := range statsx {
+			c, ok := v.(int64)
+			if ok {
+				counts[k] = int(c)
+			}
+		}
+	}
+
+	// TODO: Query plan
+
+	return &conn.Summary{
+		Bookmark:  bookmark,
+		TLast:     t_last,
+		StmntType: stmntType,
+		Counters:  counts,
+	}
 }

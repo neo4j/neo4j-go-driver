@@ -15,6 +15,7 @@ type runInTxOrNot interface {
 
 func TestDriverIntegration(ot *testing.T) {
 	makeDriver := func(t *testing.T) Driver {
+		t.Helper()
 		driver, err := NewDriver("bolt://localhost:7687", BasicAuth("neo4j", "pass", ""), func(c *Config) {
 			c.MaxConnectionPoolSize = 2
 			c.ConnectionAcquisitionTimeout = time.Second * 1
@@ -151,6 +152,117 @@ func TestDriverIntegration(ot *testing.T) {
 			t.Fatal(err)
 		}
 		assertNoRandomNode(t, sess2, params)
+	})
+
+	ot.Run("Read node", func(t *testing.T) {
+		driver := makeDriver(t)
+		sess, err := driver.Session(AccessModeWrite)
+		if err != nil {
+			t.Fatal(err)
+		}
+		x, err := sess.WriteTransaction(func(tx Transaction) (interface{}, error) {
+			res, err := tx.Run("CREATE (p:Person:Swedish {name: 'Nisse', age: 19, city: 'Lund' }) RETURN p", nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+			_, err = res.Summary()
+			if err != nil {
+				t.Fatal(err)
+			}
+			res.Next()
+			return res.Record().Values()[0], nil
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		n := x.(Node)
+		if n.Id() == 0 {
+			t.Error("Node id can not be 0")
+		}
+		labels := n.Labels()
+		if len(labels) != 2 {
+			t.Error("Should be two labels")
+		}
+		props := n.Props()
+		if len(props) != 3 {
+			t.Error("Should be three props")
+		}
+	})
+
+	ot.Run("Read relationship", func(t *testing.T) {
+		driver := makeDriver(t)
+		sess, err := driver.Session(AccessModeWrite)
+		if err != nil {
+			t.Fatal(err)
+		}
+		sess.WriteTransaction(func(tx Transaction) (interface{}, error) {
+			res, err := tx.Run("CREATE (a:Person{name: 'p1'})-[r:Knows {val: 0.5}]->(b:Person{name:'p2'}) RETURN a, b, r", nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+			_, err = res.Summary()
+			if err != nil {
+				t.Fatal(err)
+			}
+			res.Next()
+			vals := res.Record().Values()
+			n1 := vals[0].(Node)
+			fmt.Printf("%+v\n", n1)
+			n2 := vals[1].(Node)
+			fmt.Printf("%+v\n", n2)
+			r := vals[2].(Relationship)
+			if r.StartId() != n1.Id() {
+				t.Error("Wrong start")
+			}
+			if r.EndId() != n2.Id() {
+				t.Error("Wrong end")
+			}
+			return nil, nil
+		})
+	})
+
+	ot.Run("Read path", func(t *testing.T) {
+		driver := makeDriver(t)
+		sess, err := driver.Session(AccessModeWrite)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		sess.WriteTransaction(func(tx Transaction) (interface{}, error) {
+			res, err := tx.Run(
+				"CREATE p =(andy { name:'Andy' })-[:WORKS_AT]->(neo)<-[:WORKS_AT]-(michael { name: 'Michael' }) RETURN p", nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+			_, err = res.Summary()
+			if err != nil {
+				t.Fatal(err)
+			}
+			res.Next()
+			vals := res.Record().Values()
+			p := vals[0].(Path)
+
+			nodes := p.Nodes()
+			andy := nodes[0]
+			neo := nodes[1]
+			michael := nodes[2]
+
+			rels := p.Relationships()
+			andy2Neo := rels[0]
+			michael2Neo := rels[1]
+
+			if andy2Neo.StartId() != andy.Id() {
+				t.Error("Wrong start of andy to neo")
+			}
+			if andy2Neo.EndId() != neo.Id() {
+				t.Error("Wrong end of andy to neo")
+			}
+			if michael2Neo.StartId() != michael.Id() {
+				t.Error("Wrong start of michael to neo")
+			}
+
+			return nil, nil
+		})
 	})
 }
 

@@ -60,7 +60,7 @@ type bolt3 struct {
 	state         int
 	txId          int64
 	streamId      int64
-	steamKeys     []string
+	streamKeys    []string
 	conn          net.Conn
 	serverName    string
 	chunker       *chunker
@@ -125,7 +125,7 @@ func (b *bolt3) assertHandle(id int64, h conn.Handle) error {
 }
 
 func (b *bolt3) receiveSuccessResponse() (*successResponse, error) {
-	res, err := b.unpacker.UnpackStruct(b)
+	res, err := b.unpacker.UnpackStruct(sharedHydrator)
 	if err != nil {
 		return nil, err
 	}
@@ -133,7 +133,7 @@ func (b *bolt3) receiveSuccessResponse() (*successResponse, error) {
 	case *successResponse:
 		return v, nil
 	case *failureResponse:
-		return nil, errors.New("Received failure from server")
+		return nil, v
 	}
 	return nil, errors.New("Unknown response")
 }
@@ -163,10 +163,13 @@ func (b *bolt3) connect() error {
 	if err != nil {
 		return err
 	}
-	b.connId, b.serverVersion, err = b.successResponseToConnectionInfo(succRes)
-	if err != nil {
-		return err
+	helloRes := succRes.hello()
+	if helloRes == nil {
+		return errors.New("proto error")
 	}
+	b.connId = helloRes.connectionId
+	b.serverVersion = helloRes.server
+
 	// Transition into ready state
 	b.state = ready
 	return nil
@@ -181,9 +184,9 @@ func (b *bolt3) TxBegin(
 	}
 
 	// TODO: Lazy begin, defer this to when Run is called
-	smode := "WRITE"
+	smode := "w"
 	if mode == conn.ReadMode {
-		smode = "READ"
+		smode = "r"
 	}
 	params := map[string]interface{}{
 		"mode": smode,
@@ -272,7 +275,11 @@ func (b *bolt3) TxRollback(txh conn.Handle) error {
 
 func (b *bolt3) run(successState int, cypher string, params map[string]interface{}) (*conn.Stream, error) {
 	// Send request to run query along with request to stream the result
-	// TODO: Meta data
+	// Same format as tx begin
+	// TODO: bookmarks
+	// TODO: txTimeout
+	// TODO: accessMode
+	// TODO: txMetadata
 	err := b.appendMsg(msgV3Run,
 		cypher,
 		params,
@@ -290,21 +297,21 @@ func (b *bolt3) run(successState int, cypher string, params map[string]interface
 		return nil, err
 	}
 
-	// Receive run response
+	// Receive RUN response
 	succRes, err := b.receiveSuccessResponse()
 	if err != nil {
 		return nil, err
 	}
-
-	err = b.successResponseStreamStart(succRes)
-	if err != nil {
+	runRes := succRes.run()
+	if runRes == nil {
 		b.state = corrupt
-		return nil, err
+		return nil, errors.New("parse fail, proto error")
 	}
 
+	b.streamKeys = runRes.fields
 	b.streamId = time.Now().Unix()
 	b.state = successState
-	stream := &conn.Stream{Keys: b.steamKeys, Handle: b.streamId}
+	stream := &conn.Stream{Keys: b.streamKeys, Handle: b.streamId}
 	return stream, nil
 }
 
@@ -328,63 +335,6 @@ func (b *bolt3) RunTx(txh conn.Handle, cypher string, params map[string]interfac
 	return b.run(streamingtx, cypher, params)
 }
 
-// Try to create a response from a success response.
-func (b *bolt3) successResponseStreamStart(r *successResponse) error {
-	m := r.Map()
-	// Should be a list of keys returned from query
-	keysx, ok := m["fields"].([]interface{})
-	if !ok {
-		return errors.New("Missing fields in success response")
-	}
-	// Transform keys to proper format
-	keys := make([]string, len(keysx))
-	for i, x := range keysx {
-		keys[i], ok = x.(string)
-		if !ok {
-			return errors.New("Field is not string")
-		}
-	}
-	b.steamKeys = keys
-	return nil
-}
-
-func (b *bolt3) successResponseToConnectionInfo(r *successResponse) (string, string, error) {
-	m := r.Map()
-	id, ok := m["connection_id"].(string)
-	if !ok {
-		return "", "", errors.New("Missing connection id in success response")
-	}
-	server, ok := m["server"].(string)
-	if !ok {
-		return "", "", errors.New("Missing server in success response")
-	}
-	return id, server, nil
-}
-
-func (b *bolt3) successResponseToSummary(r *successResponse) (*conn.Summary, error) {
-	m := r.Map()
-	sum := &conn.Summary{
-		ServerVersion: b.serverVersion,
-	}
-	// In tx
-	// TODO: Counters
-	// &{m:map[stats:map[labels-added:1 nodes-created:1 properties-set:1] t_last:0 type:w]}
-
-	// Should be a bookmark
-	bm, ok := m["bookmark"].(string)
-	if ok {
-		sum.Bookmark = &bm
-	}
-	// Should be a statement type
-	/*
-		st, ok := m["type"].(string)
-		if !ok {
-			return nil, errors.New("Missing stmnt type")
-		}
-	*/
-	return sum, nil
-}
-
 // Reads one record from the stream.
 func (b *bolt3) Next(shandle conn.Handle) (*conn.Record, *conn.Summary, error) {
 	if b.state != streaming && b.state != streamingtx {
@@ -396,30 +346,32 @@ func (b *bolt3) Next(shandle conn.Handle) (*conn.Record, *conn.Summary, error) {
 		return nil, nil, err
 	}
 
-	res, err := b.unpacker.UnpackStruct(b)
+	res, err := b.unpacker.UnpackStruct(sharedHydrator)
 	if err != nil {
 		return nil, nil, err
 	}
 
 	switch x := res.(type) {
 	case *recordResponse:
-		rec := &conn.Record{Keys: b.steamKeys, Values: x.fields[0].([]interface{})}
+		rec := &conn.Record{Keys: b.streamKeys, Values: x.values}
 		return rec, nil, nil
 	case *successResponse:
-		sum, err := b.successResponseToSummary(x)
-		if err != nil {
-			b.state = corrupt
-			return nil, nil, err
-		}
 		// End of stream
 		if b.state == streamingtx {
 			b.state = tx
 		} else {
 			b.state = ready
 		}
+		// Parse summary
+		sum := x.summary()
+		if sum == nil {
+			b.state = corrupt
+			return nil, nil, errors.New("Failed to parse summary")
+		}
+		// Add some extras to the summary (move this elsewhere?)
+		sum.ServerVersion = b.serverVersion
 		return nil, sum, nil
 	case *failureResponse:
-		// Returning here assumes that we don't get any response on the pull message
 		return nil, nil, x
 	default:
 		return nil, nil, errors.New("Unknown response")
@@ -464,23 +416,4 @@ func (b *bolt3) Close() error {
 		return errs[0]
 	}
 	return nil
-}
-
-// Hydrator implements packstream HydratorFactory which gives this connection full control
-// over how structs are hydrated during stream unpacking.
-func (b *bolt3) Hydrator(tag packstream.StructTag, numFields int) (packstream.Hydrator, error) {
-	switch tag {
-	case msgV3Success:
-		return &successResponse{}, nil
-	case msgV3Ignored:
-		return &ignoredResponse{}, nil
-	case msgV3Failure:
-		return &failureResponse{}, nil
-	case msgV3Record:
-		return &recordResponse{}, nil
-	case 'N':
-		return &node{}, nil
-	default:
-		return nil, errors.New(fmt.Sprintf("Unknown tag: %02x", tag))
-	}
 }

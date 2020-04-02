@@ -100,7 +100,7 @@ func (r *result) Record() Record {
 	if r.record == nil {
 		return nil
 	}
-	return &record{r.record}
+	return newRecord(r.record)
 }
 
 func (r *result) Err() error {

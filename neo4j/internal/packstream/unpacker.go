@@ -57,31 +57,25 @@ func (u *Unpacker) readStruct(hf HydratorFactory, numFields int) (interface{}, e
 	tag := StructTag(buf[0])
 
 	// Reach out to get actual object to hydrate into
-	hydrator, err := hf.Hydrator(tag, numFields)
+	hydrate, err := hf.Hydrator(tag, numFields)
 	if err != nil {
 		return nil, err
 	}
 
-	// Read fields
-	for numFields > 0 {
+	if numFields == 0 {
+		return hydrate(nil)
+	}
+
+	// Read fields and pass them to hydrator
+	fields := make([]interface{}, numFields)
+	for i := 0; i < numFields; i++ {
 		field, err := u.Unpack(hf)
 		if err != nil {
 			return nil, err
 		}
-		err = hydrator.HydrateField(field)
-		if err != nil {
-			return nil, err
-		}
-		numFields--
+		fields[i] = field
 	}
-
-	// All fields hydrated
-	err = hydrator.HydrationComplete()
-	if err != nil {
-		return nil, err
-	}
-
-	return hydrator, nil
+	return hydrate(fields)
 }
 
 func (u *Unpacker) readNum(x interface{}) error {

@@ -23,17 +23,49 @@ import (
 	"time"
 )
 
-type Counters struct {
-	NodesCreated int
-}
+// Definitions of these should correspond to public API
+type AccessMode int
+
+const (
+	WriteMode AccessMode = 0
+	ReadMode  AccessMode = 1
+)
+
+// Definitions of these should correspond to public API
+type StatementType int
+
+const (
+	StatementTypeUnknown     StatementType = 0
+	StatementTypeRead        StatementType = 1
+	StatementTypeReadWrite   StatementType = 2
+	StatementTypeWrite       StatementType = 3
+	StatementTypeSchemaWrite StatementType = 4
+)
+
+// Counter key names
+const (
+	NodesCreated         = "nodes-created"
+	NodesDeleted         = "nodes-deleted"
+	RelationshipsCreated = "relationships-created"
+	RelationshipsDeleted = "relationships-deleted"
+	PropertiesSet        = "properties-set"
+	LabelsAdded          = "labels-added"
+	LabelsRemoved        = "labels-removed"
+	IndexesAdded         = "indexes-added"
+	IndexesRemoved       = "indexes-removed"
+	ConstraintsAdded     = "constraints-added"
+	ConstraintsRemoved   = "constraints-removed"
+	SystemUpdates        = "system-updates"
+)
 
 type Summary struct {
-	Bookmark *string
-	//StmntType     string // Typed!
+	Bookmark  string
+	StmntType StatementType
 	//Cypher        string
 	//Params        map[string]interface{}
 	ServerVersion string
-	Counters      *Counters
+	Counters      map[string]int
+	TLast         int64
 }
 
 type Record struct {
@@ -47,13 +79,6 @@ type Stream struct {
 	Handle Handle
 	Keys   []string
 }
-
-type AccessMode int
-
-const (
-	WriteMode AccessMode = 0 // Should correspond to values in public API
-	ReadMode  AccessMode = 1
-)
 
 type Connection interface {
 	TxBegin(mode AccessMode, bookmarks []string, timeout time.Duration, meta map[string]interface{}) (Handle, error)
