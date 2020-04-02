@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2019 "Neo4j,"
+ * Copyright (c) 2002-2020 "Neo4j,"
  * Neo4j Sweden AB [http://neo4j.com]
  *
  * This file is part of Neo4j.
@@ -18,6 +18,10 @@
  */
 
 package neo4j
+
+import (
+	types "github.com/neo4j/neo4j-go-driver/neo4j/internal/types"
+)
 
 // Node represents a node in the neo4j graph database
 type Node interface {
@@ -43,11 +47,25 @@ type Relationship interface {
 	Props() map[string]interface{}
 }
 
-type segment interface {
-	Start() Node
-	Relationship() Relationship
-	End() Node
+// Wrap types.Node struct in interface for backwards compatibility
+type node struct {
+	node *types.Node
 }
+
+func (n *node) Id() int64                     { return n.node.Id }
+func (n *node) Labels() []string              { return n.node.Labels }
+func (n *node) Props() map[string]interface{} { return n.node.Props }
+
+// Wrap types.Relationship struct in interface for backwards compatibility
+type relationship struct {
+	rel *types.Relationship
+}
+
+func (r *relationship) Id() int64                     { return r.rel.Id }
+func (r *relationship) StartId() int64                { return r.rel.StartId }
+func (r *relationship) EndId() int64                  { return r.rel.EndId }
+func (r *relationship) Type() string                  { return r.rel.Type }
+func (r *relationship) Props() map[string]interface{} { return r.rel.Props }
 
 // Path represents a directed sequence of relationships between two nodes.
 // This generally represents a traversal or walk through a graph and maintains a direction separate from that of any
@@ -60,90 +78,58 @@ type Path interface {
 	Relationships() []Relationship
 }
 
-type relationshipValue struct {
-	id      int64
-	startId int64
-	endId   int64
-	relType string
-	props   map[string]interface{}
+// Wrap types.Path struct in interface for backwards compatibility
+type path struct {
+	path *types.Path
 }
 
-type nodeValue struct {
-	id     int64
-	labels []string
-	props  map[string]interface{}
+func (p path) Nodes() []Node {
+	nodes := make([]Node, len(p.path.Nodes))
+	for i, n := range p.path.Nodes {
+		nodes[i] = &node{node: n}
+	}
+	return nodes
 }
 
-type segmentValue struct {
-	start        *nodeValue
-	relationship *relationshipValue
-	end          *nodeValue
-}
+func (p path) Relationships() []Relationship {
+	num := len(p.path.Indexes) / 2
+	if num == 0 {
+		return nil
+	}
+	rels := make([]Relationship, 0, num)
 
-type pathValue struct {
-	segments      []segment
-	nodes         []Node
-	relationships []Relationship
-}
+	i := 0
+	n1 := p.path.Nodes[0]
+	for num > 0 {
+		relni := p.path.Indexes[i]
+		i++
+		n2i := p.path.Indexes[i]
+		i++
+		num--
+		var reln *types.RelNode
+		var n1start bool
+		if relni < 0 {
+			reln = p.path.RelNodes[(relni*-1)-1]
+		} else {
+			reln = p.path.RelNodes[relni-1]
+			n1start = true
+		}
+		n2 := p.path.Nodes[n2i]
 
-// ID returns id of the node
-func (node *nodeValue) Id() int64 {
-	return node.id
-}
-
-// Labels returns labels of the node
-func (node *nodeValue) Labels() []string {
-	return node.labels
-}
-
-// Props returns properties of the node
-func (node *nodeValue) Props() map[string]interface{} {
-	return node.props
-}
-
-// ID returns id of the relationship
-func (rel *relationshipValue) Id() int64 {
-	return rel.id
-}
-
-// StartID returns the id of the start node
-func (rel *relationshipValue) StartId() int64 {
-	return rel.startId
-}
-
-// EndID returns the id of the end node
-func (rel *relationshipValue) EndId() int64 {
-	return rel.endId
-}
-
-// Type returns the relationship tyoe
-func (rel *relationshipValue) Type() string {
-	return rel.relType
-}
-
-// Props returns properties of the relationship
-func (rel *relationshipValue) Props() map[string]interface{} {
-	return rel.props
-}
-
-func (segment *segmentValue) Start() Node {
-	return segment.start
-}
-
-func (segment *segmentValue) End() Node {
-	return segment.end
-}
-
-func (segment *segmentValue) Relationship() Relationship {
-	return segment.relationship
-}
-
-// Nodes returns the ordered list of nodes available on the path
-func (path *pathValue) Nodes() []Node {
-	return path.nodes
-}
-
-// Relationships returns the ordered list of relationships on the path
-func (path *pathValue) Relationships() []Relationship {
-	return path.relationships
+		rel := &types.Relationship{
+			Id:    reln.Id,
+			Type:  reln.Type,
+			Props: reln.Props,
+		}
+		if n1start {
+			rel.StartId = n1.Id
+			rel.EndId = n2.Id
+		} else {
+			rel.StartId = n2.Id
+			rel.EndId = n1.Id
+		}
+		rels = append(rels, &relationship{rel: rel})
+		n1 = n2
+	}
+	return rels
 }

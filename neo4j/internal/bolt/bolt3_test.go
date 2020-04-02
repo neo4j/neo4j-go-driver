@@ -108,7 +108,10 @@ func TestBolt3(ot *testing.T) {
 			srv.connect()
 			srv.waitAndServeAutoCommit(strm1)
 		}()
-		bolt, _ := Connect("name", conn)
+		bolt, err := Connect("name", conn)
+		if err != nil {
+			t.Fatal(err)
+		}
 		defer bolt.Close()
 
 		str, _ := bolt.Run("MATCH (n) RETURN n", nil)

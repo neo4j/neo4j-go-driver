@@ -1,7 +1,25 @@
+/*
+ * Copyright (c) 2002-2020 "Neo4j,"
+ * Neo4j Sweden AB [http://neo4j.com]
+ *
+ * This file is part of Neo4j.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an "AS IS" BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
+ */
+
 package bolt
 
 import (
-	"fmt"
 	"io"
 	"net"
 	"testing"
@@ -17,6 +35,8 @@ type testStruct struct {
 	fields []interface{}
 }
 
+/*
+
 func (r *testStruct) HydrateField(field interface{}) error {
 	r.fields = append(r.fields, field)
 	return nil
@@ -25,9 +45,13 @@ func (r *testStruct) HydrateField(field interface{}) error {
 func (r *testStruct) HydrationComplete() error {
 	return nil
 }
+*/
 
-func (h *testHydrator) Hydrator(tag packstream.StructTag, numFields int) (packstream.Hydrator, error) {
-	return &testStruct{tag: tag}, nil
+func (h *testHydrator) Hydrator(tag packstream.StructTag, numFields int) (packstream.Hydrate, error) {
+	return func(fields []interface{}) (interface{}, error) {
+		return &testStruct{tag: tag, fields: fields}, nil
+	}, nil
+	//	return &testStruct{tag: tag}, nil
 }
 
 type neo4jServer struct {
@@ -128,7 +152,6 @@ func (s *neo4jServer) acceptVersion(ver byte) {
 }
 
 func (s *neo4jServer) send(tag packstream.StructTag, field ...interface{}) {
-	fmt.Printf("Sending %+v", tag)
 	s.chunker.add()
 	err := s.packer.PackStruct(tag, field...)
 	if err != nil {
@@ -262,6 +285,7 @@ func makeTestRec(values []interface{}) testStruct {
 func makeTestSum(bookmark string) testStruct {
 	m := map[string]interface{}{
 		"bookmark": bookmark,
+		"type":     "r",
 	}
 	return testStruct{tag: msgV3Success, fields: []interface{}{m}}
 }

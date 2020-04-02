@@ -19,18 +19,14 @@
 
 package packstream
 
-// Hook for providing unpacker with object to unpack structs into.
+// Hook for unpacking structs unknown to packstream into custom objects.
 type HydratorFactory interface {
-	// Given a tag the corresponding Hydrator implementations should
+	// Given a tag the corresponding Hydrate implementations should
 	// be returned or an error if no such was found.
-	Hydrator(tag StructTag, numFields int) (Hydrator, error)
+	Hydrator(tag StructTag, numFields int) (Hydrate, error)
 }
 
-type Hydrator interface {
-	// Called by unpacker to let receiver check and store the unpacked field in custom object.
-	// If the hydrator considers this field wrong it should return an error, this
-	// error will make the unpacker stop unpacking and return this error to the unpack caller.
-	HydrateField(field interface{}) error
-	// Called by unpacker when all fields has been unpacked. Same error rules apply as above.
-	HydrationComplete() error
-}
+// Called by unpacker to let receiver check all fields and let the receiver return an
+// hydrated instance or an error if any of the fields or number of fields are different
+// expected.
+type Hydrate func(fields []interface{}) (interface{}, error)

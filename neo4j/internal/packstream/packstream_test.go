@@ -35,36 +35,27 @@ type customStruct struct{}
 
 type testHydratorFactory struct{}
 
-func (f *testHydratorFactory) Hydrator(tag StructTag, n int) (Hydrator, error) {
-	return &rawStruct{tag: tag}, nil
+func (f *testHydratorFactory) Hydrator(tag StructTag, n int) (Hydrate, error) {
+	raw := rawStruct{tag: tag}
+	return raw.Hydrate, nil
 }
 
 type mockHydratorFactory struct {
-	hydrator Hydrator
-	err      error
+	hydrate Hydrate
+	err     error
 }
 
-func (f *mockHydratorFactory) Hydrator(tag StructTag, n int) (Hydrator, error) {
-	return f.hydrator, f.err
+func (f *mockHydratorFactory) Hydrator(tag StructTag, n int) (Hydrate, error) {
+	if f.err != nil {
+		return nil, f.err
+	}
+	return f.hydrate, nil
 }
 
 type testHydrationError struct{}
 
 func (e *testHydrationError) Error() string {
 	return ""
-}
-
-type mockHydrator struct {
-	fieldErr    error
-	completeErr error
-}
-
-func (h *mockHydrator) HydrateField(interface{}) error {
-	return h.fieldErr
-}
-
-func (h *mockHydrator) HydrationComplete() error {
-	return h.completeErr
 }
 
 type limitedWriter struct {
@@ -650,13 +641,11 @@ func TestPackStream(ot *testing.T) {
 			buf:         []byte{0xb0, 0x66},
 			expectedErr: &testHydrationError{},
 		},
-		{name: "hydration field error",
-			hf:          &mockHydratorFactory{hydrator: &mockHydrator{fieldErr: &testHydrationError{}}},
-			buf:         []byte{0xb1, 0x66, 0x01},
-			expectedErr: &testHydrationError{},
-		},
-		{name: "hydration complete error",
-			hf:          &mockHydratorFactory{hydrator: &mockHydrator{completeErr: &testHydrationError{}}},
+		{name: "hydration error",
+			hf: &mockHydratorFactory{
+				hydrate: func(f []interface{}) (interface{}, error) {
+					return nil, &testHydrationError{}
+				}},
 			buf:         []byte{0xb1, 0x66, 0x01},
 			expectedErr: &testHydrationError{},
 		},

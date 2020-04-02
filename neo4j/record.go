@@ -21,6 +21,7 @@ package neo4j
 
 import (
 	conn "github.com/neo4j/neo4j-go-driver/neo4j/internal/connection"
+	types "github.com/neo4j/neo4j-go-driver/neo4j/internal/types"
 )
 
 type Record interface {
@@ -36,6 +37,23 @@ type Record interface {
 
 type record struct {
 	rec *conn.Record
+}
+
+func newRecord(rec *conn.Record) *record {
+	// Wrap internal types in interface implementation for backwards compatibility
+	for i, v := range rec.Values {
+		switch x := v.(type) {
+		case *types.Node:
+			rec.Values[i] = &node{node: x}
+		case *types.Relationship:
+			rec.Values[i] = &relationship{rel: x}
+		case *types.Path:
+			rec.Values[i] = &path{path: x}
+		default:
+			rec.Values[i] = v
+		}
+	}
+	return &record{rec: rec}
 }
 
 func (r *record) Keys() []string {
