@@ -80,7 +80,7 @@ func NewBolt3(serverName string, conn net.Conn) *bolt3 {
 		conn:       conn,
 		serverName: serverName,
 		chunker:    chunker,
-		packer:     packstream.NewPacker(chunker),
+		packer:     packstream.NewPacker(chunker, dehydrate),
 		unpacker:   packstream.NewUnpacker(dechunker),
 	}
 }
@@ -125,7 +125,7 @@ func (b *bolt3) assertHandle(id int64, h conn.Handle) error {
 }
 
 func (b *bolt3) receiveSuccessResponse() (*successResponse, error) {
-	res, err := b.unpacker.UnpackStruct(sharedHydrator)
+	res, err := b.unpacker.UnpackStruct(hydrate)
 	if err != nil {
 		return nil, err
 	}
@@ -346,7 +346,7 @@ func (b *bolt3) Next(shandle conn.Handle) (*conn.Record, *conn.Summary, error) {
 		return nil, nil, err
 	}
 
-	res, err := b.unpacker.UnpackStruct(sharedHydrator)
+	res, err := b.unpacker.UnpackStruct(hydrate)
 	if err != nil {
 		return nil, nil, err
 	}

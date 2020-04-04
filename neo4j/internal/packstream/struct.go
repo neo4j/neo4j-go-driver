@@ -21,25 +21,7 @@ package packstream
 
 type StructTag byte
 
-type Struct interface {
-	Tag() StructTag
-	Fields() []interface{}
-}
-
-type rawStruct struct {
-	tag    StructTag
-	fields []interface{}
-}
-
-func (s *rawStruct) Tag() StructTag {
-	return s.tag
-}
-
-func (s *rawStruct) Fields() []interface{} {
-	return s.fields
-}
-
-func (s *rawStruct) Hydrate(fields []interface{}) (interface{}, error) {
-	s.fields = fields
-	return s, nil
+type Struct struct {
+	Tag    StructTag
+	Fields []interface{}
 }

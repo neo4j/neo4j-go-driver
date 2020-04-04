@@ -24,16 +24,22 @@ import (
 	"fmt"
 	"io"
 	"math"
-	"reflect"
 )
 
+// Called by packer to let caller send custom object as structs not known by packstream.
+// Used as a convenience to let the caller be lazy and just send in data and be called
+// when packstream doesn't know what it is instead of checking all data up front.
+type Dehydrate func(x interface{}) (*Struct, error)
+
 type Packer struct {
-	wr io.Writer
+	wr        io.Writer
+	dehydrate Dehydrate
 }
 
-func NewPacker(wr io.Writer) *Packer {
+func NewPacker(wr io.Writer, dehydrate Dehydrate) *Packer {
 	return &Packer{
-		wr: wr,
+		wr:        wr,
+		dehydrate: dehydrate,
 	}
 }
 
@@ -41,8 +47,8 @@ func NewPacker(wr io.Writer) *Packer {
 // interface.
 func (p *Packer) PackStruct(tag StructTag, fields ...interface{}) error {
 	// Convert to simple struct implementation and pass it on the generic pack.
-	s := rawStruct{tag: tag, fields: fields}
-	return p.Pack(&s)
+	s := &Struct{Tag: tag, Fields: fields}
+	return p.Pack(s)
 }
 
 func (p *Packer) write(buf []byte) error {
@@ -54,20 +60,19 @@ func (p *Packer) write(buf []byte) error {
 	return &IoError{inner: err}
 }
 
-func (p *Packer) writeStruct(s Struct) error {
-	fields := s.Fields()
-	l := len(fields)
+func (p *Packer) writeStruct(s *Struct) error {
+	l := len(s.Fields)
 	if l > 0x0f {
 		return &OverflowError{msg: "Trying to pack struct with too many fields"}
 	}
 
-	buf := []byte{0xb0 + byte(l), byte(s.Tag())}
+	buf := []byte{0xb0 + byte(l), byte(s.Tag)}
 	err := p.write(buf)
 	if err != nil {
 		return err
 	}
 
-	for _, f := range fields {
+	for _, f := range s.Fields {
 		err = p.Pack(f)
 		if err != nil {
 			return err
@@ -600,18 +605,23 @@ func (p *Packer) Pack(x interface{}) error {
 			}
 		}
 		return nil
-	}
-
-	// Handle Struct interface
-	// Note that any accepted interface type should check for underlying nil value.
-	s, isStruct := x.(Struct)
-	if isStruct {
-		if reflect.ValueOf(s).IsNil() {
+	case *Struct:
+		if v == nil {
 			return p.writeNil()
 		}
-
+		return p.writeStruct(v)
+	default:
+		// Unknown type, call dehydration hook to make it into a struct
+		if p.dehydrate == nil {
+			return &UnsupportedTypeError{msg: fmt.Sprintf("Packing of type '%T' is not supported", x)}
+		}
+		s, err := p.dehydrate(x)
+		if err != nil {
+			return err
+		}
+		if s == nil {
+			return p.writeNil()
+		}
 		return p.writeStruct(s)
 	}
-
-	return &UnsupportedTypeError{msg: fmt.Sprintf("Packing of type '%T' is not supported", x)}
 }

@@ -21,6 +21,7 @@ package neo4j
 
 import (
 	conn "github.com/neo4j/neo4j-go-driver/neo4j/internal/connection"
+	"github.com/neo4j/neo4j-go-driver/neo4j/internal/types"
 )
 
 // TransactionWork represents a unit of work that will be executed against the provided
@@ -113,10 +114,31 @@ func (s *session) WriteTransaction(work TransactionWork, configurers ...func(*Tr
 	return s.runRetriable(work, configurers...)
 }
 
+func patchParamType(x interface{}) interface{} {
+	switch v := x.(type) {
+	case *Point:
+		if v.dimension == 2 {
+			return &types.Point2D{X: v.x, Y: v.y, SpatialRefId: uint32(v.srId)}
+		}
+		return &types.Point3D{X: v.x, Y: v.y, Z: v.z, SpatialRefId: uint32(v.srId)}
+	// TODO: Temporal
+	default:
+		return v
+	}
+}
+
+func patchParams(params map[string]interface{}) map[string]interface{} {
+	patched := make(map[string]interface{}, len(params))
+	for k, v := range params {
+		patched[k] = patchParamType(v)
+	}
+	return patched
+}
+
 func (s *session) Run(
 	cypher string, params map[string]interface{}) (Result, error) {
 
-	stream, err := s.conn.Run(cypher, params)
+	stream, err := s.conn.Run(cypher, patchParams(params))
 	if err != nil {
 		return nil, err
 	}

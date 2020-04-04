@@ -207,9 +207,7 @@ func TestDriverIntegration(ot *testing.T) {
 			res.Next()
 			vals := res.Record().Values()
 			n1 := vals[0].(Node)
-			fmt.Printf("%+v\n", n1)
 			n2 := vals[1].(Node)
-			fmt.Printf("%+v\n", n2)
 			r := vals[2].(Relationship)
 			if r.StartId() != n1.Id() {
 				t.Error("Wrong start")
@@ -264,6 +262,67 @@ func TestDriverIntegration(ot *testing.T) {
 			return nil, nil
 		})
 	})
+
+	ot.Run("Read/write spatial", func(t *testing.T) {
+		driver := makeDriver(t)
+		sess, err := driver.Session(AccessModeWrite)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		sess.ReadTransaction(func(tx Transaction) (interface{}, error) {
+			res, err := tx.Run(
+				"WITH point({ latitude:toFloat('13.43'), longitude:toFloat('56.21')}) AS p2, point({ x:toFloat('13.10'), y:toFloat('56.41'), z:toFloat(7)}) AS p3 RETURN p2, p3", nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+			_, err = res.Summary()
+			if err != nil {
+				t.Fatal(err)
+			}
+			res.Next()
+			vals := res.Record().Values()
+			p2 := vals[0].(*Point)
+			p3 := vals[1].(*Point)
+
+			if p2.SrId() != 4326 {
+				t.Error("2D point has wrong spatial ref id")
+			}
+			if p3.SrId() != 9157 {
+				t.Error("3D point has wrong spatial ref id")
+			}
+			if p3.Z() != float64(7) {
+				t.Error("3D point has wrong Z")
+			}
+
+			return nil, nil
+		})
+		sess.WriteTransaction(func(tx Transaction) (interface{}, error) {
+			res, err := tx.Run(
+				"CREATE (c:City {coord: $coord, name: $name, top: $top}) RETURN c",
+				map[string]interface{}{"name": "Lund", "coord": NewPoint2D(4326, 12, 199), "top": NewPoint3D(4979, 1, 2, 3)})
+			if err != nil {
+				t.Fatal(err)
+			}
+			_, err = res.Summary()
+			if err != nil {
+				t.Fatal(err)
+			}
+			res.Next()
+			vals := res.Record().Values()
+			n := vals[0].(Node)
+			p2 := n.Props()["coord"].(*Point)
+			if p2.Y() != float64(199) {
+				t.Error("Point 2 has wrong Y")
+			}
+			p3 := n.Props()["top"].(*Point)
+			if p3.Z() != float64(3) {
+				t.Error("Point 3 has wrong Z")
+			}
+			return nil, nil
+		})
+	})
+
 }
 
 func dumpResult(res Result) error {

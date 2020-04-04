@@ -32,26 +32,61 @@ type Record interface {
 	// Get returns the value (if any) corresponding to the given key
 	//Get(key string) (interface{}, bool)
 	// GetByIndex returns the value at given index
-	//GetByIndex(index int) interface{}
+	GetByIndex(index int) interface{}
 }
 
 type record struct {
 	rec *conn.Record
 }
 
+func patchRecordType(v interface{}) interface{} {
+	// TODO: Handle temporal type conversions from internal/types to neo4j
+	switch x := v.(type) {
+	case *types.Node:
+		for k, v := range x.Props {
+			x.Props[k] = patchRecordType(v)
+		}
+		return &node{node: x}
+	case *types.Relationship:
+		for k, v := range x.Props {
+			x.Props[k] = patchRecordType(v)
+		}
+		return &relationship{rel: x}
+	case *types.Path:
+		for _, n := range x.Nodes {
+			for k, v := range n.Props {
+				n.Props[k] = patchRecordType(v)
+			}
+		}
+		for _, n := range x.RelNodes {
+			for k, v := range n.Props {
+				n.Props[k] = patchRecordType(v)
+			}
+		}
+		return &path{path: x}
+	case *types.Point2D:
+		return &Point{dimension: 2, srId: int(x.SpatialRefId), x: x.X, y: x.Y}
+	case *types.Point3D:
+		return &Point{dimension: 3, srId: int(x.SpatialRefId), x: x.X, y: x.Y, z: x.Z}
+	case []interface{}:
+		for i, w := range x {
+			x[i] = patchRecordType(w)
+		}
+		return x
+	case map[string]interface{}:
+		for k, w := range x {
+			x[k] = patchRecordType(w)
+		}
+		return x
+	default:
+		return v
+	}
+}
+
 func newRecord(rec *conn.Record) *record {
 	// Wrap internal types in interface implementation for backwards compatibility
 	for i, v := range rec.Values {
-		switch x := v.(type) {
-		case *types.Node:
-			rec.Values[i] = &node{node: x}
-		case *types.Relationship:
-			rec.Values[i] = &relationship{rel: x}
-		case *types.Path:
-			rec.Values[i] = &path{path: x}
-		default:
-			rec.Values[i] = v
-		}
+		rec.Values[i] = patchRecordType(v)
 	}
 	return &record{rec: rec}
 }
@@ -62,4 +97,8 @@ func (r *record) Keys() []string {
 
 func (r *record) Values() []interface{} {
 	return r.rec.Values
+}
+
+func (r *record) GetByIndex(index int) interface{} {
+	return r.rec.Values[index]
 }

@@ -25,6 +25,11 @@ import (
 	"io"
 )
 
+// Called by unpacker to let receiver check all fields and let the receiver return an
+// hydrated instance or an error if any of the fields or number of fields are different
+// expected.
+type Hydrate func(tag StructTag, fields []interface{}) (interface{}, error)
+
 type Unpacker struct {
 	rd io.Reader
 }
@@ -44,7 +49,7 @@ func (u *Unpacker) read(n uint32) ([]byte, error) {
 	return nil, &IoError{inner: err}
 }
 
-func (u *Unpacker) readStruct(hf HydratorFactory, numFields int) (interface{}, error) {
+func (u *Unpacker) readStruct(hydrate Hydrate, numFields int) (interface{}, error) {
 	if numFields < 0 || numFields > 0x0f {
 		return nil, &IllegalFormatError{msg: fmt.Sprintf("Invalid struct size: %d", numFields)}
 	}
@@ -56,26 +61,20 @@ func (u *Unpacker) readStruct(hf HydratorFactory, numFields int) (interface{}, e
 	}
 	tag := StructTag(buf[0])
 
-	// Reach out to get actual object to hydrate into
-	hydrate, err := hf.Hydrator(tag, numFields)
-	if err != nil {
-		return nil, err
-	}
-
 	if numFields == 0 {
-		return hydrate(nil)
+		return hydrate(tag, nil)
 	}
 
 	// Read fields and pass them to hydrator
 	fields := make([]interface{}, numFields)
 	for i := 0; i < numFields; i++ {
-		field, err := u.Unpack(hf)
+		field, err := u.Unpack(hydrate)
 		if err != nil {
 			return nil, err
 		}
 		fields[i] = field
 	}
-	return hydrate(fields)
+	return hydrate(tag, fields)
 }
 
 func (u *Unpacker) readNum(x interface{}) error {
@@ -94,11 +93,11 @@ func (u *Unpacker) readStr(n uint32) (interface{}, error) {
 	return string(buf), nil
 }
 
-func (u *Unpacker) readArr(hf HydratorFactory, n uint32) ([]interface{}, error) {
+func (u *Unpacker) readArr(hydrate Hydrate, n uint32) ([]interface{}, error) {
 	var err error
 	arr := make([]interface{}, n)
 	for i := range arr {
-		arr[i], err = u.Unpack(hf)
+		arr[i], err = u.Unpack(hydrate)
 		if err != nil {
 			return nil, err
 		}
@@ -106,10 +105,10 @@ func (u *Unpacker) readArr(hf HydratorFactory, n uint32) ([]interface{}, error) 
 	return arr, nil
 }
 
-func (u *Unpacker) readMap(hf HydratorFactory, n uint32) (map[string]interface{}, error) {
+func (u *Unpacker) readMap(hydrate Hydrate, n uint32) (map[string]interface{}, error) {
 	m := make(map[string]interface{}, n)
 	for i := uint32(0); i < n; i++ {
-		keyx, err := u.Unpack(hf)
+		keyx, err := u.Unpack(hydrate)
 		if err != nil {
 			return nil, err
 		}
@@ -117,7 +116,7 @@ func (u *Unpacker) readMap(hf HydratorFactory, n uint32) (map[string]interface{}
 		if !ok {
 			return nil, &IllegalFormatError{msg: fmt.Sprintf("Map key is not string type: %T", keyx)}
 		}
-		valx, err := u.Unpack(hf)
+		valx, err := u.Unpack(hydrate)
 		if err != nil {
 			return nil, err
 		}
@@ -126,7 +125,7 @@ func (u *Unpacker) readMap(hf HydratorFactory, n uint32) (map[string]interface{}
 	return m, nil
 }
 
-func (u *Unpacker) Unpack(hf HydratorFactory) (interface{}, error) {
+func (u *Unpacker) Unpack(hydrate Hydrate) (interface{}, error) {
 	// Read field marker
 	buf, err := u.read(1)
 	if err != nil {
@@ -144,7 +143,7 @@ func (u *Unpacker) Unpack(hf HydratorFactory) (interface{}, error) {
 	}
 	if marker > 0x90 && marker < 0xa0 {
 		// Tiny array
-		return u.readArr(hf, uint32(marker-0x90))
+		return u.readArr(hydrate, uint32(marker-0x90))
 	}
 	if marker >= 0xf0 {
 		// Tiny negative int
@@ -152,10 +151,10 @@ func (u *Unpacker) Unpack(hf HydratorFactory) (interface{}, error) {
 	}
 	if marker > 0xa0 && marker < 0xb0 {
 		// Tiny map
-		return u.readMap(hf, uint32(marker-0xa0))
+		return u.readMap(hydrate, uint32(marker-0xa0))
 	}
 	if marker >= 0xb0 && marker < 0xc0 {
-		return u.readStruct(hf, int(marker-0xb0))
+		return u.readStruct(hydrate, int(marker-0xb0))
 	}
 
 	switch marker {
@@ -260,52 +259,52 @@ func (u *Unpacker) Unpack(hf HydratorFactory) (interface{}, error) {
 		if err = u.readNum(&num); err != nil {
 			return nil, err
 		}
-		return u.readArr(hf, uint32(num))
+		return u.readArr(hydrate, uint32(num))
 	case 0xd5:
 		// Array of length up to 0xffff
 		var num uint16
 		if err = u.readNum(&num); err != nil {
 			return nil, err
 		}
-		return u.readArr(hf, uint32(num))
+		return u.readArr(hydrate, uint32(num))
 	case 0xd6:
 		// Array of length up to 0xffffffff
 		var num uint32
 		if err = u.readNum(&num); err != nil {
 			return nil, err
 		}
-		return u.readArr(hf, num)
+		return u.readArr(hydrate, num)
 	case 0xd8:
 		// Map of length up to 0xff
 		var num uint8
 		if err = u.readNum(&num); err != nil {
 			return nil, err
 		}
-		return u.readMap(hf, uint32(num))
+		return u.readMap(hydrate, uint32(num))
 	case 0xd9:
 		// Map of length up to 0xffff
 		var num uint16
 		if err = u.readNum(&num); err != nil {
 			return nil, err
 		}
-		return u.readMap(hf, uint32(num))
+		return u.readMap(hydrate, uint32(num))
 	case 0xda:
 		// Map of length up to 0xffffffff
 		var num uint32
 		if err = u.readNum(&num); err != nil {
 			return nil, err
 		}
-		return u.readMap(hf, num)
+		return u.readMap(hydrate, num)
 	}
 
 	return nil, &IllegalFormatError{msg: fmt.Sprintf("Unknown marker: %02x", marker)}
 }
 
-func (u *Unpacker) UnpackStruct(hf HydratorFactory) (interface{}, error) {
+func (u *Unpacker) UnpackStruct(hydrate Hydrate) (interface{}, error) {
 	// Read struct marker
 	buf, err := u.read(1)
 	if err != nil {
 		return nil, err
 	}
-	return u.readStruct(hf, int(buf[0]-0xb0))
+	return u.readStruct(hydrate, int(buf[0]-0xb0))
 }
