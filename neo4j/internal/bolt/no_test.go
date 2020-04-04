@@ -27,37 +27,16 @@ import (
 	"github.com/neo4j/neo4j-go-driver/neo4j/internal/packstream"
 )
 
-type testHydrator struct {
-}
+type testStruct packstream.Struct
 
-type testStruct struct {
-	tag    packstream.StructTag
-	fields []interface{}
-}
-
-/*
-
-func (r *testStruct) HydrateField(field interface{}) error {
-	r.fields = append(r.fields, field)
-	return nil
-}
-
-func (r *testStruct) HydrationComplete() error {
-	return nil
-}
-*/
-
-func (h *testHydrator) Hydrator(tag packstream.StructTag, numFields int) (packstream.Hydrate, error) {
-	return func(fields []interface{}) (interface{}, error) {
-		return &testStruct{tag: tag, fields: fields}, nil
-	}, nil
-	//	return &testStruct{tag: tag}, nil
+func passthroughHydrator(tag packstream.StructTag, fields []interface{}) (interface{}, error) {
+	return &testStruct{Tag: tag, Fields: fields}, nil
 }
 
 type neo4jServer struct {
 	t         *testing.T
 	conn      net.Conn
-	hyd       *testHydrator
+	hyd       packstream.Hydrate
 	dechunker *dechunker
 	unpacker  *packstream.Unpacker
 	chunker   *chunker
@@ -68,12 +47,12 @@ func newNeo4jServer(t *testing.T, conn net.Conn) *neo4jServer {
 	dechunker := newDechunker(conn)
 	unpacker := packstream.NewUnpacker(dechunker)
 	chunker := newChunker(conn, 4096)
-	packer := packstream.NewPacker(chunker)
+	packer := packstream.NewPacker(chunker, nil)
 	return &neo4jServer{
 		t:         t,
 		conn:      conn,
 		dechunker: dechunker,
-		hyd:       &testHydrator{},
+		hyd:       passthroughHydrator,
 		unpacker:  unpacker,
 		packer:    packer,
 		chunker:   chunker,
@@ -90,15 +69,15 @@ func (s *neo4jServer) waitForHandshake() []byte {
 }
 
 func (s *neo4jServer) assertStructType(msg *testStruct, t packstream.StructTag) {
-	if msg.tag != t {
-		s.t.Fatalf("Got wrong type of message expected %d but got %d (%+v)", t, msg.tag, msg)
+	if msg.Tag != t {
+		s.t.Fatalf("Got wrong type of message expected %d but got %d (%+v)", t, msg.Tag, msg)
 	}
 }
 
 func (s *neo4jServer) waitForHello() {
 	msg := s.wait()
 	s.assertStructType(msg, msgV3Hello)
-	m := msg.fields[0].(map[string]interface{})
+	m := msg.Fields[0].(map[string]interface{})
 	// Hello should contain some musts
 	_, exists := m["scheme"]
 	if !exists {
@@ -187,7 +166,7 @@ func (s *neo4jServer) waitAndServeAutoCommit(stream []testStruct) {
 	s.waitForRun()
 	s.waitForPullAll()
 	for _, x := range stream {
-		s.send(x.tag, x.fields...)
+		s.send(x.Tag, x.Fields...)
 	}
 	//s.acceptRun(keys)
 }
@@ -196,20 +175,20 @@ func (s *neo4jServer) waitAndServeTransRun(stream []testStruct, commit bool) {
 	s.waitForTxBegin()
 	// Until lazy tx begin:
 	r := makeTxBeginResp()
-	s.send(r.tag, r.fields...)
+	s.send(r.Tag, r.Fields...)
 	s.waitForRun()
 	s.waitForPullAll()
 	for _, x := range stream {
-		s.send(x.tag, x.fields...)
+		s.send(x.Tag, x.Fields...)
 	}
 	if commit {
 		s.waitForTxCommit()
 		r = makeTxCommitResp()
-		s.send(r.tag, r.fields...)
+		s.send(r.Tag, r.Fields...)
 	} else {
 		s.waitForTxRollback()
 		r = makeTxRollbackResp()
-		s.send(r.tag, r.fields...)
+		s.send(r.Tag, r.Fields...)
 	}
 }
 
@@ -241,8 +220,8 @@ type serverStream struct {
 
 func makeTestRunResp(keys []interface{}) testStruct {
 	return testStruct{
-		tag: msgV3Success,
-		fields: []interface{}{
+		Tag: msgV3Success,
+		Fields: []interface{}{
 			map[string]interface{}{
 				"fields": keys,
 			},
@@ -252,8 +231,8 @@ func makeTestRunResp(keys []interface{}) testStruct {
 
 func makeTxBeginResp() testStruct {
 	return testStruct{
-		tag: msgV3Success,
-		fields: []interface{}{
+		Tag: msgV3Success,
+		Fields: []interface{}{
 			map[string]interface{}{},
 		},
 	}
@@ -261,8 +240,8 @@ func makeTxBeginResp() testStruct {
 
 func makeTxCommitResp() testStruct {
 	return testStruct{
-		tag: msgV3Success,
-		fields: []interface{}{
+		Tag: msgV3Success,
+		Fields: []interface{}{
 			map[string]interface{}{
 				"bookmark": "abookmark",
 			},
@@ -272,14 +251,14 @@ func makeTxCommitResp() testStruct {
 
 func makeTxRollbackResp() testStruct {
 	return testStruct{
-		tag: msgV3Success,
-		fields: []interface{}{
+		Tag: msgV3Success,
+		Fields: []interface{}{
 			map[string]interface{}{},
 		},
 	}
 }
 func makeTestRec(values []interface{}) testStruct {
-	return testStruct{tag: msgV3Record, fields: []interface{}{values}}
+	return testStruct{Tag: msgV3Record, Fields: []interface{}{values}}
 }
 
 func makeTestSum(bookmark string) testStruct {
@@ -287,5 +266,5 @@ func makeTestSum(bookmark string) testStruct {
 		"bookmark": bookmark,
 		"type":     "r",
 	}
-	return testStruct{tag: msgV3Success, fields: []interface{}{m}}
+	return testStruct{Tag: msgV3Success, Fields: []interface{}{m}}
 }

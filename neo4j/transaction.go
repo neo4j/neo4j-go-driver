@@ -42,7 +42,8 @@ type transaction struct {
 }
 
 func (t *transaction) Run(cypher string, params map[string]interface{}) (Result, error) {
-	stream, err := t.conn.RunTx(t.tx, cypher, params)
+	// TODO: Convert neo4j scoped spatial/temporal params to internal/types
+	stream, err := t.conn.RunTx(t.tx, cypher, patchParams(params))
 	if err != nil {
 		return nil, err
 	}

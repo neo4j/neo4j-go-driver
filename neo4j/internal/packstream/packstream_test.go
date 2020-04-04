@@ -33,23 +33,19 @@ import (
 
 type customStruct struct{}
 
-type testHydratorFactory struct{}
-
-func (f *testHydratorFactory) Hydrator(tag StructTag, n int) (Hydrate, error) {
-	raw := rawStruct{tag: tag}
-	return raw.Hydrate, nil
+type testHydratorMock struct {
+	customHydrate Hydrate
+	err           error
 }
 
-type mockHydratorFactory struct {
-	hydrate Hydrate
-	err     error
-}
-
-func (f *mockHydratorFactory) Hydrator(tag StructTag, n int) (Hydrate, error) {
-	if f.err != nil {
-		return nil, f.err
+func (m *testHydratorMock) hydrate(tag StructTag, fields []interface{}) (interface{}, error) {
+	if m.err != nil {
+		return nil, m.err
 	}
-	return f.hydrate, nil
+	if m.customHydrate != nil {
+		return m.customHydrate(tag, fields)
+	}
+	return &Struct{Tag: tag, Fields: fields}, nil
 }
 
 type testHydrationError struct{}
@@ -164,14 +160,10 @@ func TestPackStream(ot *testing.T) {
 		return b
 	}
 
-	// Test Go weird nil handlig for interfaces
-	var s *rawStruct = nil
-	var i Struct = s
-
-	emptyStruct := &rawStruct{tag: 0x66}
-	maxStruct := &rawStruct{tag: 0x67, fields: []interface{}{"1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15"}}
-	structOfStruct := &rawStruct{tag: 0x66,
-		fields: []interface{}{&rawStruct{tag: 0x67, fields: []interface{}{"1", "2"}}, &rawStruct{tag: 0x68, fields: []interface{}{"3", "4"}}}}
+	emptyStruct := &Struct{Tag: 0x66}
+	maxStruct := &Struct{Tag: 0x67, Fields: []interface{}{"1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15"}}
+	structOfStruct := &Struct{Tag: 0x66,
+		Fields: []interface{}{&Struct{Tag: 0x67, Fields: []interface{}{"1", "2"}}, &Struct{Tag: 0x68, Fields: []interface{}{"3", "4"}}}}
 
 	cases := []struct {
 		name           string
@@ -179,12 +171,10 @@ func TestPackStream(ot *testing.T) {
 		expectPacked   []byte
 		expectUnpacked interface{}
 		testUnpacked   bool
+		dehydrate      Dehydrate
 	}{
 		// Nil
 		{name: "nil", value: nil, testUnpacked: true,
-			expectUnpacked: nil,
-			expectPacked:   []byte{0xc0}},
-		{name: "underlying nil", value: i, testUnpacked: true,
 			expectUnpacked: nil,
 			expectPacked:   []byte{0xc0}},
 
@@ -446,10 +436,9 @@ func TestPackStream(ot *testing.T) {
 		{name: "struct, empty", value: emptyStruct, testUnpacked: true,
 			expectUnpacked: emptyStruct,
 			expectPacked:   []byte{0xb0, 0x66}},
-		{name: "struct, one", value: &rawStruct{tag: 0x01, fields: []interface{}{1}}, testUnpacked: false,
-			expectUnpacked: &rawStruct{tag: 0x01, fields: []interface{}{1}},
+		{name: "struct, one", value: &Struct{Tag: 0x01, Fields: []interface{}{1}}, testUnpacked: false,
+			expectUnpacked: &Struct{Tag: 0x01, Fields: []interface{}{1}},
 			expectPacked:   []byte{0xb1, 0x01, 0x01}},
-
 		{name: "struct, max size", value: maxStruct, testUnpacked: true,
 			expectUnpacked: maxStruct,
 			expectPacked: []byte{
@@ -461,13 +450,24 @@ func TestPackStream(ot *testing.T) {
 			expectPacked: []byte{
 				0xb2, 0x66, 0xb2, 0x67, 0x81, 0x31, 0x81, 0x32, 0xb2, 0x68, 0x81, 0x33, 0x81,
 				0x34}},
+
+		// Custom type using hook (for temporal, spatial types)
+		{name: "custom type to struct", value: &customStruct{},
+			dehydrate: func(x interface{}) (*Struct, error) {
+				switch x.(type) {
+				case *customStruct:
+					return &Struct{Tag: 0x01, Fields: []interface{}{1}}, nil
+				}
+				return nil, errors.New(".")
+			},
+			expectPacked: []byte{0xb1, 0x01, 0x01}},
 	}
 
 	for _, c := range cases {
 		// Packing
 		ot.Run(fmt.Sprintf("Packing of %s", c.name), func(t *testing.T) {
 			buf := bytes.Buffer{}
-			p := NewPacker(&buf)
+			p := NewPacker(&buf, c.dehydrate)
 			err := p.Pack(c.value)
 			if err != nil {
 				t.Fatalf("Unable to pack: %s", err)
@@ -496,8 +496,8 @@ func TestPackStream(ot *testing.T) {
 			// Initialize buffer with expectation of pack test
 			buf := bytes.NewBuffer(c.expectPacked)
 			u := NewUnpacker(buf)
-			hf := &testHydratorFactory{}
-			x, err := u.Unpack(hf)
+			hf := &testHydratorMock{}
+			x, err := u.Unpack(hf.hydrate)
 			if err != nil {
 				t.Fatalf("Unable to unpack: %s", err)
 			}
@@ -537,7 +537,7 @@ func TestPackStream(ot *testing.T) {
 
 		// Pack the map
 		buf := bytes.Buffer{}
-		p := NewPacker(&buf)
+		p := NewPacker(&buf, nil)
 		err := p.Pack(m)
 		if err != nil {
 			ot.Fatalf("Unable to pack: %s", err)
@@ -561,8 +561,8 @@ func TestPackStream(ot *testing.T) {
 			// Initialize buffer with packed result
 			buf := bytes.NewBuffer(buf.Bytes())
 			u := NewUnpacker(buf)
-			hf := &testHydratorFactory{}
-			ux, err := u.Unpack(hf)
+			hf := &testHydratorMock{}
+			ux, err := u.Unpack(hf.hydrate)
 			um, ok := ux.(map[string]interface{})
 			if !ok {
 				t.Errorf("Unpacked is not a map")
@@ -595,14 +595,20 @@ func TestPackStream(ot *testing.T) {
 		value       interface{}
 		expectedErr interface{}
 		wr          io.Writer
+		dehydrate   Dehydrate
 	}{
 		{name: "uin64 overflow", expectedErr: &OverflowError{},
 			value: (uint64(math.MaxInt64) + 1)},
 		{name: "map something else but string as key", expectedErr: &UnsupportedTypeError{},
 			value: map[int]string{}},
 		{name: "too big struct", expectedErr: &OverflowError{},
-			value: &rawStruct{tag: 0x67, fields: []interface{}{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16}}},
-		{name: "a custom type", expectedErr: &UnsupportedTypeError{},
+			value: &Struct{Tag: 0x67, Fields: []interface{}{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16}}},
+		{name: "a custom type no dehydrator", expectedErr: &UnsupportedTypeError{},
+			value: customStruct{}},
+		{name: "a custom type failing dehydrator", expectedErr: errors.New("x"),
+			dehydrate: func(interface{}) (*Struct, error) {
+				return nil, errors.New("x")
+			},
 			value: customStruct{}},
 		{name: "write error", expectedErr: &IoError{}, wr: &limitedWriter{max: 3},
 			value: "just a string"},
@@ -613,7 +619,7 @@ func TestPackStream(ot *testing.T) {
 			if wr == nil {
 				wr = &bytes.Buffer{}
 			}
-			p := NewPacker(wr)
+			p := NewPacker(wr, c.dehydrate)
 			v := c.value
 			if c.valueFunc != nil {
 				v = c.valueFunc()
@@ -633,17 +639,17 @@ func TestPackStream(ot *testing.T) {
 		name        string
 		buf         []byte
 		expectedErr interface{}
-		hf          HydratorFactory
+		hf          *testHydratorMock
 	}{
 		{name: "read error", expectedErr: &IoError{}},
 		{name: "no hydrator",
-			hf:          &mockHydratorFactory{err: &testHydrationError{}},
+			hf:          &testHydratorMock{err: &testHydrationError{}},
 			buf:         []byte{0xb0, 0x66},
 			expectedErr: &testHydrationError{},
 		},
 		{name: "hydration error",
-			hf: &mockHydratorFactory{
-				hydrate: func(f []interface{}) (interface{}, error) {
+			hf: &testHydratorMock{
+				customHydrate: func(t StructTag, f []interface{}) (interface{}, error) {
 					return nil, &testHydrationError{}
 				}},
 			buf:         []byte{0xb1, 0x66, 0x01},
@@ -654,10 +660,10 @@ func TestPackStream(ot *testing.T) {
 		ot.Run(fmt.Sprintf("Unpacking error of %s", c.name), func(t *testing.T) {
 			rd := bytes.NewBuffer(c.buf)
 			if c.hf == nil {
-				c.hf = &testHydratorFactory{}
+				c.hf = &testHydratorMock{}
 			}
 			un := NewUnpacker(rd)
-			x, err := un.Unpack(c.hf)
+			x, err := un.Unpack(c.hf.hydrate)
 			if err == nil {
 				t.Fatal("Should have gotten an error!")
 			}
@@ -675,8 +681,8 @@ func TestPackStream(ot *testing.T) {
 		// Initialize buffer with expectation of pack test
 		buf := bytes.NewBuffer([]byte{0xb0, 0x66})
 		u := NewUnpacker(buf)
-		hf := &testHydratorFactory{}
-		x, _ := u.UnpackStruct(hf)
+		hf := &testHydratorMock{}
+		x, _ := u.UnpackStruct(hf.hydrate)
 		if !reflect.DeepEqual(x, emptyStruct) {
 			t.Errorf("Unpacked differs")
 		}

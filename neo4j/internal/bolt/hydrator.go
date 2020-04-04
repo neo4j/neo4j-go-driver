@@ -27,30 +27,30 @@ import (
 	"github.com/neo4j/neo4j-go-driver/neo4j/internal/types"
 )
 
-type hydrator struct{}
-
-// Hydrator is stateless, no need for own copy for each connection
-var sharedHydrator hydrator
-
-// Called by packstream. Returns func to handle hydration of tag.
-func (h hydrator) Hydrator(tag packstream.StructTag, numFields int) (packstream.Hydrate, error) {
+// Called by packstream unpacker to hydrate a packstream struct into something
+// more usable by the consumer.
+func hydrate(tag packstream.StructTag, fields []interface{}) (interface{}, error) {
 	switch tag {
 	case msgV3Success:
-		return hydrateSuccess, nil
+		return hydrateSuccess(fields)
 	case msgV3Ignored:
-		return hydrateIgnored, nil
+		return hydrateIgnored(fields)
 	case msgV3Failure:
-		return hydrateFailure, nil
+		return hydrateFailure(fields)
 	case msgV3Record:
-		return hydrateRecord, nil
+		return hydrateRecord(fields)
 	case 'N':
-		return hydrateNode, nil
+		return hydrateNode(fields)
 	case 'R':
-		return hydrateRelationship, nil
+		return hydrateRelationship(fields)
 	case 'r':
-		return hydrateRelNode, nil
+		return hydrateRelNode(fields)
 	case 'P':
-		return hydratePath, nil
+		return hydratePath(fields)
+	case 'X':
+		return hydratePoint2d(fields)
+	case 'Y':
+		return hydratePoint3d(fields)
 	default:
 		return nil, errors.New(fmt.Sprintf("Unknown tag: %02x", tag))
 	}
@@ -197,4 +197,31 @@ func hydrateFailure(fields []interface{}) (interface{}, error) {
 		return nil, errors.New("Failure hydrate error")
 	}
 	return &failureResponse{code: code, message: msg}, nil
+}
+
+func hydratePoint2d(fields []interface{}) (interface{}, error) {
+	if len(fields) != 3 {
+		return nil, errors.New("Point2d hydrate error")
+	}
+	srId, sok := fields[0].(int64)
+	x, xok := fields[1].(float64)
+	y, yok := fields[2].(float64)
+	if !sok || !xok || !yok {
+		return nil, errors.New("Point2d hydrate error")
+	}
+	return &types.Point2D{SpatialRefId: uint32(srId), X: x, Y: y}, nil
+}
+
+func hydratePoint3d(fields []interface{}) (interface{}, error) {
+	if len(fields) != 4 {
+		return nil, errors.New("Point3d hydrate error")
+	}
+	srId, sok := fields[0].(int64)
+	x, xok := fields[1].(float64)
+	y, yok := fields[2].(float64)
+	z, zok := fields[3].(float64)
+	if !sok || !xok || !yok || !zok {
+		return nil, errors.New("Point3d hydrate error")
+	}
+	return &types.Point3D{SpatialRefId: uint32(srId), X: x, Y: y, Z: z}, nil
 }
