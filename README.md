@@ -4,13 +4,11 @@ This is the the official Neo4j Go Driver.
 
 ## Getting the Driver
 
-### With `dep`
+`$ go get github.com/neo4j/neo4j-go-driver/neo4j`
 
-Add the driver as a dependency with `dep ensure -add github.com/neo4j/neo4j-go-driver/neo4j`
+**Note**:
 
-### With `go get`
-
-Add the driver with `go get github.com/neo4j/neo4j-go-driver/neo4j`
+- Requires Go 1.11+ for go modules support
 
 ## Minimum Viable Snippet
 
@@ -34,7 +32,7 @@ defer driver.Close()
 if session, err = driver.Session(neo4j.AccessModeWrite); err != nil {
 	return err
 }
-defer session.Close() 
+defer session.Close()
 
 result, err = session.Run("CREATE (n:Item { id: $id, name: $name }) RETURN n.id, n.name", map[string]interface{}{
 	"id": 1,
@@ -63,16 +61,20 @@ if driver, err = neo4j.NewDriver("bolt+routing://localhost:7687", neo4j.BasicAut
 ```
 
 There are a few points that need to be highlighted:
+
 * Each `Driver` instance maintains a pool of connections inside, as a result, it is recommended to only use **one driver per application**.
 * It is considerably cheap to create new sessions and transactions, as sessions and transactions do not create new connections as long as there are free connections available in the connection pool.
 * The driver is thread-safe, while the session or the transaction is not thread-safe.
 
 ## Parsing Result Values
+
 ### Record Stream
+
 A cypher execution result is comprised of a stream of records followed by a result summary.
 The records inside the result can be accessed via `Next()`/`Record()` functions defined on `Result`. It is important to check `Err()` after `Next()` returning `false` to find out whether it is end of result stream or an error that caused the end of result consumption.
 
 ### Accessing Values in a Record
+
 Values in a `Record` can be accessed either by index or by alias. The return value is an `interface{}` which means you need to convert the interface to the type expected
 
 ```go
@@ -87,7 +89,8 @@ if value, ok := record.Get('field_name'); ok {
 ```
 
 ### Value Types
-The driver currently exposes values in the record as an `interface{}` type. 
+
+The driver currently exposes values in the record as an `interface{}` type.
 The underlying types of the returned values depend on the corresponding Cypher types.
 
 The mapping between Cypher types and the types used by this driver (to represent the Cypher type):
@@ -126,7 +129,8 @@ or a 3-dimensional `Point` value using;
 point := NewPoint3D(srId, 1.0, 2.0, 3.0)
 ```
 
-NOTE:
+**Note**:
+
 * For a list of supported `srId` values, please refer to the docs [here](https://neo4j.com/docs/developer-manual/current/cypher/functions/spatial/).
 
 ### Temporal Types - Date and Time
@@ -137,15 +141,15 @@ The mapping among the Cypher temporal types and actual exposed types are as foll
 
 | Cypher Type | Driver Type |
 | :----------: | :-----------: |
-| Date | neo4j.Date | 
+| Date | neo4j.Date |
 | Time | neo4j.OffsetTime |
 | LocalTime| neo4j.LocalTime |
 | DateTime | time.Time |
 | LocalDateTime | neo4j.LocalDateTime |
 | Duration | neo4j.Duration |
 
-
 Receiving a temporal value as driver type:
+
 ```go
 dateValue := record.GetByIndex(0).(neo4j.Date)
 ```
@@ -157,17 +161,19 @@ dateValue := DateOf(time.Date(2005, time.December, 16, 0, 0, 0, 0, time.Local)
 ```
 
 Converting a custom temporal value into `time.Time` (all `neo4j` temporal types expose `Time()` function to gets its corresponding `time.Time` value):
+
 ```go
 dateValueAsTime := dateValue.Time()
 ```
 
-Note:
+**Note**:
+
 * When `neo4j.OffsetTime` is converted into `time.Time` or constructed through `OffsetTimeOf(time.Time)`, its `Location` is given a fixed name of `Offset` (i.e. assigned `time.FixedZone("Offset", offsetTime.offset)`).
 * When `time.Time` values are sent/received through the driver, if its `Zone()` returns a name of `Offset` the value is stored with its offset value and with its zone name otherwise.
 
 ## Logging
 
-Logging at the driver level can be configured by setting `Log` field of `neo4j.Config` through configuration functions that can be passed to `neo4j.NewDriver` function. 
+Logging at the driver level can be configured by setting `Log` field of `neo4j.Config` through configuration functions that can be passed to `neo4j.NewDriver` function.
 
 ### Console Logger
 
@@ -207,4 +213,4 @@ type Logging interface {
 }
 ```
 
-For a customised logging target, you can implement the above interface and pass an instance of that implementation to the `Log` field.
+For a customized logging target, you can implement the above interface and pass an instance of that implementation to the `Log` field.
