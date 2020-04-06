@@ -93,6 +93,7 @@ type Connection interface {
 	Next(streamHandle Handle) (*Record, *Summary, error)
 	IsAlive() bool
 	ServerName() string
+	Reset()
 	Close() error
 }
 

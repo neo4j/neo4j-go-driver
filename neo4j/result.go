@@ -37,7 +37,7 @@ type Result interface {
 	Summary() (ResultSummary, error)
 	// Consume consumes the entire result and returns the summary information
 	// about the statement execution.
-	//Consume() (ResultSummary, error)
+	Consume() (ResultSummary, error)
 }
 
 type iterator interface {
@@ -130,8 +130,16 @@ func (r *result) fetchAll() {
 	}
 }
 
-func (r *result) Consume() {
+func (r *result) Consume() (ResultSummary, error) {
 	for !r.allReceived {
 		r.doFetch()
 	}
+	if r.summary == nil || r.err != nil {
+		return nil, r.err
+	}
+	return &resultSummary{
+		sum:    r.summary,
+		cypher: r.cypher,
+		params: r.params,
+	}, nil
 }

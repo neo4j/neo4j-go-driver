@@ -23,17 +23,18 @@ import (
 	"time"
 )
 
+// Cypher DateTime corresponds to Go time.Time
+
 type (
-	Time          time.Duration // Time since start of day with timezone information
+	Time          time.Time // Time since start of day with timezone information
 	Date          time.Time
-	DateTime      time.Time
-	LocalTime     time.Duration // Time since start of day in local timezone
+	LocalTime     time.Time // Time since start of day in local timezone
 	LocalDateTime time.Time
 )
 
-type Duration time.Duration // +- 290 years
-
-type LongDuration struct {
-	SecondsEpoch     int64
-	NanoSecondsEpoch int64
+type Duration struct {
+	Months  int64
+	Days    int64
+	Seconds int64
+	Nanos   int
 }

@@ -20,6 +20,8 @@
 package neo4j
 
 import (
+	"time"
+
 	conn "github.com/neo4j/neo4j-go-driver/neo4j/internal/connection"
 	types "github.com/neo4j/neo4j-go-driver/neo4j/internal/types"
 )
@@ -30,7 +32,7 @@ type Record interface {
 	// Values returns the values
 	Values() []interface{}
 	// Get returns the value (if any) corresponding to the given key
-	//Get(key string) (interface{}, bool)
+	Get(key string) (interface{}, bool)
 	// GetByIndex returns the value at given index
 	GetByIndex(index int) interface{}
 }
@@ -40,7 +42,6 @@ type record struct {
 }
 
 func patchRecordType(v interface{}) interface{} {
-	// TODO: Handle temporal type conversions from internal/types to neo4j
 	switch x := v.(type) {
 	case *types.Node:
 		for k, v := range x.Props {
@@ -68,6 +69,16 @@ func patchRecordType(v interface{}) interface{} {
 		return &Point{dimension: 2, srId: int(x.SpatialRefId), x: x.X, y: x.Y}
 	case *types.Point3D:
 		return &Point{dimension: 3, srId: int(x.SpatialRefId), x: x.X, y: x.Y, z: x.Z}
+	case types.Time:
+		return OffsetTimeOf(time.Time(x))
+	case types.Date:
+		return DateOf(time.Time(x))
+	case types.LocalTime:
+		return LocalTimeOf(time.Time(x))
+	case types.LocalDateTime:
+		return LocalDateTimeOf(time.Time(x))
+	case types.Duration:
+		return Duration{months: x.Months, days: x.Days, seconds: x.Seconds, nanos: x.Nanos}
 	case []interface{}:
 		for i, w := range x {
 			x[i] = patchRecordType(w)
@@ -101,4 +112,13 @@ func (r *record) Values() []interface{} {
 
 func (r *record) GetByIndex(index int) interface{} {
 	return r.rec.Values[index]
+}
+
+func (r *record) Get(key string) (interface{}, bool) {
+	for i, k := range r.rec.Keys {
+		if k == key {
+			return r.rec.Values[i], true
+		}
+	}
+	return nil, false
 }

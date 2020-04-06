@@ -139,22 +139,27 @@ func (b *bolt3) receiveSuccessResponse() (*successResponse, error) {
 }
 
 // TODO: Error types!
-func (b *bolt3) connect() error {
+func (b *bolt3) connect(auth map[string]interface{}) error {
 	// Only allowed to connect when in disconnected state
 	if b.state != disconnected {
 		return b.invalidStateError([]int{disconnected})
 	}
 
+	hello := map[string]interface{}{
+		"user_agent": userAgent,
+	}
+	// Merge authentication info into hello message
+	for k, v := range auth {
+		_, exists := hello[k]
+		if exists {
+			continue
+		}
+		hello[k] = v
+	}
+
 	// Send hello message with proper authentication
 	// TODO: Authentication
-	err := b.sendMsg(
-		msgV3Hello,
-		map[string]interface{}{
-			"user_agent":  userAgent,
-			"scheme":      "basic",
-			"principal":   "neo4j",
-			"credentials": "pass",
-		})
+	err := b.sendMsg(msgV3Hello, hello)
 	if err != nil {
 		return err
 	}
@@ -242,7 +247,6 @@ func (b *bolt3) TxCommit(txh conn.Handle) error {
 	b.state = ready
 	// TODO: Keep track of bookmark!
 	// bolt.successResponse: &{m:map[bookmark:neo4j:bookmark:v1:tx35]}
-	//fmt.Printf("Got commit response %T: %+v\n", res, res)
 	return nil
 }
 
@@ -384,6 +388,20 @@ func (b *bolt3) IsAlive() bool {
 		return false
 	}
 	return true
+}
+
+func (b *bolt3) Reset() {
+	switch b.state {
+	case ready, disconnected, corrupt:
+		// Nothing to do
+	case streaming, tx, streamingtx:
+		err := b.sendMsg(msgV3Reset)
+		if err != nil {
+			b.state = corrupt
+			return
+		}
+		b.state = ready
+	}
 }
 
 func (b *bolt3) Close() error {

@@ -23,10 +23,8 @@ package neo4j
 import (
 	"context"
 	"errors"
-	"net"
 	"net/url"
 
-	"github.com/neo4j/neo4j-go-driver/neo4j/internal/bolt"
 	conn "github.com/neo4j/neo4j-go-driver/neo4j/internal/connection"
 	"github.com/neo4j/neo4j-go-driver/neo4j/internal/pool"
 )
@@ -49,7 +47,7 @@ type Driver interface {
 	//Target() url.URL
 	Session(accessMode AccessMode, bookmarks ...string) (Session, error)
 	// Close the driver and all underlying connections
-	//Close() error
+	Close() error
 }
 
 // NewDriver is the entry point to the neo4j driver to create an instance of a Driver. It is the first function to
@@ -97,32 +95,26 @@ func NewDriver(target string, auth AuthToken, configurers ...func(*Config)) (Dri
 		return nil, err
 	}
 
+	// Make a connector that is used by pool to actually connect according to
+	// configuration. Let the pool own this.
+	c := &connector{config: config, auth: auth.tokens}
+
 	return &driver{
 		target: parsed,
 		config: config,
-		pool:   pool.New(config.MaxConnectionPoolSize, connect),
+		pool:   pool.New(config.MaxConnectionPoolSize, c.connect),
 	}, nil
+}
+
+func (d *driver) Close() error {
+	d.pool.Close()
+	return nil
 }
 
 type driver struct {
 	target *url.URL
 	config *Config
 	pool   *pool.Pool
-}
-
-func connect(target string) (conn.Connection, error) {
-	// TODO: Handle SocketConnectTimeout
-	conn, err := net.Dial("tcp", target)
-	if err != nil {
-		return nil, err
-	}
-
-	// Pass ownership of connection to bolt upon success
-	boltConn, err := bolt.Connect(target, conn)
-	if err != nil {
-		return nil, err
-	}
-	return boltConn, nil
 }
 
 func (d *driver) Session(accessMode AccessMode, bookmarks ...string) (Session, error) {

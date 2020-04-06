@@ -121,7 +121,16 @@ func patchParamType(x interface{}) interface{} {
 			return &types.Point2D{X: v.x, Y: v.y, SpatialRefId: uint32(v.srId)}
 		}
 		return &types.Point3D{X: v.x, Y: v.y, Z: v.z, SpatialRefId: uint32(v.srId)}
-	// TODO: Temporal
+	case Date:
+		return types.Date(v.Time())
+	case LocalTime:
+		return types.LocalTime(v.Time())
+	case OffsetTime:
+		return types.Time(v.Time())
+	case LocalDateTime:
+		return types.LocalDateTime(v.Time())
+	case Duration:
+		return types.Duration{Months: v.months, Days: v.days, Seconds: v.seconds, Nanos: v.nanos}
 	default:
 		return v
 	}

@@ -100,15 +100,21 @@ func TestBolt3(ot *testing.T) {
 		makeTestSum("bm"),
 	}
 
+	auth := map[string]interface{}{
+		"scheme":      "basic",
+		"principal":   "neo4j",
+		"credentials": "pass",
+	}
+
 	ot.Run("Run auto-commit, happy path", func(t *testing.T) {
 		// Connect client+server
 		conn, srv, cleanup := setupBoltPipe(t)
 		defer cleanup()
 		go func() {
-			srv.connect()
+			srv.accept()
 			srv.waitAndServeAutoCommit(strm1)
 		}()
-		bolt, err := Connect("name", conn)
+		bolt, err := Connect("name", conn, auth)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -132,10 +138,10 @@ func TestBolt3(ot *testing.T) {
 		nconn, srv, cleanup := setupBoltPipe(t)
 		defer cleanup()
 		go func() {
-			srv.connect()
+			srv.accept()
 			srv.waitAndServeTransRun(strm2, true)
 		}()
-		bolt, _ := Connect("name", nconn)
+		bolt, _ := Connect("name", nconn, auth)
 		defer bolt.Close()
 
 		tx, err := bolt.TxBegin(conn.ReadMode, nil, 0, nil)
@@ -165,10 +171,10 @@ func TestBolt3(ot *testing.T) {
 		nconn, srv, cleanup := setupBoltPipe(t)
 		defer cleanup()
 		go func() {
-			srv.connect()
+			srv.accept()
 			srv.waitAndServeTransRun(strm2, false)
 		}()
-		bolt, _ := Connect("name", nconn)
+		bolt, _ := Connect("name", nconn, auth)
 		defer bolt.Close()
 
 		tx, err := bolt.TxBegin(conn.ReadMode, nil, 0, nil)

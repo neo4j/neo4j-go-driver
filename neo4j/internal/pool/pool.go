@@ -292,6 +292,7 @@ func (p *Pool) unreg(server string, c conn.Connection) {
 }
 
 func (p *Pool) Return(c conn.Connection) {
+	c.Reset()
 	// Get the name of the bucket that the connection belongs to.
 	server := c.ServerName()
 

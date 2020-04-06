@@ -64,8 +64,14 @@ func TestConnectBolt3(t *testing.T) {
 		wg.Done()
 	}()
 
+	auth := map[string]interface{}{
+		"scheme":      "basic",
+		"principal":   "neo4j",
+		"credentials": "pass",
+	}
+
 	// Pass the connection to bolt connect
-	boltconn, err := Connect("name", conn)
+	boltconn, err := Connect("name", conn, auth)
 	if err != nil {
 		t.Fatalf("Failed to connect bolt: %s", err)
 	}
