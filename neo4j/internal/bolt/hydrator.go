@@ -22,6 +22,7 @@ package bolt
 import (
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/neo4j/neo4j-go-driver/neo4j/internal/packstream"
 	"github.com/neo4j/neo4j-go-driver/neo4j/internal/types"
@@ -51,6 +52,20 @@ func hydrate(tag packstream.StructTag, fields []interface{}) (interface{}, error
 		return hydratePoint2d(fields)
 	case 'Y':
 		return hydratePoint3d(fields)
+	case 'F':
+		return hydrateDateTimeOffset(fields)
+	case 'f':
+		return hydrateDateTimeNamedZone(fields)
+	case 'd':
+		return hydrateLocalDateTime(fields)
+	case 'D':
+		return hydrateDate(fields)
+	case 'T':
+		return hydrateTime(fields)
+	case 't':
+		return hydrateLocalTime(fields)
+	case 'E':
+		return hydrateDuration(fields)
 	default:
 		return nil, errors.New(fmt.Sprintf("Unknown tag: %02x", tag))
 	}
@@ -224,4 +239,108 @@ func hydratePoint3d(fields []interface{}) (interface{}, error) {
 		return nil, errors.New("Point3d hydrate error")
 	}
 	return &types.Point3D{SpatialRefId: uint32(srId), X: x, Y: y, Z: z}, nil
+}
+
+func hydrateDateTimeOffset(fields []interface{}) (interface{}, error) {
+	if len(fields) != 3 {
+		return nil, errors.New("DateTime hydrate error")
+	}
+	secs, sok := fields[0].(int64)
+	nans, nok := fields[1].(int64)
+	offs, ook := fields[2].(int64)
+	if !sok || !nok || !ook {
+		return nil, errors.New("DateTime hydrate error")
+	}
+
+	t := time.Unix(secs, nans)
+	l := time.FixedZone("Offset", int(offs))
+	return t.In(l), nil
+}
+
+func hydrateDateTimeNamedZone(fields []interface{}) (interface{}, error) {
+	if len(fields) != 3 {
+		return nil, errors.New("DateTime hydrate error")
+	}
+	secs, sok := fields[0].(int64)
+	nans, nok := fields[1].(int64)
+	zone, zok := fields[2].(string)
+	if !sok || !nok || !zok {
+		return nil, errors.New("DateTime hydrate error")
+	}
+
+	t := time.Unix(secs, nans)
+	l, err := time.LoadLocation(zone)
+	if err != nil {
+		// TODO: Wrap error
+		return nil, err
+	}
+	return t.In(l), nil
+}
+
+func hydrateLocalDateTime(fields []interface{}) (interface{}, error) {
+	if len(fields) != 2 {
+		return nil, errors.New("LocalDateTime hydrate error")
+	}
+	secs, sok := fields[0].(int64)
+	nans, nok := fields[1].(int64)
+	if !sok || !nok {
+		return nil, errors.New("LocalDateTime hydrate error")
+	}
+	return types.LocalDateTime(time.Unix(secs, nans)), nil
+}
+
+func hydrateDate(fields []interface{}) (interface{}, error) {
+	if len(fields) != 1 {
+		return nil, errors.New("Date hydrate error")
+	}
+	days, dok := fields[0].(int64)
+	if !dok {
+		return nil, errors.New("Date hydrate error")
+	}
+	secs := days * 86400
+	return types.Date(time.Unix(secs, 1)), nil
+}
+
+func hydrateTime(fields []interface{}) (interface{}, error) {
+	if len(fields) != 2 {
+		return nil, errors.New("Time hydrate error")
+	}
+	nans, nok := fields[0].(int64)
+	offs, ook := fields[1].(int64)
+	if !nok || !ook {
+		return nil, errors.New("Time hydrate error")
+	}
+	t := time.Unix(0, nans)
+	l := time.FixedZone("Offset", int(offs))
+	return types.Time(t.In(l)), nil
+}
+
+func hydrateLocalTime(fields []interface{}) (interface{}, error) {
+	if len(fields) != 1 {
+		return nil, errors.New("LocalTime hydrate error")
+	}
+	nans, nok := fields[0].(int64)
+	if !nok {
+		return nil, errors.New("LocalTime hydrate error")
+	}
+	t := time.Unix(0, nans).UTC()
+	return types.LocalTime(t), nil
+}
+
+func hydrateDuration(fields []interface{}) (interface{}, error) {
+	// Always hydrate to types.Duration since that allows for longer durations than the
+	// standard time.Duration even though it's probably very unusual with the need to
+	// express durations for hundreds of years.
+	if len(fields) != 4 {
+		return nil, errors.New("Duration hydrate error")
+	}
+	mon, mok := fields[0].(int64)
+	day, dok := fields[1].(int64)
+	sec, sok := fields[2].(int64)
+	nan, nok := fields[3].(int64)
+	if !mok || !dok || !sok || !nok {
+		return nil, errors.New("Duration hydrate error")
+	}
+
+	return types.Duration{Months: mon, Days: day, Seconds: sec, Nanos: int(nan)}, nil
 }

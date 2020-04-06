@@ -74,6 +74,15 @@ func (s *neo4jServer) assertStructType(msg *testStruct, t packstream.StructTag) 
 	}
 }
 
+func (s *neo4jServer) sendFailureMsg(code, msg string) {
+	f := map[string]interface{}{
+		"code":    code,
+		"message": msg,
+	}
+	s.packer.PackStruct(msgV3Failure, f)
+	s.chunker.send()
+}
+
 func (s *neo4jServer) waitForHello() {
 	msg := s.wait()
 	s.assertStructType(msg, msgV3Hello)
@@ -81,11 +90,11 @@ func (s *neo4jServer) waitForHello() {
 	// Hello should contain some musts
 	_, exists := m["scheme"]
 	if !exists {
-		s.t.Fatalf("Missing scheme")
+		s.sendFailureMsg("?", "Missing scheme in hello")
 	}
 	_, exists = m["user_agent"]
 	if !exists {
-		s.t.Fatalf("Missing user_agent")
+		s.sendFailureMsg("?", "Missing user_agent in hello")
 	}
 }
 
@@ -154,7 +163,7 @@ func (s *neo4jServer) acceptHello() {
 }
 
 // Utility when something else but connect is to be tested
-func (s *neo4jServer) connect() {
+func (s *neo4jServer) accept() {
 	s.waitForHandshake()
 	s.acceptVersion(3)
 	s.waitForHello()
