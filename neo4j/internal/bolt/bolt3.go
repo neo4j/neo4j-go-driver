@@ -130,17 +130,26 @@ func (b *bolt3) assertHandle(id int64, h conn.Handle) error {
 	return nil
 }
 
-func (b *bolt3) receiveSuccessResponse() (*successResponse, error) {
+func (b *bolt3) receive() (interface{}, error) {
 	res, err := b.unpacker.UnpackStruct(hydrate)
+	if err != nil {
+		log(fmt.Sprintf("receive error: %s", err))
+	}
+	if res != nil {
+		log(fmt.Sprintf("received: %+v", res))
+	}
+	return res, err
+}
+
+func (b *bolt3) receiveSuccessResponse() (*successResponse, error) {
+	res, err := b.receive()
 	if err != nil {
 		return nil, err
 	}
 	switch v := res.(type) {
 	case *successResponse:
-		log(fmt.Sprintf("received success response: %+v", v))
 		return v, nil
 	case *failureResponse:
-		log(fmt.Sprintf("received failure response: %+v", v))
 		return nil, v
 	}
 	return nil, errors.New("Unknown response")
@@ -165,8 +174,7 @@ func (b *bolt3) connect(auth map[string]interface{}) error {
 		hello[k] = v
 	}
 
-	// Send hello message with proper authentication
-	// TODO: Authentication
+	// Send hello message
 	err := b.sendMsg(msgV3Hello, hello)
 	if err != nil {
 		return err
@@ -193,6 +201,24 @@ func (b *bolt3) TxBegin(
 	mode conn.AccessMode, bookmarks []string, timeout time.Duration, meta map[string]interface{}) (conn.Handle, error) {
 
 	log("txBegin try")
+
+	// If streaming auto commit, consume the whole thing. Hard to do discard here since we don't
+	// know if server has sent everything on the wire already and the server doesn't
+	// like us sending a discard when it is ready.
+	switch b.state {
+	case streaming:
+		for {
+			_, sum, err := b.Next(b.streamId)
+			if sum != nil || err != nil {
+				break
+			}
+		}
+	case ready:
+		// Continue
+	default:
+		return nil, b.invalidStateError([]int{streaming, ready})
+	}
+
 	// Only allowed to begin a transaction from ready state
 	if b.state != ready {
 		return nil, b.invalidStateError([]int{ready})
@@ -236,14 +262,20 @@ func (b *bolt3) TxBegin(
 
 func (b *bolt3) TxCommit(txh conn.Handle) error {
 	log("txCommit try")
-	// Can only commit when in tx state
-	if b.state != tx && b.state != streamingtx {
-		log("txCommit fail 1")
-		return b.invalidStateError([]int{tx})
-	}
 	err := b.assertHandle(b.txId, txh)
 	if err != nil {
+		log("txCommit fail 1")
+		return err
+	}
+
+	// Can only commit when in tx state or streaming in tx
+	if b.state != tx && b.state != streamingtx {
 		log("txCommit fail 2")
+		return b.invalidStateError([]int{tx})
+	}
+
+	err = b.consumeStream()
+	if err != nil {
 		return err
 	}
 
@@ -269,14 +301,20 @@ func (b *bolt3) TxCommit(txh conn.Handle) error {
 
 func (b *bolt3) TxRollback(txh conn.Handle) error {
 	log("txRollback try")
-	// Can only commit when in tx state
-	if b.state != tx {
-		log("txRollback fail 1")
-		return b.invalidStateError([]int{tx})
-	}
 	err := b.assertHandle(b.txId, txh)
 	if err != nil {
+		log("txRollback fail 1")
+		return err
+	}
+
+	// Can only rollback when in tx state or streaming in tx
+	if b.state != tx && b.state != streamingtx {
 		log("txRollback fail 2")
+		return b.invalidStateError([]int{tx})
+	}
+
+	err = b.consumeStream()
+	if err != nil {
 		return err
 	}
 
@@ -300,6 +338,25 @@ func (b *bolt3) TxRollback(txh conn.Handle) error {
 	return nil
 }
 
+// Discards all records, keeps bookmark
+func (b *bolt3) consumeStream() error {
+	// Anything to do?
+	if b.state != streaming && b.state != streamingtx {
+		return nil
+	}
+
+	for {
+		_, sum, err := b.Next(b.streamId)
+		if err != nil {
+			return err
+		}
+		if sum != nil {
+			break
+		}
+	}
+	return nil
+}
+
 func (b *bolt3) run(cypher string, params map[string]interface{}) (*conn.Stream, error) {
 	// Send request to run query along with request to stream the result
 	// Same format as tx begin
@@ -312,30 +369,17 @@ func (b *bolt3) run(cypher string, params map[string]interface{}) (*conn.Stream,
 	// If streaming, consume the whole thing. Hard to do discard here since we don't
 	// know if server has sent everything on the wire already and the server doesn't
 	// like us sending a discard when it is ready.
-	switch b.state {
-	case streaming, streamingtx:
-		for {
-			_, sum, err := b.Next(b.streamId)
-			if sum != nil || err != nil {
-				break
-			}
-		}
-	case tx, ready:
-		// Continue
-	default:
-		return nil, b.invalidStateError([]int{streaming, streamingtx, tx, ready})
+	err := b.consumeStream()
+	if err != nil {
+		return nil, err
 	}
 
-	// Check state again after potentially consuming stream
-	switch b.state {
-	case tx, ready:
-		// Continue
-	default:
+	if b.state != tx && b.state != ready {
 		return nil, b.invalidStateError([]int{tx, ready})
 	}
 
 	// Run
-	err := b.appendMsg(msgV3Run,
+	err = b.appendMsg(msgV3Run,
 		cypher,
 		params,
 		map[string]interface{}{})
@@ -376,7 +420,7 @@ func (b *bolt3) run(cypher string, params map[string]interface{}) (*conn.Stream,
 	b.streamKeys = runRes.fields
 	b.streamId = time.Now().Unix()
 	stream := &conn.Stream{Keys: b.streamKeys, Handle: b.streamId}
-	log("run ok, streaming")
+	log(fmt.Sprintf("run ok, streaming: %d", b.state))
 	return stream, nil
 }
 
@@ -408,9 +452,10 @@ func (b *bolt3) Next(shandle conn.Handle) (*conn.Record, *conn.Summary, error) {
 		return nil, nil, err
 	}
 
-	res, err := b.unpacker.UnpackStruct(hydrate)
+	res, err := b.receive()
 	if err != nil {
 		log(fmt.Sprintf("Next unpack err: %s", err))
+		b.state = corrupt
 		return nil, nil, err
 	}
 
@@ -427,10 +472,12 @@ func (b *bolt3) Next(shandle conn.Handle) (*conn.Record, *conn.Summary, error) {
 		} else {
 			b.state = ready
 		}
+		b.streamId = 0
 		// Parse summary
 		sum := x.summary()
 		if sum == nil {
 			b.state = corrupt
+			log(fmt.Sprintf("failed to parse summary: %+v", x))
 			return nil, nil, errors.New("Failed to parse summary")
 		}
 		// TODO: Keep bookmark!
@@ -456,24 +503,56 @@ func (b *bolt3) IsAlive() bool {
 }
 
 func (b *bolt3) Reset() {
+	log("Reset try")
+	defer func() {
+		// Reset internal state
+		b.txId = 0
+		b.streamId = 0
+		b.streamKeys = []string{}
+	}()
+
 	switch b.state {
 	case ready, disconnected, corrupt:
-		log("reset nop")
-		// Nothing to do
-	case streaming, tx, streamingtx:
-		log(fmt.Sprintf("reset from %d", b.state))
-		err := b.sendMsg(msgV3Reset)
+		// No need for reset
+		log("NOP")
+		return
+	}
+
+	// Send the reset message to the server
+	err := b.sendMsg(msgV3Reset)
+	if err != nil {
+		b.state = corrupt
+		return
+	}
+
+	// If the server was streaming we need to clean everything that
+	// might have been sent by the server before it received the reset.
+	log(fmt.Sprintf("Draining %d", b.state))
+	drained := false
+	for !drained {
+		res, err := b.receive()
 		if err != nil {
 			b.state = corrupt
 			return
 		}
-		b.state = ready
+		switch x := res.(type) {
+		case *recordResponse, *ignoredResponse:
+			// Just throw away. We should only get record responses while in streaming mode.
+		case *failureResponse:
+			// This could mean that the reset command failed for some reason, could also
+			// mean some other command that failed but as long as we never have unconfirmed
+			// commands out of the handling functions this should mean that the reset failed.
+			b.state = corrupt
+			return
+		case *successResponse:
+			// This could indicate either end of a stream that have been sent right before
+			// the reset or it could be a confirmation of the reset.
+			sum := x.summary()
+			drained = sum == nil
+		}
 	}
 
-	// Reset some internal state
-	b.txId = 0
-	b.streamId = 0
-	b.streamKeys = []string{}
+	b.state = ready
 }
 
 func (b *bolt3) Close() {

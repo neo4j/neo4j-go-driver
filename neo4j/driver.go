@@ -21,9 +21,9 @@
 package neo4j
 
 import (
-	"context"
 	"errors"
 	"net/url"
+	"sync"
 
 	conn "github.com/neo4j/neo4j-go-driver/neo4j/internal/connection"
 	"github.com/neo4j/neo4j-go-driver/neo4j/internal/pool"
@@ -106,25 +106,28 @@ func NewDriver(target string, auth AuthToken, configurers ...func(*Config)) (Dri
 	}, nil
 }
 
-func (d *driver) Close() error {
-	d.pool.Close()
-	return nil
-}
-
 type driver struct {
 	target *url.URL
 	config *Config
 	pool   *pool.Pool
+	mut    sync.Mutex
 }
 
 func (d *driver) Session(accessMode AccessMode, bookmarks ...string) (Session, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), d.config.ConnectionAcquisitionTimeout)
-	defer cancel()
-
-	c, err := d.pool.Borrow(ctx, []string{d.target.Host})
-	if err != nil {
-		return nil, err
+	d.mut.Lock()
+	defer d.mut.Unlock()
+	if d.pool == nil {
+		return nil, errors.New("Driver closed")
 	}
+	return newSession(d.config, func() []string {
+		return []string{d.target.Host}
+	}, d.pool, conn.AccessMode(accessMode), bookmarks), nil
+}
 
-	return newSession(c, d.pool.Return, conn.AccessMode(accessMode), bookmarks), nil
+func (d *driver) Close() error {
+	d.mut.Lock()
+	defer d.mut.Unlock()
+	d.pool.Close()
+	d.pool = nil
+	return nil
 }

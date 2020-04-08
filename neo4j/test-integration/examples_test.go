@@ -79,52 +79,50 @@ var _ = Describe("Examples", func() {
 			Expect(err).To(BeNil())
 		})
 
-		/*
-			Specify("Config - Without Encryption", func() {
-				driver, err := createDriverWithoutEncryption(uri, username, password)
-				Expect(err).To(BeNil())
-				Expect(driver).NotTo(BeNil())
+		Specify("Config - Without Encryption", func() {
+			driver, err := createDriverWithoutEncryption(uri, username, password)
+			Expect(err).To(BeNil())
+			Expect(driver).NotTo(BeNil())
 
-				err = driver.Close()
-				Expect(err).To(BeNil())
-			})
+			err = driver.Close()
+			Expect(err).To(BeNil())
+		})
 
-				Specify("Config - With Trust Strategy", func() {
-					driver, err := createDriverWithTrustStrategy(uri, username, password)
-					Expect(err).To(BeNil())
-					Expect(driver).NotTo(BeNil())
+		Specify("Config - With Trust Strategy", func() {
+			driver, err := createDriverWithTrustStrategy(uri, username, password)
+			Expect(err).To(BeNil())
+			Expect(driver).NotTo(BeNil())
 
-					err = driver.Close()
-					Expect(err).To(BeNil())
-				})
+			err = driver.Close()
+			Expect(err).To(BeNil())
+		})
 
-				Specify("Config - With Max Retry Time", func() {
-					driver, err := createDriverWithMaxRetryTime(uri, username, password)
-					Expect(err).To(BeNil())
-					Expect(driver).NotTo(BeNil())
+		Specify("Config - With Max Retry Time", func() {
+			driver, err := createDriverWithMaxRetryTime(uri, username, password)
+			Expect(err).To(BeNil())
+			Expect(driver).NotTo(BeNil())
 
-					err = driver.Close()
-					Expect(err).To(BeNil())
-				})
+			err = driver.Close()
+			Expect(err).To(BeNil())
+		})
 
-				Specify("Config - With Customized Connection Pool", func() {
-					driver, err := createDriverWithCustomizedConnectionPool(uri, username, password)
-					Expect(err).To(BeNil())
-					Expect(driver).NotTo(BeNil())
+		Specify("Config - With Customized Connection Pool", func() {
+			driver, err := createDriverWithCustomizedConnectionPool(uri, username, password)
+			Expect(err).To(BeNil())
+			Expect(driver).NotTo(BeNil())
 
-					err = driver.Close()
-					Expect(err).To(BeNil())
-				})
+			err = driver.Close()
+			Expect(err).To(BeNil())
+		})
 
-				Specify("Config - With Connection Timeout", func() {
-					driver, err := createDriverWithConnectionTimeout(uri, username, password)
-					Expect(err).To(BeNil())
-					Expect(driver).NotTo(BeNil())
+		Specify("Config - With Connection Timeout", func() {
+			driver, err := createDriverWithConnectionTimeout(uri, username, password)
+			Expect(err).To(BeNil())
+			Expect(driver).NotTo(BeNil())
 
-					err = driver.Close()
-					Expect(err).To(BeNil())
-				})
-		*/
+			err = driver.Close()
+			Expect(err).To(BeNil())
+		})
 
 		/*
 			Specify("Service Unavailable", func() {
@@ -203,46 +201,44 @@ var _ = Describe("Examples", func() {
 			Expect(id).To(BeNumerically(">=", 0))
 		})
 
-		/*
-			Specify("Get People", func() {
-				driver, err := createDriverWithMaxRetryTime(uri, username, password)
-				Expect(err).To(BeNil())
-				Expect(driver).NotTo(BeNil())
-				defer driver.Close()
+		Specify("Get People", func() {
+			driver, err := createDriverWithMaxRetryTime(uri, username, password)
+			Expect(err).To(BeNil())
+			Expect(driver).NotTo(BeNil())
+			defer driver.Close()
 
-				id, err := addPersonNode(driver, "Annie")
-				Expect(err).To(BeNil())
-				Expect(id).To(BeNumerically(">=", 0))
+			id, err := addPersonNode(driver, "Annie")
+			Expect(err).To(BeNil())
+			Expect(id).To(BeNumerically(">=", 0))
 
-				id, err = addPersonNode(driver, "Joe")
-				Expect(err).To(BeNil())
-				Expect(id).To(BeNumerically(">=", 0))
+			id, err = addPersonNode(driver, "Joe")
+			Expect(err).To(BeNil())
+			Expect(id).To(BeNumerically(">=", 0))
 
-				people, err := getPeople(driver)
-				Expect(err).To(BeNil())
-				Expect(people).To(ContainElement("Annie"))
-				Expect(people).To(ContainElement("Joe"))
-			})
+			people, err := getPeople(driver)
+			Expect(err).To(BeNil())
+			Expect(people).To(ContainElement("Annie"))
+			Expect(people).To(ContainElement("Joe"))
+		})
 
-			Specify("Result Retain", func() {
-				driver, err := createDriverWithMaxRetryTime(uri, username, password)
-				Expect(err).To(BeNil())
-				Expect(driver).NotTo(BeNil())
-				defer driver.Close()
+		Specify("Result Retain", func() {
+			driver, err := createDriverWithMaxRetryTime(uri, username, password)
+			Expect(err).To(BeNil())
+			Expect(driver).NotTo(BeNil())
+			defer driver.Close()
 
-				id, err := addPersonNode(driver, "Carl")
-				Expect(err).To(BeNil())
-				Expect(id).To(BeNumerically(">=", 0))
+			id, err := addPersonNode(driver, "Carl")
+			Expect(err).To(BeNil())
+			Expect(id).To(BeNumerically(">=", 0))
 
-				id, err = addPersonNode(driver, "Thomas")
-				Expect(err).To(BeNil())
-				Expect(id).To(BeNumerically(">=", 0))
+			id, err = addPersonNode(driver, "Thomas")
+			Expect(err).To(BeNil())
+			Expect(id).To(BeNumerically(">=", 0))
 
-				count, err := addPersonsAsEmployees(driver, "Acme")
-				Expect(err).To(BeNil())
-				Expect(count).To(BeNumerically(">=", 2))
-			})
-		*/
+			count, err := addPersonsAsEmployees(driver, "Acme")
+			Expect(err).To(BeNil())
+			Expect(count).To(BeNumerically(">=", 2))
+		})
 	})
 
 	/*

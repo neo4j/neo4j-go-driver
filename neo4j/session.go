@@ -20,8 +20,11 @@
 package neo4j
 
 import (
+	"context"
+	"errors"
+
 	conn "github.com/neo4j/neo4j-go-driver/neo4j/internal/connection"
-	"github.com/neo4j/neo4j-go-driver/neo4j/internal/types"
+	"github.com/neo4j/neo4j-go-driver/neo4j/internal/pool"
 )
 
 // TransactionWork represents a unit of work that will be executed against the provided
@@ -48,20 +51,27 @@ type Session interface {
 	Close() error
 }
 
-type closer func(c conn.Connection)
-
 type session struct {
-	conn      conn.Connection
-	closer    closer
+	config    *Config
 	mode      conn.AccessMode
 	bookmarks []string
+	pool      *pool.Pool
+	router    func() []string
+	conn      conn.Connection
+	inTx      bool
+	res       *result
 }
 
-func newSession(conn conn.Connection, closer closer, mode conn.AccessMode, bookmarks []string) *session {
+func newSession(
+	config *Config, router func() []string, pool *pool.Pool,
+	mode conn.AccessMode, bookmarks []string) *session {
+
 	return &session{
-		conn:   conn,
-		closer: closer,
-		mode:   mode,
+		config:    config,
+		router:    router,
+		pool:      pool,
+		mode:      mode,
+		bookmarks: bookmarks,
 	}
 }
 
@@ -70,28 +80,100 @@ func (s *session) BeginTransaction(configurers ...func(*TransactionConfig)) (Tra
 	for _, c := range configurers {
 		c(&config)
 	}
+	return s.beginTransaction(s.mode, &config)
+}
 
-	tx, err := s.conn.TxBegin(s.mode, s.bookmarks, config.Timeout, config.Metadata)
+func (s *session) beginTransaction(mode conn.AccessMode, config *TransactionConfig) (Transaction, error) {
+	// Guard for more than one transaction per session
+	if s.inTx {
+		return nil, errors.New("Already in tx")
+	}
+
+	// Consume current result if any
+	if s.res != nil {
+		s.res.fetchAll()
+		s.res = nil
+	}
+
+	// Ensure that the session has a connection
+	err := s.borrowConn()
 	if err != nil {
 		return nil, err
 	}
+	conn := s.conn
 
+	// Start a transaction on the connection
+	txHandle, err := s.conn.TxBegin(s.mode, s.bookmarks, config.Timeout, config.Metadata)
+	if err != nil {
+		return nil, err
+	}
+	s.inTx = true
+
+	// Wrap the returned transaction in something directly connected to this instance to
+	// make sure state is synced. Only one active transaction per session is allowed.
+	// This wrapped transaction is bound to the local txHandle so if a transaction is
+	// kept around after the connection has been returned to the pool it will not mess
+	// with the connection since the handle is invalid. Also use local connection variable
+	// to avoid relying on state.
 	return &transaction{
-		conn: s.conn,
-		tx:   tx,
+		run: func(cypher string, params map[string]interface{}) (Result, error) {
+			// The last result should receive all records
+			if s.res != nil {
+				s.res.fetchAll()
+				s.res = nil
+			}
+
+			streamHandle, err := conn.RunTx(txHandle, cypher, patchParams(params))
+			if err != nil {
+				return nil, err
+			}
+			s.res = newResult(conn, streamHandle, cypher, params)
+			return s.res, nil
+		},
+		commit: func() error {
+			// The last result should receive all records
+			if s.res != nil {
+				s.res.fetchAll()
+				s.res = nil
+			}
+
+			err := conn.TxCommit(txHandle)
+			if err == nil {
+				s.inTx = false
+			}
+			return err
+		},
+		rollback: func() error {
+			err := conn.TxRollback(txHandle)
+			if err == nil {
+				s.inTx = false
+			}
+			return err
+		},
 	}, nil
 }
 
-func (s *session) runRetriable(work TransactionWork, configurers ...func(*TransactionConfig)) (interface{}, error) {
+func (s *session) runRetriable(
+	mode conn.AccessMode,
+	work TransactionWork, configurers ...func(*TransactionConfig)) (interface{}, error) {
+
+	config := TransactionConfig{Timeout: 0, Metadata: nil}
+	for _, c := range configurers {
+		c(&config)
+	}
+
 	// TODO: Retry
-	tx, err := s.BeginTransaction(configurers...)
+	tx, err := s.beginTransaction(mode, &config)
 	if err != nil {
 		return nil, err
 	}
-	defer tx.Close()
+	defer func() {
+		tx.Close()
+	}()
 
 	x, err := work(tx)
 	if err != nil {
+		// Rely on rollback in tx.Close
 		return nil, err
 	}
 
@@ -103,58 +185,65 @@ func (s *session) runRetriable(work TransactionWork, configurers ...func(*Transa
 	return x, nil
 }
 
-func (s *session) ReadTransaction(work TransactionWork, configurers ...func(*TransactionConfig)) (interface{}, error) {
-	return s.runRetriable(work, configurers...)
+func (s *session) ReadTransaction(
+	work TransactionWork, configurers ...func(*TransactionConfig)) (interface{}, error) {
+
+	return s.runRetriable(conn.ReadMode, work, configurers...)
 }
 
-func (s *session) WriteTransaction(work TransactionWork, configurers ...func(*TransactionConfig)) (interface{}, error) {
-	if s.mode == conn.ReadMode {
-		return nil, newDriverError("write queries cannot be performed in read access mode")
-	}
-	return s.runRetriable(work, configurers...)
+func (s *session) WriteTransaction(
+	work TransactionWork, configurers ...func(*TransactionConfig)) (interface{}, error) {
+
+	return s.runRetriable(conn.WriteMode, work, configurers...)
 }
 
-func patchParamType(x interface{}) interface{} {
-	switch v := x.(type) {
-	case *Point:
-		if v.dimension == 2 {
-			return &types.Point2D{X: v.x, Y: v.y, SpatialRefId: uint32(v.srId)}
-		}
-		return &types.Point3D{X: v.x, Y: v.y, Z: v.z, SpatialRefId: uint32(v.srId)}
-	case Date:
-		return types.Date(v.Time())
-	case LocalTime:
-		return types.LocalTime(v.Time())
-	case OffsetTime:
-		return types.Time(v.Time())
-	case LocalDateTime:
-		return types.LocalDateTime(v.Time())
-	case Duration:
-		return types.Duration{Months: v.months, Days: v.days, Seconds: v.seconds, Nanos: v.nanos}
-	default:
-		return v
-	}
+func (s *session) borrowConn() (err error) {
+	s.returnConn()
+	servers := s.router()
+
+	ctx, cancel := context.WithTimeout(context.Background(), s.config.ConnectionAcquisitionTimeout)
+	defer cancel()
+	s.conn, err = s.pool.Borrow(ctx, servers)
+	return
 }
 
-func patchParams(params map[string]interface{}) map[string]interface{} {
-	patched := make(map[string]interface{}, len(params))
-	for k, v := range params {
-		patched[k] = patchParamType(v)
+func (s *session) returnConn() {
+	if s.conn != nil {
+		s.pool.Return(s.conn)
+		s.conn = nil
 	}
-	return patched
 }
 
 func (s *session) Run(
 	cypher string, params map[string]interface{}) (Result, error) {
 
-	stream, err := s.conn.Run(cypher, patchParams(params))
+	if s.inTx {
+		return nil, errors.New("Trying run in tx")
+	}
+	if s.res != nil {
+		s.res.fetchAll()
+		s.res = nil
+	}
+
+	err := s.borrowConn()
 	if err != nil {
 		return nil, err
 	}
-	return newResult(s.conn, stream, cypher, params), nil
+
+	stream, err := s.conn.Run(cypher, patchParams(params))
+	if err != nil {
+		s.returnConn()
+		return nil, err
+	}
+	res, err := newResult(s.conn, stream, cypher, params), nil
+	if err != nil {
+		return nil, err
+	}
+	s.res = res
+	return res, nil
 }
 
 func (s *session) Close() error {
-	s.closer(s.conn)
+	s.returnConn()
 	return nil
 }
