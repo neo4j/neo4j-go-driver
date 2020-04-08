@@ -19,10 +19,6 @@
 
 package neo4j
 
-import (
-	conn "github.com/neo4j/neo4j-go-driver/neo4j/internal/connection"
-)
-
 // Transaction represents a transaction in the Neo4j database
 type Transaction interface {
 	// Run executes a statement on this transaction and returns a result
@@ -37,40 +33,29 @@ type Transaction interface {
 }
 
 type transaction struct {
-	conn conn.Connection
-	tx   conn.Handle
+	committed bool
+	run       func(cypher string, params map[string]interface{}) (Result, error)
+	commit    func() error
+	rollback  func() error
 }
 
 func (t *transaction) Run(cypher string, params map[string]interface{}) (Result, error) {
-	// TODO: Convert neo4j scoped spatial/temporal params to internal/types
-	stream, err := t.conn.RunTx(t.tx, cypher, patchParams(params))
-	if err != nil {
-		return nil, err
-	}
-	return newResult(t.conn, stream, cypher, params), nil
+	return t.run(cypher, params)
 }
 
 func (t *transaction) Commit() error {
-	err := t.conn.TxCommit(t.tx)
-	if err != nil {
-		return err
-	}
-	t.tx = nil
-	return nil
+	err := t.commit()
+	t.committed = err == nil
+	return err
 }
 
 func (t *transaction) Rollback() error {
-	err := t.conn.TxRollback(t.tx)
-	if err != nil {
-		return err
-	}
-	t.tx = nil
-	return nil
+	return t.rollback()
 }
 
 func (t *transaction) Close() error {
-	if t.tx != nil {
-		return t.conn.TxRollback(t.tx)
+	if t.committed {
+		return nil
 	}
-	return nil
+	return t.rollback()
 }
