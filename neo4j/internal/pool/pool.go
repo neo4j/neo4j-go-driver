@@ -6,6 +6,7 @@ import (
 	"container/list"
 	"context"
 	"errors"
+	"fmt"
 	"sync"
 
 	conn "github.com/neo4j/neo4j-go-driver/neo4j/internal/connection"
@@ -29,6 +30,7 @@ type Pool struct {
 }
 
 func New(maxSize int, connect Connect) *Pool {
+	log(fmt.Sprintf("new size: %d", maxSize))
 	p := &Pool{
 		maxSize: maxSize,
 		connect: connect,
@@ -37,10 +39,12 @@ func New(maxSize int, connect Connect) *Pool {
 	return p
 }
 
-func log(format string, a ...interface{}) {
+func log(msg string) {
+	fmt.Printf("pool: %s\n", msg)
 }
 
 func (p *Pool) Close() {
+	log("closing")
 	// Cancel everything in the queue by just emptying at and let all callers timeout
 	p.queueMut.Lock()
 	p.queue.Init()
@@ -54,6 +58,7 @@ func (p *Pool) Close() {
 		delete(p.buckets, n)
 	}
 	p.bucketsMut.Unlock()
+	log("closed!")
 }
 
 func (p *Pool) tryExistingBucketsExistingConn(servers []string, checkTimeout func() error) (conn.Connection, error) {
@@ -75,18 +80,18 @@ func (p *Pool) tryExistingBucketsExistingConn(servers []string, checkTimeout fun
 			if !c.IsAlive() {
 				// Unregister the connection and close it another thread to avoid potential
 				// long blocking operation during close.
-				log("%s: conn dead\n", s)
+				log(fmt.Sprintf("%s: conn dead", s))
 				b.unreg(c)
 				go func() {
 					c.Close()
 				}()
 				continue
 			}
-			log("%s: conn found\n", s)
+			log(fmt.Sprintf("%s: conn found", s))
 			return c, nil
 		}
 		if b.size == 0 {
-			log("%s: bucket dead\n", s)
+			log(fmt.Sprintf("%s: bucket dead", s))
 			// Dead bucket, remove it
 			delete(p.buckets, s)
 		}
@@ -112,13 +117,13 @@ func (p *Pool) tryExistingBucketsNewConn(servers []string, checkTimeout func() e
 			continue
 		}
 		// Try to connect, this might take a while
-		log("%s: connecting\n", s)
+		log(fmt.Sprintf("%s: connecting", s))
 		c, err := p.connect(s)
 		if err != nil || c == nil {
 			continue
 		}
 		// Register the connection in the bucket
-		log("%s: conn registered\n", s)
+		log(fmt.Sprintf("%s: conn registered", s))
 		b.reg(c)
 		return c, nil
 	}
@@ -140,20 +145,20 @@ func (p *Pool) tryNewBucketNewConn(servers []string, checkTimeout func() error) 
 		}
 
 		// No bucket for this server, try to connect and add a bucket
-		log("%s: bucket pending, connecting\n", s)
+		log(fmt.Sprintf("%s: bucket pending, connecting", s))
 		c, err := p.connect(s)
 		if err != nil || c == nil {
 			// Blacklist this server for a while ?
-			log("%s: bucket cancelled\n", s)
+			log(fmt.Sprintf("%s: bucket cancelled", s))
 			continue
 		}
 		// Ok, got a connection, now create a bucket for this server and register the
 		// connection within it
 		b = &bucket{}
 		p.buckets[s] = b
-		log("%s: bucket added\n", s)
+		log(fmt.Sprintf("%s: bucket added", s))
 		b.reg(c)
-		log("%s: conn registered\n", s)
+		log(fmt.Sprintf("%s: conn registered", s))
 		return c, nil
 	}
 	return nil, nil
@@ -195,14 +200,14 @@ func (p *Pool) Borrow(ctx context.Context, servers []string) (conn.Connection, e
 	check := func() error {
 		select {
 		case <-ctx.Done():
-			log("time out\n")
+			log("time out")
 			return ctx.Err()
 		default:
 			return nil
 		}
 	}
 
-	log("Borrow %s\n", servers)
+	log(fmt.Sprintf("Borrow %s", servers))
 
 	// Try to use an existing connection in an existing bucket, that is cheapest.
 	// This will also prune dead connections and empty buckets (servers with no connections) among
@@ -251,13 +256,13 @@ func (p *Pool) Borrow(ctx context.Context, servers []string) (conn.Connection, e
 	e := p.queue.PushBack(q)
 	p.queueMut.Unlock()
 
-	log("in queue\n")
+	log("in queue")
 
 	// Wait for either a wake up signal that indicates that we got a connection or a timeout.
 	select {
 	case <-q.wakeup:
 		// Element removed by other thread
-		log("woke up, got a conn\n")
+		log("woke up, got a conn")
 		return q.conn, nil
 	case <-ctx.Done():
 		log("timed out, checking queue")
@@ -265,7 +270,7 @@ func (p *Pool) Borrow(ctx context.Context, servers []string) (conn.Connection, e
 		p.queue.Remove(e)
 		p.queueMut.Unlock()
 		if q.conn != nil {
-			log("got a conn, recovering\n")
+			log("got a conn, recovering")
 			return q.conn, nil
 		}
 		return nil, ctx.Err()
@@ -292,15 +297,16 @@ func (p *Pool) unreg(server string, c conn.Connection) {
 }
 
 func (p *Pool) Return(c conn.Connection) {
+	// Prepare connection for being used by someone else
 	c.Reset()
 	// Get the name of the bucket that the connection belongs to.
 	server := c.ServerName()
 
-	log("Return conn in %s\n", server)
+	log(fmt.Sprintf("Return conn in %s", server))
 
 	// If the connection is dead we should just unregister it and drop it.
 	if !c.IsAlive() {
-		log("%s: conn dead\n", server)
+		log(fmt.Sprintf("%s: conn dead", server))
 		p.unreg(server, c)
 		return
 	}
@@ -327,6 +333,7 @@ func (p *Pool) Return(c conn.Connection) {
 	defer p.bucketsMut.Unlock()
 	bucket := p.buckets[server]
 	if bucket != nil { // Strange when bucket not found
+		log(fmt.Sprintf("%s: back in bucket", server))
 		bucket.ret(c)
 	}
 

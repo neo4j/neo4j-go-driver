@@ -94,7 +94,7 @@ type Connection interface {
 	IsAlive() bool
 	ServerName() string
 	Reset()
-	Close() error
+	Close()
 }
 
 //type Routable interface {

@@ -35,6 +35,7 @@ func (c *fakeConn) IsAlive() bool {
 func (c *fakeConn) ServerName() string {
 	return c.serverName
 }
-func (c *fakeConn) Close() error {
-	return nil
+func (c *fakeConn) Close() {
+}
+func (c *fakeConn) Reset() {
 }

@@ -19,6 +19,7 @@
 
 package test_integration
 
+/*
 import (
 	"math"
 	"math/rand"
@@ -32,6 +33,7 @@ import (
 	. "github.com/onsi/ginkgo/extensions/table"
 	. "github.com/onsi/gomega"
 )
+*/
 
 /*
 func TestTemporalTypes(ot *testing.T) {
@@ -52,7 +54,7 @@ func TestTemporalTypes(ot *testing.T) {
 	driver.Close()
 }
 */
-
+/*
 var _ = Describe("Temporal Types", func() {
 	const (
 		numberOfRandomValues = 2000
@@ -539,3 +541,4 @@ var _ = Describe("Temporal Types", func() {
 		Entry("DateTime{Offset|Zoned}", (*time.Time)(nil)),
 	)
 })
+*/

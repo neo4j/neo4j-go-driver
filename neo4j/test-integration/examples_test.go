@@ -25,7 +25,7 @@ import (
 
 	"github.com/neo4j/neo4j-go-driver/neo4j"
 	"github.com/neo4j/neo4j-go-driver/neo4j/test-integration/control"
-	"github.com/neo4j/neo4j-go-driver/neo4j/utils/test"
+	//"github.com/neo4j/neo4j-go-driver/neo4j/utils/test"
 	"github.com/pkg/errors"
 
 	. "github.com/onsi/ginkgo"
@@ -79,60 +79,64 @@ var _ = Describe("Examples", func() {
 			Expect(err).To(BeNil())
 		})
 
-		Specify("Config - Without Encryption", func() {
-			driver, err := createDriverWithoutEncryption(uri, username, password)
-			Expect(err).To(BeNil())
-			Expect(driver).NotTo(BeNil())
+		/*
+			Specify("Config - Without Encryption", func() {
+				driver, err := createDriverWithoutEncryption(uri, username, password)
+				Expect(err).To(BeNil())
+				Expect(driver).NotTo(BeNil())
 
-			err = driver.Close()
-			Expect(err).To(BeNil())
-		})
+				err = driver.Close()
+				Expect(err).To(BeNil())
+			})
 
-		Specify("Config - With Trust Strategy", func() {
-			driver, err := createDriverWithTrustStrategy(uri, username, password)
-			Expect(err).To(BeNil())
-			Expect(driver).NotTo(BeNil())
+				Specify("Config - With Trust Strategy", func() {
+					driver, err := createDriverWithTrustStrategy(uri, username, password)
+					Expect(err).To(BeNil())
+					Expect(driver).NotTo(BeNil())
 
-			err = driver.Close()
-			Expect(err).To(BeNil())
-		})
+					err = driver.Close()
+					Expect(err).To(BeNil())
+				})
 
-		Specify("Config - With Max Retry Time", func() {
-			driver, err := createDriverWithMaxRetryTime(uri, username, password)
-			Expect(err).To(BeNil())
-			Expect(driver).NotTo(BeNil())
+				Specify("Config - With Max Retry Time", func() {
+					driver, err := createDriverWithMaxRetryTime(uri, username, password)
+					Expect(err).To(BeNil())
+					Expect(driver).NotTo(BeNil())
 
-			err = driver.Close()
-			Expect(err).To(BeNil())
-		})
+					err = driver.Close()
+					Expect(err).To(BeNil())
+				})
 
-		Specify("Config - With Customized Connection Pool", func() {
-			driver, err := createDriverWithCustomizedConnectionPool(uri, username, password)
-			Expect(err).To(BeNil())
-			Expect(driver).NotTo(BeNil())
+				Specify("Config - With Customized Connection Pool", func() {
+					driver, err := createDriverWithCustomizedConnectionPool(uri, username, password)
+					Expect(err).To(BeNil())
+					Expect(driver).NotTo(BeNil())
 
-			err = driver.Close()
-			Expect(err).To(BeNil())
-		})
+					err = driver.Close()
+					Expect(err).To(BeNil())
+				})
 
-		Specify("Config - With Connection Timeout", func() {
-			driver, err := createDriverWithConnectionTimeout(uri, username, password)
-			Expect(err).To(BeNil())
-			Expect(driver).NotTo(BeNil())
+				Specify("Config - With Connection Timeout", func() {
+					driver, err := createDriverWithConnectionTimeout(uri, username, password)
+					Expect(err).To(BeNil())
+					Expect(driver).NotTo(BeNil())
 
-			err = driver.Close()
-			Expect(err).To(BeNil())
-		})
+					err = driver.Close()
+					Expect(err).To(BeNil())
+				})
+		*/
 
-		Specify("Service Unavailable", func() {
-			driver, err := createDriverWithMaxRetryTime("bolt://localhost:8080", username, password)
-			Expect(err).To(BeNil())
-			Expect(driver).NotTo(BeNil())
-			defer driver.Close()
+		/*
+			Specify("Service Unavailable", func() {
+				driver, err := createDriverWithMaxRetryTime("bolt://localhost:8080", username, password)
+				Expect(err).To(BeNil())
+				Expect(driver).NotTo(BeNil())
+				defer driver.Close()
 
-			err = createItem(driver)
-			Expect(err).To(test.BeGenericError(ContainSubstring("retryable operation failed to complete after")))
-		})
+				err = createItem(driver)
+				Expect(err).To(test.BeGenericError(ContainSubstring("retryable operation failed to complete after")))
+			})
+		*/
 
 		Specify("Session", func() {
 			driver, err := createDriverWithMaxRetryTime(uri, username, password)
@@ -145,7 +149,6 @@ var _ = Describe("Examples", func() {
 			count, err := countNodes(driver, "Person", "name", "Tom")
 			Expect(err).To(BeNil())
 			Expect(count).To(BeNumerically("==", 1))
-
 		})
 
 		Specify("Autocommit Transaction", func() {
@@ -161,31 +164,33 @@ var _ = Describe("Examples", func() {
 			Expect(count).To(BeNumerically("==", 1))
 		})
 
-		Specify("Pass Bookmarks", func() {
-			driver, err := createDriverWithMaxRetryTime(uri, username, password)
-			Expect(err).To(BeNil())
-			Expect(driver).NotTo(BeNil())
-			defer driver.Close()
+		/*
+			Specify("Pass Bookmarks", func() {
+				driver, err := createDriverWithMaxRetryTime(uri, username, password)
+				Expect(err).To(BeNil())
+				Expect(driver).NotTo(BeNil())
+				defer driver.Close()
 
-			err = addEmployAndMakeFriends(driver)
-			Expect(err).To(BeNil())
+				err = addEmployAndMakeFriends(driver)
+				Expect(err).To(BeNil())
 
-			count, err := countNodes(driver, "Person", "name", "Alice")
-			Expect(err).To(BeNil())
-			Expect(count).To(BeNumerically("==", 1))
+				count, err := countNodes(driver, "Person", "name", "Alice")
+				Expect(err).To(BeNil())
+				Expect(count).To(BeNumerically("==", 1))
 
-			count, err = countNodes(driver, "Person", "name", "Bob")
-			Expect(err).To(BeNil())
-			Expect(count).To(BeNumerically("==", 1))
+				count, err = countNodes(driver, "Person", "name", "Bob")
+				Expect(err).To(BeNil())
+				Expect(count).To(BeNumerically("==", 1))
 
-			count, err = countNodes(driver, "Company", "name", "LexCorp")
-			Expect(err).To(BeNil())
-			Expect(count).To(BeNumerically("==", 1))
+				count, err = countNodes(driver, "Company", "name", "LexCorp")
+				Expect(err).To(BeNil())
+				Expect(count).To(BeNumerically("==", 1))
 
-			count, err = countNodes(driver, "Company", "name", "Wayne Enterprises")
-			Expect(err).To(BeNil())
-			Expect(count).To(BeNumerically("==", 1))
-		})
+				count, err = countNodes(driver, "Company", "name", "Wayne Enterprises")
+				Expect(err).To(BeNil())
+				Expect(count).To(BeNumerically("==", 1))
+			})
+		*/
 
 		Specify("Read/Write Transaction", func() {
 			driver, err := createDriverWithMaxRetryTime(uri, username, password)
@@ -198,81 +203,85 @@ var _ = Describe("Examples", func() {
 			Expect(id).To(BeNumerically(">=", 0))
 		})
 
-		Specify("Get People", func() {
-			driver, err := createDriverWithMaxRetryTime(uri, username, password)
-			Expect(err).To(BeNil())
-			Expect(driver).NotTo(BeNil())
-			defer driver.Close()
+		/*
+			Specify("Get People", func() {
+				driver, err := createDriverWithMaxRetryTime(uri, username, password)
+				Expect(err).To(BeNil())
+				Expect(driver).NotTo(BeNil())
+				defer driver.Close()
 
-			id, err := addPersonNode(driver, "Annie")
-			Expect(err).To(BeNil())
-			Expect(id).To(BeNumerically(">=", 0))
+				id, err := addPersonNode(driver, "Annie")
+				Expect(err).To(BeNil())
+				Expect(id).To(BeNumerically(">=", 0))
 
-			id, err = addPersonNode(driver, "Joe")
-			Expect(err).To(BeNil())
-			Expect(id).To(BeNumerically(">=", 0))
+				id, err = addPersonNode(driver, "Joe")
+				Expect(err).To(BeNil())
+				Expect(id).To(BeNumerically(">=", 0))
 
-			people, err := getPeople(driver)
-			Expect(err).To(BeNil())
-			Expect(people).To(ContainElement("Annie"))
-			Expect(people).To(ContainElement("Joe"))
-		})
+				people, err := getPeople(driver)
+				Expect(err).To(BeNil())
+				Expect(people).To(ContainElement("Annie"))
+				Expect(people).To(ContainElement("Joe"))
+			})
 
-		Specify("Result Retain", func() {
-			driver, err := createDriverWithMaxRetryTime(uri, username, password)
-			Expect(err).To(BeNil())
-			Expect(driver).NotTo(BeNil())
-			defer driver.Close()
+			Specify("Result Retain", func() {
+				driver, err := createDriverWithMaxRetryTime(uri, username, password)
+				Expect(err).To(BeNil())
+				Expect(driver).NotTo(BeNil())
+				defer driver.Close()
 
-			id, err := addPersonNode(driver, "Carl")
-			Expect(err).To(BeNil())
-			Expect(id).To(BeNumerically(">=", 0))
+				id, err := addPersonNode(driver, "Carl")
+				Expect(err).To(BeNil())
+				Expect(id).To(BeNumerically(">=", 0))
 
-			id, err = addPersonNode(driver, "Thomas")
-			Expect(err).To(BeNil())
-			Expect(id).To(BeNumerically(">=", 0))
+				id, err = addPersonNode(driver, "Thomas")
+				Expect(err).To(BeNil())
+				Expect(id).To(BeNumerically(">=", 0))
 
-			count, err := addPersonsAsEmployees(driver, "Acme")
-			Expect(err).To(BeNil())
-			Expect(count).To(BeNumerically(">=", 2))
-		})
+				count, err := addPersonsAsEmployees(driver, "Acme")
+				Expect(err).To(BeNil())
+				Expect(count).To(BeNumerically(">=", 2))
+			})
+		*/
 	})
 
-	Context("Causal Cluster", func() {
-		var (
-			err      error
-			cluster  *control.Cluster
-			username string
-			password string
-		)
+	/*
+		Context("Causal Cluster", func() {
+			var (
+				err      error
+				cluster  *control.Cluster
+				username string
+				password string
+			)
 
-		BeforeEach(func() {
-			if cluster, err = control.EnsureCluster(); err != nil {
-				Fail(err.Error())
-			}
+			BeforeEach(func() {
+				if cluster, err = control.EnsureCluster(); err != nil {
+					Fail(err.Error())
+				}
 
-			username = cluster.Username()
-			password = cluster.Password()
+				username = cluster.Username()
+				password = cluster.Password()
+			})
+
+			Specify("Config - Address Resolver", func() {
+				var addresses []neo4j.ServerAddress
+				for _, server := range cluster.Cores() {
+					addresses = append(addresses, server.Address())
+				}
+
+				driver, err := createDriverWithAddressResolver("bolt+routing://x.acme.com", username, password, addresses...)
+				Expect(err).To(BeNil())
+				Expect(driver).NotTo(BeNil())
+
+				err = createItem(driver)
+				Expect(err).To(BeNil())
+
+				err = driver.Close()
+				Expect(err).To(BeNil())
+			})
+
 		})
-
-		Specify("Config - Address Resolver", func() {
-			var addresses []neo4j.ServerAddress
-			for _, server := range cluster.Cores() {
-				addresses = append(addresses, server.Address())
-			}
-
-			driver, err := createDriverWithAddressResolver("bolt+routing://x.acme.com", username, password, addresses...)
-			Expect(err).To(BeNil())
-			Expect(driver).NotTo(BeNil())
-
-			err = createItem(driver)
-			Expect(err).To(BeNil())
-
-			err = driver.Close()
-			Expect(err).To(BeNil())
-		})
-
-	})
+	*/
 
 })
 
@@ -473,6 +482,7 @@ func createItem(driver neo4j.Driver) error {
 	return err
 }
 
+/*
 func addItem(driver neo4j.Driver) bool {
 	if err := createItem(driver); err != nil {
 		if neo4j.IsServiceUnavailable(err) {
@@ -484,6 +494,7 @@ func addItem(driver neo4j.Driver) bool {
 
 	return true
 }
+*/
 
 // end::service-unavailable[]
 
@@ -628,6 +639,7 @@ func printFriendsTxFunc() neo4j.TransactionWork {
 	}
 }
 
+/*
 func addAndEmploy(driver neo4j.Driver, person string, company string) (string, error) {
 	var err error
 	var session neo4j.Session
@@ -694,6 +706,7 @@ func addEmployAndMakeFriends(driver neo4j.Driver) error {
 
 	return nil
 }
+*/
 
 // end::pass-bookmarks[]
 
