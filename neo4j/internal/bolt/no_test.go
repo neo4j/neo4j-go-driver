@@ -232,7 +232,8 @@ func makeTestRunResp(keys []interface{}) testStruct {
 		Tag: msgV3Success,
 		Fields: []interface{}{
 			map[string]interface{}{
-				"fields": keys,
+				"fields":  keys,
+				"t_first": int64(1),
 			},
 		},
 	}

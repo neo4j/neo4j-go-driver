@@ -50,6 +50,7 @@ const userAgent = "Go Driver/1.8"
 const (
 	ready        = iota // After connect and reset
 	disconnected        // Lost connection to server
+	failed              // Recoverable, needs reset
 	corrupt             // Non recoverable protocol error
 	streaming           // Receiving result from auto commit query
 	tx                  // In a transaction
@@ -94,7 +95,7 @@ func (b *bolt3) ServerName() string {
 }
 
 func (b *bolt3) appendMsg(tag packstream.StructTag, field ...interface{}) error {
-	log(fmt.Sprintf("appending tag: %d", tag))
+	log(fmt.Sprintf("appending: {Tag: %d, Fields: %+v }", tag, field))
 	// Each message in it's own chunk
 	b.chunker.add()
 	// Setup the message and let packstream write the packed bytes to the chunk
@@ -136,7 +137,7 @@ func (b *bolt3) receive() (interface{}, error) {
 		log(fmt.Sprintf("receive error: %s", err))
 	}
 	if res != nil {
-		log(fmt.Sprintf("received: %+v", res))
+		log(fmt.Sprintf("received: %T:%+v", res, res))
 	}
 	return res, err
 }
@@ -394,30 +395,41 @@ func (b *bolt3) run(cypher string, params map[string]interface{}) (*conn.Stream,
 	}
 
 	// Send all
+	log("sending")
 	err = b.chunker.send()
 	if err != nil {
 		return nil, err
 	}
 
-	// Receive RUN response
-	succRes, err := b.receiveSuccessResponse()
+	// Receive confirmation of RUN
+	res, err := b.receive()
 	if err != nil {
 		return nil, err
 	}
-	runRes := succRes.run()
-	if runRes == nil {
+	switch v := res.(type) {
+	case *successResponse:
+		// Extract the RUN response from success response
+		runRes := v.run()
+		if runRes == nil {
+			b.state = corrupt
+			return nil, errors.New("parse fail, proto error")
+		}
+		// Succesful, change state to streaming and let Next receive the records.
+		switch b.state {
+		case ready:
+			b.state = streaming
+		case tx:
+			b.state = streamingtx
+		}
+		b.streamKeys = runRes.fields
+	case *failureResponse:
+		b.state = failed
+		return nil, v
+	default:
 		b.state = corrupt
-		return nil, errors.New("parse fail, proto error")
+		return nil, errors.New("Unknown message")
 	}
 
-	switch b.state {
-	case ready:
-		b.state = streaming
-	case tx:
-		b.state = streamingtx
-	}
-
-	b.streamKeys = runRes.fields
 	b.streamId = time.Now().Unix()
 	stream := &conn.Stream{Keys: b.streamKeys, Handle: b.streamId}
 	log(fmt.Sprintf("run ok, streaming: %d", b.state))
@@ -426,6 +438,9 @@ func (b *bolt3) run(cypher string, params map[string]interface{}) (*conn.Stream,
 
 func (b *bolt3) Run(cypher string, params map[string]interface{}) (*conn.Stream, error) {
 	log("Run no tx")
+	if b.state != streaming && b.state != ready {
+		return nil, b.invalidStateError([]int{streaming, ready})
+	}
 	return b.run(cypher, params)
 }
 

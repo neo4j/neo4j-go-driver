@@ -22,11 +22,12 @@ package test
 import (
 	"fmt"
 
-	"github.com/neo4j-drivers/gobolt"
-	"github.com/onsi/gomega"
+	//"github.com/neo4j-drivers/gobolt"
+	//"github.com/onsi/gomega"
 	"github.com/onsi/gomega/types"
 )
 
+/*
 func BeGenericError(messageMatcher types.GomegaMatcher) types.GomegaMatcher {
 	return &genericErrorMatcher{
 		messageMatcher: messageMatcher,
@@ -107,6 +108,7 @@ type databaseErrorMatcher struct {
 	codeMatcher           types.GomegaMatcher
 	messageMatcher        types.GomegaMatcher
 }
+*/
 
 type serviceUnavailableErrorMatcher struct {
 }
@@ -117,6 +119,7 @@ type connectorErrorMatcher struct {
 	descriptionMatcher types.GomegaMatcher
 }
 
+/*
 func (matcher *databaseErrorMatcher) Match(actual interface{}) (success bool, err error) {
 	databaseError, ok := actual.(gobolt.DatabaseError)
 	if !ok {
@@ -188,6 +191,7 @@ func (matcher *serviceUnavailableErrorMatcher) Match(actual interface{}) (succes
 
 	return gobolt.IsServiceUnavailable(err), nil
 }
+*/
 
 func (matcher *serviceUnavailableErrorMatcher) FailureMessage(actual interface{}) (message string) {
 	_, ok := actual.(error)
@@ -207,6 +211,7 @@ func (matcher *serviceUnavailableErrorMatcher) NegatedFailureMessage(actual inte
 	return fmt.Sprintf("Expected\n\t%#v\nnot to be a ServiceUnavailableError", actual)
 }
 
+/*
 func (matcher *connectorErrorMatcher) Match(actual interface{}) (success bool, err error) {
 	connectorError, ok := actual.(gobolt.ConnectorError)
 	if !ok {
@@ -308,3 +313,4 @@ func (matcher *genericErrorMatcher) NegatedFailureMessage(actual interface{}) (m
 
 	return fmt.Sprintf("Unexpected condition in matcher")
 }
+*/

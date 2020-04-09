@@ -1,5 +1,6 @@
 package neo4j
 
+/*
 import (
 	"crypto/rand"
 	"fmt"
@@ -351,6 +352,7 @@ func dumpResult(res Result) error {
 
 	return nil
 }
+*/
 
 /*
 func TestOnRealServer(t *testing.T) {

@@ -20,6 +20,7 @@
 package neo4j
 
 import (
+	"math"
 	"time"
 
 	conn "github.com/neo4j/neo4j-go-driver/neo4j/internal/connection"
@@ -66,7 +67,7 @@ func patchRecordType(v interface{}) interface{} {
 		}
 		return &path{path: x}
 	case *types.Point2D:
-		return &Point{dimension: 2, srId: int(x.SpatialRefId), x: x.X, y: x.Y}
+		return &Point{dimension: 2, srId: int(x.SpatialRefId), x: x.X, y: x.Y, z: math.NaN()}
 	case *types.Point3D:
 		return &Point{dimension: 3, srId: int(x.SpatialRefId), x: x.X, y: x.Y, z: x.Z}
 	case types.Time:

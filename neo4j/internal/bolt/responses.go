@@ -62,8 +62,8 @@ type runSuccess struct {
 
 func (s *successResponse) run() *runSuccess {
 	fieldsx, fok := s.meta["fields"].([]interface{})
-	t_first, _ := s.meta["t_first"].(int64)
-	if !fok {
+	t_first, tok := s.meta["t_first"].(int64)
+	if !fok || !tok {
 		return nil
 	}
 	fields := make([]string, len(fieldsx))

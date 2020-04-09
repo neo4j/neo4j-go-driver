@@ -23,13 +23,34 @@ import (
 	"github.com/neo4j/neo4j-go-driver/neo4j/internal/types"
 )
 
+func patchPoint(v *Point) interface{} {
+	if v == nil {
+		return nil
+	}
+	if v.dimension == 2 {
+		return &types.Point2D{X: v.x, Y: v.y, SpatialRefId: uint32(v.srId)}
+	}
+	return &types.Point3D{X: v.x, Y: v.y, Z: v.z, SpatialRefId: uint32(v.srId)}
+}
+
 func patchParamType(x interface{}) interface{} {
 	switch v := x.(type) {
 	case *Point:
-		if v.dimension == 2 {
-			return &types.Point2D{X: v.x, Y: v.y, SpatialRefId: uint32(v.srId)}
+		return patchPoint(v)
+	case Point:
+		return patchPoint(&v)
+	case []*Point:
+		patched := make([]interface{}, len(v))
+		for i, p := range v {
+			patched[i] = patchPoint(p)
 		}
-		return &types.Point3D{X: v.x, Y: v.y, Z: v.z, SpatialRefId: uint32(v.srId)}
+		return patched
+	case []Point:
+		patched := make([]interface{}, len(v))
+		for i, p := range v {
+			patched[i] = patchPoint(&p)
+		}
+		return patched
 	case Date:
 		return types.Date(v.Time())
 	case LocalTime:
