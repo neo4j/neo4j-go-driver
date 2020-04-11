@@ -20,6 +20,8 @@
 package neo4j
 
 import (
+	"time"
+
 	"github.com/neo4j/neo4j-go-driver/neo4j/internal/types"
 )
 
@@ -31,6 +33,13 @@ func patchPoint(v *Point) interface{} {
 		return &types.Point2D{X: v.x, Y: v.y, SpatialRefId: uint32(v.srId)}
 	}
 	return &types.Point3D{X: v.x, Y: v.y, Z: v.z, SpatialRefId: uint32(v.srId)}
+}
+
+func patchDuration(v *Duration) interface{} {
+	if v == nil {
+		return nil
+	}
+	return types.Duration{Months: v.months, Days: v.days, Seconds: v.seconds, Nanos: v.nanos}
 }
 
 func patchParamType(x interface{}) interface{} {
@@ -53,14 +62,53 @@ func patchParamType(x interface{}) interface{} {
 		return patched
 	case Date:
 		return types.Date(v.Time())
+	case *Date:
+		if v == nil {
+			return nil
+		}
+		return types.Date(v.Time())
 	case LocalTime:
+		return types.LocalTime(v.Time())
+	case *LocalTime:
+		if v == nil {
+			return nil
+		}
 		return types.LocalTime(v.Time())
 	case OffsetTime:
 		return types.Time(v.Time())
+	case *OffsetTime:
+		if v == nil {
+			return nil
+		}
+		return types.Time(v.Time())
 	case LocalDateTime:
 		return types.LocalDateTime(v.Time())
+	case *LocalDateTime:
+		if v == nil {
+			return nil
+		}
+		return types.LocalDateTime(v.Time())
 	case Duration:
-		return types.Duration{Months: v.months, Days: v.days, Seconds: v.seconds, Nanos: v.nanos}
+		return patchDuration(&v)
+	case *Duration:
+		return patchDuration(v)
+	case []Duration:
+		patched := make([]interface{}, len(v))
+		for i, x := range v {
+			patched[i] = patchDuration(&x)
+		}
+		return patched
+	case []interface{}:
+		patched := make([]interface{}, len(v))
+		for i, x := range v {
+			patched[i] = patchParamType(x)
+		}
+		return patched
+	case *time.Time:
+		if v == nil {
+			return nil
+		}
+		return *v
 	default:
 		return v
 	}
