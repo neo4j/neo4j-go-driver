@@ -21,27 +21,36 @@ package bolt
 
 import (
 	"encoding/binary"
+	"fmt"
 	"io"
 )
 
 type chunker struct {
 	wr     io.Writer
-	size   int
 	chunks [][]byte
 }
 
-func newChunker(wr io.Writer, size int) *chunker {
+const max_chunk_size = 0xffff
+
+func newChunker(wr io.Writer) *chunker {
 	return &chunker{
 		wr:     wr,
-		size:   size + 2,
 		chunks: make([][]byte, 0, 2),
 	}
 }
 
-func (c *chunker) add() {
-	chunk := make([]byte, 0, c.size)
+func (c *chunker) beginMessage() {
+	c.chunk()
+}
+
+func (c *chunker) chunk() {
+	chunk := make([]byte, 0, 0x100)
 	chunk = append(chunk, 0x00, 0x00)
 	c.chunks = append(c.chunks, chunk)
+}
+
+func (c *chunker) endMessage() {
+	c.chunks = append(c.chunks, []byte{0x00, 0x00})
 }
 
 // Writes to current chunk or creates new chunks as needed.
@@ -50,18 +59,13 @@ func (c *chunker) Write(p []byte) (int, error) {
 		return 0, nil
 	}
 
-	// First chunk?
-	if len(c.chunks) == 0 {
-		c.add()
-	}
-
 	written := 0
 	for len(p) > 0 {
 		index := len(c.chunks) - 1
 		chunk := c.chunks[index]
 
 		currChunkSize := len(chunk)
-		leftInChunk := c.size - currChunkSize
+		leftInChunk := (max_chunk_size + 2) - currChunkSize
 
 		// There is room left in current chunk to write all
 		if len(p) <= leftInChunk {
@@ -70,10 +74,11 @@ func (c *chunker) Write(p []byte) (int, error) {
 			return written, nil
 		}
 
+		// This message spills over to another chunk
 		c.chunks[index] = append(chunk, p[:leftInChunk]...)
 		written += leftInChunk
 		p = p[leftInChunk:]
-		c.add()
+		c.chunk()
 	}
 
 	return written, nil
@@ -81,6 +86,7 @@ func (c *chunker) Write(p []byte) (int, error) {
 
 // Sends all chunks to server
 func (c *chunker) send() error {
+	log(fmt.Sprintf("sending %d chunks", len(c.chunks)))
 	// Discard chunks while writing them
 	for len(c.chunks) > 0 {
 		// Pop chunk
@@ -91,12 +97,9 @@ func (c *chunker) send() error {
 		// Last two bytes should always be zero. Size only includes
 		// user data, not size itself or trailing zeroes.
 		size := uint16(len(chunk) - 2)
-		if size == 0 {
-			// No need for empty chunks
-			continue
-		}
 		binary.BigEndian.PutUint16(chunk, size)
-		chunk = append(chunk, 0x00, 0x00)
+
+		log(fmt.Sprintf("sending chunk of size %d", size))
 
 		// Write chunk to underlying writer (probably the TCP connection)
 		_, err := c.wr.Write(chunk)

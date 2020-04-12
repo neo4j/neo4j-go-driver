@@ -69,6 +69,7 @@ type bolt3 struct {
 	conn          net.Conn
 	serverName    string
 	chunker       *chunker
+	dechunker     *dechunker
 	packer        *packstream.Packer
 	unpacker      *packstream.Unpacker
 	connId        string
@@ -77,7 +78,7 @@ type bolt3 struct {
 
 func NewBolt3(serverName string, conn net.Conn) *bolt3 {
 	// Wrap connection reading/writing in chunk reader/writer
-	chunker := newChunker(conn, 4096)
+	chunker := newChunker(conn)
 	dechunker := newDechunker(conn)
 
 	return &bolt3{
@@ -85,6 +86,7 @@ func NewBolt3(serverName string, conn net.Conn) *bolt3 {
 		conn:       conn,
 		serverName: serverName,
 		chunker:    chunker,
+		dechunker:  dechunker,
 		packer:     packstream.NewPacker(chunker, dehydrate),
 		unpacker:   packstream.NewUnpacker(dechunker),
 	}
@@ -96,8 +98,7 @@ func (b *bolt3) ServerName() string {
 
 func (b *bolt3) appendMsg(tag packstream.StructTag, field ...interface{}) error {
 	log(fmt.Sprintf("appending: {Tag: %d, Fields: %+v }", tag, field))
-	// Each message in it's own chunk
-	b.chunker.add()
+	b.chunker.beginMessage()
 	// Setup the message and let packstream write the packed bytes to the chunk
 	err := b.packer.PackStruct(tag, field...)
 	if err != nil {
@@ -107,6 +108,7 @@ func (b *bolt3) appendMsg(tag packstream.StructTag, field ...interface{}) error 
 		b.state = corrupt
 		return err
 	}
+	b.chunker.endMessage()
 	return nil
 }
 
@@ -132,12 +134,21 @@ func (b *bolt3) assertHandle(id int64, h conn.Handle) error {
 }
 
 func (b *bolt3) receive() (interface{}, error) {
+	if err := b.dechunker.beginMessage(); err != nil {
+		return nil, err
+	}
 	res, err := b.unpacker.UnpackStruct(hydrate)
 	if err != nil {
 		log(fmt.Sprintf("receive error: %s", err))
+		if _, isIoError := err.(*packstream.IoError); isIoError {
+			b.state = disconnected
+		}
 	}
 	if res != nil {
 		log(fmt.Sprintf("received: %T:%+v", res, res))
+	}
+	if err = b.dechunker.endMessage(); err != nil {
+		return nil, err
 	}
 	return res, err
 }

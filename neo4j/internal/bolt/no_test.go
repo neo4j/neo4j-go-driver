@@ -46,7 +46,7 @@ type neo4jServer struct {
 func newNeo4jServer(t *testing.T, conn net.Conn) *neo4jServer {
 	dechunker := newDechunker(conn)
 	unpacker := packstream.NewUnpacker(dechunker)
-	chunker := newChunker(conn, 4096)
+	chunker := newChunker(conn)
 	packer := packstream.NewPacker(chunker, nil)
 	return &neo4jServer{
 		t:         t,
@@ -75,16 +75,18 @@ func (s *neo4jServer) assertStructType(msg *testStruct, t packstream.StructTag) 
 }
 
 func (s *neo4jServer) sendFailureMsg(code, msg string) {
+	s.chunker.beginMessage()
 	f := map[string]interface{}{
 		"code":    code,
 		"message": msg,
 	}
 	s.packer.PackStruct(msgV3Failure, f)
 	s.chunker.send()
+	s.chunker.endMessage()
 }
 
 func (s *neo4jServer) waitForHello() {
-	msg := s.wait()
+	msg := s.receiveMsg()
 	s.assertStructType(msg, msgV3Hello)
 	m := msg.Fields[0].(map[string]interface{})
 	// Hello should contain some musts
@@ -98,57 +100,61 @@ func (s *neo4jServer) waitForHello() {
 	}
 }
 
-func (s *neo4jServer) wait() *testStruct {
+func (s *neo4jServer) receiveMsg() *testStruct {
+	s.dechunker.beginMessage()
 	x, err := s.unpacker.UnpackStruct(s.hyd)
 	if err != nil {
 		s.t.Fatalf("Server couldn't parse message: %s", err)
 	}
+	s.dechunker.endMessage()
 	return x.(*testStruct)
 }
 
 func (s *neo4jServer) waitForRun() {
-	msg := s.wait()
+	msg := s.receiveMsg()
 	s.assertStructType(msg, msgV3Run)
 }
 
 func (s *neo4jServer) waitForTxBegin() {
-	msg := s.wait()
+	msg := s.receiveMsg()
 	s.assertStructType(msg, msgV3Begin)
 }
 
 func (s *neo4jServer) waitForTxCommit() {
-	msg := s.wait()
+	msg := s.receiveMsg()
 	s.assertStructType(msg, msgV3Commit)
 }
 
 func (s *neo4jServer) waitForTxRollback() {
-	msg := s.wait()
+	msg := s.receiveMsg()
 	s.assertStructType(msg, msgV3Rollback)
 }
 
 func (s *neo4jServer) waitForPullAll() {
-	msg := s.wait()
+	msg := s.receiveMsg()
 	s.assertStructType(msg, msgV3PullAll)
 }
 
 func (s *neo4jServer) acceptVersion(ver byte) {
-	ver3 := []byte{0x00, 0x00, 0x00, ver}
-	_, err := s.conn.Write(ver3)
+	acceptedVer := []byte{0x00, 0x00, 0x00, ver}
+	_, err := s.conn.Write(acceptedVer)
 	if err != nil {
 		s.t.Fatalf("Failed to send version")
 	}
 }
 
 func (s *neo4jServer) send(tag packstream.StructTag, field ...interface{}) {
-	s.chunker.add()
+	s.chunker.beginMessage()
 	err := s.packer.PackStruct(tag, field...)
 	if err != nil {
 		s.t.Fatalf("Failed to pack: %s", err)
 	}
+	s.chunker.endMessage()
 	s.chunker.send()
 }
 
 func (s *neo4jServer) acceptHello() {
+	s.chunker.beginMessage()
 	err := s.packer.PackStruct(msgV3Success, map[string]interface{}{
 		"connection_id": "cid",
 		"server":        "fake/3.5",
@@ -156,6 +162,7 @@ func (s *neo4jServer) acceptHello() {
 	if err != nil {
 		s.t.Fatalf("Failed to pack: %s", err)
 	}
+	s.chunker.endMessage()
 	err = s.chunker.send()
 	if err != nil {
 		s.t.Fatalf("Failed to send acceptance of hello: %s", err)
@@ -163,9 +170,9 @@ func (s *neo4jServer) acceptHello() {
 }
 
 // Utility when something else but connect is to be tested
-func (s *neo4jServer) accept() {
+func (s *neo4jServer) accept(ver byte) {
 	s.waitForHandshake()
-	s.acceptVersion(3)
+	s.acceptVersion(ver)
 	s.waitForHello()
 	s.acceptHello()
 }

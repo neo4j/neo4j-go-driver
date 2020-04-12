@@ -111,7 +111,7 @@ func TestBolt3(ot *testing.T) {
 		conn, srv, cleanup := setupBoltPipe(t)
 		defer cleanup()
 		go func() {
-			srv.accept()
+			srv.accept(3)
 			srv.waitAndServeAutoCommit(strm1)
 		}()
 		bolt, err := Connect("name", conn, auth)
@@ -138,7 +138,7 @@ func TestBolt3(ot *testing.T) {
 		nconn, srv, cleanup := setupBoltPipe(t)
 		defer cleanup()
 		go func() {
-			srv.accept()
+			srv.accept(3)
 			srv.waitAndServeTransRun(strm2, true)
 		}()
 		bolt, _ := Connect("name", nconn, auth)
@@ -171,7 +171,7 @@ func TestBolt3(ot *testing.T) {
 		nconn, srv, cleanup := setupBoltPipe(t)
 		defer cleanup()
 		go func() {
-			srv.accept()
+			srv.accept(3)
 			srv.waitAndServeTransRun(strm2, false)
 		}()
 		bolt, _ := Connect("name", nconn, auth)

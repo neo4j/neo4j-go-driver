@@ -21,40 +21,61 @@ package bolt
 
 import (
 	"encoding/binary"
+	"errors"
 	"io"
 )
 
 type dechunker struct {
 	rd   io.Reader
-	size int // Size of current chunk or -1 if no current
+	size int
 }
 
 func newDechunker(rd io.Reader) *dechunker {
-	return &dechunker{
-		rd:   rd,
-		size: -1,
+	return &dechunker{rd: rd}
+}
+
+func (d *dechunker) beginMessage() error {
+	return d.readSize()
+}
+
+func (d *dechunker) readSize() error {
+	buf := []byte{0x00, 0x00}
+	_, err := io.ReadFull(d.rd, buf)
+	if err != nil {
+		return err
 	}
+	d.size = int(binary.BigEndian.Uint16(buf))
+	return nil
+}
+
+func (d *dechunker) endMessage() error {
+	if d.size > 0 {
+		// Reader hasn't consumed everything!
+		return errors.New("Unconsumed data")
+	}
+	// At end of message there should be a zero chunk
+	if err := d.readSize(); err != nil {
+		return err
+	}
+	if d.size != 0 {
+		return errors.New("Not a zero chunk")
+	}
+	return nil
 }
 
 func (d *dechunker) Read(p []byte) (n int, err error) {
-	// Read end of chunk zeroes
+	// Adjustment of how much reding that is done will make sure that we
+	// hit the zero.
+	// Try to continue in the next chunk, if it is the zero chunk we should
+	// return an end of file like error since reader is trying to read beyond the message
+	// boundary.
 	if d.size == 0 {
-		buf := []byte{0x00, 0x00}
-		_, err := io.ReadFull(d.rd, buf)
-		if err != nil {
+		if err := d.readSize(); err != nil {
 			return 0, err
 		}
-		d.size = -1
-	}
-
-	// Read chunk length if not in a chunk already
-	if d.size == -1 {
-		buf := []byte{0x00, 0x00}
-		_, err := io.ReadFull(d.rd, buf)
-		if err != nil {
-			return 0, err
+		if d.size == 0 {
+			return 0, errors.New("out of message")
 		}
-		d.size = int(binary.BigEndian.Uint16(buf))
 	}
 
 	// Just forward read to underlying reader and count off the bytes.

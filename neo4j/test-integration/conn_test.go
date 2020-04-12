@@ -25,6 +25,7 @@ import (
 	"math/big"
 	"net"
 	"net/url"
+	"strings"
 	"testing"
 	"time"
 
@@ -363,4 +364,30 @@ func TestConnectionConformance(ot *testing.T) {
 			boltConn.Next(s.Handle)
 		})
 	}
+
+	// Write really big query
+	ot.Run("Really big query", func(t *testing.T) {
+		query := "RETURN $x"
+		bigBuilder := strings.Builder{}
+		s := "0123456789"
+		n := 10000
+		size := len(s) * n // Should exceed 64k
+		bigBuilder.Grow(size)
+		for i := 0; i < n; i++ {
+			bigBuilder.WriteString("0123456789")
+		}
+
+		stream, err := boltConn.Run(query, map[string]interface{}{"x": bigBuilder.String()})
+		if err != nil {
+			t.Fatal(err)
+		}
+		rec, sum, err := boltConn.Next(stream.Handle)
+		if rec == nil || err != nil || sum != nil {
+			t.Fatalf("Should only be a record, %+v, %+v, %+v", rec, sum, err)
+		}
+		recS := rec.Values[0].(string)
+		if recS != bigBuilder.String() {
+			t.Errorf("Strings differ")
+		}
+	})
 }
