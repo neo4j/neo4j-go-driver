@@ -438,61 +438,118 @@ func TestConnectionConformance(ot *testing.T) {
 	}
 
 	// Temporal types
-	ot.Run("Reading temporal types", func(t *testing.T) {
-		query := "RETURN " +
-			"time({ hour: 23, minute: 49, second: 59, nanosecond: 999999999, timezone:'+03:00' }), " +
-			"date({ year: 1994, month: 11, day: 15 }), " +
-			"datetime({ year: 1859, month: 5, day: 31, hour: 23, minute: 49, second: 59, nanosecond: 999999999, timezone:'+02:30' }), " +
-			"datetime({ year: 1959, month: 5, day: 31, hour: 23, minute: 49, second: 59, nanosecond: 999999999, timezone:'Europe/London' }), " +
-			"localtime({ hour: 23, minute: 49, second: 59, nanosecond: 999999999 }), " +
-			"localdatetime({ year: 1859, month: 5, day: 31, hour: 23, minute: 49, second: 59, nanosecond: 999999999 }), " +
-			"duration({ months: 16, days: 45, seconds: 120, nanoseconds: 187309812 }) "
-
-		stream, err := boltConn.Run(query, nil)
-		if err != nil {
-			t.Fatal(err)
-		}
-		rec, sum, err := boltConn.Next(stream.Handle)
-		if rec == nil || err != nil || sum != nil {
-			t.Fatalf("Should be a record, %+v, %+v, %+v", rec, sum, err)
-		}
-
+	ot.Run("Temporal types", func(tt *testing.T) {
 		london, _ := time.LoadLocation("Europe/London")
 
-		// Verify each temporal type
-		// Time
-		gotTime := time.Time(rec.Values[0].(types.Time))
-		expectTime := time.Date(0, 0, 0, 23, 49, 59, 999999999, time.FixedZone("Offset", 3*60*60))
-		assertTime(t, gotTime, expectTime)
-		assertTimeOffset(t, gotTime, expectTime)
-		// Date
-		gotDate := time.Time(rec.Values[1].(types.Date))
-		expectDate := time.Date(1994, 11, 15, 0, 0, 0, 0, time.Local)
-		assertDate(t, gotDate, expectDate)
-		// DateTime, offset
-		gotDateTime := time.Time(rec.Values[2].(time.Time))
-		expectDateTime := time.Date(1859, 5, 31, 23, 49, 59, 999999999, time.FixedZone("Offset", 150*60))
-		assertDate(t, time.Time(gotDateTime), expectDateTime)
-		assertTime(t, gotDateTime, expectDateTime)
-		assertTimeOffset(t, gotDateTime, expectDateTime)
-		// DateTime, zone
-		gotDateTime = time.Time(rec.Values[3].(time.Time))
-		expectDateTime = time.Date(1959, 5, 31, 23, 49, 59, 999999999, london)
-		assertDate(t, time.Time(gotDateTime), expectDateTime)
-		assertTime(t, gotDateTime, expectDateTime)
-		assertTimeZone(t, gotDateTime, expectDateTime)
-		// Local time
-		gotTime = time.Time(rec.Values[4].(types.LocalTime))
-		expectTime = time.Date(0, 0, 0, 23, 49, 59, 999999999, time.Local)
-		assertTime(t, gotTime, expectTime)
-		// Local DateTime
-		gotDateTime = time.Time(rec.Values[5].(types.LocalDateTime))
-		expectDateTime = time.Date(1859, 5, 31, 23, 49, 59, 999999999, time.Local)
-		assertDate(t, time.Time(gotDateTime), expectDateTime)
-		assertTime(t, gotDateTime, expectDateTime)
-		// Duration
-		gotDuration := rec.Values[6].(types.Duration)
-		expectDuration := types.Duration{Months: 16, Days: 45, Seconds: 120, Nanos: 187309812}
-		assertDuration(t, gotDuration, expectDuration)
+		// In Cypher
+		cTime := "time({ hour: 23, minute: 49, second: 59, nanosecond: 999999999, timezone:'+03:00' })"
+		cDate := "date({ year: 1994, month: 11, day: 15 })"
+		cDateTimeO := "datetime({ year: 1859, month: 5, day: 31, hour: 23, minute: 49, second: 59, nanosecond: 999999999, timezone:'+02:30' })"
+		cDateTimeZ := "datetime({ year: 1959, month: 5, day: 31, hour: 23, minute: 49, second: 59, nanosecond: 999999999, timezone:'Europe/London' })"
+		cLocalTime := "localtime({ hour: 23, minute: 49, second: 59, nanosecond: 999999999 })"
+		cLocalDateTime := "localdatetime({ year: 1859, month: 5, day: 31, hour: 23, minute: 49, second: 59, nanosecond: 999999999 })"
+		cDuration := "duration({ months: 16, days: 45, seconds: 120, nanoseconds: 187309812 })"
+		// Same as above in time.Time
+		tTime := time.Date(0, 0, 0, 23, 49, 59, 999999999, time.FixedZone("Offset", 3*60*60))
+		tDate := time.Date(1994, 11, 15, 0, 0, 0, 0, time.Local)
+		tDateTimeO := time.Date(1859, 5, 31, 23, 49, 59, 999999999, time.FixedZone("Offset", 150*60))
+		tDateTimeZ := time.Date(1959, 5, 31, 23, 49, 59, 999999999, london)
+		tLocalTime := time.Date(0, 0, 0, 23, 49, 59, 999999999, time.Local)
+		tLocalDateTime := time.Date(1859, 5, 31, 23, 49, 59, 999999999, time.Local)
+		tDuration := types.Duration{Months: 16, Days: 45, Seconds: 120, Nanos: 187309812}
+
+		tt.Run("Reading", func(t *testing.T) {
+			query := "RETURN " +
+				cTime + ", " + cDate + ", " + cDateTimeO + ", " + cDateTimeZ + ", " + cLocalTime + ", " + cLocalDateTime + ", " + cDuration
+			stream, err := boltConn.Run(query, nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+			rec, sum, err := boltConn.Next(stream.Handle)
+			if rec == nil || err != nil || sum != nil {
+				t.Fatalf("Should be a record, %+v, %+v, %+v", rec, sum, err)
+			}
+
+			// Verify each temporal type
+			// Time
+			gotTime := time.Time(rec.Values[0].(types.Time))
+			assertTime(t, gotTime, tTime)
+			assertTimeOffset(t, gotTime, tTime)
+			// Date
+			gotDate := time.Time(rec.Values[1].(types.Date))
+			assertDate(t, gotDate, tDate)
+			// DateTime, offset
+			gotDateTime := time.Time(rec.Values[2].(time.Time))
+			assertDate(t, time.Time(gotDateTime), tDateTimeO)
+			assertTime(t, gotDateTime, tDateTimeO)
+			assertTimeOffset(t, gotDateTime, tDateTimeO)
+			// DateTime, zone
+			gotDateTime = time.Time(rec.Values[3].(time.Time))
+			assertDate(t, time.Time(gotDateTime), tDateTimeZ)
+			assertTime(t, gotDateTime, tDateTimeZ)
+			assertTimeZone(t, gotDateTime, tDateTimeZ)
+			// Local time
+			gotTime = time.Time(rec.Values[4].(types.LocalTime))
+			assertTime(t, gotTime, tLocalTime)
+			// Local DateTime
+			gotDateTime = time.Time(rec.Values[5].(types.LocalDateTime))
+			assertDate(t, time.Time(gotDateTime), tLocalDateTime)
+			assertTime(t, gotDateTime, tLocalDateTime)
+			// Duration
+			gotDuration := rec.Values[6].(types.Duration)
+			assertDuration(t, gotDuration, tDuration)
+		})
+
+		tt.Run("Writing", func(t *testing.T) {
+			// Make a node with all temporal types as parameters and make sure that we can interpret
+			// it the same way again.
+			r := randInt()
+			stream, _ := boltConn.Run(
+				"CREATE (n:Rand {"+
+					"val: $r, time: $time, date: $date, dateTimeO: $dateTimeO, "+
+					"dateTimeZ: $dateTimeZ, localTime: $localTime, localDateTime: $localDateTime}) "+
+					"RETURN n",
+				map[string]interface{}{
+					"r":             r,
+					"time":          types.Time(tTime),
+					"date":          types.Date(tDate),
+					"dateTimeO":     tDateTimeO,
+					"dateTimeZ":     tDateTimeZ,
+					"localTime":     types.LocalTime(tLocalTime),
+					"localDateTime": types.LocalDateTime(tLocalDateTime),
+				})
+			rec, sum, err := boltConn.Next(stream.Handle)
+			if rec == nil || err != nil || sum != nil {
+				t.Fatalf("Should be a record, %+v, %+v, %+v", rec, sum, err)
+			}
+
+			// Verify all temporal instances as when reading (as long as that test passes, the
+			// errors here should be due to writing).
+			node := rec.Values[0].(*types.Node)
+			// Time
+			gotTime := time.Time(node.Props["time"].(types.Time))
+			assertTime(t, gotTime, tTime)
+			assertTimeOffset(t, gotTime, tTime)
+			// Date
+			gotDate := time.Time(node.Props["date"].(types.Date))
+			assertDate(t, gotDate, tDate)
+			// DateTime, offset
+			gotDateTime := time.Time(node.Props["dateTimeO"].(time.Time))
+			assertDate(t, time.Time(gotDateTime), tDateTimeO)
+			assertTime(t, gotDateTime, tDateTimeO)
+			assertTimeOffset(t, gotDateTime, tDateTimeO)
+			// DateTime, zone
+			gotDateTime = time.Time(node.Props["dateTimeZ"].(time.Time))
+			assertDate(t, time.Time(gotDateTime), tDateTimeZ)
+			assertTime(t, gotDateTime, tDateTimeZ)
+			assertTimeZone(t, gotDateTime, tDateTimeZ)
+			// Local time
+			gotTime = time.Time(node.Props["localTime"].(types.LocalTime))
+			assertTime(t, gotTime, tLocalTime)
+			// Local DateTime
+			gotDateTime = time.Time(node.Props["localDateTime"].(types.LocalDateTime))
+			assertDate(t, time.Time(gotDateTime), tLocalDateTime)
+			assertTime(t, gotDateTime, tLocalDateTime)
+		})
 	})
 }

@@ -73,7 +73,7 @@ func TestDehydrator(ot *testing.T) {
 
 	assertDateTimeSame := func(t *testing.T, t1, t2 time.Time) {
 		t.Helper()
-		if t1.UnixNano() != t2.UnixNano() {
+		if !t1.Equal(t2) {
 			t.Errorf("Times differ: %s vs %s (%d vs %d", t1, t2, t1.UnixNano(), t2.UnixNano())
 		}
 	}
@@ -171,9 +171,21 @@ func TestDehydrator(ot *testing.T) {
 	})
 
 	ot.Run("LocalDateTime", func(t *testing.T) {
-		ni := time.Now()
+		ni := time.Now().Round(0 * time.Nanosecond)
 		l, _ := time.LoadLocation("America/New_York")
-		ni = ni.In(l)
+		ni = ni.In(l).Round(0 * time.Nanosecond)
+		no := dehydrateAndHydrate(t, types.LocalDateTime(ni)).(types.LocalDateTime)
+		assertTimeSame(t, ni, time.Time(no))
+		assertDateSame(t, ni, time.Time(no))
+		// Received time should be in Local time even if sent as something else
+		if time.Time(no).Location().String() != "Local" {
+			t.Errorf("Should be local")
+		}
+	})
+
+	ot.Run("LocalDateTime way back", func(t *testing.T) {
+		l, _ := time.LoadLocation("Asia/Anadyr")
+		ni := time.Date(311, 7, 2, 23, 59, 3, 1, l)
 		no := dehydrateAndHydrate(t, types.LocalDateTime(ni)).(types.LocalDateTime)
 		assertTimeSame(t, ni, time.Time(no))
 		assertDateSame(t, ni, time.Time(no))

@@ -62,9 +62,12 @@ func dehydrate(x interface{}) (*packstream.Struct, error) {
 		fields := []interface{}{secs, t.Nanosecond()}
 		return &packstream.Struct{Tag: packstream.StructTag('d'), Fields: fields}, nil
 	case types.Date:
-		// v is UTC
-		daysSinceEpoch := int64(time.Time(v).Sub(time.Unix(0, 0)).Hours()) / 24
-		return &packstream.Struct{Tag: packstream.StructTag('D'), Fields: []interface{}{daysSinceEpoch}}, nil
+		t := time.Time(v)
+		secs := t.Unix()
+		_, offset := t.Zone()
+		secs += int64(offset)
+		days := secs / (60 * 60 * 24)
+		return &packstream.Struct{Tag: packstream.StructTag('D'), Fields: []interface{}{days}}, nil
 	case types.Time:
 		t := time.Time(v)
 		_, tzOffsetSecs := t.Zone()

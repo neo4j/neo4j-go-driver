@@ -19,11 +19,9 @@
 
 package test_integration
 
-/*
 import (
 	"math"
 	"math/rand"
-	//"testing"
 	"time"
 
 	"github.com/neo4j/neo4j-go-driver/neo4j"
@@ -33,28 +31,7 @@ import (
 	. "github.com/onsi/ginkgo/extensions/table"
 	. "github.com/onsi/gomega"
 )
-*/
 
-/*
-func TestTemporalTypes(ot *testing.T) {
-	server, err := control.EnsureSingleInstance()
-	if err != nil {
-		ot.Fatal(err)
-	}
-
-	// Check server version
-	driver, err := server.Driver()
-	if err != nil {
-		ot.Fatal(err)
-	}
-	if versionOfDriver(driver).LessThan(V340) {
-		ot.Skip("temporal types are only available after neo4j 3.4.0 release")
-	}
-
-	driver.Close()
-}
-*/
-/*
 var _ = Describe("Temporal Types", func() {
 	const (
 		numberOfRandomValues = 2000
@@ -239,6 +216,19 @@ var _ = Describe("Temporal Types", func() {
 			var received = result.Record().GetByIndex(0)
 
 			Expect(received).To(Equal(value))
+		}
+		Expect(result.Err()).To(BeNil())
+		Expect(result.Next()).To(BeFalse())
+	}
+
+	testSendAndReceiveValueComp := func(value interface{}, comp func(x, y interface{}) bool) {
+		result, err = session.Run("CREATE (n:Node {value: $value}) RETURN n.value", map[string]interface{}{"value": value})
+		Expect(err).To(BeNil())
+
+		if result.Next() {
+			var received = result.Record().GetByIndex(0)
+
+			Expect(comp(value, received)).To(Equal(true))
 		}
 		Expect(result.Err()).To(BeNil())
 		Expect(result.Next()).To(BeFalse())
@@ -433,7 +423,12 @@ var _ = Describe("Temporal Types", func() {
 
 		It("local date time", func() {
 			for i := 0; i < numberOfRandomValues; i++ {
-				testSendAndReceiveValue(randomLocalDateTime())
+				testSendAndReceiveValueComp(randomLocalDateTime(), func(x, y interface{}) bool {
+					x1 := x.(neo4j.LocalDateTime)
+					y1 := y.(neo4j.LocalDateTime)
+
+					return x1.Time().Equal(y1.Time())
+				})
 			}
 		})
 
@@ -498,7 +493,21 @@ var _ = Describe("Temporal Types", func() {
 				list[i] = randomLocalDateTime()
 			}
 
-			testSendAndReceiveValue(list)
+			testSendAndReceiveValueComp(list, func(x, y interface{}) bool {
+				l1 := x.([]interface{})
+				l2 := y.([]interface{})
+
+				equal := true
+				for i, x := range l1 {
+					y := l2[i]
+					d1 := x.(neo4j.LocalDateTime)
+					d2 := y.(neo4j.LocalDateTime)
+					if !d1.Time().Equal(d2.Time()) {
+						equal = false
+					}
+				}
+				return equal
+			})
 		})
 
 		It("offset date time", func() {
@@ -541,4 +550,3 @@ var _ = Describe("Temporal Types", func() {
 		Entry("DateTime{Offset|Zoned}", (*time.Time)(nil)),
 	)
 })
-*/
