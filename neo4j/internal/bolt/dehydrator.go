@@ -42,8 +42,9 @@ func dehydrate(x interface{}) (*packstream.Struct, error) {
 			Fields: []interface{}{v.SpatialRefId, v.X, v.Y, v.Z},
 		}, nil
 	case time.Time:
-		fields := []interface{}{v.Unix(), v.Nanosecond(), 0 /*Make room*/}
 		zone, offset := v.Zone()
+		secs := v.Unix() + int64(offset)
+		fields := []interface{}{secs, v.Nanosecond(), 0 /*Make room*/}
 		// If this value has been hydrated by us the zone is set to "Offset" to indicate
 		// that the offset type has been and should be used again, otherwise we don't know,
 		// so use the zone name to be more specific.
@@ -56,7 +57,9 @@ func dehydrate(x interface{}) (*packstream.Struct, error) {
 		}
 	case types.LocalDateTime:
 		t := time.Time(v)
-		fields := []interface{}{t.Unix(), t.Nanosecond()}
+		_, offset := t.Zone()
+		secs := t.Unix() + int64(offset)
+		fields := []interface{}{secs, t.Nanosecond()}
 		return &packstream.Struct{Tag: packstream.StructTag('d'), Fields: fields}, nil
 	case types.Date:
 		// v is UTC
@@ -65,7 +68,6 @@ func dehydrate(x interface{}) (*packstream.Struct, error) {
 	case types.Time:
 		t := time.Time(v)
 		_, tzOffsetSecs := t.Zone()
-		t = t.UTC()
 		d := t.Sub(time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, t.Location()))
 		return &packstream.Struct{Tag: packstream.StructTag('T'), Fields: []interface{}{d.Nanoseconds(), tzOffsetSecs}}, nil
 	case types.LocalTime:

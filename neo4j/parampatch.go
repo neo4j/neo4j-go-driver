@@ -76,6 +76,12 @@ func patchParamType(x interface{}) interface{} {
 		return types.LocalTime(v.Time())
 	case OffsetTime:
 		return types.Time(v.Time())
+	case []OffsetTime:
+		patched := make([]interface{}, len(v))
+		for i, x := range v {
+			patched[i] = types.Time(x.Time())
+		}
+		return patched
 	case *OffsetTime:
 		if v == nil {
 			return nil

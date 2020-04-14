@@ -252,9 +252,9 @@ func hydrateDateTimeOffset(fields []interface{}) (interface{}, error) {
 		return nil, errors.New("DateTime hydrate error")
 	}
 
-	t := time.Unix(secs, nans)
+	t := time.Unix(secs, nans).UTC()
 	l := time.FixedZone("Offset", int(offs))
-	return t.In(l), nil
+	return time.Date(t.Year(), t.Month(), t.Day(), t.Hour(), t.Minute(), t.Second(), t.Nanosecond(), l), nil
 }
 
 func hydrateDateTimeNamedZone(fields []interface{}) (interface{}, error) {
@@ -268,13 +268,13 @@ func hydrateDateTimeNamedZone(fields []interface{}) (interface{}, error) {
 		return nil, errors.New("DateTime hydrate error")
 	}
 
-	t := time.Unix(secs, nans)
+	t := time.Unix(secs, nans).UTC()
 	l, err := time.LoadLocation(zone)
 	if err != nil {
 		// TODO: Wrap error
 		return nil, err
 	}
-	return t.In(l), nil
+	return time.Date(t.Year(), t.Month(), t.Day(), t.Hour(), t.Minute(), t.Second(), t.Nanosecond(), l), nil
 }
 
 func hydrateLocalDateTime(fields []interface{}) (interface{}, error) {
@@ -286,7 +286,9 @@ func hydrateLocalDateTime(fields []interface{}) (interface{}, error) {
 	if !sok || !nok {
 		return nil, errors.New("LocalDateTime hydrate error")
 	}
-	return types.LocalDateTime(time.Unix(secs, nans)), nil
+	t := time.Unix(secs, nans).UTC()
+	t = time.Date(t.Year(), t.Month(), t.Day(), t.Hour(), t.Minute(), t.Second(), t.Nanosecond(), time.Local)
+	return types.LocalDateTime(t), nil
 }
 
 func hydrateDate(fields []interface{}) (interface{}, error) {
@@ -310,9 +312,11 @@ func hydrateTime(fields []interface{}) (interface{}, error) {
 	if !nok || !ook {
 		return nil, errors.New("Time hydrate error")
 	}
-	t := time.Unix(0, nans)
+	secs := nans / int64(time.Second)
+	nans -= secs * int64(time.Second)
 	l := time.FixedZone("Offset", int(offs))
-	return types.Time(t.In(l)), nil
+	t := time.Date(0, 0, 0, 0, 0, int(secs), int(nans), l)
+	return types.Time(t), nil
 }
 
 func hydrateLocalTime(fields []interface{}) (interface{}, error) {
@@ -323,7 +327,9 @@ func hydrateLocalTime(fields []interface{}) (interface{}, error) {
 	if !nok {
 		return nil, errors.New("LocalTime hydrate error")
 	}
-	t := time.Unix(0, nans).UTC()
+	secs := nans / int64(time.Second)
+	nans -= secs * int64(time.Second)
+	t := time.Date(0, 0, 0, 0, 0, int(secs), int(nans), time.Local)
 	return types.LocalTime(t), nil
 }
 
