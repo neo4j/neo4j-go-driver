@@ -25,12 +25,14 @@ import (
 	"math/big"
 	"net"
 	"net/url"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/neo4j/neo4j-go-driver/neo4j/internal/bolt"
 	"github.com/neo4j/neo4j-go-driver/neo4j/internal/connection"
+	"github.com/neo4j/neo4j-go-driver/neo4j/internal/types"
 	"github.com/neo4j/neo4j-go-driver/neo4j/test-integration/control"
 )
 
@@ -389,5 +391,108 @@ func TestConnectionConformance(ot *testing.T) {
 		if recS != bigBuilder.String() {
 			t.Errorf("Strings differ")
 		}
+	})
+
+	assertTime := func(t *testing.T, t1, t2 time.Time) {
+		t.Helper()
+		if t1.Hour() != t2.Hour() || t1.Minute() != t2.Minute() ||
+			t1.Second() != t2.Second() || t1.Nanosecond() != t2.Nanosecond() {
+			t.Errorf("Time %+v vs %+v", t1, t1)
+		}
+	}
+
+	assertTimeOffset := func(t *testing.T, t1, t2 time.Time) {
+		t.Helper()
+
+		_, off1 := t1.Zone()
+		_, off2 := t2.Zone()
+
+		if off1 != off2 {
+			t.Errorf("Offset %d vs %d", off1, off2)
+		}
+	}
+
+	assertTimeZone := func(t *testing.T, t1, t2 time.Time) {
+		t.Helper()
+
+		z1, _ := t1.Zone()
+		z2, _ := t2.Zone()
+
+		if z1 != z2 {
+			t.Errorf("Zone %s vs %s", z1, z2)
+		}
+	}
+
+	assertDate := func(t *testing.T, t1, t2 time.Time) {
+		t.Helper()
+		if t1.Year() != t2.Year() || t1.Month() != t2.Month() || t1.Day() != t2.Day() {
+			t.Errorf("Date %s vs %s", t1, t2)
+		}
+	}
+
+	assertDuration := func(t *testing.T, dur1, dur2 types.Duration) {
+		t.Helper()
+		if !reflect.DeepEqual(dur1, dur2) {
+			t.Errorf("Duration %+v vs %+v", dur1, dur2)
+		}
+	}
+
+	// Temporal types
+	ot.Run("Reading temporal types", func(t *testing.T) {
+		query := "RETURN " +
+			"time({ hour: 23, minute: 49, second: 59, nanosecond: 999999999, timezone:'+03:00' }), " +
+			"date({ year: 1994, month: 11, day: 15 }), " +
+			"datetime({ year: 1859, month: 5, day: 31, hour: 23, minute: 49, second: 59, nanosecond: 999999999, timezone:'+02:30' }), " +
+			"datetime({ year: 1959, month: 5, day: 31, hour: 23, minute: 49, second: 59, nanosecond: 999999999, timezone:'Europe/London' }), " +
+			"localtime({ hour: 23, minute: 49, second: 59, nanosecond: 999999999 }), " +
+			"localdatetime({ year: 1859, month: 5, day: 31, hour: 23, minute: 49, second: 59, nanosecond: 999999999 }), " +
+			"duration({ months: 16, days: 45, seconds: 120, nanoseconds: 187309812 }) "
+
+		stream, err := boltConn.Run(query, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		rec, sum, err := boltConn.Next(stream.Handle)
+		if rec == nil || err != nil || sum != nil {
+			t.Fatalf("Should be a record, %+v, %+v, %+v", rec, sum, err)
+		}
+
+		london, _ := time.LoadLocation("Europe/London")
+
+		// Verify each temporal type
+		// Time
+		gotTime := time.Time(rec.Values[0].(types.Time))
+		expectTime := time.Date(0, 0, 0, 23, 49, 59, 999999999, time.FixedZone("Offset", 3*60*60))
+		assertTime(t, gotTime, expectTime)
+		assertTimeOffset(t, gotTime, expectTime)
+		// Date
+		gotDate := time.Time(rec.Values[1].(types.Date))
+		expectDate := time.Date(1994, 11, 15, 0, 0, 0, 0, time.Local)
+		assertDate(t, gotDate, expectDate)
+		// DateTime, offset
+		gotDateTime := time.Time(rec.Values[2].(time.Time))
+		expectDateTime := time.Date(1859, 5, 31, 23, 49, 59, 999999999, time.FixedZone("Offset", 150*60))
+		assertDate(t, time.Time(gotDateTime), expectDateTime)
+		assertTime(t, gotDateTime, expectDateTime)
+		assertTimeOffset(t, gotDateTime, expectDateTime)
+		// DateTime, zone
+		gotDateTime = time.Time(rec.Values[3].(time.Time))
+		expectDateTime = time.Date(1959, 5, 31, 23, 49, 59, 999999999, london)
+		assertDate(t, time.Time(gotDateTime), expectDateTime)
+		assertTime(t, gotDateTime, expectDateTime)
+		assertTimeZone(t, gotDateTime, expectDateTime)
+		// Local time
+		gotTime = time.Time(rec.Values[4].(types.LocalTime))
+		expectTime = time.Date(0, 0, 0, 23, 49, 59, 999999999, time.Local)
+		assertTime(t, gotTime, expectTime)
+		// Local DateTime
+		gotDateTime = time.Time(rec.Values[5].(types.LocalDateTime))
+		expectDateTime = time.Date(1859, 5, 31, 23, 49, 59, 999999999, time.Local)
+		assertDate(t, time.Time(gotDateTime), expectDateTime)
+		assertTime(t, gotDateTime, expectDateTime)
+		// Duration
+		gotDuration := rec.Values[6].(types.Duration)
+		expectDuration := types.Duration{Months: 16, Days: 45, Seconds: 120, Nanos: 187309812}
+		assertDuration(t, gotDuration, expectDuration)
 	})
 }
