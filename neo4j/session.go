@@ -123,7 +123,7 @@ func (s *session) beginTransaction(mode conn.AccessMode, config *TransactionConf
 				s.res = nil
 			}
 
-			streamHandle, err := conn.RunTx(txHandle, cypher, patchParams(params))
+			streamHandle, err := conn.RunTx(txHandle, cypher, patchInSliceX(params))
 			if err != nil {
 				return nil, err
 			}
@@ -230,7 +230,7 @@ func (s *session) Run(
 		return nil, err
 	}
 
-	stream, err := s.conn.Run(cypher, patchParams(params))
+	stream, err := s.conn.Run(cypher, patchInSliceX(params))
 	if err != nil {
 		s.returnConn()
 		return nil, err

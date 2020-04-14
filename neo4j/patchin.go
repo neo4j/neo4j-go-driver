@@ -25,7 +25,7 @@ import (
 	"github.com/neo4j/neo4j-go-driver/neo4j/internal/types"
 )
 
-func patchPoint(v *Point) interface{} {
+func patchInPoint(v *Point) interface{} {
 	if v == nil {
 		return nil
 	}
@@ -35,29 +35,29 @@ func patchPoint(v *Point) interface{} {
 	return &types.Point3D{X: v.x, Y: v.y, Z: v.z, SpatialRefId: uint32(v.srId)}
 }
 
-func patchDuration(v *Duration) interface{} {
+func patchInDuration(v *Duration) interface{} {
 	if v == nil {
 		return nil
 	}
 	return types.Duration{Months: v.months, Days: v.days, Seconds: v.seconds, Nanos: v.nanos}
 }
 
-func patchParamType(x interface{}) interface{} {
+func patchInX(x interface{}) interface{} {
 	switch v := x.(type) {
 	case *Point:
-		return patchPoint(v)
+		return patchInPoint(v)
 	case Point:
-		return patchPoint(&v)
+		return patchInPoint(&v)
 	case []*Point:
 		patched := make([]interface{}, len(v))
 		for i, p := range v {
-			patched[i] = patchPoint(p)
+			patched[i] = patchInPoint(p)
 		}
 		return patched
 	case []Point:
 		patched := make([]interface{}, len(v))
 		for i, p := range v {
-			patched[i] = patchPoint(&p)
+			patched[i] = patchInPoint(&p)
 		}
 		return patched
 	case Date:
@@ -95,19 +95,19 @@ func patchParamType(x interface{}) interface{} {
 		}
 		return types.LocalDateTime(v.Time())
 	case Duration:
-		return patchDuration(&v)
+		return patchInDuration(&v)
 	case *Duration:
-		return patchDuration(v)
+		return patchInDuration(v)
 	case []Duration:
 		patched := make([]interface{}, len(v))
 		for i, x := range v {
-			patched[i] = patchDuration(&x)
+			patched[i] = patchInDuration(&x)
 		}
 		return patched
 	case []interface{}:
 		patched := make([]interface{}, len(v))
 		for i, x := range v {
-			patched[i] = patchParamType(x)
+			patched[i] = patchInX(x)
 		}
 		return patched
 	case *time.Time:
@@ -120,10 +120,10 @@ func patchParamType(x interface{}) interface{} {
 	}
 }
 
-func patchParams(params map[string]interface{}) map[string]interface{} {
+func patchInSliceX(params map[string]interface{}) map[string]interface{} {
 	patched := make(map[string]interface{}, len(params))
 	for k, v := range params {
-		patched[k] = patchParamType(v)
+		patched[k] = patchInX(v)
 	}
 	return patched
 }
