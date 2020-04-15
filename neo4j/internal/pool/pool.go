@@ -61,7 +61,7 @@ func (p *Pool) Close() {
 	log("closed!")
 }
 
-func (p *Pool) tryExistingBucketsExistingConn(servers []string, checkTimeout func() error) (conn.Connection, error) {
+func (p *Pool) tryExistingBucketsExistingConn(servers []string) conn.Connection {
 	p.bucketsMut.Lock()
 	defer p.bucketsMut.Unlock()
 
@@ -88,7 +88,7 @@ func (p *Pool) tryExistingBucketsExistingConn(servers []string, checkTimeout fun
 				continue
 			}
 			log(fmt.Sprintf("%s: conn found", s))
-			return c, nil
+			return c
 		}
 		if b.size == 0 {
 			log(fmt.Sprintf("%s: bucket dead", s))
@@ -97,15 +97,20 @@ func (p *Pool) tryExistingBucketsExistingConn(servers []string, checkTimeout fun
 		}
 	}
 
-	return nil, checkTimeout()
+	return nil
 }
 
-func (p *Pool) tryExistingBucketsNewConn(servers []string, checkTimeout func() error) (conn.Connection, error) {
+func (p *Pool) tryExistingBucketsNewConn(servers []string, checkTimeout func() bool) (conn.Connection, error) {
 	p.bucketsMut.Lock()
 	defer p.bucketsMut.Unlock()
 
+	var (
+		err error
+		c   conn.Connection
+	)
+
 	for _, s := range servers {
-		if err := checkTimeout(); err != nil {
+		if checkTimeout() {
 			return nil, err
 		}
 
@@ -118,7 +123,7 @@ func (p *Pool) tryExistingBucketsNewConn(servers []string, checkTimeout func() e
 		}
 		// Try to connect, this might take a while
 		log(fmt.Sprintf("%s: connecting", s))
-		c, err := p.connect(s)
+		c, err = p.connect(s)
 		if err != nil || c == nil {
 			continue
 		}
@@ -127,15 +132,20 @@ func (p *Pool) tryExistingBucketsNewConn(servers []string, checkTimeout func() e
 		b.reg(c)
 		return c, nil
 	}
-	return nil, nil
+	return nil, err
 }
 
-func (p *Pool) tryNewBucketNewConn(servers []string, checkTimeout func() error) (conn.Connection, error) {
+func (p *Pool) tryNewBucketNewConn(servers []string, checkTimeout func() bool) (conn.Connection, error) {
 	p.bucketsMut.Lock()
 	defer p.bucketsMut.Unlock()
 
+	var (
+		err error
+		c   conn.Connection
+	)
+
 	for _, s := range servers {
-		if err := checkTimeout(); err != nil {
+		if checkTimeout() {
 			return nil, err
 		}
 
@@ -146,7 +156,7 @@ func (p *Pool) tryNewBucketNewConn(servers []string, checkTimeout func() error) 
 
 		// No bucket for this server, try to connect and add a bucket
 		log(fmt.Sprintf("%s: bucket pending, connecting", s))
-		c, err := p.connect(s)
+		c, err = p.connect(s)
 		if err != nil || c == nil {
 			// Blacklist this server for a while ?
 			log(fmt.Sprintf("%s: bucket cancelled", s))
@@ -161,7 +171,7 @@ func (p *Pool) tryNewBucketNewConn(servers []string, checkTimeout func() error) 
 		log(fmt.Sprintf("%s: conn registered", s))
 		return c, nil
 	}
-	return nil, nil
+	return nil, err
 }
 
 func (p *Pool) anyExistingConnInExistingBuckets(servers []string) bool {
@@ -197,44 +207,61 @@ func (p *Pool) getBuckets() map[string]bucket {
 }
 
 func (p *Pool) Borrow(ctx context.Context, servers []string) (conn.Connection, error) {
-	check := func() error {
+	timedOut := false
+	timeOut := func() bool {
 		select {
 		case <-ctx.Done():
 			log("time out")
-			return ctx.Err()
+			timedOut = true
+			return true
 		default:
-			return nil
+			return false
 		}
 	}
 
 	log(fmt.Sprintf("Borrow %s", servers))
+	var err error
+	var c conn.Connection
 
 	// Try to use an existing connection in an existing bucket, that is cheapest.
 	// This will also prune dead connections and empty buckets (servers with no connections) among
 	// the requested ones.
-	c, err := p.tryExistingBucketsExistingConn(servers, check)
-	if err != nil || c != nil {
-		return c, err
+	c = p.tryExistingBucketsExistingConn(servers)
+	if c != nil {
+		return c, nil
 	}
+	if timeOut() {
+		return nil, ctx.Err()
+	}
+
 	// The existing buckets at this point are "proved" to be working, at least we don't know that
 	// they are down yet. So try to utilize these before trying another server and corresponding
 	// new bucket.
-	c, err = p.tryExistingBucketsNewConn(servers, check)
-	if err != nil || c != nil {
-		return c, err
+	c, err = p.tryExistingBucketsNewConn(servers, timeOut)
+	if c != nil {
+		return c, nil
+	}
+	if timedOut {
+		return nil, ctx.Err()
 	}
 	// Try to increase size of any matching existing connection bucket. A non-functional server
 	// would have it's bucket pruned above but retried to connect to here, could be good if the
 	// server went down and now is up again but could also be bad if it is still down.
-	c, err = p.tryNewBucketNewConn(servers, check)
-	if err != nil || c != nil {
-		return c, err
+	c, err = p.tryNewBucketNewConn(servers, timeOut)
+	if c != nil {
+		return c, nil
+	}
+	if timedOut {
+		return nil, ctx.Err()
 	}
 
 	// If there are no buckets for any of the servers, there is no point in waiting for anything
 	// to be returned.
 	if !p.anyExistingConnInExistingBuckets(servers) {
-		return nil, errors.New("Unable to connect")
+		if err == nil {
+			err = errors.New("No conns to wait for")
+		}
+		return nil, err
 	}
 
 	// Wait for a matching connection to be returned from another thread.
@@ -242,10 +269,10 @@ func (p *Pool) Borrow(ctx context.Context, servers []string) (conn.Connection, e
 	// Ok, now that we own the queue we can add the item there but between getting the lock
 	// and above check for an existing connection another thread might have returned a connection
 	// so check again to avoid potentially starving this thread.
-	c, err = p.tryExistingBucketsExistingConn(servers, check)
-	if err != nil || c != nil {
+	c = p.tryExistingBucketsExistingConn(servers)
+	if c != nil {
 		p.queueMut.Unlock()
-		return c, err
+		return c, nil
 	}
 	// Add a waiting request to the queue and unlock the queue to let other threads that returns
 	// their connections access the queue.

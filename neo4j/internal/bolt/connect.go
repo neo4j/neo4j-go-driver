@@ -62,8 +62,6 @@ func Connect(serverName string, conn net.Conn, auth map[string]interface{}) (con
 		boltConn := NewBolt3(serverName, conn)
 		err = boltConn.connect(auth)
 		if err != nil {
-			// Make sure that the connection is closed!
-			conn.Close()
 			return nil, err
 		}
 		return boltConn, nil

@@ -21,6 +21,9 @@ package neo4j
 
 import (
 	"crypto/tls"
+	"crypto/x509"
+	"errors"
+	"fmt"
 	"net"
 
 	"github.com/neo4j/neo4j-go-driver/neo4j/internal/bolt"
@@ -32,29 +35,116 @@ type connector struct {
 	auth   map[string]interface{}
 }
 
+type tlsError struct {
+	err error
+}
+
+func (e *tlsError) Error() string {
+	return fmt.Sprintf("TLS error: %s", e.err)
+}
+
+type connectError struct {
+	err error
+}
+
+func (e *connectError) Error() string {
+	return fmt.Sprintf("Connection error: %s", e.err)
+}
+
+func (c *connector) wrapInTls(target string, rawConn net.Conn) (net.Conn, error) {
+	trust := c.config.TrustStrategy
+	conf := tls.Config{}
+	host, _, err := net.SplitHostPort(target)
+	if err != nil {
+		// No port
+		host = target
+	}
+	conf.ServerName = host
+
+	if len(trust.certificates) > 0 {
+		conf.RootCAs = x509.NewCertPool()
+		for _, cert := range trust.certificates {
+			conf.RootCAs.AddCert(cert)
+		}
+	}
+
+	// Check trust config to configure TLS accordingly
+	switch {
+	// Skip verification of root CAs, chains and hostname
+	case trust.skipVerify && trust.skipVerifyHostname:
+		conf.InsecureSkipVerify = true
+	// Skip verification of root CAs and chains
+	case trust.skipVerify:
+		conf.InsecureSkipVerify = true
+		conf.VerifyPeerCertificate = func(rawCerts [][]byte, verifiedChains [][]*x509.Certificate) error {
+			// Duplicate part of Go TLS handshake as specified in TLS example.
+			certs := make([]*x509.Certificate, len(rawCerts))
+			for i, asn1Data := range rawCerts {
+				cert, err := x509.ParseCertificate(asn1Data)
+				if err != nil {
+					return errors.New("tls: failed to parse certificate from server: " + err.Error())
+				}
+				certs[i] = cert
+			}
+			return certs[0].VerifyHostname(host)
+		}
+	// Verify root CAs and chains but not the hostname
+	case trust.skipVerifyHostname:
+		conf.InsecureSkipVerify = true
+		conf.VerifyPeerCertificate = func(rawCerts [][]byte, verifiedChains [][]*x509.Certificate) error {
+			// Duplicate part of Go TLS handshake as specified in TLS example.
+			certs := make([]*x509.Certificate, len(rawCerts))
+			for i, asn1Data := range rawCerts {
+				cert, err := x509.ParseCertificate(asn1Data)
+				if err != nil {
+					return errors.New("tls: failed to parse certificate from server: " + err.Error())
+				}
+				certs[i] = cert
+			}
+
+			opts := x509.VerifyOptions{
+				Roots:         conf.RootCAs,
+				DNSName:       "", // This is what disables the hostname check
+				Intermediates: x509.NewCertPool(),
+			}
+			for _, cert := range certs[1:] {
+				opts.Intermediates.AddCert(cert)
+			}
+			_, err := certs[0].Verify(opts)
+			return err
+		}
+	}
+
+	tlsConn := tls.Client(rawConn, &conf)
+	err = tlsConn.Handshake()
+	if err != nil {
+		rawConn.Close()
+		return nil, err
+	}
+	return tlsConn, nil
+}
+
 func (c *connector) connect(target string) (conn.Connection, error) {
 	// TODO: Handle SocketConnectTimeout
 
-	var conn net.Conn
-	var err error
+	// Make a TCP connection
+	conn, err := net.Dial("tcp", target)
+	if err != nil {
+		return nil, &connectError{err: err}
+	}
+
+	// Wrap connection in TLS if configured
 	if c.config.Encrypted {
-		conf := tls.Config{
-			InsecureSkipVerify: true, // TODO!
-		}
-		conn, err = tls.Dial("tcp", target, &conf)
+		conn, err = c.wrapInTls(target, conn)
 		if err != nil {
-			return nil, err
-		}
-	} else {
-		conn, err = net.Dial("tcp", target)
-		if err != nil {
-			return nil, err
+			return nil, &tlsError{err: err}
 		}
 	}
 
 	// Pass ownership of connection to bolt upon success
 	boltConn, err := bolt.Connect(target, conn, c.auth)
 	if err != nil {
+		conn.Close()
 		return nil, err
 	}
 	return boltConn, nil

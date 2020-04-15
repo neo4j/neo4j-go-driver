@@ -19,10 +19,34 @@
 
 package neo4j
 
-import "C"
 import (
 	"fmt"
 )
+
+type driverError struct {
+	message string
+}
+
+func (failure *driverError) Error() string {
+	return failure.message
+}
+
+func newDriverError(format string, args ...interface{}) *driverError {
+	return &driverError{message: fmt.Sprintf(format, args...)}
+}
+
+/*
+func (failure *driverError) BoltError() bool {
+	return true
+}
+
+func (failure *driverError) Message() string {
+	return failure.message
+}
+*/
+
+/*
+import "C"
 
 type databaseError struct {
 	classification string
@@ -36,10 +60,6 @@ type connectorError struct {
 	codeText    string
 	context     string
 	description string
-}
-
-type driverError struct {
-	message string
 }
 
 type sessionExpiredError struct {
@@ -94,18 +114,6 @@ func (failure *connectorError) Error() string {
 	}
 }
 
-func (failure *driverError) BoltError() bool {
-	return true
-}
-
-func (failure *driverError) Message() string {
-	return failure.message
-}
-
-func (failure *driverError) Error() string {
-	return failure.message
-}
-
 func (failure *sessionExpiredError) BoltError() bool {
 	return true
 }
@@ -118,10 +126,6 @@ func newSessionExpiredError(format string, args ...interface{}) error {
 	return &sessionExpiredError{message: fmt.Sprintf(format, args...)}
 }
 
-func newDriverError(format string, args ...interface{}) *driverError {
-	return &driverError{message: fmt.Sprintf(format, args...)}
-}
-
 func newDatabaseError(classification, code, message string) *databaseError {
 	return &databaseError{code: code, message: message, classification: classification}
 }
@@ -129,16 +133,18 @@ func newDatabaseError(classification, code, message string) *databaseError {
 func newConnectorError(state int, code int, codeText, context, description string) *connectorError {
 	return &connectorError{state: state, code: code, codeText: codeText, context: context, description: description}
 }
-
-/*
-func isRetriableError(err error) bool {
-	return gobolt.IsServiceUnavailable(err) || gobolt.IsTransientError(err) || gobolt.IsWriteError(err)
-}
+*/
 
 // IsSecurityError is a utility method to check if the provided error is related with any
 // TLS failure or authentication issues.
 func IsSecurityError(err error) bool {
-	return gobolt.IsSecurityError(err)
+	_, is := err.(*tlsError)
+	return is
+}
+
+/*
+func isRetriableError(err error) bool {
+	return gobolt.IsServiceUnavailable(err) || gobolt.IsTransientError(err) || gobolt.IsWriteError(err)
 }
 
 // IsAuthenticationError is a utility method to check if the provided error is related with any
@@ -168,10 +174,12 @@ func IsSessionExpired(err error) bool {
 
 	return gobolt.IsSessionExpired(err)
 }
+*/
 
 // IsServiceUnavailable is a utility method to check if the provided error can be classified
 // to be in service unavailable category.
 func IsServiceUnavailable(err error) bool {
-	return gobolt.IsServiceUnavailable(err)
+	_, is := err.(*connectError)
+	// TODO: More errors in this category!
+	return is
 }
-*/
