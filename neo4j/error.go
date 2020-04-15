@@ -21,6 +21,7 @@ package neo4j
 
 import (
 	"fmt"
+	conn "github.com/neo4j/neo4j-go-driver/neo4j/internal/connection"
 )
 
 type driverError struct {
@@ -146,13 +147,16 @@ func IsSecurityError(err error) bool {
 func isRetriableError(err error) bool {
 	return gobolt.IsServiceUnavailable(err) || gobolt.IsTransientError(err) || gobolt.IsWriteError(err)
 }
+*/
 
 // IsAuthenticationError is a utility method to check if the provided error is related with any
 // authentication issues.
 func IsAuthenticationError(err error) bool {
-	return gobolt.IsAuthenticationError(err)
+	_, is := err.(*conn.AuthenticationError)
+	return is
 }
 
+/*
 // IsClientError is a utility method to check if the provided error is related with the client
 // carrying out an invalid operation.
 func IsClientError(err error) bool {

@@ -20,6 +20,7 @@
 package connection
 
 import (
+	"fmt"
 	"time"
 )
 
@@ -100,3 +101,11 @@ type Connection interface {
 //type Routable interface {
 // GetRoutingTabe
 //}
+
+type AuthenticationError struct {
+	Msg string
+}
+
+func (e *AuthenticationError) Error() string {
+	return fmt.Sprintf("Authentication error: %s", e.Msg)
+}

@@ -194,6 +194,14 @@ func (b *bolt3) connect(auth map[string]interface{}) error {
 
 	succRes, err := b.receiveSuccessResponse()
 	if err != nil {
+		failureResponse, isFailure := err.(*failureResponse)
+		if isFailure {
+			// Refine the error
+			switch failureResponse.code {
+			case "Neo.ClientError.Security.Unauthorized":
+				return &conn.AuthenticationError{Msg: failureResponse.message}
+			}
+		}
 		return err
 	}
 	helloRes := succRes.hello()
