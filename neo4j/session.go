@@ -90,13 +90,13 @@ func (s *session) beginTransaction(mode conn.AccessMode, config *TransactionConf
 	}
 
 	// Consume current result if any
-	if s.res != nil {
-		s.res.fetchAll()
-		s.res = nil
+	err := s.consumeCurrent()
+	if err != nil {
+		return nil, err
 	}
 
 	// Ensure that the session has a connection
-	err := s.borrowConn()
+	err = s.borrowConn()
 	if err != nil {
 		return nil, err
 	}
@@ -118,9 +118,9 @@ func (s *session) beginTransaction(mode conn.AccessMode, config *TransactionConf
 	return &transaction{
 		run: func(cypher string, params map[string]interface{}) (Result, error) {
 			// The last result should receive all records
-			if s.res != nil {
-				s.res.fetchAll()
-				s.res = nil
+			err := s.consumeCurrent()
+			if err != nil {
+				return nil, err
 			}
 
 			streamHandle, err := conn.RunTx(txHandle, cypher, patchInSliceX(params))
@@ -214,18 +214,29 @@ func (s *session) returnConn() {
 	}
 }
 
+func (s *session) consumeCurrent() error {
+	if s.res != nil {
+		s.res.fetchAll()
+		err := s.res.err
+		s.res = nil
+		return err
+	}
+	return nil
+}
+
 func (s *session) Run(
 	cypher string, params map[string]interface{}) (Result, error) {
 
 	if s.inTx {
 		return nil, errors.New("Trying run in tx")
 	}
-	if s.res != nil {
-		s.res.fetchAll()
-		s.res = nil
+
+	err := s.consumeCurrent()
+	if err != nil {
+		return nil, err
 	}
 
-	err := s.borrowConn()
+	err = s.borrowConn()
 	if err != nil {
 		return nil, err
 	}
@@ -233,6 +244,12 @@ func (s *session) Run(
 	stream, err := s.conn.Run(cypher, patchInSliceX(params))
 	if err != nil {
 		s.returnConn()
+		// To be backwards compatible we delay the error here if it is a database error.
+		// The old implementation just sent all the commands and didn't wait for an answer
+		// until starting to consume or iterate.
+		if _, isDbErr := err.(*conn.DatabaseError); isDbErr {
+			return &delayedErrorResult{err: err}, nil
+		}
 		return nil, err
 	}
 	res, err := newResult(s.conn, stream, cypher, params), nil
@@ -244,6 +261,11 @@ func (s *session) Run(
 }
 
 func (s *session) Close() error {
+	err := s.consumeCurrent()
+	if err != nil {
+		return err
+	}
+
 	s.returnConn()
 	return nil
 }

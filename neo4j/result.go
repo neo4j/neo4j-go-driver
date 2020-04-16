@@ -143,3 +143,29 @@ func (r *result) Consume() (ResultSummary, error) {
 		params: r.params,
 	}, nil
 }
+
+// Used for backwards compatibility, error is not returned on session.Run but on iteration
+// or consumption. This implementation of result interface fakes that behaviour.
+type delayedErrorResult struct {
+	err error
+}
+
+func (d *delayedErrorResult) Next() bool {
+	return false
+}
+
+func (d *delayedErrorResult) Err() error {
+	return d.err
+}
+
+func (d *delayedErrorResult) Record() Record {
+	return nil
+}
+
+func (d *delayedErrorResult) Summary() (ResultSummary, error) {
+	return nil, d.err
+}
+
+func (d *delayedErrorResult) Consume() (ResultSummary, error) {
+	return nil, d.err
+}
