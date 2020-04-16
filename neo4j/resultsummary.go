@@ -100,7 +100,7 @@ type Statement interface {
 // ServerInfo contains basic information of the server.
 type ServerInfo interface {
 	// Address returns the address of the server.
-	//Address() string
+	Address() string
 	// Version returns the version of Neo4j running at the server.
 	Version() string
 }
@@ -113,6 +113,10 @@ type resultSummary struct {
 
 func (s *resultSummary) Server() ServerInfo {
 	return s
+}
+
+func (s *resultSummary) Address() string {
+	return s.sum.ServerName
 }
 
 func (s *resultSummary) Version() string {

@@ -61,6 +61,7 @@ const (
 type Summary struct {
 	Bookmark      string
 	StmntType     StatementType
+	ServerName    string
 	ServerVersion string
 	Counters      map[string]int
 	TFirst        int64

@@ -519,6 +519,7 @@ func (b *bolt3) Next(shandle conn.Handle) (*conn.Record, *conn.Summary, error) {
 		// TODO: Keep bookmark!
 		// Add some extras to the summary
 		sum.ServerVersion = b.serverVersion
+		sum.ServerName = b.serverName
 		sum.TFirst = b.tfirst
 		return nil, sum, nil
 	case *conn.DatabaseError:
