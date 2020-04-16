@@ -45,9 +45,9 @@ type ResultSummary interface {
 	// Statement returns statement that has been executed.
 	Statement() Statement
 	// StatementType returns type of statement that has been executed.
-	//StatementType() StatementType
+	StatementType() StatementType
 	// Counters returns statistics counts for the statement.
-	//Counters() Counters
+	Counters() Counters
 	// Plan returns statement plan for the executed statement if available, otherwise null.
 	//Plan() Plan
 	// Profile returns profiled statement plan for the executed statement if available, otherwise null.
@@ -59,6 +59,34 @@ type ResultSummary interface {
 	//ResultAvailableAfter() time.Duration
 	// ResultConsumedAfter returns the time it took the server to consume the result.
 	//ResultConsumedAfter() time.Duration
+}
+
+// Counters contains statistics about the changes made to the database made as part
+// of the statement execution.
+type Counters interface {
+	// Whether there were any updates at all, eg. any of the counters are greater than 0.
+	ContainsUpdates() bool
+	// The number of nodes created.
+	NodesCreated() int
+	// The number of nodes deleted.
+	NodesDeleted() int
+	// The number of relationships created.
+	RelationshipsCreated() int
+	// The number of relationships deleted.
+	RelationshipsDeleted() int
+	PropertiesSet() int
+	// The number of labels added to nodes.
+	LabelsAdded() int
+	// The number of labels removed from nodes.
+	LabelsRemoved() int
+	// The number of indexes added to the schema.
+	IndexesAdded() int
+	// The number of indexes removed from the schema.
+	IndexesRemoved() int
+	// The number of constraints added to the schema.
+	ConstraintsAdded() int
+	// The number of constraints removed from the schema.
+	ConstraintsRemoved() int
 }
 
 type Statement interface {
@@ -94,10 +122,73 @@ func (s *resultSummary) Statement() Statement {
 	return s
 }
 
+func (s *resultSummary) StatementType() StatementType {
+	return StatementType(s.sum.StmntType)
+}
+
 func (s *resultSummary) Text() string {
 	return s.cypher
 }
 
 func (s *resultSummary) Params() map[string]interface{} {
 	return s.params
+}
+
+func (s *resultSummary) Counters() Counters {
+	return s
+}
+
+func (s *resultSummary) ContainsUpdates() bool {
+	return len(s.sum.Counters) > 0
+}
+
+func (s *resultSummary) getCounter(n string) int {
+	if s.sum.Counters == nil {
+		return 0
+	}
+	return s.sum.Counters[n]
+}
+
+func (s *resultSummary) NodesCreated() int {
+	return s.getCounter(conn.NodesCreated)
+}
+
+func (s *resultSummary) NodesDeleted() int {
+	return s.getCounter(conn.NodesDeleted)
+}
+
+func (s *resultSummary) RelationshipsCreated() int {
+	return s.getCounter(conn.RelationshipsCreated)
+}
+
+func (s *resultSummary) RelationshipsDeleted() int {
+	return s.getCounter(conn.RelationshipsDeleted)
+}
+
+func (s *resultSummary) PropertiesSet() int {
+	return s.getCounter(conn.PropertiesSet)
+}
+
+func (s *resultSummary) LabelsAdded() int {
+	return s.getCounter(conn.LabelsAdded)
+}
+
+func (s *resultSummary) LabelsRemoved() int {
+	return s.getCounter(conn.LabelsRemoved)
+}
+
+func (s *resultSummary) IndexesAdded() int {
+	return s.getCounter(conn.IndexesAdded)
+}
+
+func (s *resultSummary) IndexesRemoved() int {
+	return s.getCounter(conn.IndexesRemoved)
+}
+
+func (s *resultSummary) ConstraintsAdded() int {
+	return s.getCounter(conn.ConstraintsAdded)
+}
+
+func (s *resultSummary) ConstraintsRemoved() int {
+	return s.getCounter(conn.ConstraintsRemoved)
 }

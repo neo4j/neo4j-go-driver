@@ -112,8 +112,8 @@ func (s *successResponse) summary() *conn.Summary {
 		// Convert from ugly interface{} to ints
 		counts = make(map[string]int, len(statsx))
 		for k, v := range statsx {
-			c, ok := v.(int64)
-			if ok {
+			c, _ := v.(int64)
+			if c > 0 {
 				counts[k] = int(c)
 			}
 		}

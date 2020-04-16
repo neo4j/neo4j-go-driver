@@ -59,10 +59,8 @@ const (
 )
 
 type Summary struct {
-	Bookmark  string
-	StmntType StatementType
-	//Cypher        string
-	//Params        map[string]interface{}
+	Bookmark      string
+	StmntType     StatementType
 	ServerVersion string
 	Counters      map[string]int
 	TLast         int64

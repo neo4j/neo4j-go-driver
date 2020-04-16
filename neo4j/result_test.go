@@ -22,9 +22,8 @@ package neo4j
 import (
 	"errors"
 	"fmt"
-	"testing"
-	//	"github.com/neo4j/neo4j-go-driver/neo4j/api"
 	conn "github.com/neo4j/neo4j-go-driver/neo4j/internal/connection"
+	"testing"
 )
 
 type iter struct {
