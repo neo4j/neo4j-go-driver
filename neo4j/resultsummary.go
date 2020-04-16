@@ -21,6 +21,7 @@ package neo4j
 
 import (
 	conn "github.com/neo4j/neo4j-go-driver/neo4j/internal/connection"
+	"time"
 )
 
 // StatementType defines the type of the statement
@@ -56,9 +57,9 @@ type ResultSummary interface {
 	// The list will be empty if no notifications produced while executing the statement.
 	//Notifications() []Notification
 	// ResultAvailableAfter returns the time it took for the server to make the result available for consumption.
-	//ResultAvailableAfter() time.Duration
+	ResultAvailableAfter() time.Duration
 	// ResultConsumedAfter returns the time it took the server to consume the result.
-	//ResultConsumedAfter() time.Duration
+	ResultConsumedAfter() time.Duration
 }
 
 // Counters contains statistics about the changes made to the database made as part
@@ -191,4 +192,12 @@ func (s *resultSummary) ConstraintsAdded() int {
 
 func (s *resultSummary) ConstraintsRemoved() int {
 	return s.getCounter(conn.ConstraintsRemoved)
+}
+
+func (s *resultSummary) ResultAvailableAfter() time.Duration {
+	return time.Duration(s.sum.TFirst) * time.Millisecond
+}
+
+func (s *resultSummary) ResultConsumedAfter() time.Duration {
+	return time.Duration(s.sum.TLast) * time.Millisecond
 }

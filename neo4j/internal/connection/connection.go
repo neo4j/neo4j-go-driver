@@ -63,6 +63,7 @@ type Summary struct {
 	StmntType     StatementType
 	ServerVersion string
 	Counters      map[string]int
+	TFirst        int64
 	TLast         int64
 }
 

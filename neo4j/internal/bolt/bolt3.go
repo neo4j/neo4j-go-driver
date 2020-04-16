@@ -74,6 +74,7 @@ type bolt3 struct {
 	unpacker      *packstream.Unpacker
 	connId        string
 	serverVersion string
+	tfirst        int64 // Time that server started streaming
 }
 
 func NewBolt3(serverName string, conn net.Conn) *bolt3 {
@@ -434,6 +435,7 @@ func (b *bolt3) run(cypher string, params map[string]interface{}) (*conn.Stream,
 			return nil, errors.New("parse fail, proto error")
 		}
 		// Succesful, change state to streaming and let Next receive the records.
+		b.tfirst = runRes.t_first
 		switch b.state {
 		case ready:
 			b.state = streaming
@@ -515,8 +517,9 @@ func (b *bolt3) Next(shandle conn.Handle) (*conn.Record, *conn.Summary, error) {
 			return nil, nil, errors.New("Failed to parse summary")
 		}
 		// TODO: Keep bookmark!
-		// Add some extras to the summary (move this elsewhere?)
+		// Add some extras to the summary
 		sum.ServerVersion = b.serverVersion
+		sum.TFirst = b.tfirst
 		return nil, sum, nil
 	case *conn.DatabaseError:
 		log(fmt.Sprintf("got failure: %s", x))
