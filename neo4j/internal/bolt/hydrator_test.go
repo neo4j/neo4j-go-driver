@@ -24,6 +24,7 @@ import (
 	"testing"
 
 	"errors"
+	conn "github.com/neo4j/neo4j-go-driver/neo4j/internal/connection"
 	"github.com/neo4j/neo4j-go-driver/neo4j/internal/packstream"
 	"github.com/neo4j/neo4j-go-driver/neo4j/internal/types"
 )
@@ -125,7 +126,7 @@ func TestHydrator(ot *testing.T) {
 			name:     "Failure response",
 			tag:      msgV3Failure,
 			fields:   []interface{}{map[string]interface{}{"code": "Code", "message": "Msg"}},
-			hydrated: &failureResponse{code: "Code", message: "Msg"},
+			hydrated: &conn.DatabaseError{Code: "Code", Msg: "Msg"},
 		},
 		{
 			name:     "Record response",

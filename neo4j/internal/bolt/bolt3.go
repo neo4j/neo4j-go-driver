@@ -58,7 +58,7 @@ const (
 )
 
 func log(msg string) {
-	fmt.Printf("bolt3: %s\n", msg)
+	//fmt.Printf("bolt3: %s\n", msg)
 }
 
 type bolt3 struct {
@@ -161,7 +161,7 @@ func (b *bolt3) receiveSuccessResponse() (*successResponse, error) {
 	switch v := res.(type) {
 	case *successResponse:
 		return v, nil
-	case *failureResponse:
+	case *conn.DatabaseError:
 		return nil, v
 	}
 	return nil, errors.New("Unknown response")
@@ -194,12 +194,12 @@ func (b *bolt3) connect(auth map[string]interface{}) error {
 
 	succRes, err := b.receiveSuccessResponse()
 	if err != nil {
-		failureResponse, isFailure := err.(*failureResponse)
-		if isFailure {
+		dbError, isDbError := err.(*conn.DatabaseError)
+		if isDbError {
 			// Refine the error
-			switch failureResponse.code {
+			switch dbError.Code {
 			case "Neo.ClientError.Security.Unauthorized":
-				return &conn.AuthenticationError{Msg: failureResponse.message}
+				return &conn.AuthenticationError{Msg: dbError.Msg}
 			}
 		}
 		return err
@@ -441,7 +441,7 @@ func (b *bolt3) run(cypher string, params map[string]interface{}) (*conn.Stream,
 			b.state = streamingtx
 		}
 		b.streamKeys = runRes.fields
-	case *failureResponse:
+	case *conn.DatabaseError:
 		b.state = failed
 		return nil, v
 	default:
@@ -518,7 +518,7 @@ func (b *bolt3) Next(shandle conn.Handle) (*conn.Record, *conn.Summary, error) {
 		// Add some extras to the summary (move this elsewhere?)
 		sum.ServerVersion = b.serverVersion
 		return nil, sum, nil
-	case *failureResponse:
+	case *conn.DatabaseError:
 		log(fmt.Sprintf("got failure: %s", x))
 		return nil, nil, x
 	default:
@@ -572,7 +572,7 @@ func (b *bolt3) Reset() {
 		switch x := res.(type) {
 		case *recordResponse, *ignoredResponse:
 			// Just throw away. We should only get record responses while in streaming mode.
-		case *failureResponse:
+		case *conn.DatabaseError:
 			// This could mean that the reset command failed for some reason, could also
 			// mean some other command that failed but as long as we never have unconfirmed
 			// commands out of the handling functions this should mean that the reset failed.

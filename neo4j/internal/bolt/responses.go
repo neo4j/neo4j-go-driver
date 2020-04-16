@@ -20,8 +20,6 @@
 package bolt
 
 import (
-	"fmt"
-
 	conn "github.com/neo4j/neo4j-go-driver/neo4j/internal/connection"
 )
 
@@ -31,16 +29,6 @@ type ignoredResponse struct {
 
 func (r *ignoredResponse) Error() string {
 	return "ignored"
-}
-
-// Server failed to fullfill request.
-type failureResponse struct {
-	code    string
-	message string
-}
-
-func (r *failureResponse) Error() string {
-	return fmt.Sprintf("code: %s, msg: %s", r.code, r.message)
 }
 
 // Record response from server.

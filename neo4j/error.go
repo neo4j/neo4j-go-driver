@@ -156,13 +156,17 @@ func IsAuthenticationError(err error) bool {
 	return is
 }
 
-/*
 // IsClientError is a utility method to check if the provided error is related with the client
 // carrying out an invalid operation.
 func IsClientError(err error) bool {
-	return gobolt.IsClientError(err)
+	dbErr, is := err.(*conn.DatabaseError)
+	if !is {
+		return false
+	}
+	return dbErr.IsClientError()
 }
 
+/*
 // IsTransientError is a utility method to check if the provided error is related with a temporary
 // failure that may be worked around by retrying.
 func IsTransientError(err error) bool {

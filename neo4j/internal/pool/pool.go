@@ -40,7 +40,7 @@ func New(maxSize int, connect Connect) *Pool {
 }
 
 func log(msg string) {
-	fmt.Printf("pool: %s\n", msg)
+	//fmt.Printf("pool: %s\n", msg)
 }
 
 func (p *Pool) Close() {
