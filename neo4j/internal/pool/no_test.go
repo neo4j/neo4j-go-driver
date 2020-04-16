@@ -20,7 +20,9 @@ func (c *fakeConn) TxRollback(tx conn.Handle) error {
 func (c *fakeConn) TxCommit(tx conn.Handle) error {
 	return nil
 }
-func (c *fakeConn) Run(cypher string, params map[string]interface{}) (*conn.Stream, error) {
+func (c *fakeConn) Run(
+	cypher string, params map[string]interface{}, mode conn.AccessMode, bookmarks []string, timeout time.Duration, meta map[string]interface{}) (*conn.Stream, error) {
+
 	return nil, nil
 }
 func (c *fakeConn) RunTx(tx conn.Handle, cypher string, params map[string]interface{}) (*conn.Stream, error) {

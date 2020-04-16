@@ -46,20 +46,20 @@ type Session interface {
 	// retry logic in place
 	WriteTransaction(work TransactionWork, configurers ...func(*TransactionConfig)) (interface{}, error)
 	// Run executes an auto-commit statement and returns a result
-	Run(cypher string, params map[string]interface{}) (Result, error) //, configurers ...func(*TransactionConfig)) (Result, error)
+	Run(cypher string, params map[string]interface{}, configurers ...func(*TransactionConfig)) (Result, error)
 	// Close closes any open resources and marks this session as unusable
 	Close() error
 }
 
 type session struct {
-	config    *Config
-	mode      conn.AccessMode
-	bookmarks []string
-	pool      *pool.Pool
-	router    func() []string
-	conn      conn.Connection
-	inTx      bool
-	res       *result
+	config      *Config
+	defaultMode conn.AccessMode
+	bookmarks   []string
+	pool        *pool.Pool
+	router      func() []string
+	conn        conn.Connection
+	inTx        bool
+	res         *result
 }
 
 func newSession(
@@ -67,11 +67,11 @@ func newSession(
 	mode conn.AccessMode, bookmarks []string) *session {
 
 	return &session{
-		config:    config,
-		router:    router,
-		pool:      pool,
-		mode:      mode,
-		bookmarks: bookmarks,
+		config:      config,
+		router:      router,
+		pool:        pool,
+		defaultMode: mode,
+		bookmarks:   bookmarks,
 	}
 }
 
@@ -80,7 +80,7 @@ func (s *session) BeginTransaction(configurers ...func(*TransactionConfig)) (Tra
 	for _, c := range configurers {
 		c(&config)
 	}
-	return s.beginTransaction(s.mode, &config)
+	return s.beginTransaction(s.defaultMode, &config)
 }
 
 func (s *session) beginTransaction(mode conn.AccessMode, config *TransactionConfig) (Transaction, error) {
@@ -103,7 +103,7 @@ func (s *session) beginTransaction(mode conn.AccessMode, config *TransactionConf
 	conn := s.conn
 
 	// Start a transaction on the connection
-	txHandle, err := s.conn.TxBegin(s.mode, s.bookmarks, config.Timeout, config.Metadata)
+	txHandle, err := s.conn.TxBegin(mode, s.bookmarks, config.Timeout, patchInMapX(config.Metadata))
 	if err != nil {
 		return nil, err
 	}
@@ -123,7 +123,7 @@ func (s *session) beginTransaction(mode conn.AccessMode, config *TransactionConf
 				return nil, err
 			}
 
-			streamHandle, err := conn.RunTx(txHandle, cypher, patchInSliceX(params))
+			streamHandle, err := conn.RunTx(txHandle, cypher, patchInMapX(params))
 			if err != nil {
 				return nil, err
 			}
@@ -225,7 +225,7 @@ func (s *session) consumeCurrent() error {
 }
 
 func (s *session) Run(
-	cypher string, params map[string]interface{}) (Result, error) {
+	cypher string, params map[string]interface{}, configurers ...func(*TransactionConfig)) (Result, error) {
 
 	if s.inTx {
 		return nil, errors.New("Trying run in tx")
@@ -241,7 +241,12 @@ func (s *session) Run(
 		return nil, err
 	}
 
-	stream, err := s.conn.Run(cypher, patchInSliceX(params))
+	config := TransactionConfig{Timeout: 0, Metadata: nil}
+	for _, c := range configurers {
+		c(&config)
+	}
+
+	stream, err := s.conn.Run(cypher, patchInMapX(params), s.defaultMode, s.bookmarks, config.Timeout, patchInMapX(config.Metadata))
 	if err != nil {
 		s.returnConn()
 		// To be backwards compatible we delay the error here if it is a database error.

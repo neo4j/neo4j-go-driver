@@ -120,7 +120,7 @@ func patchInX(x interface{}) interface{} {
 	}
 }
 
-func patchInSliceX(params map[string]interface{}) map[string]interface{} {
+func patchInMapX(params map[string]interface{}) map[string]interface{} {
 	patched := make(map[string]interface{}, len(params))
 	for k, v := range params {
 		patched[k] = patchInX(v)

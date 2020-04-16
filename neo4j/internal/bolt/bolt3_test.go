@@ -108,19 +108,19 @@ func TestBolt3(ot *testing.T) {
 
 	ot.Run("Run auto-commit, happy path", func(t *testing.T) {
 		// Connect client+server
-		conn, srv, cleanup := setupBoltPipe(t)
+		boltConn, srv, cleanup := setupBoltPipe(t)
 		defer cleanup()
 		go func() {
 			srv.accept(3)
 			srv.waitAndServeAutoCommit(strm1)
 		}()
-		bolt, err := Connect("name", conn, auth)
+		bolt, err := Connect("name", boltConn, auth)
 		if err != nil {
 			t.Fatal(err)
 		}
 		defer bolt.Close()
 
-		str, _ := bolt.Run("MATCH (n) RETURN n", nil)
+		str, _ := bolt.Run("MATCH (n) RETURN n", nil, conn.ReadMode, nil, 0, nil)
 		assertKeys(t, keys, str)
 
 		// Retrieve the records

@@ -84,9 +84,7 @@ type Connection interface {
 	TxBegin(mode AccessMode, bookmarks []string, timeout time.Duration, meta map[string]interface{}) (Handle, error)
 	TxRollback(tx Handle) error
 	TxCommit(tx Handle) error
-	// TODO: Timeout
-	// TODO: Metadata
-	Run(cypher string, params map[string]interface{}) (*Stream, error)
+	Run(cypher string, params map[string]interface{}, mode AccessMode, bookmarks []string, timeout time.Duration, meta map[string]interface{}) (*Stream, error)
 	RunTx(tx Handle, cypher string, params map[string]interface{}) (*Stream, error)
 	// If error is nil, either Record or Summary has a value, if Record is nil there are no more records.
 	// If error is non nil, neither Record or Summary has a value.

@@ -53,12 +53,41 @@ const (
 	failed              // Recoverable, needs reset
 	corrupt             // Non recoverable protocol error
 	streaming           // Receiving result from auto commit query
+	pendingtx           // Begin transaction has been requested but not applied
 	tx                  // In a transaction
 	streamingtx         // Receiving result from a query within a transaction
 )
 
 func log(msg string) {
 	//fmt.Printf("bolt3: %s\n", msg)
+}
+
+type internalTx struct {
+	mode      conn.AccessMode
+	bookmarks []string
+	timeout   time.Duration
+	txMeta    map[string]interface{}
+}
+
+func (i *internalTx) toMeta() map[string]interface{} {
+	mode := "w"
+	if i.mode == conn.ReadMode {
+		mode = "r"
+	}
+	meta := map[string]interface{}{
+		"mode": mode,
+	}
+	if len(i.bookmarks) > 0 {
+		meta["bookmarks"] = i.bookmarks
+	}
+	ts := int(i.timeout.Seconds())
+	if ts > 0 {
+		meta["tx_timeout"] = ts
+	}
+	if len(i.txMeta) > 0 {
+		meta["tx_metadata"] = i.txMeta
+	}
+	return meta
 }
 
 type bolt3 struct {
@@ -74,7 +103,8 @@ type bolt3 struct {
 	unpacker      *packstream.Unpacker
 	connId        string
 	serverVersion string
-	tfirst        int64 // Time that server started streaming
+	tfirst        int64       // Time that server started streaming
+	pendingTx     *internalTx // Stashed away when tx started explcitly
 }
 
 func NewBolt3(serverName string, conn net.Conn) *bolt3 {
@@ -219,7 +249,7 @@ func (b *bolt3) connect(auth map[string]interface{}) error {
 }
 
 func (b *bolt3) TxBegin(
-	mode conn.AccessMode, bookmarks []string, timeout time.Duration, meta map[string]interface{}) (conn.Handle, error) {
+	mode conn.AccessMode, bookmarks []string, timeout time.Duration, txMeta map[string]interface{}) (conn.Handle, error) {
 
 	log("txBegin try")
 
@@ -245,37 +275,17 @@ func (b *bolt3) TxBegin(
 		return nil, b.invalidStateError([]int{ready})
 	}
 
-	// TODO: Lazy begin, defer this to when Run is called
-	smode := "w"
-	if mode == conn.ReadMode {
-		smode = "r"
-	}
-	params := map[string]interface{}{
-		"mode": smode,
-	}
-	if len(bookmarks) > 0 {
-		params["bookmarks"] = bookmarks
-	}
-	ts := int(timeout.Seconds())
-	if ts > 0 {
-		params["tx_timeout"] = ts
-	}
-	if len(meta) > 0 {
-		params["tx_metadata"] = meta
-	}
-	err := b.sendMsg(msgV3Begin, params)
-	if err != nil {
-		return nil, err
-	}
-
-	_, err = b.receiveSuccessResponse()
-	if err != nil {
-		return nil, err
+	// Stash this into pending internal tx
+	b.pendingTx = &internalTx{
+		mode:      mode,
+		bookmarks: bookmarks,
+		timeout:   timeout,
+		txMeta:    txMeta,
 	}
 
 	b.txId = time.Now().Unix()
 	// Transition into tx state
-	b.state = tx
+	b.state = pendingtx
 
 	log("txBegin ok")
 	return b.txId, nil
@@ -287,6 +297,12 @@ func (b *bolt3) TxCommit(txh conn.Handle) error {
 	if err != nil {
 		log("txCommit fail 1")
 		return err
+	}
+
+	// Nothing to do, a transaction started but no commands were issued on it
+	if b.state == pendingtx {
+		b.state = ready
+		return nil
 	}
 
 	// Can only commit when in tx state or streaming in tx
@@ -326,6 +342,12 @@ func (b *bolt3) TxRollback(txh conn.Handle) error {
 	if err != nil {
 		log("txRollback fail 1")
 		return err
+	}
+
+	// Nothing to do, a transaction started but no commands were issued on it
+	if b.state == pendingtx {
+		b.state = ready
+		return nil
 	}
 
 	// Can only rollback when in tx state or streaming in tx
@@ -378,13 +400,7 @@ func (b *bolt3) consumeStream() error {
 	return nil
 }
 
-func (b *bolt3) run(cypher string, params map[string]interface{}) (*conn.Stream, error) {
-	// Send request to run query along with request to stream the result
-	// Same format as tx begin
-	// TODO: bookmarks
-	// TODO: txTimeout
-	// TODO: accessMode
-	// TODO: txMetadata
+func (b *bolt3) run(cypher string, params map[string]interface{}, itx *internalTx) (*conn.Stream, error) {
 	log(fmt.Sprintf("run try:%s", cypher))
 
 	// If streaming, consume the whole thing. Hard to do discard here since we don't
@@ -395,15 +411,25 @@ func (b *bolt3) run(cypher string, params map[string]interface{}) (*conn.Stream,
 		return nil, err
 	}
 
-	if b.state != tx && b.state != ready {
-		return nil, b.invalidStateError([]int{tx, ready})
+	if b.state != tx && b.state != ready && b.state != pendingtx {
+		return nil, b.invalidStateError([]int{tx, ready, pendingtx})
+	}
+
+	var meta map[string]interface{}
+	if itx != nil {
+		meta = itx.toMeta()
+	}
+
+	if b.state == pendingtx {
+		err := b.appendMsg(msgV3Begin, meta)
+		if err != nil {
+			return nil, err
+		}
+		meta = nil
 	}
 
 	// Run
-	err = b.appendMsg(msgV3Run,
-		cypher,
-		params,
-		map[string]interface{}{})
+	err = b.appendMsg(msgV3Run, cypher, params, meta)
 	if err != nil {
 		return nil, err
 	}
@@ -419,6 +445,16 @@ func (b *bolt3) run(cypher string, params map[string]interface{}) (*conn.Stream,
 	err = b.chunker.send()
 	if err != nil {
 		return nil, err
+	}
+
+	if b.state == pendingtx {
+		// Receive confirmation of BEGIN
+		_, err := b.receiveSuccessResponse()
+		if err != nil {
+			b.state = corrupt
+			return nil, err
+		}
+		b.state = tx
 	}
 
 	// Receive confirmation of RUN
@@ -457,12 +493,20 @@ func (b *bolt3) run(cypher string, params map[string]interface{}) (*conn.Stream,
 	return stream, nil
 }
 
-func (b *bolt3) Run(cypher string, params map[string]interface{}) (*conn.Stream, error) {
+func (b *bolt3) Run(
+	cypher string, params map[string]interface{}, mode conn.AccessMode, bookmarks []string, timeout time.Duration, txMeta map[string]interface{}) (*conn.Stream, error) {
+
 	log("Run no tx")
 	if b.state != streaming && b.state != ready {
 		return nil, b.invalidStateError([]int{streaming, ready})
 	}
-	return b.run(cypher, params)
+	tx := internalTx{
+		mode:      mode,
+		bookmarks: bookmarks,
+		timeout:   timeout,
+		txMeta:    txMeta,
+	}
+	return b.run(cypher, params, &tx)
 }
 
 func (b *bolt3) RunTx(txh conn.Handle, cypher string, params map[string]interface{}) (*conn.Stream, error) {
@@ -473,7 +517,9 @@ func (b *bolt3) RunTx(txh conn.Handle, cypher string, params map[string]interfac
 		return nil, err
 	}
 
-	return b.run(cypher, params)
+	stream, err := b.run(cypher, params, b.pendingTx)
+	b.pendingTx = nil
+	return stream, err
 }
 
 // Reads one record from the stream.
