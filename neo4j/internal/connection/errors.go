@@ -33,11 +33,6 @@ func (e *AuthenticationError) Error() string {
 	return fmt.Sprintf("Authentication error: %s", e.Msg)
 }
 
-const (
-	DB_TRANS_ERR_CLASS = "TransientError"
-	DB_CLIENT_ERR_CLAS = "ClientError"
-)
-
 type dbErrCls int
 
 const (
