@@ -1,3 +1,22 @@
+/*
+ * Copyright (c) 2002-2020 "Neo4j,"
+ * Neo4j Sweden AB [http://neo4j.com]
+ *
+ * This file is part of Neo4j.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an "AS IS" BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
+ */
+
 package pool
 
 // Thread safe
@@ -23,18 +42,17 @@ type qitem struct {
 type Pool struct {
 	maxSize    int
 	connect    Connect
-	buckets    map[string]*bucket
-	bucketsMut sync.Mutex
+	servers    map[string]*server
+	serversMut sync.Mutex
 	queueMut   sync.Mutex
 	queue      list.List
 }
 
 func New(maxSize int, connect Connect) *Pool {
-	log(fmt.Sprintf("new size: %d", maxSize))
 	p := &Pool{
 		maxSize: maxSize,
 		connect: connect,
-		buckets: make(map[string]*bucket),
+		servers: make(map[string]*server),
 	}
 	return p
 }
@@ -49,28 +67,28 @@ func (p *Pool) Close() {
 	p.queueMut.Lock()
 	p.queue.Init()
 	p.queueMut.Unlock()
-	// Go through each bucket and close the connections in it
-	p.bucketsMut.Lock()
-	for n, b := range p.buckets {
+	// Go through each server and close all connections to it
+	p.serversMut.Lock()
+	for n, b := range p.servers {
 		for c := b.get(); c != nil; c = b.get() {
 			c.Close()
 		}
-		delete(p.buckets, n)
+		delete(p.servers, n)
 	}
-	p.bucketsMut.Unlock()
+	p.serversMut.Unlock()
 	log("closed!")
 }
 
-func (p *Pool) tryExistingBucketsExistingConn(servers []string) conn.Connection {
-	p.bucketsMut.Lock()
-	defer p.bucketsMut.Unlock()
+// Tries to find an unused connection on one of the servers we're already connected to.
+func (p *Pool) tryExistingConnectionToKnownServer(serverNames []string) conn.Connection {
+	p.serversMut.Lock()
+	defer p.serversMut.Unlock()
 
-	for _, s := range servers {
-		b := p.buckets[s]
+	for _, s := range serverNames {
+		b := p.servers[s]
 		if b == nil {
 			continue
 		}
-		// Try to get a free alive connection
 		for {
 			c := b.get()
 			if c == nil {
@@ -78,43 +96,43 @@ func (p *Pool) tryExistingBucketsExistingConn(servers []string) conn.Connection 
 			}
 			// Check that the connection is ok
 			if !c.IsAlive() {
-				// Unregister the connection and close it another thread to avoid potential
+				// Unregister the connection and close it in another thread to avoid potential
 				// long blocking operation during close.
-				log(fmt.Sprintf("%s: conn dead", s))
+				log(fmt.Sprintf("%s: found dead connection", s))
 				b.unreg(c)
 				go func() {
 					c.Close()
 				}()
 				continue
 			}
-			log(fmt.Sprintf("%s: conn found", s))
+			log(fmt.Sprintf("%s: found connectio to use", s))
 			return c
 		}
 		if b.size == 0 {
-			log(fmt.Sprintf("%s: bucket dead", s))
-			// Dead bucket, remove it
-			delete(p.buckets, s)
+			// No more connections to this server, remote it from list of known servers
+			log(fmt.Sprintf("%s: no more connections", s))
+			delete(p.servers, s)
 		}
 	}
 
 	return nil
 }
 
-func (p *Pool) tryExistingBucketsNewConn(servers []string, checkTimeout func() bool) (conn.Connection, error) {
-	p.bucketsMut.Lock()
-	defer p.bucketsMut.Unlock()
+func (p *Pool) tryNewConnectionToKnownServer(serverNames []string, checkTimeout func() bool) (conn.Connection, error) {
+	p.serversMut.Lock()
+	defer p.serversMut.Unlock()
 
 	var (
 		err error
 		c   conn.Connection
 	)
 
-	for _, s := range servers {
+	for _, s := range serverNames {
 		if checkTimeout() {
 			return nil, err
 		}
 
-		b := p.buckets[s]
+		b := p.servers[s]
 		if b == nil {
 			continue
 		}
@@ -127,46 +145,45 @@ func (p *Pool) tryExistingBucketsNewConn(servers []string, checkTimeout func() b
 		if err != nil || c == nil {
 			continue
 		}
-		// Register the connection in the bucket
-		log(fmt.Sprintf("%s: conn registered", s))
+		// Register the connection to the server
+		log(fmt.Sprintf("%s: connection registered", s))
 		b.reg(c)
 		return c, nil
 	}
 	return nil, err
 }
 
-func (p *Pool) tryNewBucketNewConn(servers []string, checkTimeout func() bool) (conn.Connection, error) {
-	p.bucketsMut.Lock()
-	defer p.bucketsMut.Unlock()
+func (p *Pool) tryNewServer(serverNames []string, checkTimeout func() bool) (conn.Connection, error) {
+	p.serversMut.Lock()
+	defer p.serversMut.Unlock()
 
 	var (
 		err error
 		c   conn.Connection
 	)
 
-	for _, s := range servers {
+	for _, s := range serverNames {
 		if checkTimeout() {
 			return nil, err
 		}
 
-		b := p.buckets[s]
+		b := p.servers[s]
 		if b != nil {
 			continue
 		}
 
-		// No bucket for this server, try to connect and add a bucket
-		log(fmt.Sprintf("%s: bucket pending, connecting", s))
+		// Try to connect and add this server as known
+		log(fmt.Sprintf("%s: server pending, connecting", s))
 		c, err = p.connect(s)
 		if err != nil || c == nil {
 			// Blacklist this server for a while ?
-			log(fmt.Sprintf("%s: bucket cancelled", s))
+			log(fmt.Sprintf("%s: server cancelled", s))
 			continue
 		}
-		// Ok, got a connection, now create a bucket for this server and register the
-		// connection within it
-		b = &bucket{}
-		p.buckets[s] = b
-		log(fmt.Sprintf("%s: bucket added", s))
+		// Ok, got a connection, register this server register the connection within it
+		b = &server{}
+		p.servers[s] = b
+		log(fmt.Sprintf("%s: server added", s))
 		b.reg(c)
 		log(fmt.Sprintf("%s: conn registered", s))
 		return c, nil
@@ -174,11 +191,11 @@ func (p *Pool) tryNewBucketNewConn(servers []string, checkTimeout func() bool) (
 	return nil, err
 }
 
-func (p *Pool) anyExistingConnInExistingBuckets(servers []string) bool {
-	p.bucketsMut.Lock()
-	defer p.bucketsMut.Unlock()
-	for _, s := range servers {
-		b := p.buckets[s]
+func (p *Pool) anyExistingConnections(serverNames []string) bool {
+	p.serversMut.Lock()
+	defer p.serversMut.Unlock()
+	for _, s := range serverNames {
+		b := p.servers[s]
 		if b != nil {
 			if b.size > 0 {
 				return true
@@ -196,14 +213,14 @@ func (p *Pool) queueSize() int {
 }
 
 // For testing
-func (p *Pool) getBuckets() map[string]bucket {
-	p.bucketsMut.Lock()
-	defer p.bucketsMut.Unlock()
-	buckets := make(map[string]bucket)
-	for k, v := range p.buckets {
-		buckets[k] = *v
+func (p *Pool) getServers() map[string]server {
+	p.serversMut.Lock()
+	defer p.serversMut.Unlock()
+	servers := make(map[string]server)
+	for k, v := range p.servers {
+		servers[k] = *v
 	}
-	return buckets
+	return servers
 }
 
 func (p *Pool) Borrow(ctx context.Context, servers []string) (conn.Connection, error) {
@@ -223,10 +240,10 @@ func (p *Pool) Borrow(ctx context.Context, servers []string) (conn.Connection, e
 	var err error
 	var c conn.Connection
 
-	// Try to use an existing connection in an existing bucket, that is cheapest.
-	// This will also prune dead connections and empty buckets (servers with no connections) among
+	// Try to use an existing connection to a known server, that is cheapest.
+	// This will also prune dead connections and empty servers (servers with no connections) among
 	// the requested ones.
-	c = p.tryExistingBucketsExistingConn(servers)
+	c = p.tryExistingConnectionToKnownServer(servers)
 	if c != nil {
 		return c, nil
 	}
@@ -234,20 +251,20 @@ func (p *Pool) Borrow(ctx context.Context, servers []string) (conn.Connection, e
 		return nil, ctx.Err()
 	}
 
-	// The existing buckets at this point are "proved" to be working, at least we don't know that
+	// The existing servers at this point are "proved" to be working, at least we don't know that
 	// they are down yet. So try to utilize these before trying another server and corresponding
-	// new bucket.
-	c, err = p.tryExistingBucketsNewConn(servers, timeOut)
+	// new server.
+	c, err = p.tryNewConnectionToKnownServer(servers, timeOut)
 	if c != nil {
 		return c, nil
 	}
 	if timedOut {
 		return nil, ctx.Err()
 	}
-	// Try to increase size of any matching existing connection bucket. A non-functional server
-	// would have it's bucket pruned above but retried to connect to here, could be good if the
+	// Try to increase size of any matching existing connection server. A non-functional server
+	// would have it's server pruned above but retried to connect to here, could be good if the
 	// server went down and now is up again but could also be bad if it is still down.
-	c, err = p.tryNewBucketNewConn(servers, timeOut)
+	c, err = p.tryNewServer(servers, timeOut)
 	if c != nil {
 		return c, nil
 	}
@@ -255,9 +272,9 @@ func (p *Pool) Borrow(ctx context.Context, servers []string) (conn.Connection, e
 		return nil, ctx.Err()
 	}
 
-	// If there are no buckets for any of the servers, there is no point in waiting for anything
+	// If there are no connections for any of the servers, there is no point in waiting for anything
 	// to be returned.
-	if !p.anyExistingConnInExistingBuckets(servers) {
+	if !p.anyExistingConnections(servers) {
 		if err == nil {
 			err = errors.New("No conns to wait for")
 		}
@@ -269,7 +286,7 @@ func (p *Pool) Borrow(ctx context.Context, servers []string) (conn.Connection, e
 	// Ok, now that we own the queue we can add the item there but between getting the lock
 	// and above check for an existing connection another thread might have returned a connection
 	// so check again to avoid potentially starving this thread.
-	c = p.tryExistingBucketsExistingConn(servers)
+	c = p.tryExistingConnectionToKnownServer(servers)
 	if c != nil {
 		p.queueMut.Unlock()
 		return c, nil
@@ -304,16 +321,16 @@ func (p *Pool) Borrow(ctx context.Context, servers []string) (conn.Connection, e
 	}
 }
 
-func (p *Pool) unreg(server string, c conn.Connection) {
-	p.bucketsMut.Lock()
-	defer p.bucketsMut.Unlock()
+func (p *Pool) unreg(serverName string, c conn.Connection) {
+	p.serversMut.Lock()
+	defer p.serversMut.Unlock()
 
-	bucket := p.buckets[server]
-	// Check for strange condition of not finding the bucket.
-	if bucket != nil {
-		bucket.unreg(c)
-		if bucket.size == 0 {
-			delete(p.buckets, server)
+	server := p.servers[serverName]
+	// Check for strange condition of not finding the server.
+	if server != nil {
+		server.unreg(c)
+		if server.size == 0 {
+			delete(p.servers, serverName)
 		}
 	}
 
@@ -326,15 +343,15 @@ func (p *Pool) unreg(server string, c conn.Connection) {
 func (p *Pool) Return(c conn.Connection) {
 	// Prepare connection for being used by someone else
 	c.Reset()
-	// Get the name of the bucket that the connection belongs to.
-	server := c.ServerName()
+	// Get the name of the server that the connection belongs to.
+	serverName := c.ServerName()
 
-	log(fmt.Sprintf("Return conn in %s", server))
+	log(fmt.Sprintf("Return conn in %s", serverName))
 
 	// If the connection is dead we should just unregister it and drop it.
 	if !c.IsAlive() {
-		log(fmt.Sprintf("%s: conn dead", server))
-		p.unreg(server, c)
+		log(fmt.Sprintf("%s: conn dead", serverName))
+		p.unreg(serverName, c)
 		return
 	}
 
@@ -344,7 +361,7 @@ func (p *Pool) Return(c conn.Connection) {
 		qitem := e.Value.(*qitem)
 		// Check requested servers
 		for _, rserver := range qitem.servers {
-			if rserver == server {
+			if rserver == serverName {
 				qitem.conn = c
 				p.queue.Remove(e)
 				p.queueMut.Unlock()
@@ -355,13 +372,13 @@ func (p *Pool) Return(c conn.Connection) {
 	}
 	p.queueMut.Unlock()
 
-	// Just put it back in the bucket
-	p.bucketsMut.Lock()
-	defer p.bucketsMut.Unlock()
-	bucket := p.buckets[server]
-	if bucket != nil { // Strange when bucket not found
-		log(fmt.Sprintf("%s: back in bucket", server))
-		bucket.ret(c)
+	// Just put it back in the server
+	p.serversMut.Lock()
+	defer p.serversMut.Unlock()
+	server := p.servers[serverName]
+	if server != nil { // Strange when server not found
+		log(fmt.Sprintf("%s: back in server", serverName))
+		server.ret(c)
 	}
 
 }
