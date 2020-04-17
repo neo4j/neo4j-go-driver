@@ -25,6 +25,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"time"
 
 	"github.com/neo4j/neo4j-go-driver/neo4j/internal/bolt"
 	conn "github.com/neo4j/neo4j-go-driver/neo4j/internal/connection"
@@ -125,10 +126,17 @@ func (c *connector) wrapInTls(target string, rawConn net.Conn) (net.Conn, error)
 }
 
 func (c *connector) connect(target string) (conn.Connection, error) {
-	// TODO: Handle SocketConnectTimeout
+	keepAlive := 0 * time.Second // Implies net default TCP keep-alive value
+	if !c.config.SocketKeepalive {
+		keepAlive = -1 * time.Second // Turns keep-alive off
+	}
+	d := net.Dialer{
+		Timeout:   c.config.SocketConnectTimeout,
+		KeepAlive: keepAlive,
+	}
 
 	// Make a TCP connection
-	conn, err := net.Dial("tcp", target)
+	conn, err := d.Dial("tcp", target)
 	if err != nil {
 		return nil, &connectError{err: err}
 	}
