@@ -48,18 +48,18 @@ const (
 const userAgent = "Go Driver/1.8"
 
 const (
-	ready        = iota // After connect and reset
-	disconnected        // Lost connection to server
-	failed              // Recoverable, needs reset
-	corrupt             // Non recoverable protocol error
-	streaming           // Receiving result from auto commit query
-	pendingtx           // Begin transaction has been requested but not applied
-	tx                  // In a transaction
-	streamingtx         // Receiving result from a query within a transaction
+	bolt3_ready        = iota // After connect and reset
+	bolt3_disconnected        // Lost connection to server
+	bolt3_failed              // Recoverable, needs reset
+	bolt3_corrupt             // Non recoverable protocol error
+	bolt3_streaming           // Receiving result from auto commit query
+	bolt3_pendingtx           // Begin transaction has been requested but not applied
+	bolt3_tx                  // In a transaction
+	bolt3_streamingtx         // Receiving result from a query within a transaction
 )
 
 func log(msg string) {
-	//fmt.Printf("bolt3: %s\n", msg)
+	fmt.Printf("bolt3: %s\n", msg)
 }
 
 type internalTx struct {
@@ -113,7 +113,7 @@ func NewBolt3(serverName string, conn net.Conn) *bolt3 {
 	dechunker := newDechunker(conn)
 
 	return &bolt3{
-		state:      disconnected,
+		state:      bolt3_disconnected,
 		conn:       conn,
 		serverName: serverName,
 		chunker:    chunker,
@@ -136,7 +136,7 @@ func (b *bolt3) appendMsg(tag packstream.StructTag, field ...interface{}) error 
 		// At this point we do not know the state of what has been written to the chunks.
 		// Either we should support rolling back whatever that has been written or just
 		// bail out this session.
-		b.state = corrupt
+		b.state = bolt3_corrupt
 		return err
 	}
 	b.chunker.endMessage()
@@ -166,19 +166,21 @@ func (b *bolt3) assertHandle(id int64, h conn.Handle) error {
 
 func (b *bolt3) receive() (interface{}, error) {
 	if err := b.dechunker.beginMessage(); err != nil {
+		b.state = bolt3_corrupt
 		return nil, err
 	}
 	res, err := b.unpacker.UnpackStruct(hydrate)
 	if err != nil {
 		log(fmt.Sprintf("receive error: %s", err))
+		b.state = bolt3_corrupt
 		if _, isIoError := err.(*packstream.IoError); isIoError {
-			b.state = disconnected
+			b.state = bolt3_disconnected
 		}
+		return nil, err
 	}
-	if res != nil {
-		log(fmt.Sprintf("received: %T:%+v", res, res))
-	}
+	log(fmt.Sprintf("received: %T:%+v", res, res))
 	if err = b.dechunker.endMessage(); err != nil {
+		b.state = bolt3_corrupt
 		return nil, err
 	}
 	return res, err
@@ -201,8 +203,8 @@ func (b *bolt3) receiveSuccessResponse() (*successResponse, error) {
 // TODO: Error types!
 func (b *bolt3) connect(auth map[string]interface{}) error {
 	// Only allowed to connect when in disconnected state
-	if b.state != disconnected {
-		return b.invalidStateError([]int{disconnected})
+	if b.state != bolt3_disconnected {
+		return b.invalidStateError([]int{bolt3_disconnected})
 	}
 
 	hello := map[string]interface{}{
@@ -243,7 +245,7 @@ func (b *bolt3) connect(auth map[string]interface{}) error {
 	b.serverVersion = helloRes.server
 
 	// Transition into ready state
-	b.state = ready
+	b.state = bolt3_ready
 	log("connected")
 	return nil
 }
@@ -257,22 +259,22 @@ func (b *bolt3) TxBegin(
 	// know if server has sent everything on the wire already and the server doesn't
 	// like us sending a discard when it is ready.
 	switch b.state {
-	case streaming:
+	case bolt3_streaming:
 		for {
 			_, sum, err := b.Next(b.streamId)
 			if sum != nil || err != nil {
 				break
 			}
 		}
-	case ready:
+	case bolt3_ready:
 		// Continue
 	default:
-		return nil, b.invalidStateError([]int{streaming, ready})
+		return nil, b.invalidStateError([]int{bolt3_streaming, bolt3_ready})
 	}
 
 	// Only allowed to begin a transaction from ready state
-	if b.state != ready {
-		return nil, b.invalidStateError([]int{ready})
+	if b.state != bolt3_ready {
+		return nil, b.invalidStateError([]int{bolt3_ready})
 	}
 
 	// Stash this into pending internal tx
@@ -285,7 +287,7 @@ func (b *bolt3) TxBegin(
 
 	b.txId = time.Now().Unix()
 	// Transition into tx state
-	b.state = pendingtx
+	b.state = bolt3_pendingtx
 
 	log("txBegin ok")
 	return b.txId, nil
@@ -300,15 +302,15 @@ func (b *bolt3) TxCommit(txh conn.Handle) error {
 	}
 
 	// Nothing to do, a transaction started but no commands were issued on it
-	if b.state == pendingtx {
-		b.state = ready
+	if b.state == bolt3_pendingtx {
+		b.state = bolt3_ready
 		return nil
 	}
 
 	// Can only commit when in tx state or streaming in tx
-	if b.state != tx && b.state != streamingtx {
+	if b.state != bolt3_tx && b.state != bolt3_streamingtx {
 		log("txCommit fail 2")
-		return b.invalidStateError([]int{tx})
+		return b.invalidStateError([]int{bolt3_tx})
 	}
 
 	err = b.consumeStream()
@@ -329,7 +331,7 @@ func (b *bolt3) TxCommit(txh conn.Handle) error {
 	}
 
 	// Transition into ready state
-	b.state = ready
+	b.state = bolt3_ready
 	// TODO: Keep track of bookmark!
 	// bolt.successResponse: &{m:map[bookmark:neo4j:bookmark:v1:tx35]}
 	log("txCommit ok")
@@ -345,15 +347,15 @@ func (b *bolt3) TxRollback(txh conn.Handle) error {
 	}
 
 	// Nothing to do, a transaction started but no commands were issued on it
-	if b.state == pendingtx {
-		b.state = ready
+	if b.state == bolt3_pendingtx {
+		b.state = bolt3_ready
 		return nil
 	}
 
 	// Can only rollback when in tx state or streaming in tx
-	if b.state != tx && b.state != streamingtx {
+	if b.state != bolt3_tx && b.state != bolt3_streamingtx {
 		log("txRollback fail 2")
-		return b.invalidStateError([]int{tx})
+		return b.invalidStateError([]int{bolt3_tx})
 	}
 
 	err = b.consumeStream()
@@ -374,7 +376,7 @@ func (b *bolt3) TxRollback(txh conn.Handle) error {
 	}
 
 	// Transition into ready state
-	b.state = ready
+	b.state = bolt3_ready
 
 	//  *bolt.successResponse: &{m:map[]}
 	log("txRollback ok")
@@ -384,7 +386,7 @@ func (b *bolt3) TxRollback(txh conn.Handle) error {
 // Discards all records, keeps bookmark
 func (b *bolt3) consumeStream() error {
 	// Anything to do?
-	if b.state != streaming && b.state != streamingtx {
+	if b.state != bolt3_streaming && b.state != bolt3_streamingtx {
 		return nil
 	}
 
@@ -400,7 +402,7 @@ func (b *bolt3) consumeStream() error {
 	return nil
 }
 
-func (b *bolt3) run(cypher string, params map[string]interface{}, itx *internalTx) (*conn.Stream, error) {
+func (b *bolt3) run(cypher string, params map[string]interface{}, tx *internalTx) (*conn.Stream, error) {
 	log(fmt.Sprintf("run try:%s", cypher))
 
 	// If streaming, consume the whole thing. Hard to do discard here since we don't
@@ -411,16 +413,16 @@ func (b *bolt3) run(cypher string, params map[string]interface{}, itx *internalT
 		return nil, err
 	}
 
-	if b.state != tx && b.state != ready && b.state != pendingtx {
-		return nil, b.invalidStateError([]int{tx, ready, pendingtx})
+	if b.state != bolt3_tx && b.state != bolt3_ready && b.state != bolt3_pendingtx {
+		return nil, b.invalidStateError([]int{bolt3_tx, bolt3_ready, bolt3_pendingtx})
 	}
 
 	var meta map[string]interface{}
-	if itx != nil {
-		meta = itx.toMeta()
+	if tx != nil {
+		meta = tx.toMeta()
 	}
 
-	if b.state == pendingtx {
+	if b.state == bolt3_pendingtx {
 		err := b.appendMsg(msgV3Begin, meta)
 		if err != nil {
 			return nil, err
@@ -447,14 +449,14 @@ func (b *bolt3) run(cypher string, params map[string]interface{}, itx *internalT
 		return nil, err
 	}
 
-	if b.state == pendingtx {
+	if b.state == bolt3_pendingtx {
 		// Receive confirmation of BEGIN
 		_, err := b.receiveSuccessResponse()
 		if err != nil {
-			b.state = corrupt
+			b.state = bolt3_corrupt
 			return nil, err
 		}
-		b.state = tx
+		b.state = bolt3_tx
 	}
 
 	// Receive confirmation of RUN
@@ -467,23 +469,23 @@ func (b *bolt3) run(cypher string, params map[string]interface{}, itx *internalT
 		// Extract the RUN response from success response
 		runRes := v.run()
 		if runRes == nil {
-			b.state = corrupt
+			b.state = bolt3_corrupt
 			return nil, errors.New("parse fail, proto error")
 		}
 		// Succesful, change state to streaming and let Next receive the records.
 		b.tfirst = runRes.t_first
 		switch b.state {
-		case ready:
-			b.state = streaming
-		case tx:
-			b.state = streamingtx
+		case bolt3_ready:
+			b.state = bolt3_streaming
+		case bolt3_tx:
+			b.state = bolt3_streamingtx
 		}
 		b.streamKeys = runRes.fields
 	case *conn.DatabaseError:
-		b.state = failed
+		b.state = bolt3_failed
 		return nil, v
 	default:
-		b.state = corrupt
+		b.state = bolt3_corrupt
 		return nil, errors.New("Unknown message")
 	}
 
@@ -497,8 +499,8 @@ func (b *bolt3) Run(
 	cypher string, params map[string]interface{}, mode conn.AccessMode, bookmarks []string, timeout time.Duration, txMeta map[string]interface{}) (*conn.Stream, error) {
 
 	log("Run no tx")
-	if b.state != streaming && b.state != ready {
-		return nil, b.invalidStateError([]int{streaming, ready})
+	if b.state != bolt3_streaming && b.state != bolt3_ready {
+		return nil, b.invalidStateError([]int{bolt3_streaming, bolt3_ready})
 	}
 	tx := internalTx{
 		mode:      mode,
@@ -525,8 +527,8 @@ func (b *bolt3) RunTx(txh conn.Handle, cypher string, params map[string]interfac
 // Reads one record from the stream.
 func (b *bolt3) Next(shandle conn.Handle) (*conn.Record, *conn.Summary, error) {
 	log("next try")
-	if b.state != streaming && b.state != streamingtx {
-		return nil, nil, b.invalidStateError([]int{streaming, streamingtx})
+	if b.state != bolt3_streaming && b.state != bolt3_streamingtx {
+		return nil, nil, b.invalidStateError([]int{bolt3_streaming, bolt3_streamingtx})
 	}
 
 	err := b.assertHandle(b.streamId, shandle)
@@ -537,7 +539,7 @@ func (b *bolt3) Next(shandle conn.Handle) (*conn.Record, *conn.Summary, error) {
 	res, err := b.receive()
 	if err != nil {
 		log(fmt.Sprintf("Next unpack err: %s", err))
-		b.state = corrupt
+		b.state = bolt3_corrupt
 		return nil, nil, err
 	}
 
@@ -549,16 +551,16 @@ func (b *bolt3) Next(shandle conn.Handle) (*conn.Record, *conn.Summary, error) {
 	case *successResponse:
 		log("got end of stream")
 		// End of stream
-		if b.state == streamingtx {
-			b.state = tx
+		if b.state == bolt3_streamingtx {
+			b.state = bolt3_tx
 		} else {
-			b.state = ready
+			b.state = bolt3_ready
 		}
 		b.streamId = 0
 		// Parse summary
 		sum := x.summary()
 		if sum == nil {
-			b.state = corrupt
+			b.state = bolt3_corrupt
 			log(fmt.Sprintf("failed to parse summary: %+v", x))
 			return nil, nil, errors.New("Failed to parse summary")
 		}
@@ -578,7 +580,7 @@ func (b *bolt3) Next(shandle conn.Handle) (*conn.Record, *conn.Summary, error) {
 
 func (b *bolt3) IsAlive() bool {
 	switch b.state {
-	case disconnected, corrupt:
+	case bolt3_disconnected, bolt3_corrupt:
 		log("IsAlive response: dead")
 		return false
 	}
@@ -596,7 +598,7 @@ func (b *bolt3) Reset() {
 	}()
 
 	switch b.state {
-	case ready, disconnected, corrupt:
+	case bolt3_ready, bolt3_disconnected, bolt3_corrupt:
 		// No need for reset
 		log("NOP")
 		return
@@ -605,7 +607,7 @@ func (b *bolt3) Reset() {
 	// Send the reset message to the server
 	err := b.sendMsg(msgV3Reset)
 	if err != nil {
-		b.state = corrupt
+		b.state = bolt3_corrupt
 		return
 	}
 
@@ -616,7 +618,7 @@ func (b *bolt3) Reset() {
 	for !drained {
 		res, err := b.receive()
 		if err != nil {
-			b.state = corrupt
+			b.state = bolt3_corrupt
 			return
 		}
 		switch x := res.(type) {
@@ -626,7 +628,7 @@ func (b *bolt3) Reset() {
 			// This could mean that the reset command failed for some reason, could also
 			// mean some other command that failed but as long as we never have unconfirmed
 			// commands out of the handling functions this should mean that the reset failed.
-			b.state = corrupt
+			b.state = bolt3_corrupt
 			return
 		case *successResponse:
 			// This could indicate either end of a stream that have been sent right before
@@ -636,16 +638,16 @@ func (b *bolt3) Reset() {
 		}
 	}
 
-	b.state = ready
+	b.state = bolt3_ready
 }
 
 func (b *bolt3) Close() {
 	log("Close")
-	if b.state == disconnected {
+	if b.state == bolt3_disconnected {
 		return
 	}
 
 	b.sendMsg(msgV3Goodbye)
 	b.conn.Close()
-	b.state = disconnected
+	b.state = bolt3_disconnected
 }

@@ -20,6 +20,7 @@
 package bolt
 
 import (
+	"fmt"
 	"io"
 	"net"
 	"testing"
@@ -27,14 +28,15 @@ import (
 	"github.com/neo4j/neo4j-go-driver/neo4j/internal/packstream"
 )
 
-type testStruct packstream.Struct
-
 func passthroughHydrator(tag packstream.StructTag, fields []interface{}) (interface{}, error) {
-	return &testStruct{Tag: tag, Fields: fields}, nil
+	return &packstream.Struct{Tag: tag, Fields: fields}, nil
 }
 
-type neo4jServer struct {
-	t         *testing.T
+// Fake of bolt3 server.
+// Utility to test bolt3 protocol implemntation.
+// Use panic upon errors, simplifies output when server is running within a go thread
+// in the test.
+type bolt3server struct {
 	conn      net.Conn
 	hyd       packstream.Hydrate
 	dechunker *dechunker
@@ -43,13 +45,12 @@ type neo4jServer struct {
 	packer    *packstream.Packer
 }
 
-func newNeo4jServer(t *testing.T, conn net.Conn) *neo4jServer {
+func newBolt3Server(conn net.Conn) *bolt3server {
 	dechunker := newDechunker(conn)
 	unpacker := packstream.NewUnpacker(dechunker)
 	chunker := newChunker(conn)
 	packer := packstream.NewPacker(chunker, nil)
-	return &neo4jServer{
-		t:         t,
+	return &bolt3server{
 		conn:      conn,
 		dechunker: dechunker,
 		hyd:       passthroughHydrator,
@@ -59,33 +60,31 @@ func newNeo4jServer(t *testing.T, conn net.Conn) *neo4jServer {
 	}
 }
 
-func (s *neo4jServer) waitForHandshake() []byte {
+func (s *bolt3server) waitForHandshake() []byte {
 	handshake := make([]byte, 4*5)
 	_, err := io.ReadFull(s.conn, handshake)
 	if err != nil {
-		s.t.Fatalf("Failed to read while waiting for handshake: %s", err)
+		panic(err)
 	}
 	return handshake
 }
 
-func (s *neo4jServer) assertStructType(msg *testStruct, t packstream.StructTag) {
+func (s *bolt3server) assertStructType(msg *packstream.Struct, t packstream.StructTag) {
 	if msg.Tag != t {
-		s.t.Fatalf("Got wrong type of message expected %d but got %d (%+v)", t, msg.Tag, msg)
+		panic(fmt.Sprintf("Got wrong type of message expected %d but got %d (%+v)", t, msg.Tag, msg))
 	}
 }
 
-func (s *neo4jServer) sendFailureMsg(code, msg string) {
-	s.chunker.beginMessage()
+func (s *bolt3server) sendFailureMsg(code, msg string) {
 	f := map[string]interface{}{
 		"code":    code,
 		"message": msg,
 	}
-	s.packer.PackStruct(msgV3Failure, f)
-	s.chunker.send()
-	s.chunker.endMessage()
+	s.send(msgV3Failure, f)
+
 }
 
-func (s *neo4jServer) waitForHello() {
+func (s *bolt3server) waitForHello() {
 	msg := s.receiveMsg()
 	s.assertStructType(msg, msgV3Hello)
 	m := msg.Fields[0].(map[string]interface{})
@@ -100,77 +99,86 @@ func (s *neo4jServer) waitForHello() {
 	}
 }
 
-func (s *neo4jServer) receiveMsg() *testStruct {
+func (s *bolt3server) receiveMsg() *packstream.Struct {
 	s.dechunker.beginMessage()
 	x, err := s.unpacker.UnpackStruct(s.hyd)
 	if err != nil {
-		s.t.Fatalf("Server couldn't parse message: %s", err)
+		panic(err)
 	}
 	s.dechunker.endMessage()
-	return x.(*testStruct)
+	return x.(*packstream.Struct)
 }
 
-func (s *neo4jServer) waitForRun() {
+func (s *bolt3server) waitForRun() {
 	msg := s.receiveMsg()
 	s.assertStructType(msg, msgV3Run)
 }
 
-func (s *neo4jServer) waitForTxBegin() {
+func (s *bolt3server) waitForTxBegin() {
 	msg := s.receiveMsg()
 	s.assertStructType(msg, msgV3Begin)
 }
 
-func (s *neo4jServer) waitForTxCommit() {
+func (s *bolt3server) waitForTxCommit() {
 	msg := s.receiveMsg()
 	s.assertStructType(msg, msgV3Commit)
 }
 
-func (s *neo4jServer) waitForTxRollback() {
+func (s *bolt3server) waitForTxRollback() {
 	msg := s.receiveMsg()
 	s.assertStructType(msg, msgV3Rollback)
 }
 
-func (s *neo4jServer) waitForPullAll() {
+func (s *bolt3server) waitForPullAll() {
 	msg := s.receiveMsg()
 	s.assertStructType(msg, msgV3PullAll)
 }
 
-func (s *neo4jServer) acceptVersion(ver byte) {
+func (s *bolt3server) acceptVersion(ver byte) {
 	acceptedVer := []byte{0x00, 0x00, 0x00, ver}
 	_, err := s.conn.Write(acceptedVer)
 	if err != nil {
-		s.t.Fatalf("Failed to send version")
+		panic(err)
 	}
 }
 
-func (s *neo4jServer) send(tag packstream.StructTag, field ...interface{}) {
+func (s *bolt3server) rejectVersions() {
+	_, err := s.conn.Write([]byte{0x00, 0x00, 0x00, 0x00})
+	if err != nil {
+		panic(err)
+	}
+}
+
+func (s *bolt3server) closeConnection() {
+	s.conn.Close()
+}
+
+func (s *bolt3server) send(tag packstream.StructTag, field ...interface{}) {
 	s.chunker.beginMessage()
 	err := s.packer.PackStruct(tag, field...)
 	if err != nil {
-		s.t.Fatalf("Failed to pack: %s", err)
+		panic(err)
 	}
 	s.chunker.endMessage()
 	s.chunker.send()
 }
 
-func (s *neo4jServer) acceptHello() {
-	s.chunker.beginMessage()
-	err := s.packer.PackStruct(msgV3Success, map[string]interface{}{
+func (s *bolt3server) acceptHello() {
+	s.send(msgV3Success, map[string]interface{}{
 		"connection_id": "cid",
 		"server":        "fake/3.5",
 	})
-	if err != nil {
-		s.t.Fatalf("Failed to pack: %s", err)
-	}
-	s.chunker.endMessage()
-	err = s.chunker.send()
-	if err != nil {
-		s.t.Fatalf("Failed to send acceptance of hello: %s", err)
-	}
+}
+
+func (s *bolt3server) rejectHelloUnauthorized() {
+	s.send(msgV3Failure, map[string]interface{}{
+		"code":    "Neo.ClientError.Security.Unauthorized",
+		"message": "",
+	})
 }
 
 // Utility when something else but connect is to be tested
-func (s *neo4jServer) accept(ver byte) {
+func (s *bolt3server) accept(ver byte) {
 	s.waitForHandshake()
 	s.acceptVersion(ver)
 	s.waitForHello()
@@ -178,20 +186,17 @@ func (s *neo4jServer) accept(ver byte) {
 }
 
 // Utility to wait and serve a auto commit query
-func (s *neo4jServer) waitAndServeAutoCommit(stream []testStruct) {
+func (s *bolt3server) serveRun(stream []packstream.Struct) {
 	s.waitForRun()
 	s.waitForPullAll()
 	for _, x := range stream {
 		s.send(x.Tag, x.Fields...)
 	}
-	//s.acceptRun(keys)
 }
 
-func (s *neo4jServer) waitAndServeTransRun(stream []testStruct, commit bool) {
+func (s *bolt3server) serveRunTx(stream []packstream.Struct, commit bool) {
 	s.waitForTxBegin()
-	// Until lazy tx begin:
-	r := makeTxBeginResp()
-	s.send(r.Tag, r.Fields...)
+	s.send(msgV3Success, map[string]interface{}{})
 	s.waitForRun()
 	s.waitForPullAll()
 	for _, x := range stream {
@@ -199,18 +204,16 @@ func (s *neo4jServer) waitAndServeTransRun(stream []testStruct, commit bool) {
 	}
 	if commit {
 		s.waitForTxCommit()
-		r = makeTxCommitResp()
-		s.send(r.Tag, r.Fields...)
+		s.send(msgV3Success, map[string]interface{}{
+			"bookmark": "abookmark",
+		})
 	} else {
 		s.waitForTxRollback()
-		r = makeTxRollbackResp()
-		s.send(r.Tag, r.Fields...)
+		s.send(msgV3Success, map[string]interface{}{})
 	}
 }
 
-type cleanSetup func()
-
-func setupBoltPipe(t *testing.T) (net.Conn, *neo4jServer, cleanSetup) {
+func setupBolt3Pipe(t *testing.T) (net.Conn, *bolt3server, func()) {
 	l, err := net.Listen("tcp", ":0")
 	if err != nil {
 		t.Fatalf("Unable to listen: %s", err)
@@ -223,65 +226,9 @@ func setupBoltPipe(t *testing.T) (net.Conn, *neo4jServer, cleanSetup) {
 	if err != nil {
 		t.Fatalf("Accept error: %s", err)
 	}
-	srv := newNeo4jServer(t, srvConn)
+	srv := newBolt3Server(srvConn)
 
 	return clientConn, srv, func() {
 		l.Close()
 	}
-}
-
-type serverStream struct {
-	stream []testStruct
-}
-
-func makeTestRunResp(keys []interface{}) testStruct {
-	return testStruct{
-		Tag: msgV3Success,
-		Fields: []interface{}{
-			map[string]interface{}{
-				"fields":  keys,
-				"t_first": int64(1),
-			},
-		},
-	}
-}
-
-func makeTxBeginResp() testStruct {
-	return testStruct{
-		Tag: msgV3Success,
-		Fields: []interface{}{
-			map[string]interface{}{},
-		},
-	}
-}
-
-func makeTxCommitResp() testStruct {
-	return testStruct{
-		Tag: msgV3Success,
-		Fields: []interface{}{
-			map[string]interface{}{
-				"bookmark": "abookmark",
-			},
-		},
-	}
-}
-
-func makeTxRollbackResp() testStruct {
-	return testStruct{
-		Tag: msgV3Success,
-		Fields: []interface{}{
-			map[string]interface{}{},
-		},
-	}
-}
-func makeTestRec(values []interface{}) testStruct {
-	return testStruct{Tag: msgV3Record, Fields: []interface{}{values}}
-}
-
-func makeTestSum(bookmark string) testStruct {
-	m := map[string]interface{}{
-		"bookmark": bookmark,
-		"type":     "r",
-	}
-	return testStruct{Tag: msgV3Success, Fields: []interface{}{m}}
 }

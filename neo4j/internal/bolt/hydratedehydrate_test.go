@@ -20,10 +20,12 @@
 package bolt
 
 import (
+	"bytes"
+	"errors"
 	"reflect"
 	"testing"
+	"time"
 
-	"errors"
 	conn "github.com/neo4j/neo4j-go-driver/neo4j/internal/connection"
 	"github.com/neo4j/neo4j-go-driver/neo4j/internal/packstream"
 	"github.com/neo4j/neo4j-go-driver/neo4j/internal/types"
@@ -149,4 +151,135 @@ func TestHydrator(ot *testing.T) {
 			}
 		})
 	}
+}
+func TestDehydrator(ot *testing.T) {
+	cases := []struct {
+		name string
+		x    interface{}
+		s    *packstream.Struct
+	}{
+		{
+			name: "Point2D",
+			x:    &types.Point2D{SpatialRefId: 7, X: 8.0, Y: 9.0},
+			s:    &packstream.Struct{Tag: 'X', Fields: []interface{}{uint32(7), 8.0, 9.0}},
+		},
+		{
+			name: "Point3D",
+			x:    &types.Point3D{SpatialRefId: 7, X: 8.0, Y: 9.0, Z: 10},
+			s:    &packstream.Struct{Tag: 'Y', Fields: []interface{}{uint32(7), 8.0, 9.0, 10.0}},
+		},
+	}
+	for _, c := range cases {
+		ot.Run(c.name, func(t *testing.T) {
+			s, err := dehydrate(c.x)
+			assertNoError(t, err)
+			// Compare Structs
+			if s.Tag != c.s.Tag {
+				t.Errorf("Wrong tags, expected %d but was %d", c.s.Tag, s.Tag)
+			}
+			if len(c.s.Fields) != len(s.Fields) {
+				t.Errorf("Wrong number of fields, expected %d but was %d", len(c.s.Fields), len(s.Fields))
+			}
+			for i, v := range c.s.Fields {
+				if s.Fields[i] != v {
+					t.Errorf("Field %d differs, expected %+v but was %+v", i, v, s.Fields[i])
+				}
+			}
+		})
+	}
+}
+
+func TestDehydrateHydrate(ot *testing.T) {
+	dehydrateAndHydrate := func(t *testing.T, xi interface{}) interface{} {
+		t.Helper()
+		// Run through packstream to be certain of type assumptions
+		buf := bytes.NewBuffer([]byte{})
+		packer := packstream.NewPacker(buf, dehydrate)
+		err := packer.Pack(xi)
+		assertNoError(t, err)
+		unpacker := packstream.NewUnpacker(buf)
+		xo, err := unpacker.UnpackStruct(hydrate)
+		assertNoError(t, err)
+		return xo
+	}
+
+	ot.Run("time.Time", func(t *testing.T) {
+		ni := time.Now()
+		l, _ := time.LoadLocation("America/New_York")
+		ni = ni.In(l)
+		no := dehydrateAndHydrate(t, ni).(time.Time)
+		assertDateTimeSame(t, ni, no)
+		assertTimeLocationSame(t, ni, no)
+	})
+
+	ot.Run("time.Time offset", func(t *testing.T) {
+		ni := time.Now()
+		l := time.FixedZone("Offset", 60*60)
+		ni = ni.In(l)
+		no := dehydrateAndHydrate(t, ni).(time.Time)
+		assertDateTimeSame(t, ni, no)
+		assertTimeLocationSame(t, ni, no)
+	})
+
+	ot.Run("LocalDateTime", func(t *testing.T) {
+		ni := time.Now().Round(0 * time.Nanosecond)
+		l, _ := time.LoadLocation("America/New_York")
+		ni = ni.In(l).Round(0 * time.Nanosecond)
+		no := dehydrateAndHydrate(t, types.LocalDateTime(ni)).(types.LocalDateTime)
+		assertTimeSame(t, ni, time.Time(no))
+		assertDateSame(t, ni, time.Time(no))
+		// Received time should be in Local time even if sent as something else
+		if time.Time(no).Location().String() != "Local" {
+			t.Errorf("Should be local")
+		}
+	})
+
+	ot.Run("LocalDateTime way back", func(t *testing.T) {
+		l, _ := time.LoadLocation("Asia/Anadyr")
+		ni := time.Date(311, 7, 2, 23, 59, 3, 1, l)
+		no := dehydrateAndHydrate(t, types.LocalDateTime(ni)).(types.LocalDateTime)
+		assertTimeSame(t, ni, time.Time(no))
+		assertDateSame(t, ni, time.Time(no))
+		// Received time should be in Local time even if sent as something else
+		if time.Time(no).Location().String() != "Local" {
+			t.Errorf("Should be local")
+		}
+	})
+
+	ot.Run("Date", func(t *testing.T) {
+		ni := time.Now()
+		l, _ := time.LoadLocation("America/New_York")
+		ni = ni.In(l)
+		no := dehydrateAndHydrate(t, types.Date(ni)).(types.Date)
+		assertDateSame(t, ni, time.Time(no))
+	})
+
+	ot.Run("Time", func(t *testing.T) {
+		ni := time.Now()
+		l, _ := time.LoadLocation("America/New_York")
+		ni = ni.In(l)
+		no := dehydrateAndHydrate(t, types.Time(ni)).(types.Time)
+		assertZoneOffsetSame(t, ni, time.Time(no))
+		assertTimeSame(t, ni, time.Time(no))
+	})
+
+	ot.Run("LocalTime", func(t *testing.T) {
+		ni := time.Now()
+		l, _ := time.LoadLocation("America/New_York")
+		ni = ni.In(l)
+		no := dehydrateAndHydrate(t, types.LocalTime(ni)).(types.LocalTime)
+		assertTimeSame(t, ni, time.Time(no))
+	})
+
+	ot.Run("time.Duration", func(t *testing.T) {
+		di := 7*time.Minute + 28*time.Hour
+		do := dehydrateAndHydrate(t, di).(types.Duration)
+		assertDurationSame(t, types.Duration{Days: 1, Seconds: (4 * 60 * 60) + 7*60}, do)
+	})
+
+	ot.Run("Duration", func(t *testing.T) {
+		di := types.Duration{Months: 3, Days: 3, Seconds: 9000, Nanos: 13}
+		do := dehydrateAndHydrate(t, di).(types.Duration)
+		assertDurationSame(t, di, do)
+	})
 }

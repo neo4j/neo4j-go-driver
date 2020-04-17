@@ -23,6 +23,7 @@ import (
 	"testing"
 
 	conn "github.com/neo4j/neo4j-go-driver/neo4j/internal/connection"
+	"github.com/neo4j/neo4j-go-driver/neo4j/internal/packstream"
 )
 
 // bolt3.connect is tested through Connect, no need to test it here
@@ -43,61 +44,35 @@ import (
 //       goodbye failure
 
 func TestBolt3(ot *testing.T) {
-	assertOnlyRecord := func(t *testing.T, rec *conn.Record, sum *conn.Summary, err error) {
-		t.Helper()
-		if rec == nil {
-			t.Errorf("Expected record")
-		}
-		if sum != nil {
-			t.Errorf("Didn't expect summary")
-		}
-		if err != nil {
-			t.Errorf("Didn't expect error")
-		}
-	}
-
-	assertOnlySummary := func(t *testing.T, rec *conn.Record, sum *conn.Summary, err error) {
-		t.Helper()
-		if rec != nil {
-			t.Errorf("Didn't expect record")
-		}
-		if sum == nil {
-			t.Errorf("Expected summary")
-		}
-		if err != nil {
-			t.Errorf("Didn't expect error")
-		}
-	}
-
-	assertKeys := func(t *testing.T, ekeys []interface{}, s *conn.Stream) {
-		t.Helper()
-		if s == nil {
-			t.Fatal("No stream")
-		}
-		for i, k := range s.Keys {
-			if k != ekeys[i] {
-				t.Errorf("Stream keys differ")
-			}
-		}
-	}
-
 	// Test streams
+	// Faked returns from a server
 	keys := []interface{}{"f1", "f2"}
-	// Happy path non transactional stream
-	strm1 := []testStruct{
-		makeTestRunResp(keys),
-		makeTestRec([]interface{}{"1v1", "1v2"}),
-		makeTestRec([]interface{}{"2v1", "2v2"}),
-		makeTestRec([]interface{}{"3v1", "3v2"}),
-		makeTestSum("bm"),
-	}
-	// Happy path transactional stream
-	strm2 := []testStruct{
-		makeTestRunResp(keys),
-		makeTestRec([]interface{}{"1v1", "1v2"}),
-		makeTestRec([]interface{}{"2v1", "2v2"}),
-		makeTestRec([]interface{}{"3v1", "3v2"}),
-		makeTestSum("bm"),
+	recsStrm := []packstream.Struct{
+		packstream.Struct{
+			Tag: msgV3Success,
+			Fields: []interface{}{
+				map[string]interface{}{
+					"fields":  keys,
+					"t_first": int64(1),
+				},
+			},
+		},
+		packstream.Struct{
+			Tag:    msgV3Record,
+			Fields: []interface{}{[]interface{}{"1v1", "1v2"}},
+		},
+		packstream.Struct{
+			Tag:    msgV3Record,
+			Fields: []interface{}{[]interface{}{"2v1", "2v2"}},
+		},
+		packstream.Struct{
+			Tag:    msgV3Record,
+			Fields: []interface{}{[]interface{}{"3v1", "3v2"}},
+		},
+		packstream.Struct{
+			Tag:    msgV3Success,
+			Fields: []interface{}{map[string]interface{}{"bookmark": "bm", "type": "r"}},
+		},
 	}
 
 	auth := map[string]interface{}{
@@ -106,96 +81,140 @@ func TestBolt3(ot *testing.T) {
 		"credentials": "pass",
 	}
 
-	ot.Run("Run auto-commit, happy path", func(t *testing.T) {
+	assertBoltState := func(t *testing.T, expected int, bolt *bolt3) {
+		if expected != bolt.state {
+			t.Errorf("Bolt is in unexpected state %d vs %d", expected, bolt.state)
+		}
+	}
+
+	assertBoltDead := func(t *testing.T, bolt *bolt3) {
+		if bolt.IsAlive() {
+			t.Error("Bolt is alive when it should be dead")
+		}
+	}
+
+	connectToServer := func(t *testing.T, serverJob func(srv *bolt3server)) (*bolt3, func()) {
 		// Connect client+server
-		boltConn, srv, cleanup := setupBoltPipe(t)
-		defer cleanup()
-		go func() {
-			srv.accept(3)
-			srv.waitAndServeAutoCommit(strm1)
-		}()
-		bolt, err := Connect("name", boltConn, auth)
+		tcpConn, srv, cleanup := setupBolt3Pipe(t)
+		go serverJob(srv)
+
+		c, err := Connect("name", tcpConn, auth)
 		if err != nil {
 			t.Fatal(err)
 		}
-		defer bolt.Close()
+
+		bolt := c.(*bolt3)
+		assertBoltState(t, bolt3_ready, bolt)
+		return bolt, cleanup
+	}
+
+	ot.Run("Run auto-commit", func(t *testing.T) {
+		bolt, cleanup := connectToServer(t, func(srv *bolt3server) {
+			srv.accept(3)
+			srv.serveRun(recsStrm)
+		})
+		defer cleanup()
 
 		str, _ := bolt.Run("MATCH (n) RETURN n", nil, conn.ReadMode, nil, 0, nil)
 		assertKeys(t, keys, str)
+		assertBoltState(t, bolt3_streaming, bolt)
 
 		// Retrieve the records
-		for i := 1; i < len(strm1)-1; i++ {
+		for i := 1; i < len(recsStrm)-1; i++ {
 			rec, sum, err := bolt.Next(str.Handle)
 			assertOnlyRecord(t, rec, sum, err)
 		}
 		// Retrieve the summary
 		rec, sum, err := bolt.Next(str.Handle)
 		assertOnlySummary(t, rec, sum, err)
+		assertBoltState(t, bolt3_ready, bolt)
 	})
 
-	ot.Run("Run transactional, happy path", func(t *testing.T) {
-		// Connect client+server
-		nconn, srv, cleanup := setupBoltPipe(t)
-		defer cleanup()
-		go func() {
+	ot.Run("Run transactional commit", func(t *testing.T) {
+		bolt, cleanup := connectToServer(t, func(srv *bolt3server) {
 			srv.accept(3)
-			srv.waitAndServeTransRun(strm2, true)
-		}()
-		bolt, _ := Connect("name", nconn, auth)
-		defer bolt.Close()
+			srv.serveRunTx(recsStrm, true)
+		})
+		defer cleanup()
 
 		tx, err := bolt.TxBegin(conn.ReadMode, nil, 0, nil)
-		if err != nil {
-			t.Fatal(err)
-		}
+		assertNoError(t, err)
+		assertBoltState(t, bolt3_pendingtx, bolt)
 		str, err := bolt.RunTx(tx, "MATCH (n) RETURN n", nil)
-		if err != nil {
-			t.Fatal(err)
-		}
+		assertBoltState(t, bolt3_streamingtx, bolt)
+		assertNoError(t, err)
 		assertKeys(t, keys, str)
 
 		// Retrieve the records
-		for i := 1; i < len(strm2)-1; i++ {
+		for i := 1; i < len(recsStrm)-1; i++ {
 			rec, sum, err := bolt.Next(str.Handle)
 			assertOnlyRecord(t, rec, sum, err)
 		}
 		// Retrieve the summary
 		rec, sum, err := bolt.Next(str.Handle)
 		assertOnlySummary(t, rec, sum, err)
+		assertBoltState(t, bolt3_tx, bolt)
 
 		bolt.TxCommit(tx)
+		assertBoltState(t, bolt3_ready, bolt)
 	})
 
-	ot.Run("Run transactional, rollback", func(t *testing.T) {
-		// Connect client+server
-		nconn, srv, cleanup := setupBoltPipe(t)
-		defer cleanup()
-		go func() {
+	ot.Run("Run transactional rollback", func(t *testing.T) {
+		bolt, cleanup := connectToServer(t, func(srv *bolt3server) {
 			srv.accept(3)
-			srv.waitAndServeTransRun(strm2, false)
-		}()
-		bolt, _ := Connect("name", nconn, auth)
-		defer bolt.Close()
+			srv.serveRunTx(recsStrm, false)
+		})
+		defer cleanup()
 
 		tx, err := bolt.TxBegin(conn.ReadMode, nil, 0, nil)
-		if err != nil {
-			t.Fatal(err)
-		}
+		assertNoError(t, err)
+		assertBoltState(t, bolt3_pendingtx, bolt)
 		str, err := bolt.RunTx(tx, "MATCH (n) RETURN n", nil)
-		if err != nil {
-			t.Fatal(err)
-		}
+		assertNoError(t, err)
+		assertBoltState(t, bolt3_streamingtx, bolt)
 		assertKeys(t, keys, str)
 
 		// Retrieve the records
-		for i := 1; i < len(strm2)-1; i++ {
+		for i := 1; i < len(recsStrm)-1; i++ {
 			rec, sum, err := bolt.Next(str.Handle)
 			assertOnlyRecord(t, rec, sum, err)
 		}
 		// Retrieve the summary
 		rec, sum, err := bolt.Next(str.Handle)
 		assertOnlySummary(t, rec, sum, err)
+		assertBoltState(t, bolt3_tx, bolt)
 
 		bolt.TxRollback(tx)
+		assertBoltState(t, bolt3_ready, bolt)
+	})
+
+	ot.Run("Server close while streaming", func(t *testing.T) {
+		bolt, cleanup := connectToServer(t, func(srv *bolt3server) {
+			srv.accept(3)
+			srv.waitForRun()
+			srv.waitForPullAll()
+			// Send response to run and first record as response to pull
+			srv.send(msgV3Success, map[string]interface{}{
+				"fields":  keys,
+				"t_first": int64(1),
+			})
+			srv.send(msgV3Record, []interface{}{"1v1", "1v2"})
+			// Pretty nice towards bolt, a full message is written
+			srv.closeConnection()
+		})
+		defer cleanup()
+
+		str, err := bolt.Run("MATCH (n) RETURN n", nil, conn.ReadMode, nil, 0, nil)
+		assertNoError(t, err)
+		assertBoltState(t, bolt3_streaming, bolt)
+
+		// Retrieve the first record
+		rec, sum, err := bolt.Next(str.Handle)
+		assertOnlyRecord(t, rec, sum, err)
+
+		// Next one should fail due to connection closed
+		rec, sum, err = bolt.Next(str.Handle)
+		assertOnlyError(t, rec, sum, err)
+		assertBoltDead(t, bolt)
 	})
 }

@@ -64,7 +64,7 @@ func (d *dechunker) endMessage() error {
 }
 
 func (d *dechunker) Read(p []byte) (n int, err error) {
-	// Adjustment of how much reding that is done will make sure that we
+	// Adjustment of how much reading that is done will make sure that we
 	// hit the zero.
 	// Try to continue in the next chunk, if it is the zero chunk we should
 	// return an end of file like error since reader is trying to read beyond the message

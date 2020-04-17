@@ -91,18 +91,12 @@ func TestChunker(ot *testing.T) {
 	receiveAndAssertMessage := func(t *testing.T, dec *dechunker, expected []byte) {
 		t.Helper()
 		err := dec.beginMessage()
-		if err != nil {
-			t.Fatal(err)
-		}
+		assertNoError(t, err)
 		msg := make([]byte, len(expected))
 		_, err = io.ReadFull(dec, msg)
-		if err != nil {
-			t.Fatal(err)
-		}
+		assertNoError(t, err)
 		err = dec.endMessage()
-		if err != nil {
-			t.Fatal(err)
-		}
+		assertNoError(t, err)
 		assertSlices(t, msg, expected)
 	}
 
@@ -113,31 +107,13 @@ func TestChunker(ot *testing.T) {
 		chunked := []byte{}
 		chunked = writeSmall(chunker, chunked)
 		err := chunker.send()
-		if err != nil {
-			t.Fatal(err)
-		}
+		assertNoError(t, err)
 		assertBuf(t, cbuf, chunked)
 
 		// Dechunk
 		dbuf := bytes.NewBuffer(chunked)
 		dechunker := newDechunker(dbuf)
 		receiveAndAssertMessage(t, dechunker, msgS)
-		/*
-			err = dechunker.beginMessage()
-			if err != nil {
-				t.Fatal(err)
-			}
-			msg := make([]byte, len(msgS))
-			_, err = io.ReadFull(dechunker, msg)
-			if err != nil {
-				t.Fatal(err)
-			}
-			err = dechunker.endMessage()
-			if err != nil {
-				t.Fatal(err)
-			}
-			assertSlices(t, msg, msgS)
-		*/
 	})
 
 	ot.Run("Two small messages", func(t *testing.T) {
@@ -147,9 +123,7 @@ func TestChunker(ot *testing.T) {
 		chunked = writeSmall(chunker, chunked)
 		chunked = writeSmall(chunker, chunked)
 		err := chunker.send()
-		if err != nil {
-			t.Fatal(err)
-		}
+		assertNoError(t, err)
 		assertBuf(t, cbuf, chunked)
 
 		// Dechunk

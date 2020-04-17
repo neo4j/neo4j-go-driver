@@ -20,49 +20,12 @@
 package bolt
 
 import (
-	"sync"
+	"github.com/neo4j/neo4j-go-driver/neo4j/internal/connection"
 	"testing"
 )
 
-func TestConnectBolt3(t *testing.T) {
-	wg := sync.WaitGroup{}
-	wg.Add(1)
-
-	// TODO: Test version handshake failure, connection should close
-	// TODO: Test authentication failure, connection should close (bolt3 test?)
+func TestConnect(ot *testing.T) {
 	// TODO: Test connect timeout
-
-	conn, srv, cleanup := setupBoltPipe(t)
-	defer cleanup()
-
-	// Simulate server with a succesful connect
-	go func() {
-		// Wait for initial handshake
-		handshake := srv.waitForHandshake()
-
-		// There should be a version 3 somewhere
-		foundV3 := false
-		for i := 0; i < 5; i++ {
-			ver := handshake[(i * 4) : (i*4)+4]
-			if ver[3] == 3 {
-				foundV3 = true
-			}
-		}
-		if !foundV3 {
-			t.Fatalf("Didn't find version 3 in handshake: %+v", handshake)
-		}
-
-		// Accept bolt version 3
-		srv.acceptVersion(3)
-
-		// Need unpacker, hydrator and a dechunker now
-		srv.waitForHello()
-
-		// Need packer and a chunker now
-		srv.acceptHello()
-
-		wg.Done()
-	}()
 
 	auth := map[string]interface{}{
 		"scheme":      "basic",
@@ -70,13 +33,96 @@ func TestConnectBolt3(t *testing.T) {
 		"credentials": "pass",
 	}
 
-	// Pass the connection to bolt connect
-	boltconn, err := Connect("name", conn, auth)
-	if err != nil {
-		t.Fatalf("Failed to connect bolt: %s", err)
-	}
+	ot.Run("Bolt3 success", func(t *testing.T) {
+		conn, srv, cleanup := setupBolt3Pipe(t)
+		defer cleanup()
 
-	boltconn.Close()
+		// Simulate server with a succesful connect
+		go func() {
+			handshake := srv.waitForHandshake()
+			// There should be a version 3 somewhere
+			foundV3 := false
+			for i := 0; i < 5; i++ {
+				ver := handshake[(i * 4) : (i*4)+4]
+				if ver[3] == 3 {
+					foundV3 = true
+				}
+			}
+			if !foundV3 {
+				t.Fatalf("Didn't find version 3 in handshake: %+v", handshake)
+			}
 
-	wg.Wait()
+			// Accept bolt version 3
+			srv.acceptVersion(3)
+			srv.waitForHello()
+			srv.acceptHello()
+		}()
+
+		// Pass the connection to bolt connect
+		serverName := "theServerName"
+		boltconn, err := Connect(serverName, conn, auth)
+		assertNoError(t, err)
+
+		// Check some properties on the connection that is related to connecting
+		if boltconn.ServerName() != serverName {
+			t.Error("Wrong servername")
+		}
+		if !boltconn.IsAlive() {
+			t.Error("New connection is dead")
+		}
+
+		boltconn.Close()
+	})
+
+	ot.Run("Bolt3 failed authentication", func(t *testing.T) {
+		conn, srv, cleanup := setupBolt3Pipe(t)
+		defer cleanup()
+
+		// Simulate server with a succesful connect
+		go func() {
+			srv.waitForHandshake()
+			srv.acceptVersion(3)
+			srv.waitForHello()
+			srv.rejectHelloUnauthorized()
+		}()
+
+		boltconn, err := Connect("serverName", conn, auth)
+		// Make sure that we get the right error type
+		_ = err.(*connection.AuthenticationError)
+		if boltconn != nil {
+			t.Error("Shouldn't returned conn")
+		}
+	})
+
+	ot.Run("Server rejects versions", func(t *testing.T) {
+		conn, srv, cleanup := setupBolt3Pipe(t)
+		defer cleanup()
+
+		// Simulate server that rejects whatever version the client supports
+		go func() {
+			srv.waitForHandshake()
+			srv.rejectVersions()
+			srv.closeConnection()
+		}()
+
+		_, err := Connect("servername", conn, auth)
+		assertError(t, err)
+	})
+
+	ot.Run("Server answers with invalid version", func(t *testing.T) {
+		conn, srv, cleanup := setupBolt3Pipe(t)
+		defer cleanup()
+
+		// Simulate server that rejects whatever version the client supports
+		go func() {
+			srv.waitForHandshake()
+			srv.acceptVersion(1)
+		}()
+
+		boltconn, err := Connect("servername", conn, auth)
+		assertError(t, err)
+		if boltconn != nil {
+			t.Error("Shouldn't returned conn")
+		}
+	})
 }
