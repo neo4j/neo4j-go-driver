@@ -24,15 +24,6 @@ import (
 	"strings"
 )
 
-// Server reported authentication error.
-type AuthenticationError struct {
-	Msg string
-}
-
-func (e *AuthenticationError) Error() string {
-	return fmt.Sprintf("Authentication error: %s", e.Msg)
-}
-
 type dbErrCls int
 
 const (
@@ -80,32 +71,30 @@ func (e *DatabaseError) getCls() dbErrCls {
 	return e.cls
 }
 
-func (e *DatabaseError) IsTransientError() bool {
-	// TODO: More condition for this?
+func (e *DatabaseError) IsAuthentication() bool {
+	return e.Code == "Neo.ClientError.Security.Unauthorized"
+}
+
+func (e *DatabaseError) IsTransient() bool {
+	return e.getCls() == dbErrClsTransient
+}
+
+func (e *DatabaseError) IsRetriableTransient() bool {
+	if e.getCls() != dbErrClsTransient {
+		return false
+	}
+	switch e.Code {
+	// Happens when client aborts transaction, should not retry
+	case "Neo.TransientError.Transaction.Terminated", "Neo.TransientError.Transaction.LockClientStopped":
+		return false
+	}
+	return true
+}
+
+func (e *DatabaseError) IsClient() bool {
 	return e.getCls() == dbErrClsClient
 }
 
-func (e *DatabaseError) IsClientError() bool {
-	return e.getCls() == dbErrClsClient
+func (e *DatabaseError) IsRetriable() bool {
+	return e.IsRetriableTransient() // TODO: More
 }
-
-// More specific client error
-func (e *DatabaseError) IsSyntaxError() bool {
-	return false
-}
-
-func (e *DatabaseError) IsArithmeticError() bool {
-	return false
-}
-
-/*
-424     if (strcmp(code_str, "Neo.ClientError.General.ForbiddenOnReadOnlyDatabase")==0) {
-425         BoltRoutingPool_forget_writer(pool, server);
-426     }
-427     else if (strcmp(code_str, "Neo.ClientError.Cluster.NotALeader")==0) {
-428         BoltRoutingPool_forget_writer(pool, server);
-429     }
-430     else if (strcmp(code_str, "Neo.TransientError.General.DatabaseUnavailable")==0) {
-431         BoltRoutingPool_forget_server(pool, server);
-432     }
-*/

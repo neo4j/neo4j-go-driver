@@ -59,7 +59,7 @@ const (
 )
 
 func log(msg string) {
-	fmt.Printf("bolt3: %s\n", msg)
+	//fmt.Printf("bolt3: %s\n", msg)
 }
 
 type internalTx struct {
@@ -227,14 +227,6 @@ func (b *bolt3) connect(auth map[string]interface{}) error {
 
 	succRes, err := b.receiveSuccessResponse()
 	if err != nil {
-		dbError, isDbError := err.(*conn.DatabaseError)
-		if isDbError {
-			// Refine the error
-			switch dbError.Code {
-			case "Neo.ClientError.Security.Unauthorized":
-				return &conn.AuthenticationError{Msg: dbError.Msg}
-			}
-		}
 		return err
 	}
 	helloRes := succRes.hello()

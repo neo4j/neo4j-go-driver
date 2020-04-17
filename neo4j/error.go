@@ -152,8 +152,11 @@ func isRetriableError(err error) bool {
 // IsAuthenticationError is a utility method to check if the provided error is related with any
 // authentication issues.
 func IsAuthenticationError(err error) bool {
-	_, is := err.(*conn.AuthenticationError)
-	return is
+	dbErr, is := err.(*conn.DatabaseError)
+	if !is {
+		return false
+	}
+	return dbErr.IsAuthentication()
 }
 
 // IsClientError is a utility method to check if the provided error is related with the client
@@ -163,16 +166,20 @@ func IsClientError(err error) bool {
 	if !is {
 		return false
 	}
-	return dbErr.IsClientError()
+	return dbErr.IsClient()
 }
 
-/*
 // IsTransientError is a utility method to check if the provided error is related with a temporary
 // failure that may be worked around by retrying.
 func IsTransientError(err error) bool {
-	return gobolt.IsTransientError(err)
+	dbErr, is := err.(*conn.DatabaseError)
+	if !is {
+		return false
+	}
+	return dbErr.IsRetriableTransient()
 }
 
+/*
 // IsSessionExpired is a utility method to check if the session no longer satisfy the criteria
 // under which it was acquired, e.g. a server no longer accepts write requests.
 func IsSessionExpired(err error) bool {
