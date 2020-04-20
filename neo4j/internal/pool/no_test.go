@@ -22,7 +22,7 @@ package pool
 import (
 	"time"
 
-	conn "github.com/neo4j/neo4j-go-driver/neo4j/internal/connection"
+	"github.com/neo4j/neo4j-go-driver/neo4j/internal/db"
 )
 
 type fakeConn struct {
@@ -30,29 +30,29 @@ type fakeConn struct {
 	isAlive    bool
 }
 
-func (c *fakeConn) TxBegin(mode conn.AccessMode, bookmarks []string, timeout time.Duration, meta map[string]interface{}) (conn.Handle, error) {
+func (c *fakeConn) TxBegin(mode db.AccessMode, bookmarks []string, timeout time.Duration, meta map[string]interface{}) (db.Handle, error) {
 	return nil, nil
 }
 
-func (c *fakeConn) TxRollback(tx conn.Handle) error {
+func (c *fakeConn) TxRollback(tx db.Handle) error {
 	return nil
 }
 
-func (c *fakeConn) TxCommit(tx conn.Handle) error {
+func (c *fakeConn) TxCommit(tx db.Handle) error {
 	return nil
 }
 
 func (c *fakeConn) Run(
-	cypher string, params map[string]interface{}, mode conn.AccessMode, bookmarks []string, timeout time.Duration, meta map[string]interface{}) (*conn.Stream, error) {
+	cypher string, params map[string]interface{}, mode db.AccessMode, bookmarks []string, timeout time.Duration, meta map[string]interface{}) (*db.Stream, error) {
 
 	return nil, nil
 }
 
-func (c *fakeConn) RunTx(tx conn.Handle, cypher string, params map[string]interface{}) (*conn.Stream, error) {
+func (c *fakeConn) RunTx(tx db.Handle, cypher string, params map[string]interface{}) (*db.Stream, error) {
 	return nil, nil
 }
 
-func (c *fakeConn) Next(s conn.Handle) (*conn.Record, *conn.Summary, error) {
+func (c *fakeConn) Next(s db.Handle) (*db.Record, *db.Summary, error) {
 	return nil, nil, nil
 }
 

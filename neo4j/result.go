@@ -21,7 +21,7 @@ package neo4j
 
 import (
 	"container/list"
-	conn "github.com/neo4j/neo4j-go-driver/neo4j/internal/connection"
+	"github.com/neo4j/neo4j-go-driver/neo4j/internal/db"
 )
 
 type Result interface {
@@ -41,22 +41,22 @@ type Result interface {
 }
 
 type iterator interface {
-	Next(s conn.Handle) (*conn.Record, *conn.Summary, error)
+	Next(s db.Handle) (*db.Record, *db.Summary, error)
 }
 
 type result struct {
 	err         error
 	iter        iterator
-	stream      *conn.Stream
+	stream      *db.Stream
 	cypher      string
 	params      map[string]interface{}
 	allReceived bool
 	unconsumed  list.List
-	record      *conn.Record
-	summary     *conn.Summary
+	record      *db.Record
+	summary     *db.Summary
 }
 
-func newResult(iter iterator, str *conn.Stream, cypher string, params map[string]interface{}) *result {
+func newResult(iter iterator, str *db.Stream, cypher string, params map[string]interface{}) *result {
 	return &result{
 		iter:   iter,
 		stream: str,
@@ -66,9 +66,9 @@ func newResult(iter iterator, str *conn.Stream, cypher string, params map[string
 }
 
 // Receive another record.
-func (r *result) doFetch() *conn.Record {
-	var rec *conn.Record
-	var sum *conn.Summary
+func (r *result) doFetch() *db.Record {
+	var rec *db.Record
+	var sum *db.Summary
 	rec, sum, r.err = r.iter.Next(r.stream.Handle)
 	r.allReceived = r.err != nil || rec == nil
 	r.summary = sum
@@ -91,7 +91,7 @@ func (r *result) Next() bool {
 
 	// Remove the record from list of unconsumed and return it
 	r.unconsumed.Remove(e)
-	r.record = e.Value.(*conn.Record)
+	r.record = e.Value.(*db.Record)
 	return true
 }
 

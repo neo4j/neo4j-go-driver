@@ -20,7 +20,7 @@
 package neo4j
 
 import (
-	conn "github.com/neo4j/neo4j-go-driver/neo4j/internal/connection"
+	"github.com/neo4j/neo4j-go-driver/neo4j/internal/db"
 )
 
 type Record interface {
@@ -35,10 +35,10 @@ type Record interface {
 }
 
 type record struct {
-	rec *conn.Record
+	rec *db.Record
 }
 
-func newRecord(rec *conn.Record) *record {
+func newRecord(rec *db.Record) *record {
 	// Wrap internal types in interface implementation for backwards compatibility
 	for i, v := range rec.Values {
 		rec.Values[i] = patchOutX(v)

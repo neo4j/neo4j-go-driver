@@ -20,7 +20,7 @@
 package neo4j
 
 import (
-	conn "github.com/neo4j/neo4j-go-driver/neo4j/internal/connection"
+	"github.com/neo4j/neo4j-go-driver/neo4j/internal/db"
 	"time"
 )
 
@@ -106,7 +106,7 @@ type ServerInfo interface {
 }
 
 type resultSummary struct {
-	sum    *conn.Summary
+	sum    *db.Summary
 	cypher string
 	params map[string]interface{}
 }
@@ -155,47 +155,47 @@ func (s *resultSummary) getCounter(n string) int {
 }
 
 func (s *resultSummary) NodesCreated() int {
-	return s.getCounter(conn.NodesCreated)
+	return s.getCounter(db.NodesCreated)
 }
 
 func (s *resultSummary) NodesDeleted() int {
-	return s.getCounter(conn.NodesDeleted)
+	return s.getCounter(db.NodesDeleted)
 }
 
 func (s *resultSummary) RelationshipsCreated() int {
-	return s.getCounter(conn.RelationshipsCreated)
+	return s.getCounter(db.RelationshipsCreated)
 }
 
 func (s *resultSummary) RelationshipsDeleted() int {
-	return s.getCounter(conn.RelationshipsDeleted)
+	return s.getCounter(db.RelationshipsDeleted)
 }
 
 func (s *resultSummary) PropertiesSet() int {
-	return s.getCounter(conn.PropertiesSet)
+	return s.getCounter(db.PropertiesSet)
 }
 
 func (s *resultSummary) LabelsAdded() int {
-	return s.getCounter(conn.LabelsAdded)
+	return s.getCounter(db.LabelsAdded)
 }
 
 func (s *resultSummary) LabelsRemoved() int {
-	return s.getCounter(conn.LabelsRemoved)
+	return s.getCounter(db.LabelsRemoved)
 }
 
 func (s *resultSummary) IndexesAdded() int {
-	return s.getCounter(conn.IndexesAdded)
+	return s.getCounter(db.IndexesAdded)
 }
 
 func (s *resultSummary) IndexesRemoved() int {
-	return s.getCounter(conn.IndexesRemoved)
+	return s.getCounter(db.IndexesRemoved)
 }
 
 func (s *resultSummary) ConstraintsAdded() int {
-	return s.getCounter(conn.ConstraintsAdded)
+	return s.getCounter(db.ConstraintsAdded)
 }
 
 func (s *resultSummary) ConstraintsRemoved() int {
-	return s.getCounter(conn.ConstraintsRemoved)
+	return s.getCounter(db.ConstraintsRemoved)
 }
 
 func (s *resultSummary) ResultAvailableAfter() time.Duration {

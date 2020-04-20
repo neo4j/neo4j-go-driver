@@ -23,7 +23,7 @@ import (
 	"reflect"
 	"testing"
 
-	conn "github.com/neo4j/neo4j-go-driver/neo4j/internal/connection"
+	"github.com/neo4j/neo4j-go-driver/neo4j/internal/db"
 )
 
 func TestSuccessResponseExtraction(ot *testing.T) {
@@ -68,7 +68,7 @@ func TestSuccessResponseExtraction(ot *testing.T) {
 				"t_last":   int64(3),
 				"bookmark": "bookm",
 			},
-			expected: &conn.Summary{Bookmark: "bookm", TLast: 3, StmntType: conn.StatementTypeWrite},
+			expected: &db.Summary{Bookmark: "bookm", TLast: 3, StmntType: db.StatementTypeWrite},
 			extract:  func(r *successResponse) interface{} { return r.summary() },
 		},
 	}

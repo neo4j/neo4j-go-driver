@@ -20,8 +20,9 @@
 package bolt
 
 import (
-	"github.com/neo4j/neo4j-go-driver/neo4j/internal/connection"
 	"testing"
+
+	"github.com/neo4j/neo4j-go-driver/neo4j/internal/db"
 )
 
 func TestConnect(ot *testing.T) {
@@ -88,7 +89,7 @@ func TestConnect(ot *testing.T) {
 
 		boltconn, err := Connect("serverName", conn, auth)
 		// Make sure that we get the right error type
-		dbErr := err.(*connection.DatabaseError)
+		dbErr := err.(*db.DatabaseError)
 		if !dbErr.IsAuthentication() {
 			t.Errorf("Should be authentication error: %s", dbErr)
 		}

@@ -22,7 +22,7 @@ package bolt
 import (
 	"testing"
 
-	conn "github.com/neo4j/neo4j-go-driver/neo4j/internal/connection"
+	"github.com/neo4j/neo4j-go-driver/neo4j/internal/db"
 	"github.com/neo4j/neo4j-go-driver/neo4j/internal/packstream"
 )
 
@@ -115,7 +115,7 @@ func TestBolt3(ot *testing.T) {
 		})
 		defer cleanup()
 
-		str, _ := bolt.Run("MATCH (n) RETURN n", nil, conn.ReadMode, nil, 0, nil)
+		str, _ := bolt.Run("MATCH (n) RETURN n", nil, db.ReadMode, nil, 0, nil)
 		assertKeys(t, keys, str)
 		assertBoltState(t, bolt3_streaming, bolt)
 
@@ -137,7 +137,7 @@ func TestBolt3(ot *testing.T) {
 		})
 		defer cleanup()
 
-		tx, err := bolt.TxBegin(conn.ReadMode, nil, 0, nil)
+		tx, err := bolt.TxBegin(db.ReadMode, nil, 0, nil)
 		assertNoError(t, err)
 		assertBoltState(t, bolt3_pendingtx, bolt)
 		str, err := bolt.RunTx(tx, "MATCH (n) RETURN n", nil)
@@ -166,7 +166,7 @@ func TestBolt3(ot *testing.T) {
 		})
 		defer cleanup()
 
-		tx, err := bolt.TxBegin(conn.ReadMode, nil, 0, nil)
+		tx, err := bolt.TxBegin(db.ReadMode, nil, 0, nil)
 		assertNoError(t, err)
 		assertBoltState(t, bolt3_pendingtx, bolt)
 		str, err := bolt.RunTx(tx, "MATCH (n) RETURN n", nil)
@@ -204,7 +204,7 @@ func TestBolt3(ot *testing.T) {
 		})
 		defer cleanup()
 
-		str, err := bolt.Run("MATCH (n) RETURN n", nil, conn.ReadMode, nil, 0, nil)
+		str, err := bolt.Run("MATCH (n) RETURN n", nil, db.ReadMode, nil, 0, nil)
 		assertNoError(t, err)
 		assertBoltState(t, bolt3_streaming, bolt)
 

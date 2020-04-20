@@ -20,7 +20,7 @@
 package bolt
 
 import (
-	conn "github.com/neo4j/neo4j-go-driver/neo4j/internal/connection"
+	"github.com/neo4j/neo4j-go-driver/neo4j/internal/db"
 )
 
 // Server ignored request.
@@ -84,7 +84,7 @@ func (s *successResponse) hello() *helloSuccess {
 
 // Extracted from SuccessResponse.meta on end of stream.
 // Maps directly to shared internal summary type to avoid unnecessary conversions.
-func (s *successResponse) summary() *conn.Summary {
+func (s *successResponse) summary() *db.Summary {
 	t_last, _ := s.meta["t_last"].(int64)
 	qtype, tok := s.meta["type"].(string)
 	bookmark, _ := s.meta["bookmark"].(string) // Optional ?
@@ -93,16 +93,16 @@ func (s *successResponse) summary() *conn.Summary {
 	}
 
 	// Map statement type received to internal type
-	stmntType := conn.StatementTypeUnknown
+	stmntType := db.StatementTypeUnknown
 	switch qtype {
 	case "r":
-		stmntType = conn.StatementTypeRead
+		stmntType = db.StatementTypeRead
 	case "w":
-		stmntType = conn.StatementTypeWrite
+		stmntType = db.StatementTypeWrite
 	case "rw":
-		stmntType = conn.StatementTypeReadWrite
+		stmntType = db.StatementTypeReadWrite
 	case "s":
-		stmntType = conn.StatementTypeSchemaWrite
+		stmntType = db.StatementTypeSchemaWrite
 	}
 
 	// Optional statistics
@@ -121,7 +121,7 @@ func (s *successResponse) summary() *conn.Summary {
 
 	// TODO: Query plan
 
-	return &conn.Summary{
+	return &db.Summary{
 		Bookmark:  bookmark,
 		TLast:     t_last,
 		StmntType: stmntType,

@@ -23,7 +23,7 @@ import (
 	"context"
 	"errors"
 
-	conn "github.com/neo4j/neo4j-go-driver/neo4j/internal/connection"
+	"github.com/neo4j/neo4j-go-driver/neo4j/internal/db"
 	"github.com/neo4j/neo4j-go-driver/neo4j/internal/pool"
 )
 
@@ -53,18 +53,18 @@ type Session interface {
 
 type session struct {
 	config      *Config
-	defaultMode conn.AccessMode
+	defaultMode db.AccessMode
 	bookmarks   []string
 	pool        *pool.Pool
 	router      func() []string
-	conn        conn.Connection
+	conn        db.Connection
 	inTx        bool
 	res         *result
 }
 
 func newSession(
 	config *Config, router func() []string, pool *pool.Pool,
-	mode conn.AccessMode, bookmarks []string) *session {
+	mode db.AccessMode, bookmarks []string) *session {
 
 	return &session{
 		config:      config,
@@ -83,7 +83,7 @@ func (s *session) BeginTransaction(configurers ...func(*TransactionConfig)) (Tra
 	return s.beginTransaction(s.defaultMode, &config)
 }
 
-func (s *session) beginTransaction(mode conn.AccessMode, config *TransactionConfig) (Transaction, error) {
+func (s *session) beginTransaction(mode db.AccessMode, config *TransactionConfig) (Transaction, error) {
 	// Guard for more than one transaction per session
 	if s.inTx {
 		return nil, errors.New("Already in tx")
@@ -154,7 +154,7 @@ func (s *session) beginTransaction(mode conn.AccessMode, config *TransactionConf
 }
 
 func (s *session) runRetriable(
-	mode conn.AccessMode,
+	mode db.AccessMode,
 	work TransactionWork, configurers ...func(*TransactionConfig)) (interface{}, error) {
 
 	config := TransactionConfig{Timeout: 0, Metadata: nil}
@@ -188,13 +188,13 @@ func (s *session) runRetriable(
 func (s *session) ReadTransaction(
 	work TransactionWork, configurers ...func(*TransactionConfig)) (interface{}, error) {
 
-	return s.runRetriable(conn.ReadMode, work, configurers...)
+	return s.runRetriable(db.ReadMode, work, configurers...)
 }
 
 func (s *session) WriteTransaction(
 	work TransactionWork, configurers ...func(*TransactionConfig)) (interface{}, error) {
 
-	return s.runRetriable(conn.WriteMode, work, configurers...)
+	return s.runRetriable(db.WriteMode, work, configurers...)
 }
 
 func (s *session) borrowConn() (err error) {
@@ -252,7 +252,7 @@ func (s *session) Run(
 		// To be backwards compatible we delay the error here if it is a database error.
 		// The old implementation just sent all the commands and didn't wait for an answer
 		// until starting to consume or iterate.
-		if _, isDbErr := err.(*conn.DatabaseError); isDbErr {
+		if _, isDbErr := err.(*db.DatabaseError); isDbErr {
 			return &delayedErrorResult{err: err}, nil
 		}
 		return nil, err

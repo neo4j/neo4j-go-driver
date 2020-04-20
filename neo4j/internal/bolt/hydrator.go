@@ -24,7 +24,7 @@ import (
 	"fmt"
 	"time"
 
-	conn "github.com/neo4j/neo4j-go-driver/neo4j/internal/connection"
+	"github.com/neo4j/neo4j-go-driver/neo4j/internal/db"
 	"github.com/neo4j/neo4j-go-driver/neo4j/internal/packstream"
 	"github.com/neo4j/neo4j-go-driver/neo4j/internal/types"
 )
@@ -212,8 +212,9 @@ func hydrateFailure(fields []interface{}) (interface{}, error) {
 	if !cok || !mok {
 		return nil, errors.New("Failure hydrate error")
 	}
-	// Hydrate right into connection server error to avoid remapping
-	return &conn.DatabaseError{Code: code, Msg: msg}, nil
+	// Hydrate right into error defined in db package to avoid remapping at a later
+	// state.
+	return &db.DatabaseError{Code: code, Msg: msg}, nil
 }
 
 func hydratePoint2d(fields []interface{}) (interface{}, error) {

@@ -25,7 +25,7 @@ import (
 	"time"
 
 	"github.com/neo4j/neo4j-go-driver/neo4j"
-	conn "github.com/neo4j/neo4j-go-driver/neo4j/internal/connection"
+	"github.com/neo4j/neo4j-go-driver/neo4j/internal/db"
 	"github.com/neo4j/neo4j-go-driver/neo4j/test-integration/control"
 
 	//. "github.com/neo4j/neo4j-go-driver/neo4j/utils/test"
@@ -522,7 +522,7 @@ var _ = Describe("Session", func() {
 			// Should be a database error of class Transient indicating that the transaction
 			// has been terminated. For some reason this should not be considered transient
 			// by the IsTransientError.
-			dbErr := err.(*conn.DatabaseError)
+			dbErr := err.(*db.DatabaseError)
 			Expect(dbErr.Msg).To(ContainSubstring("terminated"))
 			//Expect(err).To(BeTransientError(nil, ContainSubstring("terminated")))
 		})
@@ -539,7 +539,7 @@ var _ = Describe("Session", func() {
 
 			_, err := session3.WriteTransaction(updateNodeWork("WriteTransactionTxTimeOut", map[string]interface{}{"id": 2}), neo4j.WithTxTimeout(1*time.Second))
 			Expect(err).ToNot(BeNil())
-			dbErr := err.(*conn.DatabaseError)
+			dbErr := err.(*db.DatabaseError)
 			Expect(dbErr.Msg).To(ContainSubstring("terminated"))
 			//Expect(err).To(BeTransientError(nil, ContainSubstring("terminated")))
 		})

@@ -25,7 +25,7 @@ import (
 	"net"
 	"time"
 
-	conn "github.com/neo4j/neo4j-go-driver/neo4j/internal/connection"
+	"github.com/neo4j/neo4j-go-driver/neo4j/internal/db"
 	"github.com/neo4j/neo4j-go-driver/neo4j/internal/packstream"
 )
 
@@ -63,7 +63,7 @@ func log(msg string) {
 }
 
 type internalTx struct {
-	mode      conn.AccessMode
+	mode      db.AccessMode
 	bookmarks []string
 	timeout   time.Duration
 	txMeta    map[string]interface{}
@@ -71,7 +71,7 @@ type internalTx struct {
 
 func (i *internalTx) toMeta() map[string]interface{} {
 	mode := "w"
-	if i.mode == conn.ReadMode {
+	if i.mode == db.ReadMode {
 		mode = "r"
 	}
 	meta := map[string]interface{}{
@@ -156,7 +156,7 @@ func (b *bolt3) invalidStateError(expected []int) error {
 	return errors.New(fmt.Sprintf("Invalid state %d, expected: %+v", b.state, expected))
 }
 
-func (b *bolt3) assertHandle(id int64, h conn.Handle) error {
+func (b *bolt3) assertHandle(id int64, h db.Handle) error {
 	hid, ok := h.(int64)
 	if !ok || hid != id {
 		return errors.New("Invalid handle")
@@ -194,7 +194,7 @@ func (b *bolt3) receiveSuccessResponse() (*successResponse, error) {
 	switch v := res.(type) {
 	case *successResponse:
 		return v, nil
-	case *conn.DatabaseError:
+	case *db.DatabaseError:
 		return nil, v
 	}
 	return nil, errors.New("Unknown response")
@@ -243,7 +243,7 @@ func (b *bolt3) connect(auth map[string]interface{}) error {
 }
 
 func (b *bolt3) TxBegin(
-	mode conn.AccessMode, bookmarks []string, timeout time.Duration, txMeta map[string]interface{}) (conn.Handle, error) {
+	mode db.AccessMode, bookmarks []string, timeout time.Duration, txMeta map[string]interface{}) (db.Handle, error) {
 
 	log("txBegin try")
 
@@ -285,7 +285,7 @@ func (b *bolt3) TxBegin(
 	return b.txId, nil
 }
 
-func (b *bolt3) TxCommit(txh conn.Handle) error {
+func (b *bolt3) TxCommit(txh db.Handle) error {
 	log("txCommit try")
 	err := b.assertHandle(b.txId, txh)
 	if err != nil {
@@ -330,7 +330,7 @@ func (b *bolt3) TxCommit(txh conn.Handle) error {
 	return nil
 }
 
-func (b *bolt3) TxRollback(txh conn.Handle) error {
+func (b *bolt3) TxRollback(txh db.Handle) error {
 	log("txRollback try")
 	err := b.assertHandle(b.txId, txh)
 	if err != nil {
@@ -394,7 +394,7 @@ func (b *bolt3) consumeStream() error {
 	return nil
 }
 
-func (b *bolt3) run(cypher string, params map[string]interface{}, tx *internalTx) (*conn.Stream, error) {
+func (b *bolt3) run(cypher string, params map[string]interface{}, tx *internalTx) (*db.Stream, error) {
 	log(fmt.Sprintf("run try:%s", cypher))
 
 	// If streaming, consume the whole thing. Hard to do discard here since we don't
@@ -473,7 +473,7 @@ func (b *bolt3) run(cypher string, params map[string]interface{}, tx *internalTx
 			b.state = bolt3_streamingtx
 		}
 		b.streamKeys = runRes.fields
-	case *conn.DatabaseError:
+	case *db.DatabaseError:
 		b.state = bolt3_failed
 		return nil, v
 	default:
@@ -482,13 +482,13 @@ func (b *bolt3) run(cypher string, params map[string]interface{}, tx *internalTx
 	}
 
 	b.streamId = time.Now().Unix()
-	stream := &conn.Stream{Keys: b.streamKeys, Handle: b.streamId}
+	stream := &db.Stream{Keys: b.streamKeys, Handle: b.streamId}
 	log(fmt.Sprintf("run ok, streaming: %d", b.state))
 	return stream, nil
 }
 
 func (b *bolt3) Run(
-	cypher string, params map[string]interface{}, mode conn.AccessMode, bookmarks []string, timeout time.Duration, txMeta map[string]interface{}) (*conn.Stream, error) {
+	cypher string, params map[string]interface{}, mode db.AccessMode, bookmarks []string, timeout time.Duration, txMeta map[string]interface{}) (*db.Stream, error) {
 
 	log("Run no tx")
 	if b.state != bolt3_streaming && b.state != bolt3_ready {
@@ -503,7 +503,7 @@ func (b *bolt3) Run(
 	return b.run(cypher, params, &tx)
 }
 
-func (b *bolt3) RunTx(txh conn.Handle, cypher string, params map[string]interface{}) (*conn.Stream, error) {
+func (b *bolt3) RunTx(txh db.Handle, cypher string, params map[string]interface{}) (*db.Stream, error) {
 	log("Run tx")
 
 	err := b.assertHandle(b.txId, txh)
@@ -517,7 +517,7 @@ func (b *bolt3) RunTx(txh conn.Handle, cypher string, params map[string]interfac
 }
 
 // Reads one record from the stream.
-func (b *bolt3) Next(shandle conn.Handle) (*conn.Record, *conn.Summary, error) {
+func (b *bolt3) Next(shandle db.Handle) (*db.Record, *db.Summary, error) {
 	log("next try")
 	if b.state != bolt3_streaming && b.state != bolt3_streamingtx {
 		return nil, nil, b.invalidStateError([]int{bolt3_streaming, bolt3_streamingtx})
@@ -537,7 +537,7 @@ func (b *bolt3) Next(shandle conn.Handle) (*conn.Record, *conn.Summary, error) {
 
 	switch x := res.(type) {
 	case *recordResponse:
-		rec := &conn.Record{Keys: b.streamKeys, Values: x.values}
+		rec := &db.Record{Keys: b.streamKeys, Values: x.values}
 		log("got record")
 		return rec, nil, nil
 	case *successResponse:
@@ -562,7 +562,7 @@ func (b *bolt3) Next(shandle conn.Handle) (*conn.Record, *conn.Summary, error) {
 		sum.ServerName = b.serverName
 		sum.TFirst = b.tfirst
 		return nil, sum, nil
-	case *conn.DatabaseError:
+	case *db.DatabaseError:
 		log(fmt.Sprintf("got failure: %s", x))
 		return nil, nil, x
 	default:
@@ -616,7 +616,7 @@ func (b *bolt3) Reset() {
 		switch x := res.(type) {
 		case *recordResponse, *ignoredResponse:
 			// Just throw away. We should only get record responses while in streaming mode.
-		case *conn.DatabaseError:
+		case *db.DatabaseError:
 			// This could mean that the reset command failed for some reason, could also
 			// mean some other command that failed but as long as we never have unconfirmed
 			// commands out of the handling functions this should mean that the reset failed.

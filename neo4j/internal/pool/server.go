@@ -22,16 +22,16 @@ package pool
 // Not thread safe
 
 import (
-	conn "github.com/neo4j/neo4j-go-driver/neo4j/internal/connection"
+	"github.com/neo4j/neo4j-go-driver/neo4j/internal/db"
 )
 
 // Represents a server with a number of connections.
 type server struct {
-	ready []conn.Connection
+	ready []db.Connection
 	size  int
 }
 
-func (s *server) get() conn.Connection {
+func (s *server) get() db.Connection {
 	l := len(s.ready)
 	if l == 0 {
 		return nil
@@ -42,7 +42,7 @@ func (s *server) get() conn.Connection {
 	return c
 }
 
-func (s *server) ret(c conn.Connection) {
+func (s *server) ret(c db.Connection) {
 	s.ready = append(s.ready, c)
 }
 
@@ -50,10 +50,10 @@ func (s server) num() int {
 	return len(s.ready)
 }
 
-func (s *server) reg(c conn.Connection) {
+func (s *server) reg(c db.Connection) {
 	s.size += 1
 }
 
-func (s *server) unreg(c conn.Connection) {
+func (s *server) unreg(c db.Connection) {
 	s.size -= 1
 }

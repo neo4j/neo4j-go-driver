@@ -25,7 +25,7 @@ import (
 	"net/url"
 	"sync"
 
-	conn "github.com/neo4j/neo4j-go-driver/neo4j/internal/connection"
+	"github.com/neo4j/neo4j-go-driver/neo4j/internal/db"
 	"github.com/neo4j/neo4j-go-driver/neo4j/internal/pool"
 )
 
@@ -121,7 +121,7 @@ func (d *driver) Session(accessMode AccessMode, bookmarks ...string) (Session, e
 	}
 	return newSession(d.config, func() []string {
 		return []string{d.target.Host}
-	}, d.pool, conn.AccessMode(accessMode), bookmarks), nil
+	}, d.pool, db.AccessMode(accessMode), bookmarks), nil
 }
 
 func (d *driver) Close() error {

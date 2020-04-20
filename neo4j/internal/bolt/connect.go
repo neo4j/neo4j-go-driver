@@ -26,14 +26,12 @@ import (
 	"io"
 	"net"
 
-	"github.com/neo4j/neo4j-go-driver/neo4j/internal/connection"
+	"github.com/neo4j/neo4j-go-driver/neo4j/internal/db"
 )
 
 // Negotiate version of bolt protocol.
-// Closes the provided connection if any error is encountered.
-func Connect(serverName string, conn net.Conn, auth map[string]interface{}) (connection.Connection, error) {
-	// TODO: Use deadline read/write
-
+// Returns instance of bolt protocol implmenting low-level abstract db connection interface.
+func Connect(serverName string, conn net.Conn, auth map[string]interface{}) (db.Connection, error) {
 	// Perform Bolt handshake to negotiate version
 	// Send handshake to server
 	handshake := []byte{

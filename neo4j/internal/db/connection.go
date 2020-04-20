@@ -17,7 +17,7 @@
  *  limitations under the License.
  */
 
-package connection
+package db
 
 import (
 	"time"
@@ -80,17 +80,20 @@ type Stream struct {
 	Keys   []string
 }
 
+// Abstract database connection.
 type Connection interface {
 	TxBegin(mode AccessMode, bookmarks []string, timeout time.Duration, meta map[string]interface{}) (Handle, error)
 	TxRollback(tx Handle) error
 	TxCommit(tx Handle) error
 	Run(cypher string, params map[string]interface{}, mode AccessMode, bookmarks []string, timeout time.Duration, meta map[string]interface{}) (*Stream, error)
 	RunTx(tx Handle, cypher string, params map[string]interface{}) (*Stream, error)
+	// Moves to next item in the stream.
 	// If error is nil, either Record or Summary has a value, if Record is nil there are no more records.
 	// If error is non nil, neither Record or Summary has a value.
 	Next(streamHandle Handle) (*Record, *Summary, error)
 	IsAlive() bool
 	ServerName() string
+	// Resets connection to same state as directly after a connect.
 	Reset()
 	Close()
 }

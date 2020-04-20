@@ -28,7 +28,7 @@ import (
 	"time"
 
 	"github.com/neo4j/neo4j-go-driver/neo4j/internal/bolt"
-	conn "github.com/neo4j/neo4j-go-driver/neo4j/internal/connection"
+	"github.com/neo4j/neo4j-go-driver/neo4j/internal/db"
 )
 
 type connector struct {
@@ -125,7 +125,7 @@ func (c *connector) wrapInTls(target string, rawConn net.Conn) (net.Conn, error)
 	return tlsConn, nil
 }
 
-func (c *connector) connect(target string) (conn.Connection, error) {
+func (c *connector) connect(target string) (db.Connection, error) {
 	keepAlive := 0 * time.Second // Implies net default TCP keep-alive value
 	if !c.config.SocketKeepalive {
 		keepAlive = -1 * time.Second // Turns keep-alive off

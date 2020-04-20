@@ -31,12 +31,12 @@ import (
 	"time"
 
 	"github.com/neo4j/neo4j-go-driver/neo4j/internal/bolt"
-	conn "github.com/neo4j/neo4j-go-driver/neo4j/internal/connection"
+	"github.com/neo4j/neo4j-go-driver/neo4j/internal/db"
 	"github.com/neo4j/neo4j-go-driver/neo4j/internal/types"
 	"github.com/neo4j/neo4j-go-driver/neo4j/test-integration/control"
 )
 
-// Tests the specification of the internal/connection API
+// Tests the specification of the internal db connection API
 func TestConnectionConformance(ot *testing.T) {
 	server, err := control.EnsureSingleInstance()
 	if err != nil {
@@ -74,13 +74,13 @@ func TestConnectionConformance(ot *testing.T) {
 	// for a reset. All tests share the same connection.
 	cases := []struct {
 		name string
-		fun  func(*testing.T, conn.Connection)
+		fun  func(*testing.T, db.Connection)
 	}{
 		{
 			// Leaves the connection in perfect state after creating and cosuming all records
 			name: "Run autocommit, full consume",
-			fun: func(t *testing.T, c conn.Connection) {
-				s, err := c.Run("CREATE (n:Rand {val: $r}) RETURN n", map[string]interface{}{"r": randInt()}, conn.WriteMode, nil, 0, nil)
+			fun: func(t *testing.T, c db.Connection) {
+				s, err := c.Run("CREATE (n:Rand {val: $r}) RETURN n", map[string]interface{}{"r": randInt()}, db.WriteMode, nil, 0, nil)
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -98,12 +98,12 @@ func TestConnectionConformance(ot *testing.T) {
 			// Let the connection consume the result before next autocommit (also leaves the
 			// connection in a streaming state)
 			name: "Run autocommit twice, no consume",
-			fun: func(t *testing.T, c conn.Connection) {
-				_, err := c.Run("CREATE (n:Rand {val: $r})", map[string]interface{}{"r": randInt()}, conn.WriteMode, nil, 0, nil)
+			fun: func(t *testing.T, c db.Connection) {
+				_, err := c.Run("CREATE (n:Rand {val: $r})", map[string]interface{}{"r": randInt()}, db.WriteMode, nil, 0, nil)
 				if err != nil {
 					t.Fatal(err)
 				}
-				_, err = c.Run("CREATE (n:Rand {val: $r})", map[string]interface{}{"r": randInt()}, conn.WriteMode, nil, 0, nil)
+				_, err = c.Run("CREATE (n:Rand {val: $r})", map[string]interface{}{"r": randInt()}, db.WriteMode, nil, 0, nil)
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -112,8 +112,8 @@ func TestConnectionConformance(ot *testing.T) {
 		{
 			// Consume everything returned from create before committing
 			name: "Run explicit commit, full consume",
-			fun: func(t *testing.T, c conn.Connection) {
-				txHandle, err := c.TxBegin(conn.WriteMode, []string{}, 10*time.Minute, nil)
+			fun: func(t *testing.T, c db.Connection) {
+				txHandle, err := c.TxBegin(db.WriteMode, []string{}, 10*time.Minute, nil)
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -135,7 +135,7 @@ func TestConnectionConformance(ot *testing.T) {
 					t.Fatal(err)
 				}
 				// Make sure it's commited
-				s, err = c.Run("MATCH (n:Rand {val: $r}) RETURN n", map[string]interface{}{"r": r}, conn.ReadMode, nil, 0, nil)
+				s, err = c.Run("MATCH (n:Rand {val: $r}) RETURN n", map[string]interface{}{"r": r}, db.ReadMode, nil, 0, nil)
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -149,8 +149,8 @@ func TestConnectionConformance(ot *testing.T) {
 		{
 			// Do not consume anything before commiting
 			name: "Run explicit commit, no consume",
-			fun: func(t *testing.T, c conn.Connection) {
-				txHandle, err := c.TxBegin(conn.WriteMode, []string{}, 10*time.Minute, nil)
+			fun: func(t *testing.T, c db.Connection) {
+				txHandle, err := c.TxBegin(db.WriteMode, []string{}, 10*time.Minute, nil)
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -164,7 +164,7 @@ func TestConnectionConformance(ot *testing.T) {
 					t.Fatal(err)
 				}
 				// Make sure it's commited
-				s, err = c.Run("MATCH (n:Rand {val: $r}) RETURN n", map[string]interface{}{"r": r}, conn.ReadMode, nil, 0, nil)
+				s, err = c.Run("MATCH (n:Rand {val: $r}) RETURN n", map[string]interface{}{"r": r}, db.ReadMode, nil, 0, nil)
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -178,8 +178,8 @@ func TestConnectionConformance(ot *testing.T) {
 		{
 			// Consume everything returned from create before rolling back
 			name: "Run explicit rollback, full consume",
-			fun: func(t *testing.T, c conn.Connection) {
-				txHandle, err := c.TxBegin(conn.WriteMode, []string{}, 10*time.Minute, nil)
+			fun: func(t *testing.T, c db.Connection) {
+				txHandle, err := c.TxBegin(db.WriteMode, []string{}, 10*time.Minute, nil)
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -201,7 +201,7 @@ func TestConnectionConformance(ot *testing.T) {
 					t.Fatal(err)
 				}
 				// Make sure it's rolled back
-				s, err = c.Run("MATCH (n:Rand {val: $r}) RETURN n", map[string]interface{}{"r": r}, conn.ReadMode, nil, 0, nil)
+				s, err = c.Run("MATCH (n:Rand {val: $r}) RETURN n", map[string]interface{}{"r": r}, db.ReadMode, nil, 0, nil)
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -214,8 +214,8 @@ func TestConnectionConformance(ot *testing.T) {
 		{
 			// Do not consume anything before rolling back
 			name: "Run explicit rollback, no consume",
-			fun: func(t *testing.T, c conn.Connection) {
-				txHandle, err := c.TxBegin(conn.WriteMode, []string{}, 10*time.Minute, nil)
+			fun: func(t *testing.T, c db.Connection) {
+				txHandle, err := c.TxBegin(db.WriteMode, []string{}, 10*time.Minute, nil)
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -229,7 +229,7 @@ func TestConnectionConformance(ot *testing.T) {
 					t.Fatal(err)
 				}
 				// Make sure it's commited
-				s, err = c.Run("MATCH (n:Rand {val: $r}) RETURN n", map[string]interface{}{"r": r}, conn.ReadMode, nil, 0, nil)
+				s, err = c.Run("MATCH (n:Rand {val: $r}) RETURN n", map[string]interface{}{"r": r}, db.ReadMode, nil, 0, nil)
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -241,7 +241,7 @@ func TestConnectionConformance(ot *testing.T) {
 		},
 		{
 			name: "Next without streaming",
-			fun: func(t *testing.T, c conn.Connection) {
+			fun: func(t *testing.T, c db.Connection) {
 				rec, sum, err := c.Next(3)
 				if rec != nil || err == nil || sum != nil {
 					t.Fatalf("Should only be an error, %+v, %+v, %+v", rec, sum, err)
@@ -250,8 +250,8 @@ func TestConnectionConformance(ot *testing.T) {
 		},
 		{
 			name: "Next passed the summary",
-			fun: func(t *testing.T, c conn.Connection) {
-				s, err := boltConn.Run("RETURN datetime()", nil, conn.ReadMode, nil, 0, nil)
+			fun: func(t *testing.T, c db.Connection) {
+				s, err := boltConn.Run("RETURN datetime()", nil, db.ReadMode, nil, 0, nil)
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -271,13 +271,13 @@ func TestConnectionConformance(ot *testing.T) {
 		},
 		{
 			name: "Run autocommit while in tx",
-			fun: func(t *testing.T, c conn.Connection) {
-				txHandle, err := c.TxBegin(conn.WriteMode, []string{}, 10*time.Minute, nil)
+			fun: func(t *testing.T, c db.Connection) {
+				txHandle, err := c.TxBegin(db.WriteMode, []string{}, 10*time.Minute, nil)
 				if txHandle == nil || err != nil {
 					t.Fatalf("Failed to begin tx: %s", err)
 				}
 				defer c.TxRollback(txHandle)
-				s, err := c.Run("CREATE (n:Rand {val: $r})", map[string]interface{}{"r": randInt()}, conn.WriteMode, nil, 0, nil)
+				s, err := c.Run("CREATE (n:Rand {val: $r})", map[string]interface{}{"r": randInt()}, db.WriteMode, nil, 0, nil)
 				if s != nil || err == nil {
 					t.Fatal("Should fail to run auto commit when in transaction")
 				}
@@ -286,7 +286,7 @@ func TestConnectionConformance(ot *testing.T) {
 		},
 		{
 			name: "Commit while not in tx",
-			fun: func(t *testing.T, c conn.Connection) {
+			fun: func(t *testing.T, c db.Connection) {
 				err := c.TxCommit(1)
 				if err == nil {
 					t.Fatal("Should have failed")
@@ -296,7 +296,7 @@ func TestConnectionConformance(ot *testing.T) {
 		},
 		{
 			name: "Rollback while not in tx",
-			fun: func(t *testing.T, c conn.Connection) {
+			fun: func(t *testing.T, c db.Connection) {
 				err := c.TxRollback(3)
 				if err == nil {
 					t.Fatal("Should have failed")
@@ -333,13 +333,13 @@ func TestConnectionConformance(ot *testing.T) {
 	// necessarily without it. All tests share the same connection.
 	cases = []struct {
 		name string
-		fun  func(*testing.T, conn.Connection)
+		fun  func(*testing.T, db.Connection)
 	}{
 		// Connection is in failed state upon syntax error
 		{
 			name: "Run autocommit with syntax error",
-			fun: func(t *testing.T, c conn.Connection) {
-				s, err := c.Run("MATCH (n:Rand {val: $r} ", map[string]interface{}{"r": randInt()}, conn.ReadMode, nil, 0, nil)
+			fun: func(t *testing.T, c db.Connection) {
+				s, err := c.Run("MATCH (n:Rand {val: $r} ", map[string]interface{}{"r": randInt()}, db.ReadMode, nil, 0, nil)
 				if err == nil || s != nil {
 					t.Fatal("Should have received error")
 				}
@@ -355,7 +355,7 @@ func TestConnectionConformance(ot *testing.T) {
 			}
 			boltConn.Reset()
 			// Should be working now
-			s, err := boltConn.Run("RETURN datetime()", nil, conn.ReadMode, nil, 0, nil)
+			s, err := boltConn.Run("RETURN datetime()", nil, db.ReadMode, nil, 0, nil)
 			if err != nil {
 				t.Error("Reset didn't help")
 			}
@@ -379,7 +379,7 @@ func TestConnectionConformance(ot *testing.T) {
 			bigBuilder.WriteString("0123456789")
 		}
 
-		stream, err := boltConn.Run(query, map[string]interface{}{"x": bigBuilder.String()}, conn.ReadMode, nil, 0, nil)
+		stream, err := boltConn.Run(query, map[string]interface{}{"x": bigBuilder.String()}, db.ReadMode, nil, 0, nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -461,7 +461,7 @@ func TestConnectionConformance(ot *testing.T) {
 		tt.Run("Reading", func(t *testing.T) {
 			query := "RETURN " +
 				cTime + ", " + cDate + ", " + cDateTimeO + ", " + cDateTimeZ + ", " + cLocalTime + ", " + cLocalDateTime + ", " + cDuration
-			stream, err := boltConn.Run(query, nil, conn.ReadMode, nil, 0, nil)
+			stream, err := boltConn.Run(query, nil, db.ReadMode, nil, 0, nil)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -517,7 +517,7 @@ func TestConnectionConformance(ot *testing.T) {
 					"dateTimeZ":     tDateTimeZ,
 					"localTime":     types.LocalTime(tLocalTime),
 					"localDateTime": types.LocalDateTime(tLocalDateTime),
-				}, conn.WriteMode, nil, 0, nil)
+				}, db.WriteMode, nil, 0, nil)
 			rec, sum, err := boltConn.Next(stream.Handle)
 			if rec == nil || err != nil || sum != nil {
 				t.Fatalf("Should be a record, %+v, %+v, %+v", rec, sum, err)

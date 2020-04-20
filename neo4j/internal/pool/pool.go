@@ -28,15 +28,15 @@ import (
 	"fmt"
 	"sync"
 
-	conn "github.com/neo4j/neo4j-go-driver/neo4j/internal/connection"
+	"github.com/neo4j/neo4j-go-driver/neo4j/internal/db"
 )
 
-type Connect func(string) (conn.Connection, error)
+type Connect func(string) (db.Connection, error)
 
 type qitem struct {
 	servers []string
 	wakeup  chan bool
-	conn    conn.Connection
+	conn    db.Connection
 }
 
 type Pool struct {
@@ -80,7 +80,7 @@ func (p *Pool) Close() {
 }
 
 // Tries to find an unused connection on one of the servers we're already connected to.
-func (p *Pool) tryExistingConnectionToKnownServer(serverNames []string) conn.Connection {
+func (p *Pool) tryExistingConnectionToKnownServer(serverNames []string) db.Connection {
 	p.serversMut.Lock()
 	defer p.serversMut.Unlock()
 
@@ -118,13 +118,13 @@ func (p *Pool) tryExistingConnectionToKnownServer(serverNames []string) conn.Con
 	return nil
 }
 
-func (p *Pool) tryNewConnectionToKnownServer(serverNames []string, checkTimeout func() bool) (conn.Connection, error) {
+func (p *Pool) tryNewConnectionToKnownServer(serverNames []string, checkTimeout func() bool) (db.Connection, error) {
 	p.serversMut.Lock()
 	defer p.serversMut.Unlock()
 
 	var (
 		err error
-		c   conn.Connection
+		c   db.Connection
 	)
 
 	for _, s := range serverNames {
@@ -153,13 +153,13 @@ func (p *Pool) tryNewConnectionToKnownServer(serverNames []string, checkTimeout 
 	return nil, err
 }
 
-func (p *Pool) tryNewServer(serverNames []string, checkTimeout func() bool) (conn.Connection, error) {
+func (p *Pool) tryNewServer(serverNames []string, checkTimeout func() bool) (db.Connection, error) {
 	p.serversMut.Lock()
 	defer p.serversMut.Unlock()
 
 	var (
 		err error
-		c   conn.Connection
+		c   db.Connection
 	)
 
 	for _, s := range serverNames {
@@ -223,7 +223,7 @@ func (p *Pool) getServers() map[string]server {
 	return servers
 }
 
-func (p *Pool) Borrow(ctx context.Context, servers []string) (conn.Connection, error) {
+func (p *Pool) Borrow(ctx context.Context, servers []string) (db.Connection, error) {
 	timedOut := false
 	timeOut := func() bool {
 		select {
@@ -238,7 +238,7 @@ func (p *Pool) Borrow(ctx context.Context, servers []string) (conn.Connection, e
 
 	log(fmt.Sprintf("Borrow %s", servers))
 	var err error
-	var c conn.Connection
+	var c db.Connection
 
 	// Try to use an existing connection to a known server, that is cheapest.
 	// This will also prune dead connections and empty servers (servers with no connections) among
@@ -321,7 +321,7 @@ func (p *Pool) Borrow(ctx context.Context, servers []string) (conn.Connection, e
 	}
 }
 
-func (p *Pool) unreg(serverName string, c conn.Connection) {
+func (p *Pool) unreg(serverName string, c db.Connection) {
 	p.serversMut.Lock()
 	defer p.serversMut.Unlock()
 
@@ -340,7 +340,7 @@ func (p *Pool) unreg(serverName string, c conn.Connection) {
 	}()
 }
 
-func (p *Pool) Return(c conn.Connection) {
+func (p *Pool) Return(c db.Connection) {
 	// Prepare connection for being used by someone else
 	c.Reset()
 	// Get the name of the server that the connection belongs to.

@@ -22,14 +22,14 @@ package neo4j
 import (
 	"errors"
 	"fmt"
-	conn "github.com/neo4j/neo4j-go-driver/neo4j/internal/connection"
+	"github.com/neo4j/neo4j-go-driver/neo4j/internal/db"
 	"testing"
 )
 
 type iter struct {
 	expectNext   bool
-	expectRec    *conn.Record
-	expectSum    *conn.Summary
+	expectRec    *db.Record
+	expectSum    *db.Summary
 	expectSumErr error
 	expectErr    error
 	//fetchAll     bool
@@ -39,8 +39,8 @@ type iter struct {
 }
 
 type fetchRet struct {
-	rec *conn.Record
-	sum *conn.Summary
+	rec *db.Record
+	sum *db.Summary
 	err error
 }
 
@@ -49,7 +49,7 @@ type testFetcher struct {
 	panicOnFetch bool
 }
 
-func (f *testFetcher) Next(s conn.Handle) (*conn.Record, *conn.Summary, error) {
+func (f *testFetcher) Next(s db.Handle) (*db.Record, *db.Summary, error) {
 	if len(f.rets) == 0 || f.panicOnFetch {
 		// If signalling is made correctly in test case this shouldn't happen and if it does
 		// it is an error in test setup.
@@ -61,18 +61,18 @@ func (f *testFetcher) Next(s conn.Handle) (*conn.Record, *conn.Summary, error) {
 }
 
 func TestResult(ot *testing.T) {
-	stream := &conn.Stream{
+	stream := &db.Stream{
 		Keys: []string{"key1", "key2"},
 	}
 	cypher := ""
 	params := map[string]interface{}{}
-	recs := []*conn.Record{
-		&conn.Record{},
-		&conn.Record{},
-		&conn.Record{},
+	recs := []*db.Record{
+		&db.Record{},
+		&db.Record{},
+		&db.Record{},
 	}
-	sums := []*conn.Summary{
-		&conn.Summary{},
+	sums := []*db.Summary{
+		&db.Summary{},
 	}
 	errs := []error{
 		errors.New("Whatever"),
@@ -100,7 +100,7 @@ func TestResult(ot *testing.T) {
 		name   string
 		stream []fetchRet
 		iters  []iter
-		sum    conn.Summary
+		sum    db.Summary
 	}{
 		{
 			name: "happy",

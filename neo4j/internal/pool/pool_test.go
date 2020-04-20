@@ -27,16 +27,16 @@ import (
 	"testing"
 	"time"
 
-	conn "github.com/neo4j/neo4j-go-driver/neo4j/internal/connection"
+	"github.com/neo4j/neo4j-go-driver/neo4j/internal/db"
 )
 
 // Scenarios for Borrow and Return
 func TestPoolBorrowReturn(ot *testing.T) {
-	succeedingConnect := func(s string) (conn.Connection, error) {
+	succeedingConnect := func(s string) (db.Connection, error) {
 		return &fakeConn{serverName: s, isAlive: true}, nil
 	}
 
-	failingConnect := func(s string) (conn.Connection, error) {
+	failingConnect := func(s string) (db.Connection, error) {
 		return nil, errors.New("whatever")
 	}
 
@@ -167,7 +167,7 @@ func TestPoolBorrowReturn(ot *testing.T) {
 
 // Resource usage scenarios
 func TestPoolResourceUsage(ot *testing.T) {
-	succeedingConnect := func(s string) (conn.Connection, error) {
+	succeedingConnect := func(s string) (db.Connection, error) {
 		return &fakeConn{serverName: s, isAlive: true}, nil
 	}
 
