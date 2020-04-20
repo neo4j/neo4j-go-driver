@@ -48,6 +48,10 @@ func (c *fakeConn) Run(
 	return nil, nil
 }
 
+func (c *fakeConn) Bookmark() string {
+	return ""
+}
+
 func (c *fakeConn) RunTx(tx db.Handle, cypher string, params map[string]interface{}) (*db.Stream, error) {
 	return nil, nil
 }

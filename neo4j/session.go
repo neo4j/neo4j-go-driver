@@ -36,7 +36,7 @@ type TransactionWork func(tx Transaction) (interface{}, error)
 type Session interface {
 	// LastBookmark returns the bookmark received following the last successfully completed transaction.
 	// If no bookmark was received or if this transaction was rolled back, the bookmark value will not be changed.
-	//LastBookmark() string
+	LastBookmark() string
 	// BeginTransaction starts a new explicit transaction on this session
 	BeginTransaction(configurers ...func(*TransactionConfig)) (Transaction, error)
 	// ReadTransaction executes the given unit of work in a AccessModeRead transaction with
@@ -73,6 +73,23 @@ func newSession(
 		defaultMode: mode,
 		bookmarks:   bookmarks,
 	}
+}
+
+func (s *session) LastBookmark() string {
+	// Report bookmark on current connection if any
+	if s.conn != nil {
+		currentBookmark := s.conn.Bookmark()
+		if len(currentBookmark) > 0 {
+			return currentBookmark
+		}
+	}
+
+	// Report bookmark from previously closed connection or from initial set
+	if len(s.bookmarks) > 0 {
+		return s.bookmarks[len(s.bookmarks)-1]
+	}
+
+	return ""
 }
 
 func (s *session) BeginTransaction(configurers ...func(*TransactionConfig)) (Transaction, error) {
@@ -209,6 +226,13 @@ func (s *session) borrowConn() (err error) {
 
 func (s *session) returnConn() {
 	if s.conn != nil {
+		// Retrieve bookmark before returning connection, useful as input to next transaction
+		// on another connection.
+		bookmark := s.conn.Bookmark()
+		if len(bookmark) > 0 {
+			s.bookmarks = []string{bookmark}
+		}
+
 		s.pool.Return(s.conn)
 		s.conn = nil
 	}

@@ -71,6 +71,14 @@ func TestSuccessResponseExtraction(ot *testing.T) {
 			expected: &db.Summary{Bookmark: "bookm", TLast: 3, StmntType: db.StatementTypeWrite},
 			extract:  func(r *successResponse) interface{} { return r.summary() },
 		},
+		{
+			name: "Commit",
+			meta: map[string]interface{}{
+				"bookmark": "neo4j:bookmark:v1:tx35",
+			},
+			expected: &commitSuccess{bookmark: "neo4j:bookmark:v1:tx35"},
+			extract:  func(r *successResponse) interface{} { return r.commit() },
+		},
 	}
 	for _, c := range cases {
 		ot.Run(c.name, func(t *testing.T) {

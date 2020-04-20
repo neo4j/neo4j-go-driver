@@ -65,6 +65,17 @@ func (s *successResponse) run() *runSuccess {
 	return &runSuccess{fields: fields, t_first: t_first}
 }
 
+type commitSuccess struct {
+	bookmark string
+}
+
+func (s *successResponse) commit() *commitSuccess {
+	bookmark, _ := s.meta["bookmark"].(string)
+	return &commitSuccess{
+		bookmark: bookmark,
+	}
+}
+
 // Extracted from SuccessResponse.meta for a HELLO request.
 type helloSuccess struct {
 	connectionId       string
@@ -87,7 +98,7 @@ func (s *successResponse) hello() *helloSuccess {
 func (s *successResponse) summary() *db.Summary {
 	t_last, _ := s.meta["t_last"].(int64)
 	qtype, tok := s.meta["type"].(string)
-	bookmark, _ := s.meta["bookmark"].(string) // Optional ?
+	bookmark, _ := s.meta["bookmark"].(string) // Only for auto-commit transactions
 	if !tok {
 		return nil
 	}

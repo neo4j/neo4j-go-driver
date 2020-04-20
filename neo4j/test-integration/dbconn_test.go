@@ -552,4 +552,63 @@ func TestConnectionConformance(ot *testing.T) {
 			assertTime(t, gotDateTime, tLocalDateTime)
 		})
 	})
+
+	// Bookmark tests
+	ot.Run("Bookmarks", func(tt *testing.T) {
+		boltConn.Reset()
+		lastBookmark := boltConn.Bookmark()
+
+		assertNewBookmark := func(t *testing.T) {
+			t.Helper()
+			bookmark := boltConn.Bookmark()
+			if len(bookmark) == 0 {
+				t.Fatal("No bookmark")
+			}
+			if bookmark == lastBookmark {
+				t.Fatal("No new bookmark")
+			}
+			lastBookmark = bookmark
+		}
+
+		assertNoNewBookmark := func(t *testing.T) {
+			t.Helper()
+			bookmark := boltConn.Bookmark()
+			if bookmark != lastBookmark {
+				t.Fatal("New bookmark")
+			}
+		}
+
+		tt.Run("Auto-commit, bookmark by iteration", func(t *testing.T) {
+			s, _ := boltConn.Run("CREATE (n:BmRand {x: $rand}) RETURN n", map[string]interface{}{"rand": randInt()}, db.WriteMode, nil, 0, nil)
+			boltConn.Next(s.Handle)
+			boltConn.Next(s.Handle)
+			assertNewBookmark(t)
+		})
+		tt.Run("Auto-commit, bookmark by new auto-commit", func(t *testing.T) {
+			boltConn.Run("CREATE (n:BmRand {x: $rand}) RETURN n", map[string]interface{}{"rand": randInt()}, db.WriteMode, nil, 0, nil)
+			s, _ := boltConn.Run("CREATE (n:BmRand {x: $rand}) RETURN n", map[string]interface{}{"rand": randInt()}, db.WriteMode, nil, 0, nil)
+			assertNewBookmark(t)
+			boltConn.Next(s.Handle)
+			boltConn.Next(s.Handle)
+			assertNewBookmark(t)
+		})
+		tt.Run("Commit", func(t *testing.T) {
+			tx, _ := boltConn.TxBegin(db.WriteMode, nil, 0, nil)
+			s, _ := boltConn.RunTx(tx, "CREATE (n:BmRand {x: $rand}) RETURN n", map[string]interface{}{"rand": randInt()})
+			boltConn.Next(s.Handle)
+			boltConn.Next(s.Handle)
+			assertNoNewBookmark(t)
+			boltConn.TxCommit(tx)
+			assertNewBookmark(t)
+		})
+		tt.Run("Rollback", func(t *testing.T) {
+			tx, _ := boltConn.TxBegin(db.WriteMode, nil, 0, nil)
+			s, _ := boltConn.RunTx(tx, "CREATE (n:BmRand {x: $rand}) RETURN n", map[string]interface{}{"rand": randInt()})
+			boltConn.Next(s.Handle)
+			boltConn.Next(s.Handle)
+			assertNoNewBookmark(t)
+			boltConn.TxRollback(tx)
+			assertNoNewBookmark(t)
+		})
+	})
 }

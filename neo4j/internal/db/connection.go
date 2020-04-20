@@ -91,8 +91,14 @@ type Connection interface {
 	// If error is nil, either Record or Summary has a value, if Record is nil there are no more records.
 	// If error is non nil, neither Record or Summary has a value.
 	Next(streamHandle Handle) (*Record, *Summary, error)
-	IsAlive() bool
+	// Returns bookmark from last committed transaction or last finished auto-commit transaction.
+	// Note that if there is an ongoing auto-commit transaction (stream active) the bookmark
+	// from that is not included. Empty string if no bookmark.
+	Bookmark() string
+	// Returns name of the server that the connection is connected to.
 	ServerName() string
+	// Returns true if the connection is fully functional.
+	IsAlive() bool
 	// Resets connection to same state as directly after a connect.
 	Reset()
 	Close()

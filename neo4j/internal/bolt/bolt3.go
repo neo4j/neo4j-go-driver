@@ -105,6 +105,7 @@ type bolt3 struct {
 	serverVersion string
 	tfirst        int64       // Time that server started streaming
 	pendingTx     *internalTx // Stashed away when tx started explcitly
+	bookmark      string      // Last bookmark
 }
 
 func NewBolt3(serverName string, conn net.Conn) *bolt3 {
@@ -200,7 +201,6 @@ func (b *bolt3) receiveSuccessResponse() (*successResponse, error) {
 	return nil, errors.New("Unknown response")
 }
 
-// TODO: Error types!
 func (b *bolt3) connect(auth map[string]interface{}) error {
 	// Only allowed to connect when in disconnected state
 	if b.state != bolt3_disconnected {
@@ -316,16 +316,21 @@ func (b *bolt3) TxCommit(txh db.Handle) error {
 		return err
 	}
 
-	_, err = b.receiveSuccessResponse()
+	succRes, err := b.receiveSuccessResponse()
 	if err != nil {
-		log("txCommit fail 4")
 		return err
+	}
+	commitSuccess := succRes.commit()
+	if commitSuccess == nil {
+		return errors.New("Parser error")
+	}
+	if len(commitSuccess.bookmark) > 0 {
+		b.bookmark = commitSuccess.bookmark
 	}
 
 	// Transition into ready state
 	b.state = bolt3_ready
-	// TODO: Keep track of bookmark!
-	// bolt.successResponse: &{m:map[bookmark:neo4j:bookmark:v1:tx35]}
+
 	log("txCommit ok")
 	return nil
 }
@@ -518,7 +523,6 @@ func (b *bolt3) RunTx(txh db.Handle, cypher string, params map[string]interface{
 
 // Reads one record from the stream.
 func (b *bolt3) Next(shandle db.Handle) (*db.Record, *db.Summary, error) {
-	log("next try")
 	if b.state != bolt3_streaming && b.state != bolt3_streamingtx {
 		return nil, nil, b.invalidStateError([]int{bolt3_streaming, bolt3_streamingtx})
 	}
@@ -530,7 +534,6 @@ func (b *bolt3) Next(shandle db.Handle) (*db.Record, *db.Summary, error) {
 
 	res, err := b.receive()
 	if err != nil {
-		log(fmt.Sprintf("Next unpack err: %s", err))
 		b.state = bolt3_corrupt
 		return nil, nil, err
 	}
@@ -543,12 +546,6 @@ func (b *bolt3) Next(shandle db.Handle) (*db.Record, *db.Summary, error) {
 	case *successResponse:
 		log("got end of stream")
 		// End of stream
-		if b.state == bolt3_streamingtx {
-			b.state = bolt3_tx
-		} else {
-			b.state = bolt3_ready
-		}
-		b.streamId = 0
 		// Parse summary
 		sum := x.summary()
 		if sum == nil {
@@ -556,7 +553,16 @@ func (b *bolt3) Next(shandle db.Handle) (*db.Record, *db.Summary, error) {
 			log(fmt.Sprintf("failed to parse summary: %+v", x))
 			return nil, nil, errors.New("Failed to parse summary")
 		}
-		// TODO: Keep bookmark!
+		if b.state == bolt3_streamingtx {
+			b.state = bolt3_tx
+		} else {
+			b.state = bolt3_ready
+			// Keep bookmark for auto-commit tx
+			if len(sum.Bookmark) > 0 {
+				b.bookmark = sum.Bookmark
+			}
+		}
+		b.streamId = 0
 		// Add some extras to the summary
 		sum.ServerVersion = b.serverVersion
 		sum.ServerName = b.serverName
@@ -568,6 +574,10 @@ func (b *bolt3) Next(shandle db.Handle) (*db.Record, *db.Summary, error) {
 	default:
 		return nil, nil, errors.New("Unknown response")
 	}
+}
+
+func (b *bolt3) Bookmark() string {
+	return b.bookmark
 }
 
 func (b *bolt3) IsAlive() bool {
@@ -587,6 +597,7 @@ func (b *bolt3) Reset() {
 		b.txId = 0
 		b.streamId = 0
 		b.streamKeys = []string{}
+		b.bookmark = ""
 	}()
 
 	switch b.state {
