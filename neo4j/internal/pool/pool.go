@@ -55,6 +55,7 @@ type Pool struct {
 	queueMut   sync.Mutex
 	queue      list.List
 	now        func() time.Time
+	closed     bool
 }
 
 func New(maxSize int, maxAge time.Duration, connect Connect) *Pool {
@@ -74,16 +75,15 @@ func log(msg string) {
 
 func (p *Pool) Close() {
 	log("closing")
+	p.closed = true
 	// Cancel everything in the queue by just emptying at and let all callers timeout
 	p.queueMut.Lock()
 	p.queue.Init()
 	p.queueMut.Unlock()
 	// Go through each server and close all connections to it
 	p.serversMut.Lock()
-	for n, b := range p.servers {
-		for c := b.get(); c != nil; c = b.get() {
-			c.Close()
-		}
+	for n, s := range p.servers {
+		s.closeAll()
 		delete(p.servers, n)
 	}
 	p.serversMut.Unlock()
@@ -101,12 +101,11 @@ func (p *Pool) tryExistingConnectionToKnownServer(serverNames []string) Connecti
 			continue
 		}
 		for {
-			c := b.get()
+			c := b.getIdle()
 			if c == nil {
 				break
 			}
-			// Check that the connection is ok
-			log(fmt.Sprintf("%s: found connectio to use", s))
+			log(fmt.Sprintf("%s: found connection to use", s))
 			return c
 		}
 	}
@@ -132,10 +131,11 @@ func (p *Pool) tryNewConnectionToKnownServer(serverNames []string, checkTimeout 
 		if b == nil {
 			continue
 		}
-		if b.size >= p.maxSize {
+		if b.size() >= p.maxSize {
 			continue
 		}
 		// Try to connect, this might take a while
+		// Important that errors from p.connect is propagated
 		log(fmt.Sprintf("%s: connecting", s))
 		c, err = p.connect(s)
 		if err != nil || c == nil {
@@ -143,7 +143,7 @@ func (p *Pool) tryNewConnectionToKnownServer(serverNames []string, checkTimeout 
 		}
 		// Register the connection to the server
 		log(fmt.Sprintf("%s: connection registered", s))
-		b.reg(c)
+		b.regBusy(c)
 		return c, nil
 	}
 	return nil, err
@@ -169,6 +169,7 @@ func (p *Pool) tryNewServer(serverNames []string, checkTimeout func() bool, errS
 		}
 
 		// Try to connect and add this server as known
+		// Important that errors from p.connect is propagated
 		log(fmt.Sprintf("%s: server pending, connecting", s))
 		c, err = p.connect(s)
 		if err != nil || c == nil {
@@ -180,7 +181,7 @@ func (p *Pool) tryNewServer(serverNames []string, checkTimeout func() bool, errS
 		b = &server{}
 		p.servers[s] = b
 		log(fmt.Sprintf("%s: server added", s))
-		b.reg(c)
+		b.regBusy(c)
 		log(fmt.Sprintf("%s: conn registered", s))
 		return c, nil
 	}
@@ -193,7 +194,7 @@ func (p *Pool) anyExistingConnections(serverNames []string) bool {
 	for _, s := range serverNames {
 		b := p.servers[s]
 		if b != nil {
-			if b.size > 0 {
+			if b.size() > 0 {
 				return true
 			}
 		}
@@ -209,17 +210,20 @@ func (p *Pool) queueSize() int {
 }
 
 // For testing
-func (p *Pool) getServers() map[string]server {
+func (p *Pool) getServers() map[string]*server {
 	p.serversMut.Lock()
 	defer p.serversMut.Unlock()
-	servers := make(map[string]server)
+	servers := make(map[string]*server)
 	for k, v := range p.servers {
-		servers[k] = *v
+		servers[k] = v
 	}
 	return servers
 }
 
-func (p *Pool) Borrow(ctx context.Context, servers []string) (Connection, error) {
+// Borrow tries to borrow an existing database connection or tries to create a new one
+// if none exists. The wait flag indicates if the caller wants to wait for a connection
+// to be returned if there aren't any idle connection available.
+func (p *Pool) Borrow(ctx context.Context, servers []string, wait bool) (Connection, error) {
 	timedOut := false
 	timeOut := func() bool {
 		select {
@@ -232,6 +236,10 @@ func (p *Pool) Borrow(ctx context.Context, servers []string) (Connection, error)
 		}
 	}
 
+	if p.closed {
+		return nil, &PoolClosed{}
+	}
+
 	log(fmt.Sprintf("Borrow %s", servers))
 	var err error
 	var c Connection
@@ -242,7 +250,7 @@ func (p *Pool) Borrow(ctx context.Context, servers []string) (Connection, error)
 	p.serversMut.Lock()
 	for n, s := range p.servers {
 		s.prune(p.keepConnection)
-		if s.size == 0 {
+		if s.size() == 0 {
 			delete(p.servers, n)
 		}
 	}
@@ -254,7 +262,7 @@ func (p *Pool) Borrow(ctx context.Context, servers []string) (Connection, error)
 		return c, nil
 	}
 	if timeOut() {
-		return nil, ctx.Err()
+		return nil, &PoolTimeout{err: ctx.Err(), servers: servers}
 	}
 
 	// Prefer to have few connections to many servers over many connections to few servers.
@@ -266,7 +274,7 @@ func (p *Pool) Borrow(ctx context.Context, servers []string) (Connection, error)
 		return c, nil
 	}
 	if timedOut {
-		return nil, ctx.Err()
+		return nil, &PoolTimeout{err: ctx.Err(), servers: servers}
 	}
 
 	// Try another connection to one of the known servers
@@ -275,14 +283,18 @@ func (p *Pool) Borrow(ctx context.Context, servers []string) (Connection, error)
 		return c, nil
 	}
 	if timedOut {
-		return nil, ctx.Err()
+		return nil, &PoolTimeout{err: ctx.Err(), servers: servers}
+	}
+
+	if !wait {
+		return nil, &PoolFull{servers: servers}
 	}
 
 	// If there are no connections for any of the servers, there is no point in waiting for anything
 	// to be returned.
 	if !p.anyExistingConnections(servers) {
 		if err == nil {
-			err = errors.New("No conns to wait for")
+			err = &PoolTimeout{err: errors.New("No connection to wait for"), servers: servers}
 		}
 		return nil, err
 	}
@@ -322,7 +334,7 @@ func (p *Pool) Borrow(ctx context.Context, servers []string) (Connection, error)
 			log("got a conn, recovering")
 			return q.conn, nil
 		}
-		return nil, ctx.Err()
+		return nil, &PoolTimeout{err: ctx.Err(), servers: servers}
 	}
 }
 
@@ -333,8 +345,8 @@ func (p *Pool) unreg(serverName string, c Connection) {
 	server := p.servers[serverName]
 	// Check for strange condition of not finding the server.
 	if server != nil {
-		server.unreg(c)
-		if server.size == 0 {
+		server.unregBusy(c)
+		if server.size() == 0 {
 			delete(p.servers, serverName)
 		}
 	}
@@ -365,6 +377,10 @@ func (p *Pool) Return(c Connection) {
 	// Get the name of the server that the connection belongs to.
 	serverName := c.ServerName()
 	log(fmt.Sprintf("Return conn in %s", serverName))
+
+	if p.closed {
+		return
+	}
 
 	if !p.keepConnection(c) {
 		log(fmt.Sprintf("%s: throwing away connection", serverName))
@@ -399,6 +415,6 @@ func (p *Pool) Return(c Connection) {
 	server := p.servers[serverName]
 	if server != nil { // Strange when server not found
 		log(fmt.Sprintf("%s: back in server", serverName))
-		server.ret(c)
+		server.retBusy(c)
 	}
 }

@@ -218,9 +218,20 @@ func (s *session) borrowConn() error {
 	s.returnConn()
 	servers := s.router()
 
-	ctx, cancel := context.WithTimeout(context.Background(), s.config.ConnectionAcquisitionTimeout)
-	defer cancel()
-	conn, err := s.pool.Borrow(ctx, servers)
+	var (
+		ctx    context.Context
+		cancel context.CancelFunc
+	)
+
+	if s.config.ConnectionAcquisitionTimeout > 0 {
+		ctx, cancel = context.WithTimeout(context.Background(), s.config.ConnectionAcquisitionTimeout)
+	} else {
+		ctx = context.Background()
+	}
+	if cancel != nil {
+		defer cancel()
+	}
+	conn, err := s.pool.Borrow(ctx, servers, s.config.ConnectionAcquisitionTimeout != 0)
 	if err != nil {
 		return err
 	}

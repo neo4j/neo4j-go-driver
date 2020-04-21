@@ -24,49 +24,81 @@ import (
 )
 
 // Represents a server with a number of connections that either is in use (borrowed) or
-// is ready for use. The borrows connections are not kept.
+// is ready for use.
 // Not thread safe
 type server struct {
-	ready list.List
-	size  int
+	idle list.List
+	busy list.List
+	//size  int
 }
 
-// Returns a ready connection if any
-func (s *server) get() Connection {
-	e := s.ready.Front()
+// Returns a idle connection if any
+func (s *server) getIdle() Connection {
+	// Remove from idle list and add to busy list
+	e := s.idle.Front()
 	if e != nil {
-		c := s.ready.Remove(e)
+		c := s.idle.Remove(e)
+		s.busy.PushFront(c)
 		return c.(Connection)
 	}
 	return nil
 }
 
-func (s *server) ret(c Connection) {
-	s.ready.PushFront(c)
+// Returns a busy connection, makes it idle
+func (s *server) retBusy(c Connection) {
+	s.unregBusy(c)
+	s.idle.PushFront(c)
 }
 
-func (s server) num() int {
-	return s.ready.Len()
+// Number of idle connections
+func (s server) numIdle() int {
+	return s.idle.Len()
 }
 
-func (s *server) reg(c Connection) {
-	s.size += 1
+// Adds a connection to busy list
+func (s *server) regBusy(c Connection) {
+	s.busy.PushFront(c)
 }
 
-func (s *server) unreg(c Connection) {
-	s.size -= 1
+func (s *server) unregBusy(c Connection) {
+	found := false
+	for e := s.busy.Front(); e != nil && !found; e = e.Next() {
+		x := e.Value.(Connection)
+		found = x == c
+		if found {
+			s.busy.Remove(e)
+		}
+	}
 }
 
+func (s *server) size() int {
+	return s.busy.Len() + s.idle.Len()
+}
+
+// Removes old and dead connections from idle list
 func (s *server) prune(keep func(c Connection) bool) {
-	e := s.ready.Front()
+	e := s.idle.Front()
 	for e != nil {
 		n := e.Next()
 		c := e.Value.(Connection)
 		if !keep(c) {
-			s.ready.Remove(e)
-			s.size -= 1
+			s.idle.Remove(e)
 			go c.Close()
 		}
 		e = n
 	}
+}
+
+func closeAndEmptyConnections(l list.List) {
+	for e := l.Front(); e != nil; e = e.Next() {
+		c := e.Value.(Connection)
+		c.Close()
+	}
+	l.Init()
+}
+
+func (s *server) closeAll() {
+	closeAndEmptyConnections(s.idle)
+	// Closing the busy connections could mean here that we do close from another thread.
+	closeAndEmptyConnections(s.busy)
 }

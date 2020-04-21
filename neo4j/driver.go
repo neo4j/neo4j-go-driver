@@ -127,7 +127,10 @@ func (d *driver) Session(accessMode AccessMode, bookmarks ...string) (Session, e
 func (d *driver) Close() error {
 	d.mut.Lock()
 	defer d.mut.Unlock()
-	d.pool.Close()
+	// Safeguard against closing more than once
+	if d.pool != nil {
+		d.pool.Close()
+	}
 	d.pool = nil
 	return nil
 }

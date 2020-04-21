@@ -26,29 +26,29 @@ import (
 func TestServer(ot *testing.T) {
 	ot.Run("reg/unreg/size", func(t *testing.T) {
 		s := &server{}
-		if s.size != 0 {
+		if s.size() != 0 {
 			t.Error("not 0")
 		}
 
 		// Register should increase size
 		c1 := &fakeConn{}
-		s.reg(c1)
-		if s.size != 1 {
+		s.regBusy(c1)
+		if s.size() != 1 {
 			t.Error("not 1")
 		}
 		c2 := &fakeConn{}
-		s.reg(c2)
-		if s.size != 2 {
+		s.regBusy(c2)
+		if s.size() != 2 {
 			t.Error("not 2")
 		}
 
 		// Unregister should decrease size
-		s.unreg(c2)
-		if s.size != 1 {
+		s.unregBusy(c2)
+		if s.size() != 1 {
 			t.Error("not 1")
 		}
-		s.unreg(c1)
-		if s.size != 0 {
+		s.unregBusy(c1)
+		if s.size() != 0 {
 			t.Error("not 0")
 		}
 	})
@@ -56,19 +56,19 @@ func TestServer(ot *testing.T) {
 	ot.Run("get/ret", func(t *testing.T) {
 		s := &server{}
 		c1 := &fakeConn{}
-		s.reg(c1)
-		s.ret(c1)
+		s.regBusy(c1)
+		s.retBusy(c1)
 
-		c2 := s.get()
+		c2 := s.getIdle()
 		if c2 == nil {
 			t.Error("did not get")
 		}
-		c3 := s.get()
+		c3 := s.getIdle()
 		if c3 != nil {
 			t.Error("did get")
 		}
-		s.ret(c2)
-		c3 = s.get()
+		s.retBusy(c2)
+		c3 = s.getIdle()
 		if c3 == nil {
 			t.Error("did not get")
 		}
@@ -81,22 +81,22 @@ func TestServer(ot *testing.T) {
 		for i := range conns {
 			c := &fakeConn{}
 			conns[i] = c
-			s.reg(c)
-			s.ret(c)
+			s.regBusy(c)
+			s.retBusy(c)
 		}
 
 		// Let the conn in the middle be dead
 		s.prune(func(c Connection) bool {
 			return c != conns[1]
 		})
-		if s.size != 2 {
+		if s.size() != 2 {
 			t.Error("Should be pruned")
 		}
 
 		// Should be able to borrow twice
-		b1 := s.get()
-		b2 := s.get()
-		b3 := s.get()
+		b1 := s.getIdle()
+		b2 := s.getIdle()
+		b3 := s.getIdle()
 		if b1 == nil || b2 == nil {
 			t.Error("Should be two conns to borrow")
 		}
@@ -105,18 +105,18 @@ func TestServer(ot *testing.T) {
 		}
 
 		// Return the connections and prune everything
-		s.ret(b1)
-		s.ret(b2)
+		s.retBusy(b1)
+		s.retBusy(b2)
 		s.prune(func(c Connection) bool {
 			return false
 		})
 
 		// Shouldn't be abble to borrow anything and size should be zero
-		b1 = s.get()
+		b1 = s.getIdle()
 		if b1 != nil {
 			t.Error("Shouldn't be able to borrow")
 		}
-		if s.size != 0 {
+		if s.size() != 0 {
 			t.Error("Shouldn't be anything left")
 		}
 	})

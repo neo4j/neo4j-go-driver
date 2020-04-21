@@ -26,7 +26,7 @@ import (
 	"github.com/neo4j/neo4j-go-driver/neo4j"
 	"github.com/neo4j/neo4j-go-driver/neo4j/test-integration/control"
 
-	. "github.com/neo4j/neo4j-go-driver/neo4j/utils/test"
+	//. "github.com/neo4j/neo4j-go-driver/neo4j/utils/test"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
@@ -143,7 +143,8 @@ var _ = Describe("Driver", func() {
 			Expect(err).To(BeNil())
 
 			_, err = session3.Run("UNWIND RANGE(1, 100) AS N RETURN N", nil)
-			Expect(err).To(BeConnectorErrorWithCode(0x600))
+			Expect(neo4j.IsServiceUnavailable(err)).To(BeTrue())
+			//Expect(err).To(BeConnectorErrorWithCode(0x600))
 		})
 	})
 
@@ -189,7 +190,8 @@ var _ = Describe("Driver", func() {
 			start := time.Now()
 			_, err = session3.Run("UNWIND RANGE(1, 100) AS N RETURN N", nil)
 			elapsed := time.Since(start)
-			Expect(err).To(BeConnectorErrorWithCode(0x601))
+			Expect(neo4j.IsServiceUnavailable(err)).To(BeTrue())
+			//Expect(err).To(BeConnectorErrorWithCode(0x601))
 			Expect(math.Round(float64(elapsed / time.Second))).To(BeNumerically(">=", 10))
 		})
 	})

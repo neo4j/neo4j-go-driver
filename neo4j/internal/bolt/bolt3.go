@@ -650,6 +650,7 @@ func (b *bolt3) Reset() {
 	b.state = bolt3_ready
 }
 
+// Beware, could be called on another thread when driver is closed.
 func (b *bolt3) Close() {
 	log("Close")
 	if b.state != bolt3_disconnected {

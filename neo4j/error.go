@@ -22,6 +22,7 @@ package neo4j
 import (
 	"fmt"
 	"github.com/neo4j/neo4j-go-driver/neo4j/internal/db"
+	"github.com/neo4j/neo4j-go-driver/neo4j/internal/pool"
 )
 
 type driverError struct {
@@ -195,6 +196,13 @@ func IsSessionExpired(err error) bool {
 // to be in service unavailable category.
 func IsServiceUnavailable(err error) bool {
 	_, is := err.(*connectError)
-	// TODO: More errors in this category!
+	if is {
+		return true
+	}
+	_, is = err.(*pool.PoolTimeout)
+	if is {
+		return true
+	}
+	_, is = err.(*pool.PoolFull)
 	return is
 }
