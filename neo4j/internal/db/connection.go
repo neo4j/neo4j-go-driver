@@ -98,8 +98,14 @@ type Connection interface {
 	// Returns name of the server that the connection is connected to.
 	ServerName() string
 	// Returns true if the connection is fully functional.
+	// Implementation of this should be passive, no pinging or similair since it might be
+	// called rather frequently.
 	IsAlive() bool
+	// Returns the point in time when this connection was established.
+	Birthdate() time.Time
 	// Resets connection to same state as directly after a connect.
 	Reset()
+	// Closes the database connection as well as any underlying connection.
+	// The instance should not be used after being closed.
 	Close()
 }

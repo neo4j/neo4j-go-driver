@@ -102,7 +102,7 @@ func NewDriver(target string, auth AuthToken, configurers ...func(*Config)) (Dri
 	return &driver{
 		target: parsed,
 		config: config,
-		pool:   pool.New(config.MaxConnectionPoolSize, c.connect),
+		pool:   pool.New(config.MaxConnectionPoolSize, config.MaxConnectionLifetime, c.connect),
 	}, nil
 }
 

@@ -73,4 +73,51 @@ func TestServer(ot *testing.T) {
 			t.Error("did not get")
 		}
 	})
+
+	ot.Run("prune", func(t *testing.T) {
+		s := &server{}
+		// Register and return three connections
+		conns := make([]*fakeConn, 3)
+		for i := range conns {
+			c := &fakeConn{}
+			conns[i] = c
+			s.reg(c)
+			s.ret(c)
+		}
+
+		// Let the conn in the middle be dead
+		s.prune(func(c Connection) bool {
+			return c != conns[1]
+		})
+		if s.size != 2 {
+			t.Error("Should be pruned")
+		}
+
+		// Should be able to borrow twice
+		b1 := s.get()
+		b2 := s.get()
+		b3 := s.get()
+		if b1 == nil || b2 == nil {
+			t.Error("Should be two conns to borrow")
+		}
+		if b3 != nil {
+			t.Error("Shouldn't be able to borrow third")
+		}
+
+		// Return the connections and prune everything
+		s.ret(b1)
+		s.ret(b2)
+		s.prune(func(c Connection) bool {
+			return false
+		})
+
+		// Shouldn't be abble to borrow anything and size should be zero
+		b1 = s.get()
+		if b1 != nil {
+			t.Error("Shouldn't be able to borrow")
+		}
+		if s.size != 0 {
+			t.Error("Shouldn't be anything left")
+		}
+	})
 }

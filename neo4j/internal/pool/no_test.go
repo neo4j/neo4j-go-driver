@@ -19,45 +19,13 @@
 
 package pool
 
-import (
-	"time"
-
-	"github.com/neo4j/neo4j-go-driver/neo4j/internal/db"
-)
+import "time"
 
 type fakeConn struct {
 	serverName string
 	isAlive    bool
-}
-
-func (c *fakeConn) TxBegin(mode db.AccessMode, bookmarks []string, timeout time.Duration, meta map[string]interface{}) (db.Handle, error) {
-	return nil, nil
-}
-
-func (c *fakeConn) TxRollback(tx db.Handle) error {
-	return nil
-}
-
-func (c *fakeConn) TxCommit(tx db.Handle) error {
-	return nil
-}
-
-func (c *fakeConn) Run(
-	cypher string, params map[string]interface{}, mode db.AccessMode, bookmarks []string, timeout time.Duration, meta map[string]interface{}) (*db.Stream, error) {
-
-	return nil, nil
-}
-
-func (c *fakeConn) Bookmark() string {
-	return ""
-}
-
-func (c *fakeConn) RunTx(tx db.Handle, cypher string, params map[string]interface{}) (*db.Stream, error) {
-	return nil, nil
-}
-
-func (c *fakeConn) Next(s db.Handle) (*db.Record, *db.Summary, error) {
-	return nil, nil, nil
+	birthdate  time.Time
+	id         int
 }
 
 func (c *fakeConn) IsAlive() bool {
@@ -72,4 +40,8 @@ func (c *fakeConn) Close() {
 }
 
 func (c *fakeConn) Reset() {
+}
+
+func (c *fakeConn) Birthdate() time.Time {
+	return c.birthdate
 }

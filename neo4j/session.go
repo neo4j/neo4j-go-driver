@@ -214,14 +214,18 @@ func (s *session) WriteTransaction(
 	return s.runRetriable(db.WriteMode, work, configurers...)
 }
 
-func (s *session) borrowConn() (err error) {
+func (s *session) borrowConn() error {
 	s.returnConn()
 	servers := s.router()
 
 	ctx, cancel := context.WithTimeout(context.Background(), s.config.ConnectionAcquisitionTimeout)
 	defer cancel()
-	s.conn, err = s.pool.Borrow(ctx, servers)
-	return
+	conn, err := s.pool.Borrow(ctx, servers)
+	if err != nil {
+		return err
+	}
+	s.conn = conn.(db.Connection)
+	return nil
 }
 
 func (s *session) returnConn() {

@@ -27,32 +27,43 @@ import (
 	"errors"
 	"fmt"
 	"sync"
-
-	"github.com/neo4j/neo4j-go-driver/neo4j/internal/db"
+	"time"
 )
 
-type Connect func(string) (db.Connection, error)
+type Connection interface {
+	ServerName() string
+	IsAlive() bool
+	Reset()
+	Close()
+	Birthdate() time.Time
+}
+
+type Connect func(string) (Connection, error)
 
 type qitem struct {
 	servers []string
 	wakeup  chan bool
-	conn    db.Connection
+	conn    Connection
 }
 
 type Pool struct {
 	maxSize    int
+	maxAge     time.Duration
 	connect    Connect
 	servers    map[string]*server
 	serversMut sync.Mutex
 	queueMut   sync.Mutex
 	queue      list.List
+	now        func() time.Time
 }
 
-func New(maxSize int, connect Connect) *Pool {
+func New(maxSize int, maxAge time.Duration, connect Connect) *Pool {
 	p := &Pool{
 		maxSize: maxSize,
+		maxAge:  maxAge,
 		connect: connect,
 		servers: make(map[string]*server),
+		now:     time.Now,
 	}
 	return p
 }
@@ -80,7 +91,7 @@ func (p *Pool) Close() {
 }
 
 // Tries to find an unused connection on one of the servers we're already connected to.
-func (p *Pool) tryExistingConnectionToKnownServer(serverNames []string) db.Connection {
+func (p *Pool) tryExistingConnectionToKnownServer(serverNames []string) Connection {
 	p.serversMut.Lock()
 	defer p.serversMut.Unlock()
 
@@ -95,36 +106,21 @@ func (p *Pool) tryExistingConnectionToKnownServer(serverNames []string) db.Conne
 				break
 			}
 			// Check that the connection is ok
-			if !c.IsAlive() {
-				// Unregister the connection and close it in another thread to avoid potential
-				// long blocking operation during close.
-				log(fmt.Sprintf("%s: found dead connection", s))
-				b.unreg(c)
-				go func() {
-					c.Close()
-				}()
-				continue
-			}
 			log(fmt.Sprintf("%s: found connectio to use", s))
 			return c
-		}
-		if b.size == 0 {
-			// No more connections to this server, remote it from list of known servers
-			log(fmt.Sprintf("%s: no more connections", s))
-			delete(p.servers, s)
 		}
 	}
 
 	return nil
 }
 
-func (p *Pool) tryNewConnectionToKnownServer(serverNames []string, checkTimeout func() bool) (db.Connection, error) {
+func (p *Pool) tryNewConnectionToKnownServer(serverNames []string, checkTimeout func() bool, errSeed error) (Connection, error) {
 	p.serversMut.Lock()
 	defer p.serversMut.Unlock()
 
 	var (
-		err error
-		c   db.Connection
+		err error = errSeed
+		c   Connection
 	)
 
 	for _, s := range serverNames {
@@ -153,13 +149,13 @@ func (p *Pool) tryNewConnectionToKnownServer(serverNames []string, checkTimeout 
 	return nil, err
 }
 
-func (p *Pool) tryNewServer(serverNames []string, checkTimeout func() bool) (db.Connection, error) {
+func (p *Pool) tryNewServer(serverNames []string, checkTimeout func() bool, errSeed error) (Connection, error) {
 	p.serversMut.Lock()
 	defer p.serversMut.Unlock()
 
 	var (
-		err error
-		c   db.Connection
+		err error = errSeed
+		c   Connection
 	)
 
 	for _, s := range serverNames {
@@ -180,7 +176,7 @@ func (p *Pool) tryNewServer(serverNames []string, checkTimeout func() bool) (db.
 			log(fmt.Sprintf("%s: server cancelled", s))
 			continue
 		}
-		// Ok, got a connection, register this server register the connection within it
+		// Ok, got a connection, track this server and the connection
 		b = &server{}
 		p.servers[s] = b
 		log(fmt.Sprintf("%s: server added", s))
@@ -223,7 +219,7 @@ func (p *Pool) getServers() map[string]server {
 	return servers
 }
 
-func (p *Pool) Borrow(ctx context.Context, servers []string) (db.Connection, error) {
+func (p *Pool) Borrow(ctx context.Context, servers []string) (Connection, error) {
 	timedOut := false
 	timeOut := func() bool {
 		select {
@@ -238,11 +234,21 @@ func (p *Pool) Borrow(ctx context.Context, servers []string) (db.Connection, err
 
 	log(fmt.Sprintf("Borrow %s", servers))
 	var err error
-	var c db.Connection
+	var c Connection
+
+	// Prune all connection on all the servers, this makes sure that servers
+	// gets removed from the map at some point in time (as long as someone
+	// borrows new connections)
+	p.serversMut.Lock()
+	for n, s := range p.servers {
+		s.prune(p.keepConnection)
+		if s.size == 0 {
+			delete(p.servers, n)
+		}
+	}
+	p.serversMut.Unlock()
 
 	// Try to use an existing connection to a known server, that is cheapest.
-	// This will also prune dead connections and empty servers (servers with no connections) among
-	// the requested ones.
 	c = p.tryExistingConnectionToKnownServer(servers)
 	if c != nil {
 		return c, nil
@@ -251,20 +257,20 @@ func (p *Pool) Borrow(ctx context.Context, servers []string) (db.Connection, err
 		return nil, ctx.Err()
 	}
 
-	// The existing servers at this point are "proved" to be working, at least we don't know that
-	// they are down yet. So try to utilize these before trying another server and corresponding
-	// new server.
-	c, err = p.tryNewConnectionToKnownServer(servers, timeOut)
+	// Prefer to have few connections to many servers over many connections to few servers.
+	//  A non-functional server would have it's server pruned above but retried to connect to
+	// here, could be good if the server went down and now is up again but could also be bad if
+	// it is still down.
+	c, err = p.tryNewServer(servers, timeOut, nil)
 	if c != nil {
 		return c, nil
 	}
 	if timedOut {
 		return nil, ctx.Err()
 	}
-	// Try to increase size of any matching existing connection server. A non-functional server
-	// would have it's server pruned above but retried to connect to here, could be good if the
-	// server went down and now is up again but could also be bad if it is still down.
-	c, err = p.tryNewServer(servers, timeOut)
+
+	// Try another connection to one of the known servers
+	c, err = p.tryNewConnectionToKnownServer(servers, timeOut, err)
 	if c != nil {
 		return c, nil
 	}
@@ -305,7 +311,6 @@ func (p *Pool) Borrow(ctx context.Context, servers []string) (db.Connection, err
 	// Wait for either a wake up signal that indicates that we got a connection or a timeout.
 	select {
 	case <-q.wakeup:
-		// Element removed by other thread
 		log("woke up, got a conn")
 		return q.conn, nil
 	case <-ctx.Done():
@@ -321,7 +326,7 @@ func (p *Pool) Borrow(ctx context.Context, servers []string) (db.Connection, err
 	}
 }
 
-func (p *Pool) unreg(serverName string, c db.Connection) {
+func (p *Pool) unreg(serverName string, c Connection) {
 	p.serversMut.Lock()
 	defer p.serversMut.Unlock()
 
@@ -334,26 +339,42 @@ func (p *Pool) unreg(serverName string, c db.Connection) {
 		}
 	}
 
-	// Close connection another thread to avoid potential long blocking operation during close.
+	// Close connection in another thread to avoid potential long blocking operation during close.
 	go func() {
 		c.Close()
 	}()
 }
 
-func (p *Pool) Return(c db.Connection) {
-	// Prepare connection for being used by someone else
-	c.Reset()
+func (p *Pool) keepConnection(c Connection) bool {
+	if !c.IsAlive() {
+		return false
+	}
+
+	// Zero or less disables the check
+	if p.maxAge > 0 {
+		age := p.now().Sub(c.Birthdate())
+		if age >= p.maxAge {
+			return false
+		}
+	}
+
+	return true
+}
+
+func (p *Pool) Return(c Connection) {
 	// Get the name of the server that the connection belongs to.
 	serverName := c.ServerName()
-
 	log(fmt.Sprintf("Return conn in %s", serverName))
 
-	// If the connection is dead we should just unregister it and drop it.
-	if !c.IsAlive() {
-		log(fmt.Sprintf("%s: conn dead", serverName))
+	if !p.keepConnection(c) {
+		log(fmt.Sprintf("%s: throwing away connection", serverName))
 		p.unreg(serverName, c)
+		// This might cause someone waiting in the queue to wait in vain.
 		return
 	}
+
+	// Prepare connection for being used by someone else
+	c.Reset()
 
 	// Check if there is anyone in the queue waiting for a connection to this server.
 	p.queueMut.Lock()
@@ -380,5 +401,4 @@ func (p *Pool) Return(c db.Connection) {
 		log(fmt.Sprintf("%s: back in server", serverName))
 		server.ret(c)
 	}
-
 }

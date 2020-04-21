@@ -19,41 +19,54 @@
 
 package pool
 
-// Not thread safe
-
 import (
-	"github.com/neo4j/neo4j-go-driver/neo4j/internal/db"
+	"container/list"
 )
 
-// Represents a server with a number of connections.
+// Represents a server with a number of connections that either is in use (borrowed) or
+// is ready for use. The borrows connections are not kept.
+// Not thread safe
 type server struct {
-	ready []db.Connection
+	ready list.List
 	size  int
 }
 
-func (s *server) get() db.Connection {
-	l := len(s.ready)
-	if l == 0 {
-		return nil
+// Returns a ready connection if any
+func (s *server) get() Connection {
+	e := s.ready.Front()
+	if e != nil {
+		c := s.ready.Remove(e)
+		return c.(Connection)
 	}
-	// Pop the last one, faster to just pop the end of the slice
-	c := s.ready[l-1]
-	s.ready = s.ready[:l-1]
-	return c
+	return nil
 }
 
-func (s *server) ret(c db.Connection) {
-	s.ready = append(s.ready, c)
+func (s *server) ret(c Connection) {
+	s.ready.PushFront(c)
 }
 
 func (s server) num() int {
-	return len(s.ready)
+	return s.ready.Len()
 }
 
-func (s *server) reg(c db.Connection) {
+func (s *server) reg(c Connection) {
 	s.size += 1
 }
 
-func (s *server) unreg(c db.Connection) {
+func (s *server) unreg(c Connection) {
 	s.size -= 1
+}
+
+func (s *server) prune(keep func(c Connection) bool) {
+	e := s.ready.Front()
+	for e != nil {
+		n := e.Next()
+		c := e.Value.(Connection)
+		if !keep(c) {
+			s.ready.Remove(e)
+			s.size -= 1
+			go c.Close()
+		}
+		e = n
+	}
 }

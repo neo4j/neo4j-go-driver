@@ -106,6 +106,7 @@ type bolt3 struct {
 	tfirst        int64       // Time that server started streaming
 	pendingTx     *internalTx // Stashed away when tx started explcitly
 	bookmark      string      // Last bookmark
+	birthDate     time.Time
 }
 
 func NewBolt3(serverName string, conn net.Conn) *bolt3 {
@@ -121,6 +122,7 @@ func NewBolt3(serverName string, conn net.Conn) *bolt3 {
 		dechunker:  dechunker,
 		packer:     packstream.NewPacker(chunker, dehydrate),
 		unpacker:   packstream.NewUnpacker(dechunker),
+		birthDate:  time.Now(),
 	}
 }
 
@@ -590,6 +592,10 @@ func (b *bolt3) IsAlive() bool {
 	return true
 }
 
+func (b *bolt3) Birthdate() time.Time {
+	return b.birthDate
+}
+
 func (b *bolt3) Reset() {
 	log("Reset try")
 	defer func() {
@@ -646,11 +652,9 @@ func (b *bolt3) Reset() {
 
 func (b *bolt3) Close() {
 	log("Close")
-	if b.state == bolt3_disconnected {
-		return
+	if b.state != bolt3_disconnected {
+		b.sendMsg(msgV3Goodbye)
 	}
-
-	b.sendMsg(msgV3Goodbye)
 	b.conn.Close()
 	b.state = bolt3_disconnected
 }
