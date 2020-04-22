@@ -22,11 +22,13 @@ package neo4j
 
 import (
 	"errors"
+	"fmt"
 	"net/url"
 	"sync"
 
 	"github.com/neo4j/neo4j-go-driver/neo4j/internal/db"
 	"github.com/neo4j/neo4j-go-driver/neo4j/internal/pool"
+	"github.com/neo4j/neo4j-go-driver/neo4j/internal/router"
 )
 
 // AccessMode defines modes that routing driver decides to which cluster member
@@ -72,19 +74,16 @@ func NewDriver(target string, auth AuthToken, configurers ...func(*Config)) (Dri
 		return nil, err
 	}
 
-	routing := false
-
+	directRouting := false
 	switch parsed.Scheme {
 	case "bolt":
+		if len(parsed.RawQuery) > 0 {
+			return nil, newDriverError("routing context is not supported for direct driver")
+		}
+		directRouting = true
 	case "bolt+routing", "neo4j":
-		routing = true
-		return nil, errors.New("Routed schemed not implemented")
 	default:
 		return nil, newDriverError("url scheme %s is not supported", parsed.Scheme)
-	}
-
-	if !routing && len(parsed.RawQuery) > 0 {
-		return nil, newDriverError("routing context is not supported for direct driver")
 	}
 
 	config := defaultConfig()
@@ -95,15 +94,39 @@ func NewDriver(target string, auth AuthToken, configurers ...func(*Config)) (Dri
 		return nil, err
 	}
 
-	// Make a connector that is used by pool to actually connect according to
-	// configuration. Let the pool own this.
 	c := &connector{config: config, auth: auth.tokens}
+	pool := pool.New(config.MaxConnectionPoolSize, config.MaxConnectionLifetime, c.connect)
+
+	var sessRouter sessionRouter
+	if directRouting {
+		sessRouter = &directRouter{server: parsed.Host}
+	} else {
+		var routersResolver func() []string
+		addressResolverHook := config.AddressResolver
+		if addressResolverHook != nil {
+			routersResolver = func() []string {
+				addresses := addressResolverHook(parsed)
+				servers := make([]string, len(addresses))
+				for i, a := range addresses {
+					servers[i] = fmt.Sprintf("%s:%s", a.Hostname(), a.Port())
+				}
+				return servers
+			}
+		}
+		sessRouter = router.New(parsed.Host, routersResolver, nil, pool)
+	}
 
 	return &driver{
 		target: parsed,
 		config: config,
-		pool:   pool.New(config.MaxConnectionPoolSize, config.MaxConnectionLifetime, c.connect),
+		pool:   pool,
+		router: sessRouter,
 	}, nil
+}
+
+type sessionRouter interface {
+	Readers() ([]string, error)
+	Writers() ([]string, error)
 }
 
 type driver struct {
@@ -111,6 +134,7 @@ type driver struct {
 	config *Config
 	pool   *pool.Pool
 	mut    sync.Mutex
+	router sessionRouter
 }
 
 func (d *driver) Session(accessMode AccessMode, bookmarks ...string) (Session, error) {
@@ -119,9 +143,9 @@ func (d *driver) Session(accessMode AccessMode, bookmarks ...string) (Session, e
 	if d.pool == nil {
 		return nil, errors.New("Driver closed")
 	}
-	return newSession(d.config, func() []string {
-		return []string{d.target.Host}
-	}, d.pool, db.AccessMode(accessMode), bookmarks), nil
+	return newSession(
+		d.config, d.router,
+		d.pool, db.AccessMode(accessMode), bookmarks), nil
 }
 
 func (d *driver) Close() error {

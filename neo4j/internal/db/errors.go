@@ -95,6 +95,10 @@ func (e *DatabaseError) IsClient() bool {
 	return e.getCls() == dbErrClsClient
 }
 
-func (e *DatabaseError) IsRetriable() bool {
-	return e.IsRetriableTransient() // TODO: More
+type RoutingNotSupportedError struct {
+	Server string
+}
+
+func (e *RoutingNotSupportedError) Error() string {
+	return fmt.Sprintf("%s does not support routing", e.Server)
 }

@@ -95,8 +95,10 @@ type Connection interface {
 	// Note that if there is an ongoing auto-commit transaction (stream active) the bookmark
 	// from that is not included. Empty string if no bookmark.
 	Bookmark() string
-	// Returns name of the server that the connection is connected to.
+	// Returns name of the remote server
 	ServerName() string
+	// Returns server version on pattern Neo4j/1.2.3
+	ServerVersion() string
 	// Returns true if the connection is fully functional.
 	// Implementation of this should be passive, no pinging or similair since it might be
 	// called rather frequently.
@@ -108,4 +110,18 @@ type Connection interface {
 	// Closes the database connection as well as any underlying connection.
 	// The instance should not be used after being closed.
 	Close()
+
+	// Used to check if the connection is alive and ready to use
+	// Ping() error
+}
+
+type RoutingTable struct {
+	TimeToLive int
+	Routers    []string
+	Readers    []string
+	Writers    []string
+}
+
+type ClusterDiscovery interface {
+	GetRoutingTable(context map[string]string) (*RoutingTable, error)
 }

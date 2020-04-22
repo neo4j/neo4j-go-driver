@@ -130,6 +130,10 @@ func (b *bolt3) ServerName() string {
 	return b.serverName
 }
 
+func (b *bolt3) ServerVersion() string {
+	return b.serverVersion
+}
+
 func (b *bolt3) appendMsg(tag packstream.StructTag, field ...interface{}) error {
 	log(fmt.Sprintf("appending: {Tag: %d, Fields: %+v }", tag, field))
 	b.chunker.beginMessage()
@@ -627,7 +631,6 @@ func (b *bolt3) Reset() {
 	for !drained {
 		res, err := b.receive()
 		if err != nil {
-			b.state = bolt3_corrupt
 			return
 		}
 		switch x := res.(type) {
@@ -648,6 +651,13 @@ func (b *bolt3) Reset() {
 	}
 
 	b.state = bolt3_ready
+}
+
+func (b *bolt3) GetRoutingTable(context map[string]string) (*db.RoutingTable, error) {
+	if b.state != bolt3_ready {
+		return nil, b.invalidStateError([]int{bolt3_ready})
+	}
+	return getRoutingTable(b, context)
 }
 
 // Beware, could be called on another thread when driver is closed.

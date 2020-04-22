@@ -29,7 +29,6 @@ import (
 type server struct {
 	idle list.List
 	busy list.List
-	//size  int
 }
 
 // Returns a idle connection if any

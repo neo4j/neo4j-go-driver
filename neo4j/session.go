@@ -56,14 +56,14 @@ type session struct {
 	defaultMode db.AccessMode
 	bookmarks   []string
 	pool        *pool.Pool
-	router      func() []string
+	router      sessionRouter
 	conn        db.Connection
 	inTx        bool
 	res         *result
 }
 
 func newSession(
-	config *Config, router func() []string, pool *pool.Pool,
+	config *Config, router sessionRouter, pool *pool.Pool,
 	mode db.AccessMode, bookmarks []string) *session {
 
 	return &session{
@@ -113,7 +113,7 @@ func (s *session) beginTransaction(mode db.AccessMode, config *TransactionConfig
 	}
 
 	// Ensure that the session has a connection
-	err = s.borrowConn()
+	err = s.borrowConn(mode)
 	if err != nil {
 		return nil, err
 	}
@@ -214,9 +214,18 @@ func (s *session) WriteTransaction(
 	return s.runRetriable(db.WriteMode, work, configurers...)
 }
 
-func (s *session) borrowConn() error {
+func (s *session) borrowConn(mode db.AccessMode) error {
 	s.returnConn()
-	servers := s.router()
+	var servers []string
+	var err error
+	if mode == db.ReadMode {
+		servers, err = s.router.Readers()
+	} else {
+		servers, err = s.router.Writers()
+	}
+	if err != nil {
+		return err
+	}
 
 	var (
 		ctx    context.Context
@@ -275,7 +284,7 @@ func (s *session) Run(
 		return nil, err
 	}
 
-	err = s.borrowConn()
+	err = s.borrowConn(s.defaultMode)
 	if err != nil {
 		return nil, err
 	}
