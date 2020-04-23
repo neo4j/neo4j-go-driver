@@ -21,7 +21,6 @@ package bolt
 
 import (
 	"encoding/binary"
-	"fmt"
 	"io"
 )
 
@@ -86,7 +85,6 @@ func (c *chunker) Write(p []byte) (int, error) {
 
 // Sends all chunks to server
 func (c *chunker) send() error {
-	log(fmt.Sprintf("sending %d chunks", len(c.chunks)))
 	// Discard chunks while writing them
 	for len(c.chunks) > 0 {
 		// Pop chunk
@@ -98,8 +96,6 @@ func (c *chunker) send() error {
 		// user data, not size itself or trailing zeroes.
 		size := uint16(len(chunk) - 2)
 		binary.BigEndian.PutUint16(chunk, size)
-
-		log(fmt.Sprintf("sending chunk of size %d", size))
 
 		// Write chunk to underlying writer (probably the TCP connection)
 		_, err := c.wr.Write(chunk)

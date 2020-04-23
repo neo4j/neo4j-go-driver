@@ -49,37 +49,51 @@ func getRoutingTable(conn db.Connection, context map[string]string) (*db.Routing
 	// Just empty the stream, ignore the summary should leave the connecion in ready state
 	conn.Next(stream.Handle)
 
-	// Parse the record into a routing table
-	ttl, ttlOk := rec.Values[0].(int64)
-	list, lOk := rec.Values[1].([]interface{})
-	if !ttlOk || !lOk {
-		return nil, errors.New("Parse error")
+	table := parseRoutingTableRecord(rec)
+	if table == nil {
+		return nil, errors.New("Parser error")
 	}
+
+	return table, nil
+}
+
+// Parses a record assumed to contain a routing table into common db API routing table struct
+// Returns nil if error while parsing
+func parseRoutingTableRecord(rec *db.Record) *db.RoutingTable {
+	ttl, ok := rec.Values[0].(int64)
+	if !ok {
+		return nil
+	}
+	listOfX, ok := rec.Values[1].([]interface{})
+	if !ok {
+		return nil
+	}
+
 	table := &db.RoutingTable{
 		TimeToLive: int(ttl),
 	}
 
-	for _, x := range list {
-		m, mOk := x.(map[string]interface{})
-		if !mOk {
-			return nil, errors.New("Parse error 2")
+	for _, x := range listOfX {
+		// Each x should be a map consisting of addresses and the role
+		m, ok := x.(map[string]interface{})
+		if !ok {
+			return nil
 		}
-		xaddresses, aOk := m["addresses"].([]interface{})
-		_, rOk := m["role"].(string)
-		if !aOk || !rOk {
-			return nil, errors.New("Parse error 3")
+		addressesX, ok := m["addresses"].([]interface{})
+		if !ok {
+			return nil
 		}
-		addresses := make([]string, len(xaddresses))
-		for i, xaddr := range xaddresses {
-			a, aOk := xaddr.(string)
-			if !aOk {
-				return nil, errors.New("Parse error 4")
+		addresses := make([]string, len(addressesX))
+		for i, addrX := range addressesX {
+			addr, ok := addrX.(string)
+			if !ok {
+				return nil
 			}
-			addresses[i] = a
+			addresses[i] = addr
 		}
-		role, rOk := m["role"].(string)
-		if !rOk {
-			return nil, errors.New("Parse error 5")
+		role, ok := m["role"].(string)
+		if !ok {
+			return nil
 		}
 		switch role {
 		case "READ":
@@ -90,6 +104,5 @@ func getRoutingTable(conn db.Connection, context map[string]string) (*db.Routing
 			table.Routers = addresses
 		}
 	}
-
-	return table, nil
+	return table
 }
