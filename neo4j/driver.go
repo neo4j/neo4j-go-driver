@@ -127,6 +127,7 @@ func NewDriver(target string, auth AuthToken, configurers ...func(*Config)) (Dri
 type sessionRouter interface {
 	Readers() ([]string, error)
 	Writers() ([]string, error)
+	Invalidate()
 }
 
 type driver struct {

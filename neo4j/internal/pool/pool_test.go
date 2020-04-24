@@ -216,6 +216,27 @@ func TestPoolResourceUsage(ot *testing.T) {
 		return &fakeConn{serverName: s, isAlive: true, birthdate: birthdate}, nil
 	}
 
+	assertNumberOfServers := func(t *testing.T, p *Pool, expectedNum int) {
+		t.Helper()
+		actualNum := len(p.getServers())
+		if actualNum != expectedNum {
+			t.Fatalf("Expected number of servers to be %d but was %d", expectedNum, actualNum)
+		}
+	}
+
+	assertNumberOfIdle := func(t *testing.T, p *Pool, serverName string, expectedNum int) {
+		t.Helper()
+		servers := p.getServers()
+		server := servers[serverName]
+		if server == nil {
+			t.Fatalf("Server %s not found", serverName)
+		}
+		actualNum := server.numIdle()
+		if actualNum != expectedNum {
+			t.Fatalf("Expected number of idle conns on %s to be %d but was %d", serverName, expectedNum, actualNum)
+		}
+	}
+
 	ot.Run("Use order of named servers as priority when creating new servers", func(t *testing.T) {
 		p := New(1, maxAge, succeedingConnect)
 		p.now = func() time.Time { return birthdate }
@@ -254,25 +275,50 @@ func TestPoolResourceUsage(ot *testing.T) {
 		}
 	})
 
-	ot.Run("Returning last dead connection to server should remove server", func(t *testing.T) {
-		p := New(2, maxAge, succeedingConnect)
-		p.now = func() time.Time { return birthdate }
-		defer p.Close()
-		serverNames := []string{"srvA"}
-		c1, _ := p.Borrow(context.Background(), serverNames, true)
-		c2, _ := p.Borrow(context.Background(), serverNames, true)
-		c1.(*fakeConn).isAlive = false
+	/*
+		ot.Run("Returning last dead connection to server should remove server", func(t *testing.T) {
+			p := New(2, maxAge, succeedingConnect)
+			p.now = func() time.Time { return birthdate }
+			defer p.Close()
+			serverNames := []string{"srvA"}
+			c1, _ := p.Borrow(context.Background(), serverNames, true)
+			c2, _ := p.Borrow(context.Background(), serverNames, true)
+			c1.(*fakeConn).isAlive = false
+			p.Return(c1)
+			servers := p.getServers()
+			if len(servers) != 1 {
+				t.Errorf("Should still be a server")
+			}
+			c2.(*fakeConn).isAlive = false
+			p.Return(c2)
+			//assertNumberOfServers(t, p, 0)
+			assertNumberOfIdle(t, p, "srvA", 0)
+		})
+	*/
+
+	ot.Run("Returning dead connection to server should remove older idle connections", func(t *testing.T) {
+		p := New(3, 0, succeedingConnect)
+		// Trigger creation of three connections on the same server
+		c1, _ := p.Borrow(context.Background(), []string{"A"}, true)
+		c2, _ := p.Borrow(context.Background(), []string{"A"}, true)
+		c3, _ := p.Borrow(context.Background(), []string{"A"}, true)
+		// Manipulate birthdate on the connections
+		now := time.Now()
+		c1.(*fakeConn).birthdate = now.Add(-1 * time.Second)
+		c1.(*fakeConn).id = 1
+		c2.(*fakeConn).birthdate = now
+		c2.(*fakeConn).id = 2
+		c3.(*fakeConn).birthdate = now.Add(1 * time.Second)
+		c3.(*fakeConn).id = 3
+		// Return the old and young connections to make them idle
 		p.Return(c1)
-		servers := p.getServers()
-		if len(servers) != 1 {
-			t.Errorf("Should still be a server")
-		}
+		p.Return(c3)
+		assertNumberOfServers(t, p, 1)
+		assertNumberOfIdle(t, p, "A", 2)
+		// Kill the middle aged connection and return it
 		c2.(*fakeConn).isAlive = false
 		p.Return(c2)
-		servers = p.getServers()
-		if len(servers) != 0 {
-			t.Errorf("Should be no servers")
-		}
+		assertNumberOfIdle(t, p, "A", 1)
 	})
 
 	ot.Run("Do not borrow too old connections", func(t *testing.T) {
@@ -302,9 +348,6 @@ func TestPoolResourceUsage(ot *testing.T) {
 		if c1 == nil || c2 == nil {
 			t.Error("Didn't get connections")
 		}
-		servers := p.getServers()
-		if len(servers) != 2 {
-			t.Error("Should be two servers, one overflowed?")
-		}
+		assertNumberOfServers(t, p, 2)
 	})
 }

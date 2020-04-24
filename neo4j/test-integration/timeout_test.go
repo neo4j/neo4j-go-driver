@@ -66,6 +66,7 @@ var _ = Describe("Timeout and Lifetime", func() {
 		defer session2.Close()
 
 		_, err = session2.Run("RETURN 1", nil)
+		Expect(err).ToNot(BeNil())
 		//Expect(err).To(test.BeConnectorErrorWithCode(0x601))
 	})
 

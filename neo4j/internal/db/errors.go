@@ -91,6 +91,14 @@ func (e *DatabaseError) IsRetriableTransient() bool {
 	return true
 }
 
+func (e *DatabaseError) IsRetriableCluster() bool {
+	switch e.Code {
+	case "Neo.ClientError.Cluster.NotALeader", "Neo.ClientError.General.ForbiddenOnReadOnlyDatabase":
+		return true
+	}
+	return false
+}
+
 func (e *DatabaseError) IsClient() bool {
 	return e.getCls() == dbErrClsClient
 }

@@ -22,6 +22,7 @@ package neo4j
 import (
 	"context"
 	"errors"
+	"time"
 
 	"github.com/neo4j/neo4j-go-driver/neo4j/internal/db"
 	"github.com/neo4j/neo4j-go-driver/neo4j/internal/pool"
@@ -60,6 +61,8 @@ type session struct {
 	conn        db.Connection
 	inTx        bool
 	res         *result
+	sleep       func(d time.Duration)
+	now         func() time.Time
 }
 
 // Remove empty string bookmarks to check for "bad" callers
@@ -95,6 +98,8 @@ func newSession(config *Config, router sessionRouter, pool *pool.Pool,
 		pool:        pool,
 		defaultMode: mode,
 		bookmarks:   cleanupBookmarks(bookmarks),
+		sleep:       time.Sleep,
+		now:         time.Now,
 	}
 }
 
@@ -116,14 +121,6 @@ func (s *session) LastBookmark() string {
 }
 
 func (s *session) BeginTransaction(configurers ...func(*TransactionConfig)) (Transaction, error) {
-	config := TransactionConfig{Timeout: 0, Metadata: nil}
-	for _, c := range configurers {
-		c(&config)
-	}
-	return s.beginTransaction(s.defaultMode, &config)
-}
-
-func (s *session) beginTransaction(mode db.AccessMode, config *TransactionConfig) (Transaction, error) {
 	// Guard for more than one transaction per session
 	if s.inTx {
 		return nil, errors.New("Already in tx")
@@ -135,8 +132,19 @@ func (s *session) beginTransaction(mode db.AccessMode, config *TransactionConfig
 		return nil, err
 	}
 
+	config := TransactionConfig{Timeout: 0, Metadata: nil}
+	for _, c := range configurers {
+		c(&config)
+	}
+
+	s.returnConn()
+
+	return s.beginTransaction(s.defaultMode, &config)
+}
+
+func (s *session) beginTransaction(mode db.AccessMode, config *TransactionConfig) (Transaction, error) {
 	// Ensure that the session has a connection
-	err = s.borrowConn(mode)
+	err := s.borrowConn(mode)
 	if err != nil {
 		return nil, err
 	}
@@ -193,17 +201,8 @@ func (s *session) beginTransaction(mode db.AccessMode, config *TransactionConfig
 	}, nil
 }
 
-func (s *session) runRetriable(
-	mode db.AccessMode,
-	work TransactionWork, configurers ...func(*TransactionConfig)) (interface{}, error) {
-
-	config := TransactionConfig{Timeout: 0, Metadata: nil}
-	for _, c := range configurers {
-		c(&config)
-	}
-
-	// TODO: Retry
-	tx, err := s.beginTransaction(mode, &config)
+func (s *session) runOneTry(mode db.AccessMode, work TransactionWork, config *TransactionConfig) (interface{}, error) {
+	tx, err := s.beginTransaction(mode, config)
 	if err != nil {
 		return nil, err
 	}
@@ -213,7 +212,6 @@ func (s *session) runRetriable(
 
 	x, err := work(tx)
 	if err != nil {
-		// Rely on rollback in tx.Close
 		return nil, err
 	}
 
@@ -223,6 +221,81 @@ func (s *session) runRetriable(
 	}
 
 	return x, nil
+}
+
+func (s *session) runRetriable(
+	mode db.AccessMode,
+	work TransactionWork, configurers ...func(*TransactionConfig)) (interface{}, error) {
+
+	// Guard for more than one transaction per session
+	if s.inTx {
+		return nil, errors.New("Already in tx")
+	}
+
+	config := TransactionConfig{Timeout: 0, Metadata: nil}
+	for _, c := range configurers {
+		c(&config)
+	}
+
+	// Consume current result if any
+	err := s.consumeCurrent()
+	if err != nil {
+		return nil, err
+	}
+
+	var (
+		maxDeadErrors    = s.config.MaxConnectionPoolSize / 2
+		maxClusterErrors = 1
+		throttle         = throttler(1 * time.Second)
+		start            time.Time
+	)
+	for {
+		// Always return the current connection before trying (again)
+		s.returnConn()
+
+		x, err := s.runOneTry(mode, work, &config)
+		if err == nil {
+			return x, nil
+		}
+
+		// Check retry timeout
+		if start.IsZero() {
+			start = s.now()
+		}
+		if time.Since(start) > s.config.MaxTransactionRetryTime {
+			return nil, err
+		}
+
+		// Failed, check cause and determine next action
+
+		// If the connection is dead just return the connection, get another and try again, no sleep
+		if !s.conn.IsAlive() {
+			maxDeadErrors--
+			if maxDeadErrors < 0 {
+				return nil, err
+			}
+			continue
+		}
+
+		// Check type of error, this assumes a well behaved transaction func, could be better
+		// to keep last error in the connection in the future.
+		switch e := err.(type) {
+		case *db.DatabaseError:
+			switch {
+			case e.IsRetriableCluster():
+				s.router.Invalidate()
+				maxClusterErrors--
+				if maxClusterErrors < 0 {
+					return nil, err
+				}
+			case e.IsRetriableTransient():
+				throttle = throttle.next()
+				s.sleep(throttle.delay())
+			}
+		default:
+			return nil, err
+		}
+	}
 }
 
 func (s *session) ReadTransaction(
@@ -238,7 +311,6 @@ func (s *session) WriteTransaction(
 }
 
 func (s *session) borrowConn(mode db.AccessMode) error {
-	s.returnConn()
 	var servers []string
 	var err error
 	if mode == db.ReadMode {
@@ -306,6 +378,7 @@ func (s *session) Run(
 	if err != nil {
 		return nil, err
 	}
+	s.returnConn()
 
 	err = s.borrowConn(s.defaultMode)
 	if err != nil {

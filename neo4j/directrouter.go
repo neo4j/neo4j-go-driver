@@ -31,3 +31,6 @@ func (r *directRouter) Readers() ([]string, error) {
 func (r *directRouter) Writers() ([]string, error) {
 	return []string{r.server}, nil
 }
+
+func (r *directRouter) Invalidate() {
+}

@@ -105,3 +105,11 @@ func (r *Router) Writers() ([]string, error) {
 	}
 	return table.Writers, nil
 }
+
+func (r *Router) Invalidate() {
+	r.tableMut.Lock()
+	defer r.tableMut.Unlock()
+	// Reset due time to the 70s, this will make next access refresh the routing table using
+	// last set of routers instead of the original one.
+	r.dueUnix = 0
+}

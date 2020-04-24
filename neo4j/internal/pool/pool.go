@@ -26,6 +26,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sort"
 	"sync"
 	"time"
 )
@@ -58,7 +59,17 @@ type Pool struct {
 	closed     bool
 }
 
+type serverPenalty struct {
+	name    string
+	penalty uint32
+}
+
 func New(maxSize int, maxAge time.Duration, connect Connect) *Pool {
+	// Means infinite life, simplifies checking later on
+	if maxAge <= 0 {
+		maxAge = 1<<63 - 1
+	}
+
 	p := &Pool{
 		maxSize: maxSize,
 		maxAge:  maxAge,
@@ -70,11 +81,10 @@ func New(maxSize int, maxAge time.Duration, connect Connect) *Pool {
 }
 
 func log(msg string) {
-	//fmt.Printf("pool: %s\n", msg)
+	fmt.Printf("pool: %s\n", msg)
 }
 
 func (p *Pool) Close() {
-	log("closing")
 	p.closed = true
 	// Cancel everything in the queue by just emptying at and let all callers timeout
 	p.queueMut.Lock()
@@ -87,108 +97,9 @@ func (p *Pool) Close() {
 		delete(p.servers, n)
 	}
 	p.serversMut.Unlock()
-	log("closed!")
 }
 
-// Tries to find an unused connection on one of the servers we're already connected to.
-func (p *Pool) tryExistingConnectionToKnownServer(serverNames []string) Connection {
-	p.serversMut.Lock()
-	defer p.serversMut.Unlock()
-
-	for _, s := range serverNames {
-		b := p.servers[s]
-		if b == nil {
-			continue
-		}
-		for {
-			c := b.getIdle()
-			if c == nil {
-				break
-			}
-			log(fmt.Sprintf("%s: found connection to use", s))
-			return c
-		}
-	}
-
-	return nil
-}
-
-func (p *Pool) tryNewConnectionToKnownServer(serverNames []string, checkTimeout func() bool, errSeed error) (Connection, error) {
-	p.serversMut.Lock()
-	defer p.serversMut.Unlock()
-
-	var (
-		err error = errSeed
-		c   Connection
-	)
-
-	for _, s := range serverNames {
-		if checkTimeout() {
-			return nil, err
-		}
-
-		b := p.servers[s]
-		if b == nil {
-			continue
-		}
-		if b.size() >= p.maxSize {
-			continue
-		}
-		// Try to connect, this might take a while
-		// Important that errors from p.connect is propagated
-		log(fmt.Sprintf("%s: connecting", s))
-		c, err = p.connect(s)
-		if err != nil || c == nil {
-			continue
-		}
-		// Register the connection to the server
-		log(fmt.Sprintf("%s: connection registered", s))
-		b.regBusy(c)
-		return c, nil
-	}
-	return nil, err
-}
-
-func (p *Pool) tryNewServer(serverNames []string, checkTimeout func() bool, errSeed error) (Connection, error) {
-	p.serversMut.Lock()
-	defer p.serversMut.Unlock()
-
-	var (
-		err error = errSeed
-		c   Connection
-	)
-
-	for _, s := range serverNames {
-		if checkTimeout() {
-			return nil, err
-		}
-
-		b := p.servers[s]
-		if b != nil {
-			continue
-		}
-
-		// Try to connect and add this server as known
-		// Important that errors from p.connect is propagated
-		log(fmt.Sprintf("%s: server pending, connecting", s))
-		c, err = p.connect(s)
-		if err != nil || c == nil {
-			// Blacklist this server for a while ?
-			log(fmt.Sprintf("%s: server cancelled", s))
-			continue
-		}
-		// Ok, got a connection, track this server and the connection
-		b = &server{}
-		p.servers[s] = b
-		log(fmt.Sprintf("%s: server added", s))
-		b.regBusy(c)
-		log(fmt.Sprintf("%s: conn registered", s))
-		return c, nil
-	}
-	return nil, err
-}
-
-func (p *Pool) anyExistingConnections(serverNames []string) bool {
+func (p *Pool) anyExistingConnectionsOnServer(serverNames []string) bool {
 	p.serversMut.Lock()
 	defer p.serversMut.Unlock()
 	for _, s := range serverNames {
@@ -220,16 +131,101 @@ func (p *Pool) getServers() map[string]*server {
 	return servers
 }
 
+// Prune all old connection on all the servers, this makes sure that servers
+// gets removed from the map at some point in time (as long as someone
+// borrows new connections). If there is a noticed failed connect still active
+// we should wait a while with removal to get prioritization right.
+func (p *Pool) cleanupServers() {
+	p.serversMut.Lock()
+	defer p.serversMut.Unlock()
+	now := p.now()
+	for n, s := range p.servers {
+		s.removeIdleOlderThan(now, p.maxAge)
+		if s.size() == 0 && !s.hasFailedConnect(now) {
+			delete(p.servers, n)
+		}
+	}
+}
+
+func (p *Pool) tryBorrow(serverName string) (Connection, error) {
+	// For now, lock complete servers map to avoid over connecting but with the downside
+	// that long connect times will block connects to other servers as well. To fix this
+	// we would need to add a pending connect to the server and lock per server.
+	p.serversMut.Lock()
+	defer p.serversMut.Unlock()
+
+	srv := p.servers[serverName]
+	if srv != nil {
+		// Try to get an existing idle connection
+		if c := srv.getIdle(); c != nil {
+			return c, nil
+		}
+		if srv.size() >= p.maxSize {
+			return nil, &PoolFull{servers: []string{serverName}}
+		}
+	} else {
+		// Make sure that there is a server in the map
+		srv = &server{}
+		p.servers[serverName] = srv
+	}
+
+	// No idle connection, try to connect
+	c, err := p.connect(serverName)
+	if err != nil {
+		// Failed to connect, keep track that it was bad for a while
+		srv.notifyFailedConnect(p.now())
+		return nil, err
+	}
+
+	// Ok, got a connection, register the connection
+	srv.registerBusy(c)
+	srv.notifySuccesfulConnect()
+	return c, nil
+}
+
+func (p *Pool) getPenaltiesForServers(serverNames []string) []serverPenalty {
+	p.serversMut.Lock()
+	defer p.serversMut.Unlock()
+
+	// Retrieve penalty for each server
+	penalties := make([]serverPenalty, len(serverNames))
+	now := p.now()
+	for i, n := range serverNames {
+		s := p.servers[n]
+		penalties[i].name = n
+		if s != nil {
+			penalties[i].penalty = s.calculatePenalty(now)
+		} else {
+			penalties[i].penalty = newConnectionPenalty
+		}
+	}
+	return penalties
+}
+
+func (p *Pool) tryAnyIdle(serverNames []string) Connection {
+	p.serversMut.Lock()
+	defer p.serversMut.Unlock()
+	for _, serverName := range serverNames {
+		srv := p.servers[serverName]
+		if srv != nil {
+			// Try to get an existing idle connection
+			conn := srv.getIdle()
+			if conn != nil {
+				return conn
+			}
+		}
+	}
+	return nil
+}
+
 // Borrow tries to borrow an existing database connection or tries to create a new one
 // if none exists. The wait flag indicates if the caller wants to wait for a connection
 // to be returned if there aren't any idle connection available.
-func (p *Pool) Borrow(ctx context.Context, servers []string, wait bool) (Connection, error) {
-	timedOut := false
+func (p *Pool) Borrow(ctx context.Context, serverNames []string, wait bool) (Connection, error) {
 	timeOut := func() bool {
 		select {
 		case <-ctx.Done():
 			log("time out")
-			timedOut = true
 			return true
 		default:
 			return false
@@ -240,61 +236,41 @@ func (p *Pool) Borrow(ctx context.Context, servers []string, wait bool) (Connect
 		return nil, &PoolClosed{}
 	}
 
-	log(fmt.Sprintf("Borrow %s", servers))
+	log(fmt.Sprintf("Borrow %s", serverNames))
+
+	// Cleans up and prepares for borrowing
+	p.cleanupServers()
+
+	// Retrieve penalty for each server
+	penalties := p.getPenaltiesForServers(serverNames)
+	// Sort server penalties by lowest penalty
+	sort.Slice(penalties, func(i, j int) bool {
+		return penalties[i].penalty < penalties[j].penalty
+	})
+
 	var err error
-	var c Connection
-
-	// Prune all connection on all the servers, this makes sure that servers
-	// gets removed from the map at some point in time (as long as someone
-	// borrows new connections)
-	p.serversMut.Lock()
-	for n, s := range p.servers {
-		s.prune(p.keepConnection)
-		if s.size() == 0 {
-			delete(p.servers, n)
+	var conn Connection
+	for _, s := range penalties {
+		// Check if we have timed out
+		if timeOut() {
+			return nil, nil
 		}
-	}
-	p.serversMut.Unlock()
 
-	// Try to use an existing connection to a known server, that is cheapest.
-	c = p.tryExistingConnectionToKnownServer(servers)
-	if c != nil {
-		return c, nil
-	}
-	if timeOut() {
-		return nil, &PoolTimeout{err: ctx.Err(), servers: servers}
-	}
-
-	// Prefer to have few connections to many servers over many connections to few servers.
-	//  A non-functional server would have it's server pruned above but retried to connect to
-	// here, could be good if the server went down and now is up again but could also be bad if
-	// it is still down.
-	c, err = p.tryNewServer(servers, timeOut, nil)
-	if c != nil {
-		return c, nil
-	}
-	if timedOut {
-		return nil, &PoolTimeout{err: ctx.Err(), servers: servers}
-	}
-
-	// Try another connection to one of the known servers
-	c, err = p.tryNewConnectionToKnownServer(servers, timeOut, err)
-	if c != nil {
-		return c, nil
-	}
-	if timedOut {
-		return nil, &PoolTimeout{err: ctx.Err(), servers: servers}
+		conn, err = p.tryBorrow(s.name)
+		if err == nil {
+			return conn, nil
+		}
 	}
 
 	if !wait {
-		return nil, &PoolFull{servers: servers}
+		return nil, &PoolFull{servers: serverNames}
 	}
 
 	// If there are no connections for any of the servers, there is no point in waiting for anything
 	// to be returned.
-	if !p.anyExistingConnections(servers) {
+	if !p.anyExistingConnectionsOnServer(serverNames) {
 		if err == nil {
-			err = &PoolTimeout{err: errors.New("No connection to wait for"), servers: servers}
+			err = &PoolTimeout{err: errors.New("No connection to wait for"), servers: serverNames}
 		}
 		return nil, err
 	}
@@ -304,15 +280,15 @@ func (p *Pool) Borrow(ctx context.Context, servers []string, wait bool) (Connect
 	// Ok, now that we own the queue we can add the item there but between getting the lock
 	// and above check for an existing connection another thread might have returned a connection
 	// so check again to avoid potentially starving this thread.
-	c = p.tryExistingConnectionToKnownServer(servers)
-	if c != nil {
+	conn = p.tryAnyIdle(serverNames)
+	if conn != nil {
 		p.queueMut.Unlock()
-		return c, nil
+		return conn, nil
 	}
 	// Add a waiting request to the queue and unlock the queue to let other threads that returns
 	// their connections access the queue.
 	q := &qitem{
-		servers: servers,
+		servers: serverNames,
 		wakeup:  make(chan bool),
 	}
 	e := p.queue.PushBack(q)
@@ -334,43 +310,41 @@ func (p *Pool) Borrow(ctx context.Context, servers []string, wait bool) (Connect
 			log("got a conn, recovering")
 			return q.conn, nil
 		}
-		return nil, &PoolTimeout{err: ctx.Err(), servers: servers}
+		return nil, &PoolTimeout{err: ctx.Err(), servers: serverNames}
 	}
 }
 
-func (p *Pool) unreg(serverName string, c Connection) {
+func (p *Pool) unreg(serverName string, c Connection, now time.Time) {
 	p.serversMut.Lock()
 	defer p.serversMut.Unlock()
 
+	defer func() {
+		// Close connection in another thread to avoid potential long blocking operation during close.
+		go c.Close()
+	}()
+
 	server := p.servers[serverName]
 	// Check for strange condition of not finding the server.
-	if server != nil {
-		server.unregBusy(c)
-		if server.size() == 0 {
-			delete(p.servers, serverName)
-		}
+	if server == nil {
+		fmt.Println("Not found")
+		return
 	}
 
-	// Close connection in another thread to avoid potential long blocking operation during close.
-	go func() {
-		c.Close()
-	}()
+	server.unregisterBusy(c)
+	if server.size() == 0 && !server.hasFailedConnect(now) {
+		fmt.Println("zero")
+		delete(p.servers, serverName)
+	}
 }
 
-func (p *Pool) keepConnection(c Connection) bool {
-	if !c.IsAlive() {
-		return false
+func (p *Pool) removeIdleOlderThanOnServer(serverName string, now time.Time, maxAge time.Duration) {
+	p.serversMut.Lock()
+	defer p.serversMut.Unlock()
+	server := p.servers[serverName]
+	if server == nil {
+		return
 	}
-
-	// Zero or less disables the check
-	if p.maxAge > 0 {
-		age := p.now().Sub(c.Birthdate())
-		if age >= p.maxAge {
-			return false
-		}
-	}
-
-	return true
+	server.removeIdleOlderThan(now, maxAge)
 }
 
 func (p *Pool) Return(c Connection) {
@@ -382,10 +356,27 @@ func (p *Pool) Return(c Connection) {
 		return
 	}
 
-	if !p.keepConnection(c) {
-		log(fmt.Sprintf("%s: throwing away connection", serverName))
-		p.unreg(serverName, c)
-		// This might cause someone waiting in the queue to wait in vain.
+	// If the connection is dead, remove all other idle connections on the same server that older
+	// or of the same age as the dead connection, otherwise perform normal cleanup of old connections
+	maxAge := p.maxAge
+	now := p.now()
+	age := now.Sub(c.Birthdate())
+	isAlive := c.IsAlive()
+	if !isAlive {
+		// Since this connection has died all other connections that connected before this one
+		// might also be bad, remove the idle ones.
+		if age < maxAge {
+			maxAge = age
+		}
+	}
+	p.removeIdleOlderThanOnServer(serverName, now, maxAge)
+
+	// Shouldn't return a too old or dead connection back to the pool
+	if !isAlive || age >= p.maxAge {
+		p.unreg(serverName, c, now)
+		// Returning here could cause a waiting thread to wait until it times out, to do it
+		// properly we could wake up threads that waits on the server and wake them up if there
+		// are no more connections to wait for.
 		return
 	}
 
@@ -409,12 +400,12 @@ func (p *Pool) Return(c Connection) {
 	}
 	p.queueMut.Unlock()
 
-	// Just put it back in the server
+	// Just put it back in the list of idle connections for this server
 	p.serversMut.Lock()
 	defer p.serversMut.Unlock()
 	server := p.servers[serverName]
 	if server != nil { // Strange when server not found
 		log(fmt.Sprintf("%s: back in server", serverName))
-		server.retBusy(c)
+		server.returnBusy(c)
 	}
 }
