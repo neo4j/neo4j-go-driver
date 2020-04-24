@@ -62,8 +62,31 @@ type session struct {
 	res         *result
 }
 
-func newSession(
-	config *Config, router sessionRouter, pool *pool.Pool,
+// Remove empty string bookmarks to check for "bad" callers
+// To avoid allocating, first check if this is a problem
+func cleanupBookmarks(bookmarks []string) []string {
+	hasBad := false
+	for _, b := range bookmarks {
+		if len(b) == 0 {
+			hasBad = true
+			break
+		}
+	}
+
+	if !hasBad {
+		return bookmarks
+	}
+
+	cleaned := make([]string, 0, len(bookmarks)-1)
+	for _, b := range bookmarks {
+		if len(b) > 0 {
+			cleaned = append(cleaned, b)
+		}
+	}
+	return cleaned
+}
+
+func newSession(config *Config, router sessionRouter, pool *pool.Pool,
 	mode db.AccessMode, bookmarks []string) *session {
 
 	return &session{
@@ -71,7 +94,7 @@ func newSession(
 		router:      router,
 		pool:        pool,
 		defaultMode: mode,
-		bookmarks:   bookmarks,
+		bookmarks:   cleanupBookmarks(bookmarks),
 	}
 }
 
