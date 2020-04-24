@@ -39,6 +39,8 @@ func TestReadTableTable(ot *testing.T) {
 		if err == nil {
 			t.Fatal("Should be an error")
 		}
+		// Error should always indicate that routing table couldn't be retrieved
+		_ = err.(*ReadRoutingTableError)
 	}
 
 	assertTable := func(t *testing.T, table *db.RoutingTable, err error) {

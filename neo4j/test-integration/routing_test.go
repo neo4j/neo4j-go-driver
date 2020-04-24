@@ -112,8 +112,9 @@ var _ = Describe("Routing", func() {
 			Expect(err).To(BeNil())
 
 			result, err = session.Run("RETURN 1", nil)
-			//Expect(err).To(BeConnectorErrorWithCode(0x800))
 			Expect(err).ToNot(BeNil())
+			errDescr := err.Error()
+			Expect(errDescr).To(ContainSubstring("rout"))
 		})
 	})
 

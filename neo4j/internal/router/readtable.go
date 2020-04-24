@@ -30,7 +30,7 @@ import (
 // from the supplied pool.
 func readTable(ctx context.Context, pool Pool, routers []string, routerContext map[string]string) (*db.RoutingTable, error) {
 	// Preserve last error to be returned, set a default for case of no routers
-	var err error = &db.RoutingNotSupportedError{Server: "none"}
+	var err error = &ReadRoutingTableError{}
 
 	// Try the routers one at the time since some of them might no longer support routing and we
 	// can't force the pool to not re-use these when putting them back in the pool and retrieving
@@ -40,8 +40,9 @@ func readTable(ctx context.Context, pool Pool, routers []string, routerContext m
 		if conn, err = pool.Borrow(ctx, []string{router}, true); err != nil {
 			// Check if failed due to context timing out
 			if ctx.Err() != nil {
-				return nil, err
+				return nil, wrapInReadRoutingTableError(router, ctx.Err())
 			}
+			err = wrapInReadRoutingTableError(router, err)
 			continue
 		}
 		defer pool.Return(conn)
@@ -49,6 +50,7 @@ func readTable(ctx context.Context, pool Pool, routers []string, routerContext m
 		discovery, ok := conn.(db.ClusterDiscovery)
 		if !ok {
 			err = &db.RoutingNotSupportedError{Server: conn.ServerName()}
+			err = wrapInReadRoutingTableError(router, err)
 			continue
 		}
 
@@ -57,6 +59,7 @@ func readTable(ctx context.Context, pool Pool, routers []string, routerContext m
 		if err == nil {
 			return table, nil
 		}
+		err = wrapInReadRoutingTableError(router, err)
 	}
 	return nil, err
 }
