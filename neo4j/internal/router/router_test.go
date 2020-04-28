@@ -88,7 +88,7 @@ func assertNum(t *testing.T, x, y int, msg string) {
 	}
 }
 
-func TestRespectsTimeToLive(t *testing.T) {
+func TestRespectsTimeToLiveAndInvalidate(t *testing.T) {
 	numfetch := 0
 	table := &db.RoutingTable{TimeToLive: 1}
 	pool := &poolFake{
@@ -116,6 +116,15 @@ func TestRespectsTimeToLive(t *testing.T) {
 	n = n.Add(2 * time.Second)
 	router.Readers()
 	assertNum(t, numfetch, 2, "Should have have fetched")
+
+	// Just another one to make sure we're cached
+	router.Readers()
+	assertNum(t, numfetch, 2, "Should not have have fetched")
+
+	// Invalidate should force fetching
+	router.Invalidate()
+	router.Readers()
+	assertNum(t, numfetch, 3, "Should have have fetched")
 }
 
 // Verify that when the routing table can not be retrieved from the root router, a callback

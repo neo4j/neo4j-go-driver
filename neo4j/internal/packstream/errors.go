@@ -2,6 +2,7 @@ package packstream
 
 import (
 	"fmt"
+	"reflect"
 )
 
 type OverflowError struct {
@@ -13,11 +14,11 @@ func (e *OverflowError) Error() string {
 }
 
 type UnsupportedTypeError struct {
-	msg string
+	t reflect.Type
 }
 
 func (e *UnsupportedTypeError) Error() string {
-	return e.msg
+	return fmt.Sprintf("Packing of type '%s' is not supported", e.t.String())
 }
 
 type IoError struct {
@@ -35,4 +36,3 @@ type IllegalFormatError struct {
 func (e *IllegalFormatError) Error() string {
 	return e.msg
 }
-

@@ -173,6 +173,12 @@ func (s *session) beginTransaction(mode db.AccessMode, config *TransactionConfig
 
 			streamHandle, err := conn.RunTx(txHandle, cypher, patchInMapX(params))
 			if err != nil {
+				// To be backwards compatible we delay the error here if it is a database error.
+				// The old implementation just sent all the commands and didn't wait for an answer
+				// until starting to consume or iterate.
+				if _, isDbErr := err.(*db.DatabaseError); isDbErr {
+					return &delayedErrorResult{err: err}, nil
+				}
 				return nil, err
 			}
 			s.res = newResult(conn, streamHandle, cypher, params)
@@ -252,10 +258,16 @@ func (s *session) runRetriable(
 	for {
 		// Always return the current connection before trying (again)
 		s.returnConn()
+		s.res = nil
 
 		x, err := s.runOneTry(mode, work, &config)
 		if err == nil {
 			return x, nil
+		}
+
+		// If we failed due to connect problem, just give up since the pool tries really hard
+		if s.conn == nil {
+			return nil, err
 		}
 
 		// Check retry timeout
@@ -291,6 +303,8 @@ func (s *session) runRetriable(
 			case e.IsRetriableTransient():
 				throttle = throttle.next()
 				s.sleep(throttle.delay())
+			default:
+				return nil, err
 			}
 		default:
 			return nil, err
@@ -410,11 +424,7 @@ func (s *session) Run(
 }
 
 func (s *session) Close() error {
-	err := s.consumeCurrent()
-	if err != nil {
-		return err
-	}
-
+	s.consumeCurrent()
 	s.returnConn()
 	return nil
 }

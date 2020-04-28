@@ -281,8 +281,10 @@ var _ = Describe("Bookmark", func() {
 			defer tx.Close()
 
 			_, err = tx.Run("RETURN", nil)
-			Expect(err).To(Not(BeNil()))
+			Expect(err).To(BeNil())
 
+			err = tx.Close()
+			Expect(err).To(Not(BeNil()))
 			Expect(session.LastBookmark()).To(Equal(bookmark))
 		})
 
@@ -399,14 +401,11 @@ var _ = Describe("Bookmark", func() {
 		Specify("the request should fail", func() {
 			tx, err := session.BeginTransaction()
 
-			// If transactions are created lazily, run something that is valid
-			// on the transaction, this should cause it to fail.
-			if tx != nil && err == nil {
-				_, err = tx.Run("MATCH (n:Whatever) RETURN n", nil)
-				tx.Rollback()
-			}
-
+			Expect(tx).To(BeNil())
 			Expect(neo4j.IsTransientError(err)).To(BeTrue())
+			//Expect(err).To(ContainMessage("Database not up to the requested version"))
+			errDesc := err.Error()
+			Expect(errDesc).To(ContainSubstring("Database not up to the requested version"))
 		})
 	})
 

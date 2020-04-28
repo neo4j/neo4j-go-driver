@@ -82,12 +82,14 @@ func TestBolt3(ot *testing.T) {
 	}
 
 	assertBoltState := func(t *testing.T, expected int, bolt *bolt3) {
+		t.Helper()
 		if expected != bolt.state {
 			t.Errorf("Bolt is in unexpected state %d vs %d", expected, bolt.state)
 		}
 	}
 
 	assertBoltDead := func(t *testing.T, bolt *bolt3) {
+		t.Helper()
 		if bolt.IsAlive() {
 			t.Error("Bolt is alive when it should be dead")
 		}
@@ -114,6 +116,7 @@ func TestBolt3(ot *testing.T) {
 			srv.serveRun(recsStrm)
 		})
 		defer cleanup()
+		defer bolt.Close()
 
 		str, _ := bolt.Run("MATCH (n) RETURN n", nil, db.ReadMode, nil, 0, nil)
 		assertKeys(t, keys, str)
@@ -136,6 +139,7 @@ func TestBolt3(ot *testing.T) {
 			srv.serveRunTx(recsStrm, true)
 		})
 		defer cleanup()
+		defer bolt.Close()
 
 		tx, err := bolt.TxBegin(db.ReadMode, nil, 0, nil)
 		assertNoError(t, err)
@@ -165,6 +169,7 @@ func TestBolt3(ot *testing.T) {
 			srv.serveRunTx(recsStrm, false)
 		})
 		defer cleanup()
+		defer bolt.Close()
 
 		tx, err := bolt.TxBegin(db.ReadMode, nil, 0, nil)
 		assertNoError(t, err)
@@ -203,6 +208,7 @@ func TestBolt3(ot *testing.T) {
 			srv.closeConnection()
 		})
 		defer cleanup()
+		defer bolt.Close()
 
 		str, err := bolt.Run("MATCH (n) RETURN n", nil, db.ReadMode, nil, 0, nil)
 		assertNoError(t, err)
@@ -216,5 +222,45 @@ func TestBolt3(ot *testing.T) {
 		rec, sum, err = bolt.Next(str.Handle)
 		assertOnlyError(t, rec, sum, err)
 		assertBoltDead(t, bolt)
+	})
+
+	ot.Run("Server fail on run with reset", func(t *testing.T) {
+		bolt, cleanup := connectToServer(t, func(srv *bolt3server) {
+			srv.accept(3)
+			srv.waitForRun()
+			srv.waitForPullAll()
+			srv.sendFailureMsg("code", "msg")
+			srv.waitForReset()
+			srv.sendIgnoredMsg()
+			srv.sendIgnoredMsg()
+			srv.sendSuccess(map[string]interface{}{})
+		})
+		defer cleanup()
+		defer bolt.Close()
+
+		// Fake syntax error that doesn't really matter...
+		_, err := bolt.Run("MATCH (n RETURN n", nil, db.ReadMode, nil, 0, nil)
+		assertDatabaseError(t, err)
+		assertBoltState(t, bolt3_failed, bolt)
+
+		bolt.Reset()
+		assertBoltState(t, bolt3_ready, bolt)
+	})
+
+	ot.Run("Reset while streaming ", func(t *testing.T) {
+		bolt, cleanup := connectToServer(t, func(srv *bolt3server) {
+			srv.accept(3)
+			srv.serveRun(recsStrm)
+			// Reset message is never sent to server since stream is consumed
+		})
+		defer cleanup()
+		defer bolt.Close()
+
+		_, err := bolt.Run("MATCH (n) RETURN n", nil, db.ReadMode, nil, 0, nil)
+		assertNoError(t, err)
+		assertBoltState(t, bolt3_streaming, bolt)
+
+		bolt.Reset()
+		assertBoltState(t, bolt3_ready, bolt)
 	})
 }

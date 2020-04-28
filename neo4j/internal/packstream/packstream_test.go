@@ -160,6 +160,17 @@ func TestPackStream(ot *testing.T) {
 		return b
 	}
 
+	// Some custom types wrapping primitive types
+	type (
+		customBool        bool
+		customFloat       float64
+		customInt         int64
+		customString      string
+		customByteSlice   []byte
+		customStringSlice []string
+		customMapOfInts   map[string]int
+	)
+
 	emptyStruct := &Struct{Tag: 0x66}
 	maxStruct := &Struct{Tag: 0x67, Fields: []interface{}{"1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15"}}
 	structOfStruct := &Struct{Tag: 0x66,
@@ -182,6 +193,9 @@ func TestPackStream(ot *testing.T) {
 		{name: "true", value: true, testUnpacked: true,
 			expectUnpacked: true,
 			expectPacked:   []byte{0xc3}},
+		{name: "custom true", value: customBool(true), testUnpacked: true,
+			expectUnpacked: true,
+			expectPacked:   []byte{0xc3}},
 		{name: "false", value: false, testUnpacked: true,
 			expectUnpacked: false,
 			expectPacked:   []byte{0xc2}},
@@ -191,6 +205,9 @@ func TestPackStream(ot *testing.T) {
 			expectUnpacked: float64(zeroFloat64),
 			expectPacked:   []byte{0xc1, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}},
 		{name: "pi float64", value: piFloat64, testUnpacked: true,
+			expectUnpacked: float64(piFloat64),
+			expectPacked:   []byte{0xc1, 0x40, 0x09, 0x1e, 0xb8, 0x51, 0xeb, 0x85, 0x1f}},
+		{name: "pi custom float64", value: customFloat(piFloat64), testUnpacked: true,
 			expectUnpacked: float64(piFloat64),
 			expectPacked:   []byte{0xc1, 0x40, 0x09, 0x1e, 0xb8, 0x51, 0xeb, 0x85, 0x1f}},
 		{name: "pi float32", value: piFloat32, testUnpacked: true,
@@ -267,6 +284,9 @@ func TestPackStream(ot *testing.T) {
 		{name: "int32", value: aint32, testUnpacked: true,
 			expectUnpacked: int64(aint32),
 			expectPacked:   []byte{0xca, 0x80, 0x00, 0x00, 0x00}},
+		{name: "custom int", value: customInt(aint32), testUnpacked: true,
+			expectUnpacked: int64(aint32),
+			expectPacked:   []byte{0xca, 0x80, 0x00, 0x00, 0x00}},
 
 		// Strings
 		{name: "String, empty", value: "", testUnpacked: true,
@@ -279,6 +299,9 @@ func TestPackStream(ot *testing.T) {
 			expectUnpacked: "12",
 			expectPacked:   []byte{0x82, 0x31, 0x32}},
 		{name: "string, 123", value: "123", testUnpacked: true,
+			expectUnpacked: "123",
+			expectPacked:   []byte{0x83, 0x31, 0x32, 0x33}},
+		{name: "custom string, 123", value: customString("123"), testUnpacked: true,
 			expectUnpacked: "123",
 			expectPacked:   []byte{0x83, 0x31, 0x32, 0x33}},
 		{name: "string, 4, 4->8", value: str15, testUnpacked: true,
@@ -307,6 +330,10 @@ func TestPackStream(ot *testing.T) {
 		{name: "[]byte, some", value: []byte{0x01, 0x02, 0x03}, testUnpacked: true,
 			expectUnpacked: []byte{0x01, 0x02, 0x03},
 			expectPacked:   []byte{0xcc, 0x03, 0x01, 0x02, 0x03}},
+		{name: "custom []byte", value: customByteSlice([]byte{0x01, 0x02, 0x03}),
+			expectUnpacked: []byte{0x01, 0x02, 0x03},
+			// Custom type will cause this to be like any slice, not bytes
+			expectPacked: []byte{0x93, 0x01, 0x02, 0x03}},
 		{name: "[]byte, 8, 8->16", value: byt255, testUnpacked: true,
 			expectUnpacked: byt255,
 			expectPacked:   append([]byte{0xcc, 0xff}, byt255...)},
@@ -338,6 +365,11 @@ func TestPackStream(ot *testing.T) {
 		{name: "[]int64, samples", value: []int64{1, posInt24To40 + 1, 0}, testUnpacked: true,
 			expectUnpacked: []interface{}{int64(1), int64(posInt24To40 + 1), int64(0)},
 			expectPacked:   []byte{0x93, 0x01, 0xca, 0x00, 0x00, 0x80, 0x00, 0x00}},
+		{name: "custom []string", value: customStringSlice([]string{"short", str16}), testUnpacked: true,
+			expectUnpacked: []interface{}{"short", str16},
+			expectPacked: []byte{
+				0x92, 0x85, 0x73, 0x68, 0x6f, 0x72, 0x74, 0xd0, 0x10, 0x61, 0x61, 0x61, 0x61, 0x61,
+				0x61, 0x61, 0x61, 0x61, 0x61, 0x61, 0x61, 0x61, 0x61, 0x61, 0x61}},
 
 		// Slice sizes
 		{name: "array size, 4, 4->8", value: arr15, testUnpacked: true,
@@ -361,6 +393,8 @@ func TestPackStream(ot *testing.T) {
 
 		// Slice of ints (bytes excluded)
 		{name: "[]int, type", value: []int{1},
+			expectPacked: []byte{0x91, 0x01}},
+		{name: "*[]int, type", value: &([]int{1}),
 			expectPacked: []byte{0x91, 0x01}},
 		{name: "[]int8, type", value: []int8{1},
 			expectPacked: []byte{0x91, 0x01}},
@@ -398,6 +432,8 @@ func TestPackStream(ot *testing.T) {
 		// Map[string] of ints
 		{name: "map[string]string, empty", value: map[string]string{},
 			expectPacked: []byte{0xa0}},
+		{name: "*map[string]string, empty", value: &(map[string]string{}),
+			expectPacked: []byte{0xa0}},
 		{name: "map[string]string, sample", value: map[string]string{"key": "value"},
 			expectPacked: []byte{
 				0xa1, 0x83, 0x6b, 0x65, 0x79, 0x85, 0x76, 0x61, 0x6c, 0x75, 0x65}},
@@ -418,6 +454,8 @@ func TestPackStream(ot *testing.T) {
 		{name: "map[string]int32, type", value: map[string]int32{"l": 1},
 			expectPacked: []byte{0xa1, 0x81, 0x6c, 0x01}},
 		{name: "map[string]uint64, type", value: map[string]uint64{"l": 1},
+			expectPacked: []byte{0xa1, 0x81, 0x6c, 0x01}},
+		{name: "custom map[string]int, type", value: customMapOfInts(map[string]int{"l": 1}),
 			expectPacked: []byte{0xa1, 0x81, 0x6c, 0x01}},
 
 		// Map[string] of floats
@@ -600,7 +638,7 @@ func TestPackStream(ot *testing.T) {
 		{name: "uin64 overflow", expectedErr: &OverflowError{},
 			value: (uint64(math.MaxInt64) + 1)},
 		{name: "map something else but string as key", expectedErr: &UnsupportedTypeError{},
-			value: map[int]string{}},
+			value: map[int]string{1: "y"}},
 		{name: "too big struct", expectedErr: &OverflowError{},
 			value: &Struct{Tag: 0x67, Fields: []interface{}{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16}}},
 		{name: "a custom type no dehydrator", expectedErr: &UnsupportedTypeError{},

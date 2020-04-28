@@ -81,7 +81,10 @@ func (s *bolt3server) sendFailureMsg(code, msg string) {
 		"message": msg,
 	}
 	s.send(msgV3Failure, f)
+}
 
+func (s *bolt3server) sendIgnoredMsg() {
+	s.send(msgV3Ignored)
 }
 
 func (s *bolt3server) waitForHello() {
@@ -112,6 +115,11 @@ func (s *bolt3server) receiveMsg() *packstream.Struct {
 func (s *bolt3server) waitForRun() {
 	msg := s.receiveMsg()
 	s.assertStructType(msg, msgV3Run)
+}
+
+func (s *bolt3server) waitForReset() {
+	msg := s.receiveMsg()
+	s.assertStructType(msg, msgV3Reset)
 }
 
 func (s *bolt3server) waitForTxBegin() {
@@ -161,6 +169,10 @@ func (s *bolt3server) send(tag packstream.StructTag, field ...interface{}) {
 	}
 	s.chunker.endMessage()
 	s.chunker.send()
+}
+
+func (s *bolt3server) sendSuccess(m map[string]interface{}) {
+	s.send(msgV3Success, m)
 }
 
 func (s *bolt3server) acceptHello() {

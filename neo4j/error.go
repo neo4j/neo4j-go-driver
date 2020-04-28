@@ -37,118 +37,12 @@ func newDriverError(format string, args ...interface{}) *driverError {
 	return &driverError{message: fmt.Sprintf(format, args...)}
 }
 
-/*
-func (failure *driverError) BoltError() bool {
-	return true
-}
-
-func (failure *driverError) Message() string {
-	return failure.message
-}
-*/
-
-/*
-import "C"
-
-type databaseError struct {
-	classification string
-	code           string
-	message        string
-}
-
-type connectorError struct {
-	state       int
-	code        int
-	codeText    string
-	context     string
-	description string
-}
-
-type sessionExpiredError struct {
-	message string
-}
-
-func (failure *databaseError) BoltError() bool {
-	return true
-}
-
-func (failure *databaseError) Classification() string {
-	return failure.classification
-}
-
-func (failure *databaseError) Code() string {
-	return failure.code
-}
-
-func (failure *databaseError) Message() string {
-	return failure.message
-}
-
-func (failure *databaseError) Error() string {
-	return fmt.Sprintf("database returned error [%s]: %s", failure.code, failure.message)
-}
-
-func (failure *connectorError) BoltError() bool {
-	return true
-}
-
-func (failure *connectorError) State() int {
-	return failure.state
-}
-
-func (failure *connectorError) Code() int {
-	return failure.code
-}
-
-func (failure *connectorError) Context() string {
-	return failure.context
-}
-
-func (failure *connectorError) Description() string {
-	return failure.description
-}
-
-func (failure *connectorError) Error() string {
-	if failure.description != "" {
-		return fmt.Sprintf("%s: error: [%d] %s, state: %d, context: %s", failure.description, failure.code, failure.codeText, failure.state, failure.context)
-	} else {
-		return fmt.Sprintf("error: [%d] %s, state: %d, context: %s", failure.code, failure.codeText, failure.state, failure.context)
-	}
-}
-
-func (failure *sessionExpiredError) BoltError() bool {
-	return true
-}
-
-func (failure *sessionExpiredError) Error() string {
-	return failure.message
-}
-
-func newSessionExpiredError(format string, args ...interface{}) error {
-	return &sessionExpiredError{message: fmt.Sprintf(format, args...)}
-}
-
-func newDatabaseError(classification, code, message string) *databaseError {
-	return &databaseError{code: code, message: message, classification: classification}
-}
-
-func newConnectorError(state int, code int, codeText, context, description string) *connectorError {
-	return &connectorError{state: state, code: code, codeText: codeText, context: context, description: description}
-}
-*/
-
 // IsSecurityError is a utility method to check if the provided error is related with any
 // TLS failure or authentication issues.
 func IsSecurityError(err error) bool {
 	_, is := err.(*tlsError)
 	return is
 }
-
-/*
-func isRetriableError(err error) bool {
-	return gobolt.IsServiceUnavailable(err) || gobolt.IsTransientError(err) || gobolt.IsWriteError(err)
-}
-*/
 
 // IsAuthenticationError is a utility method to check if the provided error is related with any
 // authentication issues.

@@ -77,13 +77,6 @@ func dehydrate(x interface{}) (*packstream.Struct, error) {
 		t := time.Time(v)
 		nanos := int64(time.Hour)*int64(t.Hour()) + int64(time.Minute)*int64(t.Minute()) + int64(time.Second)*int64(t.Second()) + int64(t.Nanosecond())
 		return &packstream.Struct{Tag: packstream.StructTag('t'), Fields: []interface{}{nanos}}, nil
-	// Support standard duration to simplify for client
-	case time.Duration:
-		nanos := v.Nanoseconds()
-		months, nanos := divmod(nanos, 2629800000000000)
-		days, nanos := divmod(nanos, 86400000000000)
-		seconds, nanos := divmod(nanos, 1e9)
-		return &packstream.Struct{Tag: packstream.StructTag('E'), Fields: []interface{}{months, days, seconds, nanos}}, nil
 	case types.Duration:
 		return &packstream.Struct{Tag: packstream.StructTag('E'), Fields: []interface{}{v.Months, v.Days, v.Seconds, v.Nanos}}, nil
 	default:

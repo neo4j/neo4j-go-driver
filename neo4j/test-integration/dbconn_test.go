@@ -336,7 +336,7 @@ func TestConnectionConformance(ot *testing.T) {
 		name string
 		fun  func(*testing.T, db.Connection)
 	}{
-		// Connection is in failed state upon syntax error
+		// Connection is in failed state due to syntax error
 		{
 			name: "Run autocommit with syntax error",
 			fun: func(t *testing.T, c db.Connection) {
@@ -344,7 +344,38 @@ func TestConnectionConformance(ot *testing.T) {
 				if err == nil || s != nil {
 					t.Fatal("Should have received error")
 				}
-				// TODO: Assert type of error!
+				_, isDbError := err.(*db.DatabaseError)
+				if !isDbError {
+					t.Error("Should be db error")
+				}
+			},
+		},
+		{
+			name: "Run autocommit with division by zero in result",
+			fun: func(t *testing.T, c db.Connection) {
+				s, err := c.Run("UNWIND [0] AS x RETURN 10 / x", map[string]interface{}{"r": randInt()}, db.ReadMode, nil, 0, nil)
+				if err != nil || s == nil {
+					t.Fatal("Should not have received error")
+				}
+				// Should get error while iterating
+				_, _, err = c.Next(s.Handle)
+				if err == nil {
+					t.Error("Should have error")
+				}
+				_, isDbError := err.(*db.DatabaseError)
+				if !isDbError {
+					t.Error("Should be db error")
+				}
+			},
+		},
+		// Connection is in transaction
+		{
+			name: "Set connection in transaction mode",
+			fun: func(t *testing.T, c db.Connection) {
+				_, err := c.TxBegin(db.WriteMode, []string{}, 0, nil)
+				if err != nil {
+					t.Fatal("Should have started transaction")
+				}
 			},
 		},
 	}
@@ -358,10 +389,10 @@ func TestConnectionConformance(ot *testing.T) {
 			// Should be working now
 			s, err := boltConn.Run("RETURN datetime()", nil, db.ReadMode, nil, 0, nil)
 			if err != nil {
-				t.Error("Reset didn't help")
+				t.Errorf("Reset didn't help: %s", err)
 			}
 			if s == nil {
-				t.Error("Didn't get a stream")
+				t.Fatal("Didn't get a stream")
 			}
 			boltConn.Next(s.Handle)
 			boltConn.Next(s.Handle)

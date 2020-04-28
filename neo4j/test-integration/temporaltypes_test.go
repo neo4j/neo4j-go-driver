@@ -34,7 +34,7 @@ import (
 
 var _ = Describe("Temporal Types", func() {
 	const (
-		numberOfRandomValues = 2000
+		numberOfRandomValues = 200
 	)
 
 	var server *control.SingleInstance

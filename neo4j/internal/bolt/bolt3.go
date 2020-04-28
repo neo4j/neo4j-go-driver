@@ -188,7 +188,7 @@ func (b *bolt3) receiveSuccess() (*successResponse, error) {
 		return nil, v
 	}
 	b.state = bolt3_dead
-	return nil, errors.New("Unknown response")
+	return nil, errors.New("Expected success or database error")
 }
 
 func (b *bolt3) connect(auth map[string]interface{}) error {
@@ -244,17 +244,30 @@ func (b *bolt3) TxBegin(
 		return nil, err
 	}
 
-	// Stash this into pending internal tx
-	b.pendingTx = &internalTx{
+	tx := &internalTx{
 		mode:      mode,
 		bookmarks: bookmarks,
 		timeout:   timeout,
 		txMeta:    txMeta,
 	}
 
-	b.txId = time.Now().Unix()
-	b.state = bolt3_pendingtx
-
+	// If there are bookmarks, begin the transaction immediately for backwards compatible
+	// reasons, otherwise delay it to save a round-trip
+	if len(bookmarks) > 0 {
+		if err := b.sendMsg(msgV3Begin, tx.toMeta()); err != nil {
+			return nil, err
+		}
+		if _, err := b.receiveSuccess(); err != nil {
+			return nil, err
+		}
+		b.txId = time.Now().Unix()
+		b.state = bolt3_tx
+	} else {
+		// Stash this into pending internal tx
+		b.pendingTx = tx
+		b.txId = time.Now().Unix()
+		b.state = bolt3_pendingtx
+	}
 	return b.txId, nil
 }
 
@@ -335,11 +348,11 @@ func (b *bolt3) TxRollback(txh db.Handle) error {
 		return err
 	}
 
+	// Receive rollback confirmation
 	if _, err := b.receiveSuccess(); err != nil {
 		return err
 	}
 
-	// Transition into ready state
 	b.state = bolt3_ready
 	return nil
 }
@@ -535,38 +548,38 @@ func (b *bolt3) Reset() {
 		return
 	}
 
+	// Will consume ongoing stream if any
+	b.consumeStream()
+	if b.state == bolt3_ready || b.state == bolt3_dead {
+		// No need for reset
+		return
+	}
+
 	// Send the reset message to the server
 	err := b.sendMsg(msgV3Reset)
 	if err != nil {
 		return
 	}
 
-	// If the server was streaming we need to clean everything that
-	// might have been sent by the server before it received the reset.
-	drained := false
-	for !drained {
-		res, err := b.receiveMsg()
+	// Should receive x number of ignores until we get a success
+	for {
+		msg, err := b.receiveMsg()
 		if err != nil {
-			return
-		}
-		switch x := res.(type) {
-		case *recordResponse, *ignoredResponse:
-			// Just throw away. We should only get record responses while in streaming mode.
-		case *db.DatabaseError:
-			// This could mean that the reset command failed for some reason, could also
-			// mean some other command that failed but as long as we never have unconfirmed
-			// commands out of the handling functions this should mean that the reset failed.
 			b.state = bolt3_dead
 			return
+		}
+		switch msg.(type) {
+		case *ignoredResponse:
+			// Command ignored
 		case *successResponse:
-			// This could indicate either end of a stream have been sent right before
-			// the reset or it could be a confirmation of the reset.
-			sum := x.summary()
-			drained = sum == nil
+			// Reset confirmed
+			b.state = bolt3_ready
+			return
+		default:
+			b.state = bolt3_dead
+			return
 		}
 	}
-
-	b.state = bolt3_ready
 }
 
 func (b *bolt3) GetRoutingTable(context map[string]string) (*db.RoutingTable, error) {

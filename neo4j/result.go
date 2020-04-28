@@ -21,12 +21,13 @@ package neo4j
 
 import (
 	"container/list"
+
 	"github.com/neo4j/neo4j-go-driver/neo4j/internal/db"
 )
 
 type Result interface {
 	// Keys returns the keys available on the result set.
-	//Keys() ([]string, error)
+	Keys() ([]string, error)
 	// Next returns true only if there is a record to be processed.
 	Next() bool
 	// Err returns the latest error that caused this Next to return false.
@@ -73,6 +74,13 @@ func (r *result) doFetch() *db.Record {
 	r.allReceived = r.err != nil || rec == nil
 	r.summary = sum
 	return rec
+}
+
+func (r *result) Keys() ([]string, error) {
+	if r.err != nil {
+		return nil, r.err
+	}
+	return r.stream.Keys, nil
 }
 
 func (r *result) Next() bool {
@@ -148,6 +156,10 @@ func (r *result) Consume() (ResultSummary, error) {
 // or consumption. This implementation of result interface fakes that behaviour.
 type delayedErrorResult struct {
 	err error
+}
+
+func (d *delayedErrorResult) Keys() ([]string, error) {
+	return nil, d.err
 }
 
 func (d *delayedErrorResult) Next() bool {

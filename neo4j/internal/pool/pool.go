@@ -81,7 +81,7 @@ func New(maxSize int, maxAge time.Duration, connect Connect) *Pool {
 }
 
 func log(msg string) {
-	fmt.Printf("pool: %s\n", msg)
+	//fmt.Printf("pool: %s\n", msg)
 }
 
 func (p *Pool) Close() {
@@ -253,7 +253,7 @@ func (p *Pool) Borrow(ctx context.Context, serverNames []string, wait bool) (Con
 	for _, s := range penalties {
 		// Check if we have timed out
 		if timeOut() {
-			return nil, nil
+			return nil, &PoolTimeout{servers: serverNames}
 		}
 
 		conn, err = p.tryBorrow(s.name)
@@ -332,7 +332,6 @@ func (p *Pool) unreg(serverName string, c Connection, now time.Time) {
 
 	server.unregisterBusy(c)
 	if server.size() == 0 && !server.hasFailedConnect(now) {
-		fmt.Println("zero")
 		delete(p.servers, serverName)
 	}
 }
@@ -371,6 +370,14 @@ func (p *Pool) Return(c Connection) {
 	}
 	p.removeIdleOlderThanOnServer(serverName, now, maxAge)
 
+	// Prepare connection for being used by someone else if is alive.
+	// Since reset could find the connection to be in a bad state or non-recoverable state,
+	// make sure again that it really is alive.
+	if isAlive {
+		c.Reset()
+		isAlive = c.IsAlive()
+	}
+
 	// Shouldn't return a too old or dead connection back to the pool
 	if !isAlive || age >= p.maxAge {
 		p.unreg(serverName, c, now)
@@ -379,9 +386,6 @@ func (p *Pool) Return(c Connection) {
 		// are no more connections to wait for.
 		return
 	}
-
-	// Prepare connection for being used by someone else
-	c.Reset()
 
 	// Check if there is anyone in the queue waiting for a connection to this server.
 	p.queueMut.Lock()

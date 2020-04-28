@@ -92,6 +92,15 @@ func assertError(t *testing.T, err error) {
 	}
 }
 
+func assertDatabaseError(t *testing.T, err error) {
+	t.Helper()
+	assertError(t, err)
+	_, isDbErr := err.(*db.DatabaseError)
+	if !isDbErr {
+		t.Errorf("Expected database error but was %T: %s", err, err)
+	}
+}
+
 func assertDateTimeSame(t *testing.T, t1, t2 time.Time) {
 	t.Helper()
 	if !t1.Equal(t2) {

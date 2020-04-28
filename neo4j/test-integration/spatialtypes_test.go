@@ -250,13 +250,13 @@ var _ = Describe("Spatial Types", func() {
 	})
 
 	It("should send and receive points - randomised", func() {
-		for i := 0; i < 1000; i++ {
+		for i := 0; i < 100; i++ {
 			testSendAndReceive(randomPoint(i))
 		}
 	})
 
 	It("should send and receive point list - randomised", func() {
-		for i := 0; i < 1000; i++ {
+		for i := 0; i < 100; i++ {
 			testSendAndReceiveList(randomPointList(i, 100))
 		}
 	})

@@ -24,6 +24,7 @@ import (
 	"fmt"
 	"io"
 	"math"
+	"reflect"
 )
 
 // Called by packer to let caller send custom object as structs not known by packstream.
@@ -37,6 +38,12 @@ type Packer struct {
 }
 
 func NewPacker(wr io.Writer, dehydrate Dehydrate) *Packer {
+	if dehydrate == nil {
+		dehydrate = func(x interface{}) (*Struct, error) {
+			return nil, &UnsupportedTypeError{t: reflect.TypeOf(x)}
+		}
+	}
+
 	return &Packer{
 		wr:        wr,
 		dehydrate: dehydrate,
@@ -182,49 +189,20 @@ func (p *Packer) writeNil() error {
 	return p.write([]byte{0xc0})
 }
 
-func (p *Packer) Pack(x interface{}) error {
-	if x == nil {
+func (p *Packer) tryDehydrate(x interface{}) error {
+	s, err := p.dehydrate(x)
+	if err != nil {
+		return err
+	}
+	if s == nil {
 		return p.writeNil()
 	}
+	return p.writeStruct(s)
+}
 
-	overflowInt := func(i uint64) error {
-		if i > math.MaxInt64 {
-			return &OverflowError{msg: "Trying to pack uint64 that doesn't fit into int64"}
-		}
-		return nil
-	}
-
+func (p *Packer) writeSlice(x interface{}) error {
+	// Check for optimized cases, resort to slower reflection if not found
 	switch v := x.(type) {
-	case bool:
-		return p.writeBool(v)
-	case float32:
-		return p.writeFloat(float64(v))
-	case float64:
-		return p.writeFloat(v)
-	case int:
-		return p.writeInt(int64(v))
-	case int8:
-		return p.writeInt(int64(v))
-	case int16:
-		return p.writeInt(int64(v))
-	case int32:
-		return p.writeInt(int64(v))
-	case uint8:
-		return p.writeInt(int64(v))
-	case uint16:
-		return p.writeInt(int64(v))
-	case uint32:
-		return p.writeInt(int64(v))
-	case int64:
-		return p.writeInt(v)
-	case uint64:
-		err := overflowInt(v)
-		if err != nil {
-			return err
-		}
-		return p.writeInt(int64(v))
-	case string:
-		return p.writeString(v)
 	case []byte:
 		return p.writeBytes(v)
 	case []interface{}:
@@ -376,6 +354,25 @@ func (p *Packer) Pack(x interface{}) error {
 			}
 		}
 		return nil
+	default:
+		// We know that this is some kind of slice
+		rv := reflect.ValueOf(x)
+		num := rv.Len()
+		if err := p.writeArrayHeader(num); err != nil {
+			return err
+		}
+		for i := 0; i < num; i++ {
+			rx := rv.Index(i)
+			if err := p.Pack(rx.Interface()); err != nil {
+				return err
+			}
+		}
+		return nil
+	}
+}
+
+func (p *Packer) writeMap(x interface{}) error {
+	switch v := x.(type) {
 	case map[string]interface{}:
 		err := p.writeMapHeader(len(v))
 		if err != nil {
@@ -605,23 +602,86 @@ func (p *Packer) Pack(x interface{}) error {
 			}
 		}
 		return nil
-	case *Struct:
-		if v == nil {
-			return p.writeNil()
-		}
-		return p.writeStruct(v)
 	default:
-		// Unknown type, call dehydration hook to make it into a struct
-		if p.dehydrate == nil {
-			return &UnsupportedTypeError{msg: fmt.Sprintf("Packing of type '%T' is not supported", x)}
-		}
-		s, err := p.dehydrate(x)
-		if err != nil {
+		// We know that this is some kind of map
+		rv := reflect.ValueOf(x)
+		num := rv.Len()
+		if err := p.writeMapHeader(num); err != nil {
 			return err
 		}
-		if s == nil {
+		// We will not detect if key is something else but a string until checking first
+		// element, this means that we will succeed in packaing map[int]string {} as an empty
+		// map.
+		iter := rv.MapRange()
+		for iter.Next() {
+			ik := iter.Key()
+			iv := iter.Value()
+			if ik.Kind() != reflect.String {
+				return &UnsupportedTypeError{t: reflect.TypeOf(x)}
+			}
+			if err := p.writeString(ik.String()); err != nil {
+				return err
+			}
+			if err := p.Pack(iv.Interface()); err != nil {
+				return err
+			}
+		}
+		return nil
+	}
+}
+
+func overflowInt(i uint64) error {
+	if i > math.MaxInt64 {
+		return &OverflowError{msg: "Trying to pack uint64 that doesn't fit into int64"}
+	}
+	return nil
+}
+
+func (p *Packer) Pack(x interface{}) error {
+	if x == nil {
+		return p.writeNil()
+	}
+
+	t := reflect.ValueOf(x)
+	switch t.Kind() {
+	case reflect.Bool:
+		return p.writeBool(t.Bool())
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+		return p.writeInt(t.Int())
+	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+		u := t.Uint()
+		if err := overflowInt(u); err != nil {
+			return err
+		}
+		return p.writeInt(int64(u))
+	case reflect.Float32, reflect.Float64:
+		return p.writeFloat(t.Float())
+	case reflect.String:
+		return p.writeString(t.String())
+	case reflect.Ptr:
+		if t.IsNil() {
 			return p.writeNil()
 		}
-		return p.writeStruct(s)
+		// Inspect what the pointer points to
+		i := reflect.Indirect(t)
+		switch i.Kind() {
+		case reflect.Struct:
+			s, isS := x.(*Struct)
+			if isS {
+				return p.writeStruct(s)
+			}
+			// Unknown type, call dehydration hook to make it into a struct
+			return p.tryDehydrate(x)
+		default:
+			return p.Pack(i.Interface())
+		}
+	case reflect.Struct:
+		// Unknown type, call dehydration hook to make it into a struct
+		return p.tryDehydrate(x)
+	case reflect.Slice:
+		return p.writeSlice(x)
+	case reflect.Map:
+		return p.writeMap(x)
 	}
+	return &UnsupportedTypeError{t: reflect.TypeOf(x)}
 }

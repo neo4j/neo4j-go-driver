@@ -271,12 +271,6 @@ func TestDehydrateHydrate(ot *testing.T) {
 		assertTimeSame(t, ni, time.Time(no))
 	})
 
-	ot.Run("time.Duration", func(t *testing.T) {
-		di := 7*time.Minute + 28*time.Hour
-		do := dehydrateAndHydrate(t, di).(types.Duration)
-		assertDurationSame(t, types.Duration{Days: 1, Seconds: (4 * 60 * 60) + 7*60}, do)
-	})
-
 	ot.Run("Duration", func(t *testing.T) {
 		di := types.Duration{Months: 3, Days: 3, Seconds: 9000, Nanos: 13}
 		do := dehydrateAndHydrate(t, di).(types.Duration)
