@@ -74,17 +74,11 @@ func IsTransientError(err error) bool {
 	return dbErr.IsRetriableTransient()
 }
 
-/*
 // IsSessionExpired is a utility method to check if the session no longer satisfy the criteria
 // under which it was acquired, e.g. a server no longer accepts write requests.
 func IsSessionExpired(err error) bool {
-	if _, ok := err.(*sessionExpiredError); ok {
-		return true
-	}
-
-	return gobolt.IsSessionExpired(err)
+	return false
 }
-*/
 
 // IsServiceUnavailable is a utility method to check if the provided error can be classified
 // to be in service unavailable category.
