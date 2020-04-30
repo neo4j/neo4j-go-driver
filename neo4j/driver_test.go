@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2019 "Neo4j,"
+ * Copyright (c) 2002-2020 "Neo4j,"
  * Neo4j Sweden AB [http://neo4j.com]
  *
  * This file is part of Neo4j.
@@ -20,7 +20,6 @@
 package neo4j
 
 import (
-	. "github.com/neo4j/neo4j-go-driver/neo4j/utils/test"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/ginkgo/extensions/table"
 	. "github.com/onsi/gomega"
@@ -57,7 +56,10 @@ var _ = Describe("Driver", func() {
 			driver, err := NewDriver("anotherscheme://localhost:7687", NoAuth())
 
 			Expect(driver).To(BeNil())
-			Expect(err).To(BeGenericError(ContainSubstring("url scheme anotherscheme is not supported")))
+			Expect(err).ToNot(BeNil())
+			errDescr := err.Error()
+			Expect(errDescr).To(ContainSubstring("url scheme anotherscheme is not supported"))
+			//Expect(err).To(BeGenericError(ContainSubstring("url scheme anotherscheme is not supported")))
 		})
 	})
 
@@ -121,15 +123,15 @@ var _ = Describe("Driver", func() {
 				driver, err := NewDriver(testCase.uri, NoAuth())
 				Expect(err).To(BeNil())
 
-				session, err := driver.Session(testCase.mode, testCase.bookmarks...)
+				sessi, err := driver.Session(testCase.mode, testCase.bookmarks...)
 				Expect(err).To(BeNil())
 
-				neoSession := session.(*neoSession)
+				sess := sessi.(*session)
 
-				Expect(neoSession.accessMode).To(BeIdenticalTo(testCase.mode))
+				Expect(sess.defaultMode).To(BeIdenticalTo(testCase.mode))
 
-				Expect(neoSession.bookmarks).To(HaveLen(len(testCase.bookmarks)))
-				Expect(neoSession.bookmarks).To(ConsistOf(testCase.bookmarks))
+				Expect(sess.bookmarks).To(HaveLen(len(testCase.bookmarks)))
+				Expect(sess.bookmarks).To(ConsistOf(testCase.bookmarks))
 			}, Entry("(write, no_bookmark)", SessionTestCase{
 				uri:       "bolt://localhost:7687",
 				mode:      AccessModeWrite,
