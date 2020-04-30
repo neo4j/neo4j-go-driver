@@ -72,6 +72,28 @@ func TestSuccessResponseExtraction(ot *testing.T) {
 			extract:  func(r *successResponse) interface{} { return r.summary() },
 		},
 		{
+			name: "Summary with plan",
+			meta: map[string]interface{}{
+				"type":     "w",
+				"t_last":   int64(3),
+				"bookmark": "bookm",
+				"plan": map[string]interface{}{
+					"operatorType": "opType",
+					"identifiers":  []string{"id1", "id2"},
+					"args": map[string]interface{}{
+						"arg1": 1001,
+					},
+				},
+			},
+			expected: &db.Summary{Bookmark: "bookm", TLast: 3, StmntType: db.StatementTypeWrite, Plan: &db.Plan{
+				Operator:    "opType",
+				Arguments:   map[string]interface{}{"arg1": 1001},
+				Identifiers: []string{"id1", "id2"},
+				Children:    []db.Plan{},
+			}},
+			extract: func(r *successResponse) interface{} { return r.summary() },
+		},
+		{
 			name: "Commit",
 			meta: map[string]interface{}{
 				"bookmark": "neo4j:bookmark:v1:tx35",
@@ -87,7 +109,7 @@ func TestSuccessResponseExtraction(ot *testing.T) {
 			extr := c.extract(&succ)
 			// Compare the extracted data with the expectation
 			if !reflect.DeepEqual(extr, c.expected) {
-				t.Errorf("Extracted differs: %+v vs %+v", c.expected, extr)
+				t.Errorf("Extracted differs: %#v vs %#v", c.expected, extr)
 			}
 		})
 	}

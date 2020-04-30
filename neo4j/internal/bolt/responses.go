@@ -130,12 +130,88 @@ func (s *successResponse) summary() *db.Summary {
 		}
 	}
 
-	// TODO: Query plan
+	// Optional query plan
+	planx, _ := s.meta["plan"].(map[string]interface{})
+	var plan *db.Plan
+	if len(planx) > 0 {
+		plan = parsePlan(planx)
+	}
+
+	// Optional query profile
+	profilex, _ := s.meta["profile"].(map[string]interface{})
+	var profile *db.ProfiledPlan
+	if len(profilex) > 0 {
+		profile = parseProfile(profilex)
+	}
 
 	return &db.Summary{
-		Bookmark:  bookmark,
-		TLast:     t_last,
-		StmntType: stmntType,
-		Counters:  counts,
+		Bookmark:     bookmark,
+		TLast:        t_last,
+		StmntType:    stmntType,
+		Counters:     counts,
+		Plan:         plan,
+		ProfiledPlan: profile,
 	}
+}
+
+func parsePlanOpIdArgsChildren(planx map[string]interface{}) (string, []string, map[string]interface{}, []interface{}) {
+	operator, _ := planx["operatorType"].(string)
+	identifiersx, _ := planx["identifiers"].([]interface{})
+	arguments, _ := planx["args"].(map[string]interface{})
+
+	identifiers := make([]string, len(identifiersx))
+	for i, id := range identifiersx {
+		identifiers[i], _ = id.(string)
+	}
+
+	childrenx, _ := planx["children"].([]interface{})
+
+	return operator, identifiers, arguments, childrenx
+}
+
+func parsePlan(planx map[string]interface{}) *db.Plan {
+	op, ids, args, childrenx := parsePlanOpIdArgsChildren(planx)
+	plan := &db.Plan{
+		Operator:    op,
+		Arguments:   args,
+		Identifiers: ids,
+	}
+
+	plan.Children = make([]db.Plan, 0, len(childrenx))
+	for _, c := range childrenx {
+		childPlanx, _ := c.(map[string]interface{})
+		if len(childPlanx) > 0 {
+			childPlan := parsePlan(childPlanx)
+			if childPlan != nil {
+				plan.Children = append(plan.Children, *childPlan)
+			}
+		}
+	}
+
+	return plan
+}
+
+func parseProfile(profilex map[string]interface{}) *db.ProfiledPlan {
+	op, ids, args, childrenx := parsePlanOpIdArgsChildren(profilex)
+	plan := &db.ProfiledPlan{
+		Operator:    op,
+		Arguments:   args,
+		Identifiers: ids,
+	}
+
+	plan.DbHits, _ = profilex["dbHits"].(int64)
+	plan.Records, _ = profilex["rows"].(int64)
+
+	plan.Children = make([]db.ProfiledPlan, 0, len(childrenx))
+	for _, c := range childrenx {
+		childPlanx, _ := c.(map[string]interface{})
+		if len(childPlanx) > 0 {
+			childPlan := parseProfile(childPlanx)
+			if childPlan != nil {
+				plan.Children = append(plan.Children, *childPlan)
+			}
+		}
+	}
+
+	return plan
 }

@@ -655,38 +655,57 @@ func TestConnectionConformance(ot *testing.T) {
 			t.Error("Error should be of type RoutingNotSupportedError")
 		}
 	})
+
+	ot.Run("Explain query", func(t *testing.T) {
+		s, _ := boltConn.Run("EXPLAIN MATCH(n:BmRand) RETURN n", nil, db.ReadMode, nil, 0, nil)
+		_, sum, _ := boltConn.Next(s.Handle)
+		t.Logf("%+v", sum.Plan)
+	})
+
+	ot.Run("Profile query", func(t *testing.T) {
+		s, _ := boltConn.Run("PROFILE MATCH(n:BmRand) RETURN n", nil, db.ReadMode, nil, 0, nil)
+		_, sum, _ := boltConn.Next(s.Handle)
+		t.Logf("%+v", sum.ProfiledPlan)
+	})
 }
 
 func TestConnectionConformanceCluster(ot *testing.T) {
-	cluster, err := control.EnsureCluster()
-	if err != nil {
-		ot.Fatal(err)
-	}
-	leader := cluster.Leader()
-	uri := leader.RoutingURI()
-	parsedUri, err := url.Parse(uri)
-	if err != nil {
-		ot.Fatal(err)
-	}
 
-	tcpConn, err := net.Dial("tcp", parsedUri.Host)
-	if err != nil {
-		ot.Fatal(err)
-	}
+	var boltConn db.Connection
+	getBoltConn := func() db.Connection {
+		if boltConn == nil {
+			cluster, err := control.EnsureCluster()
+			if err != nil {
+				ot.Fatal(err)
+			}
+			leader := cluster.Leader()
+			uri := leader.RoutingURI()
+			parsedUri, err := url.Parse(uri)
+			if err != nil {
+				ot.Fatal(err)
+			}
 
-	authMap := map[string]interface{}{
-		"scheme":      "basic",
-		"principal":   cluster.Username(),
-		"credentials": cluster.Password(),
-	}
+			tcpConn, err := net.Dial("tcp", parsedUri.Host)
+			if err != nil {
+				ot.Fatal(err)
+			}
 
-	boltConn, err := bolt.Connect(parsedUri.Host, tcpConn, authMap)
-	if err != nil {
-		ot.Fatal(err)
+			authMap := map[string]interface{}{
+				"scheme":      "basic",
+				"principal":   cluster.Username(),
+				"credentials": cluster.Password(),
+			}
+
+			boltConn, err = bolt.Connect(parsedUri.Host, tcpConn, authMap)
+			if err != nil {
+				ot.Fatal(err)
+			}
+		}
+		return boltConn
 	}
 
 	ot.Run("Cluster discovery", func(t *testing.T) {
-		discovery := boltConn.(db.ClusterDiscovery)
+		discovery := getBoltConn().(db.ClusterDiscovery)
 		table, err := discovery.GetRoutingTable(nil)
 		if err != nil {
 			t.Fatalf("Routing should be supported: %s", err)

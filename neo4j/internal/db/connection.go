@@ -58,6 +58,48 @@ const (
 	SystemUpdates        = "system-updates"
 )
 
+// Plan describes the actual plan that the database planner produced and used (or will use) to execute your statement.
+// This can be extremely helpful in understanding what a statement is doing, and how to optimize it. For more details,
+// see the Neo4j Manual. The plan for the statement is a tree of plans - each sub-tree containing zero or more child
+// plans. The statement starts with the root plan. Each sub-plan is of a specific operator, which describes what
+// that part of the plan does - for instance, perform an index lookup or filter results.
+// The Neo4j Manual contains a reference of the available operator types, and these may differ across Neo4j versions.
+type Plan struct {
+	// Operator is the operation this plan is performing.
+	Operator string
+	// Arguments for the operator.
+	// Many operators have arguments defining their specific behavior. This map contains those arguments.
+	Arguments map[string]interface{}
+	// List of identifiers used by this plan. Identifiers used by this part of the plan.
+	// These can be both identifiers introduced by you, or automatically generated.
+	Identifiers []string
+	// Zero or more child plans. A plan is a tree, where each child is another plan.
+	// The children are where this part of the plan gets its input records - unless this is an operator that
+	// introduces new records on its own.
+	Children []Plan
+}
+
+// ProfiledPlan is the same as a regular Plan - except this plan has been executed, meaning it also
+// contains detailed information about how much work each step of the plan incurred on the database.
+type ProfiledPlan struct {
+	// Operator returns the operation this plan is performing.
+	Operator string
+	// Arguments returns the arguments for the operator used.
+	// Many operators have arguments defining their specific behavior. This map contains those arguments.
+	Arguments map[string]interface{}
+	// Identifiers returns a list of identifiers used by this plan. Identifiers used by this part of the plan.
+	// These can be both identifiers introduced by you, or automatically generated.
+	Identifiers []string
+	// DbHits returns the number of times this part of the plan touched the underlying data stores/
+	DbHits int64
+	// Records returns the number of records this part of the plan produced.
+	Records int64
+	// Children returns zero or more child plans. A plan is a tree, where each child is another plan.
+	// The children are where this part of the plan gets its input records - unless this is an operator that
+	// introduces new records on its own.
+	Children []ProfiledPlan
+}
+
 type Summary struct {
 	Bookmark      string
 	StmntType     StatementType
@@ -66,6 +108,8 @@ type Summary struct {
 	Counters      map[string]int
 	TFirst        int64
 	TLast         int64
+	Plan          *Plan
+	ProfiledPlan  *ProfiledPlan
 }
 
 type Record struct {
