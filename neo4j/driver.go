@@ -24,6 +24,7 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
+	"strings"
 	"sync"
 
 	"github.com/neo4j/neo4j-go-driver/neo4j/internal/db"
@@ -101,6 +102,11 @@ func NewDriver(target string, auth AuthToken, configurers ...func(*Config)) (Dri
 	if directRouting {
 		sessRouter = &directRouter{server: parsed.Host}
 	} else {
+		routingContext, err := routingContextFromUrl(parsed)
+		if err != nil {
+			return nil, err
+		}
+
 		var routersResolver func() []string
 		addressResolverHook := config.AddressResolver
 		if addressResolverHook != nil {
@@ -113,7 +119,7 @@ func NewDriver(target string, auth AuthToken, configurers ...func(*Config)) (Dri
 				return servers
 			}
 		}
-		sessRouter = router.New(parsed.Host, routersResolver, nil, pool)
+		sessRouter = router.New(parsed.Host, routersResolver, routingContext, pool)
 	}
 
 	return &driver{
@@ -122,6 +128,26 @@ func NewDriver(target string, auth AuthToken, configurers ...func(*Config)) (Dri
 		pool:   pool,
 		router: sessRouter,
 	}, nil
+}
+
+func routingContextFromUrl(u *url.URL) (map[string]string, error) {
+	queryValues := u.Query()
+	routingContext := make(map[string]string, len(queryValues))
+	for k, vs := range queryValues {
+		if len(vs) > 1 {
+			return nil, newDriverError("Duplicated routing context key '%s'", k)
+		}
+		if len(vs) == 0 {
+			return nil, newDriverError("Empty routing context key '%s'", k)
+		}
+		v := vs[0]
+		v = strings.TrimSpace(v)
+		if len(v) == 0 {
+			return nil, newDriverError("Empty routing context key '%s'", k)
+		}
+		routingContext[k] = v
+	}
+	return routingContext, nil
 }
 
 type sessionRouter interface {

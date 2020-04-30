@@ -106,6 +106,10 @@ func (r *Router) Writers() ([]string, error) {
 	return table.Writers, nil
 }
 
+func (r *Router) Context() map[string]string {
+	return r.routerContext
+}
+
 func (r *Router) Invalidate() {
 	r.tableMut.Lock()
 	defer r.tableMut.Unlock()

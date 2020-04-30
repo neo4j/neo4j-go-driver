@@ -23,9 +23,28 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/ginkgo/extensions/table"
 	. "github.com/onsi/gomega"
+
+	"github.com/neo4j/neo4j-go-driver/neo4j/internal/router"
 )
 
 var _ = Describe("Driver", func() {
+	assertNoRouter := func(di Driver) {
+		d := di.(*driver)
+		_, isDirectRouter := d.router.(*directRouter)
+		Expect(isDirectRouter).To(BeTrue())
+	}
+
+	assertRouter := func(di Driver) {
+		d := di.(*driver)
+		_, isRouter := d.router.(*router.Router)
+		Expect(isRouter).To(BeTrue())
+	}
+
+	assertRouterContext := func(di Driver, context map[string]string) {
+		d := di.(*driver)
+		r := d.router.(*router.Router)
+		Expect(r.Context()).To(Equal(context))
+	}
 
 	Context("URI", func() {
 		It("should support bolt:// scheme", func() {
@@ -34,6 +53,7 @@ var _ = Describe("Driver", func() {
 			Expect(err).To(BeNil())
 			Expect(driver).NotTo(BeNil())
 			Expect(driver.Target().Scheme).To(BeIdenticalTo("bolt"))
+			assertNoRouter(driver)
 		})
 
 		It("should support bolt+routing:// scheme", func() {
@@ -42,6 +62,7 @@ var _ = Describe("Driver", func() {
 			Expect(err).To(BeNil())
 			Expect(driver).NotTo(BeNil())
 			Expect(driver.Target().Scheme).To(BeIdenticalTo("bolt+routing"))
+			assertRouter(driver)
 		})
 
 		It("should support neo4j:// scheme", func() {
@@ -50,6 +71,7 @@ var _ = Describe("Driver", func() {
 			Expect(err).To(BeNil())
 			Expect(driver).NotTo(BeNil())
 			Expect(driver.Target().Scheme).To(BeIdenticalTo("neo4j"))
+			assertRouter(driver)
 		})
 
 		It("should error anotherscheme:// scheme", func() {
@@ -60,6 +82,19 @@ var _ = Describe("Driver", func() {
 			errDescr := err.Error()
 			Expect(errDescr).To(ContainSubstring("url scheme anotherscheme is not supported"))
 			//Expect(err).To(BeGenericError(ContainSubstring("url scheme anotherscheme is not supported")))
+		})
+
+		It("should support neo4j:// routing context", func() {
+			driver, _ := NewDriver("neo4j://localhost:7687?x=y&a=b", NoAuth())
+
+			assertRouterContext(driver, map[string]string{"x": "y", "a": "b"})
+		})
+
+		It("should error neo4j:// routing context with duplicate keys", func() {
+			driver, err := NewDriver("neo4j://localhost:7687?x=y&x=b", NoAuth())
+
+			Expect(driver).To(BeNil())
+			Expect(err).ToNot(BeNil())
 		})
 	})
 
