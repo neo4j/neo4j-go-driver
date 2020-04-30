@@ -23,7 +23,7 @@ import (
 	"math"
 	"time"
 
-	types "github.com/neo4j/neo4j-go-driver/neo4j/internal/types"
+	"github.com/neo4j/neo4j-go-driver/neo4j/internal/types"
 )
 
 func patchOutX(v interface{}) interface{} {

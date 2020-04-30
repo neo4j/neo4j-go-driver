@@ -46,7 +46,7 @@ const (
 // safe for concurrent use.
 type Driver interface {
 	// The url this driver is bootstrapped
-	//Target() url.URL
+	Target() url.URL
 	Session(accessMode AccessMode, bookmarks ...string) (Session, error)
 	// Close the driver and all underlying connections
 	Close() error
@@ -136,6 +136,10 @@ type driver struct {
 	pool   *pool.Pool
 	mut    sync.Mutex
 	router sessionRouter
+}
+
+func (d *driver) Target() url.URL {
+	return *d.target
 }
 
 func (d *driver) Session(accessMode AccessMode, bookmarks ...string) (Session, error) {

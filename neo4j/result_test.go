@@ -32,7 +32,6 @@ type iter struct {
 	expectSum    *db.Summary
 	expectSumErr error
 	expectErr    error
-	//fetchAll     bool
 	consumeAll   bool
 	summary      bool
 	panicOnFetch bool
@@ -154,22 +153,6 @@ func TestResult(ot *testing.T) {
 				iter{panicOnFetch: true, summary: true, expectNext: true, expectRec: recs[2], expectSum: sums[0]},
 			},
 		},
-		/*
-			{
-				name: "fetch all",
-				stream: []fetchRet{
-					fetchRet{rec: recs[0]},
-					fetchRet{rec: recs[1]},
-					fetchRet{rec: recs[2]},
-					fetchRet{sum: sums[0]},
-				},
-				iters: []iter{
-					iter{expectNext: true, expectRec: recs[0]},
-					iter{fetchAll: true, expectNext: true, expectRec: recs[1]},
-					iter{panicOnFetch: true, summary: true, expectNext: true, expectRec: recs[2], expectSum: sums[0]},
-				},
-			},
-		*/
 		{
 			name: "consume all",
 			stream: []fetchRet{
@@ -190,14 +173,6 @@ func TestResult(ot *testing.T) {
 			res := newResult(fetcher, stream, cypher, params)
 			for i, call := range c.iters {
 				fetcher.panicOnFetch = call.panicOnFetch
-				/*
-					if call.fetchAll {
-						res.FetchAll()
-						if len(fetcher.rets) > 0 {
-							t.Fatalf("FetchAll should have emptied stream")
-						}
-					}
-				*/
 				if call.consumeAll {
 					res.Consume()
 					if len(fetcher.rets) > 0 {

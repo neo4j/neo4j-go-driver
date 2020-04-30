@@ -201,21 +201,3 @@ func newServerAddressURL(hostname string, port string) *url.URL {
 func NewServerAddress(hostname string, port string) ServerAddress {
 	return newServerAddressURL(hostname, port)
 }
-
-/*
-func wrapAddressResolverOrNil(addressResolver ServerAddressResolver) gobolt.URLAddressResolver {
-	if addressResolver == nil {
-		return nil
-	}
-
-	return func(address *url.URL) []*url.URL {
-		var result []*url.URL
-
-		for _, address := range addressResolver(address) {
-			result = append(result, newServerAddressURL(address.Hostname(), address.Port()))
-		}
-
-		return result
-	}
-}
-*/
