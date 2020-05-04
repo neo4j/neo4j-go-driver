@@ -127,7 +127,6 @@ func defaultConfig() *Config {
 	return &Config{
 		Encrypted:                    true,
 		TrustStrategy:                TrustAny(false),
-		Log:                          NoOpLogger(),
 		AddressResolver:              nil,
 		MaxTransactionRetryTime:      30 * time.Second,
 		MaxConnectionPoolSize:        100,

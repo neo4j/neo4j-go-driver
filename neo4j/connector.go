@@ -25,16 +25,22 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"sync/atomic"
 	"time"
 
 	"github.com/neo4j/neo4j-go-driver/neo4j/internal/bolt"
+	"github.com/neo4j/neo4j-go-driver/neo4j/internal/log"
 	"github.com/neo4j/neo4j-go-driver/neo4j/internal/pool"
 )
 
 type connector struct {
 	config *Config
 	auth   map[string]interface{}
+	log    log.Logger
+	logId  string
 }
+
+var connectorid uint32
 
 type tlsError struct {
 	err error
@@ -50,6 +56,20 @@ type connectError struct {
 
 func (e *connectError) Error() string {
 	return fmt.Sprintf("Connection error: %s", e.err)
+}
+
+func newConnector(config *Config, auth map[string]interface{}, logger log.Logger) *connector {
+	id := atomic.AddUint32(&connectorid, 1)
+	c := &connector{
+		config: config,
+		auth:   auth,
+		log:    logger,
+		logId:  fmt.Sprintf("connector %d", id),
+	}
+	c.log.Infof(c.logId, "Created {TLS: %t, SkipVerify: %t, SkipVerifyHostName: %t, CustomCerts: %t }",
+		config.Encrypted, config.TrustStrategy.skipVerify, config.TrustStrategy.skipVerifyHostname,
+		len(config.TrustStrategy.certificates) > 0)
+	return c
 }
 
 func (c *connector) wrapInTls(target string, rawConn net.Conn) (net.Conn, error) {
@@ -138,6 +158,7 @@ func (c *connector) connect(target string) (pool.Connection, error) {
 	// Make a TCP connection
 	conn, err := d.Dial("tcp", target)
 	if err != nil {
+		c.log.Error(c.logId, err)
 		return nil, &connectError{err: err}
 	}
 
@@ -145,12 +166,13 @@ func (c *connector) connect(target string) (pool.Connection, error) {
 	if c.config.Encrypted {
 		conn, err = c.wrapInTls(target, conn)
 		if err != nil {
+			c.log.Error(c.logId, err)
 			return nil, &tlsError{err: err}
 		}
 	}
 
 	// Pass ownership of connection to bolt upon success
-	boltConn, err := bolt.Connect(target, conn, c.auth)
+	boltConn, err := bolt.Connect(target, conn, c.auth, c.log)
 	if err != nil {
 		conn.Close()
 		return nil, err

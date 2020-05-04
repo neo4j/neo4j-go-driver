@@ -163,7 +163,7 @@ var _ = Describe("Driver", func() {
 
 				sess := sessi.(*session)
 
-				Expect(sess.defaultMode).To(BeIdenticalTo(testCase.mode))
+				Expect(AccessMode(sess.defaultMode)).To(BeIdenticalTo(testCase.mode))
 
 				Expect(sess.bookmarks).To(HaveLen(len(testCase.bookmarks)))
 				Expect(sess.bookmarks).To(ConsistOf(testCase.bookmarks))

@@ -44,14 +44,14 @@ func getRoutingTable(conn db.Connection, context map[string]string) (*db.Routing
 		return nil, err
 	}
 	if rec == nil {
-		return nil, errors.New("No record")
+		return nil, errors.New("No routing table record")
 	}
 	// Just empty the stream, ignore the summary should leave the connecion in ready state
 	conn.Next(stream.Handle)
 
 	table := parseRoutingTableRecord(rec)
 	if table == nil {
-		return nil, errors.New("Parser error")
+		return nil, errors.New("Unable to parse routing table")
 	}
 
 	return table, nil

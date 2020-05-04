@@ -33,6 +33,7 @@ import (
 
 	"github.com/neo4j/neo4j-go-driver/neo4j/internal/bolt"
 	"github.com/neo4j/neo4j-go-driver/neo4j/internal/db"
+	"github.com/neo4j/neo4j-go-driver/neo4j/internal/log"
 	"github.com/neo4j/neo4j-go-driver/neo4j/internal/types"
 	"github.com/neo4j/neo4j-go-driver/neo4j/test-integration/control"
 )
@@ -61,7 +62,8 @@ func TestConnectionConformance(ot *testing.T) {
 		"credentials": server.Password(),
 	}
 
-	boltConn, err := bolt.Connect(parsedUri.Host, tcpConn, authMap)
+	logger := &log.ConsoleLogger{Errors: true, Infos: true, Warns: true}
+	boltConn, err := bolt.Connect(parsedUri.Host, tcpConn, authMap, logger)
 	if err != nil {
 		ot.Fatal(err)
 	}
@@ -671,6 +673,7 @@ func TestConnectionConformance(ot *testing.T) {
 
 func TestConnectionConformanceCluster(ot *testing.T) {
 
+	logger := &log.ConsoleLogger{Errors: true, Infos: true, Warns: true}
 	var boltConn db.Connection
 	getBoltConn := func() db.Connection {
 		if boltConn == nil {
@@ -696,7 +699,7 @@ func TestConnectionConformanceCluster(ot *testing.T) {
 				"credentials": cluster.Password(),
 			}
 
-			boltConn, err = bolt.Connect(parsedUri.Host, tcpConn, authMap)
+			boltConn, err = bolt.Connect(parsedUri.Host, tcpConn, authMap, logger)
 			if err != nil {
 				ot.Fatal(err)
 			}

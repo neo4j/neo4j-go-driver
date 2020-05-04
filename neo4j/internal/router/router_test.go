@@ -28,8 +28,11 @@ import (
 	"time"
 
 	"github.com/neo4j/neo4j-go-driver/neo4j/internal/db"
+	"github.com/neo4j/neo4j-go-driver/neo4j/internal/log"
 	poolpackage "github.com/neo4j/neo4j-go-driver/neo4j/internal/pool"
 )
+
+var logger = &log.ConsoleLogger{Errors: true, Infos: true, Warns: true}
 
 // Verifies that concurrent access works as expected relying on the race detector to
 // report supicious behavior.
@@ -48,7 +51,7 @@ func TestMultithreading(t *testing.T) {
 		},
 	}
 	n := time.Now()
-	router := New("router", func() []string { return []string{} }, nil, pool)
+	router := New("router", func() []string { return []string{} }, nil, pool, logger)
 	router.now = func() time.Time {
 		n = n.Add(time.Duration(table.TimeToLive) * time.Second * 2)
 		return n
@@ -99,7 +102,7 @@ func TestRespectsTimeToLiveAndInvalidate(t *testing.T) {
 	}
 	nzero := time.Now()
 	n := nzero
-	router := New("router", func() []string { return []string{} }, nil, pool)
+	router := New("router", func() []string { return []string{} }, nil, pool, logger)
 	router.now = func() time.Time {
 		return n
 	}
@@ -139,7 +142,7 @@ func TestUseGetRoutersHookWhenInitialRouterFails(t *testing.T) {
 	}
 	rootRouter := "rootRouter"
 	backupRouters := []string{"bup1", "bup2"}
-	router := New(rootRouter, func() []string { return backupRouters }, nil, pool)
+	router := New(rootRouter, func() []string { return backupRouters }, nil, pool, logger)
 
 	// Trigger read of routing table
 	router.Readers()

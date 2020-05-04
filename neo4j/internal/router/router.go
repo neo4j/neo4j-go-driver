@@ -21,10 +21,13 @@ package router
 
 import (
 	"context"
+	"fmt"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/neo4j/neo4j-go-driver/neo4j/internal/db"
+	"github.com/neo4j/neo4j-go-driver/neo4j/internal/log"
 	"github.com/neo4j/neo4j-go-driver/neo4j/internal/pool"
 )
 
@@ -38,6 +41,8 @@ type Router struct {
 	now           func() time.Time
 	rootRouter    string
 	getRouters    func() []string
+	log           log.Logger
+	logId         string
 }
 
 type Pool interface {
@@ -45,14 +50,21 @@ type Pool interface {
 	Return(c pool.Connection)
 }
 
-func New(rootRouter string, getRouters func() []string, routerContext map[string]string, pool Pool) *Router {
-	return &Router{
+var routerid uint32
+
+func New(rootRouter string, getRouters func() []string, routerContext map[string]string, pool Pool, logger log.Logger) *Router {
+	id := atomic.AddUint32(&routerid, 1)
+	r := &Router{
 		rootRouter:    rootRouter,
 		getRouters:    getRouters,
 		routerContext: routerContext,
 		pool:          pool,
 		now:           time.Now,
+		log:           logger,
+		logId:         fmt.Sprintf("router %d", id),
 	}
+	r.log.Infof(r.logId, "Created {context: %v}", routerContext)
+	return r
 }
 
 func (r *Router) getTable() (*db.RoutingTable, error) {
@@ -73,6 +85,7 @@ func (r *Router) getTable() (*db.RoutingTable, error) {
 		routers = []string{r.rootRouter}
 	}
 
+	r.log.Infof(r.logId, "Reading routing table from any of %v", routers)
 	table, err := readTable(context.Background(), r.pool, routers, r.routerContext)
 	if err != nil {
 		// Use hook to retrieve possibly different set of routers and retry
@@ -81,11 +94,13 @@ func (r *Router) getTable() (*db.RoutingTable, error) {
 			table, err = readTable(context.Background(), r.pool, routers, r.routerContext)
 		}
 		if err != nil {
+			r.log.Error(r.logId, err)
 			return nil, err
 		}
 	}
 	r.table = table
 	r.dueUnix = now.Add(time.Duration(table.TimeToLive) * time.Second).Unix()
+	r.log.Debugf(r.logId, "New routing table, TTL %d", table.TimeToLive)
 
 	return table, nil
 }
@@ -116,4 +131,5 @@ func (r *Router) Invalidate() {
 	// Reset due time to the 70s, this will make next access refresh the routing table using
 	// last set of routers instead of the original one.
 	r.dueUnix = 0
+	r.log.Infof(r.logId, "Invalidating routing table")
 }

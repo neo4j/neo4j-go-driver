@@ -21,10 +21,12 @@ package bolt
 
 import (
 	"errors"
+	"fmt"
 	"net"
 	"time"
 
 	"github.com/neo4j/neo4j-go-driver/neo4j/internal/db"
+	"github.com/neo4j/neo4j-go-driver/neo4j/internal/log"
 	"github.com/neo4j/neo4j-go-driver/neo4j/internal/packstream"
 )
 
@@ -96,14 +98,16 @@ type bolt3 struct {
 	packer        *packstream.Packer
 	unpacker      *packstream.Unpacker
 	connId        string
+	logId         string
 	serverVersion string
 	tfirst        int64       // Time that server started streaming
 	pendingTx     *internalTx // Stashed away when tx started explcitly
 	bookmark      string      // Last bookmark
 	birthDate     time.Time
+	log           log.Logger
 }
 
-func NewBolt3(serverName string, conn net.Conn) *bolt3 {
+func NewBolt3(serverName string, conn net.Conn, log log.Logger) *bolt3 {
 	chunker := newChunker(conn)
 	dechunker := newDechunker(conn)
 
@@ -116,6 +120,7 @@ func NewBolt3(serverName string, conn net.Conn) *bolt3 {
 		packer:     packstream.NewPacker(chunker, dehydrate),
 		unpacker:   packstream.NewUnpacker(dechunker),
 		birthDate:  time.Now(),
+		log:        log,
 	}
 }
 
@@ -134,6 +139,7 @@ func (b *bolt3) appendMsg(tag packstream.StructTag, field ...interface{}) error 
 		// At this point we do not know the state of what has been written to the chunks.
 		// Either we should support rolling back whatever that has been written or just
 		// bail out this session.
+		b.log.Error(b.logId, err)
 		b.state = bolt3_dead
 		return err
 	}
@@ -146,6 +152,7 @@ func (b *bolt3) sendMsg(tag packstream.StructTag, field ...interface{}) error {
 		return err
 	}
 	if err := b.chunker.send(); err != nil {
+		b.log.Error(b.logId, err)
 		b.state = bolt3_dead
 		return err
 	}
@@ -154,17 +161,20 @@ func (b *bolt3) sendMsg(tag packstream.StructTag, field ...interface{}) error {
 
 func (b *bolt3) receiveMsg() (interface{}, error) {
 	if err := b.dechunker.beginMessage(); err != nil {
+		b.log.Error(b.logId, err)
 		b.state = bolt3_dead
 		return nil, err
 	}
 
 	msg, err := b.unpacker.UnpackStruct(hydrate)
 	if err != nil {
+		b.log.Error(b.logId, err)
 		b.state = bolt3_dead
 		return nil, err
 	}
 
 	if err = b.dechunker.endMessage(); err != nil {
+		b.log.Error(b.logId, err)
 		b.state = bolt3_dead
 		return nil, err
 	}
@@ -185,15 +195,23 @@ func (b *bolt3) receiveSuccess() (*successResponse, error) {
 		return v, nil
 	case *db.DatabaseError:
 		b.state = bolt3_failed
+		if v.IsClient() {
+			// These could include potentially large cypher statement, only log to debug
+			b.log.Debugf(b.logId, "%s", v)
+		} else {
+			b.log.Error(b.logId, v)
+		}
 		return nil, v
 	}
 	b.state = bolt3_dead
-	return nil, errors.New("Expected success or database error")
+	err = errors.New("Expected success or database error")
+	b.log.Error(b.logId, err)
+	return nil, err
 }
 
 func (b *bolt3) connect(auth map[string]interface{}) error {
 	// Only allowed to connect when in disconnected state
-	if err := assertState(b.state, bolt3_dead); err != nil {
+	if err := assertState(b.logError, b.state, bolt3_dead); err != nil {
 		return err
 	}
 
@@ -220,13 +238,15 @@ func (b *bolt3) connect(auth map[string]interface{}) error {
 	}
 	helloRes := succRes.hello()
 	if helloRes == nil {
-		return errors.New("proto error")
+		return errors.New(fmt.Sprintf("Unexpected server response: %s", succRes))
 	}
 	b.connId = helloRes.connectionId
+	b.logId = "bolt@" + b.connId
 	b.serverVersion = helloRes.server
 
 	// Transition into ready state
 	b.state = bolt3_ready
+	b.log.Infof(b.logId, "Connected")
 	return nil
 }
 
@@ -240,7 +260,7 @@ func (b *bolt3) TxBegin(
 		}
 	}
 
-	if err := assertState(b.state, bolt3_ready); err != nil {
+	if err := assertState(b.logError, b.state, bolt3_ready); err != nil {
 		return nil, err
 	}
 
@@ -272,7 +292,7 @@ func (b *bolt3) TxBegin(
 }
 
 func (b *bolt3) TxCommit(txh db.Handle) error {
-	if err := assertHandle(b.txId, txh); err != nil {
+	if err := assertHandle(b.logError, b.txId, txh); err != nil {
 		return err
 	}
 
@@ -290,7 +310,7 @@ func (b *bolt3) TxCommit(txh db.Handle) error {
 	}
 
 	// Should be in vanilla tx state now
-	if err := assertState(b.state, bolt3_tx); err != nil {
+	if err := assertState(b.logError, b.state, bolt3_tx); err != nil {
 		return err
 	}
 
@@ -321,7 +341,7 @@ func (b *bolt3) TxCommit(txh db.Handle) error {
 }
 
 func (b *bolt3) TxRollback(txh db.Handle) error {
-	if err := assertHandle(b.txId, txh); err != nil {
+	if err := assertHandle(b.logError, b.txId, txh); err != nil {
 		return err
 	}
 
@@ -339,7 +359,8 @@ func (b *bolt3) TxRollback(txh db.Handle) error {
 	}
 
 	// Should be in vanilla tx state now
-	if err := assertState(b.state, bolt3_tx); err != nil {
+	// Don't log this as an error since it might happen if a statement failed
+	if err := assertState(b.logDebug, b.state, bolt3_tx); err != nil {
 		return err
 	}
 
@@ -382,7 +403,7 @@ func (b *bolt3) run(cypher string, params map[string]interface{}, tx *internalTx
 		return nil, err
 	}
 
-	if err := assertStates(b.state, []int{bolt3_tx, bolt3_ready, bolt3_pendingtx}); err != nil {
+	if err := assertStates(b.logError, b.state, []int{bolt3_tx, bolt3_ready, bolt3_pendingtx}); err != nil {
 		return nil, err
 	}
 
@@ -443,11 +464,19 @@ func (b *bolt3) run(cypher string, params map[string]interface{}, tx *internalTx
 	return stream, nil
 }
 
+func (b *bolt3) logError(err error) {
+	b.log.Error(b.logId, err)
+}
+
+func (b *bolt3) logDebug(err error) {
+	b.log.Debugf(b.logId, "%s", err)
+}
+
 func (b *bolt3) Run(
 	cypher string, params map[string]interface{}, mode db.AccessMode,
 	bookmarks []string, timeout time.Duration, txMeta map[string]interface{}) (*db.Stream, error) {
 
-	if err := assertStates(b.state, []int{bolt3_streaming, bolt3_ready}); err != nil {
+	if err := assertStates(b.logError, b.state, []int{bolt3_streaming, bolt3_ready}); err != nil {
 		return nil, err
 	}
 
@@ -461,7 +490,7 @@ func (b *bolt3) Run(
 }
 
 func (b *bolt3) RunTx(txh db.Handle, cypher string, params map[string]interface{}) (*db.Stream, error) {
-	if err := assertHandle(b.txId, txh); err != nil {
+	if err := assertHandle(b.logError, b.txId, txh); err != nil {
 		return nil, err
 	}
 
@@ -472,11 +501,11 @@ func (b *bolt3) RunTx(txh db.Handle, cypher string, params map[string]interface{
 
 // Reads one record from the stream.
 func (b *bolt3) Next(shandle db.Handle) (*db.Record, *db.Summary, error) {
-	if err := assertHandle(b.streamId, shandle); err != nil {
+	if err := assertHandle(b.logError, b.streamId, shandle); err != nil {
 		return nil, nil, err
 	}
 
-	if err := assertStates(b.state, []int{bolt3_streaming, bolt3_streamingtx}); err != nil {
+	if err := assertStates(b.logError, b.state, []int{bolt3_streaming, bolt3_streamingtx}); err != nil {
 		return nil, nil, err
 	}
 
@@ -495,7 +524,9 @@ func (b *bolt3) Next(shandle db.Handle) (*db.Record, *db.Summary, error) {
 		sum := x.summary()
 		if sum == nil {
 			b.state = bolt3_dead
-			return nil, nil, errors.New("Failed to parse summary")
+			err = errors.New("Failed to parse summary")
+			b.log.Error(b.logId, err)
+			return nil, nil, err
 		}
 		if b.state == bolt3_streamingtx {
 			b.state = bolt3_tx
@@ -514,10 +545,13 @@ func (b *bolt3) Next(shandle db.Handle) (*db.Record, *db.Summary, error) {
 		return nil, sum, nil
 	case *db.DatabaseError:
 		b.state = bolt3_failed
+		b.log.Error(b.logId, x)
 		return nil, nil, x
 	default:
 		b.state = bolt3_dead
-		return nil, nil, errors.New("Unknown response")
+		err = errors.New("Unknown response")
+		b.log.Error(b.logId, err)
+		return nil, nil, err
 	}
 }
 
@@ -583,7 +617,7 @@ func (b *bolt3) Reset() {
 }
 
 func (b *bolt3) GetRoutingTable(context map[string]string) (*db.RoutingTable, error) {
-	if err := assertState(b.state, bolt3_ready); err != nil {
+	if err := assertState(b.logError, b.state, bolt3_ready); err != nil {
 		return nil, err
 	}
 	return getRoutingTable(b, context)

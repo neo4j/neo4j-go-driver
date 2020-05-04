@@ -20,11 +20,8 @@
 package neo4j
 
 import (
-	//"fmt"
 	"log"
 	"os"
-	//"path/filepath"
-	//"runtime"
 )
 
 // Logging is the interface that any provided logging target must satisfy for the neo4j
@@ -110,4 +107,32 @@ func (logger *internalLogger) Infof(message string, args ...interface{}) {
 
 func (logger *internalLogger) Debugf(message string, args ...interface{}) {
 	logger.debugLogger.Printf(message, args...)
+}
+
+// Implement internal logger interface on top of the exported.
+// Temporary solution for backwards compatibility, next major we should export the internal
+// logger interface instead.
+type adaptorLogger struct {
+	logging Logging
+}
+
+func (l adaptorLogger) Error(componentId string, err error) {
+	if l.logging.ErrorEnabled() {
+		l.logging.Errorf("%s: %s", componentId, err)
+	}
+}
+func (l *adaptorLogger) Warnf(componentId string, msg string, args ...interface{}) {
+	if l.logging.WarningEnabled() {
+		l.logging.Warningf(componentId+":"+msg, args)
+	}
+}
+func (l *adaptorLogger) Infof(componentId string, msg string, args ...interface{}) {
+	if l.logging.InfoEnabled() {
+		l.logging.Infof(componentId+":"+msg, args)
+	}
+}
+func (l *adaptorLogger) Debugf(componentId string, msg string, args ...interface{}) {
+	if l.logging.DebugEnabled() {
+		l.logging.Debugf(componentId+":"+msg, args)
+	}
 }

@@ -62,17 +62,6 @@ var _ = Describe("Config", func() {
 		It("should have socket keep alive enabled", func() {
 			Expect(config.SocketKeepalive).To(BeTrue())
 		})
-
-		It("should have non-nil logger", func() {
-			Expect(config.Log).NotTo(BeNil())
-		})
-
-		It("should have an internalLogger logger with level set to 0", func() {
-			logger, ok := config.Log.(*internalLogger)
-			Expect(ok).To(BeTrue())
-
-			Expect(logger.level).To(BeZero())
-		})
 	})
 
 	Context("validateAndNormaliseConfig", func() {

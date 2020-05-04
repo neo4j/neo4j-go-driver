@@ -28,6 +28,7 @@ import (
 	"sync"
 
 	"github.com/neo4j/neo4j-go-driver/neo4j/internal/db"
+	"github.com/neo4j/neo4j-go-driver/neo4j/internal/log"
 	"github.com/neo4j/neo4j-go-driver/neo4j/internal/pool"
 	"github.com/neo4j/neo4j-go-driver/neo4j/internal/router"
 )
@@ -95,8 +96,18 @@ func NewDriver(target string, auth AuthToken, configurers ...func(*Config)) (Dri
 		return nil, err
 	}
 
-	c := &connector{config: config, auth: auth.tokens}
-	pool := pool.New(config.MaxConnectionPoolSize, config.MaxConnectionLifetime, c.connect)
+	// Setup logging
+	var logger log.Logger
+	if config.Log != nil {
+		// Wrap obsolete logging system in internal
+		logger = &adaptorLogger{logging: config.Log}
+	} else {
+		// Default to void logger
+		logger = &log.VoidLogger{}
+	}
+
+	connector := newConnector(config, auth.tokens, logger)
+	pool := pool.New(config.MaxConnectionPoolSize, config.MaxConnectionLifetime, connector.connect, logger)
 
 	var sessRouter sessionRouter
 	if directRouting {
@@ -119,7 +130,7 @@ func NewDriver(target string, auth AuthToken, configurers ...func(*Config)) (Dri
 				return servers
 			}
 		}
-		sessRouter = router.New(parsed.Host, routersResolver, routingContext, pool)
+		sessRouter = router.New(parsed.Host, routersResolver, routingContext, pool, logger)
 	}
 
 	return &driver{

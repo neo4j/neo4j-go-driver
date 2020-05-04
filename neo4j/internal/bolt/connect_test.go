@@ -23,7 +23,10 @@ import (
 	"testing"
 
 	"github.com/neo4j/neo4j-go-driver/neo4j/internal/db"
+	"github.com/neo4j/neo4j-go-driver/neo4j/internal/log"
 )
+
+var logger = &log.ConsoleLogger{Errors: true, Infos: true, Warns: true}
 
 func TestConnect(ot *testing.T) {
 	// TODO: Test connect timeout
@@ -61,7 +64,7 @@ func TestConnect(ot *testing.T) {
 
 		// Pass the connection to bolt connect
 		serverName := "theServerName"
-		boltconn, err := Connect(serverName, conn, auth)
+		boltconn, err := Connect(serverName, conn, auth, logger)
 		assertNoError(t, err)
 
 		// Check some properties on the connection that is related to connecting
@@ -87,7 +90,7 @@ func TestConnect(ot *testing.T) {
 			srv.rejectHelloUnauthorized()
 		}()
 
-		boltconn, err := Connect("serverName", conn, auth)
+		boltconn, err := Connect("serverName", conn, auth, logger)
 		// Make sure that we get the right error type
 		dbErr := err.(*db.DatabaseError)
 		if !dbErr.IsAuthentication() {
@@ -109,7 +112,7 @@ func TestConnect(ot *testing.T) {
 			srv.closeConnection()
 		}()
 
-		_, err := Connect("servername", conn, auth)
+		_, err := Connect("servername", conn, auth, logger)
 		assertError(t, err)
 	})
 
@@ -123,7 +126,7 @@ func TestConnect(ot *testing.T) {
 			srv.acceptVersion(1)
 		}()
 
-		boltconn, err := Connect("servername", conn, auth)
+		boltconn, err := Connect("servername", conn, auth, logger)
 		assertError(t, err)
 		if boltconn != nil {
 			t.Error("Shouldn't returned conn")

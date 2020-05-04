@@ -26,10 +26,12 @@ import (
 	"github.com/neo4j/neo4j-go-driver/neo4j/internal/db"
 )
 
-func assertHandle(id int64, h db.Handle) error {
+func assertHandle(log func(error), id int64, h db.Handle) error {
 	hid, ok := h.(int64)
 	if !ok || hid != id {
-		return errors.New("Invalid handle")
+		err := errors.New("Invalid handle")
+		log(err)
+		return err
 	}
 	return nil
 }
@@ -38,18 +40,22 @@ func invalidStateError(state int, expected []int) error {
 	return errors.New(fmt.Sprintf("Invalid state %d, expected: %+v", state, expected))
 }
 
-func assertStates(state int, allowed []int) error {
+func assertStates(log func(error), state int, allowed []int) error {
 	for _, a := range allowed {
 		if state == a {
 			return nil
 		}
 	}
-	return invalidStateError(state, allowed)
+	err := invalidStateError(state, allowed)
+	log(err)
+	return err
 }
 
-func assertState(state, allowed int) error {
+func assertState(log func(error), state, allowed int) error {
 	if state != allowed {
-		return invalidStateError(state, []int{allowed})
+		err := invalidStateError(state, []int{allowed})
+		log(err)
+		return err
 	}
 	return nil
 }

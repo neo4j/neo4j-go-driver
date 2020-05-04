@@ -27,11 +27,18 @@ import (
 	"net"
 
 	"github.com/neo4j/neo4j-go-driver/neo4j/internal/db"
+	"github.com/neo4j/neo4j-go-driver/neo4j/internal/log"
 )
+
+type Logger interface {
+	ConnectError(c net.Conn, err error)
+	ConnectionError(c db.Connection, err error)
+	ConnectionInfo(c db.Connection, msg string, args ...interface{})
+}
 
 // Negotiate version of bolt protocol.
 // Returns instance of bolt protocol implmenting low-level abstract db connection interface.
-func Connect(serverName string, conn net.Conn, auth map[string]interface{}) (db.Connection, error) {
+func Connect(serverName string, conn net.Conn, auth map[string]interface{}, log log.Logger) (db.Connection, error) {
 	// Perform Bolt handshake to negotiate version
 	// Send handshake to server
 	handshake := []byte{
@@ -57,15 +64,18 @@ func Connect(serverName string, conn net.Conn, auth map[string]interface{}) (db.
 	switch ver {
 	case 3:
 		// Handover rest of connection handshaking
-		boltConn := NewBolt3(serverName, conn)
+		boltConn := NewBolt3(serverName, conn, log)
 		err = boltConn.connect(auth)
 		if err != nil {
 			return nil, err
 		}
 		return boltConn, nil
 	case 0:
-		return nil, errors.New("No matching version")
+		err = errors.New("Server did not accept any version")
 	default:
-		return nil, errors.New(fmt.Sprintf("Unsupported version: %d", ver))
+		err = errors.New(fmt.Sprintf("Server responded with unsupported version %d", ver))
 	}
+
+	log.Error("boltconnect@"+serverName, err)
+	return nil, err
 }

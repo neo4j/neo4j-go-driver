@@ -27,22 +27,6 @@ import (
 )
 
 // bolt3.connect is tested through Connect, no need to test it here
-
-// TODO:
-//       syntax error, RUN fails with client error
-//       locking error, RUN fails with retryable error
-//       transaction open
-//       not alive
-//       unconsumed result
-//       no response
-//       unexpected response
-// TODO: test IsAlive
-//       different error condtions that can make it not be alive
-// TODO: test Close
-//       unconsumed result
-//       already closed
-//       goodbye failure
-
 func TestBolt3(ot *testing.T) {
 	// Test streams
 	// Faked returns from a server
@@ -100,7 +84,7 @@ func TestBolt3(ot *testing.T) {
 		tcpConn, srv, cleanup := setupBolt3Pipe(t)
 		go serverJob(srv)
 
-		c, err := Connect("name", tcpConn, auth)
+		c, err := Connect("name", tcpConn, auth, logger)
 		if err != nil {
 			t.Fatal(err)
 		}
