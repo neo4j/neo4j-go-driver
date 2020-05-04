@@ -241,7 +241,7 @@ func (b *bolt3) connect(auth map[string]interface{}) error {
 		return errors.New(fmt.Sprintf("Unexpected server response: %s", succRes))
 	}
 	b.connId = helloRes.connectionId
-	b.logId = "bolt@" + b.connId
+	b.logId = fmt.Sprintf("%s@%s", b.connId, b.serverName)
 	b.serverVersion = helloRes.server
 
 	// Transition into ready state
