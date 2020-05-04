@@ -659,12 +659,14 @@ func TestConnectionConformance(ot *testing.T) {
 	})
 
 	ot.Run("Explain query", func(t *testing.T) {
+		t.Skip()
 		s, _ := boltConn.Run("EXPLAIN MATCH(n:BmRand) RETURN n", nil, db.ReadMode, nil, 0, nil)
 		_, sum, _ := boltConn.Next(s.Handle)
 		t.Logf("%+v", sum.Plan)
 	})
 
 	ot.Run("Profile query", func(t *testing.T) {
+		t.Skip()
 		s, _ := boltConn.Run("PROFILE MATCH(n:BmRand) RETURN n", nil, db.ReadMode, nil, 0, nil)
 		_, sum, _ := boltConn.Next(s.Handle)
 		t.Logf("%+v", sum.ProfiledPlan)

@@ -120,7 +120,6 @@ func hydrateRelNode(fields []interface{}) (interface{}, error) {
 		return nil, errors.New("RelNode hydrate error")
 	}
 	s := &types.RelNode{Id: id, Type: lbl, Props: props}
-	fmt.Printf("seg: %+v\n", s)
 	return s, nil
 }
 

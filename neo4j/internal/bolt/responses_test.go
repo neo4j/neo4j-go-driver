@@ -79,19 +79,63 @@ func TestSuccessResponseExtraction(ot *testing.T) {
 				"bookmark": "bookm",
 				"plan": map[string]interface{}{
 					"operatorType": "opType",
-					"identifiers":  []string{"id1", "id2"},
+					"identifiers":  []interface{}{"id1", "id2"},
 					"args": map[string]interface{}{
 						"arg1": 1001,
 					},
+					"children": []interface{}{
+						map[string]interface{}{
+							"operatorType": "cop",
+							"identifiers":  []interface{}{"cid"},
+						},
+					},
 				},
 			},
-			expected: &db.Summary{Bookmark: "bookm", TLast: 3, StmntType: db.StatementTypeWrite, Plan: &db.Plan{
+			expected: &db.Plan{
 				Operator:    "opType",
 				Arguments:   map[string]interface{}{"arg1": 1001},
 				Identifiers: []string{"id1", "id2"},
-				Children:    []db.Plan{},
-			}},
-			extract: func(r *successResponse) interface{} { return r.summary() },
+				Children: []db.Plan{
+					db.Plan{Operator: "cop", Identifiers: []string{"cid"}, Children: []db.Plan{}},
+				},
+			},
+			extract: func(r *successResponse) interface{} { return r.summary().Plan },
+		},
+		{
+			name: "Summary with profile",
+			meta: map[string]interface{}{
+				"type":     "w",
+				"t_last":   int64(3),
+				"bookmark": "bookm",
+				"profile": map[string]interface{}{
+					"dbHits":       int64(7),
+					"rows":         int64(4),
+					"operatorType": "opType",
+					"identifiers":  []interface{}{"id1", "id2"},
+					"args": map[string]interface{}{
+						"arg1": 1001,
+					},
+					"children": []interface{}{
+						map[string]interface{}{
+							"operatorType": "cop",
+							"identifiers":  []interface{}{"cid"},
+							"dbHits":       int64(1),
+							"rows":         int64(2),
+						},
+					},
+				},
+			},
+			expected: &db.ProfiledPlan{
+				Operator:    "opType",
+				Arguments:   map[string]interface{}{"arg1": 1001},
+				Identifiers: []string{"id1", "id2"},
+				Children: []db.ProfiledPlan{
+					db.ProfiledPlan{Operator: "cop", Identifiers: []string{"cid"}, Children: []db.ProfiledPlan{}, DbHits: 1, Records: 2},
+				},
+				DbHits:  7,
+				Records: 4,
+			},
+			extract: func(r *successResponse) interface{} { return r.summary().ProfiledPlan },
 		},
 		{
 			name: "Commit",
