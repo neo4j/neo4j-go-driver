@@ -50,12 +50,12 @@ type ResultSummary interface {
 	// Counters returns statistics counts for the statement.
 	Counters() Counters
 	// Plan returns statement plan for the executed statement if available, otherwise null.
-	//Plan() Plan
+	Plan() Plan
 	// Profile returns profiled statement plan for the executed statement if available, otherwise null.
-	//Profile() ProfiledPlan
+	Profile() ProfiledPlan
 	// Notifications returns a slice of notifications produced while executing the statement.
 	// The list will be empty if no notifications produced while executing the statement.
-	//Notifications() []Notification
+	Notifications() []Notification
 	// ResultAvailableAfter returns the time it took for the server to make the result available for consumption.
 	ResultAvailableAfter() time.Duration
 	// ResultConsumedAfter returns the time it took the server to consume the result.
@@ -272,4 +272,122 @@ func (s *resultSummary) ResultAvailableAfter() time.Duration {
 
 func (s *resultSummary) ResultConsumedAfter() time.Duration {
 	return time.Duration(s.sum.TLast) * time.Millisecond
+}
+
+func (s *resultSummary) Plan() Plan {
+	if s.sum.Plan == nil {
+		return nil
+	}
+	return &plan{plan: s.sum.Plan}
+}
+
+type plan struct {
+	plan *db.Plan
+}
+
+func (p *plan) Operator() string {
+	return p.plan.Operator
+}
+
+func (p *plan) Arguments() map[string]interface{} {
+	return p.plan.Arguments
+}
+
+func (p *plan) Identifiers() []string {
+	return p.plan.Identifiers
+}
+
+func (p *plan) Children() []Plan {
+	children := make([]Plan, len(p.plan.Children))
+	for i, c := range p.plan.Children {
+		children[i] = &plan{plan: &c}
+	}
+	return children
+}
+
+func (s *resultSummary) Profile() ProfiledPlan {
+	if s.sum.ProfiledPlan == nil {
+		return nil
+	}
+	return &profile{profile: s.sum.ProfiledPlan}
+}
+
+type profile struct {
+	profile *db.ProfiledPlan
+}
+
+func (p *profile) Operator() string {
+	return p.profile.Operator
+}
+
+func (p *profile) Arguments() map[string]interface{} {
+	return p.profile.Arguments
+}
+
+func (p *profile) Identifiers() []string {
+	return p.profile.Identifiers
+}
+
+func (p *profile) DbHits() int64 {
+	return p.profile.DbHits
+}
+
+func (p *profile) Records() int64 {
+	return p.profile.Records
+}
+
+func (p *profile) Children() []ProfiledPlan {
+	children := make([]ProfiledPlan, len(p.profile.Children))
+	for i, c := range p.profile.Children {
+		children[i] = &profile{profile: &c}
+	}
+	return children
+}
+
+func (s *resultSummary) Notifications() []Notification {
+	if s.sum.Notifications == nil {
+		return nil
+	}
+	notifications := make([]Notification, len(s.sum.Notifications))
+	for i, n := range s.sum.Notifications {
+		notifications[i] = &notification{notification: &n}
+	}
+	return notifications
+}
+
+type notification struct {
+	notification *db.Notification
+}
+
+func (n *notification) Code() string {
+	return n.notification.Code
+}
+
+func (n *notification) Title() string {
+	return n.notification.Title
+}
+
+func (n *notification) Description() string {
+	return n.notification.Description
+}
+
+func (n *notification) Severity() string {
+	return n.notification.Severity
+}
+
+func (n *notification) Position() InputPosition {
+	if n.notification.Position == nil {
+		return nil
+	}
+	return n
+}
+
+func (n *notification) Offset() int {
+	return n.notification.Position.Offset
+}
+func (n *notification) Column() int {
+	return n.notification.Position.Column
+}
+func (n *notification) Line() int {
+	return n.notification.Position.Line
 }

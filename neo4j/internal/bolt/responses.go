@@ -144,13 +144,27 @@ func (s *successResponse) summary() *db.Summary {
 		profile = parseProfile(profilex)
 	}
 
+	// Optional notifications
+	notificationsx, _ := s.meta["notifications"].([]interface{})
+	var notifications []db.Notification
+	if len(notificationsx) > 0 {
+		notifications = make([]db.Notification, 0, len(notificationsx))
+		for _, x := range notificationsx {
+			notificationx, ok := x.(map[string]interface{})
+			if ok {
+				notifications = append(notifications, parseNotification(notificationx))
+			}
+		}
+	}
+
 	return &db.Summary{
-		Bookmark:     bookmark,
-		TLast:        t_last,
-		StmntType:    stmntType,
-		Counters:     counts,
-		Plan:         plan,
-		ProfiledPlan: profile,
+		Bookmark:      bookmark,
+		TLast:         t_last,
+		StmntType:     stmntType,
+		Counters:      counts,
+		Plan:          plan,
+		ProfiledPlan:  profile,
+		Notifications: notifications,
 	}
 }
 
@@ -214,4 +228,25 @@ func parseProfile(profilex map[string]interface{}) *db.ProfiledPlan {
 	}
 
 	return plan
+}
+
+func parseNotification(m map[string]interface{}) db.Notification {
+	n := db.Notification{}
+	n.Code, _ = m["code"].(string)
+	n.Description = m["description"].(string)
+	n.Severity, _ = m["severity"].(string)
+	n.Title, _ = m["title"].(string)
+	posx, exists := m["position"].(map[string]interface{})
+	if exists {
+		pos := &db.InputPosition{}
+		i, _ := posx["column"].(int64)
+		pos.Column = int(i)
+		i, _ = posx["line"].(int64)
+		pos.Line = int(i)
+		i, _ = posx["offset"].(int64)
+		pos.Offset = int(i)
+		n.Position = pos
+	}
+
+	return n
 }
