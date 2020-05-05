@@ -26,6 +26,7 @@ import (
 	"net/url"
 	"strings"
 	"sync"
+	"sync/atomic"
 
 	"github.com/neo4j/neo4j-go-driver/neo4j/internal/db"
 	"github.com/neo4j/neo4j-go-driver/neo4j/internal/log"
@@ -105,6 +106,8 @@ func NewDriver(target string, auth AuthToken, configurers ...func(*Config)) (Dri
 		// Default to void logger
 		logger = &log.VoidLogger{}
 	}
+	id := atomic.AddUint32(&driverid, 1)
+	logId := fmt.Sprintf("driver %d", id)
 
 	connector := newConnector(config, auth.tokens, logger)
 	pool := pool.New(config.MaxConnectionPoolSize, config.MaxConnectionLifetime, connector.connect, logger)
@@ -115,6 +118,7 @@ func NewDriver(target string, auth AuthToken, configurers ...func(*Config)) (Dri
 	} else {
 		routingContext, err := routingContextFromUrl(parsed)
 		if err != nil {
+			logger.Error(logId, err)
 			return nil, err
 		}
 
@@ -133,13 +137,19 @@ func NewDriver(target string, auth AuthToken, configurers ...func(*Config)) (Dri
 		sessRouter = router.New(parsed.Host, routersResolver, routingContext, pool, logger)
 	}
 
-	return &driver{
+	driver := &driver{
 		target: parsed,
 		config: config,
 		pool:   pool,
 		router: sessRouter,
-	}, nil
+		log:    logger,
+		logId:  logId,
+	}
+	logger.Infof(logId, "Created { target: %s }", target)
+	return driver, nil
 }
+
+var driverid uint32
 
 func routingContextFromUrl(u *url.URL) (map[string]string, error) {
 	queryValues := u.Query()
@@ -173,6 +183,8 @@ type driver struct {
 	pool   *pool.Pool
 	mut    sync.Mutex
 	router sessionRouter
+	logId  string
+	log    log.Logger
 }
 
 func (d *driver) Target() url.URL {
@@ -198,5 +210,6 @@ func (d *driver) Close() error {
 		d.pool.Close()
 	}
 	d.pool = nil
+	d.log.Infof(d.logId, "Closed")
 	return nil
 }
