@@ -138,6 +138,38 @@ func TestSuccessResponseExtraction(ot *testing.T) {
 			extract: func(r *successResponse) interface{} { return r.summary().ProfiledPlan },
 		},
 		{
+			name: "Summary with notifications",
+			meta: map[string]interface{}{
+				"type":     "w",
+				"t_last":   int64(3),
+				"bookmark": "bookm",
+				"notifications": []interface{}{
+					map[string]interface{}{
+						"code":        "c1",
+						"title":       "t1",
+						"description": "d1",
+						"position": map[string]interface{}{
+							"offset": int64(1),
+							"line":   int64(2),
+							"column": int64(3),
+						},
+						"severity": "s1",
+					},
+					map[string]interface{}{
+						"code":        "c2",
+						"title":       "t2",
+						"description": "d2",
+						"severity":    "s2",
+					},
+				},
+			},
+			expected: []db.Notification{
+				db.Notification{Code: "c1", Title: "t1", Description: "d1", Severity: "s1", Position: &db.InputPosition{Offset: 1, Line: 2, Column: 3}},
+				db.Notification{Code: "c2", Title: "t2", Description: "d2", Severity: "s2"},
+			},
+			extract: func(r *successResponse) interface{} { return r.summary().Notifications },
+		},
+		{
 			name: "Commit",
 			meta: map[string]interface{}{
 				"bookmark": "neo4j:bookmark:v1:tx35",
