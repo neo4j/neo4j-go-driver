@@ -66,19 +66,16 @@ type internalTx struct {
 }
 
 func (i *internalTx) toMeta() map[string]interface{} {
-	mode := "w"
+	meta := map[string]interface{}{}
 	if i.mode == db.ReadMode {
-		mode = "r"
-	}
-	meta := map[string]interface{}{
-		"mode": mode,
+		meta["mode"] = "r"
 	}
 	if len(i.bookmarks) > 0 {
 		meta["bookmarks"] = i.bookmarks
 	}
-	ts := int(i.timeout.Seconds())
-	if ts > 0 {
-		meta["tx_timeout"] = ts
+	ms := int(i.timeout.Milliseconds())
+	if ms > 0 {
+		meta["tx_timeout"] = ms
 	}
 	if len(i.txMeta) > 0 {
 		meta["tx_metadata"] = i.txMeta
@@ -238,7 +235,7 @@ func (b *bolt3) connect(auth map[string]interface{}) error {
 	}
 	helloRes := succRes.hello()
 	if helloRes == nil {
-		return errors.New(fmt.Sprintf("Unexpected server response: %s", succRes))
+		return errors.New(fmt.Sprintf("Unexpected server response: %+v", succRes))
 	}
 	b.connId = helloRes.connectionId
 	b.logId = fmt.Sprintf("%s@%s", b.connId, b.serverName)
@@ -327,7 +324,9 @@ func (b *bolt3) TxCommit(txh db.Handle) error {
 	commitSuccess := succRes.commit()
 	if commitSuccess == nil {
 		b.state = bolt3_dead
-		return errors.New("Parser error")
+		err := errors.New(fmt.Sprintf("Failed to parse commit response: %+v", succRes))
+		b.log.Error(b.logId, err)
+		return err
 	}
 
 	// Keep track of bookmark
@@ -448,7 +447,9 @@ func (b *bolt3) run(cypher string, params map[string]interface{}, tx *internalTx
 	runRes := res.run()
 	if runRes == nil {
 		b.state = bolt3_dead
-		return nil, errors.New("parse fail, proto error")
+		err = errors.New(fmt.Sprintf("Failed to parse RUN response: %+v", res))
+		b.log.Error(b.logId, err)
+		return nil, err
 	}
 	b.tfirst = runRes.t_first
 	b.streamKeys = runRes.fields

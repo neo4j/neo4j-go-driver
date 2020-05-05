@@ -118,21 +118,21 @@ type adaptorLogger struct {
 
 func (l adaptorLogger) Error(componentId string, err error) {
 	if l.logging.ErrorEnabled() {
-		l.logging.Errorf("%s: %s", componentId, err)
+		l.logging.Errorf("%s:%s", componentId, err)
 	}
 }
 func (l *adaptorLogger) Warnf(componentId string, msg string, args ...interface{}) {
 	if l.logging.WarningEnabled() {
-		l.logging.Warningf(componentId+":"+msg, args)
+		l.logging.Warningf(componentId+":"+msg, args...)
 	}
 }
 func (l *adaptorLogger) Infof(componentId string, msg string, args ...interface{}) {
 	if l.logging.InfoEnabled() {
-		l.logging.Infof(componentId+":"+msg, args)
+		l.logging.Infof(componentId+":"+msg, args...)
 	}
 }
 func (l *adaptorLogger) Debugf(componentId string, msg string, args ...interface{}) {
 	if l.logging.DebugEnabled() {
-		l.logging.Debugf(componentId+":"+msg, args)
+		l.logging.Debugf(componentId+":"+msg, args...)
 	}
 }
