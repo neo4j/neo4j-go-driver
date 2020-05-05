@@ -3,8 +3,12 @@
 !: AUTO GOODBYE
 !: AUTO RESET
 
-C: RUN "RETURN $x" {"x": 1} {"tx_timeout": 12340}
+C: BEGIN {}
+S: SUCCESS {}
+C: RUN "RETURN 1" {} {}
    PULL_ALL
 S: SUCCESS {"fields": ["x"]}
    RECORD [1]
-   SUCCESS {}
+   SUCCESS {"type": "r"}
+C: COMMIT
+S: SUCCESS {}

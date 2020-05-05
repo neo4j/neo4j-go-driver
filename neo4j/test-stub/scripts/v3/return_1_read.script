@@ -3,12 +3,8 @@
 !: AUTO GOODBYE
 !: AUTO RESET
 
-C: BEGIN {}
-S: SUCCESS {}
-C: RUN "RETURN 1" {} {}
+C: RUN "RETURN 1" {} {"mode": "r"}
    PULL_ALL
 S: SUCCESS {"fields": ["x"]}
    RECORD [1]
-   SUCCESS {}
-C: COMMIT
-S: SUCCESS {}
+   SUCCESS {"type": "r"}

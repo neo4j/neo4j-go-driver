@@ -73,5 +73,5 @@ func logLevel() neo4j.LogLevel {
 		}
 	}
 
-	return neo4j.ERROR
+	return neo4j.DEBUG
 }

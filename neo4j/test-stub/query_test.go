@@ -61,6 +61,7 @@ func Test_Query(t *testing.T) {
 	}
 
 	t.Run("V1", func(t *testing.T) {
+		t.Skip()
 		t.Run("shouldExecuteSimpleQuery", func(t *testing.T) {
 			verifyReturn1(t, path.Join("v1", "return_1.script"), nil)
 		})
