@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2019 "Neo4j,"
+ * Copyright (c) 2002-2020 "Neo4j,"
  * Neo4j Sweden AB [http://neo4j.com]
  *
  * This file is part of Neo4j.
@@ -17,31 +17,15 @@
  * limitations under the License.
  */
 
-package neo4j
+package test_integration
 
-type neoRecord struct {
-	keys   []string
-	values []interface{}
-}
+import (
+	"github.com/neo4j/neo4j-go-driver/neo4j/test-integration/control"
 
-func (record *neoRecord) Keys() []string {
-	return record.keys
-}
+	. "github.com/onsi/ginkgo"
+)
 
-func (record *neoRecord) Values() []interface{} {
-	return record.values
-}
-
-func (record *neoRecord) Get(key string) (interface{}, bool) {
-	for i := range record.keys {
-		if record.keys[i] == key {
-			return record.values[i], true
-		}
-	}
-
-	return nil, false
-}
-
-func (record *neoRecord) GetByIndex(index int) interface{} {
-	return record.values[index]
-}
+var _ = AfterSuite(func() {
+	control.StopSingleInstance()
+	control.StopCluster()
+})
