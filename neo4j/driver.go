@@ -21,7 +21,6 @@
 package neo4j
 
 import (
-	"errors"
 	"fmt"
 	"net/url"
 	"strings"
@@ -195,7 +194,7 @@ func (d *driver) Session(accessMode AccessMode, bookmarks ...string) (Session, e
 	d.mut.Lock()
 	defer d.mut.Unlock()
 	if d.pool == nil {
-		return nil, errors.New("Driver closed")
+		return nil, newDriverError("Driver closed")
 	}
 	return newSession(
 		d.config, d.router,
