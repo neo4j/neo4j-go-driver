@@ -22,6 +22,7 @@ package log
 // Logger interface used by internal packages
 type Logger interface {
 	Error(componentId string, err error)
+	Errorf(componentId string, msg string, args ...interface{})
 	Warnf(componentId string, msg string, args ...interface{})
 	Infof(componentId string, msg string, args ...interface{})
 	Debugf(componentId string, msg string, args ...interface{})

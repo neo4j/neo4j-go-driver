@@ -24,6 +24,9 @@ type VoidLogger struct{}
 func (l VoidLogger) Error(id string, err error) {
 }
 
+func (l VoidLogger) Errorf(id string, msg string, args ...interface{}) {
+}
+
 func (l VoidLogger) Infof(id string, msg string, args ...interface{}) {
 }
 

@@ -199,7 +199,7 @@ func (d *driver) Session(accessMode AccessMode, bookmarks ...string) (Session, e
 	}
 	return newSession(
 		d.config, d.router,
-		d.pool, db.AccessMode(accessMode), bookmarks), nil
+		d.pool, db.AccessMode(accessMode), bookmarks, d.log), nil
 }
 
 func (d *driver) Close() error {

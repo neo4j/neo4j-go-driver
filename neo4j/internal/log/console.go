@@ -45,6 +45,15 @@ func (l *ConsoleLogger) Error(id string, err error) {
 	fmt.Fprintf(os.Stderr, "%s  ERROR  [%s] %s\n", now.Format(timeFormat), id, err.Error())
 }
 
+func (l *ConsoleLogger) Errorf(id string, msg string, args ...interface{}) {
+	if !l.Infos {
+		return
+	}
+
+	now := time.Now()
+	fmt.Fprintf(os.Stdout, "%s  ERROR  [%s] %s\n", now.Format(timeFormat), id, fmt.Sprintf(msg, args...))
+}
+
 func (l *ConsoleLogger) Infof(id string, msg string, args ...interface{}) {
 	if !l.Infos {
 		return
