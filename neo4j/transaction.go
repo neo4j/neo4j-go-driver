@@ -33,10 +33,10 @@ type Transaction interface {
 }
 
 type transaction struct {
-	committed bool
-	run       func(cypher string, params map[string]interface{}) (Result, error)
-	commit    func() error
-	rollback  func() error
+	done     bool
+	run      func(cypher string, params map[string]interface{}) (Result, error)
+	commit   func() error
+	rollback func() error
 }
 
 func (t *transaction) Run(cypher string, params map[string]interface{}) (Result, error) {
@@ -45,16 +45,18 @@ func (t *transaction) Run(cypher string, params map[string]interface{}) (Result,
 
 func (t *transaction) Commit() error {
 	err := t.commit()
-	t.committed = err == nil
+	t.done = err == nil
 	return err
 }
 
 func (t *transaction) Rollback() error {
-	return t.rollback()
+	err := t.rollback()
+	t.done = err == nil
+	return err
 }
 
 func (t *transaction) Close() error {
-	if t.committed {
+	if t.done {
 		return nil
 	}
 	return t.rollback()
