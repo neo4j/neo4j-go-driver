@@ -16,40 +16,38 @@ Add the driver with `go get github.com/neo4j/neo4j-go-driver/neo4j`
 
 Connect, execute a statement and handle results
 
-```go
-var (
-	driver neo4j.Driver
-	session neo4j.Session
-	result neo4j.Result
-	err error
-)
+Make sure to use the configuration in the code that matches the version of Neo4j server that you run.
 
-if driver, err = neo4j.NewDriver("bolt://localhost:7687", neo4j.BasicAuth("username", "password", "")); err != nil {
-	return err // handle error
+```go
+// configForNeo4j35 := func(conf *neo4j.Config) {}
+configForNeo4j40 := func(conf *neo4j.Config) { conf.Encrypted = false }
+
+driver, err := neo4j.NewDriver("bolt://localhost:7687", neo4j.BasicAuth("username", "password", ""), configForNeo4j40)
+if err != nil {
+	return err
 }
 // handle driver lifetime based on your application lifetime requirements
 // driver's lifetime is usually bound by the application lifetime, which usually implies one driver instance per application
 defer driver.Close()
 
-if session, err = driver.Session(neo4j.AccessModeWrite); err != nil {
+session, err := driver.Session(neo4j.AccessModeWrite)
+if err != nil {
 	return err
 }
-defer session.Close() 
+defer session.Close()
 
-result, err = session.Run("CREATE (n:Item { id: $id, name: $name }) RETURN n.id, n.name", map[string]interface{}{
-	"id": 1,
+result, err := session.Run("CREATE (n:Item { id: $id, name: $name }) RETURN n.id, n.name", map[string]interface{}{
+	"id":   1,
 	"name": "Item 1",
 })
 if err != nil {
-	return err // handle error
+	return err
 }
 
 for result.Next() {
 	fmt.Printf("Created Item with Id = '%d' and Name = '%s'\n", result.Record().GetByIndex(0).(int64), result.Record().GetByIndex(1).(string))
 }
-if err = result.Err(); err != nil {
-	return err // handle error
-}
+return result.Err()
 ```
 
 ## Connecting to a causal cluster
