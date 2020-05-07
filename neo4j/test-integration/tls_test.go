@@ -22,7 +22,6 @@ package test_integration
 import (
 	"github.com/neo4j/neo4j-go-driver/neo4j"
 	"github.com/neo4j/neo4j-go-driver/neo4j/test-integration/control"
-	"github.com/neo4j/neo4j-go-driver/neo4j/utils/test"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
@@ -65,7 +64,7 @@ var _ = Describe("Trust", func() {
 		Expect(resultSummary).NotTo(BeNil())
 	}
 
-	verifyFailedConnection := func(uri string, strategy neo4j.TrustStrategy, expectedCode uint32) {
+	verifyFailedConnection := func(uri string, strategy neo4j.TrustStrategy) {
 		var driver neo4j.Driver
 		var session neo4j.Session
 		var err error
@@ -83,7 +82,7 @@ var _ = Describe("Trust", func() {
 		defer session.Close()
 
 		_, err = session.Run("RETURN 1", nil)
-		Expect(err).To(test.BeConnectorErrorWithCode(expectedCode))
+		Expect(neo4j.IsSecurityError(err)).To(BeTrue())
 	}
 
 	Context("TrustAny", func() {
@@ -92,7 +91,7 @@ var _ = Describe("Trust", func() {
 		})
 
 		It("should not connect when hostname verification is enabled", func() {
-			verifyFailedConnection("bolt://127.0.0.1:7687", neo4j.TrustAny(true), 13)
+			verifyFailedConnection("bolt://127.0.0.1:7687", neo4j.TrustAny(true))
 		})
 
 		It("should connect when hostname verification is disabled", func() {
@@ -106,11 +105,11 @@ var _ = Describe("Trust", func() {
 
 	Context("TrustOnly", func() {
 		It("should not connect when certificate is not provided - bolt://127.0.0.1:7687", func() {
-			verifyFailedConnection("bolt://127.0.0.1:7687", neo4j.TrustOnly(false), 13)
+			verifyFailedConnection("bolt://127.0.0.1:7687", neo4j.TrustOnly(false))
 		})
 
 		It("should not connect when certificate is not provided - bolt://localhost:7687", func() {
-			verifyFailedConnection("bolt://localhost:7687", neo4j.TrustOnly(false), 13)
+			verifyFailedConnection("bolt://localhost:7687", neo4j.TrustOnly(false))
 		})
 
 		It("should connect when hostname verification is enabled", func() {
@@ -118,7 +117,7 @@ var _ = Describe("Trust", func() {
 		})
 
 		It("should not connect when hostname verification is enabled", func() {
-			verifyFailedConnection("bolt://127.0.0.1:7687", neo4j.TrustOnly(true, server.TLSCertificate()), 13)
+			verifyFailedConnection("bolt://127.0.0.1:7687", neo4j.TrustOnly(true, server.TLSCertificate()))
 		})
 
 		It("should connect when hostname verification is disabled", func() {

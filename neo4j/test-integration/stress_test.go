@@ -33,7 +33,7 @@ import (
 )
 
 var _ = Describe("Stress Test", func() {
-	const TestDuration = 1 * time.Minute
+	const TestDuration = 30 * time.Second
 	const TestNumberOfGoRoutines = 20
 
 	stessTest := func(ctx *stress.TestContext, successfulExecutors []func(*stress.TestContext), failingExecutors []func(*stress.TestContext)) {
@@ -126,65 +126,67 @@ var _ = Describe("Stress Test", func() {
 		})
 	})
 
-	Context("Causal Cluster", func() {
-		var ctx *stress.TestContext
-		var driver neo4j.Driver
-		var cluster *control.Cluster
-		var err error
-		var successfulQueryExecutors []func(*stress.TestContext)
-		var failingQueryExecutors []func(ctx2 *stress.TestContext)
+	/*
+		Context("Causal Cluster", func() {
+			var ctx *stress.TestContext
+			var driver neo4j.Driver
+			var cluster *control.Cluster
+			var err error
+			var successfulQueryExecutors []func(*stress.TestContext)
+			var failingQueryExecutors []func(ctx2 *stress.TestContext)
 
-		BeforeEach(func() {
-			cluster, err = control.EnsureCluster()
-			Expect(err).To(BeNil())
-			Expect(cluster).NotTo(BeNil())
+			BeforeEach(func() {
+				cluster, err = control.EnsureCluster()
+				Expect(err).To(BeNil())
+				Expect(cluster).NotTo(BeNil())
 
-			driver, err = neo4j.NewDriver(cluster.AnyFollower().RoutingURI(), cluster.AuthToken(), cluster.Config())
-			Expect(err).To(BeNil())
-			Expect(driver).NotTo(BeNil())
+				driver, err = neo4j.NewDriver(cluster.AnyFollower().RoutingURI(), cluster.AuthToken(), cluster.Config())
+				Expect(err).To(BeNil())
+				Expect(driver).NotTo(BeNil())
 
-			ctx = stress.NewTestContext(driver)
+				ctx = stress.NewTestContext(driver)
 
-			successfulQueryExecutors = append(successfulQueryExecutors,
-				stress.ReadQueryExecutor(driver, true),
-				stress.ReadQueryExecutor(driver, false),
-				stress.ReadQueryInTxExecutor(driver, true),
-				stress.ReadQueryInTxExecutor(driver, false),
-				stress.ReadQueryWithReadTransactionExecutor(driver, true),
-				stress.ReadQueryWithReadTransactionExecutor(driver, false),
-				stress.WriteQueryExecutor(driver, true),
-				stress.WriteQueryExecutor(driver, false),
-				stress.WriteQueryInTxExecutor(driver, true),
-				stress.WriteQueryInTxExecutor(driver, false),
-				stress.WriteQueryWithWriteTransactionExecutor(driver, true),
-				stress.WriteQueryWithWriteTransactionExecutor(driver, false),
-			)
+				successfulQueryExecutors = append(successfulQueryExecutors,
+					stress.ReadQueryExecutor(driver, true),
+					stress.ReadQueryExecutor(driver, false),
+					stress.ReadQueryInTxExecutor(driver, true),
+					stress.ReadQueryInTxExecutor(driver, false),
+					stress.ReadQueryWithReadTransactionExecutor(driver, true),
+					stress.ReadQueryWithReadTransactionExecutor(driver, false),
+					stress.WriteQueryExecutor(driver, true),
+					stress.WriteQueryExecutor(driver, false),
+					stress.WriteQueryInTxExecutor(driver, true),
+					stress.WriteQueryInTxExecutor(driver, false),
+					stress.WriteQueryWithWriteTransactionExecutor(driver, true),
+					stress.WriteQueryWithWriteTransactionExecutor(driver, false),
+				)
 
-			failingQueryExecutors = append(failingQueryExecutors,
-				stress.WriteQueryInReadSessionExecutor(driver, true),
-				stress.WriteQueryInReadSessionExecutor(driver, false),
-				stress.WriteQueryInTxInReadSessionExecutor(driver, true),
-				stress.WriteQueryInTxInReadSessionExecutor(driver, false),
-				stress.FailingQueryExecutor(driver, true),
-				stress.FailingQueryExecutor(driver, false),
-				stress.FailingQueryInTxExecutor(driver, true),
-				stress.FailingQueryInTxExecutor(driver, false),
-				stress.FailingQueryWithReadTransactionExecutor(driver, true),
-				stress.FailingQueryWithReadTransactionExecutor(driver, false),
-				stress.FailingQueryWithWriteTransactionExecutor(driver, true),
-				stress.FailingQueryWithWriteTransactionExecutor(driver, false),
-				stress.WrongQueryExecutor(driver),
-				stress.WrongQueryInTxExecutor(driver),
-			)
+				failingQueryExecutors = append(failingQueryExecutors,
+					stress.WriteQueryInReadSessionExecutor(driver, true),
+					stress.WriteQueryInReadSessionExecutor(driver, false),
+					stress.WriteQueryInTxInReadSessionExecutor(driver, true),
+					stress.WriteQueryInTxInReadSessionExecutor(driver, false),
+					stress.FailingQueryExecutor(driver, true),
+					stress.FailingQueryExecutor(driver, false),
+					stress.FailingQueryInTxExecutor(driver, true),
+					stress.FailingQueryInTxExecutor(driver, false),
+					stress.FailingQueryWithReadTransactionExecutor(driver, true),
+					stress.FailingQueryWithReadTransactionExecutor(driver, false),
+					stress.FailingQueryWithWriteTransactionExecutor(driver, true),
+					stress.FailingQueryWithWriteTransactionExecutor(driver, false),
+					stress.WrongQueryExecutor(driver),
+					stress.WrongQueryInTxExecutor(driver),
+				)
+			})
+
+			AfterEach(func() {
+				ctx.PrintStats()
+			})
+
+			It("should complete without any errors", func() {
+				stessTest(ctx, successfulQueryExecutors, failingQueryExecutors)
+			})
 		})
-
-		AfterEach(func() {
-			ctx.PrintStats()
-		})
-
-		It("should complete without any errors", func() {
-			stessTest(ctx, successfulQueryExecutors, failingQueryExecutors)
-		})
-	})
+	*/
 
 })

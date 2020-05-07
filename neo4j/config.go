@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2019 "Neo4j,"
+ * Copyright (c) 2002-2020 "Neo4j,"
  * Neo4j Sweden AB [http://neo4j.com]
  *
  * This file is part of Neo4j.
@@ -20,9 +20,51 @@
 package neo4j
 
 import (
+	"crypto/x509"
 	"math"
+	"net/url"
 	"time"
 )
+
+// TrustStrategy defines how the driver will establish trust with the neo4j instance
+type TrustStrategy struct {
+	certificates       []*x509.Certificate
+	skipVerify         bool
+	skipVerifyHostname bool
+}
+
+// TrustAny returns a trust strategy which skips trust verification (trusts any certificate
+// provided) and whose hostname verification can be enabled/disabled based on the provided
+// parameter
+func TrustAny(verifyHostname bool) TrustStrategy {
+	return TrustStrategy{
+		certificates:       nil,
+		skipVerify:         true,
+		skipVerifyHostname: !verifyHostname,
+	}
+}
+
+// TrustSystem returns a trust strategy which uses system provided certificates for
+// trust verification and whose hostname verification can be enabled/disabled based
+// on the provided parameter
+func TrustSystem(verifyHostname bool) TrustStrategy {
+	return TrustStrategy{
+		certificates:       nil,
+		skipVerify:         false,
+		skipVerifyHostname: !verifyHostname,
+	}
+}
+
+// TrustOnly returns a trust strategy which uses provided certificates for trust
+// verification and whose hostname verification can be enabled/disabled based
+// on the provided parameter
+func TrustOnly(verifyHostname bool, certs ...*x509.Certificate) TrustStrategy {
+	return TrustStrategy{
+		certificates:       certs,
+		skipVerify:         false,
+		skipVerifyHostname: !verifyHostname,
+	}
+}
 
 // A Config contains options that can be used to customize certain
 // aspects of the driver
@@ -85,7 +127,6 @@ func defaultConfig() *Config {
 	return &Config{
 		Encrypted:                    true,
 		TrustStrategy:                TrustAny(false),
-		Log:                          NoOpLogger(),
 		AddressResolver:              nil,
 		MaxTransactionRetryTime:      30 * time.Second,
 		MaxConnectionPoolSize:        100,
@@ -127,4 +168,35 @@ func validateAndNormaliseConfig(config *Config) error {
 	}
 
 	return nil
+}
+
+// ServerAddress represents a host and port. Host can either be an IP address or a DNS name.
+// Both IPv4 and IPv6 hosts are supported.
+type ServerAddress interface {
+	// Hostname returns the host portion of this ServerAddress.
+	Hostname() string
+	// Port returns the port portion of this ServerAddress.
+	Port() string
+}
+
+// ServerAddressResolver is a function type that defines the resolver function used by the routing driver to
+// resolve the initial address used to create the driver.
+type ServerAddressResolver func(address ServerAddress) []ServerAddress
+
+func newServerAddressURL(hostname string, port string) *url.URL {
+	if hostname == "" {
+		return nil
+	}
+
+	hostAndPort := hostname
+	if port != "" {
+		hostAndPort = hostAndPort + ":" + port
+	}
+
+	return &url.URL{Host: hostAndPort}
+}
+
+// NewServerAddress generates a ServerAddress with provided hostname and port information.
+func NewServerAddress(hostname string, port string) ServerAddress {
+	return newServerAddressURL(hostname, port)
 }

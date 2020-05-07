@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2019 "Neo4j,"
+ * Copyright (c) 2002-2020 "Neo4j,"
  * Neo4j Sweden AB [http://neo4j.com]
  *
  * This file is part of Neo4j.
@@ -25,7 +25,7 @@ import (
 	"github.com/neo4j/neo4j-go-driver/neo4j"
 	"github.com/neo4j/neo4j-go-driver/neo4j/test-integration/control"
 
-	. "github.com/neo4j/neo4j-go-driver/neo4j/utils/test"
+	//. "github.com/neo4j/neo4j-go-driver/neo4j/utils/test"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
@@ -284,8 +284,7 @@ var _ = Describe("Bookmark", func() {
 			Expect(err).To(BeNil())
 
 			err = tx.Close()
-			Expect(err).To(BeSyntaxError())
-
+			Expect(err).To(Not(BeNil()))
 			Expect(session.LastBookmark()).To(Equal(bookmark))
 		})
 
@@ -304,7 +303,7 @@ var _ = Describe("Bookmark", func() {
 			Expect(err).To(BeNil())
 
 			_, err = result.Consume()
-			Expect(err).To(BeSyntaxError())
+			Expect(err).To(Not(BeNil()))
 
 			Expect(session.LastBookmark()).To(Equal(bookmark))
 		})
@@ -403,8 +402,10 @@ var _ = Describe("Bookmark", func() {
 			tx, err := session.BeginTransaction()
 
 			Expect(tx).To(BeNil())
-			Expect(err).To(BeTransientError(nil, nil))
-			Expect(err).To(ContainMessage("Database not up to the requested version"))
+			Expect(neo4j.IsTransientError(err)).To(BeTrue())
+			//Expect(err).To(ContainMessage("Database not up to the requested version"))
+			errDesc := err.Error()
+			Expect(errDesc).To(ContainSubstring("Database not up to the requested version"))
 		})
 	})
 

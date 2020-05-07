@@ -23,7 +23,6 @@ import (
 	"github.com/neo4j/neo4j-go-driver/neo4j"
 	"github.com/neo4j/neo4j-go-driver/neo4j/test-integration/control"
 
-	. "github.com/neo4j/neo4j-go-driver/neo4j/utils/test"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
@@ -49,7 +48,7 @@ var _ = Describe("Authentication", func() {
 		defer session.Close()
 
 		_, err = session.Run("RETURN 1", nil)
-		Expect(err).To(BeAuthenticationError())
+		Expect(neo4j.IsAuthenticationError(err)).To(BeTrue())
 	})
 
 	verifyConnect := func(token neo4j.AuthToken) func() {

@@ -9,6 +9,6 @@ C: RUN "RETURN 1" {} {}
    PULL_ALL
 S: SUCCESS {"fields": ["x"]}
    RECORD [1]
-   SUCCESS {}
+   SUCCESS {"type": "r"}
 C: COMMIT
 S: SUCCESS {}

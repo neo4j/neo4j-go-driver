@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2019 "Neo4j,"
+ * Copyright (c) 2002-2020 "Neo4j,"
  * Neo4j Sweden AB [http://neo4j.com]
  *
  * This file is part of Neo4j.
@@ -29,7 +29,7 @@ const (
 	communityEdition  = "community"
 	enterpriseEdition = "enterprise"
 
-	defaultVersionAndEdition = "-e 3.4.6"
+	defaultVersionAndEdition = "-e 3.5"
 	defaultLogLevel          = neo4j.ERROR
 
 	username = "neo4j"

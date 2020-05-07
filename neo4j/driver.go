@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2019 "Neo4j,"
+ * Copyright (c) 2002-2020 "Neo4j,"
  * Neo4j Sweden AB [http://neo4j.com]
  *
  * This file is part of Neo4j.
@@ -21,7 +21,16 @@
 package neo4j
 
 import (
+	"fmt"
 	"net/url"
+	"strings"
+	"sync"
+	"sync/atomic"
+
+	"github.com/neo4j/neo4j-go-driver/neo4j/internal/db"
+	"github.com/neo4j/neo4j-go-driver/neo4j/internal/log"
+	"github.com/neo4j/neo4j-go-driver/neo4j/internal/pool"
+	"github.com/neo4j/neo4j-go-driver/neo4j/internal/router"
 )
 
 // AccessMode defines modes that routing driver decides to which cluster member
@@ -67,22 +76,139 @@ func NewDriver(target string, auth AuthToken, configurers ...func(*Config)) (Dri
 		return nil, err
 	}
 
-	if parsed.Scheme != "bolt" && parsed.Scheme != "bolt+routing" && parsed.Scheme != "neo4j" {
+	directRouting := false
+	switch parsed.Scheme {
+	case "bolt":
+		if len(parsed.RawQuery) > 0 {
+			return nil, newDriverError("routing context is not supported for direct driver")
+		}
+		directRouting = true
+	case "bolt+routing", "neo4j":
+	default:
 		return nil, newDriverError("url scheme %s is not supported", parsed.Scheme)
-	}
-
-	if parsed.Scheme == "bolt" && len(parsed.RawQuery) > 0 {
-		return nil, newDriverError("routing context is not supported for direct driver")
 	}
 
 	config := defaultConfig()
 	for _, configurer := range configurers {
 		configurer(config)
 	}
-
 	if err := validateAndNormaliseConfig(config); err != nil {
 		return nil, err
 	}
 
-	return newGoboltDriver(parsed, auth, config)
+	// Setup logging
+	var logger log.Logger
+	if config.Log != nil {
+		// Wrap obsolete logging system in internal
+		logger = &adaptorLogger{logging: config.Log}
+	} else {
+		// Default to void logger
+		logger = &log.VoidLogger{}
+	}
+	id := atomic.AddUint32(&driverid, 1)
+	logId := fmt.Sprintf("driver %d", id)
+
+	connector := newConnector(config, auth.tokens, logger)
+	pool := pool.New(config.MaxConnectionPoolSize, config.MaxConnectionLifetime, connector.connect, logger)
+
+	var sessRouter sessionRouter
+	if directRouting {
+		sessRouter = &directRouter{server: parsed.Host}
+	} else {
+		routingContext, err := routingContextFromUrl(parsed)
+		if err != nil {
+			logger.Error(logId, err)
+			return nil, err
+		}
+
+		var routersResolver func() []string
+		addressResolverHook := config.AddressResolver
+		if addressResolverHook != nil {
+			routersResolver = func() []string {
+				addresses := addressResolverHook(parsed)
+				servers := make([]string, len(addresses))
+				for i, a := range addresses {
+					servers[i] = fmt.Sprintf("%s:%s", a.Hostname(), a.Port())
+				}
+				return servers
+			}
+		}
+		sessRouter = router.New(parsed.Host, routersResolver, routingContext, pool, logger)
+	}
+
+	driver := &driver{
+		target: parsed,
+		config: config,
+		pool:   pool,
+		router: sessRouter,
+		log:    logger,
+		logId:  logId,
+	}
+	logger.Infof(logId, "Created { target: %s }", target)
+	return driver, nil
+}
+
+var driverid uint32
+
+func routingContextFromUrl(u *url.URL) (map[string]string, error) {
+	queryValues := u.Query()
+	routingContext := make(map[string]string, len(queryValues))
+	for k, vs := range queryValues {
+		if len(vs) > 1 {
+			return nil, newDriverError("Duplicated routing context key '%s'", k)
+		}
+		if len(vs) == 0 {
+			return nil, newDriverError("Empty routing context key '%s'", k)
+		}
+		v := vs[0]
+		v = strings.TrimSpace(v)
+		if len(v) == 0 {
+			return nil, newDriverError("Empty routing context key '%s'", k)
+		}
+		routingContext[k] = v
+	}
+	return routingContext, nil
+}
+
+type sessionRouter interface {
+	Readers() ([]string, error)
+	Writers() ([]string, error)
+	Invalidate()
+}
+
+type driver struct {
+	target *url.URL
+	config *Config
+	pool   *pool.Pool
+	mut    sync.Mutex
+	router sessionRouter
+	logId  string
+	log    log.Logger
+}
+
+func (d *driver) Target() url.URL {
+	return *d.target
+}
+
+func (d *driver) Session(accessMode AccessMode, bookmarks ...string) (Session, error) {
+	d.mut.Lock()
+	defer d.mut.Unlock()
+	if d.pool == nil {
+		return nil, newDriverError("Driver closed")
+	}
+	return newSession(
+		d.config, d.router,
+		d.pool, db.AccessMode(accessMode), bookmarks, d.log), nil
+}
+
+func (d *driver) Close() error {
+	d.mut.Lock()
+	defer d.mut.Unlock()
+	// Safeguard against closing more than once
+	if d.pool != nil {
+		d.pool.Close()
+	}
+	d.pool = nil
+	d.log.Infof(d.logId, "Closed")
+	return nil
 }

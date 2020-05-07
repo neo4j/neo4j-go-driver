@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2019 "Neo4j,"
+ * Copyright (c) 2002-2020 "Neo4j,"
  * Neo4j Sweden AB [http://neo4j.com]
  *
  * This file is part of Neo4j.
@@ -61,17 +61,6 @@ var _ = Describe("Config", func() {
 
 		It("should have socket keep alive enabled", func() {
 			Expect(config.SocketKeepalive).To(BeTrue())
-		})
-
-		It("should have non-nil logger", func() {
-			Expect(config.Log).NotTo(BeNil())
-		})
-
-		It("should have an internalLogger logger with level set to 0", func() {
-			logger, ok := config.Log.(*internalLogger)
-			Expect(ok).To(BeTrue())
-
-			Expect(logger.level).To(BeZero())
 		})
 	})
 

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2019 "Neo4j,"
+ * Copyright (c) 2002-2020 "Neo4j,"
  * Neo4j Sweden AB [http://neo4j.com]
  *
  * This file is part of Neo4j.
@@ -30,4 +30,34 @@ type Transaction interface {
 	// Close rolls back the actual transaction if it's not already committed/rolled back
 	// and closes all resources associated with this transaction
 	Close() error
+}
+
+type transaction struct {
+	done     bool
+	run      func(cypher string, params map[string]interface{}) (Result, error)
+	commit   func() error
+	rollback func() error
+}
+
+func (t *transaction) Run(cypher string, params map[string]interface{}) (Result, error) {
+	return t.run(cypher, params)
+}
+
+func (t *transaction) Commit() error {
+	err := t.commit()
+	t.done = err == nil
+	return err
+}
+
+func (t *transaction) Rollback() error {
+	err := t.rollback()
+	t.done = err == nil
+	return err
+}
+
+func (t *transaction) Close() error {
+	if t.done {
+		return nil
+	}
+	return t.rollback()
 }
