@@ -24,6 +24,7 @@ import (
 	"crypto/x509"
 	"errors"
 	"fmt"
+	"io"
 	"net"
 	"sync/atomic"
 	"time"
@@ -139,6 +140,9 @@ func (c *connector) wrapInTls(target string, rawConn net.Conn) (net.Conn, error)
 	tlsConn := tls.Client(rawConn, &conf)
 	err = tlsConn.Handshake()
 	if err != nil {
+		if err == io.EOF {
+			err = errors.New("Remote end closed the connection, check that TLS is enabled on the server")
+		}
 		rawConn.Close()
 		return nil, err
 	}
