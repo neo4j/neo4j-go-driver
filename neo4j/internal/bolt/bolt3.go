@@ -73,7 +73,7 @@ func (i *internalTx) toMeta() map[string]interface{} {
 	if len(i.bookmarks) > 0 {
 		meta["bookmarks"] = i.bookmarks
 	}
-	ms := int(i.timeout.Milliseconds())
+	ms := int(i.timeout.Nanoseconds() / 1e6)
 	if ms > 0 {
 		meta["tx_timeout"] = ms
 	}
