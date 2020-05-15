@@ -610,22 +610,22 @@ func (p *Packer) writeMap(x interface{}) error {
 			return err
 		}
 		// We will not detect if key is something else but a string until checking first
-		// element, this means that we will succeed in packaing map[int]string {} as an empty
-		// map.
-		iter := rv.MapRange()
-		for iter.Next() {
-			ik := iter.Key()
-			iv := iter.Value()
+		// element, this means that we will succeed in packaging map[int]string {} as an empty
+		// map. TODO: When Go 1.12 is min version use MapRange instead.
+		keys := rv.MapKeys()
+		for _, ik := range keys {
 			if ik.Kind() != reflect.String {
 				return &UnsupportedTypeError{t: reflect.TypeOf(x)}
 			}
 			if err := p.writeString(ik.String()); err != nil {
 				return err
 			}
+			iv := rv.MapIndex(ik)
 			if err := p.Pack(iv.Interface()); err != nil {
 				return err
 			}
 		}
+
 		return nil
 	}
 }
