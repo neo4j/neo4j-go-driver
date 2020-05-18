@@ -42,6 +42,7 @@ import (
 func TestConnectionConformance(ot *testing.T) {
 	server, err := control.EnsureSingleInstance()
 	if err != nil {
+		fmt.Println(err)
 		ot.Fatal(err)
 	}
 
@@ -688,6 +689,7 @@ func TestConnectionConformanceCluster(ot *testing.T) {
 		if boltConn == nil {
 			cluster, err := control.EnsureCluster()
 			if err != nil {
+				fmt.Println(err)
 				ot.Fatal(err)
 			}
 			leader := cluster.Leader()
