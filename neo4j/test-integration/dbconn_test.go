@@ -19,7 +19,6 @@
 
 package test_integration
 
-/*
 import (
 	"crypto/rand"
 	"fmt"
@@ -728,4 +727,3 @@ func TestConnectionConformanceCluster(ot *testing.T) {
 		fmt.Printf("%+v", table)
 	})
 }
-*/
