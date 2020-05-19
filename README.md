@@ -2,6 +2,9 @@
 
 This is the the official Neo4j Go Driver. It is built on our C Connector, [seabolt](https://github.com/neo4j-drivers/seabolt) and depends on it to be available on the host system.
 
+## Upcoming pure Go version
+There will be a new version of the driver that doesn't rely on cgo. This version is in beta on branch 1.8 and will be replacing the 1.7 cgo based version soon. 
+
 ##  Requirements
 
 This package requires the following tools/libraries to be installed in order to be built.
