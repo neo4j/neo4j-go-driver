@@ -50,6 +50,14 @@ for result.Next() {
 return result.Err()
 ```
 
+## Neo4j and Bolt protocol versions
+
+The driver implements Bolt protocol version 3. This means that either Neo4j server 3.5 or above can be used with the driver.
+
+Neo4j server 4 supports both Bolt protocol version 3 and version 4.
+
+There will be an updated driver version that supports Bolt protocol version 4 to make use of new features introduced there.
+
 ## Connecting to a causal cluster
 
 You just need to use `bolt+routing` as the URL scheme and set host of the URL to one of your core members of the cluster.

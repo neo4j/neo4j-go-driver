@@ -71,7 +71,7 @@ func Connect(serverName string, conn net.Conn, auth map[string]interface{}, log 
 		}
 		return boltConn, nil
 	case 0:
-		err = errors.New("Server did not accept any version")
+		err = errors.New("Server did not accept any of the requested Bolt protocol versions. Only Neo4j version 3.5 and version 4 currently supports Bolt protocol version 3")
 	default:
 		err = errors.New(fmt.Sprintf("Server responded with unsupported version %d", ver))
 	}
