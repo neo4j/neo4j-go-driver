@@ -53,7 +53,7 @@ var _ = Describe("Authentication", func() {
 
 	verifyConnect := func(token neo4j.AuthToken) func() {
 		return func() {
-			driver, err := neo4j.NewDriver(server.BoltURI(), token)
+			driver, err := neo4j.NewDriver(server.BoltURI(), token, server.Config())
 			Expect(err).To(BeNil())
 			defer driver.Close()
 

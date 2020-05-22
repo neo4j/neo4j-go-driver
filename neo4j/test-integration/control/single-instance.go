@@ -99,6 +99,7 @@ func newSingleInstance(path string) (*SingleInstance, error) {
 
 	authToken := neo4j.BasicAuth(username, password, "")
 	config := func(config *neo4j.Config) {
+		config.Encrypted = useEncryption()
 		config.Log = neo4j.ConsoleLogger(logLevel())
 	}
 

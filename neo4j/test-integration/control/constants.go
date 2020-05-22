@@ -26,7 +26,6 @@ import (
 )
 
 const (
-	communityEdition  = "community"
 	enterpriseEdition = "enterprise"
 
 	defaultVersionAndEdition = "-e 3.5"
