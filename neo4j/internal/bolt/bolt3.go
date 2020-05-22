@@ -546,7 +546,12 @@ func (b *bolt3) Next(shandle db.Handle) (*db.Record, *db.Summary, error) {
 		return nil, sum, nil
 	case *db.DatabaseError:
 		b.state = bolt3_failed
-		b.log.Error(b.logId, x)
+		if x.IsClient() {
+			// These could include potentially large cypher statement, only log to debug
+			b.log.Debugf(b.logId, "%s", x)
+		} else {
+			b.log.Error(b.logId, x)
+		}
 		return nil, nil, x
 	default:
 		b.state = bolt3_dead

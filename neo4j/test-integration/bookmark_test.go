@@ -403,9 +403,8 @@ var _ = Describe("Bookmark", func() {
 
 			Expect(tx).To(BeNil())
 			Expect(neo4j.IsTransientError(err)).To(BeTrue())
-			//Expect(err).To(ContainMessage("Database not up to the requested version"))
 			errDesc := err.Error()
-			Expect(errDesc).To(ContainSubstring("Database not up to the requested version"))
+			Expect(errDesc).To(ContainSubstring("not up to the requested version"))
 		})
 	})
 

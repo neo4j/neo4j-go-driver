@@ -36,9 +36,10 @@ var _ = Describe("Examples", func() {
 
 	Context("Single Instance", func() {
 		var (
-			uri      string
-			username string
-			password string
+			uri       string
+			username  string
+			password  string
+			encrypted bool
 		)
 
 		BeforeEach(func() {
@@ -52,10 +53,11 @@ var _ = Describe("Examples", func() {
 			uri = singleInstance.BoltURI()
 			username = singleInstance.Username()
 			password = singleInstance.Password()
+			encrypted = control.IsTlsEnabled()
 		})
 
 		Specify("Hello World", func() {
-			greeting, err := helloWorld(uri, username, password)
+			greeting, err := helloWorld(uri, username, password, encrypted)
 
 			Expect(err).To(BeNil())
 			Expect(greeting).To(ContainSubstring("hello, world"))
@@ -98,7 +100,7 @@ var _ = Describe("Examples", func() {
 		})
 
 		Specify("Config - With Max Retry Time", func() {
-			driver, err := createDriverWithMaxRetryTime(uri, username, password)
+			driver, err := createDriverWithMaxRetryTime(uri, username, password, encrypted)
 			Expect(err).To(BeNil())
 			Expect(driver).NotTo(BeNil())
 
@@ -139,7 +141,7 @@ var _ = Describe("Examples", func() {
 		*/
 
 		Specify("Session", func() {
-			driver, err := createDriverWithMaxRetryTime(uri, username, password)
+			driver, err := createDriverWithMaxRetryTime(uri, username, password, encrypted)
 			Expect(err).To(BeNil())
 			Expect(driver).NotTo(BeNil())
 			defer driver.Close()
@@ -152,7 +154,7 @@ var _ = Describe("Examples", func() {
 		})
 
 		Specify("Autocommit Transaction", func() {
-			driver, err := createDriverWithMaxRetryTime(uri, username, password)
+			driver, err := createDriverWithMaxRetryTime(uri, username, password, encrypted)
 			Expect(err).To(BeNil())
 			Expect(driver).NotTo(BeNil())
 			defer driver.Close()
@@ -165,7 +167,7 @@ var _ = Describe("Examples", func() {
 		})
 
 		Specify("Pass Bookmarks", func() {
-			driver, err := createDriverWithMaxRetryTime(uri, username, password)
+			driver, err := createDriverWithMaxRetryTime(uri, username, password, encrypted)
 			Expect(err).To(BeNil())
 			Expect(driver).NotTo(BeNil())
 			defer driver.Close()
@@ -191,7 +193,7 @@ var _ = Describe("Examples", func() {
 		})
 
 		Specify("Read/Write Transaction", func() {
-			driver, err := createDriverWithMaxRetryTime(uri, username, password)
+			driver, err := createDriverWithMaxRetryTime(uri, username, password, encrypted)
 			Expect(err).To(BeNil())
 			Expect(driver).NotTo(BeNil())
 			defer driver.Close()
@@ -202,7 +204,7 @@ var _ = Describe("Examples", func() {
 		})
 
 		Specify("Get People", func() {
-			driver, err := createDriverWithMaxRetryTime(uri, username, password)
+			driver, err := createDriverWithMaxRetryTime(uri, username, password, encrypted)
 			Expect(err).To(BeNil())
 			Expect(driver).NotTo(BeNil())
 			defer driver.Close()
@@ -222,7 +224,7 @@ var _ = Describe("Examples", func() {
 		})
 
 		Specify("Result Retain", func() {
-			driver, err := createDriverWithMaxRetryTime(uri, username, password)
+			driver, err := createDriverWithMaxRetryTime(uri, username, password, encrypted)
 			Expect(err).To(BeNil())
 			Expect(driver).NotTo(BeNil())
 			defer driver.Close()
@@ -243,10 +245,11 @@ var _ = Describe("Examples", func() {
 
 	Context("Causal Cluster", func() {
 		var (
-			err      error
-			cluster  *control.Cluster
-			username string
-			password string
+			err       error
+			cluster   *control.Cluster
+			username  string
+			password  string
+			encrypted bool
 		)
 
 		BeforeEach(func() {
@@ -256,6 +259,7 @@ var _ = Describe("Examples", func() {
 
 			username = cluster.Username()
 			password = cluster.Password()
+			encrypted = control.IsTlsEnabled()
 		})
 
 		Specify("Config - Address Resolver", func() {
@@ -264,7 +268,7 @@ var _ = Describe("Examples", func() {
 				addresses = append(addresses, server.Address())
 			}
 
-			driver, err := createDriverWithAddressResolver("bolt+routing://x.acme.com", username, password, addresses...)
+			driver, err := createDriverWithAddressResolver("bolt+routing://x.acme.com", username, password, encrypted, addresses...)
 			Expect(err).To(BeNil())
 			Expect(driver).NotTo(BeNil())
 
@@ -278,7 +282,7 @@ var _ = Describe("Examples", func() {
 })
 
 // tag::hello-world[]
-func helloWorld(uri, username, password string) (string, error) {
+func helloWorld(uri, username, password string, encrypted bool) (string, error) {
 	var (
 		err      error
 		driver   neo4j.Driver
@@ -287,7 +291,9 @@ func helloWorld(uri, username, password string) (string, error) {
 		greeting interface{}
 	)
 
-	driver, err = neo4j.NewDriver(uri, neo4j.BasicAuth(username, password, ""))
+	driver, err = neo4j.NewDriver(uri, neo4j.BasicAuth(username, password, ""), func(c *neo4j.Config) {
+		c.Encrypted = encrypted
+	})
 	if err != nil {
 		return "", err
 	}
@@ -374,7 +380,7 @@ func createDriverWithTrustStrategy(uri, username, password string) (neo4j.Driver
 // end::config-trust[]
 
 // tag::config-custom-resolver[]
-func createDriverWithAddressResolver(virtualURI, username, password string, addresses ...neo4j.ServerAddress) (neo4j.Driver, error) {
+func createDriverWithAddressResolver(virtualURI, username, password string, encrypted bool, addresses ...neo4j.ServerAddress) (neo4j.Driver, error) {
 	// Address resolver is only valid for bolt+routing uri
 	return neo4j.NewDriver(virtualURI, neo4j.BasicAuth(username, password, ""), func(config *neo4j.Config) {
 		config.AddressResolver = func(address neo4j.ServerAddress) []neo4j.ServerAddress {
@@ -383,6 +389,7 @@ func createDriverWithAddressResolver(virtualURI, username, password string, addr
 	})
 }
 
+/*
 func addPerson(name string) error {
 	var (
 		err      error
@@ -420,6 +427,7 @@ func addPerson(name string) error {
 
 	return nil
 }
+*/
 
 // end::config-custom-resolver[]
 
@@ -444,9 +452,11 @@ func createDriverWithConnectionTimeout(uri, username, password string) (neo4j.Dr
 // end::config-connection-timeout[]
 
 // tag::config-max-retry-time[]
-func createDriverWithMaxRetryTime(uri, username, password string) (neo4j.Driver, error) {
+// This driver is used to run queries, needs actual TLS configuration as well.
+func createDriverWithMaxRetryTime(uri, username, password string, encrypted bool) (neo4j.Driver, error) {
 	return neo4j.NewDriver(uri, neo4j.BasicAuth(username, password, ""), func(config *neo4j.Config) {
 		config.MaxTransactionRetryTime = 15 * time.Second
+		config.Encrypted = encrypted
 	})
 }
 

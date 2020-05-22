@@ -134,11 +134,15 @@ var _ = Describe("Spatial Types", func() {
 			return float64(rand.Intn(360)-180) + rand.Float64()
 		}
 
+		randomDoubleY := func() float64 {
+			return float64(rand.Intn(180)-90) + rand.Float64()
+		}
+
 		switch sequence % 4 {
 		case 0:
-			return neo4j.NewPoint2D(WGS84SrID, randomDouble(), randomDouble())
+			return neo4j.NewPoint2D(WGS84SrID, randomDouble(), randomDoubleY())
 		case 1:
-			return neo4j.NewPoint3D(WGS843DSrID, randomDouble(), randomDouble(), randomDouble())
+			return neo4j.NewPoint3D(WGS843DSrID, randomDouble(), randomDoubleY(), randomDouble())
 		case 2:
 			return neo4j.NewPoint2D(CartesianSrID, randomDouble(), randomDouble())
 		case 3:
@@ -244,7 +248,7 @@ var _ = Describe("Spatial Types", func() {
 
 	It("should send and receive point", func() {
 		testSendAndReceive(neo4j.NewPoint2D(WGS84SrID, 51.24923585, 0.92723724))
-		testSendAndReceive(neo4j.NewPoint3D(WGS843DSrID, 22.86211019, 171.61820439, 0.1230987))
+		testSendAndReceive(neo4j.NewPoint3D(WGS843DSrID, 22.86211019, 71.61820439, 0.1230987))
 		testSendAndReceive(neo4j.NewPoint2D(CartesianSrID, 39.111748, -76.775635))
 		testSendAndReceive(neo4j.NewPoint3D(Cartesian3DSrID, 39.111748, -76.775635, 19.2937302840))
 	})

@@ -30,6 +30,13 @@ var _ = Describe("Trust", func() {
 	var err error
 	var server *control.SingleInstance
 
+	// If the server isn't configured for TLS we cannot test this.
+	if !control.IsTlsEnabled() {
+		// Unable to skip here...
+		//Skip("Can not test TLS trust on server with TLS disabled")
+		return
+	}
+
 	BeforeEach(func() {
 		server, err = control.EnsureSingleInstance()
 		Expect(err).To(BeNil())
@@ -45,6 +52,7 @@ var _ = Describe("Trust", func() {
 
 		driver, err = neo4j.NewDriver(uri, server.AuthToken(), server.Config(), func(config *neo4j.Config) {
 			config.TrustStrategy = strategy
+			config.Encrypted = true
 		})
 		Expect(err).To(BeNil())
 		Expect(driver).NotTo(BeNil())
@@ -71,6 +79,7 @@ var _ = Describe("Trust", func() {
 
 		driver, err = neo4j.NewDriver(uri, server.AuthToken(), server.Config(), func(config *neo4j.Config) {
 			config.TrustStrategy = strategy
+			config.Encrypted = true
 		})
 		Expect(err).To(BeNil())
 		Expect(driver).NotTo(BeNil())
