@@ -4,9 +4,11 @@ This is the the official Neo4j Go Driver.
 
 ## Getting the Driver
 
-### With `dep`
+### Module version
 
-Add the driver as a dependency with `dep ensure -add github.com/neo4j/neo4j-go-driver/neo4j`
+Make sure your application has been setup to use go modules (there should be a go.mod file in your application root). Add the driver with:
+
+`go mod edit -require github.com/neo4j/neo4j-go-driver@<the tag>`
 
 ### With `go get`
 
