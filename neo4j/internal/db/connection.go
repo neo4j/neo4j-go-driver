@@ -181,9 +181,6 @@ type Connection interface {
 	// Closes the database connection as well as any underlying connection.
 	// The instance should not be used after being closed.
 	Close()
-
-	// Used to check if the connection is alive and ready to use
-	// Ping() error
 }
 
 type RoutingTable struct {

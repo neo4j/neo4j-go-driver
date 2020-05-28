@@ -21,7 +21,6 @@ package test_integration
 
 import (
 	"crypto/rand"
-	"fmt"
 	"math"
 	"math/big"
 	"net"
@@ -644,84 +643,5 @@ func TestConnectionConformance(ot *testing.T) {
 			boltConn.TxRollback(tx)
 			assertNoNewBookmark(t)
 		})
-	})
-
-	ot.Run("Cluster discovery not supported", func(t *testing.T) {
-		discovery := boltConn.(db.ClusterDiscovery)
-		_, err := discovery.GetRoutingTable(nil)
-		if err == nil {
-			t.Fatal("Routing should not be supported")
-		}
-		_, is := err.(*db.RoutingNotSupportedError)
-		if !is {
-			t.Error("Error should be of type RoutingNotSupportedError")
-		}
-	})
-
-	ot.Run("Explain query", func(t *testing.T) {
-		t.Skip()
-		s, _ := boltConn.Run("EXPLAIN MATCH(n:BmRand) RETURN n", nil, db.ReadMode, nil, 0, nil)
-		_, sum, _ := boltConn.Next(s.Handle)
-		t.Logf("%+v", sum.Plan)
-	})
-
-	ot.Run("Profile query", func(t *testing.T) {
-		t.Skip()
-		s, _ := boltConn.Run("PROFILE MATCH(n:BmRand) RETURN n", nil, db.ReadMode, nil, 0, nil)
-		_, sum, _ := boltConn.Next(s.Handle)
-		t.Logf("%+v", sum.ProfiledPlan)
-	})
-
-	ot.Run("Notifications query", func(t *testing.T) {
-		t.Skip()
-		s, _ := boltConn.Run("MATCH(n:unknownUnusedWhateverLabel) RETURN n", nil, db.ReadMode, nil, 0, nil)
-		_, sum, _ := boltConn.Next(s.Handle)
-		t.Logf("%+v", sum.Notifications)
-	})
-}
-
-func TestConnectionConformanceCluster(ot *testing.T) {
-
-	logger := &log.ConsoleLogger{Errors: true, Infos: true, Warns: true}
-	var boltConn db.Connection
-	getBoltConn := func() db.Connection {
-		if boltConn == nil {
-			cluster, err := control.EnsureCluster()
-			if err != nil {
-				ot.Fatal(err)
-			}
-			leader := cluster.Leader()
-			uri := leader.RoutingURI()
-			parsedUri, err := url.Parse(uri)
-			if err != nil {
-				ot.Fatal(err)
-			}
-
-			tcpConn, err := net.Dial("tcp", parsedUri.Host)
-			if err != nil {
-				ot.Fatal(err)
-			}
-
-			authMap := map[string]interface{}{
-				"scheme":      "basic",
-				"principal":   cluster.Username(),
-				"credentials": cluster.Password(),
-			}
-
-			boltConn, err = bolt.Connect(parsedUri.Host, tcpConn, authMap, logger)
-			if err != nil {
-				ot.Fatal(err)
-			}
-		}
-		return boltConn
-	}
-
-	ot.Run("Cluster discovery", func(t *testing.T) {
-		discovery := getBoltConn().(db.ClusterDiscovery)
-		table, err := discovery.GetRoutingTable(nil)
-		if err != nil {
-			t.Fatalf("Routing should be supported: %s", err)
-		}
-		fmt.Printf("%+v", table)
 	})
 }

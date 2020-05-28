@@ -59,6 +59,8 @@ func Connect(serverName string, conn net.Conn, auth map[string]interface{}, log 
 		return nil, err
 	}
 
+	logId := "boltconnect@" + serverName
+
 	// Parse received version and construct the correct instance
 	ver := binary.BigEndian.Uint32(buf)
 	switch ver {
@@ -69,6 +71,7 @@ func Connect(serverName string, conn net.Conn, auth map[string]interface{}, log 
 		if err != nil {
 			return nil, err
 		}
+		log.Infof(logId, "Connected to %s", boltConn.ServerVersion())
 		return boltConn, nil
 	case 0:
 		err = errors.New("Server did not accept any of the requested Bolt protocol versions. Only Neo4j version 3.5 and version 4 currently supports Bolt protocol version 3")
@@ -76,6 +79,6 @@ func Connect(serverName string, conn net.Conn, auth map[string]interface{}, log 
 		err = errors.New(fmt.Sprintf("Server responded with unsupported version %d", ver))
 	}
 
-	log.Error("boltconnect@"+serverName, err)
+	log.Error(logId, err)
 	return nil, err
 }
