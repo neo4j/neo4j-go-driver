@@ -33,13 +33,13 @@ import (
 // more usable by the consumer.
 func hydrate(tag packstream.StructTag, fields []interface{}) (interface{}, error) {
 	switch tag {
-	case msgV3Success:
+	case msgSuccess:
 		return hydrateSuccess(fields)
-	case msgV3Ignored:
+	case msgIgnored:
 		return hydrateIgnored(fields)
-	case msgV3Failure:
+	case msgFailure:
 		return hydrateFailure(fields)
-	case msgV3Record:
+	case msgRecord:
 		return hydrateRecord(fields)
 	case 'N':
 		return hydrateNode(fields)

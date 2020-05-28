@@ -43,8 +43,8 @@ func Connect(serverName string, conn net.Conn, auth map[string]interface{}, log 
 	// Send handshake to server
 	handshake := []byte{
 		0x60, 0x60, 0xb0, 0x17, // Magic: GoGoBolt
-		0x00, 0x00, 0x00, 0x03, // Versions in priority order, big endian.
-		0x00, 0x00, 0x00, 0x00,
+		0x00, 0x00, 0x00, 0x04, // Versions in priority order, big endian.
+		0x00, 0x00, 0x00, 0x03,
 		0x00, 0x00, 0x00, 0x00,
 		0x00, 0x00, 0x00, 0x00}
 	_, err := conn.Write(handshake)
@@ -72,6 +72,14 @@ func Connect(serverName string, conn net.Conn, auth map[string]interface{}, log 
 			return nil, err
 		}
 		log.Infof(logId, "Connected to %s", boltConn.ServerVersion())
+		return boltConn, nil
+	case 4:
+		// Handover rest of connection handshaking
+		boltConn := NewBolt4(serverName, conn, log)
+		err = boltConn.connect(auth)
+		if err != nil {
+			return nil, err
+		}
 		return boltConn, nil
 	case 0:
 		err = errors.New("Server did not accept any of the requested Bolt protocol versions. Only Neo4j version 3.5 and version 4 currently supports Bolt protocol version 3")

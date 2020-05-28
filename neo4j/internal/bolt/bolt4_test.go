@@ -26,8 +26,8 @@ import (
 	"github.com/neo4j/neo4j-go-driver/neo4j/internal/packstream"
 )
 
-// bolt3.connect is tested through Connect, no need to test it here
-func TestBolt3(ot *testing.T) {
+// bolt4.connect is tested through Connect, no need to test it here
+func TestBolt4(ot *testing.T) {
 	// Test streams
 	// Faked returns from a server
 	keys := []interface{}{"f1", "f2"}
@@ -65,23 +65,23 @@ func TestBolt3(ot *testing.T) {
 		"credentials": "pass",
 	}
 
-	assertBoltState := func(t *testing.T, expected int, bolt *bolt3) {
+	assertBoltState := func(t *testing.T, expected int, bolt *bolt4) {
 		t.Helper()
 		if expected != bolt.state {
 			t.Errorf("Bolt is in unexpected state %d vs %d", expected, bolt.state)
 		}
 	}
 
-	assertBoltDead := func(t *testing.T, bolt *bolt3) {
+	assertBoltDead := func(t *testing.T, bolt *bolt4) {
 		t.Helper()
 		if bolt.IsAlive() {
 			t.Error("Bolt is alive when it should be dead")
 		}
 	}
 
-	connectToServer := func(t *testing.T, serverJob func(srv *bolt3server)) (*bolt3, func()) {
+	connectToServer := func(t *testing.T, serverJob func(srv *bolt4server)) (*bolt4, func()) {
 		// Connect client+server
-		tcpConn, srv, cleanup := setupBolt3Pipe(t)
+		tcpConn, srv, cleanup := setupBolt4Pipe(t)
 		go serverJob(srv)
 
 		c, err := Connect("name", tcpConn, auth, logger)
@@ -89,14 +89,14 @@ func TestBolt3(ot *testing.T) {
 			t.Fatal(err)
 		}
 
-		bolt := c.(*bolt3)
-		assertBoltState(t, bolt3_ready, bolt)
+		bolt := c.(*bolt4)
+		assertBoltState(t, bolt4_ready, bolt)
 		return bolt, cleanup
 	}
 
 	ot.Run("Run auto-commit", func(t *testing.T) {
-		bolt, cleanup := connectToServer(t, func(srv *bolt3server) {
-			srv.accept(3)
+		bolt, cleanup := connectToServer(t, func(srv *bolt4server) {
+			srv.accept(4)
 			srv.serveRun(recsStrm)
 		})
 		defer cleanup()
@@ -104,7 +104,7 @@ func TestBolt3(ot *testing.T) {
 
 		str, _ := bolt.Run("MATCH (n) RETURN n", nil, db.ReadMode, nil, 0, nil)
 		assertKeys(t, keys, str)
-		assertBoltState(t, bolt3_streaming, bolt)
+		assertBoltState(t, bolt4_streaming, bolt)
 
 		// Retrieve the records
 		for i := 1; i < len(recsStrm)-1; i++ {
@@ -114,12 +114,12 @@ func TestBolt3(ot *testing.T) {
 		// Retrieve the summary
 		rec, sum, err := bolt.Next(str.Handle)
 		assertOnlySummary(t, rec, sum, err)
-		assertBoltState(t, bolt3_ready, bolt)
+		assertBoltState(t, bolt4_ready, bolt)
 	})
 
 	ot.Run("Run transactional commit", func(t *testing.T) {
-		bolt, cleanup := connectToServer(t, func(srv *bolt3server) {
-			srv.accept(3)
+		bolt, cleanup := connectToServer(t, func(srv *bolt4server) {
+			srv.accept(4)
 			srv.serveRunTx(recsStrm, true)
 		})
 		defer cleanup()
@@ -127,9 +127,9 @@ func TestBolt3(ot *testing.T) {
 
 		tx, err := bolt.TxBegin(db.ReadMode, nil, 0, nil)
 		assertNoError(t, err)
-		assertBoltState(t, bolt3_pendingtx, bolt)
+		assertBoltState(t, bolt4_pendingtx, bolt)
 		str, err := bolt.RunTx(tx, "MATCH (n) RETURN n", nil)
-		assertBoltState(t, bolt3_streamingtx, bolt)
+		assertBoltState(t, bolt4_streamingtx, bolt)
 		assertNoError(t, err)
 		assertKeys(t, keys, str)
 
@@ -141,15 +141,15 @@ func TestBolt3(ot *testing.T) {
 		// Retrieve the summary
 		rec, sum, err := bolt.Next(str.Handle)
 		assertOnlySummary(t, rec, sum, err)
-		assertBoltState(t, bolt3_tx, bolt)
+		assertBoltState(t, bolt4_tx, bolt)
 
 		bolt.TxCommit(tx)
-		assertBoltState(t, bolt3_ready, bolt)
+		assertBoltState(t, bolt4_ready, bolt)
 	})
 
 	ot.Run("Run transactional rollback", func(t *testing.T) {
-		bolt, cleanup := connectToServer(t, func(srv *bolt3server) {
-			srv.accept(3)
+		bolt, cleanup := connectToServer(t, func(srv *bolt4server) {
+			srv.accept(4)
 			srv.serveRunTx(recsStrm, false)
 		})
 		defer cleanup()
@@ -157,10 +157,10 @@ func TestBolt3(ot *testing.T) {
 
 		tx, err := bolt.TxBegin(db.ReadMode, nil, 0, nil)
 		assertNoError(t, err)
-		assertBoltState(t, bolt3_pendingtx, bolt)
+		assertBoltState(t, bolt4_pendingtx, bolt)
 		str, err := bolt.RunTx(tx, "MATCH (n) RETURN n", nil)
 		assertNoError(t, err)
-		assertBoltState(t, bolt3_streamingtx, bolt)
+		assertBoltState(t, bolt4_streamingtx, bolt)
 		assertKeys(t, keys, str)
 
 		// Retrieve the records
@@ -171,15 +171,15 @@ func TestBolt3(ot *testing.T) {
 		// Retrieve the summary
 		rec, sum, err := bolt.Next(str.Handle)
 		assertOnlySummary(t, rec, sum, err)
-		assertBoltState(t, bolt3_tx, bolt)
+		assertBoltState(t, bolt4_tx, bolt)
 
 		bolt.TxRollback(tx)
-		assertBoltState(t, bolt3_ready, bolt)
+		assertBoltState(t, bolt4_ready, bolt)
 	})
 
 	ot.Run("Server close while streaming", func(t *testing.T) {
-		bolt, cleanup := connectToServer(t, func(srv *bolt3server) {
-			srv.accept(3)
+		bolt, cleanup := connectToServer(t, func(srv *bolt4server) {
+			srv.accept(4)
 			srv.waitForRun()
 			srv.waitForPullAll()
 			// Send response to run and first record as response to pull
@@ -196,7 +196,7 @@ func TestBolt3(ot *testing.T) {
 
 		str, err := bolt.Run("MATCH (n) RETURN n", nil, db.ReadMode, nil, 0, nil)
 		assertNoError(t, err)
-		assertBoltState(t, bolt3_streaming, bolt)
+		assertBoltState(t, bolt4_streaming, bolt)
 
 		// Retrieve the first record
 		rec, sum, err := bolt.Next(str.Handle)
@@ -209,8 +209,8 @@ func TestBolt3(ot *testing.T) {
 	})
 
 	ot.Run("Server fail on run with reset", func(t *testing.T) {
-		bolt, cleanup := connectToServer(t, func(srv *bolt3server) {
-			srv.accept(3)
+		bolt, cleanup := connectToServer(t, func(srv *bolt4server) {
+			srv.accept(4)
 			srv.waitForRun()
 			srv.waitForPullAll()
 			srv.sendFailureMsg("code", "msg")
@@ -225,15 +225,15 @@ func TestBolt3(ot *testing.T) {
 		// Fake syntax error that doesn't really matter...
 		_, err := bolt.Run("MATCH (n RETURN n", nil, db.ReadMode, nil, 0, nil)
 		assertDatabaseError(t, err)
-		assertBoltState(t, bolt3_failed, bolt)
+		assertBoltState(t, bolt4_failed, bolt)
 
 		bolt.Reset()
-		assertBoltState(t, bolt3_ready, bolt)
+		assertBoltState(t, bolt4_ready, bolt)
 	})
 
 	ot.Run("Reset while streaming ", func(t *testing.T) {
-		bolt, cleanup := connectToServer(t, func(srv *bolt3server) {
-			srv.accept(3)
+		bolt, cleanup := connectToServer(t, func(srv *bolt4server) {
+			srv.accept(4)
 			srv.serveRun(recsStrm)
 			// Reset message is never sent to server since stream is consumed
 		})
@@ -242,9 +242,9 @@ func TestBolt3(ot *testing.T) {
 
 		_, err := bolt.Run("MATCH (n) RETURN n", nil, db.ReadMode, nil, 0, nil)
 		assertNoError(t, err)
-		assertBoltState(t, bolt3_streaming, bolt)
+		assertBoltState(t, bolt4_streaming, bolt)
 
 		bolt.Reset()
-		assertBoltState(t, bolt3_ready, bolt)
+		assertBoltState(t, bolt4_ready, bolt)
 	})
 }
