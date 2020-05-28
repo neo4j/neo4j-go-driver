@@ -28,15 +28,11 @@ import (
 	"github.com/neo4j/neo4j-go-driver/neo4j/internal/packstream"
 )
 
-func passthroughHydrator(tag packstream.StructTag, fields []interface{}) (interface{}, error) {
-	return &packstream.Struct{Tag: tag, Fields: fields}, nil
-}
-
-// Fake of bolt3 server.
-// Utility to test bolt3 protocol implemntation.
+// Fake of bolt4 server.
+// Utility to test bolt4 protocol implemntation.
 // Use panic upon errors, simplifies output when server is running within a go thread
 // in the test.
-type bolt3server struct {
+type bolt4server struct {
 	conn      net.Conn
 	hyd       packstream.Hydrate
 	dechunker *dechunker
@@ -45,12 +41,12 @@ type bolt3server struct {
 	packer    *packstream.Packer
 }
 
-func newBolt3Server(conn net.Conn) *bolt3server {
+func newBolt4Server(conn net.Conn) *bolt4server {
 	dechunker := newDechunker(conn)
 	unpacker := packstream.NewUnpacker(dechunker)
 	chunker := newChunker(conn)
 	packer := packstream.NewPacker(chunker, nil)
-	return &bolt3server{
+	return &bolt4server{
 		conn:      conn,
 		dechunker: dechunker,
 		hyd:       passthroughHydrator,
@@ -60,7 +56,7 @@ func newBolt3Server(conn net.Conn) *bolt3server {
 	}
 }
 
-func (s *bolt3server) waitForHandshake() []byte {
+func (s *bolt4server) waitForHandshake() []byte {
 	handshake := make([]byte, 4*5)
 	_, err := io.ReadFull(s.conn, handshake)
 	if err != nil {
@@ -69,13 +65,13 @@ func (s *bolt3server) waitForHandshake() []byte {
 	return handshake
 }
 
-func (s *bolt3server) assertStructType(msg *packstream.Struct, t packstream.StructTag) {
+func (s *bolt4server) assertStructType(msg *packstream.Struct, t packstream.StructTag) {
 	if msg.Tag != t {
 		panic(fmt.Sprintf("Got wrong type of message expected %d but got %d (%+v)", t, msg.Tag, msg))
 	}
 }
 
-func (s *bolt3server) sendFailureMsg(code, msg string) {
+func (s *bolt4server) sendFailureMsg(code, msg string) {
 	f := map[string]interface{}{
 		"code":    code,
 		"message": msg,
@@ -83,11 +79,11 @@ func (s *bolt3server) sendFailureMsg(code, msg string) {
 	s.send(msgFailure, f)
 }
 
-func (s *bolt3server) sendIgnoredMsg() {
+func (s *bolt4server) sendIgnoredMsg() {
 	s.send(msgIgnored)
 }
 
-func (s *bolt3server) waitForHello() {
+func (s *bolt4server) waitForHello() {
 	msg := s.receiveMsg()
 	s.assertStructType(msg, msgHello)
 	m := msg.Fields[0].(map[string]interface{})
@@ -102,7 +98,7 @@ func (s *bolt3server) waitForHello() {
 	}
 }
 
-func (s *bolt3server) receiveMsg() *packstream.Struct {
+func (s *bolt4server) receiveMsg() *packstream.Struct {
 	s.dechunker.beginMessage()
 	x, err := s.unpacker.UnpackStruct(s.hyd)
 	if err != nil {
@@ -112,37 +108,37 @@ func (s *bolt3server) receiveMsg() *packstream.Struct {
 	return x.(*packstream.Struct)
 }
 
-func (s *bolt3server) waitForRun() {
+func (s *bolt4server) waitForRun() {
 	msg := s.receiveMsg()
 	s.assertStructType(msg, msgRun)
 }
 
-func (s *bolt3server) waitForReset() {
+func (s *bolt4server) waitForReset() {
 	msg := s.receiveMsg()
 	s.assertStructType(msg, msgReset)
 }
 
-func (s *bolt3server) waitForTxBegin() {
+func (s *bolt4server) waitForTxBegin() {
 	msg := s.receiveMsg()
 	s.assertStructType(msg, msgBegin)
 }
 
-func (s *bolt3server) waitForTxCommit() {
+func (s *bolt4server) waitForTxCommit() {
 	msg := s.receiveMsg()
 	s.assertStructType(msg, msgCommit)
 }
 
-func (s *bolt3server) waitForTxRollback() {
+func (s *bolt4server) waitForTxRollback() {
 	msg := s.receiveMsg()
 	s.assertStructType(msg, msgRollback)
 }
 
-func (s *bolt3server) waitForPullAll() {
+func (s *bolt4server) waitForPullAll() {
 	msg := s.receiveMsg()
 	s.assertStructType(msg, msgPullAll)
 }
 
-func (s *bolt3server) acceptVersion(ver byte) {
+func (s *bolt4server) acceptVersion(ver byte) {
 	acceptedVer := []byte{0x00, 0x00, 0x00, ver}
 	_, err := s.conn.Write(acceptedVer)
 	if err != nil {
@@ -150,18 +146,18 @@ func (s *bolt3server) acceptVersion(ver byte) {
 	}
 }
 
-func (s *bolt3server) rejectVersions() {
+func (s *bolt4server) rejectVersions() {
 	_, err := s.conn.Write([]byte{0x00, 0x00, 0x00, 0x00})
 	if err != nil {
 		panic(err)
 	}
 }
 
-func (s *bolt3server) closeConnection() {
+func (s *bolt4server) closeConnection() {
 	s.conn.Close()
 }
 
-func (s *bolt3server) send(tag packstream.StructTag, field ...interface{}) {
+func (s *bolt4server) send(tag packstream.StructTag, field ...interface{}) {
 	s.chunker.beginMessage()
 	err := s.packer.PackStruct(tag, field...)
 	if err != nil {
@@ -171,18 +167,18 @@ func (s *bolt3server) send(tag packstream.StructTag, field ...interface{}) {
 	s.chunker.send()
 }
 
-func (s *bolt3server) sendSuccess(m map[string]interface{}) {
+func (s *bolt4server) sendSuccess(m map[string]interface{}) {
 	s.send(msgSuccess, m)
 }
 
-func (s *bolt3server) acceptHello() {
+func (s *bolt4server) acceptHello() {
 	s.send(msgSuccess, map[string]interface{}{
 		"connection_id": "cid",
-		"server":        "fake/3.5",
+		"server":        "fake/4.5",
 	})
 }
 
-func (s *bolt3server) rejectHelloUnauthorized() {
+func (s *bolt4server) rejectHelloUnauthorized() {
 	s.send(msgFailure, map[string]interface{}{
 		"code":    "Neo.ClientError.Security.Unauthorized",
 		"message": "",
@@ -190,7 +186,7 @@ func (s *bolt3server) rejectHelloUnauthorized() {
 }
 
 // Utility when something else but connect is to be tested
-func (s *bolt3server) accept(ver byte) {
+func (s *bolt4server) accept(ver byte) {
 	s.waitForHandshake()
 	s.acceptVersion(ver)
 	s.waitForHello()
@@ -198,7 +194,7 @@ func (s *bolt3server) accept(ver byte) {
 }
 
 // Utility to wait and serve a auto commit query
-func (s *bolt3server) serveRun(stream []packstream.Struct) {
+func (s *bolt4server) serveRun(stream []packstream.Struct) {
 	s.waitForRun()
 	s.waitForPullAll()
 	for _, x := range stream {
@@ -206,7 +202,7 @@ func (s *bolt3server) serveRun(stream []packstream.Struct) {
 	}
 }
 
-func (s *bolt3server) serveRunTx(stream []packstream.Struct, commit bool) {
+func (s *bolt4server) serveRunTx(stream []packstream.Struct, commit bool) {
 	s.waitForTxBegin()
 	s.send(msgSuccess, map[string]interface{}{})
 	s.waitForRun()
@@ -225,7 +221,7 @@ func (s *bolt3server) serveRunTx(stream []packstream.Struct, commit bool) {
 	}
 }
 
-func setupBolt3Pipe(t *testing.T) (net.Conn, *bolt3server, func()) {
+func setupBolt4Pipe(t *testing.T) (net.Conn, *bolt4server, func()) {
 	l, err := net.Listen("tcp", ":0")
 	if err != nil {
 		t.Fatalf("Unable to listen: %s", err)
@@ -238,7 +234,7 @@ func setupBolt3Pipe(t *testing.T) (net.Conn, *bolt3server, func()) {
 	if err != nil {
 		t.Fatalf("Accept error: %s", err)
 	}
-	srv := newBolt3Server(srvConn)
+	srv := newBolt4Server(srvConn)
 
 	return clientConn, srv, func() {
 		l.Close()

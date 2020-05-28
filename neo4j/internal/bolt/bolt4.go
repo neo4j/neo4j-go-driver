@@ -31,23 +31,23 @@ import (
 )
 
 const (
-	bolt3_ready       = iota // Ready for use
-	bolt3_streaming          // Receiving result from auto commit query
-	bolt3_pendingtx          // Transaction has been requested but not applied
-	bolt3_tx                 // Transaction pending
-	bolt3_streamingtx        // Receiving result from a query within a transaction
-	bolt3_failed             // Recoverable error, needs reset
-	bolt3_dead               // Non recoverable protocol or connection error
+	bolt4_ready       = iota // Ready for use
+	bolt4_streaming          // Receiving result from auto commit query
+	bolt4_pendingtx          // Transaction has been requested but not applied
+	bolt4_tx                 // Transaction pending
+	bolt4_streamingtx        // Receiving result from a query within a transaction
+	bolt4_failed             // Recoverable error, needs reset
+	bolt4_dead               // Non recoverable protocol or connection error
 )
 
-type internalTx3 struct {
+type internalTx4 struct {
 	mode      db.AccessMode
 	bookmarks []string
 	timeout   time.Duration
 	txMeta    map[string]interface{}
 }
 
-func (i *internalTx3) toMeta() map[string]interface{} {
+func (i *internalTx4) toMeta() map[string]interface{} {
 	meta := map[string]interface{}{}
 	if i.mode == db.ReadMode {
 		meta["mode"] = "r"
@@ -65,7 +65,7 @@ func (i *internalTx3) toMeta() map[string]interface{} {
 	return meta
 }
 
-type bolt3 struct {
+type bolt4 struct {
 	state         int
 	txId          int64
 	streamId      int64
@@ -80,18 +80,18 @@ type bolt3 struct {
 	logId         string
 	serverVersion string
 	tfirst        int64        // Time that server started streaming
-	pendingTx     *internalTx3 // Stashed away when tx started explcitly
+	pendingTx     *internalTx4 // Stashed away when tx started explcitly
 	bookmark      string       // Last bookmark
 	birthDate     time.Time
 	log           log.Logger
 }
 
-func NewBolt3(serverName string, conn net.Conn, log log.Logger) *bolt3 {
+func NewBolt4(serverName string, conn net.Conn, log log.Logger) *bolt4 {
 	chunker := newChunker(conn)
 	dechunker := newDechunker(conn)
 
-	return &bolt3{
-		state:      bolt3_dead,
+	return &bolt4{
+		state:      bolt4_dead,
 		conn:       conn,
 		serverName: serverName,
 		chunker:    chunker,
@@ -103,15 +103,15 @@ func NewBolt3(serverName string, conn net.Conn, log log.Logger) *bolt3 {
 	}
 }
 
-func (b *bolt3) ServerName() string {
+func (b *bolt4) ServerName() string {
 	return b.serverName
 }
 
-func (b *bolt3) ServerVersion() string {
+func (b *bolt4) ServerVersion() string {
 	return b.serverVersion
 }
 
-func (b *bolt3) appendMsg(tag packstream.StructTag, field ...interface{}) error {
+func (b *bolt4) appendMsg(tag packstream.StructTag, field ...interface{}) error {
 	b.chunker.beginMessage()
 	// Setup the message and let packstream write the packed bytes to the chunk
 	if err := b.packer.PackStruct(tag, field...); err != nil {
@@ -119,42 +119,42 @@ func (b *bolt3) appendMsg(tag packstream.StructTag, field ...interface{}) error 
 		// Either we should support rolling back whatever that has been written or just
 		// bail out this session.
 		b.log.Error(b.logId, err)
-		b.state = bolt3_dead
+		b.state = bolt4_dead
 		return err
 	}
 	b.chunker.endMessage()
 	return nil
 }
 
-func (b *bolt3) sendMsg(tag packstream.StructTag, field ...interface{}) error {
+func (b *bolt4) sendMsg(tag packstream.StructTag, field ...interface{}) error {
 	if err := b.appendMsg(tag, field...); err != nil {
 		return err
 	}
 	if err := b.chunker.send(); err != nil {
 		b.log.Error(b.logId, err)
-		b.state = bolt3_dead
+		b.state = bolt4_dead
 		return err
 	}
 	return nil
 }
 
-func (b *bolt3) receiveMsg() (interface{}, error) {
+func (b *bolt4) receiveMsg() (interface{}, error) {
 	if err := b.dechunker.beginMessage(); err != nil {
 		b.log.Error(b.logId, err)
-		b.state = bolt3_dead
+		b.state = bolt4_dead
 		return nil, err
 	}
 
 	msg, err := b.unpacker.UnpackStruct(hydrate)
 	if err != nil {
 		b.log.Error(b.logId, err)
-		b.state = bolt3_dead
+		b.state = bolt4_dead
 		return nil, err
 	}
 
 	if err = b.dechunker.endMessage(); err != nil {
 		b.log.Error(b.logId, err)
-		b.state = bolt3_dead
+		b.state = bolt4_dead
 		return nil, err
 	}
 
@@ -163,7 +163,7 @@ func (b *bolt3) receiveMsg() (interface{}, error) {
 
 // Receives a message that is assumed to be a success response or a failure in response
 // to a sent command.
-func (b *bolt3) receiveSuccess() (*successResponse, error) {
+func (b *bolt4) receiveSuccess() (*successResponse, error) {
 	msg, err := b.receiveMsg()
 	if err != nil {
 		return nil, err
@@ -173,7 +173,7 @@ func (b *bolt3) receiveSuccess() (*successResponse, error) {
 	case *successResponse:
 		return v, nil
 	case *db.DatabaseError:
-		b.state = bolt3_failed
+		b.state = bolt4_failed
 		if v.IsClient() {
 			// These could include potentially large cypher statement, only log to debug
 			b.log.Debugf(b.logId, "%s", v)
@@ -182,15 +182,15 @@ func (b *bolt3) receiveSuccess() (*successResponse, error) {
 		}
 		return nil, v
 	}
-	b.state = bolt3_dead
+	b.state = bolt4_dead
 	err = errors.New("Expected success or database error")
 	b.log.Error(b.logId, err)
 	return nil, err
 }
 
-func (b *bolt3) connect(auth map[string]interface{}) error {
+func (b *bolt4) connect(auth map[string]interface{}) error {
 	// Only allowed to connect when in disconnected state
-	if err := assertState(b.logError, b.state, bolt3_dead); err != nil {
+	if err := assertState(b.logError, b.state, bolt4_dead); err != nil {
 		return err
 	}
 
@@ -220,30 +220,30 @@ func (b *bolt3) connect(auth map[string]interface{}) error {
 		return errors.New(fmt.Sprintf("Unexpected server response: %+v", succRes))
 	}
 	b.connId = helloRes.connectionId
-	b.logId = fmt.Sprintf("%s@%s/v3", b.connId, b.serverName)
+	b.logId = fmt.Sprintf("%s@%s/v4", b.connId, b.serverName)
 	b.serverVersion = helloRes.server
 
 	// Transition into ready state
-	b.state = bolt3_ready
+	b.state = bolt4_ready
 	b.log.Infof(b.logId, "Connected")
 	return nil
 }
 
-func (b *bolt3) TxBegin(
+func (b *bolt4) TxBegin(
 	mode db.AccessMode, bookmarks []string, timeout time.Duration, txMeta map[string]interface{}) (db.Handle, error) {
 
 	// Ok, to begin transaction while streaming auto-commit, just empty the stream and continue.
-	if b.state == bolt3_streaming {
+	if b.state == bolt4_streaming {
 		if err := b.consumeStream(); err != nil {
 			return nil, err
 		}
 	}
 
-	if err := assertState(b.logError, b.state, bolt3_ready); err != nil {
+	if err := assertState(b.logError, b.state, bolt4_ready); err != nil {
 		return nil, err
 	}
 
-	tx := &internalTx3{
+	tx := &internalTx4{
 		mode:      mode,
 		bookmarks: bookmarks,
 		timeout:   timeout,
@@ -260,36 +260,36 @@ func (b *bolt3) TxBegin(
 			return nil, err
 		}
 		b.txId = time.Now().Unix()
-		b.state = bolt3_tx
+		b.state = bolt4_tx
 	} else {
 		// Stash this into pending internal tx
 		b.pendingTx = tx
 		b.txId = time.Now().Unix()
-		b.state = bolt3_pendingtx
+		b.state = bolt4_pendingtx
 	}
 	return b.txId, nil
 }
 
-func (b *bolt3) TxCommit(txh db.Handle) error {
+func (b *bolt4) TxCommit(txh db.Handle) error {
 	if err := assertHandle(b.logError, b.txId, txh); err != nil {
 		return err
 	}
 
 	// Nothing to do, a transaction started but no commands were issued on it, server is unaware
-	if b.state == bolt3_pendingtx {
-		b.state = bolt3_ready
+	if b.state == bolt4_pendingtx {
+		b.state = bolt4_ready
 		return nil
 	}
 
 	// Consume pending stream if any to turn state from streamingtx to tx
-	if b.state == bolt3_streamingtx {
+	if b.state == bolt4_streamingtx {
 		if err := b.consumeStream(); err != nil {
 			return err
 		}
 	}
 
 	// Should be in vanilla tx state now
-	if err := assertState(b.logError, b.state, bolt3_tx); err != nil {
+	if err := assertState(b.logError, b.state, bolt4_tx); err != nil {
 		return err
 	}
 
@@ -305,7 +305,7 @@ func (b *bolt3) TxCommit(txh db.Handle) error {
 	}
 	commitSuccess := succRes.commit()
 	if commitSuccess == nil {
-		b.state = bolt3_dead
+		b.state = bolt4_dead
 		err := errors.New(fmt.Sprintf("Failed to parse commit response: %+v", succRes))
 		b.log.Error(b.logId, err)
 		return err
@@ -317,23 +317,23 @@ func (b *bolt3) TxCommit(txh db.Handle) error {
 	}
 
 	// Transition into ready state
-	b.state = bolt3_ready
+	b.state = bolt4_ready
 	return nil
 }
 
-func (b *bolt3) TxRollback(txh db.Handle) error {
+func (b *bolt4) TxRollback(txh db.Handle) error {
 	if err := assertHandle(b.logError, b.txId, txh); err != nil {
 		return err
 	}
 
 	// Nothing to do, a transaction started but no commands were issued on it
-	if b.state == bolt3_pendingtx {
-		b.state = bolt3_ready
+	if b.state == bolt4_pendingtx {
+		b.state = bolt4_ready
 		return nil
 	}
 
 	// Can not send rollback while still streaming, consume to turn state into tx
-	if b.state == bolt3_streamingtx {
+	if b.state == bolt4_streamingtx {
 		if err := b.consumeStream(); err != nil {
 			return err
 		}
@@ -341,7 +341,7 @@ func (b *bolt3) TxRollback(txh db.Handle) error {
 
 	// Should be in vanilla tx state now
 	// Don't log this as an error since it might happen if a statement failed
-	if err := assertState(b.logDebug, b.state, bolt3_tx); err != nil {
+	if err := assertState(b.logDebug, b.state, bolt4_tx); err != nil {
 		return err
 	}
 
@@ -355,14 +355,14 @@ func (b *bolt3) TxRollback(txh db.Handle) error {
 		return err
 	}
 
-	b.state = bolt3_ready
+	b.state = bolt4_ready
 	return nil
 }
 
 // Discards all records, keeps bookmark
-func (b *bolt3) consumeStream() error {
+func (b *bolt4) consumeStream() error {
 	// Anything to do?
-	if b.state != bolt3_streaming && b.state != bolt3_streamingtx {
+	if b.state != bolt4_streaming && b.state != bolt4_streamingtx {
 		return nil
 	}
 
@@ -378,13 +378,14 @@ func (b *bolt3) consumeStream() error {
 	return nil
 }
 
-func (b *bolt3) run(cypher string, params map[string]interface{}, tx *internalTx3) (*db.Stream, error) {
+func (b *bolt4) run(cypher string, params map[string]interface{}, tx *internalTx4) (*db.Stream, error) {
+	b.log.Debugf(b.logId, "run")
 	// If already streaming, consume the whole thing first
 	if err := b.consumeStream(); err != nil {
 		return nil, err
 	}
 
-	if err := assertStates(b.logError, b.state, []int{bolt3_tx, bolt3_ready, bolt3_pendingtx}); err != nil {
+	if err := assertStates(b.logError, b.state, []int{bolt4_tx, bolt4_ready, bolt4_pendingtx}); err != nil {
 		return nil, err
 	}
 
@@ -394,7 +395,7 @@ func (b *bolt3) run(cypher string, params map[string]interface{}, tx *internalTx
 	}
 
 	// Append lazy begin transaction message
-	if b.state == bolt3_pendingtx {
+	if b.state == bolt4_pendingtx {
 		if err := b.appendMsg(msgBegin, meta); err != nil {
 			return nil, err
 		}
@@ -407,17 +408,17 @@ func (b *bolt3) run(cypher string, params map[string]interface{}, tx *internalTx
 	}
 
 	// Append pull all message and send it all
-	if err := b.sendMsg(msgPullAll); err != nil {
+	if err := b.sendMsg(msgPullAll, map[string]interface{}{"n": -1}); err != nil {
 		return nil, err
 	}
 
 	// Process server responses
 	// Receive confirmation of transaction begin if it was started above
-	if b.state == bolt3_pendingtx {
+	if b.state == bolt4_pendingtx {
 		if _, err := b.receiveSuccess(); err != nil {
 			return nil, err
 		}
-		b.state = bolt3_tx
+		b.state = bolt4_tx
 	}
 
 	// Receive confirmation of run message
@@ -428,7 +429,7 @@ func (b *bolt3) run(cypher string, params map[string]interface{}, tx *internalTx
 	// Extract the RUN response from success response
 	runRes := res.run()
 	if runRes == nil {
-		b.state = bolt3_dead
+		b.state = bolt4_dead
 		err = errors.New(fmt.Sprintf("Failed to parse RUN response: %+v", res))
 		b.log.Error(b.logId, err)
 		return nil, err
@@ -436,10 +437,10 @@ func (b *bolt3) run(cypher string, params map[string]interface{}, tx *internalTx
 	b.tfirst = runRes.t_first
 	b.streamKeys = runRes.fields
 	// Change state to streaming
-	if b.state == bolt3_ready {
-		b.state = bolt3_streaming
+	if b.state == bolt4_ready {
+		b.state = bolt4_streaming
 	} else {
-		b.state = bolt3_streamingtx
+		b.state = bolt4_streamingtx
 	}
 
 	b.streamId = time.Now().Unix()
@@ -447,23 +448,23 @@ func (b *bolt3) run(cypher string, params map[string]interface{}, tx *internalTx
 	return stream, nil
 }
 
-func (b *bolt3) logError(err error) {
+func (b *bolt4) logError(err error) {
 	b.log.Error(b.logId, err)
 }
 
-func (b *bolt3) logDebug(err error) {
+func (b *bolt4) logDebug(err error) {
 	b.log.Debugf(b.logId, "%s", err)
 }
 
-func (b *bolt3) Run(
+func (b *bolt4) Run(
 	cypher string, params map[string]interface{}, mode db.AccessMode,
 	bookmarks []string, timeout time.Duration, txMeta map[string]interface{}) (*db.Stream, error) {
 
-	if err := assertStates(b.logError, b.state, []int{bolt3_streaming, bolt3_ready}); err != nil {
+	if err := assertStates(b.logError, b.state, []int{bolt4_streaming, bolt4_ready}); err != nil {
 		return nil, err
 	}
 
-	tx := internalTx3{
+	tx := internalTx4{
 		mode:      mode,
 		bookmarks: bookmarks,
 		timeout:   timeout,
@@ -472,7 +473,7 @@ func (b *bolt3) Run(
 	return b.run(cypher, params, &tx)
 }
 
-func (b *bolt3) RunTx(txh db.Handle, cypher string, params map[string]interface{}) (*db.Stream, error) {
+func (b *bolt4) RunTx(txh db.Handle, cypher string, params map[string]interface{}) (*db.Stream, error) {
 	if err := assertHandle(b.logError, b.txId, txh); err != nil {
 		return nil, err
 	}
@@ -483,12 +484,12 @@ func (b *bolt3) RunTx(txh db.Handle, cypher string, params map[string]interface{
 }
 
 // Reads one record from the stream.
-func (b *bolt3) Next(shandle db.Handle) (*db.Record, *db.Summary, error) {
+func (b *bolt4) Next(shandle db.Handle) (*db.Record, *db.Summary, error) {
 	if err := assertHandle(b.logError, b.streamId, shandle); err != nil {
 		return nil, nil, err
 	}
 
-	if err := assertStates(b.logError, b.state, []int{bolt3_streaming, bolt3_streamingtx}); err != nil {
+	if err := assertStates(b.logError, b.state, []int{bolt4_streaming, bolt4_streamingtx}); err != nil {
 		return nil, nil, err
 	}
 
@@ -506,15 +507,15 @@ func (b *bolt3) Next(shandle db.Handle) (*db.Record, *db.Summary, error) {
 		// Parse summary
 		sum := x.summary()
 		if sum == nil {
-			b.state = bolt3_dead
+			b.state = bolt4_dead
 			err = errors.New("Failed to parse summary")
 			b.log.Error(b.logId, err)
 			return nil, nil, err
 		}
-		if b.state == bolt3_streamingtx {
-			b.state = bolt3_tx
+		if b.state == bolt4_streamingtx {
+			b.state = bolt4_tx
 		} else {
-			b.state = bolt3_ready
+			b.state = bolt4_ready
 			// Keep bookmark for auto-commit tx
 			if len(sum.Bookmark) > 0 {
 				b.bookmark = sum.Bookmark
@@ -527,7 +528,7 @@ func (b *bolt3) Next(shandle db.Handle) (*db.Record, *db.Summary, error) {
 		sum.TFirst = b.tfirst
 		return nil, sum, nil
 	case *db.DatabaseError:
-		b.state = bolt3_failed
+		b.state = bolt4_failed
 		if x.IsClient() {
 			// These could include potentially large cypher statement, only log to debug
 			b.log.Debugf(b.logId, "%s", x)
@@ -536,26 +537,26 @@ func (b *bolt3) Next(shandle db.Handle) (*db.Record, *db.Summary, error) {
 		}
 		return nil, nil, x
 	default:
-		b.state = bolt3_dead
+		b.state = bolt4_dead
 		err = errors.New("Unknown response")
 		b.log.Error(b.logId, err)
 		return nil, nil, err
 	}
 }
 
-func (b *bolt3) Bookmark() string {
+func (b *bolt4) Bookmark() string {
 	return b.bookmark
 }
 
-func (b *bolt3) IsAlive() bool {
-	return b.state != bolt3_dead
+func (b *bolt4) IsAlive() bool {
+	return b.state != bolt4_dead
 }
 
-func (b *bolt3) Birthdate() time.Time {
+func (b *bolt4) Birthdate() time.Time {
 	return b.birthDate
 }
 
-func (b *bolt3) Reset() {
+func (b *bolt4) Reset() {
 	defer func() {
 		// Reset internal state
 		b.txId = 0
@@ -565,14 +566,14 @@ func (b *bolt3) Reset() {
 		b.pendingTx = nil
 	}()
 
-	if b.state == bolt3_ready || b.state == bolt3_dead {
+	if b.state == bolt4_ready || b.state == bolt4_dead {
 		// No need for reset
 		return
 	}
 
 	// Will consume ongoing stream if any
 	b.consumeStream()
-	if b.state == bolt3_ready || b.state == bolt3_dead {
+	if b.state == bolt4_ready || b.state == bolt4_dead {
 		// No need for reset
 		return
 	}
@@ -587,7 +588,7 @@ func (b *bolt3) Reset() {
 	for {
 		msg, err := b.receiveMsg()
 		if err != nil {
-			b.state = bolt3_dead
+			b.state = bolt4_dead
 			return
 		}
 		switch msg.(type) {
@@ -595,27 +596,27 @@ func (b *bolt3) Reset() {
 			// Command ignored
 		case *successResponse:
 			// Reset confirmed
-			b.state = bolt3_ready
+			b.state = bolt4_ready
 			return
 		default:
-			b.state = bolt3_dead
+			b.state = bolt4_dead
 			return
 		}
 	}
 }
 
-func (b *bolt3) GetRoutingTable(context map[string]string) (*db.RoutingTable, error) {
-	if err := assertState(b.logError, b.state, bolt3_ready); err != nil {
+func (b *bolt4) GetRoutingTable(context map[string]string) (*db.RoutingTable, error) {
+	if err := assertState(b.logError, b.state, bolt4_ready); err != nil {
 		return nil, err
 	}
 	return getRoutingTable(b, context)
 }
 
 // Beware, could be called on another thread when driver is closed.
-func (b *bolt3) Close() {
-	if b.state != bolt3_dead {
+func (b *bolt4) Close() {
+	if b.state != bolt4_dead {
 		b.sendMsg(msgGoodbye)
 	}
 	b.conn.Close()
-	b.state = bolt3_dead
+	b.state = bolt4_dead
 }
