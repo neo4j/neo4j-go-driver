@@ -43,7 +43,7 @@ type StubServer struct {
 }
 
 const (
-	connectionAttempts = 10
+	connectionAttempts = 20
 	exitAttempts       = 10
 )
 
