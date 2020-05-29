@@ -21,6 +21,7 @@ package router
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sync"
 	"sync/atomic"
@@ -31,6 +32,8 @@ import (
 	"github.com/neo4j/neo4j-go-driver/neo4j/internal/pool"
 )
 
+const missingWriterRetries = 100
+
 // Thread safe
 type Router struct {
 	routerContext map[string]string
@@ -39,6 +42,7 @@ type Router struct {
 	dueUnix       int64
 	tableMut      sync.Mutex
 	now           func() time.Time
+	sleep         func(time.Duration)
 	rootRouter    string
 	getRouters    func() []string
 	log           log.Logger
@@ -60,6 +64,7 @@ func New(rootRouter string, getRouters func() []string, routerContext map[string
 		routerContext: routerContext,
 		pool:          pool,
 		now:           time.Now,
+		sleep:         time.Sleep,
 		log:           logger,
 		logId:         fmt.Sprintf("router %d", id),
 	}
@@ -118,6 +123,29 @@ func (r *Router) Writers() ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	// During election we can get tables without any writers
+	retries := missingWriterRetries
+	for len(table.Writers) == 0 {
+		retries--
+		if retries == 0 {
+			break
+		}
+		r.log.Debugf(r.logId, "Invalidating routing table, no writers")
+		r.sleep(100 * time.Millisecond)
+		r.tableMut.Lock()
+		// Reset due time to keep list of routers
+		r.dueUnix = 0
+		r.tableMut.Unlock()
+		table, err = r.getTable()
+		if err != nil {
+			return nil, err
+		}
+	}
+	if len(table.Writers) == 0 {
+		return nil, wrapInReadRoutingTableError(r.rootRouter, errors.New("No writers"))
+	}
+
 	return table.Writers, nil
 }
 
