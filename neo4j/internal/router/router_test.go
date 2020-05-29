@@ -154,3 +154,72 @@ func TestUseGetRoutersHookWhenInitialRouterFails(t *testing.T) {
 		t.Errorf("Didn't try the expected routers, tried: %#v", tried)
 	}
 }
+
+func TestWritersFailAfterNRetries(t *testing.T) {
+	numfetch := 0
+	tableNoWriters := &db.RoutingTable{TimeToLive: 1, Routers: []string{"rt1", "rt2"}, Readers: []string{"rd1"}}
+	pool := &poolFake{
+		borrow: func(names []string, cancel context.CancelFunc) (poolpackage.Connection, error) {
+			// Return no writers first time and writers the second time
+			numfetch++
+			return &connFake{table: tableNoWriters}, nil
+		},
+	}
+	numsleep := 0
+	router := New("router", func() []string { return []string{} }, nil, pool, logger)
+	router.sleep = func(time.Duration) {
+		numsleep++
+	}
+
+	// Should trigger a lot of retries to get a writer until it finally fails
+	writers, err := router.Writers()
+	if err == nil {
+		t.Error("Should have failed")
+	}
+	if writers != nil {
+		t.Error("Should'nt have any writers")
+	}
+	if numsleep <= 0 {
+		t.Error("Should have slept plenty")
+	}
+	if numfetch <= 0 {
+		t.Error("Should have fetched plenty")
+	}
+}
+
+func TestWritersRetriesWhenNoWriters(t *testing.T) {
+	numfetch := 0
+	tableNoWriters := &db.RoutingTable{TimeToLive: 1, Routers: []string{"rt1", "rt2"}, Readers: []string{"rd1"}}
+	tableWriters := &db.RoutingTable{TimeToLive: 1, Routers: []string{"rt1", "rt2"}, Readers: []string{"rd1"}, Writers: []string{"wr1"}}
+	pool := &poolFake{
+		borrow: func(names []string, cancel context.CancelFunc) (poolpackage.Connection, error) {
+			// Return no writers first time and writers the second time
+			numfetch++
+			if numfetch == 1 {
+				return &connFake{table: tableNoWriters}, nil
+			}
+			return &connFake{table: tableWriters}, nil
+		},
+	}
+	numsleep := 0
+	router := New("router", func() []string { return []string{} }, nil, pool, logger)
+	router.sleep = func(time.Duration) {
+		numsleep++
+	}
+
+	// Should trigger initial table read that contains no writers and a second table read
+	// that gets the writers
+	writers, err := router.Writers()
+	if err != nil {
+		t.Errorf("Got error: %s", err)
+	}
+	if len(writers) != 1 {
+		t.Error("Didn't get expected writer")
+	}
+	if numfetch != 2 {
+		t.Error("Should have fetched two times")
+	}
+	if numsleep != 1 {
+		t.Error("Should have slept once")
+	}
+}
