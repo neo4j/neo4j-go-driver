@@ -22,6 +22,7 @@ package test_integration
 import (
 	"errors"
 	"fmt"
+	"net/url"
 	"time"
 
 	"github.com/neo4j/neo4j-go-driver/neo4j"
@@ -264,8 +265,8 @@ var _ = Describe("Examples", func() {
 
 		Specify("Config - Address Resolver", func() {
 			var addresses []neo4j.ServerAddress
-			for _, server := range cluster.Cores() {
-				addresses = append(addresses, server.Address())
+			for _, server := range cluster.Members {
+				addresses = append(addresses, &url.URL{Host: server.HostnameAndPort})
 			}
 
 			driver, err := createDriverWithAddressResolver("bolt+routing://x.acme.com", username, password, encrypted, addresses...)
@@ -383,51 +384,12 @@ func createDriverWithTrustStrategy(uri, username, password string) (neo4j.Driver
 func createDriverWithAddressResolver(virtualURI, username, password string, encrypted bool, addresses ...neo4j.ServerAddress) (neo4j.Driver, error) {
 	// Address resolver is only valid for bolt+routing uri
 	return neo4j.NewDriver(virtualURI, neo4j.BasicAuth(username, password, ""), func(config *neo4j.Config) {
+		config.Encrypted = encrypted
 		config.AddressResolver = func(address neo4j.ServerAddress) []neo4j.ServerAddress {
 			return addresses
 		}
 	})
 }
-
-/*
-func addPerson(name string) error {
-	var (
-		err      error
-		driver   neo4j.Driver
-		session  neo4j.Session
-		result   neo4j.Result
-		username = "neo4j"
-		password = "some password"
-	)
-
-	driver, err = createDriverWithAddressResolver("bolt+routing://x.acme.com", username, password,
-		neo4j.NewServerAddress("a.acme.com", "7676"),
-		neo4j.NewServerAddress("b.acme.com", "8787"),
-		neo4j.NewServerAddress("c.acme.com", "9898"))
-	if err != nil {
-		return err
-	}
-	defer driver.Close()
-
-	session, err = driver.Session(neo4j.AccessModeWrite)
-	if err != nil {
-		return err
-	}
-	defer session.Close()
-
-	result, err = session.Run("CREATE (n:Person { name: $name})", map[string]interface{}{"name": name})
-	if err != nil {
-		return err
-	}
-
-	_, err = result.Consume()
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-*/
 
 // end::config-custom-resolver[]
 
