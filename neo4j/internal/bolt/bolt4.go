@@ -41,10 +41,11 @@ const (
 )
 
 type internalTx4 struct {
-	mode      db.AccessMode
-	bookmarks []string
-	timeout   time.Duration
-	txMeta    map[string]interface{}
+	mode         db.AccessMode
+	bookmarks    []string
+	timeout      time.Duration
+	txMeta       map[string]interface{}
+	databaseName string
 }
 
 func (i *internalTx4) toMeta() map[string]interface{} {
@@ -61,6 +62,9 @@ func (i *internalTx4) toMeta() map[string]interface{} {
 	}
 	if len(i.txMeta) > 0 {
 		meta["tx_metadata"] = i.txMeta
+	}
+	if i.databaseName != db.DefaultDatabase {
+		meta["db"] = i.databaseName
 	}
 	return meta
 }
@@ -84,6 +88,7 @@ type bolt4 struct {
 	bookmark      string       // Last bookmark
 	birthDate     time.Time
 	log           log.Logger
+	databaseName  string
 }
 
 func NewBolt4(serverName string, conn net.Conn, log log.Logger) *bolt4 {
@@ -244,10 +249,11 @@ func (b *bolt4) TxBegin(
 	}
 
 	tx := &internalTx4{
-		mode:      mode,
-		bookmarks: bookmarks,
-		timeout:   timeout,
-		txMeta:    txMeta,
+		mode:         mode,
+		bookmarks:    bookmarks,
+		timeout:      timeout,
+		txMeta:       txMeta,
+		databaseName: b.databaseName,
 	}
 
 	// If there are bookmarks, begin the transaction immediately for backwards compatible
@@ -465,10 +471,11 @@ func (b *bolt4) Run(
 	}
 
 	tx := internalTx4{
-		mode:      mode,
-		bookmarks: bookmarks,
-		timeout:   timeout,
-		txMeta:    txMeta,
+		mode:         mode,
+		bookmarks:    bookmarks,
+		timeout:      timeout,
+		txMeta:       txMeta,
+		databaseName: b.databaseName,
 	}
 	return b.run(cypher, params, &tx)
 }
@@ -564,6 +571,7 @@ func (b *bolt4) Reset() {
 		b.streamKeys = []string{}
 		b.bookmark = ""
 		b.pendingTx = nil
+		b.databaseName = db.DefaultDatabase
 	}()
 
 	if b.state == bolt4_ready || b.state == bolt4_dead {
@@ -619,4 +627,8 @@ func (b *bolt4) Close() {
 	}
 	b.conn.Close()
 	b.state = bolt4_dead
+}
+
+func (b *bolt4) SelectDatabase(database string) {
+	b.databaseName = database
 }

@@ -151,7 +151,7 @@ type Stream struct {
 	Keys   []string
 }
 
-// Abstract database connection.
+// Abstract database server connection.
 type Connection interface {
 	TxBegin(mode AccessMode, bookmarks []string, timeout time.Duration, meta map[string]interface{}) (Handle, error)
 	TxRollback(tx Handle) error
@@ -192,4 +192,15 @@ type RoutingTable struct {
 
 type ClusterDiscovery interface {
 	GetRoutingTable(context map[string]string) (*RoutingTable, error)
+}
+
+// Marker for using the default database instance.
+const DefaultDatabase = ""
+
+// If database server connection supports selecting which database instance on the server
+// to connect to. Prior to Neo4j 4 there was only one database per server.
+type DatabaseSelector interface {
+	// Should be called immediately after Reset. Not allowed to call multiple times with different
+	// databases without a reset inbetween.
+	SelectDatabase(database string)
 }

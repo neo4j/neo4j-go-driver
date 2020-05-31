@@ -644,4 +644,57 @@ func TestConnectionConformance(ot *testing.T) {
 			assertNoNewBookmark(t)
 		})
 	})
+
+	// Enterprise feature
+	ot.Run("Multidatabase", func(tt *testing.T) {
+		selector, supportsMultidatabase := boltConn.(db.DatabaseSelector)
+		if !supportsMultidatabase {
+			tt.Skipf("Database %s:%s does not support multidatabase functionality", boltConn.ServerName(), boltConn.ServerVersion())
+		}
+
+		// DROP DATABASE test1 IF EXISTS
+
+		// Should always reset before selecting a database
+		boltConn.Reset()
+		// Connect to system database and create a test databases
+		selector.SelectDatabase("system")
+		boltConn.Run("DROP DATABASE test1 IF EXISTS", nil, db.WriteMode, nil, 0, nil)
+		_, err := boltConn.Run("CREATE DATABASE test1", nil, db.WriteMode, nil, 0, nil)
+		if err != nil {
+			dbErr, _ := err.(*db.DatabaseError)
+			if dbErr == nil || dbErr.Code != "Neo.ClientError.Database.ExistingDatabaseFound" {
+				tt.Fatal(err)
+			}
+		}
+		boltConn.Reset()
+		// Use test database to create a random node
+		selector.SelectDatabase("test1")
+		r := randInt()
+		_, err = boltConn.Run("CREATE (n:MdbRand {x: $x}) RETURN n", map[string]interface{}{"x": r}, db.WriteMode, nil, 0, nil)
+		if err != nil {
+			tt.Fatal(err)
+		}
+		boltConn.Reset()
+		// Connect to standard database and make sure we can't see the node
+		s, err := boltConn.Run("MATCH (n:MdbRand {x: $x}) RETURN n", map[string]interface{}{"x": r}, db.ReadMode, nil, 0, nil)
+		if err != nil {
+			tt.Fatal(err)
+		}
+		rec, sum, err := boltConn.Next(s.Handle)
+		if rec != nil || err != nil || sum == nil {
+			tt.Fatalf("Should only be a summary, %+v, %+v, %+v", rec, sum, err)
+		}
+		boltConn.Reset()
+		// Connect to test database and make sure we can see the node
+		selector.SelectDatabase("test1")
+		s, err = boltConn.Run("MATCH (n:MdbRand {x: $x}) RETURN n", map[string]interface{}{"x": r}, db.ReadMode, nil, 0, nil)
+		if err != nil {
+			tt.Fatal(err)
+		}
+		rec, sum, err = boltConn.Next(s.Handle)
+		if rec == nil || err != nil || sum != nil {
+			tt.Fatalf("Should only be a record, %+v, %+v, %+v", rec, sum, err)
+		}
+		boltConn.Reset()
+	})
 }
