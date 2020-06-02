@@ -468,5 +468,9 @@ func (s *session) Close() error {
 	s.consumeCurrent()
 	s.returnConn()
 	s.log.Debugf(s.logId, "Closed")
+	// Schedule cleanups
+	go func() {
+		s.pool.CleanUp()
+	}()
 	return nil
 }
