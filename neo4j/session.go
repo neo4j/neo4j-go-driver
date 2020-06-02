@@ -325,7 +325,7 @@ func (s *session) runRetriable(
 			switch {
 			case e.IsRetriableCluster():
 				// Force routing tables to be updated before trying again
-				s.router.Invalidate()
+				s.router.Invalidate(s.databaseName)
 				maxClusterErrors--
 				if maxClusterErrors < 0 {
 					s.log.Errorf(s.logId, "Retriable transaction failed due to encountering too many cluster errors")
@@ -362,9 +362,9 @@ func (s *session) borrowConn(mode db.AccessMode) error {
 	var servers []string
 	var err error
 	if mode == db.ReadMode {
-		servers, err = s.router.Readers()
+		servers, err = s.router.Readers(s.databaseName)
 	} else {
-		servers, err = s.router.Writers()
+		servers, err = s.router.Writers(s.databaseName)
 	}
 	if err != nil {
 		return err

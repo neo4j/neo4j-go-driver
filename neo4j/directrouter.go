@@ -24,13 +24,13 @@ type directRouter struct {
 	server string
 }
 
-func (r *directRouter) Readers() ([]string, error) {
+func (r *directRouter) Readers(database string) ([]string, error) {
 	return []string{r.server}, nil
 }
 
-func (r *directRouter) Writers() ([]string, error) {
+func (r *directRouter) Writers(database string) ([]string, error) {
 	return []string{r.server}, nil
 }
 
-func (r *directRouter) Invalidate() {
+func (r *directRouter) Invalidate(database string) {
 }

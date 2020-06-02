@@ -174,9 +174,9 @@ func routingContextFromUrl(u *url.URL) (map[string]string, error) {
 }
 
 type sessionRouter interface {
-	Readers() ([]string, error)
-	Writers() ([]string, error)
-	Invalidate()
+	Readers(database string) ([]string, error)
+	Writers(database string) ([]string, error)
+	Invalidate(database string)
 }
 
 type driver struct {
