@@ -19,7 +19,10 @@
 
 package pool
 
-import "time"
+import (
+	"testing"
+	"time"
+)
 
 type fakeConn struct {
 	serverName string
@@ -44,4 +47,44 @@ func (c *fakeConn) Reset() {
 
 func (c *fakeConn) Birthdate() time.Time {
 	return c.birthdate
+}
+
+func assertConnection(t *testing.T, c Connection, err error) {
+	if err != nil {
+		t.Fatal(err)
+	}
+	if c == nil {
+		t.Fatal("No connection")
+	}
+}
+
+func assertNoConnection(t *testing.T, c Connection, err error) {
+	t.Helper()
+	if c != nil {
+		t.Fatal("Should not have connection")
+	}
+	if err == nil {
+		t.Fatal("Should have error")
+	}
+}
+
+func assertNumberOfServers(t *testing.T, p *Pool, expectedNum int) {
+	t.Helper()
+	actualNum := len(p.getServers())
+	if actualNum != expectedNum {
+		t.Fatalf("Expected number of servers to be %d but was %d", expectedNum, actualNum)
+	}
+}
+
+func assertNumberOfIdle(t *testing.T, p *Pool, serverName string, expectedNum int) {
+	t.Helper()
+	servers := p.getServers()
+	server := servers[serverName]
+	if server == nil {
+		t.Fatalf("Server %s not found", serverName)
+	}
+	actualNum := server.numIdle()
+	if actualNum != expectedNum {
+		t.Fatalf("Expected number of idle conns on %s to be %d but was %d", serverName, expectedNum, actualNum)
+	}
 }

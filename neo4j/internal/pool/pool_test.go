@@ -46,33 +46,13 @@ func TestPoolBorrowReturn(ot *testing.T) {
 		return nil, failingError
 	}
 
-	assertBorrowed := func(t *testing.T, c Connection, err error) {
-		t.Helper()
-		if c == nil {
-			t.Fatal("Should have connection")
-		}
-		if err != nil {
-			t.Fatal(err)
-		}
-	}
-
-	assertNotBorrowed := func(t *testing.T, c Connection, err error) {
-		t.Helper()
-		if c != nil {
-			t.Fatal("Should not have connection")
-		}
-		if err == nil {
-			t.Fatal("Should have error")
-		}
-	}
-
 	ot.Run("Single thread borrow+return", func(t *testing.T) {
 		p := New(1, maxAge, succeedingConnect, logger)
 		p.now = func() time.Time { return birthdate }
 		defer p.Close()
 		serverNames := []string{"srv1"}
 		conn, err := p.Borrow(context.Background(), serverNames, true)
-		assertBorrowed(t, conn, err)
+		assertConnection(t, conn, err)
 		p.Return(conn)
 
 		// Make sure that connection actually returned
@@ -93,7 +73,7 @@ func TestPoolBorrowReturn(ot *testing.T) {
 		// First thread borrows
 		ctx1 := context.Background()
 		c1, err1 := p.Borrow(ctx1, serverNames, true)
-		assertBorrowed(t, c1, err1)
+		assertConnection(t, c1, err1)
 
 		// Second thread tries to borrow the only allowed connection on the same server
 		go func() {
@@ -101,7 +81,7 @@ func TestPoolBorrowReturn(ot *testing.T) {
 			// Will block here until first thread detects me in the queue and returns the
 			// connection which will unblock here.
 			c2, err2 := p.Borrow(ctx2, serverNames, true)
-			assertBorrowed(t, c2, err2)
+			assertConnection(t, c2, err2)
 			wg.Done()
 		}()
 
@@ -126,12 +106,12 @@ func TestPoolBorrowReturn(ot *testing.T) {
 		// First thread borrows
 		ctx1 := context.Background()
 		c1, err1 := p.Borrow(ctx1, serverNames, true)
-		assertBorrowed(t, c1, err1)
+		assertConnection(t, c1, err1)
 
 		// Actually don't need a thread here since we shouldn't block
 		ctx2 := context.Background()
 		c2, err2 := p.Borrow(ctx2, serverNames, false)
-		assertNotBorrowed(t, c2, err2)
+		assertNoConnection(t, c2, err2)
 		// Error should be pool full
 		_ = err2.(*PoolFull)
 	})
@@ -148,7 +128,7 @@ func TestPoolBorrowReturn(ot *testing.T) {
 		worker := func() {
 			for i := 0; i < 5; i++ {
 				c, err := p.Borrow(context.Background(), serverNames, true)
-				assertBorrowed(t, c, err)
+				assertConnection(t, c, err)
 				time.Sleep(time.Duration((rand.Int() % 7)) * time.Millisecond)
 				p.Return(c)
 			}
@@ -174,7 +154,7 @@ func TestPoolBorrowReturn(ot *testing.T) {
 		p.now = func() time.Time { return birthdate }
 		serverNames := []string{"srv1"}
 		c, err := p.Borrow(context.Background(), serverNames, true)
-		assertNotBorrowed(t, c, err)
+		assertNoConnection(t, c, err)
 		// Should get the connect error back
 		if err != failingError {
 			t.Errorf("Should get connect error back but got: %s", err)
@@ -220,27 +200,6 @@ func TestPoolResourceUsage(ot *testing.T) {
 		return &fakeConn{serverName: s, isAlive: true, birthdate: birthdate}, nil
 	}
 
-	assertNumberOfServers := func(t *testing.T, p *Pool, expectedNum int) {
-		t.Helper()
-		actualNum := len(p.getServers())
-		if actualNum != expectedNum {
-			t.Fatalf("Expected number of servers to be %d but was %d", expectedNum, actualNum)
-		}
-	}
-
-	assertNumberOfIdle := func(t *testing.T, p *Pool, serverName string, expectedNum int) {
-		t.Helper()
-		servers := p.getServers()
-		server := servers[serverName]
-		if server == nil {
-			t.Fatalf("Server %s not found", serverName)
-		}
-		actualNum := server.numIdle()
-		if actualNum != expectedNum {
-			t.Fatalf("Expected number of idle conns on %s to be %d but was %d", serverName, expectedNum, actualNum)
-		}
-	}
-
 	ot.Run("Use order of named servers as priority when creating new servers", func(t *testing.T) {
 		p := New(1, maxAge, succeedingConnect, logger)
 		p.now = func() time.Time { return birthdate }
@@ -278,27 +237,6 @@ func TestPoolResourceUsage(ot *testing.T) {
 			t.Errorf("Should have either removed the server or kept it but emptied it")
 		}
 	})
-
-	/*
-		ot.Run("Returning last dead connection to server should remove server", func(t *testing.T) {
-			p := New(2, maxAge, succeedingConnect)
-			p.now = func() time.Time { return birthdate }
-			defer p.Close()
-			serverNames := []string{"srvA"}
-			c1, _ := p.Borrow(context.Background(), serverNames, true)
-			c2, _ := p.Borrow(context.Background(), serverNames, true)
-			c1.(*fakeConn).isAlive = false
-			p.Return(c1)
-			servers := p.getServers()
-			if len(servers) != 1 {
-				t.Errorf("Should still be a server")
-			}
-			c2.(*fakeConn).isAlive = false
-			p.Return(c2)
-			//assertNumberOfServers(t, p, 0)
-			assertNumberOfIdle(t, p, "srvA", 0)
-		})
-	*/
 
 	ot.Run("Returning dead connection to server should remove older idle connections", func(t *testing.T) {
 		p := New(3, 0, succeedingConnect, logger)
@@ -347,11 +285,85 @@ func TestPoolResourceUsage(ot *testing.T) {
 		p := New(1, maxAge, succeedingConnect, logger)
 		p.now = func() time.Time { return birthdate }
 		defer p.Close()
-		c1, _ := p.Borrow(context.Background(), []string{"A"}, true)
-		c2, _ := p.Borrow(context.Background(), []string{"B"}, true)
-		if c1 == nil || c2 == nil {
-			t.Error("Didn't get connections")
-		}
+		c1, err := p.Borrow(context.Background(), []string{"A"}, true)
+		assertConnection(t, c1, err)
+		c2, err := p.Borrow(context.Background(), []string{"B"}, true)
+		assertConnection(t, c2, err)
 		assertNumberOfServers(t, p, 2)
+	})
+}
+
+func TestPoolCleanup(ot *testing.T) {
+	birthdate := time.Now()
+	maxLife := 1 * time.Second
+	succeedingConnect := func(s string) (Connection, error) {
+		return &fakeConn{serverName: s, isAlive: true, birthdate: birthdate}, nil
+	}
+
+	// Borrows a connection in server A and another in server B
+	borrowConnections := func(t *testing.T, p *Pool) (Connection, Connection) {
+		c1, err := p.Borrow(context.Background(), []string{"A"}, true)
+		assertConnection(t, c1, err)
+		c2, err := p.Borrow(context.Background(), []string{"B"}, true)
+		assertConnection(t, c2, err)
+		return c1, c2
+	}
+
+	ot.Run("Should remove servers with only idle too old connections", func(t *testing.T) {
+		p := New(0, maxLife, succeedingConnect, logger)
+		defer p.Close()
+		p.now = func() time.Time { return birthdate }
+		c1, c2 := borrowConnections(t, p)
+		p.Return(c1)
+		p.Return(c2)
+		assertNumberOfServers(t, p, 2)
+		assertNumberOfIdle(t, p, "A", 1)
+		assertNumberOfIdle(t, p, "B", 1)
+
+		// Now go into the future and cleanup, should remove both servers and close the connections
+		p.now = func() time.Time { return birthdate.Add(maxLife).Add(1 * time.Second) }
+		p.CleanUp()
+		assertNumberOfServers(t, p, 0)
+	})
+
+	ot.Run("Should not remove servers with busy connections", func(t *testing.T) {
+		p := New(0, maxLife, succeedingConnect, logger)
+		defer p.Close()
+		p.now = func() time.Time { return birthdate }
+		_, c2 := borrowConnections(t, p)
+		p.Return(c2)
+		assertNumberOfServers(t, p, 2)
+		assertNumberOfIdle(t, p, "A", 0)
+		assertNumberOfIdle(t, p, "B", 1)
+
+		// Now go into the future and cleanup, should only remove B
+		p.now = func() time.Time { return birthdate.Add(maxLife).Add(1 * time.Second) }
+		p.CleanUp()
+		assertNumberOfServers(t, p, 1)
+	})
+
+	ot.Run("Should not remove servers with only idle connections but with recent connect failures ", func(t *testing.T) {
+		failingConnect := func(s string) (Connection, error) {
+			return nil, errors.New("an error")
+		}
+		p := New(0, maxLife, failingConnect, logger)
+		defer p.Close()
+		c1, err := p.Borrow(context.Background(), []string{"A"}, true)
+		assertNoConnection(t, c1, err)
+		assertNumberOfServers(t, p, 1)
+		assertNumberOfIdle(t, p, "A", 0)
+
+		// Now go into the future and cleanup, should not remove A even if has no connections since
+		// we should remember the failure a bit longer
+		p.now = func() time.Time { return birthdate.Add(maxLife).Add(1 * time.Second) }
+		p.CleanUp()
+		assertNumberOfServers(t, p, 1)
+
+		// Further into the future, the failure should have been forgotten
+		p.now = func() time.Time {
+			return birthdate.Add(maxLife).Add(rememberFailedConnectDuration).Add(1 * time.Second)
+		}
+		p.CleanUp()
+		assertNumberOfServers(t, p, 0)
 	})
 }

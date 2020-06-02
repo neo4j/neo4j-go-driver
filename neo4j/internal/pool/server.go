@@ -37,6 +37,8 @@ type server struct {
 
 var sharedRoundRobin uint32
 
+const rememberFailedConnectDuration = 3 * time.Minute
+
 // Returns a idle connection if any
 func (s *server) getIdle() Connection {
 	// Remove from idle list and add to busy list
@@ -64,7 +66,7 @@ func (s *server) hasFailedConnect(now time.Time) bool {
 	if s.failedConnectAt.IsZero() {
 		return false
 	}
-	return now.Sub(s.failedConnectAt) < 3*time.Minute
+	return now.Sub(s.failedConnectAt) < rememberFailedConnectDuration
 }
 
 const newConnectionPenalty = uint32(1 << 8)

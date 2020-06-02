@@ -107,7 +107,7 @@ func (p *Pool) Close() {
 	p.log.Infof(p.logId, "Closed")
 }
 
-func (p *Pool) anyExistingConnectionsOnServer(serverNames []string) bool {
+func (p *Pool) anyExistingConnectionsOnServers(serverNames []string) bool {
 	p.serversMut.Lock()
 	defer p.serversMut.Unlock()
 	for _, s := range serverNames {
@@ -143,7 +143,7 @@ func (p *Pool) getServers() map[string]*server {
 // gets removed from the map at some point in time (as long as someone
 // borrows new connections). If there is a noticed failed connect still active
 // we should wait a while with removal to get prioritization right.
-func (p *Pool) cleanupServers() {
+func (p *Pool) CleanUp() {
 	p.serversMut.Lock()
 	defer p.serversMut.Unlock()
 	now := p.now()
@@ -202,6 +202,8 @@ func (p *Pool) getPenaltiesForServers(serverNames []string) []serverPenalty {
 		s := p.servers[n]
 		penalties[i].name = n
 		if s != nil {
+			// Make sure that we don't get a too old connection
+			s.removeIdleOlderThan(now, p.maxAge)
 			penalties[i].penalty = s.calculatePenalty(now)
 		} else {
 			penalties[i].penalty = newConnectionPenalty
@@ -245,9 +247,6 @@ func (p *Pool) Borrow(ctx context.Context, serverNames []string, wait bool) (Con
 	}
 	p.log.Debugf(p.logId, "Trying to borrow connection from %s", serverNames)
 
-	// Cleans up and prepares for borrowing
-	p.cleanupServers()
-
 	// Retrieve penalty for each server
 	penalties := p.getPenaltiesForServers(serverNames)
 	// Sort server penalties by lowest penalty
@@ -275,7 +274,7 @@ func (p *Pool) Borrow(ctx context.Context, serverNames []string, wait bool) (Con
 
 	// If there are no connections for any of the servers, there is no point in waiting for anything
 	// to be returned.
-	if !p.anyExistingConnectionsOnServer(serverNames) {
+	if !p.anyExistingConnectionsOnServers(serverNames) {
 		if err == nil {
 			err = &PoolTimeout{err: errors.New("No connection to wait for"), servers: serverNames}
 		}
@@ -352,14 +351,14 @@ func (p *Pool) removeIdleOlderThanOnServer(serverName string, now time.Time, max
 }
 
 func (p *Pool) Return(c Connection) {
-	// Get the name of the server that the connection belongs to.
-	serverName := c.ServerName()
-	isAlive := c.IsAlive()
-
 	if p.closed {
 		p.log.Warnf(p.logId, "Trying to return connection to closed pool")
 		return
 	}
+
+	// Get the name of the server that the connection belongs to.
+	serverName := c.ServerName()
+	isAlive := c.IsAlive()
 	p.log.Debugf(p.logId, "Returning connection to %s {alive:%t}", serverName, isAlive)
 
 	// If the connection is dead, remove all other idle connections on the same server that older
