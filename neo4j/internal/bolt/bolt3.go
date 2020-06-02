@@ -604,11 +604,43 @@ func (b *bolt3) Reset() {
 	}
 }
 
-func (b *bolt3) GetRoutingTable(context map[string]string) (*db.RoutingTable, error) {
+func (b *bolt3) GetRoutingTable(database string, context map[string]string) (*db.RoutingTable, error) {
 	if err := assertState(b.logError, b.state, bolt3_ready); err != nil {
 		return nil, err
 	}
-	return getRoutingTable(b, context)
+
+	if database != db.DefaultDatabase {
+		return nil, errors.New("Bolt 3 does not support routing to a specifiec database name")
+	}
+
+	// Only available when Neo4j is setup with clustering
+	const query = "CALL dbms.cluster.routing.getRoutingTable($context)"
+	stream, err := b.Run(query, map[string]interface{}{"context": context}, db.ReadMode, nil, 0, nil)
+	if err != nil {
+		// Give a better error
+		dbError, isDbError := err.(*db.DatabaseError)
+		if isDbError && dbError.Code == "Neo.ClientError.Procedure.ProcedureNotFound" {
+			return nil, &db.RoutingNotSupportedError{Server: b.serverName}
+		}
+		return nil, err
+	}
+
+	rec, _, err := b.Next(stream.Handle)
+	if err != nil {
+		return nil, err
+	}
+	if rec == nil {
+		return nil, errors.New("No routing table record")
+	}
+	// Just empty the stream, ignore the summary should leave the connecion in ready state
+	b.Next(stream.Handle)
+
+	table := parseRoutingTableRecord(rec)
+	if table == nil {
+		return nil, errors.New("Unable to parse routing table")
+	}
+
+	return table, nil
 }
 
 // Beware, could be called on another thread when driver is closed.

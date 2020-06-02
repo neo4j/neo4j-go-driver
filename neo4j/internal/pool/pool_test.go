@@ -265,15 +265,22 @@ func TestPoolResourceUsage(ot *testing.T) {
 
 	ot.Run("Do not borrow too old connections", func(t *testing.T) {
 		p := New(1, maxAge, succeedingConnect, logger)
+		nowMut := sync.Mutex{}
 		now := birthdate
-		p.now = func() time.Time { return now }
+		p.now = func() time.Time {
+			nowMut.Lock()
+			defer nowMut.Unlock()
+			return now
+		}
 		defer p.Close()
 		serverNames := []string{"srvA"}
 		c1, _ := p.Borrow(context.Background(), serverNames, true)
 		c1.(*fakeConn).id = 123
 		// It's alive when returning it
 		p.Return(c1)
+		nowMut.Lock()
 		now = now.Add(2 * maxAge)
+		nowMut.Unlock()
 		// Shouldn't get the same one back!
 		c2, _ := p.Borrow(context.Background(), serverNames, true)
 		if c2.(*fakeConn).id == 123 {

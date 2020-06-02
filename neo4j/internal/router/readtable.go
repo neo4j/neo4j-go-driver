@@ -55,7 +55,7 @@ func readTable(ctx context.Context, pool Pool, routers []string, routerContext m
 		}
 
 		var table *db.RoutingTable
-		table, err = discovery.GetRoutingTable(routerContext)
+		table, err = discovery.GetRoutingTable(db.DefaultDatabase, routerContext)
 		if err == nil {
 			return table, nil
 		}
