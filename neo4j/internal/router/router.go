@@ -34,13 +34,17 @@ import (
 
 const missingWriterRetries = 100
 
+type databaseRouter struct {
+	dueUnix int64
+	table   *db.RoutingTable
+}
+
 // Thread safe
 type Router struct {
 	routerContext map[string]string
 	pool          Pool
-	table         *db.RoutingTable
-	dueUnix       int64
-	tableMut      sync.Mutex
+	dbRouters     map[string]*databaseRouter
+	dbRoutersMut  sync.Mutex
 	now           func() time.Time
 	sleep         func(time.Duration)
 	rootRouter    string
@@ -63,6 +67,7 @@ func New(rootRouter string, getRouters func() []string, routerContext map[string
 		getRouters:    getRouters,
 		routerContext: routerContext,
 		pool:          pool,
+		dbRouters:     make(map[string]*databaseRouter),
 		now:           time.Now,
 		sleep:         time.Sleep,
 		log:           logger,
@@ -72,54 +77,57 @@ func New(rootRouter string, getRouters func() []string, routerContext map[string
 	return r
 }
 
-func (r *Router) getTable() (*db.RoutingTable, error) {
-	r.tableMut.Lock()
-	defer r.tableMut.Unlock()
-
+func (r *Router) getTable(database string) (*db.RoutingTable, error) {
 	now := r.now()
 
-	if r.table != nil && now.Unix() < r.dueUnix {
-		return r.table, nil
+	r.dbRoutersMut.Lock()
+	defer r.dbRoutersMut.Unlock()
+
+	dbRouter := r.dbRouters[database]
+	if dbRouter != nil && now.Unix() < dbRouter.dueUnix {
+		return dbRouter.table, nil
 	}
 
 	var routers []string
-	if r.table != nil {
-		routers = r.table.Routers
+	if dbRouter != nil {
+		routers = dbRouter.table.Routers
 	}
 	if len(routers) == 0 {
 		routers = []string{r.rootRouter}
 	}
 
-	r.log.Infof(r.logId, "Reading routing table from any of %v", routers)
-	table, err := readTable(context.Background(), r.pool, routers, r.routerContext)
+	r.log.Infof(r.logId, "Reading routing table for '%s' from any of %v", database, routers)
+	table, err := readTable(context.Background(), r.pool, database, routers, r.routerContext)
 	if err != nil {
 		// Use hook to retrieve possibly different set of routers and retry
 		if r.getRouters != nil {
 			routers = r.getRouters()
-			table, err = readTable(context.Background(), r.pool, routers, r.routerContext)
+			table, err = readTable(context.Background(), r.pool, database, routers, r.routerContext)
 		}
 		if err != nil {
 			r.log.Error(r.logId, err)
 			return nil, err
 		}
 	}
-	r.table = table
-	r.dueUnix = now.Add(time.Duration(table.TimeToLive) * time.Second).Unix()
-	r.log.Debugf(r.logId, "New routing table, TTL %d", table.TimeToLive)
+	r.dbRouters[database] = &databaseRouter{
+		table:   table,
+		dueUnix: now.Add(time.Duration(table.TimeToLive) * time.Second).Unix(),
+	}
+	r.log.Debugf(r.logId, "New routing table for '%s', TTL %d", database, table.TimeToLive)
 
 	return table, nil
 }
 
-func (r *Router) Readers() ([]string, error) {
-	table, err := r.getTable()
+func (r *Router) Readers(database string) ([]string, error) {
+	table, err := r.getTable(database)
 	if err != nil {
 		return nil, err
 	}
 	return table.Readers, nil
 }
 
-func (r *Router) Writers() ([]string, error) {
-	table, err := r.getTable()
+func (r *Router) Writers(database string) ([]string, error) {
+	table, err := r.getTable(database)
 	if err != nil {
 		return nil, err
 	}
@@ -133,11 +141,8 @@ func (r *Router) Writers() ([]string, error) {
 		}
 		r.log.Debugf(r.logId, "Invalidating routing table, no writers")
 		r.sleep(100 * time.Millisecond)
-		r.tableMut.Lock()
-		// Reset due time to keep list of routers
-		r.dueUnix = 0
-		r.tableMut.Unlock()
-		table, err = r.getTable()
+		r.Invalidate(database)
+		table, err = r.getTable(database)
 		if err != nil {
 			return nil, err
 		}
@@ -153,11 +158,14 @@ func (r *Router) Context() map[string]string {
 	return r.routerContext
 }
 
-func (r *Router) Invalidate() {
-	r.tableMut.Lock()
-	defer r.tableMut.Unlock()
+func (r *Router) Invalidate(database string) {
+	r.log.Infof(r.logId, "Invalidating routing table for '%s'", database)
+	r.dbRoutersMut.Lock()
+	defer r.dbRoutersMut.Unlock()
 	// Reset due time to the 70s, this will make next access refresh the routing table using
 	// last set of routers instead of the original one.
-	r.dueUnix = 0
-	r.log.Infof(r.logId, "Invalidating routing table")
+	dbRouter := r.dbRouters[database]
+	if dbRouter != nil {
+		dbRouter.dueUnix = 0
+	}
 }

@@ -146,7 +146,7 @@ func TestReadTableTable(ot *testing.T) {
 		ot.Run(c.name, func(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			c.pool.cancel = cancel
-			table, err := readTable(ctx, c.pool, c.routers, nil)
+			table, err := readTable(ctx, c.pool, "dbname", c.routers, nil)
 			c.assert(t, table, err)
 			if c.numReturns != len(c.pool.returned) {
 				t.Errorf("Expected %d returned connections but %d was returned", c.numReturns, len(c.pool.returned))

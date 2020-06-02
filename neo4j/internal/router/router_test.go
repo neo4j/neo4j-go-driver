@@ -37,8 +37,6 @@ var logger = &log.ConsoleLogger{Errors: true, Infos: true, Warns: true}
 // Verifies that concurrent access works as expected relying on the race detector to
 // report supicious behavior.
 func TestMultithreading(t *testing.T) {
-	wg := sync.WaitGroup{}
-	wg.Add(2)
 
 	// Setup a router that needs to read the routing table essentially on every access to
 	// stress threading a bit more.
@@ -52,28 +50,34 @@ func TestMultithreading(t *testing.T) {
 	}
 	n := time.Now()
 	router := New("router", func() []string { return []string{} }, nil, pool, logger)
+	mut := sync.Mutex{}
 	router.now = func() time.Time {
+		// Need to lock here to make race detector happy
+		mut.Lock()
+		defer mut.Unlock()
 		n = n.Add(time.Duration(table.TimeToLive) * time.Second * 2)
 		return n
 	}
 
+	dbName := "dbname"
+	wg := sync.WaitGroup{}
+	wg.Add(2)
 	consumer := func() {
 		for i := 0; i < 30; i++ {
-			readers, err := router.Readers()
+			readers, err := router.Readers(dbName)
 			if len(readers) != 2 {
 				t.Error("Wrong number of readers")
 			}
 			if err != nil {
 				t.Error(err)
 			}
-			writers, err := router.Writers()
+			writers, err := router.Writers(dbName)
 			if len(writers) != 1 {
 				t.Error("Wrong number of writers")
 			}
 			if err != nil {
 				t.Error(err)
 			}
-
 		}
 		wg.Done()
 	}
@@ -106,27 +110,28 @@ func TestRespectsTimeToLiveAndInvalidate(t *testing.T) {
 	router.now = func() time.Time {
 		return n
 	}
+	dbName := "dbname"
 
 	// First access should trigger initial table read
-	router.Readers()
+	router.Readers(dbName)
 	assertNum(t, numfetch, 1, "Should have fetched initial")
 
 	// Second access with time set to same should not trigger a read
-	router.Readers()
+	router.Readers(dbName)
 	assertNum(t, numfetch, 1, "Should not have have fetched")
 
 	// Third access with time passed table due should trigger fetch
 	n = n.Add(2 * time.Second)
-	router.Readers()
+	router.Readers(dbName)
 	assertNum(t, numfetch, 2, "Should have have fetched")
 
 	// Just another one to make sure we're cached
-	router.Readers()
+	router.Readers(dbName)
 	assertNum(t, numfetch, 2, "Should not have have fetched")
 
 	// Invalidate should force fetching
-	router.Invalidate()
-	router.Readers()
+	router.Invalidate(dbName)
+	router.Readers(dbName)
 	assertNum(t, numfetch, 3, "Should have have fetched")
 }
 
@@ -143,9 +148,10 @@ func TestUseGetRoutersHookWhenInitialRouterFails(t *testing.T) {
 	rootRouter := "rootRouter"
 	backupRouters := []string{"bup1", "bup2"}
 	router := New(rootRouter, func() []string { return backupRouters }, nil, pool, logger)
+	dbName := "dbname"
 
 	// Trigger read of routing table
-	router.Readers()
+	router.Readers(dbName)
 
 	expected := []string{rootRouter}
 	expected = append(expected, backupRouters...)
@@ -170,9 +176,10 @@ func TestWritersFailAfterNRetries(t *testing.T) {
 	router.sleep = func(time.Duration) {
 		numsleep++
 	}
+	dbName := "dbname"
 
 	// Should trigger a lot of retries to get a writer until it finally fails
-	writers, err := router.Writers()
+	writers, err := router.Writers(dbName)
 	if err == nil {
 		t.Error("Should have failed")
 	}
@@ -206,10 +213,11 @@ func TestWritersRetriesWhenNoWriters(t *testing.T) {
 	router.sleep = func(time.Duration) {
 		numsleep++
 	}
+	dbName := "dbname"
 
 	// Should trigger initial table read that contains no writers and a second table read
 	// that gets the writers
-	writers, err := router.Writers()
+	writers, err := router.Writers(dbName)
 	if err != nil {
 		t.Errorf("Got error: %s", err)
 	}
