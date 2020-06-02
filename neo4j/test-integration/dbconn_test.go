@@ -58,6 +58,7 @@ func TestConnectionConformance(ot *testing.T) {
 	logger := &log.ConsoleLogger{Errors: true, Infos: true, Warns: true}
 	boltConn, err := bolt.Connect(parsedUri.Host, tcpConn, authMap, logger)
 	assertNoError(ot, err)
+	defer boltConn.Close()
 
 	randInt := func() int64 {
 		bid, _ := rand.Int(rand.Reader, big.NewInt(math.MaxInt64))

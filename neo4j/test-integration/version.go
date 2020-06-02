@@ -15,18 +15,18 @@ var (
 func versionOfDriver(driver neo4j.Driver) utils.Version {
 	session, err := driver.Session(neo4j.AccessModeRead)
 	if err != nil {
-		return utils.VersionOf("0.0.0")
+		panic(err)
 	}
 	defer session.Close()
 
 	result, err := session.Run("RETURN 1", nil)
 	if err != nil {
-		return utils.VersionOf("0.0.0")
+		panic(err)
 	}
 
 	summary, err := result.Consume()
 	if err != nil {
-		return utils.VersionOf("0.0.0")
+		panic(err)
 	}
 
 	return utils.VersionOf(summary.Server().Version())

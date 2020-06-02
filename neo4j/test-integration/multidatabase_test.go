@@ -33,6 +33,7 @@ func TestMultidatabase(ot *testing.T) {
 
 	driver, err := server.Driver()
 	assertNoError(ot, err)
+	defer driver.Close()
 
 	// Need > 4.0 for database support
 	version := versionOfDriver(driver)
