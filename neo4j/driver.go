@@ -50,6 +50,9 @@ type Driver interface {
 	// The url this driver is bootstrapped
 	Target() url.URL
 	Session(accessMode AccessMode, bookmarks ...string) (Session, error)
+	// Creates a new session based on the specified session configuration.
+	// The session configuration contains access mode, bookmarks and database name.
+	NewSession(config SessionConfig) (Session, error)
 	// Close the driver and all underlying connections
 	Close() error
 }
@@ -198,7 +201,23 @@ func (d *driver) Session(accessMode AccessMode, bookmarks ...string) (Session, e
 	}
 	return newSession(
 		d.config, d.router,
-		d.pool, db.AccessMode(accessMode), bookmarks, d.log), nil
+		d.pool, db.AccessMode(accessMode), bookmarks, db.DefaultDatabase, d.log), nil
+}
+
+func (d *driver) NewSession(config SessionConfig) (Session, error) {
+	databaseName := db.DefaultDatabase
+	if config.DatabaseName != "" {
+		databaseName = config.DatabaseName
+	}
+
+	d.mut.Lock()
+	defer d.mut.Unlock()
+	if d.pool == nil {
+		return nil, newDriverError("Driver closed")
+	}
+	return newSession(
+		d.config, d.router,
+		d.pool, db.AccessMode(config.AccessMode), config.Bookmarks, databaseName, d.log), nil
 }
 
 func (d *driver) Close() error {

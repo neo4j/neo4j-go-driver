@@ -55,19 +55,26 @@ type Session interface {
 	Close() error
 }
 
+type SessionConfig struct {
+	AccessMode   AccessMode
+	Bookmarks    []string
+	DatabaseName string
+}
+
 type session struct {
-	config      *Config
-	defaultMode db.AccessMode
-	bookmarks   []string
-	pool        *pool.Pool
-	router      sessionRouter
-	conn        db.Connection
-	inTx        bool
-	res         *result
-	sleep       func(d time.Duration)
-	now         func() time.Time
-	logId       string
-	log         log.Logger
+	config       *Config
+	defaultMode  db.AccessMode
+	bookmarks    []string
+	databaseName string
+	pool         *pool.Pool
+	router       sessionRouter
+	conn         db.Connection
+	inTx         bool
+	res          *result
+	sleep        func(d time.Duration)
+	now          func() time.Time
+	logId        string
+	log          log.Logger
 }
 
 var sessionid uint32
@@ -97,22 +104,23 @@ func cleanupBookmarks(bookmarks []string) []string {
 }
 
 func newSession(config *Config, router sessionRouter, pool *pool.Pool,
-	mode db.AccessMode, bookmarks []string, logger log.Logger) *session {
+	mode db.AccessMode, bookmarks []string, databaseName string, logger log.Logger) *session {
 
 	id := atomic.AddUint32(&sessionid, 1)
 	logId := fmt.Sprintf("sess %d", id)
 	logger.Debugf(logId, "Created")
 
 	return &session{
-		config:      config,
-		router:      router,
-		pool:        pool,
-		defaultMode: mode,
-		bookmarks:   cleanupBookmarks(bookmarks),
-		sleep:       time.Sleep,
-		now:         time.Now,
-		log:         logger,
-		logId:       logId,
+		config:       config,
+		router:       router,
+		pool:         pool,
+		defaultMode:  mode,
+		bookmarks:    cleanupBookmarks(bookmarks),
+		databaseName: databaseName,
+		sleep:        time.Sleep,
+		now:          time.Now,
+		log:          logger,
+		logId:        logId,
 	}
 }
 
@@ -380,6 +388,15 @@ func (s *session) borrowConn(mode db.AccessMode) error {
 		return err
 	}
 	s.conn = conn.(db.Connection)
+
+	// Select database on server
+	if s.databaseName != db.DefaultDatabase {
+		dbSelector, ok := s.conn.(db.DatabaseSelector)
+		if !ok {
+			return errors.New("Database does not support multidatabase")
+		}
+		dbSelector.SelectDatabase(s.databaseName)
+	}
 	return nil
 }
 

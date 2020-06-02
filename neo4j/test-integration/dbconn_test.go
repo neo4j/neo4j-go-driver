@@ -40,20 +40,14 @@ import (
 // Tests the specification of the internal db connection API
 func TestConnectionConformance(ot *testing.T) {
 	server, err := control.EnsureSingleInstance()
-	if err != nil {
-		ot.Fatal(err)
-	}
+	assertNoError(ot, err)
 
 	uri := server.BoltURI()
 	parsedUri, err := url.Parse(uri)
-	if err != nil {
-		ot.Fatal(err)
-	}
+	assertNoError(ot, err)
 
 	tcpConn, err := net.Dial("tcp", parsedUri.Host)
-	if err != nil {
-		ot.Fatal(err)
-	}
+	assertNoError(ot, err)
 
 	authMap := map[string]interface{}{
 		"scheme":      "basic",
@@ -63,9 +57,8 @@ func TestConnectionConformance(ot *testing.T) {
 
 	logger := &log.ConsoleLogger{Errors: true, Infos: true, Warns: true}
 	boltConn, err := bolt.Connect(parsedUri.Host, tcpConn, authMap, logger)
-	if err != nil {
-		ot.Fatal(err)
-	}
+	assertNoError(ot, err)
+	defer boltConn.Close()
 
 	randInt := func() int64 {
 		bid, _ := rand.Int(rand.Reader, big.NewInt(math.MaxInt64))
@@ -83,17 +76,11 @@ func TestConnectionConformance(ot *testing.T) {
 			name: "Run autocommit, full consume",
 			fun: func(t *testing.T, c db.Connection) {
 				s, err := c.Run("CREATE (n:Rand {val: $r}) RETURN n", map[string]interface{}{"r": randInt()}, db.WriteMode, nil, 0, nil)
-				if err != nil {
-					t.Fatal(err)
-				}
+				assertNoError(t, err)
 				rec, sum, err := c.Next(s.Handle)
-				if rec == nil || err != nil || sum != nil {
-					t.Fatalf("Should only be a record, %+v, %+v, %+v", rec, sum, err)
-				}
+				assertDbRecord(t, rec, sum, err)
 				rec, sum, err = c.Next(s.Handle)
-				if rec != nil || err != nil || sum == nil {
-					t.Fatalf("Should only be a summary, %+v, %+v, %+v", rec, sum, err)
-				}
+				assertDbSummary(t, rec, sum, err)
 			},
 		},
 		{
@@ -102,13 +89,9 @@ func TestConnectionConformance(ot *testing.T) {
 			name: "Run autocommit twice, no consume",
 			fun: func(t *testing.T, c db.Connection) {
 				_, err := c.Run("CREATE (n:Rand {val: $r})", map[string]interface{}{"r": randInt()}, db.WriteMode, nil, 0, nil)
-				if err != nil {
-					t.Fatal(err)
-				}
+				assertNoError(t, err)
 				_, err = c.Run("CREATE (n:Rand {val: $r})", map[string]interface{}{"r": randInt()}, db.WriteMode, nil, 0, nil)
-				if err != nil {
-					t.Fatal(err)
-				}
+				assertNoError(t, err)
 			},
 		},
 		{
@@ -116,35 +99,21 @@ func TestConnectionConformance(ot *testing.T) {
 			name: "Run explicit commit, full consume",
 			fun: func(t *testing.T, c db.Connection) {
 				txHandle, err := c.TxBegin(db.WriteMode, []string{}, 10*time.Minute, nil)
-				if err != nil {
-					t.Fatal(err)
-				}
+				assertNoError(t, err)
 				r := randInt()
 				s, err := c.RunTx(txHandle, "CREATE (n:Rand {val: $r}) RETURN n", map[string]interface{}{"r": r})
-				if err != nil {
-					t.Fatal(err)
-				}
+				assertNoError(t, err)
 				rec, sum, err := c.Next(s.Handle)
-				if rec == nil || err != nil || sum != nil {
-					t.Fatalf("Should only be a record, %+v, %+v, %+v", rec, sum, err)
-				}
+				assertDbRecord(t, rec, sum, err)
 				rec, sum, err = c.Next(s.Handle)
-				if rec != nil || err != nil || sum == nil {
-					t.Fatalf("Should only be a summary, %+v, %+v, %+v", rec, sum, err)
-				}
+				assertDbSummary(t, rec, sum, err)
 				err = c.TxCommit(txHandle)
-				if err != nil {
-					t.Fatal(err)
-				}
+				assertNoError(t, err)
 				// Make sure it's commited
 				s, err = c.Run("MATCH (n:Rand {val: $r}) RETURN n", map[string]interface{}{"r": r}, db.ReadMode, nil, 0, nil)
-				if err != nil {
-					t.Fatal(err)
-				}
+				assertNoError(t, err)
 				rec, sum, err = c.Next(s.Handle)
-				if rec == nil || err != nil || sum != nil {
-					t.Fatalf("Should only be a record, %+v, %+v, %+v", rec, sum, err)
-				}
+				assertDbRecord(t, rec, sum, err)
 				// Not everything consumed from the read check, but that is also fine
 			},
 		},
@@ -153,27 +122,17 @@ func TestConnectionConformance(ot *testing.T) {
 			name: "Run explicit commit, no consume",
 			fun: func(t *testing.T, c db.Connection) {
 				txHandle, err := c.TxBegin(db.WriteMode, []string{}, 10*time.Minute, nil)
-				if err != nil {
-					t.Fatal(err)
-				}
+				assertNoError(t, err)
 				r := randInt()
 				s, err := c.RunTx(txHandle, "CREATE (n:Rand {val: $r}) RETURN n", map[string]interface{}{"r": r})
-				if err != nil {
-					t.Fatal(err)
-				}
+				assertNoError(t, err)
 				err = c.TxCommit(txHandle)
-				if err != nil {
-					t.Fatal(err)
-				}
+				assertNoError(t, err)
 				// Make sure it's commited
 				s, err = c.Run("MATCH (n:Rand {val: $r}) RETURN n", map[string]interface{}{"r": r}, db.ReadMode, nil, 0, nil)
-				if err != nil {
-					t.Fatal(err)
-				}
+				assertNoError(t, err)
 				rec, sum, err := c.Next(s.Handle)
-				if rec == nil || err != nil || sum != nil {
-					t.Fatalf("Should only be a record, %+v, %+v, %+v", rec, sum, err)
-				}
+				assertDbRecord(t, rec, sum, err)
 				// Not everything consumed from the read check, but that is also fine
 			},
 		},
@@ -182,35 +141,21 @@ func TestConnectionConformance(ot *testing.T) {
 			name: "Run explicit rollback, full consume",
 			fun: func(t *testing.T, c db.Connection) {
 				txHandle, err := c.TxBegin(db.WriteMode, []string{}, 10*time.Minute, nil)
-				if err != nil {
-					t.Fatal(err)
-				}
+				assertNoError(t, err)
 				r := randInt()
 				s, err := c.RunTx(txHandle, "CREATE (n:Rand {val: $r}) RETURN n", map[string]interface{}{"r": r})
-				if err != nil {
-					t.Fatal(err)
-				}
+				assertNoError(t, err)
 				rec, sum, err := c.Next(s.Handle)
-				if rec == nil || err != nil || sum != nil {
-					t.Fatalf("Should only be a record, %+v, %+v, %+v", rec, sum, err)
-				}
+				assertDbRecord(t, rec, sum, err)
 				rec, sum, err = c.Next(s.Handle)
-				if rec != nil || err != nil || sum == nil {
-					t.Fatalf("Should only be a summary, %+v, %+v, %+v", rec, sum, err)
-				}
+				assertDbSummary(t, rec, sum, err)
 				err = c.TxRollback(txHandle)
-				if err != nil {
-					t.Fatal(err)
-				}
+				assertNoError(t, err)
 				// Make sure it's rolled back
 				s, err = c.Run("MATCH (n:Rand {val: $r}) RETURN n", map[string]interface{}{"r": r}, db.ReadMode, nil, 0, nil)
-				if err != nil {
-					t.Fatal(err)
-				}
+				assertNoError(t, err)
 				rec, sum, err = c.Next(s.Handle)
-				if rec != nil || err != nil || sum == nil {
-					t.Fatalf("Should only be a summary, %+v, %+v, %+v", rec, sum, err)
-				}
+				assertDbSummary(t, rec, sum, err)
 			},
 		},
 		{
@@ -218,66 +163,44 @@ func TestConnectionConformance(ot *testing.T) {
 			name: "Run explicit rollback, no consume",
 			fun: func(t *testing.T, c db.Connection) {
 				txHandle, err := c.TxBegin(db.WriteMode, []string{}, 10*time.Minute, nil)
-				if err != nil {
-					t.Fatal(err)
-				}
+				assertNoError(t, err)
 				r := randInt()
 				s, err := c.RunTx(txHandle, "CREATE (n:Rand {val: $r}) RETURN n", map[string]interface{}{"r": r})
-				if err != nil {
-					t.Fatal(err)
-				}
+				assertNoError(t, err)
 				err = c.TxRollback(txHandle)
-				if err != nil {
-					t.Fatal(err)
-				}
+				assertNoError(t, err)
 				// Make sure it's commited
 				s, err = c.Run("MATCH (n:Rand {val: $r}) RETURN n", map[string]interface{}{"r": r}, db.ReadMode, nil, 0, nil)
-				if err != nil {
-					t.Fatal(err)
-				}
+				assertNoError(t, err)
 				rec, sum, err := c.Next(s.Handle)
-				if rec != nil || err != nil || sum == nil {
-					t.Fatalf("Should only be a summary, %+v, %+v, %+v", rec, sum, err)
-				}
+				assertDbSummary(t, rec, sum, err)
 			},
 		},
 		{
 			name: "Next without streaming",
 			fun: func(t *testing.T, c db.Connection) {
 				rec, sum, err := c.Next(3)
-				if rec != nil || err == nil || sum != nil {
-					t.Fatalf("Should only be an error, %+v, %+v, %+v", rec, sum, err)
-				}
+				assertDbError(t, rec, sum, err)
 			},
 		},
 		{
 			name: "Next passed the summary",
 			fun: func(t *testing.T, c db.Connection) {
 				s, err := boltConn.Run("RETURN datetime()", nil, db.ReadMode, nil, 0, nil)
-				if err != nil {
-					t.Fatal(err)
-				}
+				assertNoError(t, err)
 				rec, sum, err := c.Next(s.Handle)
-				if rec == nil || err != nil || sum != nil {
-					t.Fatalf("Should only be a record, %+v, %+v, %+v", rec, sum, err)
-				}
+				assertDbRecord(t, rec, sum, err)
 				rec, sum, err = c.Next(s.Handle)
-				if rec != nil || err != nil || sum == nil {
-					t.Fatalf("Should only be a summary, %+v, %+v, %+v", rec, sum, err)
-				}
+				assertDbSummary(t, rec, sum, err)
 				rec, sum, err = c.Next(s.Handle)
-				if rec != nil || err == nil || sum != nil {
-					t.Fatalf("Should only be an error, %+v, %+v, %+v", rec, sum, err)
-				}
+				assertDbError(t, rec, sum, err)
 			},
 		},
 		{
 			name: "Run autocommit while in tx",
 			fun: func(t *testing.T, c db.Connection) {
 				txHandle, err := c.TxBegin(db.WriteMode, []string{}, 10*time.Minute, nil)
-				if txHandle == nil || err != nil {
-					t.Fatalf("Failed to begin tx: %s", err)
-				}
+				assertNoError(t, err)
 				defer c.TxRollback(txHandle)
 				s, err := c.Run("CREATE (n:Rand {val: $r})", map[string]interface{}{"r": randInt()}, db.WriteMode, nil, 0, nil)
 				if s != nil || err == nil {
@@ -355,9 +278,7 @@ func TestConnectionConformance(ot *testing.T) {
 			name: "Run autocommit with division by zero in result",
 			fun: func(t *testing.T, c db.Connection) {
 				s, err := c.Run("UNWIND [0] AS x RETURN 10 / x", map[string]interface{}{"r": randInt()}, db.ReadMode, nil, 0, nil)
-				if err != nil || s == nil {
-					t.Fatal("Should not have received error")
-				}
+				assertNoError(t, err)
 				// Should get error while iterating
 				_, _, err = c.Next(s.Handle)
 				if err == nil {
@@ -374,9 +295,7 @@ func TestConnectionConformance(ot *testing.T) {
 			name: "Set connection in transaction mode",
 			fun: func(t *testing.T, c db.Connection) {
 				_, err := c.TxBegin(db.WriteMode, []string{}, 0, nil)
-				if err != nil {
-					t.Fatal("Should have started transaction")
-				}
+				assertNoError(t, err)
 			},
 		},
 	}
@@ -389,9 +308,7 @@ func TestConnectionConformance(ot *testing.T) {
 			boltConn.Reset()
 			// Should be working now
 			s, err := boltConn.Run("RETURN datetime()", nil, db.ReadMode, nil, 0, nil)
-			if err != nil {
-				t.Errorf("Reset didn't help: %s", err)
-			}
+			assertNoError(t, err)
 			if s == nil {
 				t.Fatal("Didn't get a stream")
 			}
@@ -413,13 +330,9 @@ func TestConnectionConformance(ot *testing.T) {
 		}
 
 		stream, err := boltConn.Run(query, map[string]interface{}{"x": bigBuilder.String()}, db.ReadMode, nil, 0, nil)
-		if err != nil {
-			t.Fatal(err)
-		}
+		assertNoError(t, err)
 		rec, sum, err := boltConn.Next(stream.Handle)
-		if rec == nil || err != nil || sum != nil {
-			t.Fatalf("Should only be a record, %+v, %+v, %+v", rec, sum, err)
-		}
+		assertDbRecord(t, rec, sum, err)
 		recS := rec.Values[0].(string)
 		if recS != bigBuilder.String() {
 			t.Errorf("Strings differ")
@@ -495,9 +408,7 @@ func TestConnectionConformance(ot *testing.T) {
 			query := "RETURN " +
 				cTime + ", " + cDate + ", " + cDateTimeO + ", " + cDateTimeZ + ", " + cLocalTime + ", " + cLocalDateTime + ", " + cDuration
 			stream, err := boltConn.Run(query, nil, db.ReadMode, nil, 0, nil)
-			if err != nil {
-				t.Fatal(err)
-			}
+			assertNoError(t, err)
 			rec, sum, err := boltConn.Next(stream.Handle)
 			if rec == nil || err != nil || sum != nil {
 				t.Fatalf("Should be a record, %+v, %+v, %+v", rec, sum, err)
@@ -652,8 +563,6 @@ func TestConnectionConformance(ot *testing.T) {
 			tt.Skipf("Database %s:%s does not support multidatabase functionality", boltConn.ServerName(), boltConn.ServerVersion())
 		}
 
-		// DROP DATABASE test1 IF EXISTS
-
 		// Should always reset before selecting a database
 		boltConn.Reset()
 		// Connect to system database and create a test databases
@@ -671,30 +580,20 @@ func TestConnectionConformance(ot *testing.T) {
 		selector.SelectDatabase("test1")
 		r := randInt()
 		_, err = boltConn.Run("CREATE (n:MdbRand {x: $x}) RETURN n", map[string]interface{}{"x": r}, db.WriteMode, nil, 0, nil)
-		if err != nil {
-			tt.Fatal(err)
-		}
+		assertNoError(tt, err)
 		boltConn.Reset()
 		// Connect to standard database and make sure we can't see the node
 		s, err := boltConn.Run("MATCH (n:MdbRand {x: $x}) RETURN n", map[string]interface{}{"x": r}, db.ReadMode, nil, 0, nil)
-		if err != nil {
-			tt.Fatal(err)
-		}
+		assertNoError(tt, err)
 		rec, sum, err := boltConn.Next(s.Handle)
-		if rec != nil || err != nil || sum == nil {
-			tt.Fatalf("Should only be a summary, %+v, %+v, %+v", rec, sum, err)
-		}
+		assertDbSummary(tt, rec, sum, err)
 		boltConn.Reset()
 		// Connect to test database and make sure we can see the node
 		selector.SelectDatabase("test1")
 		s, err = boltConn.Run("MATCH (n:MdbRand {x: $x}) RETURN n", map[string]interface{}{"x": r}, db.ReadMode, nil, 0, nil)
-		if err != nil {
-			tt.Fatal(err)
-		}
+		assertNoError(tt, err)
 		rec, sum, err = boltConn.Next(s.Handle)
-		if rec == nil || err != nil || sum != nil {
-			tt.Fatalf("Should only be a record, %+v, %+v, %+v", rec, sum, err)
-		}
+		assertDbRecord(tt, rec, sum, err)
 		boltConn.Reset()
 	})
 }

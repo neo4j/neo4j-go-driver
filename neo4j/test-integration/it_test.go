@@ -26,6 +26,7 @@ import (
 )
 
 var _ = AfterSuite(func() {
-	control.StopSingleInstance()
+	// Temporarily disabled since it makes non ginkgo tests in the suite fail
+	//control.StopSingleInstance()
 	control.StopCluster()
 })
