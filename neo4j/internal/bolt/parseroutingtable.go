@@ -20,42 +20,8 @@
 package bolt
 
 import (
-	"errors"
-
 	"github.com/neo4j/neo4j-go-driver/neo4j/internal/db"
 )
-
-// Utility for retrieving a routing table using low level db connection
-func getRoutingTable(conn db.Connection, context map[string]string) (*db.RoutingTable, error) {
-	const query = "CALL dbms.cluster.routing.getRoutingTable($context)"
-
-	stream, err := conn.Run(query, map[string]interface{}{"context": context}, db.ReadMode, nil, 0, nil)
-	if err != nil {
-		// Give a better error
-		dbError, isDbError := err.(*db.DatabaseError)
-		if isDbError && dbError.Code == "Neo.ClientError.Procedure.ProcedureNotFound" {
-			return nil, &db.RoutingNotSupportedError{Server: conn.ServerName()}
-		}
-		return nil, err
-	}
-
-	rec, _, err := conn.Next(stream.Handle)
-	if err != nil {
-		return nil, err
-	}
-	if rec == nil {
-		return nil, errors.New("No routing table record")
-	}
-	// Just empty the stream, ignore the summary should leave the connecion in ready state
-	conn.Next(stream.Handle)
-
-	table := parseRoutingTableRecord(rec)
-	if table == nil {
-		return nil, errors.New("Unable to parse routing table")
-	}
-
-	return table, nil
-}
 
 // Parses a record assumed to contain a routing table into common db API routing table struct
 // Returns nil if error while parsing

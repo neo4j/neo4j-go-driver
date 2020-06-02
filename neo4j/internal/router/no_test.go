@@ -65,7 +65,7 @@ func (c *connFake) Birthdate() time.Time {
 	return time.Now()
 }
 
-func (c *connFake) GetRoutingTable(context map[string]string) (*db.RoutingTable, error) {
+func (c *connFake) GetRoutingTable(database string, context map[string]string) (*db.RoutingTable, error) {
 	return c.table, c.err
 }
 

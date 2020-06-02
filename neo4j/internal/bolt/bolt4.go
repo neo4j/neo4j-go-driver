@@ -613,11 +613,44 @@ func (b *bolt4) Reset() {
 	}
 }
 
-func (b *bolt4) GetRoutingTable(context map[string]string) (*db.RoutingTable, error) {
-	if err := assertState(b.logError, b.state, bolt4_ready); err != nil {
+func (b *bolt4) GetRoutingTable(database string, context map[string]string) (*db.RoutingTable, error) {
+	if err := assertState(b.logError, b.state, bolt3_ready); err != nil {
 		return nil, err
 	}
-	return getRoutingTable(b, context)
+
+	const (
+		queryDefault  = "CALL dbms.routing.getRoutingTable($context)"
+		queryDatabase = "CALL dbms.routing.getRoutingTable($context, $db)"
+	)
+	query := queryDefault
+	params := map[string]interface{}{"context": context}
+
+	if database != db.DefaultDatabase {
+		query = queryDatabase
+		params["db"] = database
+	}
+
+	stream, err := b.Run(query, params, db.ReadMode, nil, 0, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	rec, _, err := b.Next(stream.Handle)
+	if err != nil {
+		return nil, err
+	}
+	if rec == nil {
+		return nil, errors.New("No routing table record")
+	}
+	// Just empty the stream, ignore the summary should leave the connecion in ready state
+	b.Next(stream.Handle)
+
+	table := parseRoutingTableRecord(rec)
+	if table == nil {
+		return nil, errors.New("Unable to parse routing table")
+	}
+
+	return table, nil
 }
 
 // Beware, could be called on another thread when driver is closed.
