@@ -169,3 +169,16 @@ func (r *Router) Invalidate(database string) {
 		dbRouter.dueUnix = 0
 	}
 }
+
+func (r *Router) CleanUp() {
+	r.log.Debugf(r.logId, "Cleaning up")
+	now := r.now().Unix()
+	r.dbRoutersMut.Lock()
+	defer r.dbRoutersMut.Unlock()
+
+	for dbName, dbRouter := range r.dbRouters {
+		if now > dbRouter.dueUnix {
+			delete(r.dbRouters, dbName)
+		}
+	}
+}

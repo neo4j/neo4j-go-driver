@@ -177,6 +177,7 @@ type sessionRouter interface {
 	Readers(database string) ([]string, error)
 	Writers(database string) ([]string, error)
 	Invalidate(database string)
+	CleanUp()
 }
 
 type driver struct {

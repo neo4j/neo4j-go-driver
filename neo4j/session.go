@@ -471,6 +471,7 @@ func (s *session) Close() error {
 	// Schedule cleanups
 	go func() {
 		s.pool.CleanUp()
+		s.router.CleanUp()
 	}()
 	return nil
 }
