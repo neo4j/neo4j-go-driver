@@ -184,7 +184,7 @@ func TestWritersFailAfterNRetries(t *testing.T) {
 		t.Error("Should have failed")
 	}
 	if writers != nil {
-		t.Error("Should'nt have any writers")
+		t.Error("Should not have any writers")
 	}
 	if numsleep <= 0 {
 		t.Error("Should have slept plenty")
@@ -229,5 +229,37 @@ func TestWritersRetriesWhenNoWriters(t *testing.T) {
 	}
 	if numsleep != 1 {
 		t.Error("Should have slept once")
+	}
+}
+
+func TestCleanUp(t *testing.T) {
+	table := &db.RoutingTable{TimeToLive: 1}
+	pool := &poolFake{
+		borrow: func(names []string, cancel context.CancelFunc) (poolpackage.Connection, error) {
+			return &connFake{table: table}, nil
+		},
+	}
+	now := time.Now()
+	router := New("router", func() []string { return []string{} }, nil, pool, logger)
+	router.now = func() time.Time { return now }
+
+	router.Readers("db1")
+	router.Readers("db2")
+
+	// Should be a router for each requested database
+	if len(router.dbRouters) != 2 {
+		t.Fatal("Should be two routing tables, one for each database")
+	}
+
+	// Should not remove these since they still have time to live
+	router.CleanUp()
+	if len(router.dbRouters) != 2 {
+		t.Fatal("Should not have removed routing tables")
+	}
+
+	router.now = func() time.Time { return now.Add(1 * time.Minute) }
+	router.CleanUp()
+	if len(router.dbRouters) != 0 {
+		t.Fatal("Should have cleaned up")
 	}
 }

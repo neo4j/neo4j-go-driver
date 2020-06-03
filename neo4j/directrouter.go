@@ -34,3 +34,6 @@ func (r *directRouter) Writers(database string) ([]string, error) {
 
 func (r *directRouter) Invalidate(database string) {
 }
+
+func (r *directRouter) CleanUp() {
+}
