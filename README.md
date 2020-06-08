@@ -32,7 +32,9 @@ if err != nil {
 // driver's lifetime is usually bound by the application lifetime, which usually implies one driver instance per application
 defer driver.Close()
 
-session, err := driver.Session(neo4j.AccessModeWrite)
+// For multidatabase support, set sessionConfig.DatabaseName to requested database
+sessionConfig := neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite}
+session, err := driver.NewSession(sessionConfig)
 if err != nil {
 	return err
 }
