@@ -17,6 +17,7 @@
  *  limitations under the License.
  */
 
+// This is an internal package and is not part of the public API.
 package utils
 
 import "fmt"
