@@ -26,7 +26,6 @@ import (
 	"github.com/neo4j/neo4j-go-driver/neo4j"
 	"github.com/neo4j/neo4j-go-driver/neo4j/test-integration/control"
 
-	//. "github.com/neo4j/neo4j-go-driver/neo4j/utils/test"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
@@ -39,6 +38,24 @@ var _ = Describe("Driver", func() {
 		server, err = control.EnsureSingleInstance()
 		Expect(err).To(BeNil())
 		Expect(server).NotTo(BeNil())
+	})
+
+	Context("VerifyConnectivity", func() {
+		It("should return nil upon good connection", func() {
+			driver, _ := server.Driver()
+			defer driver.Close()
+			err := driver.VerifyConnectivity()
+			Expect(err).To(BeNil())
+		})
+
+		It("should return error upon bad connection", func() {
+			auth := neo4j.BasicAuth("bad user", "bad pass", "bad area")
+			driver, err := neo4j.NewDriver(server.BoltURI(), auth, server.Config())
+			Expect(err).To(BeNil())
+			defer driver.Close()
+			err = driver.VerifyConnectivity()
+			Expect(err).ToNot(BeNil())
+		})
 	})
 
 	Context("Direct", func() {
