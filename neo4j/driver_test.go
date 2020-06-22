@@ -20,6 +20,10 @@
 package neo4j
 
 import (
+	"reflect"
+	"strings"
+	"testing"
+
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/ginkgo/extensions/table"
 	. "github.com/onsi/gomega"
@@ -27,77 +31,108 @@ import (
 	"github.com/neo4j/neo4j-go-driver/neo4j/internal/router"
 )
 
-var _ = Describe("Driver", func() {
-	assertNoRouter := func(di Driver) {
-		d := di.(*driver)
-		_, isDirectRouter := d.router.(*directRouter)
-		Expect(isDirectRouter).To(BeTrue())
+func assertNoRouter(t *testing.T, d Driver) {
+	t.Helper()
+	_, isDirectRouter := d.(*driver).router.(*directRouter)
+	if !isDirectRouter {
+		t.Error("Expected no router")
 	}
+}
 
-	assertRouter := func(di Driver) {
-		d := di.(*driver)
-		_, isRouter := d.router.(*router.Router)
-		Expect(isRouter).To(BeTrue())
+func assertRouter(t *testing.T, d Driver) {
+	t.Helper()
+	_, isRouter := d.(*driver).router.(*router.Router)
+	if !isRouter {
+		t.Error("Expected router")
 	}
+}
 
-	assertRouterContext := func(di Driver, context map[string]string) {
-		d := di.(*driver)
-		r := d.router.(*router.Router)
-		Expect(r.Context()).To(Equal(context))
+func assertRouterContext(t *testing.T, d Driver, context map[string]string) {
+	t.Helper()
+	r := d.(*driver).router.(*router.Router)
+	c := r.Context()
+	if !reflect.DeepEqual(c, context) {
+		t.Errorf("Router contexts differ: %#v vs %#v", c, context)
 	}
+}
 
-	Context("URI", func() {
-		It("should support bolt:// scheme", func() {
+func assertNoError(t *testing.T, err error) {
+	t.Helper()
+	if err != nil {
+		t.Fatalf("Expected no error but was %s", err)
+	}
+}
+
+func assertError(t *testing.T, err error) {
+	t.Helper()
+	if err == nil {
+		t.Errorf("Expected error")
+	}
+}
+
+func assertStringEqual(t *testing.T, s1, s2 string) {
+	t.Helper()
+	if s1 != s2 {
+		t.Errorf("Expected %s to equal %s", s1, s2)
+	}
+}
+
+func assertStringContain(t *testing.T, str, substr string) {
+	t.Helper()
+	if !strings.Contains(str, substr) {
+		t.Errorf("Expected %s to contain %s", str, substr)
+	}
+}
+
+func TestDriverN(t0 *testing.T) {
+	t0.Run("URI", func(t1 *testing.T) {
+		t1.Run("Should support bolt:// scheme", func(t *testing.T) {
 			driver, err := NewDriver("bolt://localhost:7687", NoAuth())
 
-			Expect(err).To(BeNil())
-			Expect(driver).NotTo(BeNil())
-			Expect(driver.Target().Scheme).To(BeIdenticalTo("bolt"))
-			assertNoRouter(driver)
+			assertNoError(t, err)
+			assertStringEqual(t, driver.Target().Scheme, "bolt")
+			assertNoRouter(t, driver)
 		})
 
-		It("should support bolt+routing:// scheme", func() {
+		t1.Run("Should support bolt+routing:// sceme", func(t *testing.T) {
 			driver, err := NewDriver("bolt+routing://localhost:7687", NoAuth())
 
-			Expect(err).To(BeNil())
-			Expect(driver).NotTo(BeNil())
-			Expect(driver.Target().Scheme).To(BeIdenticalTo("bolt+routing"))
-			assertRouter(driver)
+			assertNoError(t, err)
+			assertStringEqual(t, driver.Target().Scheme, "bolt+routing")
+			assertRouter(t, driver)
 		})
 
-		It("should support neo4j:// scheme", func() {
+		t1.Run("should support neo4j:// scheme", func(t *testing.T) {
 			driver, err := NewDriver("neo4j://localhost:7687", NoAuth())
 
-			Expect(err).To(BeNil())
-			Expect(driver).NotTo(BeNil())
-			Expect(driver.Target().Scheme).To(BeIdenticalTo("neo4j"))
-			assertRouter(driver)
+			assertNoError(t, err)
+			assertStringEqual(t, driver.Target().Scheme, "neo4j")
+			assertRouter(t, driver)
 		})
 
-		It("should error anotherscheme:// scheme", func() {
-			driver, err := NewDriver("anotherscheme://localhost:7687", NoAuth())
+		t1.Run("should error anotherscheme:// scheme", func(t *testing.T) {
+			_, err := NewDriver("anotherscheme://localhost:7687", NoAuth())
 
-			Expect(driver).To(BeNil())
-			Expect(err).ToNot(BeNil())
-			errDescr := err.Error()
-			Expect(errDescr).To(ContainSubstring("url scheme anotherscheme is not supported"))
-			//Expect(err).To(BeGenericError(ContainSubstring("url scheme anotherscheme is not supported")))
+			assertError(t, err)
+			assertStringContain(t, err.Error(), "scheme")
 		})
 
-		It("should support neo4j:// routing context", func() {
-			driver, _ := NewDriver("neo4j://localhost:7687?x=y&a=b", NoAuth())
+		t1.Run("should support neo4j:// routing context", func(t *testing.T) {
+			driver, err := NewDriver("neo4j://localhost:7687?x=y&a=b", NoAuth())
 
-			assertRouterContext(driver, map[string]string{"x": "y", "a": "b"})
+			assertNoError(t, err)
+			assertRouterContext(t, driver, map[string]string{"x": "y", "a": "b"})
 		})
 
-		It("should error neo4j:// routing context with duplicate keys", func() {
-			driver, err := NewDriver("neo4j://localhost:7687?x=y&x=b", NoAuth())
+		t1.Run("should error neo4j:// routing context with duplicate keys", func(t *testing.T) {
+			_, err := NewDriver("neo4j://localhost:7687?x=y&x=b", NoAuth())
 
-			Expect(driver).To(BeNil())
-			Expect(err).ToNot(BeNil())
+			assertError(t, err)
 		})
 	})
+}
 
+var _ = Describe("Driver", func() {
 	When("constructed with bolt://localhost:7687", func() {
 		driver, err := NewDriver("bolt://localhost:7687", NoAuth())
 
