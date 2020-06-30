@@ -28,6 +28,7 @@ import (
 	"github.com/neo4j/neo4j-go-driver/neo4j/internal/db"
 	"github.com/neo4j/neo4j-go-driver/neo4j/internal/log"
 	"github.com/neo4j/neo4j-go-driver/neo4j/internal/packstream"
+	"github.com/neo4j/neo4j-go-driver/neo4j/types"
 )
 
 const (
@@ -486,7 +487,7 @@ func (b *bolt4) RunTx(txh db.Handle, cypher string, params map[string]interface{
 }
 
 // Reads one record from the stream.
-func (b *bolt4) Next(shandle db.Handle) (*db.Record, *db.Summary, error) {
+func (b *bolt4) Next(shandle db.Handle) (*types.Record, *db.Summary, error) {
 	if err := assertHandle(b.logError, b.streamId, shandle); err != nil {
 		return nil, nil, err
 	}
@@ -501,7 +502,7 @@ func (b *bolt4) Next(shandle db.Handle) (*db.Record, *db.Summary, error) {
 	}
 
 	switch x := res.(type) {
-	case *db.Record:
+	case *types.Record:
 		x.Keys = b.streamKeys
 		return x, nil, nil
 	case *successResponse:

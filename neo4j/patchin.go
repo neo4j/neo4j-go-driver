@@ -19,11 +19,13 @@
 
 package neo4j
 
+/*
 import (
 	"time"
 
-	"github.com/neo4j/neo4j-go-driver/neo4j/internal/types"
+	"github.com/neo4j/neo4j-go-driver/neo4j/types"
 )
+
 
 func patchInPoint(v *Point) interface{} {
 	if v == nil {
@@ -127,3 +129,4 @@ func patchInMapX(params map[string]interface{}) map[string]interface{} {
 	}
 	return patched
 }
+*/

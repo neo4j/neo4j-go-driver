@@ -33,7 +33,7 @@ type Result interface {
 	// Err returns the latest error that caused this Next to return false.
 	Err() error
 	// Record returns the current record.
-	Record() Record
+	Record() *Record
 	// Summary returns the summary information about the statement execution.
 	Summary() (ResultSummary, error)
 	// Consume consumes the entire result and returns the summary information
@@ -42,7 +42,7 @@ type Result interface {
 }
 
 type iterator interface {
-	Next(s db.Handle) (*db.Record, *db.Summary, error)
+	Next(s db.Handle) (*Record, *db.Summary, error)
 }
 
 type result struct {
@@ -53,7 +53,7 @@ type result struct {
 	params      map[string]interface{}
 	allReceived bool
 	unconsumed  list.List
-	record      *db.Record
+	record      *Record
 	summary     *db.Summary
 }
 
@@ -67,8 +67,8 @@ func newResult(iter iterator, str *db.Stream, cypher string, params map[string]i
 }
 
 // Receive another record.
-func (r *result) doFetch() *db.Record {
-	var rec *db.Record
+func (r *result) doFetch() *Record {
+	var rec *Record
 	var sum *db.Summary
 	rec, sum, r.err = r.iter.Next(r.stream.Handle)
 	r.allReceived = r.err != nil || rec == nil
@@ -99,16 +99,16 @@ func (r *result) Next() bool {
 
 	// Remove the record from list of unconsumed and return it
 	r.unconsumed.Remove(e)
-	r.record = e.Value.(*db.Record)
+	r.record = e.Value.(*Record)
 	return true
 }
 
-func (r *result) Record() Record {
+func (r *result) Record() *Record {
 	// Unbox for better client experience
 	if r.record == nil {
 		return nil
 	}
-	return newRecord(r.record)
+	return r.record
 }
 
 func (r *result) Err() error {
@@ -170,7 +170,7 @@ func (d *delayedErrorResult) Err() error {
 	return d.err
 }
 
-func (d *delayedErrorResult) Record() Record {
+func (d *delayedErrorResult) Record() *Record {
 	return nil
 }
 

@@ -19,28 +19,11 @@
 
 package types
 
-type Node struct {
-	Id     int64
-	Labels []string
-	Props  map[string]interface{}
+type Record struct {
+	Values []interface{}
+	Keys   []string
 }
 
-type Relationship struct {
-	Id      int64
-	StartId int64
-	EndId   int64
-	Type    string
-	Props   map[string]interface{}
-}
-
-type RelNode struct {
-	Id    int64
-	Type  string
-	Props map[string]interface{}
-}
-
-type Path struct {
-	Nodes    []*Node
-	RelNodes []*RelNode
-	Indexes  []int
+func (r *Record) GetByIndex(i int) interface{} {
+	return r.Values[i]
 }

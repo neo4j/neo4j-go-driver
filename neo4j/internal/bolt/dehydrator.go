@@ -25,7 +25,7 @@ import (
 	"time"
 
 	"github.com/neo4j/neo4j-go-driver/neo4j/internal/packstream"
-	"github.com/neo4j/neo4j-go-driver/neo4j/internal/types"
+	"github.com/neo4j/neo4j-go-driver/neo4j/types"
 )
 
 // Called by packstream during packing when it encounters an unknown type.

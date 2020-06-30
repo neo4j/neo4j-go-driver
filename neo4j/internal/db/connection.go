@@ -20,6 +20,7 @@
 package db
 
 import (
+	"github.com/neo4j/neo4j-go-driver/neo4j/types"
 	"time"
 )
 
@@ -139,10 +140,12 @@ type Summary struct {
 	Notifications []Notification
 }
 
+/*
 type Record struct {
 	Values []interface{}
 	Keys   []string
 }
+*/
 
 type Handle interface{}
 
@@ -161,7 +164,7 @@ type Connection interface {
 	// Moves to next item in the stream.
 	// If error is nil, either Record or Summary has a value, if Record is nil there are no more records.
 	// If error is non nil, neither Record or Summary has a value.
-	Next(streamHandle Handle) (*Record, *Summary, error)
+	Next(streamHandle Handle) (*types.Record, *Summary, error)
 	// Returns bookmark from last committed transaction or last finished auto-commit transaction.
 	// Note that if there is an ongoing auto-commit transaction (stream active) the bookmark
 	// from that is not included. Empty string if no bookmark.

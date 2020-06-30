@@ -20,9 +20,12 @@
 package neo4j
 
 import (
-	"github.com/neo4j/neo4j-go-driver/neo4j/internal/db"
+	"github.com/neo4j/neo4j-go-driver/neo4j/types"
 )
 
+type Record = types.Record
+
+/*
 type Record interface {
 	// Keys returns the keys available
 	Keys() []string
@@ -39,10 +42,6 @@ type record struct {
 }
 
 func newRecord(rec *db.Record) *record {
-	// Wrap internal types in interface implementation for backwards compatibility
-	for i, v := range rec.Values {
-		rec.Values[i] = patchOutX(v)
-	}
 	return &record{rec: rec}
 }
 
@@ -66,3 +65,4 @@ func (r *record) Get(key string) (interface{}, bool) {
 	}
 	return nil, false
 }
+*/
