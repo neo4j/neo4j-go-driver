@@ -25,8 +25,8 @@ import (
 	"math/big"
 	"testing"
 
-	"github.com/neo4j/neo4j-go-driver/neo4j"
-	"github.com/neo4j/neo4j-go-driver/neo4j/internal/db"
+	"github.com/neo4j/neo4j-go-driver/v4/neo4j"
+	"github.com/neo4j/neo4j-go-driver/v4/neo4j/db"
 )
 
 func assertNoError(t *testing.T, err error) {
@@ -65,16 +65,16 @@ func createRandomNode(t *testing.T, sess neo4j.Session) int64 {
 			return nil, err
 		}
 		res.Next()
-		return res.Record().GetByIndex(0), nil
+		return res.Record().Values[0], nil
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
 	node := nodex.(neo4j.Node)
-	return node.Props()["val"].(int64)
+	return node.Props["val"].(int64)
 }
 
-func findRandomNode(t *testing.T, sess neo4j.Session, randomId int64) neo4j.Node {
+func findRandomNode(t *testing.T, sess neo4j.Session, randomId int64) *neo4j.Node {
 	nodex, err := sess.ReadTransaction(func(tx neo4j.Transaction) (interface{}, error) {
 		res, err := tx.Run("MATCH (n:RandomNode{val: $r}) RETURN n", map[string]interface{}{"r": randomId})
 		if err != nil {
@@ -83,7 +83,7 @@ func findRandomNode(t *testing.T, sess neo4j.Session, randomId int64) neo4j.Node
 		if !res.Next() {
 			return nil, nil
 		}
-		return res.Record().GetByIndex(0), nil
+		return res.Record().Values[0], nil
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -91,7 +91,8 @@ func findRandomNode(t *testing.T, sess neo4j.Session, randomId int64) neo4j.Node
 	if nodex == nil {
 		return nil
 	}
-	return nodex.(neo4j.Node)
+	node := nodex.(neo4j.Node)
+	return &node
 }
 
 func assertRandomNode(t *testing.T, sess neo4j.Session, randomId int64) {
@@ -106,4 +107,27 @@ func assertNoRandomNode(t *testing.T, sess neo4j.Session, randomId int64) {
 	if node != nil {
 		t.Error("Shouldn't find random node but did")
 	}
+}
+
+// Utility that executes Cypher and retrieves the expected single value from single record.
+func single(t *testing.T, driver neo4j.Driver, cypher string, params map[string]interface{}) interface{} {
+	t.Helper()
+	session, err := driver.NewSession(neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer session.Close()
+	result, err := session.Run(cypher, params)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !result.Next() {
+		t.Fatalf("No result or error retrieving result: %s", result.Err())
+	}
+	val := result.Record().Values[0]
+	_, err = result.Consume()
+	if err != nil {
+		t.Fatal(err)
+	}
+	return val
 }

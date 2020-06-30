@@ -23,8 +23,8 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 
-	"github.com/neo4j/neo4j-go-driver/neo4j"
-	"github.com/neo4j/neo4j-go-driver/neo4j/test-integration/control"
+	"github.com/neo4j/neo4j-go-driver/v4/neo4j"
+	"github.com/neo4j/neo4j-go-driver/v4/neo4j/test-integration/control"
 )
 
 var _ = Describe("Routing", func() {
@@ -83,7 +83,7 @@ var _ = Describe("Routing", func() {
 			}
 
 			if writeResult.Next() {
-				return writeResult.Record().GetByIndex(0), nil
+				return writeResult.Record().Values[0], nil
 			}
 
 			if err := writeResult.Err(); err != nil {
@@ -102,7 +102,7 @@ var _ = Describe("Routing", func() {
 			}
 
 			if readResult.Next() {
-				return readResult.Record().GetByIndex(0), nil
+				return readResult.Record().Values[0], nil
 			}
 
 			if err := readResult.Err(); err != nil {

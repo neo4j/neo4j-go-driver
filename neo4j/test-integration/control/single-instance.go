@@ -28,7 +28,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/neo4j/neo4j-go-driver/neo4j"
+	"github.com/neo4j/neo4j-go-driver/v4/neo4j"
 )
 
 // SingleInstance holds information about the single instance server
@@ -170,6 +170,15 @@ func (server *SingleInstance) Config() func(config *neo4j.Config) {
 // Driver returns a driver instance to the server
 func (server *SingleInstance) Driver() (neo4j.Driver, error) {
 	return neo4j.NewDriver(server.boltURI, server.authToken, server.config)
+}
+
+// Driver returns a driver instance to the server, panics if it fails
+func (server *SingleInstance) Driver2() neo4j.Driver {
+	driver, err := neo4j.NewDriver(server.boltURI, server.authToken, server.config)
+	if err != nil {
+		panic(err)
+	}
+	return driver
 }
 
 func (server *SingleInstance) deleteData() error {

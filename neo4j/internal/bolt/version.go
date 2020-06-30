@@ -19,4 +19,4 @@
 
 package bolt
 
-const userAgent = "Go Driver/1.8"
+const userAgent = "Go Driver/4.0"

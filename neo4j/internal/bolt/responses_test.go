@@ -23,7 +23,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/neo4j/neo4j-go-driver/neo4j/internal/db"
+	"github.com/neo4j/neo4j-go-driver/v4/neo4j/db"
 )
 
 func TestSuccessResponseExtraction(ot *testing.T) {

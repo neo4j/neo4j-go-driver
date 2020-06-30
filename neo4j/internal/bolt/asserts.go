@@ -23,7 +23,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/neo4j/neo4j-go-driver/neo4j/internal/db"
+	"github.com/neo4j/neo4j-go-driver/v4/neo4j/db"
 )
 
 func assertHandle(log func(error), id int64, h db.Handle) error {

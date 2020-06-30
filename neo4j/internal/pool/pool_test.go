@@ -27,7 +27,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/neo4j/neo4j-go-driver/neo4j/internal/log"
+	"github.com/neo4j/neo4j-go-driver/v4/neo4j/internal/log"
 )
 
 var logger = &log.ConsoleLogger{Errors: true, Infos: true, Warns: true}

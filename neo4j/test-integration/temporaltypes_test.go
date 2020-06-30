@@ -24,8 +24,8 @@ import (
 	"math/rand"
 	"time"
 
-	"github.com/neo4j/neo4j-go-driver/neo4j"
-	"github.com/neo4j/neo4j-go-driver/neo4j/test-integration/control"
+	"github.com/neo4j/neo4j-go-driver/v4/neo4j"
+	"github.com/neo4j/neo4j-go-driver/v4/neo4j/test-integration/control"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/ginkgo/extensions/table"
@@ -187,7 +187,7 @@ var _ = Describe("Temporal Types", func() {
 		Expect(err).To(BeNil())
 
 		if result.Next() {
-			var received = result.Record().GetByIndex(0)
+			var received = result.Record().Values[0]
 
 			Expect(received).To(Equal(expected))
 		}
@@ -200,7 +200,7 @@ var _ = Describe("Temporal Types", func() {
 		Expect(err).To(BeNil())
 
 		if result.Next() {
-			var received = result.Record().Values()
+			var received = result.Record().Values
 
 			Expect(received).To(Equal(expected))
 		}
@@ -213,7 +213,7 @@ var _ = Describe("Temporal Types", func() {
 		Expect(err).To(BeNil())
 
 		if result.Next() {
-			var received = result.Record().GetByIndex(0)
+			var received = result.Record().Values[0]
 
 			Expect(received).To(Equal(value))
 		}
@@ -226,7 +226,7 @@ var _ = Describe("Temporal Types", func() {
 		Expect(err).To(BeNil())
 
 		if result.Next() {
-			var received = result.Record().GetByIndex(0)
+			var received = result.Record().Values[0]
 
 			Expect(comp(value, received)).To(Equal(true))
 		}
@@ -537,7 +537,7 @@ var _ = Describe("Temporal Types", func() {
 			Expect(err).To(BeNil())
 
 			if result.Next() {
-				Expect(result.Record().GetByIndex(0)).To(BeNil())
+				Expect(result.Record().Values[0]).To(BeNil())
 			}
 			Expect(result.Next()).To(BeFalse())
 			Expect(result.Err()).To(BeNil())

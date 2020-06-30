@@ -24,11 +24,11 @@ import (
 	"reflect"
 	"time"
 
-	"github.com/neo4j/neo4j-go-driver/neo4j"
-	"github.com/neo4j/neo4j-go-driver/neo4j/internal/db"
-	"github.com/neo4j/neo4j-go-driver/neo4j/test-integration/control"
+	"github.com/neo4j/neo4j-go-driver/v4/neo4j"
+	"github.com/neo4j/neo4j-go-driver/v4/neo4j/db"
+	"github.com/neo4j/neo4j-go-driver/v4/neo4j/test-integration/control"
 
-	//. "github.com/neo4j/neo4j-go-driver/neo4j/utils/test"
+	//. "github.com/neo4j/neo4j-go-driver/v4/neo4j/utils/test"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
@@ -123,30 +123,26 @@ var _ = Describe("Session", func() {
 			Expect(summary.StatementType()).To(BeEquivalentTo(neo4j.StatementTypeReadOnly))
 		})
 
-		Specify("when an invalid query is executed, it should return error when consuming", func() {
+		Specify("when an invalid query is executed, it should return error", func() {
 			stmt := "UNWIND RANGE(0,100) RETURN N"
 
 			result, err = session.Run(stmt, nil)
-			Expect(err).To(BeNil())
-			Expect(result).NotTo(BeNil())
-
-			summary, err = result.Consume()
+			Expect(result).To(BeNil())
 			Expect(neo4j.IsClientError(err)).To(BeTrue())
-			//Expect(err).To(BeSyntaxError())
-			Expect(summary).To(BeNil())
-
-			Expect(result.Next()).To(BeFalse())
-			Expect(neo4j.IsClientError(err)).To(BeTrue())
-			//Expect(result.Err()).To(BeSyntaxError())
 		})
 
 		Specify("when a fail-on-streaming query is executed, it should run and return error when consuming", func() {
 			stmt := "UNWIND [1, 2, 3, 4, 0] AS x RETURN 10 / 0"
 
 			result, err = session.Run(stmt, nil)
-			Expect(err).To(BeNil())
+			// Up to the db when the error occures
+			if err != nil {
+				Expect(result).To(BeNil())
+				//Expect(err).To(BeArithmeticError())
+				Expect(neo4j.IsClientError(err)).To(BeTrue())
+				return
+			}
 			Expect(result).NotTo(BeNil())
-
 			summary, err = result.Consume()
 			Expect(neo4j.IsClientError(err)).To(BeTrue())
 			//Expect(err).To(BeArithmeticError())
@@ -263,17 +259,14 @@ var _ = Describe("Session", func() {
 
 		Specify("when one statement fails, the next one should run successfully", func() {
 			result, err = session.Run("Invalid Cypher", nil)
-			Expect(err).To(BeNil())
-
-			summary, err = result.Consume()
+			Expect(result).To(BeNil())
 			Expect(neo4j.IsClientError(err)).To(BeTrue())
-			//Expect(err).To(BeSyntaxError())
 
 			result, err = session.Run("RETURN 1", nil)
 			Expect(err).To(BeNil())
 
 			if result.Next() {
-				Expect(result.Record().GetByIndex(0)).To(BeEquivalentTo(1))
+				Expect(result.Record().Values[0]).To(BeEquivalentTo(1))
 			}
 			Expect(result.Next()).To(BeFalse())
 			Expect(result.Err()).To(BeNil())
@@ -327,8 +320,8 @@ var _ = Describe("Session", func() {
 			records, _ := neo4j.Collect(result, nil)
 			Expect(records).NotTo(BeNil())
 			Expect(records).To(HaveLen(100))
-			Expect(records[0].GetByIndex(0)).To(BeEquivalentTo(1))
-			Expect(records[99].GetByIndex(0)).To(BeEquivalentTo(100))
+			Expect(records[0].Values[0]).To(BeEquivalentTo(1))
+			Expect(records[99].Values[0]).To(BeEquivalentTo(100))
 		})
 
 		Specify("when session is closed, pending queries should be executed", func() {
@@ -357,14 +350,14 @@ var _ = Describe("Session", func() {
 			records1, _ := neo4j.Collect(result1, nil)
 			Expect(records1).NotTo(BeNil())
 			Expect(records1).To(HaveLen(100))
-			Expect(records1[0].GetByIndex(0)).To(BeEquivalentTo(1))
-			Expect(records1[99].GetByIndex(0)).To(BeEquivalentTo(100))
+			Expect(records1[0].Values[0]).To(BeEquivalentTo(1))
+			Expect(records1[99].Values[0]).To(BeEquivalentTo(100))
 
 			records2, _ := neo4j.Collect(result2, nil)
 			Expect(records2).NotTo(BeNil())
 			Expect(records2).To(HaveLen(100))
-			Expect(records2[0].GetByIndex(0)).Should(Equal("Text 1"))
-			Expect(records2[99].GetByIndex(0)).Should(Equal("Text 100"))
+			Expect(records2[0].Values[0]).Should(Equal("Text 1"))
+			Expect(records2[99].Values[0]).Should(Equal("Text 100"))
 		})
 
 		Specify("when session is closed, pending explicit transaction should be rolled-back", func() {
@@ -399,16 +392,16 @@ var _ = Describe("Session", func() {
 			records1, _ := neo4j.Collect(result1, nil)
 			Expect(records1).NotTo(BeNil())
 			Expect(records1).To(HaveLen(100))
-			Expect(records1[0].GetByIndex(0)).To(BeEquivalentTo(1))
-			Expect(records1[99].GetByIndex(0)).To(BeEquivalentTo(100))
+			Expect(records1[0].Values[0]).To(BeEquivalentTo(1))
+			Expect(records1[99].Values[0]).To(BeEquivalentTo(100))
 
 			records2, _ := neo4j.Collect(result2, nil)
 			Expect(records2).NotTo(BeNil())
 			Expect(records2).To(HaveLen(100))
-			Expect(records2[0].GetByIndex(0)).To(BeEquivalentTo(1))
-			Expect(records2[0].GetByIndex(1)).Should(Equal("Text 1"))
-			Expect(records2[99].GetByIndex(0)).To(BeEquivalentTo(100))
-			Expect(records2[99].GetByIndex(1)).Should(Equal("Text 100"))
+			Expect(records2[0].Values[0]).To(BeEquivalentTo(1))
+			Expect(records2[0].Values[1]).Should(Equal("Text 1"))
+			Expect(records2[99].Values[0]).To(BeEquivalentTo(100))
+			Expect(records2[99].Values[1]).Should(Equal("Text 100"))
 
 			newSession, err := driver.Session(neo4j.AccessModeRead)
 			Expect(err).To(BeNil())
@@ -516,7 +509,12 @@ var _ = Describe("Session", func() {
 			session3 := newSession(driver, neo4j.AccessModeWrite)
 
 			result3, err := session3.Run("MATCH (n:RunTxTimeOut) SET n.id = 2", nil, neo4j.WithTxTimeout(1*time.Second))
-			Expect(err).To(BeNil())
+			// Up to db to determine when error occures
+			if err != nil {
+				dbErr := err.(*db.DatabaseError)
+				Expect(dbErr.Msg).To(ContainSubstring("terminated"))
+				return
+			}
 
 			_, err = result3.Consume()
 			// Should be a database error of class Transient indicating that the transaction

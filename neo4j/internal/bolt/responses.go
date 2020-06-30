@@ -20,7 +20,7 @@
 package bolt
 
 import (
-	"github.com/neo4j/neo4j-go-driver/neo4j/internal/db"
+	"github.com/neo4j/neo4j-go-driver/v4/neo4j/db"
 )
 
 // Server ignored request.
