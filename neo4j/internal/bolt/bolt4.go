@@ -25,9 +25,9 @@ import (
 	"net"
 	"time"
 
-	"github.com/neo4j/neo4j-go-driver/neo4j/internal/db"
-	"github.com/neo4j/neo4j-go-driver/neo4j/internal/log"
-	"github.com/neo4j/neo4j-go-driver/neo4j/internal/packstream"
+	"github.com/neo4j/neo4j-go-driver/v4/neo4j/db"
+	"github.com/neo4j/neo4j-go-driver/v4/neo4j/internal/log"
+	"github.com/neo4j/neo4j-go-driver/v4/neo4j/internal/packstream"
 )
 
 const (
@@ -628,7 +628,7 @@ func (b *bolt4) GetRoutingTable(database string, context map[string]string) (*db
 	params := map[string]interface{}{"context": context}
 	if database != db.DefaultDatabase {
 		query = queryDatabase
-		params["db"] = database
+		params["connection"] = database
 	}
 
 	stream, err := b.Run(query, params, db.ReadMode, nil, 0, nil)

@@ -25,8 +25,8 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"github.com/neo4j/neo4j-go-driver/neo4j"
-	//. "github.com/neo4j/neo4j-go-driver/neo4j/utils/test"
+	"github.com/neo4j/neo4j-go-driver/v4/neo4j"
+	//. "github.com/neo4j/neo4j-go-driver/v4/neo4j/utils/test"
 	. "github.com/onsi/gomega"
 )
 
@@ -181,7 +181,7 @@ func ReadQueryExecutor(driver neo4j.Driver, useBookmark bool) func(ctx *TestCont
 		Expect(err).To(BeNil())
 
 		if result.Next() {
-			nodeInt := result.Record().GetByIndex(0)
+			nodeInt := result.Record().Values[0]
 			Expect(nodeInt).NotTo(BeNil())
 
 			_, ok := nodeInt.(neo4j.Node)
@@ -190,7 +190,7 @@ func ReadQueryExecutor(driver neo4j.Driver, useBookmark bool) func(ctx *TestCont
 		Expect(result.Err()).To(BeNil())
 		Expect(result.Next()).To(BeFalse())
 
-		summary, err := result.Summary()
+		summary, err := result.Consume()
 		Expect(err).To(BeNil())
 		Expect(summary).NotTo(BeNil())
 
@@ -211,7 +211,7 @@ func ReadQueryInTxExecutor(driver neo4j.Driver, useBookmark bool) func(ctx *Test
 		Expect(err).To(BeNil())
 
 		if result.Next() {
-			nodeInt := result.Record().GetByIndex(0)
+			nodeInt := result.Record().Values[0]
 			Expect(nodeInt).NotTo(BeNil())
 
 			_, ok := nodeInt.(neo4j.Node)
@@ -220,7 +220,7 @@ func ReadQueryInTxExecutor(driver neo4j.Driver, useBookmark bool) func(ctx *Test
 		Expect(result.Err()).To(BeNil())
 		Expect(result.Next()).To(BeFalse())
 
-		summary, err := result.Summary()
+		summary, err := result.Consume()
 		Expect(err).To(BeNil())
 		Expect(summary).NotTo(BeNil())
 
@@ -242,7 +242,7 @@ func ReadQueryWithReadTransactionExecutor(driver neo4j.Driver, useBookmark bool)
 			Expect(err).To(BeNil())
 
 			if result.Next() {
-				nodeInt := result.Record().GetByIndex(0)
+				nodeInt := result.Record().Values[0]
 				Expect(nodeInt).NotTo(BeNil())
 
 				_, ok := nodeInt.(neo4j.Node)
@@ -251,7 +251,7 @@ func ReadQueryWithReadTransactionExecutor(driver neo4j.Driver, useBookmark bool)
 			Expect(result.Err()).To(BeNil())
 			Expect(result.Next()).To(BeFalse())
 
-			return result.Summary()
+			return result.Consume()
 		})
 
 		Expect(err).To(BeNil())
@@ -448,12 +448,8 @@ func WrongQueryExecutor(driver neo4j.Driver) func(ctx *TestContext) {
 		session := newStressSession(driver, false, neo4j.AccessModeRead, ctx)
 		defer session.Close()
 
-		result, err := session.Run("RETURN wrongThing", nil)
-		Expect(err).To(BeNil())
-
-		_, err = result.Consume()
+		_, err := session.Run("RETURN wrongThing", nil)
 		Expect(err).ToNot(BeNil())
-		//Expect(err).To(BeSyntaxError())
 	}
 }
 
@@ -466,11 +462,7 @@ func WrongQueryInTxExecutor(driver neo4j.Driver) func(ctx *TestContext) {
 		tx := newStressTransaction(session, false, ctx)
 		defer tx.Close()
 
-		result, err := tx.Run("RETURN wrongThing", nil)
-		Expect(err).To(BeNil())
-
-		_, err = result.Consume()
+		_, err := tx.Run("RETURN wrongThing", nil)
 		Expect(err).ToNot(BeNil())
-		//Expect(err).To(BeSyntaxError())
 	}
 }

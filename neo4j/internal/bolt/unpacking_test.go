@@ -23,8 +23,8 @@ import (
 	"bytes"
 	"testing"
 
-	"github.com/neo4j/neo4j-go-driver/neo4j/internal/packstream"
-	"github.com/neo4j/neo4j-go-driver/neo4j/internal/types"
+	"github.com/neo4j/neo4j-go-driver/v4/neo4j/dbtype"
+	"github.com/neo4j/neo4j-go-driver/v4/neo4j/internal/packstream"
 )
 
 // Benchmarks reception of messages over the protocol parts chunking+packstream unpacking
@@ -74,7 +74,7 @@ func BenchmarkUnpackingStructs(b *testing.B) {
 	// simple. Temporal types needs separate benchmarking.
 	packer := &packstream.Packer{}
 	buf, _ := packer.PackStruct([]byte{}, dehydrate, msgRecord,
-		&types.Point2D{}, &types.Point3D{}, &types.Point2D{}, &types.Point3D{}, &types.Point2D{}, &types.Point3D{})
+		&dbtype.Point2D{}, &dbtype.Point3D{}, &dbtype.Point2D{}, &dbtype.Point3D{}, &dbtype.Point2D{}, &dbtype.Point3D{})
 	unpacker := &packstream.Unpacker{}
 
 	for i := 0; i < b.N; i++ {

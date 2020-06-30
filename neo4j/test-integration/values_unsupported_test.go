@@ -19,13 +19,14 @@
 
 package test_integration
 
+/*
 import (
 	"time"
 
-	"github.com/neo4j/neo4j-go-driver/neo4j"
-	"github.com/neo4j/neo4j-go-driver/neo4j/test-integration/control"
+	"github.com/neo4j/neo4j-go-driver/v4/neo4j"
+	"github.com/neo4j/neo4j-go-driver/v4/neo4j/test-integration/control"
 
-	//. "github.com/neo4j/neo4j-go-driver/neo4j/utils/test"
+	//. "github.com/neo4j/neo4j-go-driver/v4/neo4j/utils/test"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
@@ -116,3 +117,4 @@ var _ = Describe("Unsupported Types [V1]", func() {
 		})
 	})
 })
+*/

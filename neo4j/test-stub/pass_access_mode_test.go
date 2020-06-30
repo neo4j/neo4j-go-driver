@@ -23,8 +23,8 @@ import (
 	"path"
 	"testing"
 
-	"github.com/neo4j/neo4j-go-driver/neo4j"
-	"github.com/neo4j/neo4j-go-driver/neo4j/test-stub/control"
+	"github.com/neo4j/neo4j-go-driver/v4/neo4j"
+	"github.com/neo4j/neo4j-go-driver/v4/neo4j/test-stub/control"
 )
 
 func Test_PassingAccessMode(t *testing.T) {
@@ -45,7 +45,7 @@ func Test_PassingAccessMode(t *testing.T) {
 			assertNoError(t, err)
 			assertNotNil(t, result)
 
-			assertInt64Eq(t, int64(1), result.GetByIndex(0).(int64))
+			assertInt64Eq(t, int64(1), result.Values[0].(int64))
 		}
 
 		verifyReturn1Tx := func(t *testing.T, script string, mode neo4j.AccessMode) {
@@ -71,7 +71,7 @@ func Test_PassingAccessMode(t *testing.T) {
 			assertNoError(t, err)
 			assertNotNil(t, result)
 
-			assertInt64Eq(t, int64(1), result.GetByIndex(0).(int64))
+			assertInt64Eq(t, int64(1), result.Values[0].(int64))
 		}
 
 		t.Run("shouldPassAccessModeForReadSessionRun", func(t *testing.T) {
@@ -112,7 +112,7 @@ func Test_PassingAccessMode(t *testing.T) {
 			assertNoError(t, err)
 			assertNotNil(t, result)
 
-			assertInt64Eq(t, int64(1), result.GetByIndex(0).(int64))
+			assertInt64Eq(t, int64(1), result.Values[0].(int64))
 		}
 
 		verifyReturn1Tx := func(t *testing.T, port int, script string, mode neo4j.AccessMode) {
@@ -141,7 +141,7 @@ func Test_PassingAccessMode(t *testing.T) {
 			assertNoError(t, err)
 			assertNotNil(t, result)
 
-			assertInt64Eq(t, int64(1), result.GetByIndex(0).(int64))
+			assertInt64Eq(t, int64(1), result.Values[0].(int64))
 		}
 
 		t.Run("shouldPassAccessModeForReadSessionRun", func(t *testing.T) {

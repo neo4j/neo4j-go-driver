@@ -26,9 +26,9 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/neo4j/neo4j-go-driver/neo4j/internal/db"
-	"github.com/neo4j/neo4j-go-driver/neo4j/internal/log"
-	"github.com/neo4j/neo4j-go-driver/neo4j/internal/pool"
+	"github.com/neo4j/neo4j-go-driver/v4/neo4j/db"
+	"github.com/neo4j/neo4j-go-driver/v4/neo4j/internal/log"
+	"github.com/neo4j/neo4j-go-driver/v4/neo4j/internal/pool"
 )
 
 // TransactionWork represents a unit of work that will be executed against the provided
@@ -158,8 +158,8 @@ func (s *session) BeginTransaction(configurers ...func(*TransactionConfig)) (Tra
 		return nil, err
 	}
 
-	// Consume current result if any
-	err := s.consumeCurrent()
+	// Fetch all in current result if any
+	err := s.fetchAllInCurrentResult()
 	if err != nil {
 		return nil, err
 	}
@@ -183,7 +183,7 @@ func (s *session) beginTransaction(mode db.AccessMode, config *TransactionConfig
 	conn := s.conn
 
 	// Start a transaction on the connection
-	txHandle, err := s.conn.TxBegin(mode, s.bookmarks, config.Timeout, patchInMapX(config.Metadata))
+	txHandle, err := s.conn.TxBegin(mode, s.bookmarks, config.Timeout, config.Metadata)
 	if err != nil {
 		return nil, err
 	}
@@ -197,20 +197,14 @@ func (s *session) beginTransaction(mode db.AccessMode, config *TransactionConfig
 	// to avoid relying on state.
 	return &transaction{
 		run: func(cypher string, params map[string]interface{}) (Result, error) {
-			// The last result should receive all records
-			err := s.consumeCurrent()
+			// The previous result should receive all records
+			err := s.fetchAllInCurrentResult()
 			if err != nil {
 				return nil, err
 			}
 
-			streamHandle, err := conn.RunTx(txHandle, cypher, patchInMapX(params))
+			streamHandle, err := conn.RunTx(txHandle, cypher, params)
 			if err != nil {
-				// To be backwards compatible we delay the error here if it is a database error.
-				// The old implementation just sent all the commands and didn't wait for an answer
-				// until starting to consume or iterate.
-				if _, isDbErr := err.(*db.DatabaseError); isDbErr {
-					return &delayedErrorResult{err: err}, nil
-				}
 				return nil, err
 			}
 			s.res = newResult(conn, streamHandle, cypher, params)
@@ -235,7 +229,7 @@ func (s *session) beginTransaction(mode db.AccessMode, config *TransactionConfig
 	}, nil
 }
 
-func (s *session) runOneTry(mode db.AccessMode, work TransactionWork, config *TransactionConfig) (interface{}, bool, error) {
+func (s *session) runOneTry(mode db.AccessMode, work TransactionWork, config *TransactionConfig) (interface{}, error) {
 	tx, err := s.beginTransaction(mode, config)
 	if err != nil {
 		return nil, false, err
@@ -272,8 +266,8 @@ func (s *session) runRetriable(
 		c(&config)
 	}
 
-	// Consume current result if any
-	err := s.consumeCurrent()
+	// Fetch all in current result if any
+	err := s.fetchAllInCurrentResult()
 	if err != nil {
 		return nil, err
 	}
@@ -417,7 +411,7 @@ func (s *session) borrowConn(mode db.AccessMode) error {
 func (s *session) returnConn() {
 	if s.conn != nil {
 		// Retrieve bookmark before returning connection, useful as input to next transaction
-		// on another connection.
+		// on another db.
 		bookmark := s.conn.Bookmark()
 		if len(bookmark) > 0 {
 			s.bookmarks = []string{bookmark}
@@ -428,7 +422,7 @@ func (s *session) returnConn() {
 	}
 }
 
-func (s *session) consumeCurrent() error {
+func (s *session) fetchAllInCurrentResult() error {
 	if s.res != nil {
 		s.res.fetchAll()
 		err := s.res.err
@@ -447,7 +441,7 @@ func (s *session) Run(
 		return nil, err
 	}
 
-	err := s.consumeCurrent()
+	err := s.fetchAllInCurrentResult()
 	if err != nil {
 		return nil, err
 	}
@@ -463,15 +457,9 @@ func (s *session) Run(
 		c(&config)
 	}
 
-	stream, err := s.conn.Run(cypher, patchInMapX(params), s.defaultMode, s.bookmarks, config.Timeout, patchInMapX(config.Metadata))
+	stream, err := s.conn.Run(cypher, params, s.defaultMode, s.bookmarks, config.Timeout, config.Metadata)
 	if err != nil {
 		s.returnConn()
-		// To be backwards compatible we delay the error here if it is a database error.
-		// The old implementation just sent all the commands and didn't wait for an answer
-		// until starting to consume or iterate.
-		if _, isDbErr := err.(*db.DatabaseError); isDbErr {
-			return &delayedErrorResult{err: err}, nil
-		}
 		return nil, err
 	}
 	s.res = newResult(s.conn, stream, cypher, params)
@@ -479,7 +467,7 @@ func (s *session) Run(
 }
 
 func (s *session) Close() error {
-	s.consumeCurrent()
+	s.fetchAllInCurrentResult()
 	s.returnConn()
 	s.log.Debugf(s.logId, "Closed")
 	// Schedule cleanups

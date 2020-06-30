@@ -26,8 +26,8 @@ import (
 	"io"
 	"net"
 
-	"github.com/neo4j/neo4j-go-driver/neo4j/internal/db"
-	"github.com/neo4j/neo4j-go-driver/neo4j/internal/log"
+	"github.com/neo4j/neo4j-go-driver/v4/neo4j/db"
+	"github.com/neo4j/neo4j-go-driver/v4/neo4j/internal/log"
 )
 
 type Logger interface {
@@ -37,7 +37,7 @@ type Logger interface {
 }
 
 // Negotiate version of bolt protocol.
-// Returns instance of bolt protocol implmenting low-level abstract db connection interface.
+// Returns instance of bolt protocol implmenting low-level abstract connection Connection interface.
 func Connect(serverName string, conn net.Conn, auth map[string]interface{}, log log.Logger) (db.Connection, error) {
 	// Perform Bolt handshake to negotiate version
 	// Send handshake to server
