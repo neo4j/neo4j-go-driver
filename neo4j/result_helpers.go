@@ -22,9 +22,9 @@ package neo4j
 // Single returns one and only one record from the result stream. Any error passed in
 // or reported while navigating the result stream is returned without any conversion.
 // If the result stream contains zero or more than one records error is returned.
-func Single(from interface{}, err error) (Record, error) {
+func Single(from interface{}, err error) (*Record, error) {
 	var result Result
-	var record Record
+	var record *Record
 	var ok bool
 
 	if err != nil {
@@ -57,9 +57,9 @@ func Single(from interface{}, err error) (Record, error) {
 // Collect loops through the result stream, collects records into a slice and returns the
 // resulting slice. Any error passed in or reported while navigating the result stream is
 // returned without any conversion.
-func Collect(from interface{}, err error) ([]Record, error) {
+func Collect(from interface{}, err error) ([]*Record, error) {
 	var result Result
-	var list []Record
+	var list []*Record
 	var ok bool
 
 	if err != nil {

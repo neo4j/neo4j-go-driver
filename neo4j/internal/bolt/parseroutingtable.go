@@ -21,11 +21,12 @@ package bolt
 
 import (
 	"github.com/neo4j/neo4j-go-driver/neo4j/internal/db"
+	"github.com/neo4j/neo4j-go-driver/neo4j/types"
 )
 
 // Parses a record assumed to contain a routing table into common db API routing table struct
 // Returns nil if error while parsing
-func parseRoutingTableRecord(rec *db.Record) *db.RoutingTable {
+func parseRoutingTableRecord(rec *types.Record) *db.RoutingTable {
 	ttl, ok := rec.Values[0].(int64)
 	if !ok {
 		return nil

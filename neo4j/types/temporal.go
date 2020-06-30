@@ -20,6 +20,7 @@
 package types
 
 import (
+	"fmt"
 	"time"
 )
 
@@ -27,14 +28,38 @@ import (
 
 type (
 	Time          time.Time // Time since start of day with timezone information
-	Date          time.Time
+	Date          time.Time // Date value, without a time zone and time related components.
 	LocalTime     time.Time // Time since start of day in local timezone
-	LocalDateTime time.Time
+	LocalDateTime time.Time // Date and time in local timezone
 )
 
+// Duration represents temporal amount containing months, days, seconds and nanoseconds.
+// Supports longer durations than time.Duration
 type Duration struct {
 	Months  int64
 	Days    int64
 	Seconds int64
 	Nanos   int
+}
+
+// String returns the string representation of this Duration in ISO-8601 compliant form.
+func (d Duration) String() string {
+	sign := ""
+	if d.Seconds < 0 && d.Nanos > 0 {
+		d.Seconds++
+		d.Nanos = int(time.Second) - d.Nanos
+
+		if d.Seconds == 0 {
+			sign = "-"
+		}
+	}
+
+	timePart := ""
+	if d.Nanos == 0 {
+		timePart = fmt.Sprintf("%s%d", sign, d.Seconds)
+	} else {
+		timePart = fmt.Sprintf("%s%d.%09d", sign, d.Seconds, d.Nanos)
+	}
+
+	return fmt.Sprintf("P%dM%dDT%sS", d.Months, d.Days, timePart)
 }

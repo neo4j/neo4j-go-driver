@@ -26,7 +26,7 @@ import (
 
 	"github.com/neo4j/neo4j-go-driver/neo4j/internal/db"
 	"github.com/neo4j/neo4j-go-driver/neo4j/internal/packstream"
-	"github.com/neo4j/neo4j-go-driver/neo4j/internal/types"
+	"github.com/neo4j/neo4j-go-driver/neo4j/types"
 )
 
 // Called by packstream unpacker to hydrate a packstream struct into something

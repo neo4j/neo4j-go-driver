@@ -183,7 +183,7 @@ func (s *session) beginTransaction(mode db.AccessMode, config *TransactionConfig
 	conn := s.conn
 
 	// Start a transaction on the connection
-	txHandle, err := s.conn.TxBegin(mode, s.bookmarks, config.Timeout, patchInMapX(config.Metadata))
+	txHandle, err := s.conn.TxBegin(mode, s.bookmarks, config.Timeout, config.Metadata)
 	if err != nil {
 		return nil, err
 	}
@@ -203,7 +203,7 @@ func (s *session) beginTransaction(mode db.AccessMode, config *TransactionConfig
 				return nil, err
 			}
 
-			streamHandle, err := conn.RunTx(txHandle, cypher, patchInMapX(params))
+			streamHandle, err := conn.RunTx(txHandle, cypher, params)
 			if err != nil {
 				// To be backwards compatible we delay the error here if it is a database error.
 				// The old implementation just sent all the commands and didn't wait for an answer
@@ -454,7 +454,7 @@ func (s *session) Run(
 		c(&config)
 	}
 
-	stream, err := s.conn.Run(cypher, patchInMapX(params), s.defaultMode, s.bookmarks, config.Timeout, patchInMapX(config.Metadata))
+	stream, err := s.conn.Run(cypher, params, s.defaultMode, s.bookmarks, config.Timeout, config.Metadata)
 	if err != nil {
 		s.returnConn()
 		// To be backwards compatible we delay the error here if it is a database error.
