@@ -21,7 +21,7 @@ package neo4j
 
 import (
 	"fmt"
-	"github.com/neo4j/neo4j-go-driver/neo4j/internal/db"
+	"github.com/neo4j/neo4j-go-driver/neo4j/connection"
 	"github.com/neo4j/neo4j-go-driver/neo4j/internal/pool"
 )
 
@@ -47,7 +47,7 @@ func IsSecurityError(err error) bool {
 // IsAuthenticationError is a utility method to check if the provided error is related with any
 // authentication issues.
 func IsAuthenticationError(err error) bool {
-	dbErr, is := err.(*db.DatabaseError)
+	dbErr, is := err.(*connection.DatabaseError)
 	if !is {
 		return false
 	}
@@ -57,7 +57,7 @@ func IsAuthenticationError(err error) bool {
 // IsClientError is a utility method to check if the provided error is related with the client
 // carrying out an invalid operation.
 func IsClientError(err error) bool {
-	dbErr, is := err.(*db.DatabaseError)
+	dbErr, is := err.(*connection.DatabaseError)
 	if !is {
 		return false
 	}
@@ -67,7 +67,7 @@ func IsClientError(err error) bool {
 // IsTransientError is a utility method to check if the provided error is related with a temporary
 // failure that may be worked around by retrying.
 func IsTransientError(err error) bool {
-	dbErr, is := err.(*db.DatabaseError)
+	dbErr, is := err.(*connection.DatabaseError)
 	if !is {
 		return false
 	}

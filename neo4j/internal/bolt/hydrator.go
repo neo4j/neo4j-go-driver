@@ -24,9 +24,9 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/neo4j/neo4j-go-driver/neo4j/internal/db"
+	"github.com/neo4j/neo4j-go-driver/neo4j/connection"
+	"github.com/neo4j/neo4j-go-driver/neo4j/dbtype"
 	"github.com/neo4j/neo4j-go-driver/neo4j/internal/packstream"
-	"github.com/neo4j/neo4j-go-driver/neo4j/types"
 )
 
 // Called by packstream unpacker to hydrate a packstream struct into something
@@ -82,7 +82,7 @@ func hydrateNode(fields []interface{}) (interface{}, error) {
 	if !idok || !tagsok || !propsok {
 		return nil, errors.New("Node hydrate error")
 	}
-	n := &types.Node{Id: id, Props: props, Labels: make([]string, len(tagsx))}
+	n := &dbtype.Node{Id: id, Props: props, Labels: make([]string, len(tagsx))}
 	// Convert tags to strings
 	for i, x := range tagsx {
 		t, tok := x.(string)
@@ -106,7 +106,7 @@ func hydrateRelationship(fields []interface{}) (interface{}, error) {
 	if !idok || !sidok || !eidok || !lblok || !propsok {
 		return nil, errors.New("Relationship hydrate error")
 	}
-	return &types.Relationship{Id: id, StartId: sid, EndId: eid, Type: lbl, Props: props}, nil
+	return &dbtype.Relationship{Id: id, StartId: sid, EndId: eid, Type: lbl, Props: props}, nil
 }
 
 func hydrateRelNode(fields []interface{}) (interface{}, error) {
@@ -119,7 +119,7 @@ func hydrateRelNode(fields []interface{}) (interface{}, error) {
 	if !idok || !lblok || !propsok {
 		return nil, errors.New("RelNode hydrate error")
 	}
-	s := &types.RelNode{Id: id, Type: lbl, Props: props}
+	s := &dbtype.RelNode{Id: id, Type: lbl, Props: props}
 	return s, nil
 }
 
@@ -134,18 +134,18 @@ func hydratePath(fields []interface{}) (interface{}, error) {
 		return nil, errors.New("Path hydrate error")
 	}
 
-	nodes := make([]*types.Node, len(nodesx))
+	nodes := make([]*dbtype.Node, len(nodesx))
 	for i, nx := range nodesx {
-		n, ok := nx.(*types.Node)
+		n, ok := nx.(*dbtype.Node)
 		if !ok {
 			return nil, errors.New("Path hydrate error")
 		}
 		nodes[i] = n
 	}
 
-	relnodes := make([]*types.RelNode, len(relnodesx))
+	relnodes := make([]*dbtype.RelNode, len(relnodesx))
 	for i, rx := range relnodesx {
-		r, ok := rx.(*types.RelNode)
+		r, ok := rx.(*dbtype.RelNode)
 		if !ok {
 			return nil, errors.New("Path hydrate error")
 		}
@@ -165,7 +165,7 @@ func hydratePath(fields []interface{}) (interface{}, error) {
 		return nil, errors.New("Path hydrate error")
 	}
 
-	p := &types.Path{Nodes: nodes, RelNodes: relnodes, Indexes: indexes}
+	p := &dbtype.Path{Nodes: nodes, RelNodes: relnodes, Indexes: indexes}
 	return p, nil
 }
 
@@ -211,9 +211,9 @@ func hydrateFailure(fields []interface{}) (interface{}, error) {
 	if !cok || !mok {
 		return nil, errors.New("Failure hydrate error")
 	}
-	// Hydrate right into error defined in db package to avoid remapping at a later
+	// Hydrate right into error defined in connection package to avoid remapping at a later
 	// state.
-	return &db.DatabaseError{Code: code, Msg: msg}, nil
+	return &connection.DatabaseError{Code: code, Msg: msg}, nil
 }
 
 func hydratePoint2d(fields []interface{}) (interface{}, error) {
@@ -226,7 +226,7 @@ func hydratePoint2d(fields []interface{}) (interface{}, error) {
 	if !sok || !xok || !yok {
 		return nil, errors.New("Point2d hydrate error")
 	}
-	return &types.Point2D{SpatialRefId: uint32(srId), X: x, Y: y}, nil
+	return &dbtype.Point2D{SpatialRefId: uint32(srId), X: x, Y: y}, nil
 }
 
 func hydratePoint3d(fields []interface{}) (interface{}, error) {
@@ -240,7 +240,7 @@ func hydratePoint3d(fields []interface{}) (interface{}, error) {
 	if !sok || !xok || !yok || !zok {
 		return nil, errors.New("Point3d hydrate error")
 	}
-	return &types.Point3D{SpatialRefId: uint32(srId), X: x, Y: y, Z: z}, nil
+	return &dbtype.Point3D{SpatialRefId: uint32(srId), X: x, Y: y, Z: z}, nil
 }
 
 func hydrateDateTimeOffset(fields []interface{}) (interface{}, error) {
@@ -290,7 +290,7 @@ func hydrateLocalDateTime(fields []interface{}) (interface{}, error) {
 	}
 	t := time.Unix(secs, nans).UTC()
 	t = time.Date(t.Year(), t.Month(), t.Day(), t.Hour(), t.Minute(), t.Second(), t.Nanosecond(), time.Local)
-	return types.LocalDateTime(t), nil
+	return dbtype.LocalDateTime(t), nil
 }
 
 func hydrateDate(fields []interface{}) (interface{}, error) {
@@ -302,7 +302,7 @@ func hydrateDate(fields []interface{}) (interface{}, error) {
 		return nil, errors.New("Date hydrate error")
 	}
 	secs := days * 86400
-	return types.Date(time.Unix(secs, 1)), nil
+	return dbtype.Date(time.Unix(secs, 1)), nil
 }
 
 func hydrateTime(fields []interface{}) (interface{}, error) {
@@ -318,7 +318,7 @@ func hydrateTime(fields []interface{}) (interface{}, error) {
 	nans -= secs * int64(time.Second)
 	l := time.FixedZone("Offset", int(offs))
 	t := time.Date(0, 0, 0, 0, 0, int(secs), int(nans), l)
-	return types.Time(t), nil
+	return dbtype.Time(t), nil
 }
 
 func hydrateLocalTime(fields []interface{}) (interface{}, error) {
@@ -332,11 +332,11 @@ func hydrateLocalTime(fields []interface{}) (interface{}, error) {
 	secs := nans / int64(time.Second)
 	nans -= secs * int64(time.Second)
 	t := time.Date(0, 0, 0, 0, 0, int(secs), int(nans), time.Local)
-	return types.LocalTime(t), nil
+	return dbtype.LocalTime(t), nil
 }
 
 func hydrateDuration(fields []interface{}) (interface{}, error) {
-	// Always hydrate to types.Duration since that allows for longer durations than the
+	// Always hydrate to dbtype.Duration since that allows for longer durations than the
 	// standard time.Duration even though it's probably very unusual with the need to
 	// express durations for hundreds of years.
 	if len(fields) != 4 {
@@ -350,5 +350,5 @@ func hydrateDuration(fields []interface{}) (interface{}, error) {
 		return nil, errors.New("Duration hydrate error")
 	}
 
-	return types.Duration{Months: mon, Days: day, Seconds: sec, Nanos: int(nan)}, nil
+	return dbtype.Duration{Months: mon, Days: day, Seconds: sec, Nanos: int(nan)}, nil
 }

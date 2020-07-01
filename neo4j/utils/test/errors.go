@@ -20,10 +20,10 @@
 package test
 
 import (
-	"github.com/neo4j/neo4j-go-driver/neo4j/internal/db"
+	"github.com/neo4j/neo4j-go-driver/neo4j/connection"
 )
 
 // Hook used by tests to get access to internal error
 func NewDatabaseErrorForTest(code string) error {
-	return &db.DatabaseError{Code: code, Msg: "Faked database error"}
+	return &connection.DatabaseError{Code: code, Msg: "Faked database error"}
 }

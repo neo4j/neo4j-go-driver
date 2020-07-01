@@ -27,7 +27,7 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"github.com/neo4j/neo4j-go-driver/neo4j/internal/db"
+	"github.com/neo4j/neo4j-go-driver/neo4j/connection"
 	"github.com/neo4j/neo4j-go-driver/neo4j/internal/log"
 	"github.com/neo4j/neo4j-go-driver/neo4j/internal/pool"
 	"github.com/neo4j/neo4j-go-driver/neo4j/internal/router"
@@ -210,11 +210,11 @@ func (d *driver) Session(accessMode AccessMode, bookmarks ...string) (Session, e
 	}
 	return newSession(
 		d.config, d.router,
-		d.pool, db.AccessMode(accessMode), bookmarks, db.DefaultDatabase, d.log), nil
+		d.pool, connection.AccessMode(accessMode), bookmarks, connection.DefaultDatabase, d.log), nil
 }
 
 func (d *driver) NewSession(config SessionConfig) (Session, error) {
-	databaseName := db.DefaultDatabase
+	databaseName := connection.DefaultDatabase
 	if config.DatabaseName != "" {
 		databaseName = config.DatabaseName
 	}
@@ -226,7 +226,7 @@ func (d *driver) NewSession(config SessionConfig) (Session, error) {
 	}
 	return newSession(
 		d.config, d.router,
-		d.pool, db.AccessMode(config.AccessMode), config.Bookmarks, databaseName, d.log), nil
+		d.pool, connection.AccessMode(config.AccessMode), config.Bookmarks, databaseName, d.log), nil
 }
 
 func (d *driver) VerifyConnectivity() error {

@@ -26,7 +26,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/neo4j/neo4j-go-driver/neo4j/internal/db"
+	"github.com/neo4j/neo4j-go-driver/neo4j/connection"
 	"github.com/neo4j/neo4j-go-driver/neo4j/internal/log"
 	"github.com/neo4j/neo4j-go-driver/neo4j/internal/pool"
 )
@@ -70,12 +70,12 @@ type sessionPool interface {
 
 type session struct {
 	config       *Config
-	defaultMode  db.AccessMode
+	defaultMode  connection.AccessMode
 	bookmarks    []string
 	databaseName string
 	pool         sessionPool
 	router       sessionRouter
-	conn         db.Connection
+	conn         connection.Connection
 	inTx         bool
 	res          *result
 	sleep        func(d time.Duration)
@@ -112,7 +112,7 @@ func cleanupBookmarks(bookmarks []string) []string {
 }
 
 func newSession(config *Config, router sessionRouter, pool sessionPool,
-	mode db.AccessMode, bookmarks []string, databaseName string, logger log.Logger) *session {
+	mode connection.AccessMode, bookmarks []string, databaseName string, logger log.Logger) *session {
 
 	id := atomic.AddUint32(&sessionid, 1)
 	logId := fmt.Sprintf("sess %d", id)
@@ -174,7 +174,7 @@ func (s *session) BeginTransaction(configurers ...func(*TransactionConfig)) (Tra
 	return s.beginTransaction(s.defaultMode, &config)
 }
 
-func (s *session) beginTransaction(mode db.AccessMode, config *TransactionConfig) (Transaction, error) {
+func (s *session) beginTransaction(mode connection.AccessMode, config *TransactionConfig) (Transaction, error) {
 	// Ensure that the session has a connection
 	err := s.borrowConn(mode)
 	if err != nil {
@@ -208,7 +208,7 @@ func (s *session) beginTransaction(mode db.AccessMode, config *TransactionConfig
 				// To be backwards compatible we delay the error here if it is a database error.
 				// The old implementation just sent all the commands and didn't wait for an answer
 				// until starting to consume or iterate.
-				if _, isDbErr := err.(*db.DatabaseError); isDbErr {
+				if _, isDbErr := err.(*connection.DatabaseError); isDbErr {
 					return &delayedErrorResult{err: err}, nil
 				}
 				return nil, err
@@ -235,7 +235,7 @@ func (s *session) beginTransaction(mode db.AccessMode, config *TransactionConfig
 	}, nil
 }
 
-func (s *session) runOneTry(mode db.AccessMode, work TransactionWork, config *TransactionConfig) (interface{}, error) {
+func (s *session) runOneTry(mode connection.AccessMode, work TransactionWork, config *TransactionConfig) (interface{}, error) {
 	tx, err := s.beginTransaction(mode, config)
 	if err != nil {
 		return nil, err
@@ -258,7 +258,7 @@ func (s *session) runOneTry(mode db.AccessMode, work TransactionWork, config *Tr
 }
 
 func (s *session) runRetriable(
-	mode db.AccessMode,
+	mode connection.AccessMode,
 	work TransactionWork, configurers ...func(*TransactionConfig)) (interface{}, error) {
 
 	// Guard for more than one transaction per session
@@ -326,7 +326,7 @@ func (s *session) runRetriable(
 		// Check type of error, this assumes a well behaved transaction func, could be better
 		// to keep last error in the connection in the future.
 		switch e := err.(type) {
-		case *db.DatabaseError:
+		case *connection.DatabaseError:
 			switch {
 			case e.IsRetriableCluster():
 				// Force routing tables to be updated before trying again
@@ -354,19 +354,19 @@ func (s *session) runRetriable(
 func (s *session) ReadTransaction(
 	work TransactionWork, configurers ...func(*TransactionConfig)) (interface{}, error) {
 
-	return s.runRetriable(db.ReadMode, work, configurers...)
+	return s.runRetriable(connection.ReadMode, work, configurers...)
 }
 
 func (s *session) WriteTransaction(
 	work TransactionWork, configurers ...func(*TransactionConfig)) (interface{}, error) {
 
-	return s.runRetriable(db.WriteMode, work, configurers...)
+	return s.runRetriable(connection.WriteMode, work, configurers...)
 }
 
-func (s *session) borrowConn(mode db.AccessMode) error {
+func (s *session) borrowConn(mode connection.AccessMode) error {
 	var servers []string
 	var err error
-	if mode == db.ReadMode {
+	if mode == connection.ReadMode {
 		servers, err = s.router.Readers(s.databaseName)
 	} else {
 		servers, err = s.router.Writers(s.databaseName)
@@ -392,11 +392,11 @@ func (s *session) borrowConn(mode db.AccessMode) error {
 	if err != nil {
 		return err
 	}
-	s.conn = conn.(db.Connection)
+	s.conn = conn.(connection.Connection)
 
 	// Select database on server
-	if s.databaseName != db.DefaultDatabase {
-		dbSelector, ok := s.conn.(db.DatabaseSelector)
+	if s.databaseName != connection.DefaultDatabase {
+		dbSelector, ok := s.conn.(connection.DatabaseSelector)
 		if !ok {
 			return errors.New("Database does not support multidatabase")
 		}
@@ -460,7 +460,7 @@ func (s *session) Run(
 		// To be backwards compatible we delay the error here if it is a database error.
 		// The old implementation just sent all the commands and didn't wait for an answer
 		// until starting to consume or iterate.
-		if _, isDbErr := err.(*db.DatabaseError); isDbErr {
+		if _, isDbErr := err.(*connection.DatabaseError); isDbErr {
 			return &delayedErrorResult{err: err}, nil
 		}
 		return nil, err

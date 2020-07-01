@@ -24,19 +24,19 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/neo4j/neo4j-go-driver/neo4j/dbtype"
 	"github.com/neo4j/neo4j-go-driver/neo4j/internal/packstream"
-	"github.com/neo4j/neo4j-go-driver/neo4j/types"
 )
 
 // Called by packstream during packing when it encounters an unknown type.
 func dehydrate(x interface{}) (*packstream.Struct, error) {
 	switch v := x.(type) {
-	case *types.Point2D:
+	case *dbtype.Point2D:
 		return &packstream.Struct{
 			Tag:    packstream.StructTag('X'),
 			Fields: []interface{}{v.SpatialRefId, v.X, v.Y},
 		}, nil
-	case *types.Point3D:
+	case *dbtype.Point3D:
 		return &packstream.Struct{
 			Tag:    packstream.StructTag('Y'),
 			Fields: []interface{}{v.SpatialRefId, v.X, v.Y, v.Z},
@@ -55,29 +55,29 @@ func dehydrate(x interface{}) (*packstream.Struct, error) {
 			fields[2] = v.Location().String()
 			return &packstream.Struct{Tag: packstream.StructTag('f'), Fields: fields}, nil
 		}
-	case types.LocalDateTime:
+	case dbtype.LocalDateTime:
 		t := time.Time(v)
 		_, offset := t.Zone()
 		secs := t.Unix() + int64(offset)
 		fields := []interface{}{secs, t.Nanosecond()}
 		return &packstream.Struct{Tag: packstream.StructTag('d'), Fields: fields}, nil
-	case types.Date:
+	case dbtype.Date:
 		t := time.Time(v)
 		secs := t.Unix()
 		_, offset := t.Zone()
 		secs += int64(offset)
 		days := secs / (60 * 60 * 24)
 		return &packstream.Struct{Tag: packstream.StructTag('D'), Fields: []interface{}{days}}, nil
-	case types.Time:
+	case dbtype.Time:
 		t := time.Time(v)
 		_, tzOffsetSecs := t.Zone()
 		d := t.Sub(time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, t.Location()))
 		return &packstream.Struct{Tag: packstream.StructTag('T'), Fields: []interface{}{d.Nanoseconds(), tzOffsetSecs}}, nil
-	case types.LocalTime:
+	case dbtype.LocalTime:
 		t := time.Time(v)
 		nanos := int64(time.Hour)*int64(t.Hour()) + int64(time.Minute)*int64(t.Minute()) + int64(time.Second)*int64(t.Second()) + int64(t.Nanosecond())
 		return &packstream.Struct{Tag: packstream.StructTag('t'), Fields: []interface{}{nanos}}, nil
-	case types.Duration:
+	case dbtype.Duration:
 		return &packstream.Struct{Tag: packstream.StructTag('E'), Fields: []interface{}{v.Months, v.Days, v.Seconds, v.Nanos}}, nil
 	default:
 		return nil, errors.New(fmt.Sprintf("Unable to dehydrate type %T", x))

@@ -20,9 +20,10 @@
 package neo4j
 
 import (
-	"github.com/neo4j/neo4j-go-driver/neo4j/types"
+	"github.com/neo4j/neo4j-go-driver/neo4j/dbtype"
 )
 
 type (
-	Point2D = types.Point2D
+	Point2D = dbtype.Point2D
+	Point3D = dbtype.Point3D
 )
