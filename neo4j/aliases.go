@@ -23,7 +23,18 @@ import (
 	"github.com/neo4j/neo4j-go-driver/neo4j/dbtype"
 )
 
+// Aliases for simpler usage (fewer imports)
+// A separate type package is needed to avoid circular package references and to avoid
+// unnecessary copying/conversions between structs.
 type (
-	Point2D = dbtype.Point2D
-	Point3D = dbtype.Point3D
+	Point2D       = dbtype.Point2D
+	Point3D       = dbtype.Point3D
+	Date          = dbtype.Date
+	LocalTime     = dbtype.LocalTime
+	LocalDateTime = dbtype.LocalDateTime
+	Time          = dbtype.Time // AKA OffsetTime
+	Duration      = dbtype.Duration
+	Node          = dbtype.Node
+	Relationship  = dbtype.Relationship
+	Path          = dbtype.Path
 )

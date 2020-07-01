@@ -17,7 +17,7 @@
  * limitations under the License.
  */
 
-package connection
+package dbtype
 
 import (
 	"fmt"

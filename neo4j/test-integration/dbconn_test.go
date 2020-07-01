@@ -30,11 +30,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/neo4j/neo4j-go-driver/neo4j/dbtype"
 	"github.com/neo4j/neo4j-go-driver/neo4j/internal/bolt"
 	"github.com/neo4j/neo4j-go-driver/neo4j/internal/db"
 	"github.com/neo4j/neo4j-go-driver/neo4j/internal/log"
 	"github.com/neo4j/neo4j-go-driver/neo4j/test-integration/control"
-	"github.com/neo4j/neo4j-go-driver/neo4j/types"
 )
 
 func makeRawConnection(logger log.Logger) db.Connection {
@@ -408,7 +408,7 @@ func TestConnectionConformance(ot *testing.T) {
 		}
 	}
 
-	assertDuration := func(t *testing.T, dur1, dur2 types.Duration) {
+	assertDuration := func(t *testing.T, dur1, dur2 dbtype.Duration) {
 		t.Helper()
 		if !reflect.DeepEqual(dur1, dur2) {
 			t.Errorf("Duration %+v vs %+v", dur1, dur2)
@@ -434,7 +434,7 @@ func TestConnectionConformance(ot *testing.T) {
 		tDateTimeZ := time.Date(1959, 5, 31, 23, 49, 59, 999999999, london)
 		tLocalTime := time.Date(0, 0, 0, 23, 49, 59, 999999999, time.Local)
 		tLocalDateTime := time.Date(1859, 5, 31, 23, 49, 59, 999999999, time.Local)
-		tDuration := types.Duration{Months: 16, Days: 45, Seconds: 120, Nanos: 187309812}
+		tDuration := dbtype.Duration{Months: 16, Days: 45, Seconds: 120, Nanos: 187309812}
 
 		tt.Run("Reading", func(t *testing.T) {
 			query := "RETURN " +
@@ -448,11 +448,11 @@ func TestConnectionConformance(ot *testing.T) {
 
 			// Verify each temporal type
 			// Time
-			gotTime := time.Time(rec.Values[0].(types.Time))
+			gotTime := time.Time(rec.Values[0].(dbtype.Time))
 			assertTime(t, gotTime, tTime)
 			assertTimeOffset(t, gotTime, tTime)
 			// Date
-			gotDate := time.Time(rec.Values[1].(types.Date))
+			gotDate := time.Time(rec.Values[1].(dbtype.Date))
 			assertDate(t, gotDate, tDate)
 			// DateTime, offset
 			gotDateTime := time.Time(rec.Values[2].(time.Time))
@@ -465,14 +465,14 @@ func TestConnectionConformance(ot *testing.T) {
 			assertTime(t, gotDateTime, tDateTimeZ)
 			assertTimeZone(t, gotDateTime, tDateTimeZ)
 			// Local time
-			gotTime = time.Time(rec.Values[4].(types.LocalTime))
+			gotTime = time.Time(rec.Values[4].(dbtype.LocalTime))
 			assertTime(t, gotTime, tLocalTime)
 			// Local DateTime
-			gotDateTime = time.Time(rec.Values[5].(types.LocalDateTime))
+			gotDateTime = time.Time(rec.Values[5].(dbtype.LocalDateTime))
 			assertDate(t, time.Time(gotDateTime), tLocalDateTime)
 			assertTime(t, gotDateTime, tLocalDateTime)
 			// Duration
-			gotDuration := rec.Values[6].(types.Duration)
+			gotDuration := rec.Values[6].(dbtype.Duration)
 			assertDuration(t, gotDuration, tDuration)
 		})
 
@@ -487,12 +487,12 @@ func TestConnectionConformance(ot *testing.T) {
 					"RETURN n",
 				map[string]interface{}{
 					"r":             r,
-					"time":          types.Time(tTime),
-					"date":          types.Date(tDate),
+					"time":          dbtype.Time(tTime),
+					"date":          dbtype.Date(tDate),
 					"dateTimeO":     tDateTimeO,
 					"dateTimeZ":     tDateTimeZ,
-					"localTime":     types.LocalTime(tLocalTime),
-					"localDateTime": types.LocalDateTime(tLocalDateTime),
+					"localTime":     dbtype.LocalTime(tLocalTime),
+					"localDateTime": dbtype.LocalDateTime(tLocalDateTime),
 				}, db.WriteMode, nil, 0, nil)
 			rec, sum, err := boltConn.Next(stream.Handle)
 			if rec == nil || err != nil || sum != nil {
@@ -503,11 +503,11 @@ func TestConnectionConformance(ot *testing.T) {
 			// errors here should be due to writing).
 			node := rec.Values[0].(*types.Node)
 			// Time
-			gotTime := time.Time(node.Props["time"].(types.Time))
+			gotTime := time.Time(node.Props["time"].(dbtype.Time))
 			assertTime(t, gotTime, tTime)
 			assertTimeOffset(t, gotTime, tTime)
 			// Date
-			gotDate := time.Time(node.Props["date"].(types.Date))
+			gotDate := time.Time(node.Props["date"].(dbtype.Date))
 			assertDate(t, gotDate, tDate)
 			// DateTime, offset
 			gotDateTime := time.Time(node.Props["dateTimeO"].(time.Time))
@@ -520,10 +520,10 @@ func TestConnectionConformance(ot *testing.T) {
 			assertTime(t, gotDateTime, tDateTimeZ)
 			assertTimeZone(t, gotDateTime, tDateTimeZ)
 			// Local time
-			gotTime = time.Time(node.Props["localTime"].(types.LocalTime))
+			gotTime = time.Time(node.Props["localTime"].(dbtype.LocalTime))
 			assertTime(t, gotTime, tLocalTime)
 			// Local DateTime
-			gotDateTime = time.Time(node.Props["localDateTime"].(types.LocalDateTime))
+			gotDateTime = time.Time(node.Props["localDateTime"].(dbtype.LocalDateTime))
 			assertDate(t, time.Time(gotDateTime), tLocalDateTime)
 			assertTime(t, gotDateTime, tLocalDateTime)
 		})

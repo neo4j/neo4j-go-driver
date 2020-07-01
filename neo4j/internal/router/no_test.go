@@ -23,7 +23,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/neo4j/neo4j-go-driver/neo4j/internal/db"
+	"github.com/neo4j/neo4j-go-driver/neo4j/connection"
 	poolpackage "github.com/neo4j/neo4j-go-driver/neo4j/internal/pool"
 )
 
@@ -43,7 +43,7 @@ func (p *poolFake) Return(c poolpackage.Connection) {
 
 type connFake struct {
 	name  string
-	table *db.RoutingTable
+	table *connection.RoutingTable
 	err   error
 }
 
@@ -65,7 +65,7 @@ func (c *connFake) Birthdate() time.Time {
 	return time.Now()
 }
 
-func (c *connFake) GetRoutingTable(database string, context map[string]string) (*db.RoutingTable, error) {
+func (c *connFake) GetRoutingTable(database string, context map[string]string) (*connection.RoutingTable, error) {
 	return c.table, c.err
 }
 

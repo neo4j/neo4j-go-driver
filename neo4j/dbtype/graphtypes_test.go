@@ -17,7 +17,7 @@
  * limitations under the License.
  */
 
-package connection
+package dbtype
 
 import (
 	"testing"
@@ -25,14 +25,14 @@ import (
 
 func TestGraphPath(ot *testing.T) {
 	cases := []struct {
-		name    string
-		rawPath Path
-		nodes   []int64
-		rels    []Relationship
+		name  string
+		path  Path
+		nodes []int64
+		rels  []Relationship
 	}{
 		{
 			name: "Two nodes",
-			rawPath: Path{
+			path: Path{
 				Nodes:    []*Node{&Node{Id: 1}, &Node{Id: 2}},
 				RelNodes: []*RelNode{&RelNode{Id: 3, Type: "x"}},
 				Indexes:  []int{1, 1},
@@ -44,7 +44,7 @@ func TestGraphPath(ot *testing.T) {
 		},
 		{
 			name: "Two nodes reverse",
-			rawPath: Path{
+			path: Path{
 				Nodes:    []*Node{&Node{Id: 1}, &Node{Id: 2}},
 				RelNodes: []*RelNode{&RelNode{Id: 3, Type: "x"}},
 				Indexes:  []int{-1, 1},
@@ -57,19 +57,14 @@ func TestGraphPath(ot *testing.T) {
 	}
 	for _, c := range cases {
 		ot.Run(c.name, func(t *testing.T) {
-			p := path{path: &c.rawPath}
-			nodes := p.Nodes()
-			if len(nodes) != len(c.nodes) {
-				t.Errorf("Wrong numbber of nodes")
-			}
+			p := c.path
 			rels := p.Relationships()
 			if len(rels) != len(c.rels) {
 				t.Errorf("Wrong numbber of relationships")
 			}
-			for i, reli := range rels {
+			for i, rel := range rels {
 				// Compare expected relationship, hard cast interface
 				// to known implementation.
-				rel := reli.(*relationship).rel
 				erel := c.rels[i]
 				if rel.Id != erel.Id {
 					t.Errorf("Relation %d not as expected, ids differ", i)

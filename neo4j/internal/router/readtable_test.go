@@ -24,14 +24,14 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/neo4j/neo4j-go-driver/neo4j/internal/db"
+	"github.com/neo4j/neo4j-go-driver/neo4j/connection"
 	poolpackage "github.com/neo4j/neo4j-go-driver/neo4j/internal/pool"
 )
 
 func TestReadTableTable(ot *testing.T) {
 	standardRouters := []string{"router1", "router2"}
 
-	assertNoTable := func(t *testing.T, table *db.RoutingTable, err error) {
+	assertNoTable := func(t *testing.T, table *connection.RoutingTable, err error) {
 		t.Helper()
 		if table != nil {
 			t.Error("Shouldn't be a table")
@@ -43,7 +43,7 @@ func TestReadTableTable(ot *testing.T) {
 		_ = err.(*ReadRoutingTableError)
 	}
 
-	assertTable := func(t *testing.T, table *db.RoutingTable, err error) {
+	assertTable := func(t *testing.T, table *connection.RoutingTable, err error) {
 		t.Helper()
 		if table == nil {
 			t.Fatalf("Should be a table, error: %s", err)
@@ -57,7 +57,7 @@ func TestReadTableTable(ot *testing.T) {
 		name       string
 		routers    []string
 		pool       *poolFake
-		assert     func(t *testing.T, table *db.RoutingTable, err error)
+		assert     func(t *testing.T, table *connection.RoutingTable, err error)
 		numReturns int
 	}{
 		{
@@ -84,7 +84,7 @@ func TestReadTableTable(ot *testing.T) {
 			assert:  assertTable,
 			pool: &poolFake{
 				borrow: func(names []string, cancel context.CancelFunc) (poolpackage.Connection, error) {
-					return &connFake{table: &db.RoutingTable{}}, nil
+					return &connFake{table: &connection.RoutingTable{}}, nil
 				},
 			},
 			numReturns: 1,
@@ -96,7 +96,7 @@ func TestReadTableTable(ot *testing.T) {
 			pool: &poolFake{
 				borrow: func(names []string, cancel context.CancelFunc) (poolpackage.Connection, error) {
 					if names[0] == "router2" {
-						return &connFake{table: &db.RoutingTable{}}, nil
+						return &connFake{table: &connection.RoutingTable{}}, nil
 					}
 					return nil, errors.New("borrow fail")
 				},

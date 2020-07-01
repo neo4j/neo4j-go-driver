@@ -23,8 +23,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/neo4j/neo4j-go-driver/neo4j/internal/connection"
-	"github.com/neo4j/neo4j-go-driver/neo4j/types"
+	"github.com/neo4j/neo4j-go-driver/neo4j/connection"
+	"github.com/neo4j/neo4j-go-driver/neo4j/dbtype"
 )
 
 func assertOnlyRecord(t *testing.T, rec *connection.Record, sum *connection.Summary, err error) {
@@ -153,7 +153,7 @@ func assertZoneOffsetSame(t *testing.T, t1, t2 time.Time) {
 	}
 }
 
-func assertDurationSame(t *testing.T, d1, d2 types.Duration) {
+func assertDurationSame(t *testing.T, d1, d2 dbtype.Duration) {
 	t.Helper()
 	if d1.Months != d2.Months {
 		t.Errorf("Months differ, %d vs %d", d1.Months, d2.Months)

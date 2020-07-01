@@ -17,8 +17,9 @@
  * limitations under the License.
  */
 
-package neo4j
+package dbtype
 
+/*
 import (
 	"time"
 
@@ -337,3 +338,4 @@ var _ = Describe("Temporal Types", func() {
 			Entry("P-10M-5DT-1.999999500S", -10, -5, -2, 500, "P-10M-5DT-1.999999500S"))
 	})
 })
+*/
