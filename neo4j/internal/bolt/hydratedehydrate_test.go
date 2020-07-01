@@ -25,9 +25,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/neo4j/neo4j-go-driver/neo4j/internal/db"
+	"github.com/neo4j/neo4j-go-driver/neo4j/connection"
+	"github.com/neo4j/neo4j-go-driver/neo4j/dbtype"
 	"github.com/neo4j/neo4j-go-driver/neo4j/internal/packstream"
-	"github.com/neo4j/neo4j-go-driver/neo4j/types"
 )
 
 func TestHydrator(ot *testing.T) {
@@ -48,7 +48,7 @@ func TestHydrator(ot *testing.T) {
 			tag:  'N',
 			fields: []interface{}{
 				int64(112), []interface{}{"lbl1", "lbl2"}, map[string]interface{}{"prop1": 2}},
-			hydrated: &types.Node{Id: 112, Labels: []string{"lbl1", "lbl2"}, Props: map[string]interface{}{"prop1": 2}},
+			hydrated: &dbtype.Node{Id: 112, Labels: []string{"lbl1", "lbl2"}, Props: map[string]interface{}{"prop1": 2}},
 		},
 		{
 			name:       "Node, no fields",
@@ -61,7 +61,7 @@ func TestHydrator(ot *testing.T) {
 			tag:  'R',
 			fields: []interface{}{
 				int64(3), int64(1), int64(2), "lbl1", map[string]interface{}{"propx": 3}},
-			hydrated: &types.Relationship{Id: 3, StartId: 1, EndId: 2, Type: "lbl1", Props: map[string]interface{}{"propx": 3}},
+			hydrated: &dbtype.Relationship{Id: 3, StartId: 1, EndId: 2, Type: "lbl1", Props: map[string]interface{}{"propx": 3}},
 		},
 		{
 			name:       "Relationship, no fields",
@@ -73,13 +73,13 @@ func TestHydrator(ot *testing.T) {
 			name: "Path",
 			tag:  'P',
 			fields: []interface{}{
-				[]interface{}{&types.Node{}, &types.Node{}},
-				[]interface{}{&types.RelNode{}},
+				[]interface{}{&dbtype.Node{}, &dbtype.Node{}},
+				[]interface{}{&dbtype.RelNode{}},
 				[]interface{}{int64(1), int64(1)},
 			},
-			hydrated: &types.Path{
-				Nodes:    []*types.Node{&types.Node{}, &types.Node{}},
-				RelNodes: []*types.RelNode{&types.RelNode{}},
+			hydrated: &dbtype.Path{
+				Nodes:    []*dbtype.Node{&dbtype.Node{}, &dbtype.Node{}},
+				RelNodes: []*dbtype.RelNode{&dbtype.RelNode{}},
 				Indexes:  []int{1, 1},
 			},
 		},
@@ -88,13 +88,13 @@ func TestHydrator(ot *testing.T) {
 			tag:  'r',
 			fields: []interface{}{
 				int64(3), "lbl1", map[string]interface{}{"propx": 3}},
-			hydrated: &types.RelNode{Id: 3, Type: "lbl1", Props: map[string]interface{}{"propx": 3}},
+			hydrated: &dbtype.RelNode{Id: 3, Type: "lbl1", Props: map[string]interface{}{"propx": 3}},
 		},
 		{
 			name:   "Point2D",
 			tag:    'X',
 			fields: []interface{}{int64(1), float64(2.0), float64(3.0)},
-			hydrated: &types.Point2D{
+			hydrated: &dbtype.Point2D{
 				SpatialRefId: 1,
 				X:            2.0,
 				Y:            3.0,
@@ -104,7 +104,7 @@ func TestHydrator(ot *testing.T) {
 			name:   "Point3D",
 			tag:    'Y',
 			fields: []interface{}{int64(1), float64(2.0), float64(3.0), float64(4.0)},
-			hydrated: &types.Point3D{
+			hydrated: &dbtype.Point3D{
 				SpatialRefId: 1,
 				X:            2.0,
 				Y:            3.0,
@@ -127,7 +127,7 @@ func TestHydrator(ot *testing.T) {
 			name:     "Failure response",
 			tag:      msgFailure,
 			fields:   []interface{}{map[string]interface{}{"code": "Code", "message": "Msg"}},
-			hydrated: &db.DatabaseError{Code: "Code", Msg: "Msg"},
+			hydrated: &connection.DatabaseError{Code: "Code", Msg: "Msg"},
 		},
 		{
 			name:     "Record response",
@@ -159,12 +159,12 @@ func TestDehydrator(ot *testing.T) {
 	}{
 		{
 			name: "Point2D",
-			x:    &types.Point2D{SpatialRefId: 7, X: 8.0, Y: 9.0},
+			x:    &dbtype.Point2D{SpatialRefId: 7, X: 8.0, Y: 9.0},
 			s:    &packstream.Struct{Tag: 'X', Fields: []interface{}{uint32(7), 8.0, 9.0}},
 		},
 		{
 			name: "Point3D",
-			x:    &types.Point3D{SpatialRefId: 7, X: 8.0, Y: 9.0, Z: 10},
+			x:    &dbtype.Point3D{SpatialRefId: 7, X: 8.0, Y: 9.0, Z: 10},
 			s:    &packstream.Struct{Tag: 'Y', Fields: []interface{}{uint32(7), 8.0, 9.0, 10.0}},
 		},
 	}
@@ -225,7 +225,7 @@ func TestDehydrateHydrate(ot *testing.T) {
 		ni := time.Now().Round(0 * time.Nanosecond)
 		l, _ := time.LoadLocation("America/New_York")
 		ni = ni.In(l).Round(0 * time.Nanosecond)
-		no := dehydrateAndHydrate(t, types.LocalDateTime(ni)).(types.LocalDateTime)
+		no := dehydrateAndHydrate(t, dbtype.LocalDateTime(ni)).(dbtype.LocalDateTime)
 		assertTimeSame(t, ni, time.Time(no))
 		assertDateSame(t, ni, time.Time(no))
 		// Received time should be in Local time even if sent as something else
@@ -237,7 +237,7 @@ func TestDehydrateHydrate(ot *testing.T) {
 	ot.Run("LocalDateTime way back", func(t *testing.T) {
 		l, _ := time.LoadLocation("Asia/Anadyr")
 		ni := time.Date(311, 7, 2, 23, 59, 3, 1, l)
-		no := dehydrateAndHydrate(t, types.LocalDateTime(ni)).(types.LocalDateTime)
+		no := dehydrateAndHydrate(t, dbtype.LocalDateTime(ni)).(dbtype.LocalDateTime)
 		assertTimeSame(t, ni, time.Time(no))
 		assertDateSame(t, ni, time.Time(no))
 		// Received time should be in Local time even if sent as something else
@@ -250,7 +250,7 @@ func TestDehydrateHydrate(ot *testing.T) {
 		ni := time.Now()
 		l, _ := time.LoadLocation("America/New_York")
 		ni = ni.In(l)
-		no := dehydrateAndHydrate(t, types.Date(ni)).(types.Date)
+		no := dehydrateAndHydrate(t, dbtype.Date(ni)).(dbtype.Date)
 		assertDateSame(t, ni, time.Time(no))
 	})
 
@@ -258,7 +258,7 @@ func TestDehydrateHydrate(ot *testing.T) {
 		ni := time.Now()
 		l, _ := time.LoadLocation("America/New_York")
 		ni = ni.In(l)
-		no := dehydrateAndHydrate(t, types.Time(ni)).(types.Time)
+		no := dehydrateAndHydrate(t, dbtype.Time(ni)).(dbtype.Time)
 		assertZoneOffsetSame(t, ni, time.Time(no))
 		assertTimeSame(t, ni, time.Time(no))
 	})
@@ -267,13 +267,13 @@ func TestDehydrateHydrate(ot *testing.T) {
 		ni := time.Now()
 		l, _ := time.LoadLocation("America/New_York")
 		ni = ni.In(l)
-		no := dehydrateAndHydrate(t, types.LocalTime(ni)).(types.LocalTime)
+		no := dehydrateAndHydrate(t, dbtype.LocalTime(ni)).(dbtype.LocalTime)
 		assertTimeSame(t, ni, time.Time(no))
 	})
 
 	ot.Run("Duration", func(t *testing.T) {
-		di := types.Duration{Months: 3, Days: 3, Seconds: 9000, Nanos: 13}
-		do := dehydrateAndHydrate(t, di).(types.Duration)
+		di := dbtype.Duration{Months: 3, Days: 3, Seconds: 9000, Nanos: 13}
+		do := dehydrateAndHydrate(t, di).(dbtype.Duration)
 		assertDurationSame(t, di, do)
 	})
 }

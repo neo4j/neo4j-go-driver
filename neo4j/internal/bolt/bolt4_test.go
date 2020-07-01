@@ -22,7 +22,7 @@ package bolt
 import (
 	"testing"
 
-	"github.com/neo4j/neo4j-go-driver/neo4j/internal/db"
+	"github.com/neo4j/neo4j-go-driver/neo4j/connection"
 	"github.com/neo4j/neo4j-go-driver/neo4j/internal/packstream"
 )
 
@@ -102,7 +102,7 @@ func TestBolt4(ot *testing.T) {
 		defer cleanup()
 		defer bolt.Close()
 
-		str, _ := bolt.Run("MATCH (n) RETURN n", nil, db.ReadMode, nil, 0, nil)
+		str, _ := bolt.Run("MATCH (n) RETURN n", nil, connection.ReadMode, nil, 0, nil)
 		assertKeys(t, keys, str)
 		assertBoltState(t, bolt4_streaming, bolt)
 
@@ -125,7 +125,7 @@ func TestBolt4(ot *testing.T) {
 		defer cleanup()
 		defer bolt.Close()
 
-		tx, err := bolt.TxBegin(db.ReadMode, nil, 0, nil)
+		tx, err := bolt.TxBegin(connection.ReadMode, nil, 0, nil)
 		assertNoError(t, err)
 		assertBoltState(t, bolt4_pendingtx, bolt)
 		str, err := bolt.RunTx(tx, "MATCH (n) RETURN n", nil)
@@ -155,7 +155,7 @@ func TestBolt4(ot *testing.T) {
 		defer cleanup()
 		defer bolt.Close()
 
-		tx, err := bolt.TxBegin(db.ReadMode, nil, 0, nil)
+		tx, err := bolt.TxBegin(connection.ReadMode, nil, 0, nil)
 		assertNoError(t, err)
 		assertBoltState(t, bolt4_pendingtx, bolt)
 		str, err := bolt.RunTx(tx, "MATCH (n) RETURN n", nil)
@@ -194,7 +194,7 @@ func TestBolt4(ot *testing.T) {
 		defer cleanup()
 		defer bolt.Close()
 
-		str, err := bolt.Run("MATCH (n) RETURN n", nil, db.ReadMode, nil, 0, nil)
+		str, err := bolt.Run("MATCH (n) RETURN n", nil, connection.ReadMode, nil, 0, nil)
 		assertNoError(t, err)
 		assertBoltState(t, bolt4_streaming, bolt)
 
@@ -223,7 +223,7 @@ func TestBolt4(ot *testing.T) {
 		defer bolt.Close()
 
 		// Fake syntax error that doesn't really matter...
-		_, err := bolt.Run("MATCH (n RETURN n", nil, db.ReadMode, nil, 0, nil)
+		_, err := bolt.Run("MATCH (n RETURN n", nil, connection.ReadMode, nil, 0, nil)
 		assertDatabaseError(t, err)
 		assertBoltState(t, bolt4_failed, bolt)
 
@@ -240,7 +240,7 @@ func TestBolt4(ot *testing.T) {
 		defer cleanup()
 		defer bolt.Close()
 
-		_, err := bolt.Run("MATCH (n) RETURN n", nil, db.ReadMode, nil, 0, nil)
+		_, err := bolt.Run("MATCH (n) RETURN n", nil, connection.ReadMode, nil, 0, nil)
 		assertNoError(t, err)
 		assertBoltState(t, bolt4_streaming, bolt)
 

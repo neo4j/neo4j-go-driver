@@ -17,7 +17,7 @@
  *  limitations under the License.
  */
 
-package connection
+package dbtype
 
 // Node represents a node in the neo4j graph database
 type Node struct {
