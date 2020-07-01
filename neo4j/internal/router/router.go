@@ -27,7 +27,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/neo4j/neo4j-go-driver/neo4j/internal/db"
+	"github.com/neo4j/neo4j-go-driver/neo4j/connection"
 	"github.com/neo4j/neo4j-go-driver/neo4j/internal/log"
 	"github.com/neo4j/neo4j-go-driver/neo4j/internal/pool"
 )
@@ -36,7 +36,7 @@ const missingWriterRetries = 100
 
 type databaseRouter struct {
 	dueUnix int64
-	table   *db.RoutingTable
+	table   *connection.RoutingTable
 }
 
 // Thread safe
@@ -77,7 +77,7 @@ func New(rootRouter string, getRouters func() []string, routerContext map[string
 	return r
 }
 
-func (r *Router) getTable(database string) (*db.RoutingTable, error) {
+func (r *Router) getTable(database string) (*connection.RoutingTable, error) {
 	now := r.now()
 
 	r.dbRoutersMut.Lock()

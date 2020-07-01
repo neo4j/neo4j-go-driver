@@ -23,11 +23,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/neo4j/neo4j-go-driver/neo4j/internal/db"
-	"github.com/neo4j/neo4j-go-driver/neo4j/internal/types"
+	"github.com/neo4j/neo4j-go-driver/neo4j/internal/connection"
+	"github.com/neo4j/neo4j-go-driver/neo4j/types"
 )
 
-func assertOnlyRecord(t *testing.T, rec *db.Record, sum *db.Summary, err error) {
+func assertOnlyRecord(t *testing.T, rec *connection.Record, sum *connection.Summary, err error) {
 	t.Helper()
 	if rec == nil {
 		t.Errorf("Expected record")
@@ -40,7 +40,7 @@ func assertOnlyRecord(t *testing.T, rec *db.Record, sum *db.Summary, err error) 
 	}
 }
 
-func assertOnlySummary(t *testing.T, rec *db.Record, sum *db.Summary, err error) {
+func assertOnlySummary(t *testing.T, rec *connection.Record, sum *connection.Summary, err error) {
 	t.Helper()
 	if rec != nil {
 		t.Errorf("Didn't expect record")
@@ -53,7 +53,7 @@ func assertOnlySummary(t *testing.T, rec *db.Record, sum *db.Summary, err error)
 	}
 }
 
-func assertOnlyError(t *testing.T, rec *db.Record, sum *db.Summary, err error) {
+func assertOnlyError(t *testing.T, rec *connection.Record, sum *connection.Summary, err error) {
 	t.Helper()
 	if rec != nil {
 		t.Errorf("Didn't expect record")
@@ -66,7 +66,7 @@ func assertOnlyError(t *testing.T, rec *db.Record, sum *db.Summary, err error) {
 	}
 }
 
-func assertKeys(t *testing.T, ekeys []interface{}, s *db.Stream) {
+func assertKeys(t *testing.T, ekeys []interface{}, s *connection.Stream) {
 	t.Helper()
 	if s == nil {
 		t.Fatal("No stream")
@@ -95,7 +95,7 @@ func assertError(t *testing.T, err error) {
 func assertDatabaseError(t *testing.T, err error) {
 	t.Helper()
 	assertError(t, err)
-	_, isDbErr := err.(*db.DatabaseError)
+	_, isDbErr := err.(*connection.DatabaseError)
 	if !isDbErr {
 		t.Errorf("Expected database error but was %T: %s", err, err)
 	}

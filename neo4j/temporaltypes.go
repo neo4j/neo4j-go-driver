@@ -20,13 +20,13 @@
 package neo4j
 
 import (
-	"github.com/neo4j/neo4j-go-driver/neo4j/types"
+	"github.com/neo4j/neo4j-go-driver/neo4j/dbtype"
 )
 
 type (
-	Date          = types.Date
-	LocalTime     = types.LocalTime
-	LocalDateTime = types.LocalDateTime
-	Time          = types.Time // AKA OffsetTime
-	Duration      = types.Duration
+	Date          = dbtype.Date
+	LocalTime     = dbtype.LocalTime
+	LocalDateTime = dbtype.LocalDateTime
+	Time          = dbtype.Time // AKA OffsetTime
+	Duration      = dbtype.Duration
 )

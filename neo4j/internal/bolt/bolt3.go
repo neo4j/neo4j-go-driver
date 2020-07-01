@@ -25,10 +25,9 @@ import (
 	"net"
 	"time"
 
-	"github.com/neo4j/neo4j-go-driver/neo4j/internal/db"
+	"github.com/neo4j/neo4j-go-driver/neo4j/connection"
 	"github.com/neo4j/neo4j-go-driver/neo4j/internal/log"
 	"github.com/neo4j/neo4j-go-driver/neo4j/internal/packstream"
-	"github.com/neo4j/neo4j-go-driver/neo4j/types"
 )
 
 const (
@@ -42,7 +41,7 @@ const (
 )
 
 type internalTx3 struct {
-	mode      db.AccessMode
+	mode      connection.AccessMode
 	bookmarks []string
 	timeout   time.Duration
 	txMeta    map[string]interface{}
@@ -50,7 +49,7 @@ type internalTx3 struct {
 
 func (i *internalTx3) toMeta() map[string]interface{} {
 	meta := map[string]interface{}{}
-	if i.mode == db.ReadMode {
+	if i.mode == connection.ReadMode {
 		meta["mode"] = "r"
 	}
 	if len(i.bookmarks) > 0 {
@@ -170,7 +169,7 @@ func (b *bolt3) receiveSuccess() (*successResponse, error) {
 	switch v := msg.(type) {
 	case *successResponse:
 		return v, nil
-	case *db.DatabaseError:
+	case *connection.DatabaseError:
 		b.state = bolt3_failed
 		if v.IsClient() {
 			// These could include potentially large cypher statement, only log to debug
@@ -228,7 +227,7 @@ func (b *bolt3) connect(auth map[string]interface{}) error {
 }
 
 func (b *bolt3) TxBegin(
-	mode db.AccessMode, bookmarks []string, timeout time.Duration, txMeta map[string]interface{}) (db.Handle, error) {
+	mode connection.AccessMode, bookmarks []string, timeout time.Duration, txMeta map[string]interface{}) (connection.Handle, error) {
 
 	// Ok, to begin transaction while streaming auto-commit, just empty the stream and continue.
 	if b.state == bolt3_streaming {
@@ -268,7 +267,7 @@ func (b *bolt3) TxBegin(
 	return b.txId, nil
 }
 
-func (b *bolt3) TxCommit(txh db.Handle) error {
+func (b *bolt3) TxCommit(txh connection.Handle) error {
 	if err := assertHandle(b.logError, b.txId, txh); err != nil {
 		return err
 	}
@@ -319,7 +318,7 @@ func (b *bolt3) TxCommit(txh db.Handle) error {
 	return nil
 }
 
-func (b *bolt3) TxRollback(txh db.Handle) error {
+func (b *bolt3) TxRollback(txh connection.Handle) error {
 	if err := assertHandle(b.logError, b.txId, txh); err != nil {
 		return err
 	}
@@ -376,7 +375,7 @@ func (b *bolt3) consumeStream() error {
 	return nil
 }
 
-func (b *bolt3) run(cypher string, params map[string]interface{}, tx *internalTx3) (*db.Stream, error) {
+func (b *bolt3) run(cypher string, params map[string]interface{}, tx *internalTx3) (*connection.Stream, error) {
 	// If already streaming, consume the whole thing first
 	if err := b.consumeStream(); err != nil {
 		return nil, err
@@ -441,7 +440,7 @@ func (b *bolt3) run(cypher string, params map[string]interface{}, tx *internalTx
 	}
 
 	b.streamId = time.Now().Unix()
-	stream := &db.Stream{Keys: b.streamKeys, Handle: b.streamId}
+	stream := &connection.Stream{Keys: b.streamKeys, Handle: b.streamId}
 	return stream, nil
 }
 
@@ -454,8 +453,8 @@ func (b *bolt3) logDebug(err error) {
 }
 
 func (b *bolt3) Run(
-	cypher string, params map[string]interface{}, mode db.AccessMode,
-	bookmarks []string, timeout time.Duration, txMeta map[string]interface{}) (*db.Stream, error) {
+	cypher string, params map[string]interface{}, mode connection.AccessMode,
+	bookmarks []string, timeout time.Duration, txMeta map[string]interface{}) (*connection.Stream, error) {
 
 	if err := assertStates(b.logError, b.state, []int{bolt3_streaming, bolt3_ready}); err != nil {
 		return nil, err
@@ -470,7 +469,7 @@ func (b *bolt3) Run(
 	return b.run(cypher, params, &tx)
 }
 
-func (b *bolt3) RunTx(txh db.Handle, cypher string, params map[string]interface{}) (*db.Stream, error) {
+func (b *bolt3) RunTx(txh connection.Handle, cypher string, params map[string]interface{}) (*connection.Stream, error) {
 	if err := assertHandle(b.logError, b.txId, txh); err != nil {
 		return nil, err
 	}
@@ -481,7 +480,7 @@ func (b *bolt3) RunTx(txh db.Handle, cypher string, params map[string]interface{
 }
 
 // Reads one record from the stream.
-func (b *bolt3) Next(shandle db.Handle) (*types.Record, *db.Summary, error) {
+func (b *bolt3) Next(shandle connection.Handle) (*connection.Record, *connection.Summary, error) {
 	if err := assertHandle(b.logError, b.streamId, shandle); err != nil {
 		return nil, nil, err
 	}
@@ -496,7 +495,7 @@ func (b *bolt3) Next(shandle db.Handle) (*types.Record, *db.Summary, error) {
 	}
 
 	switch x := res.(type) {
-	case *types.Record:
+	case *connection.Record:
 		x.Keys = b.streamKeys
 		return x, nil, nil
 	case *successResponse:
@@ -524,7 +523,7 @@ func (b *bolt3) Next(shandle db.Handle) (*types.Record, *db.Summary, error) {
 		sum.ServerName = b.serverName
 		sum.TFirst = b.tfirst
 		return nil, sum, nil
-	case *db.DatabaseError:
+	case *connection.DatabaseError:
 		b.state = bolt3_failed
 		if x.IsClient() {
 			// These could include potentially large cypher statement, only log to debug
@@ -602,23 +601,23 @@ func (b *bolt3) Reset() {
 	}
 }
 
-func (b *bolt3) GetRoutingTable(database string, context map[string]string) (*db.RoutingTable, error) {
+func (b *bolt3) GetRoutingTable(database string, context map[string]string) (*connection.RoutingTable, error) {
 	if err := assertState(b.logError, b.state, bolt3_ready); err != nil {
 		return nil, err
 	}
 
-	if database != db.DefaultDatabase {
+	if database != connection.DefaultDatabase {
 		return nil, errors.New("Bolt 3 does not support routing to a specifiec database name")
 	}
 
 	// Only available when Neo4j is setup with clustering
 	const query = "CALL dbms.cluster.routing.getRoutingTable($context)"
-	stream, err := b.Run(query, map[string]interface{}{"context": context}, db.ReadMode, nil, 0, nil)
+	stream, err := b.Run(query, map[string]interface{}{"context": context}, connection.ReadMode, nil, 0, nil)
 	if err != nil {
 		// Give a better error
-		dbError, isDbError := err.(*db.DatabaseError)
+		dbError, isDbError := err.(*connection.DatabaseError)
 		if isDbError && dbError.Code == "Neo.ClientError.Procedure.ProcedureNotFound" {
-			return nil, &db.RoutingNotSupportedError{Server: b.serverName}
+			return nil, &connection.RoutingNotSupportedError{Server: b.serverName}
 		}
 		return nil, err
 	}

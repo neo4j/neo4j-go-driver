@@ -22,13 +22,13 @@ package router
 import (
 	"context"
 
-	"github.com/neo4j/neo4j-go-driver/neo4j/internal/db"
+	"github.com/neo4j/neo4j-go-driver/neo4j/connection"
 	poolpackage "github.com/neo4j/neo4j-go-driver/neo4j/internal/pool"
 )
 
 // Tries to read routing table from any of the specified routers using new or existing connection
 // from the supplied pool.
-func readTable(ctx context.Context, pool Pool, database string, routers []string, routerContext map[string]string) (*db.RoutingTable, error) {
+func readTable(ctx context.Context, pool Pool, database string, routers []string, routerContext map[string]string) (*connection.RoutingTable, error) {
 	// Preserve last error to be returned, set a default for case of no routers
 	var err error = &ReadRoutingTableError{}
 
@@ -47,14 +47,14 @@ func readTable(ctx context.Context, pool Pool, database string, routers []string
 		}
 		defer pool.Return(conn)
 
-		discovery, ok := conn.(db.ClusterDiscovery)
+		discovery, ok := conn.(connection.ClusterDiscovery)
 		if !ok {
-			err = &db.RoutingNotSupportedError{Server: conn.ServerName()}
+			err = &connection.RoutingNotSupportedError{Server: conn.ServerName()}
 			err = wrapInReadRoutingTableError(router, err)
 			continue
 		}
 
-		var table *db.RoutingTable
+		var table *connection.RoutingTable
 		table, err = discovery.GetRoutingTable(database, routerContext)
 		if err == nil {
 			return table, nil

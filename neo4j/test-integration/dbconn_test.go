@@ -33,8 +33,8 @@ import (
 	"github.com/neo4j/neo4j-go-driver/neo4j/internal/bolt"
 	"github.com/neo4j/neo4j-go-driver/neo4j/internal/db"
 	"github.com/neo4j/neo4j-go-driver/neo4j/internal/log"
-	"github.com/neo4j/neo4j-go-driver/neo4j/internal/types"
 	"github.com/neo4j/neo4j-go-driver/neo4j/test-integration/control"
+	"github.com/neo4j/neo4j-go-driver/neo4j/types"
 )
 
 func makeRawConnection(logger log.Logger) db.Connection {
