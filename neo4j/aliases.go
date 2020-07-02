@@ -20,6 +20,7 @@
 package neo4j
 
 import (
+	"github.com/neo4j/neo4j-go-driver/neo4j/connection"
 	"github.com/neo4j/neo4j-go-driver/neo4j/dbtype"
 )
 
@@ -37,4 +38,5 @@ type (
 	Node          = dbtype.Node
 	Relationship  = dbtype.Relationship
 	Path          = dbtype.Path
+	Record        = connection.Record
 )
