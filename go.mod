@@ -1,4 +1,4 @@
-module github.com/neo4j/neo4j-go-driver
+module github.com/neo4j/neo4j-go-driver/v4
 
 go 1.14
 

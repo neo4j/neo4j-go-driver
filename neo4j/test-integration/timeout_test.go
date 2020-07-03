@@ -22,9 +22,9 @@ package test_integration
 import (
 	"time"
 
-	"github.com/neo4j/neo4j-go-driver/neo4j"
-	"github.com/neo4j/neo4j-go-driver/neo4j/test-integration/control"
-	"github.com/neo4j/neo4j-go-driver/neo4j/test-integration/utils"
+	"github.com/neo4j/neo4j-go-driver/v4/neo4j"
+	"github.com/neo4j/neo4j-go-driver/v4/neo4j/test-integration/control"
+	"github.com/neo4j/neo4j-go-driver/v4/neo4j/test-integration/utils"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"

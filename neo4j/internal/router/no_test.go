@@ -23,8 +23,8 @@ import (
 	"context"
 	"time"
 
-	"github.com/neo4j/neo4j-go-driver/neo4j/connection"
-	poolpackage "github.com/neo4j/neo4j-go-driver/neo4j/internal/pool"
+	"github.com/neo4j/neo4j-go-driver/v4/neo4j/connection"
+	poolpackage "github.com/neo4j/neo4j-go-driver/v4/neo4j/internal/pool"
 )
 
 type poolFake struct {

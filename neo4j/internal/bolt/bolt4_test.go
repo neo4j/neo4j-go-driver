@@ -22,8 +22,8 @@ package bolt
 import (
 	"testing"
 
-	"github.com/neo4j/neo4j-go-driver/neo4j/connection"
-	"github.com/neo4j/neo4j-go-driver/neo4j/internal/packstream"
+	"github.com/neo4j/neo4j-go-driver/v4/neo4j/connection"
+	"github.com/neo4j/neo4j-go-driver/v4/neo4j/internal/packstream"
 )
 
 // bolt4.connect is tested through Connect, no need to test it here

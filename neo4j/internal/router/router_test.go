@@ -27,9 +27,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/neo4j/neo4j-go-driver/neo4j/connection"
-	"github.com/neo4j/neo4j-go-driver/neo4j/internal/log"
-	poolpackage "github.com/neo4j/neo4j-go-driver/neo4j/internal/pool"
+	"github.com/neo4j/neo4j-go-driver/v4/neo4j/connection"
+	"github.com/neo4j/neo4j-go-driver/v4/neo4j/internal/log"
+	poolpackage "github.com/neo4j/neo4j-go-driver/v4/neo4j/internal/pool"
 )
 
 var logger = &log.ConsoleLogger{Errors: true, Infos: true, Warns: true}

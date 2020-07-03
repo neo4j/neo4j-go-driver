@@ -22,7 +22,7 @@ package neo4j
 import (
 	"container/list"
 
-	"github.com/neo4j/neo4j-go-driver/neo4j/connection"
+	"github.com/neo4j/neo4j-go-driver/v4/neo4j/connection"
 )
 
 type Result interface {

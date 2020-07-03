@@ -25,8 +25,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/neo4j/neo4j-go-driver/neo4j/internal/db"
-	"github.com/neo4j/neo4j-go-driver/neo4j/internal/pool"
+	"github.com/neo4j/neo4j-go-driver/v4/neo4j/internal/db"
+	"github.com/neo4j/neo4j-go-driver/v4/neo4j/internal/pool"
 )
 
 func assertErrorEq(t *testing.T, err1, err2 error) {

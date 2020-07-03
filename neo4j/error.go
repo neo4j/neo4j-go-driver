@@ -21,8 +21,8 @@ package neo4j
 
 import (
 	"fmt"
-	"github.com/neo4j/neo4j-go-driver/neo4j/connection"
-	"github.com/neo4j/neo4j-go-driver/neo4j/internal/pool"
+	"github.com/neo4j/neo4j-go-driver/v4/neo4j/connection"
+	"github.com/neo4j/neo4j-go-driver/v4/neo4j/internal/pool"
 )
 
 type driverError struct {

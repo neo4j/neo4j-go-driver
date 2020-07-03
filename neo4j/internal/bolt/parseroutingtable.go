@@ -20,7 +20,7 @@
 package bolt
 
 import (
-	"github.com/neo4j/neo4j-go-driver/neo4j/connection"
+	"github.com/neo4j/neo4j-go-driver/v4/neo4j/connection"
 )
 
 // Parses a record assumed to contain a routing table into common db API routing table struct

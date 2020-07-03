@@ -25,7 +25,7 @@ import (
 	"net"
 	"testing"
 
-	"github.com/neo4j/neo4j-go-driver/neo4j/internal/packstream"
+	"github.com/neo4j/neo4j-go-driver/v4/neo4j/internal/packstream"
 )
 
 func passthroughHydrator(tag packstream.StructTag, fields []interface{}) (interface{}, error) {
