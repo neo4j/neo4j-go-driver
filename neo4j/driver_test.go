@@ -28,7 +28,7 @@ import (
 	. "github.com/onsi/ginkgo/extensions/table"
 	. "github.com/onsi/gomega"
 
-	"github.com/neo4j/neo4j-go-driver/neo4j/internal/router"
+	"github.com/neo4j/neo4j-go-driver/v4/neo4j/internal/router"
 )
 
 func assertNoRouter(t *testing.T, d Driver) {

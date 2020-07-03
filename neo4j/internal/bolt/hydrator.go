@@ -24,9 +24,9 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/neo4j/neo4j-go-driver/neo4j/connection"
-	"github.com/neo4j/neo4j-go-driver/neo4j/dbtype"
-	"github.com/neo4j/neo4j-go-driver/neo4j/internal/packstream"
+	"github.com/neo4j/neo4j-go-driver/v4/neo4j/connection"
+	"github.com/neo4j/neo4j-go-driver/v4/neo4j/dbtype"
+	"github.com/neo4j/neo4j-go-driver/v4/neo4j/internal/packstream"
 )
 
 // Called by packstream unpacker to hydrate a packstream struct into something

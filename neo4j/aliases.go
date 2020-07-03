@@ -20,8 +20,8 @@
 package neo4j
 
 import (
-	"github.com/neo4j/neo4j-go-driver/neo4j/connection"
-	"github.com/neo4j/neo4j-go-driver/neo4j/dbtype"
+	"github.com/neo4j/neo4j-go-driver/v4/neo4j/connection"
+	"github.com/neo4j/neo4j-go-driver/v4/neo4j/dbtype"
 )
 
 // Aliases for simpler usage (fewer imports)

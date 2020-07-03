@@ -23,8 +23,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/neo4j/neo4j-go-driver/neo4j/connection"
-	"github.com/neo4j/neo4j-go-driver/neo4j/dbtype"
+	"github.com/neo4j/neo4j-go-driver/v4/neo4j/connection"
+	"github.com/neo4j/neo4j-go-driver/v4/neo4j/dbtype"
 )
 
 func assertOnlyRecord(t *testing.T, rec *connection.Record, sum *connection.Summary, err error) {

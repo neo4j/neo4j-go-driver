@@ -30,11 +30,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/neo4j/neo4j-go-driver/neo4j/dbtype"
-	"github.com/neo4j/neo4j-go-driver/neo4j/internal/bolt"
-	"github.com/neo4j/neo4j-go-driver/neo4j/internal/db"
-	"github.com/neo4j/neo4j-go-driver/neo4j/internal/log"
-	"github.com/neo4j/neo4j-go-driver/neo4j/test-integration/control"
+	"github.com/neo4j/neo4j-go-driver/v4/neo4j/dbtype"
+	"github.com/neo4j/neo4j-go-driver/v4/neo4j/internal/bolt"
+	"github.com/neo4j/neo4j-go-driver/v4/neo4j/internal/db"
+	"github.com/neo4j/neo4j-go-driver/v4/neo4j/internal/log"
+	"github.com/neo4j/neo4j-go-driver/v4/neo4j/test-integration/control"
 )
 
 func makeRawConnection(logger log.Logger) db.Connection {

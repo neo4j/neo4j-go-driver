@@ -22,7 +22,7 @@ package neo4j
 import (
 	"errors"
 	"fmt"
-	"github.com/neo4j/neo4j-go-driver/neo4j/connection"
+	"github.com/neo4j/neo4j-go-driver/v4/neo4j/connection"
 	"testing"
 )
 

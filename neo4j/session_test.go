@@ -24,8 +24,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/neo4j/neo4j-go-driver/neo4j/internal/db"
-	"github.com/neo4j/neo4j-go-driver/neo4j/internal/log"
+	"github.com/neo4j/neo4j-go-driver/v4/neo4j/internal/db"
+	"github.com/neo4j/neo4j-go-driver/v4/neo4j/internal/log"
 )
 
 func TestSession(st *testing.T) {

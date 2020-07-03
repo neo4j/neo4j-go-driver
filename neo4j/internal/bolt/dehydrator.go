@@ -24,8 +24,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/neo4j/neo4j-go-driver/neo4j/dbtype"
-	"github.com/neo4j/neo4j-go-driver/neo4j/internal/packstream"
+	"github.com/neo4j/neo4j-go-driver/v4/neo4j/dbtype"
+	"github.com/neo4j/neo4j-go-driver/v4/neo4j/internal/packstream"
 )
 
 // Called by packstream during packing when it encounters an unknown type.
