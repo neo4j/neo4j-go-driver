@@ -25,90 +25,83 @@ import (
 )
 
 type chunker struct {
-	wr     io.Writer
-	chunks [][]byte
+	buf    []byte
+	sizes  []int
+	offset int
 }
 
-const max_chunk_size = 0xffff
-
-func newChunker(wr io.Writer) *chunker {
+func newChunker() *chunker {
 	return &chunker{
-		wr:     wr,
-		chunks: make([][]byte, 0, 2),
+		buf:    make([]byte, 0, 1024),
+		sizes:  make([]int, 0, 3),
+		offset: 0,
 	}
 }
 
 func (c *chunker) beginMessage() {
-	c.chunk()
-}
-
-func (c *chunker) chunk() {
-	chunk := make([]byte, 0, 0x100)
-	chunk = append(chunk, 0x00, 0x00)
-	c.chunks = append(c.chunks, chunk)
+	// Space for length of next message
+	c.buf = append(c.buf, 0, 0)
+	c.offset += 2
 }
 
 func (c *chunker) endMessage() {
-	c.chunks = append(c.chunks, []byte{0x00, 0x00})
+	// Calculate size and stash it
+	size := len(c.buf) - c.offset
+	c.offset += size
+	c.sizes = append(c.sizes, size)
+
+	// Add zero chunk to mark end of message
+	c.buf = append(c.buf, 0, 0)
+	c.offset += 2
 }
 
-// Writes to current chunk or creates new chunks as needed.
-func (c *chunker) Write(p []byte) (int, error) {
-	if len(p) == 0 {
-		return 0, nil
-	}
+func (c *chunker) send(wr io.Writer) error {
+	// Try to make as few writes as possible to reduce network overhead
+	// Whenever we encounter a message that is bigger than max chunk size we need
+	// to write and make a new chunk
+	start := 0
+	end := 0
 
-	written := 0
-	for len(p) > 0 {
-		index := len(c.chunks) - 1
-		chunk := c.chunks[index]
+	for _, size := range c.sizes {
+		if size <= 0xffff {
+			binary.BigEndian.PutUint16(c.buf[end:], uint16(size))
+			// Size + messge + end of message marker
+			end += 2 + size + 2
+		} else {
+			// Could be a message that ranges over multiple chunks
+			for size > 0xffff {
+				c.buf[end] = 0xff
+				c.buf[end+1] = 0xff
+				// Size + messge
+				end += 2 + 0xffff
 
-		currChunkSize := len(chunk)
-		leftInChunk := (max_chunk_size + 2) - currChunkSize
-
-		// There is room left in current chunk to write all
-		if len(p) <= leftInChunk {
-			c.chunks[index] = append(chunk, p...)
-			written += len(p)
-			return written, nil
+				_, err := wr.Write(c.buf[start:end])
+				if err != nil {
+					return err
+				}
+				// Reuse part of buffer that has already been written to specify size
+				// of the chunk
+				end -= 2
+				start = end
+				size -= 0xffff
+			}
+			binary.BigEndian.PutUint16(c.buf[end:], uint16(size))
+			// Size + messge + end of message marker
+			end += 2 + size + 2
 		}
-
-		// This message spills over to another chunk
-		c.chunks[index] = append(chunk, p[:leftInChunk]...)
-		written += leftInChunk
-		p = p[leftInChunk:]
-		c.chunk()
 	}
 
-	return written, nil
-}
-
-// Sends all chunks to server
-func (c *chunker) send() error {
-	// Discard chunks while writing them
-	for len(c.chunks) > 0 {
-		// Pop chunk
-		chunk := c.chunks[0]
-		c.chunks = c.chunks[1:]
-
-		// First two bytes is size of chunk, needs to be updated
-		// Last two bytes should always be zero. Size only includes
-		// user data, not size itself or trailing zeroes.
-		size := uint16(len(chunk) - 2)
-		binary.BigEndian.PutUint16(chunk, size)
-
-		// Write chunk to underlying writer (probably the TCP connection)
-		_, err := c.wr.Write(chunk)
+	if end > start {
+		_, err := wr.Write(c.buf[start:end])
 		if err != nil {
 			return err
 		}
 	}
 
-	return nil
-}
+	// Prepare for reuse
+	c.offset = 0
+	c.buf = c.buf[:0]
+	c.sizes = c.sizes[:0]
 
-// Discards all chunks
-func (c *chunker) reset() {
-	// Preserve capacity
-	c.chunks = c.chunks[:0]
+	return nil
 }

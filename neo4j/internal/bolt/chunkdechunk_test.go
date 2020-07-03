@@ -36,45 +36,34 @@ func TestChunker(ot *testing.T) {
 	msgL = append(msgL, msgS...)
 
 	writeSmall := func(c *chunker, out []byte) []byte {
+		// Packstream has direct access to this buffer
 		c.beginMessage()
-		out = append(out, 0x00, byte(len(msgS)))
-		c.Write(msgS)
-		out = append(out, msgS...)
+		c.buf = append(c.buf, msgS...)
 		c.endMessage()
+		// Construct expected
+		out = append(out, 0x00, byte(len(msgS)))
+		out = append(out, msgS...)
 		out = append(out, 0x00, 0x00)
 		return out
 	}
 
 	writeLarge := func(c *chunker, out []byte) []byte {
+		// Packstream has direct access to this buffer
 		c.beginMessage()
-		// Write this in parts to reflect what really will happen
-		m := msgL[0:]
-		parts := []int{12, 189, 91, 6}
-		p := 0
-		for len(m) > 0 {
-			l := parts[p%len(parts)]
-			if len(m) < l {
-				c.Write(m)
-				break
-			}
-			x := m[:l]
-			c.Write(x)
-			m = m[l:]
-			p++
-		}
-
+		c.buf = append(c.buf, msgL...)
+		c.endMessage()
+		// Construct expected
 		out = append(out, 0xff, 0xff)
 		out = append(out, msgN...)
 		out = append(out, 0xff, 0xff)
 		out = append(out, msgN...)
 		out = append(out, 0x00, byte(len(msgS)))
 		out = append(out, msgS...)
-		c.endMessage()
 		out = append(out, 0x00, 0x00)
 		return out
 	}
 
-	assertBuf := func(t *testing.T, buf bytes.Buffer, exp []byte) {
+	assertBuf := func(t *testing.T, buf *bytes.Buffer, exp []byte) {
 		t.Helper()
 		if bytes.Compare(exp, buf.Bytes()) != 0 {
 			t.Errorf("Chunked output differs")
@@ -88,78 +77,74 @@ func TestChunker(ot *testing.T) {
 		}
 	}
 
-	receiveAndAssertMessage := func(t *testing.T, dec *dechunker, expected []byte) {
+	receiveAndAssertMessage := func(t *testing.T, rd io.Reader, expected []byte) {
 		t.Helper()
-		err := dec.beginMessage()
-		assertNoError(t, err)
-		msg := make([]byte, len(expected))
-		_, err = io.ReadFull(dec, msg)
-		assertNoError(t, err)
-		err = dec.endMessage()
+		msg, err := dechunkMessage(rd, []byte{})
 		assertNoError(t, err)
 		assertSlices(t, msg, expected)
 	}
 
 	ot.Run("Small message", func(t *testing.T) {
 		// Chunk
-		cbuf := bytes.Buffer{}
-		chunker := newChunker(&cbuf)
+		cbuf := &bytes.Buffer{}
+		chunker := newChunker()
 		chunked := []byte{}
 		chunked = writeSmall(chunker, chunked)
-		err := chunker.send()
+		err := chunker.send(cbuf)
 		assertNoError(t, err)
 		assertBuf(t, cbuf, chunked)
 
 		// Dechunk
 		dbuf := bytes.NewBuffer(chunked)
-		dechunker := newDechunker(dbuf)
-		receiveAndAssertMessage(t, dechunker, msgS)
+		receiveAndAssertMessage(t, dbuf, msgS)
 	})
 
 	ot.Run("Two small messages", func(t *testing.T) {
-		cbuf := bytes.Buffer{}
-		chunker := newChunker(&cbuf)
+		// Chunk
+		cbuf := &bytes.Buffer{}
+		chunker := newChunker()
 		chunked := []byte{}
 		chunked = writeSmall(chunker, chunked)
 		chunked = writeSmall(chunker, chunked)
-		err := chunker.send()
+		err := chunker.send(cbuf)
 		assertNoError(t, err)
 		assertBuf(t, cbuf, chunked)
 
 		// Dechunk
 		dbuf := bytes.NewBuffer(chunked)
-		dechunker := newDechunker(dbuf)
-		receiveAndAssertMessage(t, dechunker, msgS)
-		receiveAndAssertMessage(t, dechunker, msgS)
+		receiveAndAssertMessage(t, dbuf, msgS)
+		receiveAndAssertMessage(t, dbuf, msgS)
 	})
 
-	ot.Run("Large message", func(t *testing.T) {
-		cbuf := bytes.Buffer{}
-		chunker := newChunker(&cbuf)
+	ot.Run("One large message", func(t *testing.T) {
+		// Chunk
+		cbuf := &bytes.Buffer{}
+		chunker := newChunker()
 		chunked := []byte{}
 		chunked = writeLarge(chunker, chunked)
-		chunker.send()
+		err := chunker.send(cbuf)
+		assertNoError(t, err)
 		assertBuf(t, cbuf, chunked)
 
 		// Dechunk
 		dbuf := bytes.NewBuffer(chunked)
-		dechunker := newDechunker(dbuf)
-		receiveAndAssertMessage(t, dechunker, msgL)
+		receiveAndAssertMessage(t, dbuf, msgL)
 	})
 
 	ot.Run("Small and large message", func(t *testing.T) {
-		cbuf := bytes.Buffer{}
-		chunker := newChunker(&cbuf)
+		// Chunk
+		cbuf := &bytes.Buffer{}
+		chunker := newChunker()
 		chunked := []byte{}
 		chunked = writeSmall(chunker, chunked)
 		chunked = writeLarge(chunker, chunked)
-		chunker.send()
+		err := chunker.send(cbuf)
+		assertNoError(t, err)
 		assertBuf(t, cbuf, chunked)
 
 		// Dechunk
 		dbuf := bytes.NewBuffer(chunked)
-		dechunker := newDechunker(dbuf)
-		receiveAndAssertMessage(t, dechunker, msgS)
-		receiveAndAssertMessage(t, dechunker, msgL)
+		receiveAndAssertMessage(t, dbuf, msgS)
+		receiveAndAssertMessage(t, dbuf, msgL)
 	})
 }
