@@ -31,11 +31,6 @@ func (r *ignoredResponse) Error() string {
 	return "ignored"
 }
 
-// Record response from server.
-type recordResponse struct {
-	values []interface{}
-}
-
 // Success response from server, success contains meta data that looks different depending
 // on what request the response is for.
 type successResponse struct {

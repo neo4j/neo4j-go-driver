@@ -20,7 +20,6 @@
 package packstream
 
 import (
-	"bytes"
 	"encoding/hex"
 	"errors"
 	"fmt"
@@ -44,6 +43,12 @@ func (m *testHydratorMock) hydrate(tag StructTag, fields []interface{}) (interfa
 	}
 	if m.customHydrate != nil {
 		return m.customHydrate(tag, fields)
+	}
+	// Need to copy fields
+	if len(fields) > 0 {
+		copiedFields := make([]interface{}, len(fields))
+		copy(copiedFields, fields)
+		fields = copiedFields
 	}
 	return &Struct{Tag: tag, Fields: fields}, nil
 }
@@ -504,23 +509,23 @@ func TestPackStream(ot *testing.T) {
 	for _, c := range cases {
 		// Packing
 		ot.Run(fmt.Sprintf("Packing of %s", c.name), func(t *testing.T) {
-			buf := bytes.Buffer{}
-			p := NewPacker(&buf, c.dehydrate)
-			err := p.Pack(c.value)
+			buf := []byte{}
+			p := Packer{buf: buf, dehydrate: c.dehydrate}
+			err := p.pack(c.value)
 			if err != nil {
 				t.Fatalf("Unable to pack: %s", err)
 			}
-			packed := buf.Bytes()
-			if len(c.expectPacked) != buf.Len() {
-				dumper.Write(packed)
+			buf = p.buf
+			if len(c.expectPacked) != len(buf) {
+				dumper.Write(buf)
 				t.Fatalf("Packed buffer differs in size. Got %+v expected %+v",
-					len(packed), len(c.expectPacked))
+					len(buf), len(c.expectPacked))
 			}
 			for i, x := range c.expectPacked {
-				if packed[i] != x {
-					dumper.Write(packed)
+				if buf[i] != x {
+					dumper.Write(buf)
 					t.Fatalf("Packed first diff at %d. Got %+v expected %+v",
-						i, packed[i], c.expectPacked[i])
+						i, buf[i], c.expectPacked[i])
 				}
 			}
 		})
@@ -532,10 +537,9 @@ func TestPackStream(ot *testing.T) {
 		}
 		ot.Run(fmt.Sprintf("Unpacking of %s", c.name), func(t *testing.T) {
 			// Initialize buffer with expectation of pack test
-			buf := bytes.NewBuffer(c.expectPacked)
-			u := NewUnpacker(buf)
+			u := &Unpacker{buf: c.expectPacked, offset: 0, length: uint32(len(c.expectPacked))}
 			hf := &testHydratorMock{}
-			x, err := u.Unpack(hf.hydrate)
+			x, err := u.unpack(hf.hydrate)
 			if err != nil {
 				t.Fatalf("Unable to unpack: %s", err)
 			}
@@ -574,33 +578,33 @@ func TestPackStream(ot *testing.T) {
 		}
 
 		// Pack the map
-		buf := bytes.Buffer{}
-		p := NewPacker(&buf, nil)
-		err := p.Pack(m)
+		buf := []byte{}
+		p := Packer{buf: buf, dehydrate: func(x interface{}) (*Struct, error) {
+			return nil, &UnsupportedTypeError{t: reflect.TypeOf(x)}
+		}}
+		err := p.pack(m)
 		if err != nil {
 			ot.Fatalf("Unable to pack: %s", err)
 		}
+		buf = p.buf
 
 		ot.Run(fmt.Sprintf("Packing of map size %s", c.name), func(t *testing.T) {
 			// Compare the header
-			packed := buf.Bytes()
-			if len(packed) < len(c.expectHeader) {
+			if len(buf) < len(c.expectHeader) {
 				t.Fatalf("Packed map has less bytes(%d) than size of expected header (%d)",
-					len(packed), len(c.expectHeader))
+					len(buf), len(c.expectHeader))
 			}
 			for i, e := range c.expectHeader {
-				if packed[i] != e {
+				if buf[i] != e {
 					t.Fatalf("Expected header and actual header differs at %d", i)
 				}
 			}
 		})
 
 		ot.Run(fmt.Sprintf("Unpacking of map size %s", c.name), func(t *testing.T) {
-			// Initialize buffer with packed result
-			buf := bytes.NewBuffer(buf.Bytes())
-			u := NewUnpacker(buf)
+			u := &Unpacker{buf: buf, offset: 0, length: uint32(len(buf))}
 			hf := &testHydratorMock{}
-			ux, err := u.Unpack(hf.hydrate)
+			ux, err := u.unpack(hf.hydrate)
 			um, ok := ux.(map[string]interface{})
 			if !ok {
 				t.Errorf("Unpacked is not a map")
@@ -648,21 +652,21 @@ func TestPackStream(ot *testing.T) {
 				return nil, errors.New("x")
 			},
 			value: customStruct{}},
-		{name: "write error", expectedErr: &IoError{}, wr: &limitedWriter{max: 3},
-			value: "just a string"},
 	}
 	for _, c := range packerErrorCases {
 		ot.Run(fmt.Sprintf("Packing error of %s", c.name), func(t *testing.T) {
-			wr := c.wr
-			if wr == nil {
-				wr = &bytes.Buffer{}
+			buf := []byte{}
+			p := Packer{buf: buf, dehydrate: c.dehydrate}
+			if p.dehydrate == nil {
+				p.dehydrate = func(x interface{}) (*Struct, error) {
+					return nil, &UnsupportedTypeError{t: reflect.TypeOf(x)}
+				}
 			}
-			p := NewPacker(wr, c.dehydrate)
 			v := c.value
 			if c.valueFunc != nil {
 				v = c.valueFunc()
 			}
-			err := p.Pack(v)
+			err := p.pack(v)
 			if err == nil {
 				t.Fatal("Should have gotten an error!")
 			}
@@ -696,12 +700,11 @@ func TestPackStream(ot *testing.T) {
 	}
 	for _, c := range unpackerErrorCases {
 		ot.Run(fmt.Sprintf("Unpacking error of %s", c.name), func(t *testing.T) {
-			rd := bytes.NewBuffer(c.buf)
 			if c.hf == nil {
 				c.hf = &testHydratorMock{}
 			}
-			un := NewUnpacker(rd)
-			x, err := un.Unpack(c.hf.hydrate)
+			un := &Unpacker{buf: c.buf, offset: 0, length: uint32(len(c.buf))}
+			x, err := un.unpack(c.hf.hydrate)
 			if err == nil {
 				t.Fatal("Should have gotten an error!")
 			}
@@ -717,12 +720,15 @@ func TestPackStream(ot *testing.T) {
 	// Unpacker UnpackStruct top level API smoke test
 	ot.Run("UnpackStruct smoke test", func(t *testing.T) {
 		// Initialize buffer with expectation of pack test
-		buf := bytes.NewBuffer([]byte{0xb0, 0x66})
-		u := NewUnpacker(buf)
+		buf := []byte{0xb0, 0x66}
+		u := &Unpacker{} //NewUnpacker(buf)
 		hf := &testHydratorMock{}
-		x, _ := u.UnpackStruct(hf.hydrate)
+		x, err := u.UnpackStruct(buf, hf.hydrate)
+		if err != nil {
+			t.Fatal(err)
+		}
 		if !reflect.DeepEqual(x, emptyStruct) {
-			t.Errorf("Unpacked differs")
+			t.Errorf("Unpacked differs: %+v vs %+v", x, emptyStruct)
 		}
 	})
 }

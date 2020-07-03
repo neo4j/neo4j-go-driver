@@ -22,7 +22,6 @@ package packstream
 import (
 	"encoding/binary"
 	"fmt"
-	"io"
 	"math"
 	"reflect"
 )
@@ -33,54 +32,32 @@ import (
 type Dehydrate func(x interface{}) (*Struct, error)
 
 type Packer struct {
-	wr        io.Writer
+	buf       []byte
 	dehydrate Dehydrate
 }
 
-func NewPacker(wr io.Writer, dehydrate Dehydrate) *Packer {
-	if dehydrate == nil {
-		dehydrate = func(x interface{}) (*Struct, error) {
-			return nil, &UnsupportedTypeError{t: reflect.TypeOf(x)}
-		}
-	}
-
-	return &Packer{
-		wr:        wr,
-		dehydrate: dehydrate,
-	}
+func (p *Packer) PackStruct(buf []byte, dehydrate Dehydrate, tag StructTag, fields ...interface{}) ([]byte, error) {
+	p.buf = buf
+	p.dehydrate = dehydrate
+	return p.buf, p.writeStruct(tag, fields)
 }
 
-// Convenience function for caller that doesn't want to implement Struct
-// interface.
-func (p *Packer) PackStruct(tag StructTag, fields ...interface{}) error {
-	// Convert to simple struct implementation and pass it on the generic pack.
-	s := &Struct{Tag: tag, Fields: fields}
-	return p.Pack(s)
+// TEMP!
+func (p *Packer) Pack(buf []byte, dehydrate Dehydrate, x interface{}) ([]byte, error) {
+	p.buf = buf
+	p.dehydrate = dehydrate
+	return p.buf, p.pack(x)
 }
 
-func (p *Packer) write(buf []byte) error {
-	// Wrap error in IO error type?
-	_, err := p.wr.Write(buf)
-	if err == nil {
-		return nil
-	}
-	return &IoError{inner: err}
-}
-
-func (p *Packer) writeStruct(s *Struct) error {
-	l := len(s.Fields)
+func (p *Packer) writeStruct(tag StructTag, fields []interface{}) error {
+	l := len(fields)
 	if l > 0x0f {
 		return &OverflowError{msg: "Trying to pack struct with too many fields"}
 	}
 
-	buf := []byte{0xb0 + byte(l), byte(s.Tag)}
-	err := p.write(buf)
-	if err != nil {
-		return err
-	}
-
-	for _, f := range s.Fields {
-		err = p.Pack(f)
+	p.buf = append(p.buf, 0xb0+byte(l), byte(tag))
+	for _, f := range fields {
+		err := p.pack(f)
 		if err != nil {
 			return err
 		}
@@ -88,31 +65,31 @@ func (p *Packer) writeStruct(s *Struct) error {
 	return nil
 }
 
-func (p *Packer) writeInt(i int64) error {
+func (p *Packer) writeInt(i int64) {
 	switch {
 	case int64(-0x10) <= i && i < int64(0x80):
-		return p.write([]byte{byte(i)})
+		p.buf = append(p.buf, byte(i))
 	case int64(-0x80) <= i && i < int64(-0x10):
-		return p.write([]byte{0xc8, byte(i)})
+		p.buf = append(p.buf, 0xc8, byte(i))
 	case int64(-0x8000) <= i && i < int64(0x8000):
 		buf := [3]byte{0xc9}
 		binary.BigEndian.PutUint16(buf[1:], uint16(i))
-		return p.write(buf[:])
+		p.buf = append(p.buf, buf[:]...)
 	case int64(-0x80000000) <= i && i < int64(0x80000000):
 		buf := [5]byte{0xca}
 		binary.BigEndian.PutUint32(buf[1:], uint32(i))
-		return p.write(buf[:])
+		p.buf = append(p.buf, buf[:]...)
 	default:
 		buf := [9]byte{0xcb}
 		binary.BigEndian.PutUint64(buf[1:], uint64(i))
-		return p.write(buf[:])
+		p.buf = append(p.buf, buf[:]...)
 	}
 }
 
-func (p *Packer) writeFloat(f float64) error {
+func (p *Packer) writeFloat(f float64) {
 	buf := [9]byte{0xc1}
 	binary.BigEndian.PutUint64(buf[1:], math.Float64bits(f))
-	return p.write(buf[:])
+	p.buf = append(p.buf, buf[:]...)
 }
 
 func (p *Packer) writeListHeader(ll int, shortOffset, longOffset byte) error {
@@ -136,7 +113,8 @@ func (p *Packer) writeListHeader(ll int, shortOffset, longOffset byte) error {
 			return &OverflowError{msg: fmt.Sprintf("Trying to pack too large list of size %d ", l)}
 		}
 	}
-	return p.write(hdr)
+	p.buf = append(p.buf, hdr...)
+	return nil
 }
 
 func (p *Packer) writeString(s string) error {
@@ -144,7 +122,8 @@ func (p *Packer) writeString(s string) error {
 	if err != nil {
 		return err
 	}
-	return p.write([]byte(s))
+	p.buf = append(p.buf, []byte(s)...)
+	return nil
 }
 
 func (p *Packer) writeArrayHeader(l int) error {
@@ -172,22 +151,21 @@ func (p *Packer) writeBytes(b []byte) error {
 	default:
 		return &OverflowError{msg: fmt.Sprintf("Trying to pack too large byte array of size %d", l)}
 	}
-	err := p.write(hdr)
-	if err != nil {
-		return err
-	}
-	return p.write(b)
+	p.buf = append(p.buf, hdr...)
+	p.buf = append(p.buf, b...)
+	return nil
 }
 
-func (p *Packer) writeBool(b bool) error {
+func (p *Packer) writeBool(b bool) {
 	if b {
-		return p.write([]byte{0xc3})
+		p.buf = append(p.buf, 0xc3)
+		return
 	}
-	return p.write([]byte{0xc2})
+	p.buf = append(p.buf, 0xc2)
 }
 
-func (p *Packer) writeNil() error {
-	return p.write([]byte{0xc0})
+func (p *Packer) writeNil() {
+	p.buf = append(p.buf, 0xc0)
 }
 
 func (p *Packer) tryDehydrate(x interface{}) error {
@@ -196,9 +174,10 @@ func (p *Packer) tryDehydrate(x interface{}) error {
 		return err
 	}
 	if s == nil {
-		return p.writeNil()
+		p.writeNil()
+		return nil
 	}
-	return p.writeStruct(s)
+	return p.writeStruct(s.Tag, s.Fields)
 }
 
 func (p *Packer) writeSlice(x interface{}) error {
@@ -213,7 +192,7 @@ func (p *Packer) writeSlice(x interface{}) error {
 		}
 		for _, s := range v {
 			// Recurse
-			err = p.Pack(s)
+			err = p.pack(s)
 			if err != nil {
 				return err
 			}
@@ -237,10 +216,7 @@ func (p *Packer) writeSlice(x interface{}) error {
 			return err
 		}
 		for _, s := range v {
-			err = p.writeInt(s)
-			if err != nil {
-				return err
-			}
+			p.writeInt(s)
 		}
 		return nil
 	case []uint64:
@@ -253,10 +229,7 @@ func (p *Packer) writeSlice(x interface{}) error {
 			if err != nil {
 				return err
 			}
-			err = p.writeInt(int64(s))
-			if err != nil {
-				return err
-			}
+			p.writeInt(int64(s))
 		}
 		return nil
 	case []int:
@@ -265,10 +238,7 @@ func (p *Packer) writeSlice(x interface{}) error {
 			return err
 		}
 		for _, s := range v {
-			err = p.writeInt(int64(s))
-			if err != nil {
-				return err
-			}
+			p.writeInt(int64(s))
 		}
 		return nil
 	case []int8:
@@ -277,10 +247,7 @@ func (p *Packer) writeSlice(x interface{}) error {
 			return err
 		}
 		for _, s := range v {
-			err = p.writeInt(int64(s))
-			if err != nil {
-				return err
-			}
+			p.writeInt(int64(s))
 		}
 		return nil
 	case []uint16:
@@ -289,10 +256,7 @@ func (p *Packer) writeSlice(x interface{}) error {
 			return err
 		}
 		for _, s := range v {
-			err = p.writeInt(int64(s))
-			if err != nil {
-				return err
-			}
+			p.writeInt(int64(s))
 		}
 		return nil
 	case []int16:
@@ -301,10 +265,7 @@ func (p *Packer) writeSlice(x interface{}) error {
 			return err
 		}
 		for _, s := range v {
-			err = p.writeInt(int64(s))
-			if err != nil {
-				return err
-			}
+			p.writeInt(int64(s))
 		}
 		return nil
 	case []uint32:
@@ -313,10 +274,7 @@ func (p *Packer) writeSlice(x interface{}) error {
 			return err
 		}
 		for _, s := range v {
-			err = p.writeInt(int64(s))
-			if err != nil {
-				return err
-			}
+			p.writeInt(int64(s))
 		}
 		return nil
 	case []int32:
@@ -325,10 +283,7 @@ func (p *Packer) writeSlice(x interface{}) error {
 			return err
 		}
 		for _, s := range v {
-			err = p.writeInt(int64(s))
-			if err != nil {
-				return err
-			}
+			p.writeInt(int64(s))
 		}
 		return nil
 	case []float64:
@@ -337,10 +292,7 @@ func (p *Packer) writeSlice(x interface{}) error {
 			return err
 		}
 		for _, s := range v {
-			err = p.writeFloat(s)
-			if err != nil {
-				return err
-			}
+			p.writeFloat(s)
 		}
 		return nil
 	case []float32:
@@ -349,10 +301,7 @@ func (p *Packer) writeSlice(x interface{}) error {
 			return err
 		}
 		for _, s := range v {
-			err = p.writeFloat(float64(s))
-			if err != nil {
-				return err
-			}
+			p.writeFloat(float64(s))
 		}
 		return nil
 	default:
@@ -364,7 +313,7 @@ func (p *Packer) writeSlice(x interface{}) error {
 		}
 		for i := 0; i < num; i++ {
 			rx := rv.Index(i)
-			if err := p.Pack(rx.Interface()); err != nil {
+			if err := p.pack(rx.Interface()); err != nil {
 				return err
 			}
 		}
@@ -385,7 +334,7 @@ func (p *Packer) writeMap(x interface{}) error {
 				return err
 			}
 			// Recurse
-			err = p.Pack(v)
+			err = p.pack(v)
 			if err != nil {
 				return err
 			}
@@ -417,10 +366,7 @@ func (p *Packer) writeMap(x interface{}) error {
 			if err != nil {
 				return err
 			}
-			err = p.writeFloat(v)
-			if err != nil {
-				return err
-			}
+			p.writeFloat(v)
 		}
 		return nil
 	case map[string]float32:
@@ -433,10 +379,7 @@ func (p *Packer) writeMap(x interface{}) error {
 			if err != nil {
 				return err
 			}
-			err = p.writeFloat(float64(v))
-			if err != nil {
-				return err
-			}
+			p.writeFloat(float64(v))
 		}
 		return nil
 	case map[string]int64:
@@ -449,10 +392,7 @@ func (p *Packer) writeMap(x interface{}) error {
 			if err != nil {
 				return err
 			}
-			err = p.writeInt(v)
-			if err != nil {
-				return err
-			}
+			p.writeInt(v)
 		}
 		return nil
 	case map[string]uint64:
@@ -469,10 +409,7 @@ func (p *Packer) writeMap(x interface{}) error {
 			if err != nil {
 				return err
 			}
-			err = p.writeInt(int64(v))
-			if err != nil {
-				return err
-			}
+			p.writeInt(int64(v))
 		}
 		return nil
 	case map[string]int:
@@ -485,10 +422,7 @@ func (p *Packer) writeMap(x interface{}) error {
 			if err != nil {
 				return err
 			}
-			err = p.writeInt(int64(v))
-			if err != nil {
-				return err
-			}
+			p.writeInt(int64(v))
 		}
 		return nil
 	case map[string]int8:
@@ -501,10 +435,7 @@ func (p *Packer) writeMap(x interface{}) error {
 			if err != nil {
 				return err
 			}
-			err = p.writeInt(int64(v))
-			if err != nil {
-				return err
-			}
+			p.writeInt(int64(v))
 		}
 		return nil
 	case map[string]uint8:
@@ -517,10 +448,7 @@ func (p *Packer) writeMap(x interface{}) error {
 			if err != nil {
 				return err
 			}
-			err = p.writeInt(int64(v))
-			if err != nil {
-				return err
-			}
+			p.writeInt(int64(v))
 		}
 		return nil
 	case map[string]uint16:
@@ -533,10 +461,7 @@ func (p *Packer) writeMap(x interface{}) error {
 			if err != nil {
 				return err
 			}
-			err = p.writeInt(int64(v))
-			if err != nil {
-				return err
-			}
+			p.writeInt(int64(v))
 		}
 		return nil
 	case map[string]int16:
@@ -549,10 +474,7 @@ func (p *Packer) writeMap(x interface{}) error {
 			if err != nil {
 				return err
 			}
-			err = p.writeInt(int64(v))
-			if err != nil {
-				return err
-			}
+			p.writeInt(int64(v))
 		}
 		return nil
 	case map[string]uint32:
@@ -565,10 +487,7 @@ func (p *Packer) writeMap(x interface{}) error {
 			if err != nil {
 				return err
 			}
-			err = p.writeInt(int64(v))
-			if err != nil {
-				return err
-			}
+			p.writeInt(int64(v))
 		}
 		return nil
 	case map[string]int32:
@@ -581,10 +500,7 @@ func (p *Packer) writeMap(x interface{}) error {
 			if err != nil {
 				return err
 			}
-			err = p.writeInt(int64(v))
-			if err != nil {
-				return err
-			}
+			p.writeInt(int64(v))
 		}
 		return nil
 	case map[string]bool:
@@ -597,10 +513,7 @@ func (p *Packer) writeMap(x interface{}) error {
 			if err != nil {
 				return err
 			}
-			err = p.writeBool(v)
-			if err != nil {
-				return err
-			}
+			p.writeBool(v)
 		}
 		return nil
 	default:
@@ -622,7 +535,7 @@ func (p *Packer) writeMap(x interface{}) error {
 				return err
 			}
 			iv := rv.MapIndex(ik)
-			if err := p.Pack(iv.Interface()); err != nil {
+			if err := p.pack(iv.Interface()); err != nil {
 				return err
 			}
 		}
@@ -638,30 +551,36 @@ func overflowInt(i uint64) error {
 	return nil
 }
 
-func (p *Packer) Pack(x interface{}) error {
+func (p *Packer) pack(x interface{}) error {
 	if x == nil {
-		return p.writeNil()
+		p.writeNil()
+		return nil
 	}
 
 	t := reflect.ValueOf(x)
 	switch t.Kind() {
 	case reflect.Bool:
-		return p.writeBool(t.Bool())
+		p.writeBool(t.Bool())
+		return nil
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
-		return p.writeInt(t.Int())
+		p.writeInt(t.Int())
+		return nil
 	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
 		u := t.Uint()
 		if err := overflowInt(u); err != nil {
 			return err
 		}
-		return p.writeInt(int64(u))
+		p.writeInt(int64(u))
+		return nil
 	case reflect.Float32, reflect.Float64:
-		return p.writeFloat(t.Float())
+		p.writeFloat(t.Float())
+		return nil
 	case reflect.String:
 		return p.writeString(t.String())
 	case reflect.Ptr:
 		if t.IsNil() {
-			return p.writeNil()
+			p.writeNil()
+			return nil
 		}
 		// Inspect what the pointer points to
 		i := reflect.Indirect(t)
@@ -669,12 +588,12 @@ func (p *Packer) Pack(x interface{}) error {
 		case reflect.Struct:
 			s, isS := x.(*Struct)
 			if isS {
-				return p.writeStruct(s)
+				return p.writeStruct(s.Tag, s.Fields)
 			}
 			// Unknown type, call dehydration hook to make it into a struct
 			return p.tryDehydrate(x)
 		default:
-			return p.Pack(i.Interface())
+			return p.pack(i.Interface())
 		}
 	case reflect.Struct:
 		// Unknown type, call dehydration hook to make it into a struct
