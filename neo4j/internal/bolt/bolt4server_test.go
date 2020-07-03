@@ -33,26 +33,20 @@ import (
 // Use panic upon errors, simplifies output when server is running within a go thread
 // in the test.
 type bolt4server struct {
-	conn      net.Conn
-	hyd       packstream.Hydrate
-	dechunker *dechunker
-	unpacker  *packstream.Unpacker
-	chunker   *chunker
-	packer    *packstream.Packer
+	conn     net.Conn
+	hyd      packstream.Hydrate
+	unpacker *packstream.Unpacker
+	chunker  *chunker
+	packer   *packstream.Packer
 }
 
 func newBolt4Server(conn net.Conn) *bolt4server {
-	dechunker := newDechunker(conn)
-	unpacker := packstream.NewUnpacker(dechunker)
-	chunker := newChunker(conn)
-	packer := packstream.NewPacker(chunker, nil)
 	return &bolt4server{
-		conn:      conn,
-		dechunker: dechunker,
-		hyd:       passthroughHydrator,
-		unpacker:  unpacker,
-		packer:    packer,
-		chunker:   chunker,
+		unpacker: &packstream.Unpacker{},
+		conn:     conn,
+		chunker:  newChunker(),
+		hyd:      passthroughHydrator,
+		packer:   &packstream.Packer{},
 	}
 }
 
@@ -99,12 +93,14 @@ func (s *bolt4server) waitForHello() {
 }
 
 func (s *bolt4server) receiveMsg() *packstream.Struct {
-	s.dechunker.beginMessage()
-	x, err := s.unpacker.UnpackStruct(s.hyd)
+	buf, err := dechunkMessage(s.conn, []byte{})
 	if err != nil {
 		panic(err)
 	}
-	s.dechunker.endMessage()
+	x, err := s.unpacker.UnpackStruct(buf, s.hyd)
+	if err != nil {
+		panic(err)
+	}
 	return x.(*packstream.Struct)
 }
 
@@ -159,12 +155,13 @@ func (s *bolt4server) closeConnection() {
 
 func (s *bolt4server) send(tag packstream.StructTag, field ...interface{}) {
 	s.chunker.beginMessage()
-	err := s.packer.PackStruct(tag, field...)
+	var err error
+	s.chunker.buf, err = s.packer.PackStruct(s.chunker.buf, dehydrate, tag, field...)
 	if err != nil {
 		panic(err)
 	}
 	s.chunker.endMessage()
-	s.chunker.send()
+	s.chunker.send(s.conn)
 }
 
 func (s *bolt4server) sendSuccess(m map[string]interface{}) {

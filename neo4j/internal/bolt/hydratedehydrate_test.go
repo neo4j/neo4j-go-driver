@@ -20,7 +20,6 @@
 package bolt
 
 import (
-	"bytes"
 	"errors"
 	"reflect"
 	"testing"
@@ -134,7 +133,7 @@ func TestHydrator(ot *testing.T) {
 			name:     "Record response",
 			tag:      msgRecord,
 			fields:   []interface{}{[]interface{}{1, "a"}},
-			hydrated: &recordResponse{values: []interface{}{1, "a"}},
+			hydrated: &db.Record{Values: []interface{}{1, "a"}},
 		},
 	}
 	for _, c := range cases {
@@ -193,12 +192,13 @@ func TestDehydrateHydrate(ot *testing.T) {
 	dehydrateAndHydrate := func(t *testing.T, xi interface{}) interface{} {
 		t.Helper()
 		// Run through packstream to be certain of type assumptions
-		buf := bytes.NewBuffer([]byte{})
-		packer := packstream.NewPacker(buf, dehydrate)
-		err := packer.Pack(xi)
+		buf := []byte{}
+		packer := packstream.Packer{}
+		var err error
+		buf, err = packer.Pack(buf, dehydrate, xi)
 		assertNoError(t, err)
-		unpacker := packstream.NewUnpacker(buf)
-		xo, err := unpacker.UnpackStruct(hydrate)
+		unpacker := &packstream.Unpacker{}
+		xo, err := unpacker.UnpackStruct(buf, hydrate)
 		assertNoError(t, err)
 		return xo
 	}

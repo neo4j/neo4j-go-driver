@@ -77,7 +77,6 @@ type bolt4 struct {
 	conn          net.Conn
 	serverName    string
 	chunker       *chunker
-	dechunker     *dechunker
 	packer        *packstream.Packer
 	unpacker      *packstream.Unpacker
 	connId        string
@@ -89,22 +88,20 @@ type bolt4 struct {
 	birthDate     time.Time
 	log           log.Logger
 	databaseName  string
+	receiveBuffer []byte
 }
 
 func NewBolt4(serverName string, conn net.Conn, log log.Logger) *bolt4 {
-	chunker := newChunker(conn)
-	dechunker := newDechunker(conn)
-
 	return &bolt4{
-		state:      bolt4_dead,
-		conn:       conn,
-		serverName: serverName,
-		chunker:    chunker,
-		dechunker:  dechunker,
-		packer:     packstream.NewPacker(chunker, dehydrate),
-		unpacker:   packstream.NewUnpacker(dechunker),
-		birthDate:  time.Now(),
-		log:        log,
+		state:         bolt4_dead,
+		conn:          conn,
+		serverName:    serverName,
+		chunker:       newChunker(),
+		receiveBuffer: make([]byte, 4096),
+		packer:        &packstream.Packer{}, //packstream.NewPacker(chunker, dehydrate),
+		unpacker:      &packstream.Unpacker{},
+		birthDate:     time.Now(),
+		log:           log,
 	}
 }
 
@@ -119,7 +116,9 @@ func (b *bolt4) ServerVersion() string {
 func (b *bolt4) appendMsg(tag packstream.StructTag, field ...interface{}) error {
 	b.chunker.beginMessage()
 	// Setup the message and let packstream write the packed bytes to the chunk
-	if err := b.packer.PackStruct(tag, field...); err != nil {
+	var err error
+	b.chunker.buf, err = b.packer.PackStruct(b.chunker.buf, dehydrate, tag, field...)
+	if err != nil {
 		// At this point we do not know the state of what has been written to the chunks.
 		// Either we should support rolling back whatever that has been written or just
 		// bail out this session.
@@ -135,7 +134,7 @@ func (b *bolt4) sendMsg(tag packstream.StructTag, field ...interface{}) error {
 	if err := b.appendMsg(tag, field...); err != nil {
 		return err
 	}
-	if err := b.chunker.send(); err != nil {
+	if err := b.chunker.send(b.conn); err != nil {
 		b.log.Error(b.logId, err)
 		b.state = bolt4_dead
 		return err
@@ -144,20 +143,16 @@ func (b *bolt4) sendMsg(tag packstream.StructTag, field ...interface{}) error {
 }
 
 func (b *bolt4) receiveMsg() (interface{}, error) {
-	if err := b.dechunker.beginMessage(); err != nil {
-		b.log.Error(b.logId, err)
-		b.state = bolt4_dead
-		return nil, err
-	}
-
-	msg, err := b.unpacker.UnpackStruct(hydrate)
+	var err error
+	b.receiveBuffer, err = dechunkMessage(b.conn, b.receiveBuffer)
 	if err != nil {
 		b.log.Error(b.logId, err)
 		b.state = bolt4_dead
 		return nil, err
 	}
 
-	if err = b.dechunker.endMessage(); err != nil {
+	msg, err := b.unpacker.UnpackStruct(b.receiveBuffer, hydrate)
+	if err != nil {
 		b.log.Error(b.logId, err)
 		b.state = bolt4_dead
 		return nil, err
@@ -506,9 +501,9 @@ func (b *bolt4) Next(shandle db.Handle) (*db.Record, *db.Summary, error) {
 	}
 
 	switch x := res.(type) {
-	case *recordResponse:
-		rec := &db.Record{Keys: b.streamKeys, Values: x.values}
-		return rec, nil, nil
+	case *db.Record:
+		x.Keys = b.streamKeys
+		return x, nil, nil
 	case *successResponse:
 		// End of stream
 		// Parse summary
@@ -614,7 +609,7 @@ func (b *bolt4) Reset() {
 }
 
 func (b *bolt4) GetRoutingTable(database string, context map[string]string) (*db.RoutingTable, error) {
-	if err := assertState(b.logError, b.state, bolt3_ready); err != nil {
+	if err := assertState(b.logError, b.state, bolt4_ready); err != nil {
 		return nil, err
 	}
 
@@ -664,6 +659,7 @@ func (b *bolt4) Close() {
 	}
 	b.conn.Close()
 	b.state = bolt4_dead
+	b.log.Infof(b.logId, "Disconnected")
 }
 
 func (b *bolt4) SelectDatabase(database string) {

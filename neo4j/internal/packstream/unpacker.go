@@ -22,31 +22,42 @@ package packstream
 import (
 	"encoding/binary"
 	"fmt"
-	"io"
+	"math"
 )
 
 // Called by unpacker to let receiver check all fields and let the receiver return an
 // hydrated instance or an error if any of the fields or number of fields are different
-// expected.
+// expected. Values from fields must be copied, the fields slice cannot be saved.
 type Hydrate func(tag StructTag, fields []interface{}) (interface{}, error)
 
 type Unpacker struct {
-	rd io.Reader
+	buf    []byte
+	offset uint32
+	length uint32
+	err    error
+	fields []interface{} // Cached field list for unpacking structs faster
+	foff   int           // Offset into fields when nesting structs
 }
 
-func NewUnpacker(rd io.Reader) *Unpacker {
-	return &Unpacker{
-		rd: rd,
+func (u *Unpacker) pop() byte {
+	if u.offset < u.length {
+		x := u.buf[u.offset]
+		u.offset += 1
+		return x
 	}
+	u.err = &IoError{}
+	return 0
 }
 
-func (u *Unpacker) read(n uint32) ([]byte, error) {
-	buf := make([]byte, n)
-	_, err := io.ReadFull(u.rd, buf)
-	if err == nil {
-		return buf, nil
+func (u *Unpacker) read(n uint32) []byte {
+	start := u.offset
+	end := u.offset + n
+	if end > u.length {
+		u.err = &IoError{}
+		return nil
 	}
-	return nil, &IoError{inner: err}
+	u.offset = end
+	return u.buf[start:end]
 }
 
 func (u *Unpacker) readStruct(hydrate Hydrate, numFields int) (interface{}, error) {
@@ -55,83 +66,74 @@ func (u *Unpacker) readStruct(hydrate Hydrate, numFields int) (interface{}, erro
 	}
 
 	// Read struct tag
-	buf, err := u.read(1)
-	if err != nil {
-		return nil, err
-	}
-	tag := StructTag(buf[0])
+	tag := StructTag(u.pop())
 
-	if numFields == 0 {
+	// No need for allocating when no fields
+	if numFields == 0 && u.err == nil {
 		return hydrate(tag, nil)
 	}
 
-	// Read fields and pass them to hydrator
-	fields := make([]interface{}, numFields)
-	for i := 0; i < numFields; i++ {
-		field, err := u.Unpack(hydrate)
-		if err != nil {
-			return nil, err
-		}
-		fields[i] = field
+	// Use cached fields slice and grow it if needed
+	if len(u.fields) < (u.foff + numFields) {
+		newFields := make([]interface{}, len(u.fields)+numFields)
+		copy(newFields, u.fields)
+		u.fields = newFields
 	}
+
+	// Read fields and pass them to hydrator
+	foff := u.foff
+	u.foff += numFields
+	for i := foff; i < numFields+foff; i++ {
+		u.fields[i], _ = u.unpack(hydrate)
+	}
+	u.foff -= numFields
+	if u.err != nil {
+		return nil, u.err
+	}
+	fields := u.fields[u.foff : u.foff+numFields]
 	return hydrate(tag, fields)
 }
 
-func (u *Unpacker) readNum(x interface{}) error {
-	err := binary.Read(u.rd, binary.BigEndian, x)
-	if err == nil {
-		return nil
-	}
-	return &IoError{inner: err}
-}
-
 func (u *Unpacker) readStr(n uint32) (interface{}, error) {
-	buf, err := u.read(n)
-	if err != nil {
-		return nil, err
+	buf := u.read(n)
+	if u.err != nil {
+		return nil, u.err
 	}
 	return string(buf), nil
 }
 
 func (u *Unpacker) readArr(hydrate Hydrate, n uint32) ([]interface{}, error) {
-	var err error
 	arr := make([]interface{}, n)
 	for i := range arr {
-		arr[i], err = u.Unpack(hydrate)
-		if err != nil {
-			return nil, err
-		}
+		arr[i], _ = u.unpack(hydrate)
 	}
-	return arr, nil
+	return arr, u.err
 }
 
 func (u *Unpacker) readMap(hydrate Hydrate, n uint32) (map[string]interface{}, error) {
 	m := make(map[string]interface{}, n)
 	for i := uint32(0); i < n; i++ {
-		keyx, err := u.Unpack(hydrate)
-		if err != nil {
-			return nil, err
-		}
+		keyx, _ := u.unpack(hydrate)
 		key, ok := keyx.(string)
 		if !ok {
-			return nil, &IllegalFormatError{msg: fmt.Sprintf("Map key is not string type: %T", keyx)}
+			if u.err == nil {
+				u.err = &IllegalFormatError{msg: fmt.Sprintf("Map key is not string type: %T", keyx)}
+			}
+			return nil, u.err
 		}
-		valx, err := u.Unpack(hydrate)
-		if err != nil {
-			return nil, err
-		}
+		valx, _ := u.unpack(hydrate)
 		m[key] = valx
 	}
-	return m, nil
+
+	return m, u.err
 }
 
-func (u *Unpacker) Unpack(hydrate Hydrate) (interface{}, error) {
+func (u *Unpacker) unpack(hydrate Hydrate) (interface{}, error) {
 	// Read field marker
-	buf, err := u.read(1)
-	if err != nil {
-		return nil, err
+	marker := u.pop()
+	if u.err != nil {
+		return nil, u.err
 	}
-	marker := buf[0]
 
 	if marker < 0x80 {
 		// Tiny positive int
@@ -172,11 +174,11 @@ func (u *Unpacker) Unpack(hydrate Hydrate) (interface{}, error) {
 		return nil, nil
 	case 0xc1:
 		// Float
-		var f float64
-		if err = u.readNum(&f); err != nil {
-			return nil, err
+		buf := u.read(8)
+		if u.err != nil {
+			return nil, u.err
 		}
-		return f, nil
+		return math.Float64frombits(binary.BigEndian.Uint64(buf)), nil
 	case 0xc2:
 		// False
 		return false, nil
@@ -185,126 +187,135 @@ func (u *Unpacker) Unpack(hydrate Hydrate) (interface{}, error) {
 		return true, nil
 	case 0xc8:
 		// Int, 1 byte
-		var x int8
-		if err = u.readNum(&x); err != nil {
-			return nil, err
-		}
-		return int64(x), nil
+		return int64(int8(u.pop())), u.err
 	case 0xc9:
 		// Int, 2 bytes
-		var x int16
-		if err = u.readNum(&x); err != nil {
-			return nil, err
+		buf := u.read(2)
+		if u.err != nil {
+			return nil, u.err
 		}
-		return int64(x), nil
+		return int64(int16(binary.BigEndian.Uint16(buf))), nil
 	case 0xca:
 		// Int, 4 bytes
-		var x int32
-		if err = u.readNum(&x); err != nil {
-			return nil, err
+		buf := u.read(4)
+		if u.err != nil {
+			return nil, u.err
 		}
-		return int64(x), nil
+		return int64(int32(binary.BigEndian.Uint32(buf))), nil
 	case 0xcb:
 		// Int, 8 bytes
-		var x int64
-		if err = u.readNum(&x); err != nil {
-			return nil, err
+		buf := u.read(8)
+		if u.err != nil {
+			return nil, u.err
 		}
-		return x, nil
+		return int64(binary.BigEndian.Uint64(buf)), nil
 	case 0xcc:
 		// byte[] of length up to 0xff
-		var num uint8
-		if err = u.readNum(&num); err != nil {
-			return nil, err
+		num := u.pop()
+		if u.err != nil {
+			return nil, u.err
 		}
-		return u.read(uint32(num))
+		return u.read(uint32(num)), u.err
 	case 0xcd:
 		// byte[] of length up to 0xffff
-		var num uint16
-		if err = u.readNum(&num); err != nil {
-			return nil, err
+		buf := u.read(2)
+		if u.err != nil {
+			return nil, u.err
 		}
-		return u.read(uint32(num))
+		num := binary.BigEndian.Uint16(buf)
+		return u.read(uint32(num)), u.err
 	case 0xce:
 		// byte[] of length up to 0xffffffff
-		var num uint32
-		if err = u.readNum(&num); err != nil {
-			return nil, err
+		buf := u.read(4)
+		if u.err != nil {
+			return nil, u.err
 		}
-		return u.read(num)
+		num := binary.BigEndian.Uint32(buf)
+		return u.read(num), u.err
 	case 0xd0:
 		// String of length up to 0xff
-		var num uint8
-		if err = u.readNum(&num); err != nil {
-			return nil, err
+		num := u.pop()
+		if u.err != nil {
+			return nil, u.err
 		}
 		return u.readStr(uint32(num))
 	case 0xd1:
 		// String of length up to 0xffff
-		var num uint16
-		if err = u.readNum(&num); err != nil {
-			return nil, err
+		buf := u.read(2)
+		if u.err != nil {
+			return nil, u.err
 		}
+		num := binary.BigEndian.Uint16(buf)
 		return u.readStr(uint32(num))
 	case 0xd2:
 		// String of length up to 0xffffffff
-		var num uint32
-		if err = u.readNum(&num); err != nil {
-			return nil, err
+		buf := u.read(4)
+		if u.err != nil {
+			return nil, u.err
 		}
+		num := binary.BigEndian.Uint32(buf)
 		return u.readStr(num)
 	case 0xd4:
 		// Array of length up to 0xff
-		var num uint8
-		if err = u.readNum(&num); err != nil {
-			return nil, err
+		num := u.pop()
+		if u.err != nil {
+			return nil, u.err
 		}
 		return u.readArr(hydrate, uint32(num))
 	case 0xd5:
 		// Array of length up to 0xffff
-		var num uint16
-		if err = u.readNum(&num); err != nil {
-			return nil, err
+		buf := u.read(2)
+		if u.err != nil {
+			return nil, u.err
 		}
+		num := binary.BigEndian.Uint16(buf)
 		return u.readArr(hydrate, uint32(num))
 	case 0xd6:
 		// Array of length up to 0xffffffff
-		var num uint32
-		if err = u.readNum(&num); err != nil {
-			return nil, err
+		buf := u.read(4)
+		if u.err != nil {
+			return nil, u.err
 		}
+		num := binary.BigEndian.Uint32(buf)
 		return u.readArr(hydrate, num)
 	case 0xd8:
 		// Map of length up to 0xff
-		var num uint8
-		if err = u.readNum(&num); err != nil {
-			return nil, err
+		num := u.pop()
+		if u.err != nil {
+			return nil, u.err
 		}
 		return u.readMap(hydrate, uint32(num))
 	case 0xd9:
 		// Map of length up to 0xffff
-		var num uint16
-		if err = u.readNum(&num); err != nil {
-			return nil, err
+		buf := u.read(2)
+		if u.err != nil {
+			return nil, u.err
 		}
+		num := binary.BigEndian.Uint16(buf)
 		return u.readMap(hydrate, uint32(num))
 	case 0xda:
 		// Map of length up to 0xffffffff
-		var num uint32
-		if err = u.readNum(&num); err != nil {
-			return nil, err
+		buf := u.read(4)
+		if u.err != nil {
+			return nil, u.err
 		}
+		num := binary.BigEndian.Uint32(buf)
 		return u.readMap(hydrate, num)
 	}
 
 	return nil, &IllegalFormatError{msg: fmt.Sprintf("Unknown marker: %02x", marker)}
 }
 
-func (u *Unpacker) UnpackStruct(hydrate Hydrate) (interface{}, error) {
-	// Read struct marker
-	buf, err := u.read(1)
-	if err != nil {
-		return nil, err
+func (u *Unpacker) UnpackStruct(buf []byte, hydrate Hydrate) (interface{}, error) {
+	u.buf = buf
+	u.offset = 0
+	u.length = uint32(len(buf))
+	u.err = nil
+	u.foff = 0
+
+	numFields := u.pop() - 0xb0
+	if u.err != nil {
+		return nil, u.err
 	}
-	return u.readStruct(hydrate, int(buf[0]-0xb0))
+	return u.readStruct(hydrate, int(numFields))
 }
