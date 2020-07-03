@@ -37,17 +37,22 @@ import (
 	"github.com/neo4j/neo4j-go-driver/neo4j/test-integration/control"
 )
 
-// Tests the specification of the internal db connection API
-func TestConnectionConformance(ot *testing.T) {
+func makeRawConnection(logger log.Logger) db.Connection {
 	server, err := control.EnsureSingleInstance()
-	assertNoError(ot, err)
+	if err != nil {
+		panic(err)
+	}
 
 	uri := server.BoltURI()
 	parsedUri, err := url.Parse(uri)
-	assertNoError(ot, err)
+	if err != nil {
+		panic(err)
+	}
 
 	tcpConn, err := net.Dial("tcp", parsedUri.Host)
-	assertNoError(ot, err)
+	if err != nil {
+		panic(err)
+	}
 
 	authMap := map[string]interface{}{
 		"scheme":      "basic",
@@ -55,9 +60,36 @@ func TestConnectionConformance(ot *testing.T) {
 		"credentials": server.Password(),
 	}
 
-	logger := &log.ConsoleLogger{Errors: true, Infos: true, Warns: true}
 	boltConn, err := bolt.Connect(parsedUri.Host, tcpConn, authMap, logger)
-	assertNoError(ot, err)
+	if err != nil {
+		panic(err)
+	}
+	return boltConn
+}
+
+func BenchmarkQuery(b *testing.B) {
+	conn := makeRawConnection(&log.VoidLogger{})
+	defer conn.Close()
+	params := map[string]interface{}{
+		"one": 1,
+		"arr": []int{1, 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096, 8192, 16384, 32768, 65536},
+		"str": "bAbOgocy84hxL0UFyAeScQUJQqunrP5a2dxAI54mF9vm4YUfhT0wgrcUQqLsC2QauCuzWRgliXB07kdRIzLZqATHHqQxwZFkVnpB",
+	}
+
+	for i := 0; i < b.N; i++ {
+		stream, _ := conn.Run("RETURN $one, $arr, $str", params, db.ReadMode, nil, 0, nil)
+		record, _, _ := conn.Next(stream.Handle)
+
+		if len(record.Values) != 3 {
+			panic("")
+		}
+	}
+}
+
+// Tests the specification of the internal db connection API
+func TestConnectionConformance(ot *testing.T) {
+	logger := &log.ConsoleLogger{Errors: true, Infos: true, Warns: true}
+	boltConn := makeRawConnection(logger)
 	defer boltConn.Close()
 
 	randInt := func() int64 {

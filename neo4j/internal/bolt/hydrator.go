@@ -181,14 +181,14 @@ func hydrateSuccess(fields []interface{}) (interface{}, error) {
 }
 
 func hydrateRecord(fields []interface{}) (interface{}, error) {
-	if len(fields) != 1 {
+	if len(fields) == 0 {
 		return nil, errors.New("Record hydrate error")
 	}
 	v, vok := fields[0].([]interface{})
 	if !vok {
 		return nil, errors.New("Record hydrate error")
 	}
-	return &recordResponse{values: v}, nil
+	return &db.Record{Values: v}, nil
 }
 
 func hydrateIgnored(fields []interface{}) (interface{}, error) {
