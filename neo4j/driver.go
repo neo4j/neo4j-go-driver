@@ -83,6 +83,10 @@ func NewDriver(target string, auth AuthToken, configurers ...func(*Config)) (Dri
 		return nil, err
 	}
 
+	if parsed.Port() == "" {
+		parsed.Host = parsed.Host + ":7687"
+	}
+
 	directRouting := false
 	switch parsed.Scheme {
 	case "bolt":
