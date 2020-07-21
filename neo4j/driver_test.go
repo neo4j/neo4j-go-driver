@@ -129,6 +129,17 @@ func TestDriverN(t0 *testing.T) {
 
 			assertError(t, err)
 		})
+
+		t1.Run("should default to port 7687 neo4j://localhost", func(t *testing.T) {
+			driver, err := NewDriver("neo4j://localhost?x=y&a=b", NoAuth())
+			driverTarget := driver.Target()
+
+			assertNoError(t, err)
+
+			It("target port should be 7687", func() {
+				Expect(driverTarget.Port()).To(BeIdenticalTo("7687"))
+			})
+		})
 	})
 }
 
