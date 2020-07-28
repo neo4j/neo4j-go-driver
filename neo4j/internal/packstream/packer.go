@@ -127,7 +127,7 @@ func (p *Packer) writeListHeader(l int, shortOffset, longOffset byte) error {
 			hdr = hdr[:1+2]
 			hdr[0] = longOffset + 1
 			binary.BigEndian.PutUint16(hdr[1:], uint16(l))
-		case l < math.MaxUint32:
+		case uint32(l) < uint32(math.MaxUint32):
 			hdr = hdr[:1+4]
 			hdr[0] = longOffset + 2
 			binary.BigEndian.PutUint32(hdr[1:], uint32(l))
@@ -164,7 +164,7 @@ func (p *Packer) writeBytes(b []byte) error {
 		hdr = hdr[:1+2]
 		hdr[0] = 0xcd
 		binary.BigEndian.PutUint16(hdr[1:], uint16(l))
-	case l < 0x100000000:
+	case uint32(l) <= uint32(0xffffffff):
 		hdr = hdr[:1+4]
 		hdr[0] = 0xce
 		binary.BigEndian.PutUint32(hdr[1:], uint32(l))
