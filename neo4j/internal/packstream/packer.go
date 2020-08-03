@@ -115,7 +115,8 @@ func (p *Packer) writeFloat(f float64) error {
 	return p.write(buf[:])
 }
 
-func (p *Packer) writeListHeader(l int, shortOffset, longOffset byte) error {
+func (p *Packer) writeListHeader(ll int, shortOffset, longOffset byte) error {
+	l := int64(ll)
 	hdr := make([]byte, 0, 1+4)
 	if l < 0x10 {
 		hdr = append(hdr, shortOffset+byte(l))
@@ -156,7 +157,7 @@ func (p *Packer) writeMapHeader(l int) error {
 
 func (p *Packer) writeBytes(b []byte) error {
 	hdr := make([]byte, 0, 1+4)
-	l := len(b)
+	l := int64(len(b))
 	switch {
 	case l < 0x100:
 		hdr = append(hdr, 0xcc, byte(l))
