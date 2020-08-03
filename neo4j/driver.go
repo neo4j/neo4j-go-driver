@@ -53,6 +53,10 @@ type Driver interface {
 	// Creates a new session based on the specified session configuration.
 	// The session configuration contains access mode, bookmarks and database name.
 	NewSession(config SessionConfig) (Session, error)
+	// Verifies that the driver can connect to a remote server or cluster by
+	// establishing a network connection with the remote. Returns nil if succesful
+	// or error describing the problem.
+	VerifyConnectivity() error
 	// Close the driver and all underlying connections
 	Close() error
 }
@@ -77,6 +81,10 @@ func NewDriver(target string, auth AuthToken, configurers ...func(*Config)) (Dri
 	parsed, err := url.Parse(target)
 	if err != nil {
 		return nil, err
+	}
+
+	if parsed.Port() == "" {
+		parsed.Host = parsed.Host + ":7687"
 	}
 
 	directRouting := false
@@ -219,6 +227,19 @@ func (d *driver) NewSession(config SessionConfig) (Session, error) {
 	return newSession(
 		d.config, d.router,
 		d.pool, db.AccessMode(config.AccessMode), config.Bookmarks, databaseName, d.log), nil
+}
+
+func (d *driver) VerifyConnectivity() error {
+	session, err := d.NewSession(SessionConfig{AccessMode: AccessModeRead})
+	if err != nil {
+		return err
+	}
+	result, err := session.Run("RETURN 1", nil)
+	if err != nil {
+		return err
+	}
+	_, err = result.Consume()
+	return err
 }
 
 func (d *driver) Close() error {

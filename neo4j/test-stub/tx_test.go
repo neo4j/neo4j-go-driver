@@ -26,8 +26,6 @@ import (
 
 	"github.com/neo4j/neo4j-go-driver/neo4j"
 	"github.com/neo4j/neo4j-go-driver/neo4j/test-stub/control"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
 func Test_Transaction(t *testing.T) {
@@ -49,8 +47,7 @@ func Test_Transaction(t *testing.T) {
 		defer tx.Close()
 
 		result, err := tx.Run("RETURN $x", map[string]interface{}{"x": 1})
-		require.NoError(t, err)
-		require.NotNil(t, result)
+		assertNoError(t, err)
 
 		var count int64
 		for result.Next() {
@@ -59,15 +56,14 @@ func Test_Transaction(t *testing.T) {
 			}
 		}
 
-		require.NoError(t, result.Err())
-
-		assert.Equal(t, count, int64(1))
-		assert.Empty(t, session.LastBookmark())
+		assertNoError(t, result.Err())
+		assertInt64Eq(t, count, int64(1))
+		assertStringEmpty(t, session.LastBookmark())
 
 		err = tx.Commit()
-		require.NoError(t, err)
+		assertNoError(t, err)
 
-		assert.Equal(t, "bookmark:1", session.LastBookmark())
+		assertStringEq(t, "bookmark:1", session.LastBookmark())
 	}
 
 	var verifyFailureOnExplicitCommit = func(t *testing.T, script string) {
@@ -84,14 +80,13 @@ func Test_Transaction(t *testing.T) {
 		defer tx.Close()
 
 		result, err := tx.Run("CREATE (n {name: 'Bob'})", nil)
-		require.NoError(t, err)
-		require.NotNil(t, result)
+		assertNoError(t, err)
 
-		require.False(t, result.Next())
-		require.NoError(t, result.Err())
+		assertFalse(t, result.Next())
+		assertNoError(t, result.Err())
 
 		err = tx.Commit()
-		assert.Error(t, err)
+		assertError(t, err)
 		//assert.Contains(t, err.Error(), "unexpected connection state")
 	}
 
@@ -107,13 +102,13 @@ func Test_Transaction(t *testing.T) {
 
 		result, err := session.WriteTransaction(func(tx neo4j.Transaction) (interface{}, error) {
 			innerResult, innerErr := tx.Run("CREATE (n {name: 'Bob'})", nil)
-			require.NoError(t, innerErr)
-			require.NotNil(t, innerResult)
+			assertNoError(t, innerErr)
+			assertNotNil(t, innerResult)
 			return innerResult, innerErr
 		})
 
-		assert.Nil(t, result)
-		assert.Error(t, err)
+		assertNil(t, result)
+		assertError(t, err)
 		//assert.Contains(t, err.Error(), "unexpected connection state")
 	}
 

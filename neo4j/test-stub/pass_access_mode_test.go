@@ -25,8 +25,6 @@ import (
 
 	"github.com/neo4j/neo4j-go-driver/neo4j"
 	"github.com/neo4j/neo4j-go-driver/neo4j/test-stub/control"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
 func Test_PassingAccessMode(t *testing.T) {
@@ -39,15 +37,15 @@ func Test_PassingAccessMode(t *testing.T) {
 			defer driver.Close()
 
 			session, err := driver.Session(mode)
-			require.NoError(t, err)
-			require.NotNil(t, session)
+			assertNoError(t, err)
+			assertNotNil(t, session)
 			defer session.Close()
 
 			result, err := neo4j.Single(session.Run("RETURN 1", nil))
-			require.NoError(t, err)
-			require.NotNil(t, result)
+			assertNoError(t, err)
+			assertNotNil(t, result)
 
-			assert.Equal(t, int64(1), result.GetByIndex(0))
+			assertInt64Eq(t, int64(1), result.GetByIndex(0).(int64))
 		}
 
 		verifyReturn1Tx := func(t *testing.T, script string, mode neo4j.AccessMode) {
@@ -58,8 +56,8 @@ func Test_PassingAccessMode(t *testing.T) {
 			defer driver.Close()
 
 			session, err := driver.Session(mode)
-			require.NoError(t, err)
-			require.NotNil(t, session)
+			assertNoError(t, err)
+			assertNotNil(t, session)
 			defer session.Close()
 
 			txFunc := session.WriteTransaction
@@ -70,10 +68,10 @@ func Test_PassingAccessMode(t *testing.T) {
 			result, err := neo4j.Single(txFunc(func(tx neo4j.Transaction) (interface{}, error) {
 				return tx.Run("RETURN 1", nil)
 			}))
-			require.NoError(t, err)
-			require.NotNil(t, result)
+			assertNoError(t, err)
+			assertNotNil(t, result)
 
-			assert.Equal(t, int64(1), result.GetByIndex(0))
+			assertInt64Eq(t, int64(1), result.GetByIndex(0).(int64))
 		}
 
 		t.Run("shouldPassAccessModeForReadSessionRun", func(t *testing.T) {
@@ -106,15 +104,15 @@ func Test_PassingAccessMode(t *testing.T) {
 			defer driver.Close()
 
 			session, err := driver.Session(mode)
-			require.NoError(t, err)
-			require.NotNil(t, session)
+			assertNoError(t, err)
+			assertNotNil(t, session)
 			defer session.Close()
 
 			result, err := neo4j.Single(session.Run("RETURN 1", nil))
-			require.NoError(t, err)
-			require.NotNil(t, result)
+			assertNoError(t, err)
+			assertNotNil(t, result)
 
-			assert.Equal(t, int64(1), result.GetByIndex(0))
+			assertInt64Eq(t, int64(1), result.GetByIndex(0).(int64))
 		}
 
 		verifyReturn1Tx := func(t *testing.T, port int, script string, mode neo4j.AccessMode) {
@@ -128,8 +126,8 @@ func Test_PassingAccessMode(t *testing.T) {
 			defer driver.Close()
 
 			session, err := driver.Session(mode)
-			require.NoError(t, err)
-			require.NotNil(t, session)
+			assertNoError(t, err)
+			assertNotNil(t, session)
 			defer session.Close()
 
 			txFunc := session.WriteTransaction
@@ -140,10 +138,10 @@ func Test_PassingAccessMode(t *testing.T) {
 			result, err := neo4j.Single(txFunc(func(tx neo4j.Transaction) (interface{}, error) {
 				return tx.Run("RETURN 1", nil)
 			}))
-			require.NoError(t, err)
-			require.NotNil(t, result)
+			assertNoError(t, err)
+			assertNotNil(t, result)
 
-			assert.Equal(t, int64(1), result.GetByIndex(0))
+			assertInt64Eq(t, int64(1), result.GetByIndex(0).(int64))
 		}
 
 		t.Run("shouldPassAccessModeForReadSessionRun", func(t *testing.T) {

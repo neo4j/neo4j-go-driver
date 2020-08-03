@@ -26,8 +26,6 @@ import (
 
 	"github.com/neo4j/neo4j-go-driver/neo4j"
 	"github.com/neo4j/neo4j-go-driver/neo4j/test-stub/control"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
 func Test_Query(t *testing.T) {
@@ -46,8 +44,8 @@ func Test_Query(t *testing.T) {
 		defer session.Close()
 
 		result, err := session.Run("RETURN $x", map[string]interface{}{"x": 1}, txConfig...)
-		require.NoError(t, err)
-		require.NotNil(t, result)
+		assertNoError(t, err)
+		assertNotNil(t, result)
 
 		var count int64
 		for result.Next() {
@@ -56,8 +54,8 @@ func Test_Query(t *testing.T) {
 			}
 		}
 
-		require.NoError(t, result.Err())
-		assert.Equal(t, count, int64(1))
+		assertNoError(t, result.Err())
+		assertInt64Eq(t, count, int64(1))
 	}
 
 	t.Run("V1", func(t *testing.T) {
