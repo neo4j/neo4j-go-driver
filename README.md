@@ -1,6 +1,6 @@
 # neo4j-go-driver
 
-This is the the official Neo4j Go Driver.
+This is the official Neo4j Go Driver.
 
 ## Getting the Driver
 
