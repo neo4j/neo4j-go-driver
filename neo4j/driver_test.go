@@ -135,10 +135,7 @@ func TestDriverN(t0 *testing.T) {
 			driverTarget := driver.Target()
 
 			assertNoError(t, err)
-
-			It("target port should be 7687", func() {
-				Expect(driverTarget.Port()).To(BeIdenticalTo("7687"))
-			})
+			assertStringEqual(t, driverTarget.Port(), "7687")
 		})
 	})
 }
