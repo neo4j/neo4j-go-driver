@@ -140,9 +140,9 @@ func (p *Pool) getServers() map[string]*server {
 }
 
 // Prune all old connection on all the servers, this makes sure that servers
-// gets removed from the map at some point in time (as long as someone
-// borrows new connections). If there is a noticed failed connect still active
-// we should wait a while with removal to get prioritization right.
+// gets removed from the map at some point in time. If there is a noticed
+// failed connect still active  we should wait a while with removal to get
+// prioritization right.
 func (p *Pool) CleanUp() {
 	p.serversMut.Lock()
 	defer p.serversMut.Unlock()

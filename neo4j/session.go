@@ -61,12 +61,19 @@ type SessionConfig struct {
 	DatabaseName string
 }
 
+// Connection pool as seen by the session.
+type sessionPool interface {
+	Borrow(ctx context.Context, serverNames []string, wait bool) (pool.Connection, error)
+	Return(c pool.Connection)
+	CleanUp()
+}
+
 type session struct {
 	config       *Config
 	defaultMode  db.AccessMode
 	bookmarks    []string
 	databaseName string
-	pool         *pool.Pool
+	pool         sessionPool
 	router       sessionRouter
 	conn         db.Connection
 	inTx         bool
@@ -75,6 +82,7 @@ type session struct {
 	now          func() time.Time
 	logId        string
 	log          log.Logger
+	throttleTime time.Duration
 }
 
 var sessionid uint32
@@ -103,7 +111,7 @@ func cleanupBookmarks(bookmarks []string) []string {
 	return cleaned
 }
 
-func newSession(config *Config, router sessionRouter, pool *pool.Pool,
+func newSession(config *Config, router sessionRouter, pool sessionPool,
 	mode db.AccessMode, bookmarks []string, databaseName string, logger log.Logger) *session {
 
 	id := atomic.AddUint32(&sessionid, 1)
@@ -121,6 +129,7 @@ func newSession(config *Config, router sessionRouter, pool *pool.Pool,
 		now:          time.Now,
 		log:          logger,
 		logId:        logId,
+		throttleTime: time.Second * 1,
 	}
 }
 
@@ -215,16 +224,12 @@ func (s *session) beginTransaction(mode db.AccessMode, config *TransactionConfig
 			}
 
 			err := conn.TxCommit(txHandle)
-			if err == nil {
-				s.inTx = false
-			}
+			s.inTx = false
 			return err
 		},
 		rollback: func() error {
 			err := conn.TxRollback(txHandle)
-			if err == nil {
-				s.inTx = false
-			}
+			s.inTx = false
 			return err
 		},
 	}, nil
@@ -275,7 +280,7 @@ func (s *session) runRetriable(
 	var (
 		maxDeadErrors    = s.config.MaxConnectionPoolSize / 2
 		maxClusterErrors = 1
-		throttle         = throttler(1 * time.Second)
+		throttle         = throttler(s.throttleTime)
 		start            time.Time
 	)
 	for {
