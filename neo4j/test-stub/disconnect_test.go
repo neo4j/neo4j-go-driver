@@ -24,7 +24,6 @@ import (
 	"testing"
 
 	"github.com/neo4j/neo4j-go-driver/neo4j/test-stub/control"
-	"github.com/stretchr/testify/assert"
 )
 
 func Test_Disconnect(t *testing.T) {
@@ -49,12 +48,12 @@ func Test_Disconnect(t *testing.T) {
 				defer session.Close()
 
 				result, err := session.Run("RETURN $x", map[string]interface{}{"x": 1})
-				assert.NoError(t, err)
+				assertNoError(t, err)
 
 				summary, err := result.Consume()
-				assert.Error(t, err)
-				//assert.True(t, neo4j.IsServiceUnavailable(err))
-				assert.Nil(t, summary)
+				assertError(t, err)
+				// assert IsServiceUnavailable
+				assertNil(t, summary)
 			}
 
 			t.Run("shouldReturnErrorWhenServerDisconnectsAfterInit", func(t *testing.T) {

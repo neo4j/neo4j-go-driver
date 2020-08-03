@@ -44,12 +44,6 @@
   version = "v1.0.0"
 
 [[projects]]
-  name = "github.com/stretchr/testify"
-  packages = ["assert","require"]
-  revision = "3ebf1ddaeb260c4b1ae502a01c7844fa8c1fa0e9"
-  version = "v1.5.1"
-
-[[projects]]
   branch = "master"
   name = "golang.org/x/net"
   packages = ["html","html/atom","html/charset"]

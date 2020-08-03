@@ -25,36 +25,91 @@ import (
 	"testing"
 
 	"github.com/neo4j/neo4j-go-driver/neo4j"
-	"github.com/stretchr/testify/require"
 )
+
+func assertNoError(t *testing.T, err error) {
+	t.Helper()
+	if err != nil {
+		t.Fatalf("Expected no error but got: %s", err)
+	}
+}
+
+func assertError(t *testing.T, err error) {
+	t.Helper()
+	if err == nil {
+		t.Fatalf("Expected error but was none")
+	}
+}
+
+func assertNil(t *testing.T, x interface{}) {
+	t.Helper()
+	if x != nil {
+		t.Fatal("Expected nil")
+	}
+}
+
+func assertNotNil(t *testing.T, x interface{}) {
+	t.Helper()
+	if x == nil {
+		t.Fatal("Expected not nil")
+	}
+}
+
+func assertFalse(t *testing.T, b bool) {
+	t.Helper()
+	if b {
+		t.Fatal("Expected false")
+	}
+}
+
+func assertInt64Eq(t *testing.T, a, b int64) {
+	t.Helper()
+	if a != b {
+		t.Fatalf("Expected %d to equal %d", a, b)
+	}
+}
+
+func assertStringEmpty(t *testing.T, s string) {
+	t.Helper()
+	if s != "" {
+		t.Fatalf("Expected empty string but got: %s", s)
+	}
+}
+
+func assertStringEq(t *testing.T, s1, s2 string) {
+	t.Helper()
+	if s1 != s2 {
+		t.Fatalf("Expected '%s' to equal '%s'", s1, s2)
+	}
+}
 
 func newDriver(t *testing.T, uri string) neo4j.Driver {
 	driver, err := neo4j.NewDriver(uri, neo4j.NoAuth(), func(config *neo4j.Config) {
 		config.Encrypted = false
 		config.Log = neo4j.ConsoleLogger(logLevel())
 	})
-	require.NoError(t, err)
+	assertNoError(t, err)
 
 	return driver
 }
 
 func createWriteSession(t *testing.T, driver neo4j.Driver, bookmarks ...string) neo4j.Session {
 	session, err := driver.Session(neo4j.AccessModeWrite, bookmarks...)
-	require.NoError(t, err)
+	assertNoError(t, err)
 
 	return session
 }
 
 func createReadSession(t *testing.T, driver neo4j.Driver, bookmarks ...string) neo4j.Session {
 	session, err := driver.Session(neo4j.AccessModeRead, bookmarks...)
-	require.NoError(t, err)
+	assertNoError(t, err)
 
 	return session
 }
 
 func createTx(t *testing.T, session neo4j.Session, configurers ...func(*neo4j.TransactionConfig)) neo4j.Transaction {
 	tx, err := session.BeginTransaction(configurers...)
-	require.NoError(t, err)
+	assertNoError(t, err)
 
 	return tx
 }
