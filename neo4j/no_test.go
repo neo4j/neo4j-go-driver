@@ -25,7 +25,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/neo4j/neo4j-go-driver/v4/neo4j/internal/db"
+	"github.com/neo4j/neo4j-go-driver/v4/neo4j/connection"
 	"github.com/neo4j/neo4j-go-driver/v4/neo4j/internal/pool"
 )
 
@@ -79,11 +79,11 @@ func (p *testPool) CleanUp() {
 // Fake implementation of db connection
 type testConn struct {
 	err           error
-	txBeginHandle db.Handle
-	runStream     *db.Stream
-	runTxStream   *db.Stream
-	nextRecord    *db.Record
-	nextSummary   *db.Summary
+	txBeginHandle connection.Handle
+	runStream     *connection.Stream
+	runTxStream   *connection.Stream
+	nextRecord    *connection.Record
+	nextSummary   *connection.Summary
 	bookmark      string
 	serverName    string
 	serverVersion string
@@ -94,27 +94,27 @@ type testConn struct {
 	resetHook     func()
 }
 
-func (c *testConn) TxBegin(mode db.AccessMode, bookmarks []string, timeout time.Duration, meta map[string]interface{}) (db.Handle, error) {
+func (c *testConn) TxBegin(mode connection.AccessMode, bookmarks []string, timeout time.Duration, meta map[string]interface{}) (connection.Handle, error) {
 	return c.txBeginHandle, c.err
 }
 
-func (c *testConn) TxRollback(tx db.Handle) error {
+func (c *testConn) TxRollback(tx connection.Handle) error {
 	return c.txRollbackErr
 }
 
-func (c *testConn) TxCommit(tx db.Handle) error {
+func (c *testConn) TxCommit(tx connection.Handle) error {
 	return c.txCommitErr
 }
 
-func (c *testConn) Run(cypher string, params map[string]interface{}, mode db.AccessMode, bookmarks []string, timeout time.Duration, meta map[string]interface{}) (*db.Stream, error) {
+func (c *testConn) Run(cypher string, params map[string]interface{}, mode connection.AccessMode, bookmarks []string, timeout time.Duration, meta map[string]interface{}) (*connection.Stream, error) {
 	return c.runStream, c.err
 }
 
-func (c *testConn) RunTx(tx db.Handle, cypher string, params map[string]interface{}) (*db.Stream, error) {
+func (c *testConn) RunTx(tx connection.Handle, cypher string, params map[string]interface{}) (*connection.Stream, error) {
 	return c.runTxStream, c.err
 }
 
-func (c *testConn) Next(streamHandle db.Handle) (*db.Record, *db.Summary, error) {
+func (c *testConn) Next(streamHandle connection.Handle) (*connection.Record, *connection.Summary, error) {
 	return c.nextRecord, c.nextSummary, c.err
 }
 

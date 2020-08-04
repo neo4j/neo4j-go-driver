@@ -133,7 +133,7 @@ func TestHydrator(ot *testing.T) {
 			name:     "Record response",
 			tag:      msgRecord,
 			fields:   []interface{}{[]interface{}{1, "a"}},
-			hydrated: &db.Record{Values: []interface{}{1, "a"}},
+			hydrated: &connection.Record{Values: []interface{}{1, "a"}},
 		},
 	}
 	for _, c := range cases {
