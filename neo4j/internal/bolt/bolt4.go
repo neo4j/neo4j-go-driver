@@ -608,13 +608,8 @@ func (b *bolt4) Reset() {
 	}
 }
 
-<<<<<<< HEAD
-func (b *bolt4) GetRoutingTable(database string, context map[string]string) (*db.RoutingTable, error) {
-	if err := assertState(b.logError, b.state, bolt4_ready); err != nil {
-=======
 func (b *bolt4) GetRoutingTable(database string, context map[string]string) (*connection.RoutingTable, error) {
 	if err := assertState(b.logError, b.state, bolt3_ready); err != nil {
->>>>>>> Big cleanup
 		return nil, err
 	}
 

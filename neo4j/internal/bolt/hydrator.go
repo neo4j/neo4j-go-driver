@@ -188,7 +188,7 @@ func hydrateRecord(fields []interface{}) (interface{}, error) {
 	if !vok {
 		return nil, errors.New("Record hydrate error")
 	}
-	return &db.Record{Values: v}, nil
+	return &connection.Record{Values: v}, nil
 }
 
 func hydrateIgnored(fields []interface{}) (interface{}, error) {
