@@ -84,7 +84,7 @@ var _ = Describe("Spatial Types", func() {
 		Expect(err).To(BeNil())
 
 		if result.Next() {
-			var pointReceived = result.Record().GetByIndex(0).(*neo4j.Point)
+			var pointReceived = result.Record().Values[0].(*neo4j.Point)
 
 			Expect(pointReceived).NotTo(BeNil())
 			Expect(pointReceived.SrId()).To(Equal(point.SrId()))
@@ -107,7 +107,7 @@ var _ = Describe("Spatial Types", func() {
 		Expect(err).To(BeNil())
 
 		if result.Next() {
-			var pointsList = result.Record().GetByIndex(0).([]interface{})
+			var pointsList = result.Record().Values[0].([]interface{})
 
 			Expect(pointsList).To(HaveLen(len(points)))
 			for index, point := range pointsList {
@@ -165,8 +165,8 @@ var _ = Describe("Spatial Types", func() {
 		Expect(err).To(BeNil())
 
 		if result.Next() {
-			var point1 = result.Record().GetByIndex(0).(*neo4j.Point)
-			var point2 = result.Record().GetByIndex(1).(*neo4j.Point)
+			var point1 = result.Record().Values[0].(*neo4j.Point)
+			var point2 = result.Record().Values[1].(*neo4j.Point)
 
 			Expect(point1).NotTo(BeNil())
 			Expect(point1.SrId()).To(Equal(CartesianSrID))
@@ -195,7 +195,7 @@ var _ = Describe("Spatial Types", func() {
 		Expect(err).To(BeNil())
 
 		if result.Next() {
-			var node = result.Record().GetByIndex(0).(neo4j.Node)
+			var node = result.Record().Values[0].(neo4j.Node)
 			var point1Received = node.Props()["location1"].(*neo4j.Point)
 			var point2Received = node.Props()["location2"].(*neo4j.Point)
 
@@ -226,7 +226,7 @@ var _ = Describe("Spatial Types", func() {
 		Expect(err).To(BeNil())
 
 		if result.Next() {
-			var node = result.Record().GetByIndex(0).(neo4j.Node)
+			var node = result.Record().Values[0].(neo4j.Node)
 			var point1Received = node.Props()["location1"].(*neo4j.Point)
 			var point2Received = node.Props()["location2"].(*neo4j.Point)
 
@@ -271,7 +271,7 @@ var _ = Describe("Spatial Types", func() {
 			Expect(err).To(BeNil())
 
 			if result.Next() {
-				Expect(result.Record().GetByIndex(0)).To(BeNil())
+				Expect(result.Record().Values[0]).To(BeNil())
 			}
 			Expect(result.Next()).To(BeFalse())
 			Expect(result.Err()).To(BeNil())

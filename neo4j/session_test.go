@@ -24,7 +24,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/neo4j/neo4j-go-driver/v4/neo4j/connection"
+	"github.com/neo4j/neo4j-go-driver/v4/neo4j/db"
 	"github.com/neo4j/neo4j-go-driver/v4/neo4j/internal/log"
 )
 
@@ -41,7 +41,7 @@ func TestSession(st *testing.T) {
 		conf := Config{MaxTransactionRetryTime: 3 * time.Millisecond}
 		router := testRouter{}
 		pool := testPool{}
-		sess := newSession(&conf, &router, &pool, connection.ReadMode, []string{}, "", &logger)
+		sess := newSession(&conf, &router, &pool, db.ReadMode, []string{}, "", &logger)
 		sess.throttleTime = time.Millisecond * 1
 		return &router, &pool, sess
 	}
@@ -57,7 +57,7 @@ func TestSession(st *testing.T) {
 			}
 			conn := &testConn{isAlive: true}
 			pool.borrowConn = conn
-			transientErr := &connection.DatabaseError{Code: "Neo.TransientError.General.MemoryPoolOutOfMemoryError"}
+			transientErr := &db.DatabaseError{Code: "Neo.TransientError.General.MemoryPoolOutOfMemoryError"}
 			numRetries := 0
 
 			_, err := sess.WriteTransaction(func(tx Transaction) (interface{}, error) {

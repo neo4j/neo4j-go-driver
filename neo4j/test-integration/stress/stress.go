@@ -181,7 +181,7 @@ func ReadQueryExecutor(driver neo4j.Driver, useBookmark bool) func(ctx *TestCont
 		Expect(err).To(BeNil())
 
 		if result.Next() {
-			nodeInt := result.Record().GetByIndex(0)
+			nodeInt := result.Record().Values[0]
 			Expect(nodeInt).NotTo(BeNil())
 
 			_, ok := nodeInt.(neo4j.Node)
@@ -211,7 +211,7 @@ func ReadQueryInTxExecutor(driver neo4j.Driver, useBookmark bool) func(ctx *Test
 		Expect(err).To(BeNil())
 
 		if result.Next() {
-			nodeInt := result.Record().GetByIndex(0)
+			nodeInt := result.Record().Values[0]
 			Expect(nodeInt).NotTo(BeNil())
 
 			_, ok := nodeInt.(neo4j.Node)
@@ -242,7 +242,7 @@ func ReadQueryWithReadTransactionExecutor(driver neo4j.Driver, useBookmark bool)
 			Expect(err).To(BeNil())
 
 			if result.Next() {
-				nodeInt := result.Record().GetByIndex(0)
+				nodeInt := result.Record().Values[0]
 				Expect(nodeInt).NotTo(BeNil())
 
 				_, ok := nodeInt.(neo4j.Node)

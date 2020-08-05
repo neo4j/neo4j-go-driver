@@ -25,7 +25,7 @@ import (
 	"net"
 	"time"
 
-	"github.com/neo4j/neo4j-go-driver/v4/neo4j/connection"
+	"github.com/neo4j/neo4j-go-driver/v4/neo4j/db"
 	"github.com/neo4j/neo4j-go-driver/v4/neo4j/internal/log"
 	"github.com/neo4j/neo4j-go-driver/v4/neo4j/internal/packstream"
 )
@@ -41,7 +41,7 @@ const (
 )
 
 type internalTx4 struct {
-	mode         connection.AccessMode
+	mode         db.AccessMode
 	bookmarks    []string
 	timeout      time.Duration
 	txMeta       map[string]interface{}
@@ -50,7 +50,7 @@ type internalTx4 struct {
 
 func (i *internalTx4) toMeta() map[string]interface{} {
 	meta := map[string]interface{}{}
-	if i.mode == connection.ReadMode {
+	if i.mode == db.ReadMode {
 		meta["mode"] = "r"
 	}
 	if len(i.bookmarks) > 0 {
@@ -63,7 +63,7 @@ func (i *internalTx4) toMeta() map[string]interface{} {
 	if len(i.txMeta) > 0 {
 		meta["tx_metadata"] = i.txMeta
 	}
-	if i.databaseName != connection.DefaultDatabase {
+	if i.databaseName != db.DefaultDatabase {
 		meta["db"] = i.databaseName
 	}
 	return meta
@@ -172,7 +172,7 @@ func (b *bolt4) receiveSuccess() (*successResponse, error) {
 	switch v := msg.(type) {
 	case *successResponse:
 		return v, nil
-	case *connection.DatabaseError:
+	case *db.DatabaseError:
 		b.state = bolt4_failed
 		if v.IsClient() {
 			// These could include potentially large cypher statement, only log to debug
@@ -230,7 +230,7 @@ func (b *bolt4) connect(auth map[string]interface{}) error {
 }
 
 func (b *bolt4) TxBegin(
-	mode connection.AccessMode, bookmarks []string, timeout time.Duration, txMeta map[string]interface{}) (connection.Handle, error) {
+	mode db.AccessMode, bookmarks []string, timeout time.Duration, txMeta map[string]interface{}) (db.Handle, error) {
 
 	// Ok, to begin transaction while streaming auto-commit, just empty the stream and continue.
 	if b.state == bolt4_streaming {
@@ -271,7 +271,7 @@ func (b *bolt4) TxBegin(
 	return b.txId, nil
 }
 
-func (b *bolt4) TxCommit(txh connection.Handle) error {
+func (b *bolt4) TxCommit(txh db.Handle) error {
 	if err := assertHandle(b.logError, b.txId, txh); err != nil {
 		return err
 	}
@@ -322,7 +322,7 @@ func (b *bolt4) TxCommit(txh connection.Handle) error {
 	return nil
 }
 
-func (b *bolt4) TxRollback(txh connection.Handle) error {
+func (b *bolt4) TxRollback(txh db.Handle) error {
 	if err := assertHandle(b.logError, b.txId, txh); err != nil {
 		return err
 	}
@@ -379,7 +379,7 @@ func (b *bolt4) consumeStream() error {
 	return nil
 }
 
-func (b *bolt4) run(cypher string, params map[string]interface{}, tx *internalTx4) (*connection.Stream, error) {
+func (b *bolt4) run(cypher string, params map[string]interface{}, tx *internalTx4) (*db.Stream, error) {
 	b.log.Debugf(b.logId, "run")
 	// If already streaming, consume the whole thing first
 	if err := b.consumeStream(); err != nil {
@@ -445,7 +445,7 @@ func (b *bolt4) run(cypher string, params map[string]interface{}, tx *internalTx
 	}
 
 	b.streamId = time.Now().Unix()
-	stream := &connection.Stream{Keys: b.streamKeys, Handle: b.streamId}
+	stream := &db.Stream{Keys: b.streamKeys, Handle: b.streamId}
 	return stream, nil
 }
 
@@ -458,8 +458,8 @@ func (b *bolt4) logDebug(err error) {
 }
 
 func (b *bolt4) Run(
-	cypher string, params map[string]interface{}, mode connection.AccessMode,
-	bookmarks []string, timeout time.Duration, txMeta map[string]interface{}) (*connection.Stream, error) {
+	cypher string, params map[string]interface{}, mode db.AccessMode,
+	bookmarks []string, timeout time.Duration, txMeta map[string]interface{}) (*db.Stream, error) {
 
 	if err := assertStates(b.logError, b.state, []int{bolt4_streaming, bolt4_ready}); err != nil {
 		return nil, err
@@ -475,7 +475,7 @@ func (b *bolt4) Run(
 	return b.run(cypher, params, &tx)
 }
 
-func (b *bolt4) RunTx(txh connection.Handle, cypher string, params map[string]interface{}) (*connection.Stream, error) {
+func (b *bolt4) RunTx(txh db.Handle, cypher string, params map[string]interface{}) (*db.Stream, error) {
 	if err := assertHandle(b.logError, b.txId, txh); err != nil {
 		return nil, err
 	}
@@ -486,7 +486,7 @@ func (b *bolt4) RunTx(txh connection.Handle, cypher string, params map[string]in
 }
 
 // Reads one record from the stream.
-func (b *bolt4) Next(shandle connection.Handle) (*connection.Record, *connection.Summary, error) {
+func (b *bolt4) Next(shandle db.Handle) (*db.Record, *db.Summary, error) {
 	if err := assertHandle(b.logError, b.streamId, shandle); err != nil {
 		return nil, nil, err
 	}
@@ -501,7 +501,7 @@ func (b *bolt4) Next(shandle connection.Handle) (*connection.Record, *connection
 	}
 
 	switch x := res.(type) {
-	case *connection.Record:
+	case *db.Record:
 		x.Keys = b.streamKeys
 		return x, nil, nil
 	case *successResponse:
@@ -529,7 +529,7 @@ func (b *bolt4) Next(shandle connection.Handle) (*connection.Record, *connection
 		sum.ServerName = b.serverName
 		sum.TFirst = b.tfirst
 		return nil, sum, nil
-	case *connection.DatabaseError:
+	case *db.DatabaseError:
 		b.state = bolt4_failed
 		if x.IsClient() {
 			// These could include potentially large cypher statement, only log to debug
@@ -566,7 +566,7 @@ func (b *bolt4) Reset() {
 		b.streamKeys = []string{}
 		b.bookmark = ""
 		b.pendingTx = nil
-		b.databaseName = connection.DefaultDatabase
+		b.databaseName = db.DefaultDatabase
 	}()
 
 	if b.state == bolt4_ready || b.state == bolt4_dead {
@@ -608,7 +608,7 @@ func (b *bolt4) Reset() {
 	}
 }
 
-func (b *bolt4) GetRoutingTable(database string, context map[string]string) (*connection.RoutingTable, error) {
+func (b *bolt4) GetRoutingTable(database string, context map[string]string) (*db.RoutingTable, error) {
 	if err := assertState(b.logError, b.state, bolt3_ready); err != nil {
 		return nil, err
 	}
@@ -620,12 +620,12 @@ func (b *bolt4) GetRoutingTable(database string, context map[string]string) (*co
 	query := queryDefault
 	params := map[string]interface{}{"context": context}
 
-	if database != connection.DefaultDatabase {
+	if database != db.DefaultDatabase {
 		query = queryDatabase
 		params["connection"] = database
 	}
 
-	stream, err := b.Run(query, params, connection.ReadMode, nil, 0, nil)
+	stream, err := b.Run(query, params, db.ReadMode, nil, 0, nil)
 	if err != nil {
 		return nil, err
 	}

@@ -25,7 +25,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/neo4j/neo4j-go-driver/v4/neo4j/connection"
+	"github.com/neo4j/neo4j-go-driver/v4/neo4j/db"
 	"github.com/neo4j/neo4j-go-driver/v4/neo4j/dbtype"
 	"github.com/neo4j/neo4j-go-driver/v4/neo4j/internal/packstream"
 )
@@ -127,13 +127,13 @@ func TestHydrator(ot *testing.T) {
 			name:     "Failure response",
 			tag:      msgFailure,
 			fields:   []interface{}{map[string]interface{}{"code": "Code", "message": "Msg"}},
-			hydrated: &connection.DatabaseError{Code: "Code", Msg: "Msg"},
+			hydrated: &db.DatabaseError{Code: "Code", Msg: "Msg"},
 		},
 		{
 			name:     "Record response",
 			tag:      msgRecord,
 			fields:   []interface{}{[]interface{}{1, "a"}},
-			hydrated: &connection.Record{Values: []interface{}{1, "a"}},
+			hydrated: &db.Record{Values: []interface{}{1, "a"}},
 		},
 	}
 	for _, c := range cases {

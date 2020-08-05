@@ -25,7 +25,7 @@ import (
 	"time"
 
 	"github.com/neo4j/neo4j-go-driver/v4/neo4j"
-	"github.com/neo4j/neo4j-go-driver/v4/neo4j/connection"
+	"github.com/neo4j/neo4j-go-driver/v4/neo4j/db"
 	"github.com/neo4j/neo4j-go-driver/v4/neo4j/test-integration/control"
 
 	//. "github.com/neo4j/neo4j-go-driver/v4/neo4j/utils/test"
@@ -273,7 +273,7 @@ var _ = Describe("Session", func() {
 			Expect(err).To(BeNil())
 
 			if result.Next() {
-				Expect(result.Record().GetByIndex(0)).To(BeEquivalentTo(1))
+				Expect(result.Record().Values[0]).To(BeEquivalentTo(1))
 			}
 			Expect(result.Next()).To(BeFalse())
 			Expect(result.Err()).To(BeNil())
@@ -327,8 +327,8 @@ var _ = Describe("Session", func() {
 			records, _ := neo4j.Collect(result, nil)
 			Expect(records).NotTo(BeNil())
 			Expect(records).To(HaveLen(100))
-			Expect(records[0].GetByIndex(0)).To(BeEquivalentTo(1))
-			Expect(records[99].GetByIndex(0)).To(BeEquivalentTo(100))
+			Expect(records[0].Values[0]).To(BeEquivalentTo(1))
+			Expect(records[99].Values[0]).To(BeEquivalentTo(100))
 		})
 
 		Specify("when session is closed, pending queries should be executed", func() {
@@ -357,14 +357,14 @@ var _ = Describe("Session", func() {
 			records1, _ := neo4j.Collect(result1, nil)
 			Expect(records1).NotTo(BeNil())
 			Expect(records1).To(HaveLen(100))
-			Expect(records1[0].GetByIndex(0)).To(BeEquivalentTo(1))
-			Expect(records1[99].GetByIndex(0)).To(BeEquivalentTo(100))
+			Expect(records1[0].Values[0]).To(BeEquivalentTo(1))
+			Expect(records1[99].Values[0]).To(BeEquivalentTo(100))
 
 			records2, _ := neo4j.Collect(result2, nil)
 			Expect(records2).NotTo(BeNil())
 			Expect(records2).To(HaveLen(100))
-			Expect(records2[0].GetByIndex(0)).Should(Equal("Text 1"))
-			Expect(records2[99].GetByIndex(0)).Should(Equal("Text 100"))
+			Expect(records2[0].Values[0]).Should(Equal("Text 1"))
+			Expect(records2[99].Values[0]).Should(Equal("Text 100"))
 		})
 
 		Specify("when session is closed, pending explicit transaction should be rolled-back", func() {
@@ -399,16 +399,16 @@ var _ = Describe("Session", func() {
 			records1, _ := neo4j.Collect(result1, nil)
 			Expect(records1).NotTo(BeNil())
 			Expect(records1).To(HaveLen(100))
-			Expect(records1[0].GetByIndex(0)).To(BeEquivalentTo(1))
-			Expect(records1[99].GetByIndex(0)).To(BeEquivalentTo(100))
+			Expect(records1[0].Values[0]).To(BeEquivalentTo(1))
+			Expect(records1[99].Values[0]).To(BeEquivalentTo(100))
 
 			records2, _ := neo4j.Collect(result2, nil)
 			Expect(records2).NotTo(BeNil())
 			Expect(records2).To(HaveLen(100))
-			Expect(records2[0].GetByIndex(0)).To(BeEquivalentTo(1))
-			Expect(records2[0].GetByIndex(1)).Should(Equal("Text 1"))
-			Expect(records2[99].GetByIndex(0)).To(BeEquivalentTo(100))
-			Expect(records2[99].GetByIndex(1)).Should(Equal("Text 100"))
+			Expect(records2[0].Values[0]).To(BeEquivalentTo(1))
+			Expect(records2[0].Values[1]).Should(Equal("Text 1"))
+			Expect(records2[99].Values[0]).To(BeEquivalentTo(100))
+			Expect(records2[99].Values[1]).Should(Equal("Text 100"))
 
 			newSession, err := driver.Session(neo4j.AccessModeRead)
 			Expect(err).To(BeNil())
@@ -522,7 +522,7 @@ var _ = Describe("Session", func() {
 			// Should be a database error of class Transient indicating that the transaction
 			// has been terminated. For some reason this should not be considered transient
 			// by the IsTransientError.
-			dbErr := err.(*connection.DatabaseError)
+			dbErr := err.(*db.DatabaseError)
 			Expect(dbErr.Msg).To(ContainSubstring("terminated"))
 			//Expect(err).To(BeTransientError(nil, ContainSubstring("terminated")))
 		})
@@ -539,7 +539,7 @@ var _ = Describe("Session", func() {
 
 			_, err := session3.WriteTransaction(updateNodeWork("WriteTransactionTxTimeOut", map[string]interface{}{"id": 2}), neo4j.WithTxTimeout(1*time.Second))
 			Expect(err).ToNot(BeNil())
-			dbErr := err.(*connection.DatabaseError)
+			dbErr := err.(*db.DatabaseError)
 			Expect(dbErr.Msg).To(ContainSubstring("terminated"))
 			//Expect(err).To(BeTransientError(nil, ContainSubstring("terminated")))
 		})

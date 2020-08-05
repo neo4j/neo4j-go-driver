@@ -23,7 +23,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/neo4j/neo4j-go-driver/v4/neo4j/connection"
+	"github.com/neo4j/neo4j-go-driver/v4/neo4j/db"
 )
 
 func TestSuccessResponseExtraction(ot *testing.T) {
@@ -68,7 +68,7 @@ func TestSuccessResponseExtraction(ot *testing.T) {
 				"t_last":   int64(3),
 				"bookmark": "bookm",
 			},
-			expected: &connection.Summary{Bookmark: "bookm", TLast: 3, StmntType: connection.StatementTypeWrite},
+			expected: &db.Summary{Bookmark: "bookm", TLast: 3, StmntType: db.StatementTypeWrite},
 			extract:  func(r *successResponse) interface{} { return r.summary() },
 		},
 		{
@@ -91,12 +91,12 @@ func TestSuccessResponseExtraction(ot *testing.T) {
 					},
 				},
 			},
-			expected: &connection.Plan{
+			expected: &db.Plan{
 				Operator:    "opType",
 				Arguments:   map[string]interface{}{"arg1": 1001},
 				Identifiers: []string{"id1", "id2"},
-				Children: []connection.Plan{
-					connection.Plan{Operator: "cop", Identifiers: []string{"cid"}, Children: []connection.Plan{}},
+				Children: []db.Plan{
+					db.Plan{Operator: "cop", Identifiers: []string{"cid"}, Children: []db.Plan{}},
 				},
 			},
 			extract: func(r *successResponse) interface{} { return r.summary().Plan },
@@ -125,12 +125,12 @@ func TestSuccessResponseExtraction(ot *testing.T) {
 					},
 				},
 			},
-			expected: &connection.ProfiledPlan{
+			expected: &db.ProfiledPlan{
 				Operator:    "opType",
 				Arguments:   map[string]interface{}{"arg1": 1001},
 				Identifiers: []string{"id1", "id2"},
-				Children: []connection.ProfiledPlan{
-					connection.ProfiledPlan{Operator: "cop", Identifiers: []string{"cid"}, Children: []connection.ProfiledPlan{}, DbHits: 1, Records: 2},
+				Children: []db.ProfiledPlan{
+					db.ProfiledPlan{Operator: "cop", Identifiers: []string{"cid"}, Children: []db.ProfiledPlan{}, DbHits: 1, Records: 2},
 				},
 				DbHits:  7,
 				Records: 4,
@@ -163,9 +163,9 @@ func TestSuccessResponseExtraction(ot *testing.T) {
 					},
 				},
 			},
-			expected: []connection.Notification{
-				connection.Notification{Code: "c1", Title: "t1", Description: "d1", Severity: "s1", Position: &connection.InputPosition{Offset: 1, Line: 2, Column: 3}},
-				connection.Notification{Code: "c2", Title: "t2", Description: "d2", Severity: "s2"},
+			expected: []db.Notification{
+				db.Notification{Code: "c1", Title: "t1", Description: "d1", Severity: "s1", Position: &db.InputPosition{Offset: 1, Line: 2, Column: 3}},
+				db.Notification{Code: "c2", Title: "t2", Description: "d2", Severity: "s2"},
 			},
 			extract: func(r *successResponse) interface{} { return r.summary().Notifications },
 		},
