@@ -200,7 +200,7 @@ var _ = Describe("Temporal Types", func() {
 		Expect(err).To(BeNil())
 
 		if result.Next() {
-			var received = result.Record().Values()
+			var received = result.Record().Values
 
 			Expect(received).To(Equal(expected))
 		}

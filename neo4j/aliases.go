@@ -26,7 +26,15 @@ import (
 	"github.com/neo4j/neo4j-go-driver/v4/neo4j/dbtype"
 )
 
-// Aliases for simpler usage (fewer imports)
+// Aliases to simplify client usage (fewer imports) and to provide some backwards
+// compatibility with 1.x driver.
+//
+// Graph types (Node, Relationship and Path) have changed from being interfaces on 1.x to
+// being structs defined in a subpackage, to simplify porting from 1.x these types are
+// aliased as pointers. Otherwise this type of construct would be unnotified by the
+// compiler but result in a runtime panic:
+//    node := record.Values[0].(neo4j.Node)
+//
 // A separate dbtype package is needed to avoid circular package references and to avoid
 // unnecessary copying/conversions between structs.
 type (
@@ -36,14 +44,27 @@ type (
 	LocalTime     = dbtype.LocalTime
 	LocalDateTime = dbtype.LocalDateTime
 	Time          = dbtype.Time // AKA OffsetTime
+	OffsetTime    = dbtype.Time
 	Duration      = dbtype.Duration
-	Node          = dbtype.Node
-	Relationship  = dbtype.Relationship
-	Path          = dbtype.Path
+	Node          = *dbtype.Node
+	Relationship  = *dbtype.Relationship
+	Path          = *dbtype.Path
 	Record        = db.Record
 )
 
 // TODO: Point is gone, Point2D and Point3D is the new
+
+func NewPoint2D(spatialRefId uint32, x, y float64) *dbtype.Point2D {
+	return &dbtype.Point2D{SpatialRefId: spatialRefId, X: x, Y: y}
+}
+
+func NewPoint3D(spatialRefId uint32, x, y, z float64) *dbtype.Point3D {
+	return &dbtype.Point3D{SpatialRefId: spatialRefId, X: x, Y: y, Z: z}
+}
+
+func DurationOf(months, days, seconds int64, nanos int) dbtype.Duration {
+	return Duration{Months: months, Days: days, Seconds: seconds, Nanos: nanos}
+}
 
 // TODO: Document these and make note that explicit casting is to be preferred to func call.
 // For backwards compatibility with 1.8 driver, provide casting of temporal types as functions
