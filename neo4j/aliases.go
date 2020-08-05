@@ -20,12 +20,14 @@
 package neo4j
 
 import (
-	"github.com/neo4j/neo4j-go-driver/v4/neo4j/connection"
+	"time"
+
+	"github.com/neo4j/neo4j-go-driver/v4/neo4j/db"
 	"github.com/neo4j/neo4j-go-driver/v4/neo4j/dbtype"
 )
 
 // Aliases for simpler usage (fewer imports)
-// A separate type package is needed to avoid circular package references and to avoid
+// A separate dbtype package is needed to avoid circular package references and to avoid
 // unnecessary copying/conversions between structs.
 type (
 	Point2D       = dbtype.Point2D
@@ -38,5 +40,30 @@ type (
 	Node          = dbtype.Node
 	Relationship  = dbtype.Relationship
 	Path          = dbtype.Path
-	Record        = connection.Record
+	Record        = db.Record
 )
+
+// TODO: Point is gone, Point2D and Point3D is the new
+
+// TODO: Document these and make note that explicit casting is to be preferred to func call.
+// For backwards compatibility with 1.8 driver, provide casting of temporal types as functions
+
+func DateOf(t time.Time) dbtype.Date {
+	return dbtype.Date(t)
+}
+
+func LocalTimeOf(t time.Time) dbtype.LocalTime {
+	return dbtype.LocalTime(t)
+}
+
+func LocalDateTimeOf(t time.Time) dbtype.LocalDateTime {
+	return dbtype.LocalDateTime(t)
+}
+
+func TimeOf(t time.Time) dbtype.Time {
+	return dbtype.Time(t)
+}
+
+func OffsetTimeOf(t time.Time) dbtype.Time {
+	return dbtype.Time(t)
+}

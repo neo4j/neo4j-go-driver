@@ -23,10 +23,10 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/neo4j/neo4j-go-driver/v4/neo4j/connection"
+	"github.com/neo4j/neo4j-go-driver/v4/neo4j/db"
 )
 
-func assertHandle(log func(error), id int64, h connection.Handle) error {
+func assertHandle(log func(error), id int64, h db.Handle) error {
 	hid, ok := h.(int64)
 	if !ok || hid != id {
 		err := errors.New("Invalid handle")

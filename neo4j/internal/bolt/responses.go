@@ -20,7 +20,7 @@
 package bolt
 
 import (
-	"github.com/neo4j/neo4j-go-driver/v4/neo4j/connection"
+	"github.com/neo4j/neo4j-go-driver/v4/neo4j/db"
 )
 
 // Server ignored request.
@@ -90,7 +90,7 @@ func (s *successResponse) hello() *helloSuccess {
 
 // Extracted from SuccessResponse.meta on end of stream.
 // Maps directly to shared internal summary type to avoid unnecessary conversions.
-func (s *successResponse) summary() *connection.Summary {
+func (s *successResponse) summary() *db.Summary {
 	t_last, _ := s.meta["t_last"].(int64)
 	qtype, tok := s.meta["type"].(string)
 	bookmark, _ := s.meta["bookmark"].(string) // Only for auto-commit transactions
@@ -99,16 +99,16 @@ func (s *successResponse) summary() *connection.Summary {
 	}
 
 	// Map statement type received to internal type
-	stmntType := connection.StatementTypeUnknown
+	stmntType := db.StatementTypeUnknown
 	switch qtype {
 	case "r":
-		stmntType = connection.StatementTypeRead
+		stmntType = db.StatementTypeRead
 	case "w":
-		stmntType = connection.StatementTypeWrite
+		stmntType = db.StatementTypeWrite
 	case "rw":
-		stmntType = connection.StatementTypeReadWrite
+		stmntType = db.StatementTypeReadWrite
 	case "s":
-		stmntType = connection.StatementTypeSchemaWrite
+		stmntType = db.StatementTypeSchemaWrite
 	}
 
 	// Optional statistics
@@ -127,23 +127,23 @@ func (s *successResponse) summary() *connection.Summary {
 
 	// Optional query plan
 	planx, _ := s.meta["plan"].(map[string]interface{})
-	var plan *connection.Plan
+	var plan *db.Plan
 	if len(planx) > 0 {
 		plan = parsePlan(planx)
 	}
 
 	// Optional query profile
 	profilex, _ := s.meta["profile"].(map[string]interface{})
-	var profile *connection.ProfiledPlan
+	var profile *db.ProfiledPlan
 	if len(profilex) > 0 {
 		profile = parseProfile(profilex)
 	}
 
 	// Optional notifications
 	notificationsx, _ := s.meta["notifications"].([]interface{})
-	var notifications []connection.Notification
+	var notifications []db.Notification
 	if len(notificationsx) > 0 {
-		notifications = make([]connection.Notification, 0, len(notificationsx))
+		notifications = make([]db.Notification, 0, len(notificationsx))
 		for _, x := range notificationsx {
 			notificationx, ok := x.(map[string]interface{})
 			if ok {
@@ -152,7 +152,7 @@ func (s *successResponse) summary() *connection.Summary {
 		}
 	}
 
-	return &connection.Summary{
+	return &db.Summary{
 		Bookmark:      bookmark,
 		TLast:         t_last,
 		StmntType:     stmntType,
@@ -178,15 +178,15 @@ func parsePlanOpIdArgsChildren(planx map[string]interface{}) (string, []string, 
 	return operator, identifiers, arguments, childrenx
 }
 
-func parsePlan(planx map[string]interface{}) *connection.Plan {
+func parsePlan(planx map[string]interface{}) *db.Plan {
 	op, ids, args, childrenx := parsePlanOpIdArgsChildren(planx)
-	plan := &connection.Plan{
+	plan := &db.Plan{
 		Operator:    op,
 		Arguments:   args,
 		Identifiers: ids,
 	}
 
-	plan.Children = make([]connection.Plan, 0, len(childrenx))
+	plan.Children = make([]db.Plan, 0, len(childrenx))
 	for _, c := range childrenx {
 		childPlanx, _ := c.(map[string]interface{})
 		if len(childPlanx) > 0 {
@@ -200,9 +200,9 @@ func parsePlan(planx map[string]interface{}) *connection.Plan {
 	return plan
 }
 
-func parseProfile(profilex map[string]interface{}) *connection.ProfiledPlan {
+func parseProfile(profilex map[string]interface{}) *db.ProfiledPlan {
 	op, ids, args, childrenx := parsePlanOpIdArgsChildren(profilex)
-	plan := &connection.ProfiledPlan{
+	plan := &db.ProfiledPlan{
 		Operator:    op,
 		Arguments:   args,
 		Identifiers: ids,
@@ -211,7 +211,7 @@ func parseProfile(profilex map[string]interface{}) *connection.ProfiledPlan {
 	plan.DbHits, _ = profilex["dbHits"].(int64)
 	plan.Records, _ = profilex["rows"].(int64)
 
-	plan.Children = make([]connection.ProfiledPlan, 0, len(childrenx))
+	plan.Children = make([]db.ProfiledPlan, 0, len(childrenx))
 	for _, c := range childrenx {
 		childPlanx, _ := c.(map[string]interface{})
 		if len(childPlanx) > 0 {
@@ -225,15 +225,15 @@ func parseProfile(profilex map[string]interface{}) *connection.ProfiledPlan {
 	return plan
 }
 
-func parseNotification(m map[string]interface{}) connection.Notification {
-	n := connection.Notification{}
+func parseNotification(m map[string]interface{}) db.Notification {
+	n := db.Notification{}
 	n.Code, _ = m["code"].(string)
 	n.Description = m["description"].(string)
 	n.Severity, _ = m["severity"].(string)
 	n.Title, _ = m["title"].(string)
 	posx, exists := m["position"].(map[string]interface{})
 	if exists {
-		pos := &connection.InputPosition{}
+		pos := &db.InputPosition{}
 		i, _ := posx["column"].(int64)
 		pos.Column = int(i)
 		i, _ = posx["line"].(int64)

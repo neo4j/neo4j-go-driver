@@ -20,7 +20,7 @@
 package neo4j
 
 import (
-	"github.com/neo4j/neo4j-go-driver/v4/neo4j/connection"
+	"github.com/neo4j/neo4j-go-driver/v4/neo4j/db"
 	"time"
 )
 
@@ -174,7 +174,7 @@ type InputPosition interface {
 }
 
 type resultSummary struct {
-	sum    *connection.Summary
+	sum    *db.Summary
 	cypher string
 	params map[string]interface{}
 }
@@ -223,47 +223,47 @@ func (s *resultSummary) getCounter(n string) int {
 }
 
 func (s *resultSummary) NodesCreated() int {
-	return s.getCounter(connection.NodesCreated)
+	return s.getCounter(db.NodesCreated)
 }
 
 func (s *resultSummary) NodesDeleted() int {
-	return s.getCounter(connection.NodesDeleted)
+	return s.getCounter(db.NodesDeleted)
 }
 
 func (s *resultSummary) RelationshipsCreated() int {
-	return s.getCounter(connection.RelationshipsCreated)
+	return s.getCounter(db.RelationshipsCreated)
 }
 
 func (s *resultSummary) RelationshipsDeleted() int {
-	return s.getCounter(connection.RelationshipsDeleted)
+	return s.getCounter(db.RelationshipsDeleted)
 }
 
 func (s *resultSummary) PropertiesSet() int {
-	return s.getCounter(connection.PropertiesSet)
+	return s.getCounter(db.PropertiesSet)
 }
 
 func (s *resultSummary) LabelsAdded() int {
-	return s.getCounter(connection.LabelsAdded)
+	return s.getCounter(db.LabelsAdded)
 }
 
 func (s *resultSummary) LabelsRemoved() int {
-	return s.getCounter(connection.LabelsRemoved)
+	return s.getCounter(db.LabelsRemoved)
 }
 
 func (s *resultSummary) IndexesAdded() int {
-	return s.getCounter(connection.IndexesAdded)
+	return s.getCounter(db.IndexesAdded)
 }
 
 func (s *resultSummary) IndexesRemoved() int {
-	return s.getCounter(connection.IndexesRemoved)
+	return s.getCounter(db.IndexesRemoved)
 }
 
 func (s *resultSummary) ConstraintsAdded() int {
-	return s.getCounter(connection.ConstraintsAdded)
+	return s.getCounter(db.ConstraintsAdded)
 }
 
 func (s *resultSummary) ConstraintsRemoved() int {
-	return s.getCounter(connection.ConstraintsRemoved)
+	return s.getCounter(db.ConstraintsRemoved)
 }
 
 func (s *resultSummary) ResultAvailableAfter() time.Duration {
@@ -282,7 +282,7 @@ func (s *resultSummary) Plan() Plan {
 }
 
 type plan struct {
-	plan *connection.Plan
+	plan *db.Plan
 }
 
 func (p *plan) Operator() string {
@@ -313,7 +313,7 @@ func (s *resultSummary) Profile() ProfiledPlan {
 }
 
 type profile struct {
-	profile *connection.ProfiledPlan
+	profile *db.ProfiledPlan
 }
 
 func (p *profile) Operator() string {
@@ -356,7 +356,7 @@ func (s *resultSummary) Notifications() []Notification {
 }
 
 type notification struct {
-	notification *connection.Notification
+	notification *db.Notification
 }
 
 func (n *notification) Code() string {

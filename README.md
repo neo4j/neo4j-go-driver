@@ -54,7 +54,7 @@ if err != nil {
 }
 
 for result.Next() {
-	fmt.Printf("Created Item with Id = '%d' and Name = '%s'\n", result.Record().GetByIndex(0).(int64), result.Record().GetByIndex(1).(string))
+	fmt.Printf("Created Item with Id = '%d' and Name = '%s'\n", result.Record().Values[0].(int64), result.Record().Values[1].(string))
 }
 return result.Err()
 ```
@@ -91,7 +91,7 @@ The records inside the result can be accessed via `Next()`/`Record()` functions 
 Values in a `Record` can be accessed either by index or by alias. The return value is an `interface{}` which means you need to convert the interface to the type expected
 
 ```go
-value := record.GetByIndex(0)
+value := record.Values[0]
 ```
 
 ```go
@@ -162,10 +162,10 @@ The mapping among the Cypher temporal types and actual exposed types are as foll
 
 Receiving a temporal value as driver type:
 ```go
-dateValue := record.GetByIndex(0).(neo4j.Date)
+dateValue := record.Values[0].(neo4j.Date)
 ```
 
-All custom temporal types can be constructing from a `time.Time` value using `<Type>Of()` (`DateOf`, `OffsetTimeOf`, ...) functions.
+All custom temporal types can be constructed from a `time.Time` value using `<Type>Of()` (`DateOf`, `OffsetTimeOf`, ...) functions.
 
 ```go
 dateValue := DateOf(time.Date(2005, time.December, 16, 0, 0, 0, 0, time.Local)

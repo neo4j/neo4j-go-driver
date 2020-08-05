@@ -307,7 +307,7 @@ func helloWorld(uri, username, password string, encrypted bool) (string, error) 
 		}
 
 		if result.Next() {
-			return result.Record().GetByIndex(0), nil
+			return result.Record().Values[0], nil
 		}
 
 		return nil, result.Err()
@@ -497,7 +497,7 @@ func countNodes(driver neo4j.Driver, label string, property string, value string
 	}
 
 	if result.Next() {
-		return result.Record().GetByIndex(0).(int64), nil
+		return result.Record().Values[0].(int64), nil
 	}
 
 	return -1, errors.New("expected at least one record")
@@ -608,7 +608,7 @@ func printFriendsTxFunc() neo4j.TransactionWork {
 		}
 
 		for result.Next() {
-			fmt.Printf("%s knows %s\n", result.Record().GetByIndex(0), result.Record().GetByIndex(1))
+			fmt.Printf("%s knows %s\n", result.Record().Values[0], result.Record().Values[1])
 		}
 
 		return result.Summary()
@@ -700,7 +700,7 @@ func matchPersonNodeTxFunc(name string) neo4j.TransactionWork {
 		}
 
 		if result.Next() {
-			return result.Record().GetByIndex(0), nil
+			return result.Record().Values[0], nil
 		}
 
 		return nil, errors.New("one record was expected")
@@ -745,7 +745,7 @@ func getPeople(driver neo4j.Driver) ([]string, error) {
 		}
 
 		for result.Next() {
-			list = append(list, result.Record().GetByIndex(0).(string))
+			list = append(list, result.Record().Values[0].(string))
 		}
 
 		if err = result.Err(); err != nil {
@@ -783,7 +783,7 @@ func addPersonsAsEmployees(driver neo4j.Driver, companyName string) (int, error)
 		_, err = session.WriteTransaction(func(tx neo4j.Transaction) (interface{}, error) {
 			return tx.Run("MATCH (emp:Person {name: $person_name}) "+
 				"MERGE (com:Company {name: $company_name}) "+
-				"MERGE (emp)-[:WORKS_FOR]->(com)", map[string]interface{}{"person_name": person.GetByIndex(0), "company_name": companyName})
+				"MERGE (emp)-[:WORKS_FOR]->(com)", map[string]interface{}{"person_name": person.Values[0], "company_name": companyName})
 		})
 		if err != nil {
 			return 0, err

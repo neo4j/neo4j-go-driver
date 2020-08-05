@@ -30,9 +30,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/neo4j/neo4j-go-driver/v4/neo4j/db"
 	"github.com/neo4j/neo4j-go-driver/v4/neo4j/dbtype"
 	"github.com/neo4j/neo4j-go-driver/v4/neo4j/internal/bolt"
-	"github.com/neo4j/neo4j-go-driver/v4/neo4j/internal/db"
 	"github.com/neo4j/neo4j-go-driver/v4/neo4j/internal/log"
 	"github.com/neo4j/neo4j-go-driver/v4/neo4j/test-integration/control"
 )
@@ -501,7 +501,7 @@ func TestConnectionConformance(ot *testing.T) {
 
 			// Verify all temporal instances as when reading (as long as that test passes, the
 			// errors here should be due to writing).
-			node := rec.Values[0].(*types.Node)
+			node := rec.Values[0].(*dbtype.Node)
 			// Time
 			gotTime := time.Time(node.Props["time"].(dbtype.Time))
 			assertTime(t, gotTime, tTime)

@@ -36,7 +36,7 @@ func intReturningWork(query string, params map[string]interface{}) neo4j.Transac
 
 		returnValue := int64(0)
 		if create.Next() {
-			returnValue = create.Record().GetByIndex(0).(int64)
+			returnValue = create.Record().Values[0].(int64)
 		}
 		Expect(create.Next()).To(BeFalse())
 		Expect(create.Err()).To(BeNil())

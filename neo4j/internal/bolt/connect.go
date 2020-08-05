@@ -26,19 +26,19 @@ import (
 	"io"
 	"net"
 
-	"github.com/neo4j/neo4j-go-driver/v4/neo4j/connection"
+	"github.com/neo4j/neo4j-go-driver/v4/neo4j/db"
 	"github.com/neo4j/neo4j-go-driver/v4/neo4j/internal/log"
 )
 
 type Logger interface {
 	ConnectError(c net.Conn, err error)
-	ConnectionError(c connection.Connection, err error)
-	ConnectionInfo(c connection.Connection, msg string, args ...interface{})
+	ConnectionError(c db.Connection, err error)
+	ConnectionInfo(c db.Connection, msg string, args ...interface{})
 }
 
 // Negotiate version of bolt protocol.
 // Returns instance of bolt protocol implmenting low-level abstract connection Connection interface.
-func Connect(serverName string, conn net.Conn, auth map[string]interface{}, log log.Logger) (connection.Connection, error) {
+func Connect(serverName string, conn net.Conn, auth map[string]interface{}, log log.Logger) (db.Connection, error) {
 	// Perform Bolt handshake to negotiate version
 	// Send handshake to server
 	handshake := []byte{

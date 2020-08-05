@@ -22,7 +22,7 @@ package neo4j
 import (
 	"container/list"
 
-	"github.com/neo4j/neo4j-go-driver/v4/neo4j/connection"
+	"github.com/neo4j/neo4j-go-driver/v4/neo4j/db"
 )
 
 type Result interface {
@@ -42,22 +42,22 @@ type Result interface {
 }
 
 type iterator interface {
-	Next(s connection.Handle) (*Record, *connection.Summary, error)
+	Next(s db.Handle) (*Record, *db.Summary, error)
 }
 
 type result struct {
 	err         error
 	iter        iterator
-	stream      *connection.Stream
+	stream      *db.Stream
 	cypher      string
 	params      map[string]interface{}
 	allReceived bool
 	unconsumed  list.List
 	record      *Record
-	summary     *connection.Summary
+	summary     *db.Summary
 }
 
-func newResult(iter iterator, str *connection.Stream, cypher string, params map[string]interface{}) *result {
+func newResult(iter iterator, str *db.Stream, cypher string, params map[string]interface{}) *result {
 	return &result{
 		iter:   iter,
 		stream: str,
@@ -69,7 +69,7 @@ func newResult(iter iterator, str *connection.Stream, cypher string, params map[
 // Receive another record.
 func (r *result) doFetch() *Record {
 	var rec *Record
-	var sum *connection.Summary
+	var sum *db.Summary
 	rec, sum, r.err = r.iter.Next(r.stream.Handle)
 	r.allReceived = r.err != nil || rec == nil
 	r.summary = sum

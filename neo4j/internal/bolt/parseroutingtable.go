@@ -20,12 +20,12 @@
 package bolt
 
 import (
-	"github.com/neo4j/neo4j-go-driver/v4/neo4j/connection"
+	"github.com/neo4j/neo4j-go-driver/v4/neo4j/db"
 )
 
 // Parses a record assumed to contain a routing table into common db API routing table struct
 // Returns nil if error while parsing
-func parseRoutingTableRecord(rec *connection.Record) *connection.RoutingTable {
+func parseRoutingTableRecord(rec *db.Record) *db.RoutingTable {
 	ttl, ok := rec.Values[0].(int64)
 	if !ok {
 		return nil
@@ -35,7 +35,7 @@ func parseRoutingTableRecord(rec *connection.Record) *connection.RoutingTable {
 		return nil
 	}
 
-	table := &connection.RoutingTable{
+	table := &db.RoutingTable{
 		TimeToLive: int(ttl),
 	}
 

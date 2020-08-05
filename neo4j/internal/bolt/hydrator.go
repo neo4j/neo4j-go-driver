@@ -24,7 +24,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/neo4j/neo4j-go-driver/v4/neo4j/connection"
+	"github.com/neo4j/neo4j-go-driver/v4/neo4j/db"
 	"github.com/neo4j/neo4j-go-driver/v4/neo4j/dbtype"
 	"github.com/neo4j/neo4j-go-driver/v4/neo4j/internal/packstream"
 )
@@ -188,7 +188,7 @@ func hydrateRecord(fields []interface{}) (interface{}, error) {
 	if !vok {
 		return nil, errors.New("Record hydrate error")
 	}
-	return &connection.Record{Values: v}, nil
+	return &db.Record{Values: v}, nil
 }
 
 func hydrateIgnored(fields []interface{}) (interface{}, error) {
@@ -213,7 +213,7 @@ func hydrateFailure(fields []interface{}) (interface{}, error) {
 	}
 	// Hydrate right into error defined in connection package to avoid remapping at a later
 	// state.
-	return &connection.DatabaseError{Code: code, Msg: msg}, nil
+	return &db.DatabaseError{Code: code, Msg: msg}, nil
 }
 
 func hydratePoint2d(fields []interface{}) (interface{}, error) {
