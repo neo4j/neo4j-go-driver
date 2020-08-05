@@ -33,6 +33,11 @@ type (
 	LocalDateTime time.Time // Date and time in local timezone
 )
 
+// TODO: Needed??
+func (t LocalDateTime) Time() time.Time {
+	return time.Time(t)
+}
+
 // Duration represents temporal amount containing months, days, seconds and nanoseconds.
 // Supports longer durations than time.Duration
 type Duration struct {

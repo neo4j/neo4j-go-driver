@@ -36,7 +36,17 @@ func dehydrate(x interface{}) (*packstream.Struct, error) {
 			Tag:    packstream.StructTag('X'),
 			Fields: []interface{}{v.SpatialRefId, v.X, v.Y},
 		}, nil
+	case dbtype.Point2D:
+		return &packstream.Struct{
+			Tag:    packstream.StructTag('X'),
+			Fields: []interface{}{v.SpatialRefId, v.X, v.Y},
+		}, nil
 	case *dbtype.Point3D:
+		return &packstream.Struct{
+			Tag:    packstream.StructTag('Y'),
+			Fields: []interface{}{v.SpatialRefId, v.X, v.Y, v.Z},
+		}, nil
+	case dbtype.Point3D:
 		return &packstream.Struct{
 			Tag:    packstream.StructTag('Y'),
 			Fields: []interface{}{v.SpatialRefId, v.X, v.Y, v.Z},

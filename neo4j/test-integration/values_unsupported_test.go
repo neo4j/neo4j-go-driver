@@ -19,6 +19,7 @@
 
 package test_integration
 
+/*
 import (
 	"time"
 
@@ -116,3 +117,4 @@ var _ = Describe("Unsupported Types [V1]", func() {
 		})
 	})
 })
+*/

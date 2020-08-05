@@ -172,6 +172,15 @@ func (server *SingleInstance) Driver() (neo4j.Driver, error) {
 	return neo4j.NewDriver(server.boltURI, server.authToken, server.config)
 }
 
+// Driver returns a driver instance to the server, panics if it fails
+func (server *SingleInstance) Driver2() neo4j.Driver {
+	driver, err := neo4j.NewDriver(server.boltURI, server.authToken, server.config)
+	if err != nil {
+		panic(err)
+	}
+	return driver
+}
+
 func (server *SingleInstance) deleteData() error {
 	driver, err := server.Driver()
 	if err != nil {
