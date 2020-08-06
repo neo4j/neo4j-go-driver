@@ -302,7 +302,7 @@ func hydrateDate(fields []interface{}) (interface{}, error) {
 		return nil, errors.New("Date hydrate error")
 	}
 	secs := days * 86400
-	return dbtype.Date(time.Unix(secs, 1)), nil
+	return dbtype.Date(time.Unix(secs, 0).UTC()), nil
 }
 
 func hydrateTime(fields []interface{}) (interface{}, error) {

@@ -45,29 +45,6 @@ func TestSpatialTypes(st *testing.T) {
 		st.Skip("Spatial types are only available after neo4j 3.4.0 release")
 	}
 
-	// Utility that executes Cypher and retrieves the expected single value from single record.
-	single := func(t *testing.T, cypher string, params map[string]interface{}) interface{} {
-		t.Helper()
-		session, err := driver.NewSession(neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
-		if err != nil {
-			t.Fatal(err)
-		}
-		defer session.Close()
-		result, err := session.Run(cypher, params)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if !result.Next() {
-			t.Fatalf("No result or error retrieving result: %s", result.Err())
-		}
-		val := result.Record().Values[0]
-		_, err = result.Consume()
-		if err != nil {
-			t.Fatal(err)
-		}
-		return val
-	}
-
 	// Returns a random 2D/3D point (depending on seq) with random values for X, Y and Z when applicable.
 	randomPoint := func(seq int) interface{} {
 		random := func() float64 {
@@ -101,7 +78,7 @@ func TestSpatialTypes(st *testing.T) {
 	}
 
 	sendAndReceive := func(t *testing.T, p interface{}) interface{} {
-		return single(t, "CREATE (n:POI { x: $p}) RETURN n.x", map[string]interface{}{"p": p})
+		return single(t, driver, "CREATE (n:POI { x: $p}) RETURN n.x", map[string]interface{}{"p": p})
 	}
 
 	assertPoint2D := func(t *testing.T, p1, p2 *neo4j.Point2D) {
@@ -130,60 +107,64 @@ func TestSpatialTypes(st *testing.T) {
 	}
 
 	// Verifies that a single 2D point can be received.
-	st.Run("Receive Point2D", func(t *testing.T) {
-		p1 := single(t, "RETURN point({x: 39.111748, y:-76.775635})", nil).(*neo4j.Point2D)
-		p2 := &neo4j.Point2D{X: 39.111748, Y: -76.775635, SpatialRefId: CartesianSrID}
-		assertPoint2D(t, p1, p2)
+	st.Run("Receive", func(rt *testing.T) {
+		rt.Run("Point2D", func(t *testing.T) {
+			p1 := single(t, driver, "RETURN point({x: 39.111748, y:-76.775635})", nil).(*neo4j.Point2D)
+			p2 := &neo4j.Point2D{X: 39.111748, Y: -76.775635, SpatialRefId: CartesianSrID}
+			assertPoint2D(t, p1, p2)
+		})
+
+		// Verifies that a single 3D point can be received.
+		rt.Run("Point3D", func(t *testing.T) {
+			p1 := single(t, driver, "RETURN point({x: 39.111748, y:-76.775635, z:35.120})", nil).(*neo4j.Point3D)
+			p2 := &neo4j.Point3D{X: 39.111748, Y: -76.775635, Z: 35.120, SpatialRefId: Cartesian3DSrID}
+			assertPoint3D(t, p1, p2)
+		})
 	})
 
-	// Verifies that a single 3D point can be received.
-	st.Run("Receive Point2D", func(t *testing.T) {
-		p1 := single(t, "RETURN point({x: 39.111748, y:-76.775635, z:35.120})", nil).(*neo4j.Point3D)
-		p2 := &neo4j.Point3D{X: 39.111748, Y: -76.775635, Z: 35.120, SpatialRefId: Cartesian3DSrID}
-		assertPoint3D(t, p1, p2)
-	})
+	st.Run("Send", func(tt *testing.T) {
+		// Verifies that a single 2D point can be sent (and received)
+		tt.Run("Point2D", func(t *testing.T) {
+			p1 := &neo4j.Point2D{SpatialRefId: WGS84SrID, X: 51.5044585, Y: -0.105658}
+			p2 := sendAndReceive(t, p1).(*neo4j.Point2D)
+			assertPoint2D(t, p1, p2)
+		})
 
-	// Verifies that a single 2D point can be sent (and received)
-	st.Run("Send Point2D", func(t *testing.T) {
-		p1 := &neo4j.Point2D{SpatialRefId: WGS84SrID, X: 51.5044585, Y: -0.105658}
-		p2 := sendAndReceive(t, p1).(*neo4j.Point2D)
-		assertPoint2D(t, p1, p2)
-	})
+		// Verifies that a single 3D point can be sent (and received)
+		tt.Run("Point3D", func(t *testing.T) {
+			p1 := &neo4j.Point3D{SpatialRefId: WGS843DSrID, X: 51.5044585, Y: -0.105658, Z: 35.120}
+			p2 := sendAndReceive(t, p1).(*neo4j.Point3D)
+			assertPoint3D(t, p1, p2)
+		})
 
-	// Verifies that a single 3D point can be sent (and received)
-	st.Run("Send Point3D", func(t *testing.T) {
-		p1 := &neo4j.Point3D{SpatialRefId: WGS843DSrID, X: 51.5044585, Y: -0.105658, Z: 35.120}
-		p2 := sendAndReceive(t, p1).(*neo4j.Point3D)
-		assertPoint3D(t, p1, p2)
-	})
+		// Verifies that a single 2D point can be sent by value
+		tt.Run("Point2D by value", func(t *testing.T) {
+			p1 := &neo4j.Point2D{SpatialRefId: WGS84SrID, X: 51.5044585, Y: -0.105658}
+			p2 := sendAndReceive(t, *p1).(*neo4j.Point2D)
+			assertPoint2D(t, p1, p2)
+		})
 
-	// Verifies that a single 2D point can be sent by value
-	st.Run("Send Point2D", func(t *testing.T) {
-		p1 := &neo4j.Point2D{SpatialRefId: WGS84SrID, X: 51.5044585, Y: -0.105658}
-		p2 := sendAndReceive(t, *p1).(*neo4j.Point2D)
-		assertPoint2D(t, p1, p2)
-	})
+		// Verifies that a single 3D point can be sent by value
+		tt.Run("Point3D by value", func(t *testing.T) {
+			p1 := &neo4j.Point3D{SpatialRefId: WGS843DSrID, X: 51.5044585, Y: -0.105658, Z: 35.120}
+			p2 := sendAndReceive(t, *p1).(*neo4j.Point3D)
+			assertPoint3D(t, p1, p2)
+		})
 
-	// Verifies that a single 3D point can be sent by value
-	st.Run("Send Point3D", func(t *testing.T) {
-		p1 := &neo4j.Point3D{SpatialRefId: WGS843DSrID, X: 51.5044585, Y: -0.105658, Z: 35.120}
-		p2 := sendAndReceive(t, *p1).(*neo4j.Point3D)
-		assertPoint3D(t, p1, p2)
-	})
-
-	// Verifies that lists of points can be sent (and received)
-	st.Run("Send list of points", func(t *testing.T) {
-		num := 100
-		for i := 0; i < 10; i++ {
-			points1 := randomPoints(i, num)
-			points2 := sendAndReceive(t, points1).([]interface{})
-			if len(points2) != num {
-				t.Fatalf("Too few points in list, expected %d but was %d", len(points1), len(points2))
+		// Verifies that lists of points can be sent (and received)
+		tt.Run("Random lists", func(t *testing.T) {
+			num := 100
+			for i := 0; i < 10; i++ {
+				points1 := randomPoints(i, num)
+				points2 := sendAndReceive(t, points1).([]interface{})
+				if len(points2) != num {
+					t.Fatalf("Too few points in list, expected %d but was %d", len(points1), len(points2))
+				}
+				for i, p1 := range points1 {
+					assertPoint(t, p1, points2[i])
+				}
 			}
-			for i, p1 := range points1 {
-				assertPoint(t, p1, points2[i])
-			}
-		}
+		})
 	})
 
 	driver.Close()
