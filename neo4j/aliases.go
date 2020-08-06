@@ -66,11 +66,18 @@ func DurationOf(months, days, seconds int64, nanos int) dbtype.Duration {
 	return Duration{Months: months, Days: days, Seconds: seconds, Nanos: nanos}
 }
 
+// TODO: Move these time funcs somewhere (they are useful)
 // TODO: Document these and make note that explicit casting is to be preferred to func call.
-// For backwards compatibility with 1.8 driver, provide casting of temporal types as functions
+// TODO: For backwards compatibility with 1.8 driver, provide casting of temporal types as functions
+// When serializing to the database only the relevant parts of the time.Time component
+// will be used and deserializing will set the irrelevant parts to a known value.
+//
+// But to avoid confusion we make the returned time look more like the expected (makes
+// writing tests simpler).
 
 func DateOf(t time.Time) dbtype.Date {
-	return dbtype.Date(t)
+	y, m, d := t.Date()
+	return dbtype.Date(time.Date(y, m, d, 0, 0, 0, 0, time.Local))
 }
 
 func LocalTimeOf(t time.Time) dbtype.LocalTime {
@@ -78,13 +85,11 @@ func LocalTimeOf(t time.Time) dbtype.LocalTime {
 }
 
 func LocalDateTimeOf(t time.Time) dbtype.LocalDateTime {
-	return dbtype.LocalDateTime(t)
+	return dbtype.LocalDateTime(t.Local())
 }
 
 func TimeOf(t time.Time) dbtype.Time {
 	return dbtype.Time(t)
 }
 
-func OffsetTimeOf(t time.Time) dbtype.Time {
-	return dbtype.Time(t)
-}
+var OffsetTimeOf = TimeOf
