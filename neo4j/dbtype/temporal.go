@@ -33,7 +33,6 @@ type (
 	LocalDateTime time.Time // Date and time in local timezone
 )
 
-// TODO: Needed??
 func (t LocalDateTime) Time() time.Time {
 	return time.Time(t)
 }
@@ -67,4 +66,8 @@ func (d Duration) String() string {
 	}
 
 	return fmt.Sprintf("P%dM%dDT%sS", d.Months, d.Days, timePart)
+}
+
+func (d1 Duration) Equal(d2 Duration) bool {
+	return d1.Months == d2.Months && d1.Days == d2.Days && d1.Seconds == d2.Seconds && d1.Nanos == d2.Nanos
 }

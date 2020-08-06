@@ -107,3 +107,26 @@ func assertNoRandomNode(t *testing.T, sess neo4j.Session, randomId int64) {
 		t.Error("Shouldn't find random node but did")
 	}
 }
+
+// Utility that executes Cypher and retrieves the expected single value from single record.
+func single(t *testing.T, driver neo4j.Driver, cypher string, params map[string]interface{}) interface{} {
+	t.Helper()
+	session, err := driver.NewSession(neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer session.Close()
+	result, err := session.Run(cypher, params)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !result.Next() {
+		t.Fatalf("No result or error retrieving result: %s", result.Err())
+	}
+	val := result.Record().Values[0]
+	_, err = result.Consume()
+	if err != nil {
+		t.Fatal(err)
+	}
+	return val
+}
