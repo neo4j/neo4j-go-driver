@@ -235,10 +235,10 @@ func (s *session) beginTransaction(mode db.AccessMode, config *TransactionConfig
 	}, nil
 }
 
-func (s *session) runOneTry(mode db.AccessMode, work TransactionWork, config *TransactionConfig) (interface{}, error) {
+func (s *session) runOneTry(mode db.AccessMode, work TransactionWork, config *TransactionConfig) (interface{}, bool, error) {
 	tx, err := s.beginTransaction(mode, config)
 	if err != nil {
-		return nil, err
+		return nil, false, err
 	}
 	defer func() {
 		tx.Close()
@@ -246,15 +246,16 @@ func (s *session) runOneTry(mode db.AccessMode, work TransactionWork, config *Tr
 
 	x, err := work(tx)
 	if err != nil {
-		return nil, err
+		return nil, false, err
 	}
 
 	err = tx.Commit()
 	if err != nil {
-		return nil, err
+		// Indicate that Commit failed, not safe to retry network error in this case
+		return nil, true, err
 	}
 
-	return x, nil
+	return x, false, nil
 }
 
 func (s *session) runRetriable(
@@ -288,7 +289,7 @@ func (s *session) runRetriable(
 		s.returnConn()
 		s.res = nil
 
-		x, err := s.runOneTry(mode, work, &config)
+		x, commitFailure, err := s.runOneTry(mode, work, &config)
 		if err == nil {
 			return x, nil
 		}
@@ -313,7 +314,9 @@ func (s *session) runRetriable(
 		// Failed, check cause and determine next action
 
 		// If the connection is dead just return the connection, get another and try again, no sleep
-		if !s.conn.IsAlive() {
+		// Do not do this if the connection died during commit phase since we don't know if we have
+		// succesfully committed or not, might corrupt data otherwise!
+		if !commitFailure && !s.conn.IsAlive() {
 			maxDeadErrors--
 			if maxDeadErrors < 0 {
 				s.log.Errorf(s.logId, "Retriable transaction failed due to too many dead connections")
