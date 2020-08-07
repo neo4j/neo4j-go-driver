@@ -19,6 +19,12 @@
 
 package neo4j
 
+import (
+	"errors"
+
+	"github.com/neo4j/neo4j-go-driver/v4/neo4j/db"
+)
+
 // Transaction represents a transaction in the Neo4j database
 type Transaction interface {
 	// Run executes a statement on this transaction and returns a result
@@ -32,32 +38,155 @@ type Transaction interface {
 	Close() error
 }
 
+// Transaction implementation when explicit transaction started
 type transaction struct {
+	conn     db.Connection
+	txHandle db.Handle
+	res      *result
 	done     bool
-	run      func(cypher string, params map[string]interface{}) (Result, error)
-	commit   func() error
-	rollback func() error
+	err      error
+	onClosed func()
 }
 
-func (t *transaction) Run(cypher string, params map[string]interface{}) (Result, error) {
-	return t.run(cypher, params)
+func (tx *transaction) Run(cypher string, params map[string]interface{}) (Result, error) {
+	err := fetchAllInResult(&tx.res)
+	if err != nil {
+		return nil, err
+	}
+
+	stream, err := tx.conn.RunTx(tx.txHandle, cypher, params)
+	if err != nil {
+		return nil, err
+	}
+	tx.res = newResult(tx.conn, stream, cypher, params)
+	return tx.res, nil
 }
 
-func (t *transaction) Commit() error {
-	err := t.commit()
-	t.done = err == nil
-	return err
+func (tx *transaction) Commit() error {
+	if tx.done {
+		return tx.err
+	}
+	tx.err = tx.conn.TxCommit(tx.txHandle)
+	tx.done = true
+	tx.onClosed()
+	return tx.err
 }
 
-func (t *transaction) Rollback() error {
-	err := t.rollback()
-	t.done = err == nil
-	return err
+func (tx *transaction) Rollback() error {
+	if tx.done {
+		return tx.err
+	}
+	tx.err = tx.conn.TxRollback(tx.txHandle)
+	tx.done = true
+	tx.onClosed()
+	return tx.err
 }
 
-func (t *transaction) Close() error {
-	if t.done {
+func (tx *transaction) Close() error {
+	return tx.Rollback()
+}
+
+func fetchAllInResult(respp **result) error {
+	res := *respp
+	if res == nil {
 		return nil
 	}
-	return t.rollback()
+	res.fetchAll()
+	*respp = nil
+	return res.err
+}
+
+// Transaction implementation used as parameter to transactional functions
+type retryableTransaction struct {
+	conn     db.Connection
+	txHandle db.Handle
+	res      *result
+}
+
+func (tx *retryableTransaction) Run(cypher string, params map[string]interface{}) (Result, error) {
+	// Fetch all in previous result
+	err := fetchAllInResult(&tx.res)
+	if err != nil {
+		return nil, err
+	}
+
+	stream, err := tx.conn.RunTx(tx.txHandle, cypher, params)
+	if err != nil {
+		return nil, err
+	}
+	tx.res = newResult(tx.conn, stream, cypher, params)
+	return tx.res, nil
+}
+
+func (tx *retryableTransaction) Commit() error {
+	return errors.New("Commit not allowed on retryable transaction")
+}
+
+func (tx *retryableTransaction) Rollback() error {
+	return errors.New("Rollback not allowed on retryable transaction")
+}
+
+func (tx *retryableTransaction) Close() error {
+	return errors.New("Close not allowed on retryable transaction")
+}
+
+// Represents an auto commit transaction.
+// Does not implement the Transaction interface.
+// Implements Result interface to hook into when all records has been fetched and
+// invoke onClosed when that happens.
+type autoTransaction struct {
+	conn     db.Connection
+	res      *result
+	closed   bool
+	onClosed func()
+}
+
+func (tx *autoTransaction) done() {
+	tx.res.fetchAll()
+	tx.onAllReceivedEdge()
+}
+
+func (tx *autoTransaction) onAllReceivedEdge() {
+	if tx.res.allReceived && !tx.closed {
+		tx.closed = true
+		tx.onClosed()
+	}
+}
+
+func (tx *autoTransaction) Keys() ([]string, error) {
+	return tx.res.Keys()
+}
+
+func (tx *autoTransaction) Next() bool {
+	x := tx.res.Next()
+	tx.onAllReceivedEdge()
+	return x
+}
+
+func (tx *autoTransaction) NextRecord(record **Record) bool {
+	x := tx.res.NextRecord(record)
+	tx.onAllReceivedEdge()
+	return x
+}
+
+func (tx *autoTransaction) Err() error {
+	return tx.res.Err()
+}
+
+func (tx *autoTransaction) Record() *Record {
+	return tx.res.Record()
+}
+
+func (tx *autoTransaction) Collect() ([]*Record, error) {
+	return tx.res.Collect()
+}
+
+func (tx *autoTransaction) Single() (*Record, error) {
+	return tx.res.Single()
+}
+
+func (tx *autoTransaction) Consume() (ResultSummary, error) {
+	x, err := tx.res.Consume()
+	tx.onAllReceivedEdge()
+	return x, err
 }

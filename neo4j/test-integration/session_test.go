@@ -28,7 +28,6 @@ import (
 	"github.com/neo4j/neo4j-go-driver/v4/neo4j/db"
 	"github.com/neo4j/neo4j-go-driver/v4/neo4j/test-integration/control"
 
-	//. "github.com/neo4j/neo4j-go-driver/v4/neo4j/utils/test"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
@@ -361,8 +360,11 @@ var _ = Describe("Session", func() {
 		})
 
 		Specify("when session is closed, pending explicit transaction should be rolled-back", func() {
-			var result1, result2 neo4j.Result
-			var err error
+			var (
+				err      error
+				records1 []*neo4j.Record
+				records2 []*neo4j.Record
+			)
 
 			innerExecutor := func() error {
 				var tx neo4j.Transaction
@@ -376,11 +378,15 @@ var _ = Describe("Session", func() {
 					return err
 				}
 
-				if result1, err = tx.Run("UNWIND RANGE(1,100) AS N CREATE (n:TxRollbackOnClose { id: N, text: 'Text '+N }) RETURN N", nil); err != nil {
+				records1, err = neo4j.Collect(
+					tx.Run("UNWIND RANGE(1,100) AS N CREATE (n:TxRollbackOnClose { id: N, text: 'Text '+N }) RETURN N", nil))
+				if err != nil {
 					return err
 				}
 
-				if result2, err = tx.Run("MATCH (n:TxRollbackOnClose) RETURN n.id, n.text ORDER BY n.id", nil); err != nil {
+				records2, err = neo4j.Collect(
+					tx.Run("MATCH (n:TxRollbackOnClose) RETURN n.id, n.text ORDER BY n.id", nil))
+				if err != nil {
 					return err
 				}
 
@@ -388,14 +394,11 @@ var _ = Describe("Session", func() {
 			}
 
 			Expect(innerExecutor()).To(Succeed())
-
-			records1, _ := neo4j.Collect(result1, nil)
 			Expect(records1).NotTo(BeNil())
 			Expect(records1).To(HaveLen(100))
 			Expect(records1[0].Values[0]).To(BeEquivalentTo(1))
 			Expect(records1[99].Values[0]).To(BeEquivalentTo(100))
 
-			records2, _ := neo4j.Collect(result2, nil)
 			Expect(records2).NotTo(BeNil())
 			Expect(records2).To(HaveLen(100))
 			Expect(records2[0].Values[0]).To(BeEquivalentTo(1))
