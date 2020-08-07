@@ -73,22 +73,21 @@ func TestHydrator(ot *testing.T) {
 			name: "Path",
 			tag:  'P',
 			fields: []interface{}{
-				[]interface{}{&dbtype.Node{}, &dbtype.Node{}},
-				[]interface{}{&dbtype.RelNode{}},
+				[]interface{}{&dbtype.Node{Id: 1}, &dbtype.Node{Id: 2}},
+				[]interface{}{&relNode{id: 3, name: "x"}},
 				[]interface{}{int64(1), int64(1)},
 			},
 			hydrated: &dbtype.Path{
-				Nodes:    []*dbtype.Node{&dbtype.Node{}, &dbtype.Node{}},
-				RelNodes: []*dbtype.RelNode{&dbtype.RelNode{}},
-				Indexes:  []int{1, 1},
+				Nodes:         []*dbtype.Node{&dbtype.Node{Id: 1}, &dbtype.Node{Id: 2}},
+				Relationships: []*dbtype.Relationship{&dbtype.Relationship{Id: 3, StartId: 1, EndId: 2, Type: "x"}},
 			},
 		},
 		{
-			name: "RelNode",
+			name: "relNode",
 			tag:  'r',
 			fields: []interface{}{
 				int64(3), "lbl1", map[string]interface{}{"propx": 3}},
-			hydrated: &dbtype.RelNode{Id: 3, Type: "lbl1", Props: map[string]interface{}{"propx": 3}},
+			hydrated: &relNode{id: 3, name: "lbl1", props: map[string]interface{}{"propx": 3}},
 		},
 		{
 			name:   "Point2D",

@@ -17,55 +17,56 @@
  * limitations under the License.
  */
 
-package dbtype
+package bolt
 
 import (
 	"testing"
+
+	"github.com/neo4j/neo4j-go-driver/v4/neo4j/dbtype"
 )
 
-func TestGraphPath(ot *testing.T) {
+func TestBuildPath(ot *testing.T) {
 	cases := []struct {
-		name  string
-		path  Path
-		nodes []int64
-		rels  []Relationship
+		name     string
+		nodes    []*dbtype.Node
+		relNodes []*relNode
+		indexes  []int
+		path     dbtype.Path
 	}{
 		{
 			name: "Two nodes",
-			path: Path{
-				Nodes:    []*Node{&Node{Id: 1}, &Node{Id: 2}},
-				RelNodes: []*RelNode{&RelNode{Id: 3, Type: "x"}},
-				Indexes:  []int{1, 1},
+			path: dbtype.Path{
+				Nodes: []*dbtype.Node{&dbtype.Node{Id: 1}, &dbtype.Node{Id: 2}},
+				Relationships: []*dbtype.Relationship{
+					&dbtype.Relationship{Id: 3, StartId: 1, EndId: 2, Type: "x"},
+				},
 			},
-			nodes: []int64{1, 2},
-			rels: []Relationship{
-				Relationship{Id: 3, StartId: 1, EndId: 2, Type: "x"},
-			},
+			nodes:    []*dbtype.Node{&dbtype.Node{Id: 1}, &dbtype.Node{Id: 2}},
+			relNodes: []*relNode{&relNode{id: 3, name: "x"}},
+			indexes:  []int{1, 1},
 		},
 		{
 			name: "Two nodes reverse",
-			path: Path{
-				Nodes:    []*Node{&Node{Id: 1}, &Node{Id: 2}},
-				RelNodes: []*RelNode{&RelNode{Id: 3, Type: "x"}},
-				Indexes:  []int{-1, 1},
+			path: dbtype.Path{
+				Nodes: []*dbtype.Node{&dbtype.Node{Id: 1}, &dbtype.Node{Id: 2}},
+				Relationships: []*dbtype.Relationship{
+					&dbtype.Relationship{Id: 3, StartId: 2, EndId: 1, Type: "x"},
+				},
 			},
-			nodes: []int64{1, 2},
-			rels: []Relationship{
-				Relationship{Id: 3, StartId: 2, EndId: 1, Type: "x"},
-			},
+			nodes:    []*dbtype.Node{&dbtype.Node{Id: 1}, &dbtype.Node{Id: 2}},
+			relNodes: []*relNode{&relNode{id: 3, name: "x"}},
+			indexes:  []int{-1, 1},
 		},
 	}
 	for _, c := range cases {
 		ot.Run(c.name, func(t *testing.T) {
-			p := c.path
-			rels := p.Relationships()
-			if len(rels) != len(c.rels) {
-				t.Errorf("Wrong numbber of relationships")
+			path := buildPath(c.nodes, c.relNodes, c.indexes)
+			if len(path.Relationships) != len(c.path.Relationships) {
+				t.Fatal("Wrong number of relationships")
 			}
-			for i, rel := range rels {
-				// Compare expected relationship, hard cast interface
-				// to known implementation.
-				erel := c.rels[i]
+			for i, rel := range path.Relationships {
+				// Compare expected relationship
+				erel := c.path.Relationships[i]
 				if rel.Id != erel.Id {
 					t.Errorf("Relation %d not as expected, ids differ", i)
 				}

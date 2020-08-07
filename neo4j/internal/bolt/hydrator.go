@@ -119,7 +119,7 @@ func hydrateRelNode(fields []interface{}) (interface{}, error) {
 	if !idok || !lblok || !propsok {
 		return nil, errors.New("RelNode hydrate error")
 	}
-	s := &dbtype.RelNode{Id: id, Type: lbl, Props: props}
+	s := &relNode{id: id, name: lbl, props: props}
 	return s, nil
 }
 
@@ -143,9 +143,9 @@ func hydratePath(fields []interface{}) (interface{}, error) {
 		nodes[i] = n
 	}
 
-	relnodes := make([]*dbtype.RelNode, len(relnodesx))
+	relnodes := make([]*relNode, len(relnodesx))
 	for i, rx := range relnodesx {
-		r, ok := rx.(*dbtype.RelNode)
+		r, ok := rx.(*relNode)
 		if !ok {
 			return nil, errors.New("Path hydrate error")
 		}
@@ -165,8 +165,7 @@ func hydratePath(fields []interface{}) (interface{}, error) {
 		return nil, errors.New("Path hydrate error")
 	}
 
-	p := &dbtype.Path{Nodes: nodes, RelNodes: relnodes, Indexes: indexes}
-	return p, nil
+	return buildPath(nodes, relnodes, indexes), nil
 }
 
 func hydrateSuccess(fields []interface{}) (interface{}, error) {
