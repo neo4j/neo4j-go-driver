@@ -353,8 +353,8 @@ var _ = Describe("Types", func() {
 			Expect(path.Nodes).To(HaveLen(2))
 			Expect(path.Nodes).To(ContainElement(employee))
 			Expect(path.Nodes).To(ContainElement(manager))
-			Expect(path.Relationships()).To(HaveLen(1))
-			Expect(path.Relationships()).To(ContainElement(worksFor))
+			Expect(path.Relationships).To(HaveLen(1))
+			Expect(path.Relationships).To(ContainElement(worksFor))
 		}
 		Expect(result.Next()).To(BeFalse())
 		Expect(result.Err()).To(BeNil())
@@ -394,9 +394,9 @@ var _ = Describe("Types", func() {
 			Expect(path.Nodes).To(ContainElement(employee))
 			Expect(path.Nodes).To(ContainElement(lead))
 			Expect(path.Nodes).To(ContainElement(manager))
-			Expect(path.Relationships()).To(HaveLen(2))
-			Expect(path.Relationships()).To(ContainElement(ledBy))
-			Expect(path.Relationships()).To(ContainElement(reportsTo))
+			Expect(path.Relationships).To(HaveLen(2))
+			Expect(path.Relationships).To(ContainElement(ledBy))
+			Expect(path.Relationships).To(ContainElement(reportsTo))
 		}
 		Expect(result.Next()).To(BeFalse())
 		Expect(result.Err()).To(BeNil())
