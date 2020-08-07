@@ -28,6 +28,7 @@ type ConsoleLogger struct {
 	Errors bool
 	Infos  bool
 	Warns  bool
+	Debugs bool
 }
 
 const timeFormat = "2006-01-02 15:04:05.000"
@@ -41,7 +42,7 @@ func (l *ConsoleLogger) Error(name, id string, err error) {
 }
 
 func (l *ConsoleLogger) Errorf(name, id string, msg string, args ...interface{}) {
-	if !l.Infos {
+	if !l.Errors {
 		return
 	}
 	now := time.Now()
@@ -65,7 +66,7 @@ func (l *ConsoleLogger) Warnf(name, id string, msg string, args ...interface{}) 
 }
 
 func (l *ConsoleLogger) Debugf(name, id string, msg string, args ...interface{}) {
-	if !l.Warns {
+	if !l.Debugs {
 		return
 	}
 	now := time.Now()

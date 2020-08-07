@@ -30,24 +30,28 @@ import (
 )
 
 func assertNoError(t *testing.T, err error) {
+	t.Helper()
 	if err != nil {
 		t.Fatalf("Expected no error but got: %s", err)
 	}
 }
 
 func assertDbRecord(t *testing.T, rec *db.Record, sum *db.Summary, err error) {
+	t.Helper()
 	if rec == nil || err != nil || sum != nil {
 		t.Fatalf("Should only be a record, %+v, %+v, %+v", rec, sum, err)
 	}
 }
 
 func assertDbSummary(t *testing.T, rec *db.Record, sum *db.Summary, err error) {
+	t.Helper()
 	if rec != nil || err != nil || sum == nil {
 		t.Fatalf("Should only be a summary, %+v, %+v, %+v", rec, sum, err)
 	}
 }
 
 func assertDbError(t *testing.T, rec *db.Record, sum *db.Summary, err error) {
+	t.Helper()
 	if rec != nil || err == nil || sum != nil {
 		t.Fatalf("Should only be an error, %+v, %+v, %+v", rec, sum, err)
 	}
