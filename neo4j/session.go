@@ -235,7 +235,7 @@ func (s *session) beginTransaction(mode db.AccessMode, config *TransactionConfig
 	}, nil
 }
 
-func (s *session) runOneTry(mode db.AccessMode, work TransactionWork, config *TransactionConfig) (interface{}, error) {
+func (s *session) runOneTry(mode db.AccessMode, work TransactionWork, config *TransactionConfig) (interface{}, bool, error) {
 	tx, err := s.beginTransaction(mode, config)
 	if err != nil {
 		return nil, false, err
