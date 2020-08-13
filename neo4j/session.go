@@ -158,8 +158,8 @@ func (s *session) BeginTransaction(configurers ...func(*TransactionConfig)) (Tra
 		return nil, err
 	}
 
-	// Consume current result if any
-	err := s.consumeCurrent()
+	// Fetch all in current result if any
+	err := s.fetchAllInCurrentResult()
 	if err != nil {
 		return nil, err
 	}
@@ -197,20 +197,14 @@ func (s *session) beginTransaction(mode db.AccessMode, config *TransactionConfig
 	// to avoid relying on state.
 	return &transaction{
 		run: func(cypher string, params map[string]interface{}) (Result, error) {
-			// The last result should receive all records
-			err := s.consumeCurrent()
+			// The previous result should receive all records
+			err := s.fetchAllInCurrentResult()
 			if err != nil {
 				return nil, err
 			}
 
 			streamHandle, err := conn.RunTx(txHandle, cypher, params)
 			if err != nil {
-				// To be backwards compatible we delay the error here if it is a database error.
-				// The old implementation just sent all the commands and didn't wait for an answer
-				// until starting to consume or iterate.
-				if _, isDbErr := err.(*db.DatabaseError); isDbErr {
-					return &delayedErrorResult{err: err}, nil
-				}
 				return nil, err
 			}
 			s.res = newResult(conn, streamHandle, cypher, params)
@@ -272,8 +266,8 @@ func (s *session) runRetriable(
 		c(&config)
 	}
 
-	// Consume current result if any
-	err := s.consumeCurrent()
+	// Fetch all in current result if any
+	err := s.fetchAllInCurrentResult()
 	if err != nil {
 		return nil, err
 	}
@@ -422,7 +416,7 @@ func (s *session) returnConn() {
 	}
 }
 
-func (s *session) consumeCurrent() error {
+func (s *session) fetchAllInCurrentResult() error {
 	if s.res != nil {
 		s.res.fetchAll()
 		err := s.res.err
@@ -441,7 +435,7 @@ func (s *session) Run(
 		return nil, err
 	}
 
-	err := s.consumeCurrent()
+	err := s.fetchAllInCurrentResult()
 	if err != nil {
 		return nil, err
 	}
@@ -460,12 +454,6 @@ func (s *session) Run(
 	stream, err := s.conn.Run(cypher, params, s.defaultMode, s.bookmarks, config.Timeout, config.Metadata)
 	if err != nil {
 		s.returnConn()
-		// To be backwards compatible we delay the error here if it is a database error.
-		// The old implementation just sent all the commands and didn't wait for an answer
-		// until starting to consume or iterate.
-		if _, isDbErr := err.(*db.DatabaseError); isDbErr {
-			return &delayedErrorResult{err: err}, nil
-		}
 		return nil, err
 	}
 	s.res = newResult(s.conn, stream, cypher, params)
@@ -473,7 +461,7 @@ func (s *session) Run(
 }
 
 func (s *session) Close() error {
-	s.consumeCurrent()
+	s.fetchAllInCurrentResult()
 	s.returnConn()
 	s.log.Debugf(s.logId, "Closed")
 	// Schedule cleanups

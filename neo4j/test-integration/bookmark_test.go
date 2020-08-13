@@ -281,7 +281,7 @@ var _ = Describe("Bookmark", func() {
 			defer tx.Close()
 
 			_, err = tx.Run("RETURN", nil)
-			Expect(err).To(BeNil())
+			Expect(err).To(Not(BeNil()))
 
 			err = tx.Close()
 			Expect(err).To(Not(BeNil()))
@@ -299,10 +299,7 @@ var _ = Describe("Bookmark", func() {
 		})
 
 		Specify("given bookmark should be accessible after failed run", func() {
-			result, err := session.Run("RETURN", nil)
-			Expect(err).To(BeNil())
-
-			_, err = result.Consume()
+			_, err := session.Run("RETURN", nil)
 			Expect(err).To(Not(BeNil()))
 
 			Expect(session.LastBookmark()).To(Equal(bookmark))

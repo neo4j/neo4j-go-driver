@@ -448,12 +448,8 @@ func WrongQueryExecutor(driver neo4j.Driver) func(ctx *TestContext) {
 		session := newStressSession(driver, false, neo4j.AccessModeRead, ctx)
 		defer session.Close()
 
-		result, err := session.Run("RETURN wrongThing", nil)
-		Expect(err).To(BeNil())
-
-		_, err = result.Consume()
+		_, err := session.Run("RETURN wrongThing", nil)
 		Expect(err).ToNot(BeNil())
-		//Expect(err).To(BeSyntaxError())
 	}
 }
 
@@ -466,11 +462,7 @@ func WrongQueryInTxExecutor(driver neo4j.Driver) func(ctx *TestContext) {
 		tx := newStressTransaction(session, false, ctx)
 		defer tx.Close()
 
-		result, err := tx.Run("RETURN wrongThing", nil)
-		Expect(err).To(BeNil())
-
-		_, err = result.Consume()
+		_, err := tx.Run("RETURN wrongThing", nil)
 		Expect(err).ToNot(BeNil())
-		//Expect(err).To(BeSyntaxError())
 	}
 }

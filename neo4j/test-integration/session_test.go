@@ -123,30 +123,26 @@ var _ = Describe("Session", func() {
 			Expect(summary.StatementType()).To(BeEquivalentTo(neo4j.StatementTypeReadOnly))
 		})
 
-		Specify("when an invalid query is executed, it should return error when consuming", func() {
+		Specify("when an invalid query is executed, it should return error", func() {
 			stmt := "UNWIND RANGE(0,100) RETURN N"
 
 			result, err = session.Run(stmt, nil)
-			Expect(err).To(BeNil())
-			Expect(result).NotTo(BeNil())
-
-			summary, err = result.Consume()
+			Expect(result).To(BeNil())
 			Expect(neo4j.IsClientError(err)).To(BeTrue())
-			//Expect(err).To(BeSyntaxError())
-			Expect(summary).To(BeNil())
-
-			Expect(result.Next()).To(BeFalse())
-			Expect(neo4j.IsClientError(err)).To(BeTrue())
-			//Expect(result.Err()).To(BeSyntaxError())
 		})
 
 		Specify("when a fail-on-streaming query is executed, it should run and return error when consuming", func() {
 			stmt := "UNWIND [1, 2, 3, 4, 0] AS x RETURN 10 / 0"
 
 			result, err = session.Run(stmt, nil)
-			Expect(err).To(BeNil())
+			// Up to the db when the error occures
+			if err != nil {
+				Expect(result).To(BeNil())
+				//Expect(err).To(BeArithmeticError())
+				Expect(neo4j.IsClientError(err)).To(BeTrue())
+				return
+			}
 			Expect(result).NotTo(BeNil())
-
 			summary, err = result.Consume()
 			Expect(neo4j.IsClientError(err)).To(BeTrue())
 			//Expect(err).To(BeArithmeticError())
@@ -263,11 +259,8 @@ var _ = Describe("Session", func() {
 
 		Specify("when one statement fails, the next one should run successfully", func() {
 			result, err = session.Run("Invalid Cypher", nil)
-			Expect(err).To(BeNil())
-
-			summary, err = result.Consume()
+			Expect(result).To(BeNil())
 			Expect(neo4j.IsClientError(err)).To(BeTrue())
-			//Expect(err).To(BeSyntaxError())
 
 			result, err = session.Run("RETURN 1", nil)
 			Expect(err).To(BeNil())
@@ -516,7 +509,12 @@ var _ = Describe("Session", func() {
 			session3 := newSession(driver, neo4j.AccessModeWrite)
 
 			result3, err := session3.Run("MATCH (n:RunTxTimeOut) SET n.id = 2", nil, neo4j.WithTxTimeout(1*time.Second))
-			Expect(err).To(BeNil())
+			// Up to db to determine when error occures
+			if err != nil {
+				dbErr := err.(*db.DatabaseError)
+				Expect(dbErr.Msg).To(ContainSubstring("terminated"))
+				return
+			}
 
 			_, err = result3.Consume()
 			// Should be a database error of class Transient indicating that the transaction
