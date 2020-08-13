@@ -91,7 +91,8 @@ func findRandomNode(t *testing.T, sess neo4j.Session, randomId int64) *neo4j.Nod
 	if nodex == nil {
 		return nil
 	}
-	return nodex.(*neo4j.Node)
+	node := nodex.(neo4j.Node)
+	return &node
 }
 
 func assertRandomNode(t *testing.T, sess neo4j.Session, randomId int64) {
