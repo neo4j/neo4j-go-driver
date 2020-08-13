@@ -34,7 +34,7 @@ type Result interface {
 	Err() error
 	// Record returns the current record.
 	Record() *Record
-	// Consume consumes the entire result and returns the summary information
+	// Consume discards all remaining records and returns the summary information
 	// about the statement execution.
 	Consume() (ResultSummary, error)
 }
