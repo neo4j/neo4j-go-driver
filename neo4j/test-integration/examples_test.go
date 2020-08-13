@@ -611,7 +611,7 @@ func printFriendsTxFunc() neo4j.TransactionWork {
 			fmt.Printf("%s knows %s\n", result.Record().Values[0], result.Record().Values[1])
 		}
 
-		return result.Summary()
+		return result.Consume()
 	}
 }
 

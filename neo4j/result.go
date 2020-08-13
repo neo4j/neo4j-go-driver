@@ -34,8 +34,6 @@ type Result interface {
 	Err() error
 	// Record returns the current record.
 	Record() *Record
-	// Summary returns the summary information about the statement execution.
-	Summary() (ResultSummary, error)
 	// Consume consumes the entire result and returns the summary information
 	// about the statement execution.
 	Consume() (ResultSummary, error)
@@ -113,19 +111,6 @@ func (r *result) Record() *Record {
 
 func (r *result) Err() error {
 	return r.err
-}
-
-func (r *result) Summary() (ResultSummary, error) {
-	r.fetchAll()
-	// Unbox for better client experience
-	if r.summary == nil || r.err != nil {
-		return nil, r.err
-	}
-	return &resultSummary{
-		sum:    r.summary,
-		cypher: r.cypher,
-		params: r.params,
-	}, nil
 }
 
 // Used internally to fetch all records from stream and put them in unconsumed list.

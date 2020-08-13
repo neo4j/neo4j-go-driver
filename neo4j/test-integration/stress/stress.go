@@ -190,7 +190,7 @@ func ReadQueryExecutor(driver neo4j.Driver, useBookmark bool) func(ctx *TestCont
 		Expect(result.Err()).To(BeNil())
 		Expect(result.Next()).To(BeFalse())
 
-		summary, err := result.Summary()
+		summary, err := result.Consume()
 		Expect(err).To(BeNil())
 		Expect(summary).NotTo(BeNil())
 
@@ -220,7 +220,7 @@ func ReadQueryInTxExecutor(driver neo4j.Driver, useBookmark bool) func(ctx *Test
 		Expect(result.Err()).To(BeNil())
 		Expect(result.Next()).To(BeFalse())
 
-		summary, err := result.Summary()
+		summary, err := result.Consume()
 		Expect(err).To(BeNil())
 		Expect(summary).NotTo(BeNil())
 
@@ -251,7 +251,7 @@ func ReadQueryWithReadTransactionExecutor(driver neo4j.Driver, useBookmark bool)
 			Expect(result.Err()).To(BeNil())
 			Expect(result.Next()).To(BeFalse())
 
-			return result.Summary()
+			return result.Consume()
 		})
 
 		Expect(err).To(BeNil())
