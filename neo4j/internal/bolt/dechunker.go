@@ -39,8 +39,13 @@ func dechunkMessage(rd io.Reader, msgBuf []byte) ([]byte, error) {
 
 		// A chunk size of 0 means either end of current message or it is just a no op sent
 		// from server to keep connection alive.
-		if chunkSize == 0 && len(msgBuf) > 0 {
-			return msgBuf, nil
+		if chunkSize == 0 {
+			if len(msgBuf) > 0 {
+				// End of current message
+				return msgBuf, nil
+			}
+			// A no op
+			continue
 		}
 
 		msgBuf = append(msgBuf, make([]byte, chunkSize)...)
