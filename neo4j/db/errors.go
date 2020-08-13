@@ -33,6 +33,8 @@ const (
 	dbErrClsUnknown
 )
 
+// TODO: Check naming consistency, now exported!
+
 // Database server failed to fullfill request.
 type DatabaseError struct {
 	Code string
@@ -102,6 +104,9 @@ func (e *DatabaseError) IsRetriableCluster() bool {
 func (e *DatabaseError) IsClient() bool {
 	return e.getCls() == dbErrClsClient
 }
+
+// TODO: IsSyntaxError
+// TODO: IsArithmeticError
 
 type RoutingNotSupportedError struct {
 	Server string
