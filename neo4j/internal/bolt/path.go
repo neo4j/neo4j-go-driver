@@ -31,12 +31,12 @@ type relNode struct {
 }
 
 // buildPath builds a path from Bolt representation
-func buildPath(nodes []*dbtype.Node, relNodes []*relNode, indexes []int) *dbtype.Path {
+func buildPath(nodes []dbtype.Node, relNodes []*relNode, indexes []int) dbtype.Path {
 	num := len(indexes) / 2
 	if num == 0 {
-		return nil
+		return dbtype.Path{}
 	}
-	rels := make([]*dbtype.Relationship, 0, num)
+	rels := make([]dbtype.Relationship, 0, num)
 
 	i := 0
 	n1 := nodes[0]
@@ -56,7 +56,7 @@ func buildPath(nodes []*dbtype.Node, relNodes []*relNode, indexes []int) *dbtype
 		}
 		n2 := nodes[n2i]
 
-		rel := &dbtype.Relationship{
+		rel := dbtype.Relationship{
 			Id:    reln.id,
 			Type:  reln.name,
 			Props: reln.props,
@@ -72,5 +72,5 @@ func buildPath(nodes []*dbtype.Node, relNodes []*relNode, indexes []int) *dbtype
 		n1 = n2
 	}
 
-	return &dbtype.Path{Nodes: nodes, Relationships: rels}
+	return dbtype.Path{Nodes: nodes, Relationships: rels}
 }

@@ -28,7 +28,7 @@ import (
 func TestBuildPath(ot *testing.T) {
 	cases := []struct {
 		name     string
-		nodes    []*dbtype.Node
+		nodes    []dbtype.Node
 		relNodes []*relNode
 		indexes  []int
 		path     dbtype.Path
@@ -36,24 +36,24 @@ func TestBuildPath(ot *testing.T) {
 		{
 			name: "Two nodes",
 			path: dbtype.Path{
-				Nodes: []*dbtype.Node{&dbtype.Node{Id: 1}, &dbtype.Node{Id: 2}},
-				Relationships: []*dbtype.Relationship{
-					&dbtype.Relationship{Id: 3, StartId: 1, EndId: 2, Type: "x"},
+				Nodes: []dbtype.Node{dbtype.Node{Id: 1}, dbtype.Node{Id: 2}},
+				Relationships: []dbtype.Relationship{
+					dbtype.Relationship{Id: 3, StartId: 1, EndId: 2, Type: "x"},
 				},
 			},
-			nodes:    []*dbtype.Node{&dbtype.Node{Id: 1}, &dbtype.Node{Id: 2}},
+			nodes:    []dbtype.Node{dbtype.Node{Id: 1}, dbtype.Node{Id: 2}},
 			relNodes: []*relNode{&relNode{id: 3, name: "x"}},
 			indexes:  []int{1, 1},
 		},
 		{
 			name: "Two nodes reverse",
 			path: dbtype.Path{
-				Nodes: []*dbtype.Node{&dbtype.Node{Id: 1}, &dbtype.Node{Id: 2}},
-				Relationships: []*dbtype.Relationship{
-					&dbtype.Relationship{Id: 3, StartId: 2, EndId: 1, Type: "x"},
+				Nodes: []dbtype.Node{dbtype.Node{Id: 1}, dbtype.Node{Id: 2}},
+				Relationships: []dbtype.Relationship{
+					dbtype.Relationship{Id: 3, StartId: 2, EndId: 1, Type: "x"},
 				},
 			},
-			nodes:    []*dbtype.Node{&dbtype.Node{Id: 1}, &dbtype.Node{Id: 2}},
+			nodes:    []dbtype.Node{dbtype.Node{Id: 1}, dbtype.Node{Id: 2}},
 			relNodes: []*relNode{&relNode{id: 3, name: "x"}},
 			indexes:  []int{-1, 1},
 		},

@@ -82,7 +82,7 @@ func hydrateNode(fields []interface{}) (interface{}, error) {
 	if !idok || !tagsok || !propsok {
 		return nil, errors.New("Node hydrate error")
 	}
-	n := &dbtype.Node{Id: id, Props: props, Labels: make([]string, len(tagsx))}
+	n := dbtype.Node{Id: id, Props: props, Labels: make([]string, len(tagsx))}
 	// Convert tags to strings
 	for i, x := range tagsx {
 		t, tok := x.(string)
@@ -106,7 +106,7 @@ func hydrateRelationship(fields []interface{}) (interface{}, error) {
 	if !idok || !sidok || !eidok || !lblok || !propsok {
 		return nil, errors.New("Relationship hydrate error")
 	}
-	return &dbtype.Relationship{Id: id, StartId: sid, EndId: eid, Type: lbl, Props: props}, nil
+	return dbtype.Relationship{Id: id, StartId: sid, EndId: eid, Type: lbl, Props: props}, nil
 }
 
 func hydrateRelNode(fields []interface{}) (interface{}, error) {
@@ -134,9 +134,9 @@ func hydratePath(fields []interface{}) (interface{}, error) {
 		return nil, errors.New("Path hydrate error")
 	}
 
-	nodes := make([]*dbtype.Node, len(nodesx))
+	nodes := make([]dbtype.Node, len(nodesx))
 	for i, nx := range nodesx {
-		n, ok := nx.(*dbtype.Node)
+		n, ok := nx.(dbtype.Node)
 		if !ok {
 			return nil, errors.New("Path hydrate error")
 		}
@@ -225,7 +225,7 @@ func hydratePoint2d(fields []interface{}) (interface{}, error) {
 	if !sok || !xok || !yok {
 		return nil, errors.New("Point2d hydrate error")
 	}
-	return &dbtype.Point2D{SpatialRefId: uint32(srId), X: x, Y: y}, nil
+	return dbtype.Point2D{SpatialRefId: uint32(srId), X: x, Y: y}, nil
 }
 
 func hydratePoint3d(fields []interface{}) (interface{}, error) {
@@ -239,7 +239,7 @@ func hydratePoint3d(fields []interface{}) (interface{}, error) {
 	if !sok || !xok || !yok || !zok {
 		return nil, errors.New("Point3d hydrate error")
 	}
-	return &dbtype.Point3D{SpatialRefId: uint32(srId), X: x, Y: y, Z: z}, nil
+	return dbtype.Point3D{SpatialRefId: uint32(srId), X: x, Y: y, Z: z}, nil
 }
 
 func hydrateDateTimeOffset(fields []interface{}) (interface{}, error) {

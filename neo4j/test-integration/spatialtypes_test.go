@@ -57,13 +57,13 @@ func TestSpatialTypes(st *testing.T) {
 
 		switch seq % 4 {
 		case 0:
-			return neo4j.NewPoint2D(WGS84SrID, random(), randomY())
+			return neo4j.Point2D{SpatialRefId: WGS84SrID, X: random(), Y: randomY()}
 		case 1:
-			return neo4j.NewPoint3D(WGS843DSrID, random(), randomY(), random())
+			return neo4j.Point3D{SpatialRefId: WGS843DSrID, X: random(), Y: randomY(), Z: random()}
 		case 2:
-			return neo4j.NewPoint2D(CartesianSrID, random(), random())
+			return neo4j.Point2D{SpatialRefId: CartesianSrID, X: random(), Y: random()}
 		case 3:
-			return neo4j.NewPoint3D(Cartesian3DSrID, random(), random(), random())
+			return neo4j.Point3D{SpatialRefId: Cartesian3DSrID, X: random(), Y: random(), Z: random()}
 		default:
 			panic("Not expected")
 		}
@@ -81,14 +81,14 @@ func TestSpatialTypes(st *testing.T) {
 		return single(t, driver, "CREATE (n:POI { x: $p}) RETURN n.x", map[string]interface{}{"p": p})
 	}
 
-	assertPoint2D := func(t *testing.T, p1, p2 *neo4j.Point2D) {
+	assertPoint2D := func(t *testing.T, p1, p2 neo4j.Point2D) {
 		t.Helper()
 		if p1.X != p2.X || p1.Y != p2.Y || p1.SpatialRefId != p2.SpatialRefId {
 			t.Errorf("Point2D points differ: '%s' vs '%s'", p1.String(), p2.String())
 		}
 	}
 
-	assertPoint3D := func(t *testing.T, p1, p2 *neo4j.Point3D) {
+	assertPoint3D := func(t *testing.T, p1, p2 neo4j.Point3D) {
 		t.Helper()
 		if p1.X != p2.X || p1.Y != p2.Y || p1.Z != p2.Z || p1.SpatialRefId != p2.SpatialRefId {
 			t.Errorf("Point3D points differ: '%s' vs '%s'", p1.String(), p2.String())
@@ -96,28 +96,28 @@ func TestSpatialTypes(st *testing.T) {
 	}
 
 	assertPoint := func(t *testing.T, p1, p2 interface{}) {
-		_, ok := p1.(*neo4j.Point2D)
+		_, ok := p1.(neo4j.Point2D)
 		if ok {
 			// Let it panic if p2 is not 2D
-			assertPoint2D(t, p1.(*neo4j.Point2D), p2.(*neo4j.Point2D))
+			assertPoint2D(t, p1.(neo4j.Point2D), p2.(neo4j.Point2D))
 			return
 		}
 		// Let it panic if not 3D
-		assertPoint3D(t, p1.(*neo4j.Point3D), p2.(*neo4j.Point3D))
+		assertPoint3D(t, p1.(neo4j.Point3D), p2.(neo4j.Point3D))
 	}
 
 	// Verifies that a single 2D point can be received.
 	st.Run("Receive", func(rt *testing.T) {
 		rt.Run("Point2D", func(t *testing.T) {
-			p1 := single(t, driver, "RETURN point({x: 39.111748, y:-76.775635})", nil).(*neo4j.Point2D)
-			p2 := &neo4j.Point2D{X: 39.111748, Y: -76.775635, SpatialRefId: CartesianSrID}
+			p1 := single(t, driver, "RETURN point({x: 39.111748, y:-76.775635})", nil).(neo4j.Point2D)
+			p2 := neo4j.Point2D{X: 39.111748, Y: -76.775635, SpatialRefId: CartesianSrID}
 			assertPoint2D(t, p1, p2)
 		})
 
 		// Verifies that a single 3D point can be received.
 		rt.Run("Point3D", func(t *testing.T) {
-			p1 := single(t, driver, "RETURN point({x: 39.111748, y:-76.775635, z:35.120})", nil).(*neo4j.Point3D)
-			p2 := &neo4j.Point3D{X: 39.111748, Y: -76.775635, Z: 35.120, SpatialRefId: Cartesian3DSrID}
+			p1 := single(t, driver, "RETURN point({x: 39.111748, y:-76.775635, z:35.120})", nil).(neo4j.Point3D)
+			p2 := neo4j.Point3D{X: 39.111748, Y: -76.775635, Z: 35.120, SpatialRefId: Cartesian3DSrID}
 			assertPoint3D(t, p1, p2)
 		})
 	})
@@ -125,29 +125,29 @@ func TestSpatialTypes(st *testing.T) {
 	st.Run("Send", func(tt *testing.T) {
 		// Verifies that a single 2D point can be sent (and received)
 		tt.Run("Point2D", func(t *testing.T) {
-			p1 := &neo4j.Point2D{SpatialRefId: WGS84SrID, X: 51.5044585, Y: -0.105658}
-			p2 := sendAndReceive(t, p1).(*neo4j.Point2D)
+			p1 := neo4j.Point2D{SpatialRefId: WGS84SrID, X: 51.5044585, Y: -0.105658}
+			p2 := sendAndReceive(t, p1).(neo4j.Point2D)
 			assertPoint2D(t, p1, p2)
 		})
 
 		// Verifies that a single 3D point can be sent (and received)
 		tt.Run("Point3D", func(t *testing.T) {
-			p1 := &neo4j.Point3D{SpatialRefId: WGS843DSrID, X: 51.5044585, Y: -0.105658, Z: 35.120}
-			p2 := sendAndReceive(t, p1).(*neo4j.Point3D)
+			p1 := neo4j.Point3D{SpatialRefId: WGS843DSrID, X: 51.5044585, Y: -0.105658, Z: 35.120}
+			p2 := sendAndReceive(t, p1).(neo4j.Point3D)
 			assertPoint3D(t, p1, p2)
 		})
 
 		// Verifies that a single 2D point can be sent by value
 		tt.Run("Point2D by value", func(t *testing.T) {
-			p1 := &neo4j.Point2D{SpatialRefId: WGS84SrID, X: 51.5044585, Y: -0.105658}
-			p2 := sendAndReceive(t, *p1).(*neo4j.Point2D)
+			p1 := neo4j.Point2D{SpatialRefId: WGS84SrID, X: 51.5044585, Y: -0.105658}
+			p2 := sendAndReceive(t, p1).(neo4j.Point2D)
 			assertPoint2D(t, p1, p2)
 		})
 
 		// Verifies that a single 3D point can be sent by value
 		tt.Run("Point3D by value", func(t *testing.T) {
-			p1 := &neo4j.Point3D{SpatialRefId: WGS843DSrID, X: 51.5044585, Y: -0.105658, Z: 35.120}
-			p2 := sendAndReceive(t, *p1).(*neo4j.Point3D)
+			p1 := neo4j.Point3D{SpatialRefId: WGS843DSrID, X: 51.5044585, Y: -0.105658, Z: 35.120}
+			p2 := sendAndReceive(t, p1).(neo4j.Point3D)
 			assertPoint3D(t, p1, p2)
 		})
 
