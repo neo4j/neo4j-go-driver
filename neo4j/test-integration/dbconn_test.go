@@ -501,7 +501,7 @@ func TestConnectionConformance(ot *testing.T) {
 
 			// Verify all temporal instances as when reading (as long as that test passes, the
 			// errors here should be due to writing).
-			node := rec.Values[0].(*dbtype.Node)
+			node := rec.Values[0].(dbtype.Node)
 			// Time
 			gotTime := time.Time(node.Props["time"].(dbtype.Time))
 			assertTime(t, gotTime, tTime)

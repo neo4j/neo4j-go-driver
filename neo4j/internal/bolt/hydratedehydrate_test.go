@@ -48,7 +48,7 @@ func TestHydrator(ot *testing.T) {
 			tag:  'N',
 			fields: []interface{}{
 				int64(112), []interface{}{"lbl1", "lbl2"}, map[string]interface{}{"prop1": 2}},
-			hydrated: &dbtype.Node{Id: 112, Labels: []string{"lbl1", "lbl2"}, Props: map[string]interface{}{"prop1": 2}},
+			hydrated: dbtype.Node{Id: 112, Labels: []string{"lbl1", "lbl2"}, Props: map[string]interface{}{"prop1": 2}},
 		},
 		{
 			name:       "Node, no fields",
@@ -61,7 +61,7 @@ func TestHydrator(ot *testing.T) {
 			tag:  'R',
 			fields: []interface{}{
 				int64(3), int64(1), int64(2), "lbl1", map[string]interface{}{"propx": 3}},
-			hydrated: &dbtype.Relationship{Id: 3, StartId: 1, EndId: 2, Type: "lbl1", Props: map[string]interface{}{"propx": 3}},
+			hydrated: dbtype.Relationship{Id: 3, StartId: 1, EndId: 2, Type: "lbl1", Props: map[string]interface{}{"propx": 3}},
 		},
 		{
 			name:       "Relationship, no fields",
@@ -73,13 +73,13 @@ func TestHydrator(ot *testing.T) {
 			name: "Path",
 			tag:  'P',
 			fields: []interface{}{
-				[]interface{}{&dbtype.Node{Id: 1}, &dbtype.Node{Id: 2}},
+				[]interface{}{dbtype.Node{Id: 1}, dbtype.Node{Id: 2}},
 				[]interface{}{&relNode{id: 3, name: "x"}},
 				[]interface{}{int64(1), int64(1)},
 			},
-			hydrated: &dbtype.Path{
-				Nodes:         []*dbtype.Node{&dbtype.Node{Id: 1}, &dbtype.Node{Id: 2}},
-				Relationships: []*dbtype.Relationship{&dbtype.Relationship{Id: 3, StartId: 1, EndId: 2, Type: "x"}},
+			hydrated: dbtype.Path{
+				Nodes:         []dbtype.Node{dbtype.Node{Id: 1}, dbtype.Node{Id: 2}},
+				Relationships: []dbtype.Relationship{dbtype.Relationship{Id: 3, StartId: 1, EndId: 2, Type: "x"}},
 			},
 		},
 		{
@@ -93,7 +93,7 @@ func TestHydrator(ot *testing.T) {
 			name:   "Point2D",
 			tag:    'X',
 			fields: []interface{}{int64(1), float64(2.0), float64(3.0)},
-			hydrated: &dbtype.Point2D{
+			hydrated: dbtype.Point2D{
 				SpatialRefId: 1,
 				X:            2.0,
 				Y:            3.0,
@@ -103,7 +103,7 @@ func TestHydrator(ot *testing.T) {
 			name:   "Point3D",
 			tag:    'Y',
 			fields: []interface{}{int64(1), float64(2.0), float64(3.0), float64(4.0)},
-			hydrated: &dbtype.Point3D{
+			hydrated: dbtype.Point3D{
 				SpatialRefId: 1,
 				X:            2.0,
 				Y:            3.0,

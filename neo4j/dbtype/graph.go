@@ -40,6 +40,6 @@ type Relationship struct {
 // relationships traversed. It is allowed to be of size 0, meaning there are no relationships in it. In this case,
 // it contains only a single node which is both the start and the end of the path.
 type Path struct {
-	Nodes         []*Node // All the nodes in the path.
-	Relationships []*Relationship
+	Nodes         []Node // All the nodes in the path.
+	Relationships []Relationship
 }
