@@ -66,13 +66,13 @@ func writeTransactionWithIntWork(session neo4j.Session, work neo4j.TransactionWo
 	return result.(int64)
 }
 
-func newSession(driver neo4j.Driver, mode neo4j.AccessMode) neo4j.Session {
+func newSession(driver *neo4j.Driver, mode neo4j.AccessMode) neo4j.Session {
 	session, err := driver.Session(neo4j.AccessModeWrite)
 	Expect(err).To(BeNil())
 	return session
 }
 
-func newSessionAndTx(driver neo4j.Driver, mode neo4j.AccessMode, configurers ...func(*neo4j.TransactionConfig)) (neo4j.Session, neo4j.Transaction) {
+func newSessionAndTx(driver *neo4j.Driver, mode neo4j.AccessMode, configurers ...func(*neo4j.TransactionConfig)) (neo4j.Session, neo4j.Transaction) {
 	session := newSession(driver, mode)
 
 	tx, err := session.BeginTransaction(configurers...)

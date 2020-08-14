@@ -322,40 +322,40 @@ func helloWorld(uri, username, password string, encrypted bool) (string, error) 
 // end::hello-world[]
 
 // tag::driver-lifecycle[]
-func createDriver(uri, username, password string) (neo4j.Driver, error) {
+func createDriver(uri, username, password string) (*neo4j.Driver, error) {
 	return neo4j.NewDriver(uri, neo4j.BasicAuth(username, password, ""))
 }
 
 // call on application exit
-func closeDriver(driver neo4j.Driver) error {
+func closeDriver(driver *neo4j.Driver) error {
 	return driver.Close()
 }
 
 // end::driver-lifecycle[]
 
 // tag::basic-auth[]
-func createDriverWithBasicAuth(uri, username, password string) (neo4j.Driver, error) {
+func createDriverWithBasicAuth(uri, username, password string) (*neo4j.Driver, error) {
 	return neo4j.NewDriver(uri, neo4j.BasicAuth(username, password, ""))
 }
 
 // end::basic-auth[]
 
 // tag::kerberos-auth[]
-func createDriverWithKerberosAuth(uri, ticket string) (neo4j.Driver, error) {
+func createDriverWithKerberosAuth(uri, ticket string) (*neo4j.Driver, error) {
 	return neo4j.NewDriver(uri, neo4j.KerberosAuth(ticket))
 }
 
 // end::kerberos-auth[]
 
 // tag::custom-auth[]
-func createDriverWithCustomAuth(uri, principal, credentials, realm, scheme string, parameters map[string]interface{}) (neo4j.Driver, error) {
+func createDriverWithCustomAuth(uri, principal, credentials, realm, scheme string, parameters map[string]interface{}) (*neo4j.Driver, error) {
 	return neo4j.NewDriver(uri, neo4j.CustomAuth(scheme, principal, credentials, realm, parameters))
 }
 
 // end::custom-auth[]
 
 // tag::config-unencrypted[]
-func createDriverWithoutEncryption(uri, username, password string) (neo4j.Driver, error) {
+func createDriverWithoutEncryption(uri, username, password string) (*neo4j.Driver, error) {
 	return neo4j.NewDriver(uri, neo4j.BasicAuth(username, password, ""), func(config *neo4j.Config) {
 		config.Encrypted = false
 	})
@@ -364,7 +364,7 @@ func createDriverWithoutEncryption(uri, username, password string) (neo4j.Driver
 // end::config-unencrypted[]
 
 // tag::config-trust[]
-func createDriverWithTrustStrategy(uri, username, password string) (neo4j.Driver, error) {
+func createDriverWithTrustStrategy(uri, username, password string) (*neo4j.Driver, error) {
 	return neo4j.NewDriver(uri, neo4j.BasicAuth(username, password, ""), func(config *neo4j.Config) {
 		config.TrustStrategy = neo4j.TrustAny(true)
 	})
@@ -373,7 +373,7 @@ func createDriverWithTrustStrategy(uri, username, password string) (neo4j.Driver
 // end::config-trust[]
 
 // tag::config-custom-resolver[]
-func createDriverWithAddressResolver(virtualURI, username, password string, encrypted bool, addresses ...neo4j.ServerAddress) (neo4j.Driver, error) {
+func createDriverWithAddressResolver(virtualURI, username, password string, encrypted bool, addresses ...neo4j.ServerAddress) (*neo4j.Driver, error) {
 	// Address resolver is only valid for bolt+routing uri
 	return neo4j.NewDriver(virtualURI, neo4j.BasicAuth(username, password, ""), func(config *neo4j.Config) {
 		config.Encrypted = encrypted
@@ -420,7 +420,7 @@ func addPerson(name string) error {
 // end::config-custom-resolver[]
 
 // tag::config-connection-pool[]
-func createDriverWithCustomizedConnectionPool(uri, username, password string) (neo4j.Driver, error) {
+func createDriverWithCustomizedConnectionPool(uri, username, password string) (*neo4j.Driver, error) {
 	return neo4j.NewDriver(uri, neo4j.BasicAuth(username, password, ""), func(config *neo4j.Config) {
 		config.MaxConnectionLifetime = 30 * time.Minute
 		config.MaxConnectionPoolSize = 50
@@ -431,7 +431,7 @@ func createDriverWithCustomizedConnectionPool(uri, username, password string) (n
 // end::config-connection-pool[]
 
 // tag::config-connection-timeout[]
-func createDriverWithConnectionTimeout(uri, username, password string) (neo4j.Driver, error) {
+func createDriverWithConnectionTimeout(uri, username, password string) (*neo4j.Driver, error) {
 	return neo4j.NewDriver(uri, neo4j.BasicAuth(username, password, ""), func(config *neo4j.Config) {
 		config.SocketConnectTimeout = 15 * time.Second
 	})
@@ -441,7 +441,7 @@ func createDriverWithConnectionTimeout(uri, username, password string) (neo4j.Dr
 
 // tag::config-max-retry-time[]
 // This driver is used to run queries, needs actual TLS configuration as well.
-func createDriverWithMaxRetryTime(uri, username, password string, encrypted bool) (neo4j.Driver, error) {
+func createDriverWithMaxRetryTime(uri, username, password string, encrypted bool) (*neo4j.Driver, error) {
 	return neo4j.NewDriver(uri, neo4j.BasicAuth(username, password, ""), func(config *neo4j.Config) {
 		config.MaxTransactionRetryTime = 15 * time.Second
 		config.Encrypted = encrypted
@@ -451,7 +451,7 @@ func createDriverWithMaxRetryTime(uri, username, password string, encrypted bool
 // end::config-max-retry-time[]
 
 // tag::service-unavailable[]
-func createItem(driver neo4j.Driver) error {
+func createItem(driver *neo4j.Driver) error {
 	session, err := driver.Session(neo4j.AccessModeWrite)
 	if err != nil {
 		return err
@@ -470,7 +470,7 @@ func createItem(driver neo4j.Driver) error {
 	return err
 }
 
-func addItem(driver neo4j.Driver) bool {
+func addItem(driver *neo4j.Driver) bool {
 	if err := createItem(driver); err != nil {
 		if neo4j.IsServiceUnavailable(err) {
 			// perform some action
@@ -484,7 +484,7 @@ func addItem(driver neo4j.Driver) bool {
 
 // end::service-unavailable[]
 
-func countNodes(driver neo4j.Driver, label string, property string, value string) (int64, error) {
+func countNodes(driver *neo4j.Driver, label string, property string, value string) (int64, error) {
 	session, err := driver.Session(neo4j.AccessModeRead)
 	if err != nil {
 		return -1, err
@@ -504,7 +504,7 @@ func countNodes(driver neo4j.Driver, label string, property string, value string
 }
 
 // tag::session[]
-func addPersonInSession(driver neo4j.Driver, name string) error {
+func addPersonInSession(driver *neo4j.Driver, name string) error {
 	session, err := driver.Session(neo4j.AccessModeWrite)
 	if err != nil {
 		return err
@@ -526,7 +526,7 @@ func addPersonInSession(driver neo4j.Driver, name string) error {
 // end::session[]
 
 // tag::autocommit-transaction[]
-func addPersonInAutoCommitTx(driver neo4j.Driver, name string) error {
+func addPersonInAutoCommitTx(driver *neo4j.Driver, name string) error {
 	session, err := driver.Session(neo4j.AccessModeWrite)
 	if err != nil {
 		return err
@@ -548,7 +548,7 @@ func addPersonInAutoCommitTx(driver neo4j.Driver, name string) error {
 // end::autocommit-transaction[]
 
 // tag::transaction-function[]
-func addPersonInTxFunc(driver neo4j.Driver, name string) error {
+func addPersonInTxFunc(driver *neo4j.Driver, name string) error {
 	session, err := driver.Session(neo4j.AccessModeWrite)
 	if err != nil {
 		return err
@@ -615,7 +615,7 @@ func printFriendsTxFunc() neo4j.TransactionWork {
 	}
 }
 
-func addAndEmploy(driver neo4j.Driver, person string, company string) (string, error) {
+func addAndEmploy(driver *neo4j.Driver, person string, company string) (string, error) {
 	session, err := driver.Session(neo4j.AccessModeWrite)
 	if err != nil {
 		return "", err
@@ -635,7 +635,7 @@ func addAndEmploy(driver neo4j.Driver, person string, company string) (string, e
 	return session.LastBookmark(), nil
 }
 
-func makeFriend(driver neo4j.Driver, person1 string, person2 string, bookmarks ...string) (string, error) {
+func makeFriend(driver *neo4j.Driver, person1 string, person2 string, bookmarks ...string) (string, error) {
 	session, err := driver.Session(neo4j.AccessModeWrite, bookmarks...)
 	if err != nil {
 		return "", err
@@ -649,7 +649,7 @@ func makeFriend(driver neo4j.Driver, person1 string, person2 string, bookmarks .
 	return session.LastBookmark(), nil
 }
 
-func addEmployAndMakeFriends(driver neo4j.Driver) error {
+func addEmployAndMakeFriends(driver *neo4j.Driver) error {
 	var bookmark1, bookmark2, bookmark3 string
 	var err error
 
@@ -707,7 +707,7 @@ func matchPersonNodeTxFunc(name string) neo4j.TransactionWork {
 	}
 }
 
-func addPersonNode(driver neo4j.Driver, name string) (int64, error) {
+func addPersonNode(driver *neo4j.Driver, name string) (int64, error) {
 	session, err := driver.Session(neo4j.AccessModeWrite)
 	if err != nil {
 		return -1, err
@@ -729,7 +729,7 @@ func addPersonNode(driver neo4j.Driver, name string) (int64, error) {
 // end::read-write-transaction[]
 
 // tag::result-consume[]
-func getPeople(driver neo4j.Driver) ([]string, error) {
+func getPeople(driver *neo4j.Driver) ([]string, error) {
 	session, err := driver.Session(neo4j.AccessModeRead)
 	if err != nil {
 		return nil, err
@@ -764,7 +764,7 @@ func getPeople(driver neo4j.Driver) ([]string, error) {
 // end::result-consume[]
 
 // tag::result-retain[]
-func addPersonsAsEmployees(driver neo4j.Driver, companyName string) (int, error) {
+func addPersonsAsEmployees(driver *neo4j.Driver, companyName string) (int, error) {
 	session, err := driver.Session(neo4j.AccessModeWrite)
 	if err != nil {
 		return 0, err
