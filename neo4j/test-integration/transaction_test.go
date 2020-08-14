@@ -36,7 +36,7 @@ import (
 var _ = Describe("Transaction", func() {
 	var server *control.SingleInstance
 	var err error
-	var driver neo4j.Driver
+	var driver *neo4j.Driver
 	var session neo4j.Session
 	var tx neo4j.Transaction
 	var result *neo4j.Result

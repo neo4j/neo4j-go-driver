@@ -168,12 +168,12 @@ func (server *SingleInstance) Config() func(config *neo4j.Config) {
 }
 
 // Driver returns a driver instance to the server
-func (server *SingleInstance) Driver() (neo4j.Driver, error) {
+func (server *SingleInstance) Driver() (*neo4j.Driver, error) {
 	return neo4j.NewDriver(server.boltURI, server.authToken, server.config)
 }
 
 // Driver returns a driver instance to the server, panics if it fails
-func (server *SingleInstance) Driver2() neo4j.Driver {
+func (server *SingleInstance) Driver2() *neo4j.Driver {
 	driver, err := neo4j.NewDriver(server.boltURI, server.authToken, server.config)
 	if err != nil {
 		panic(err)

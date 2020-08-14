@@ -46,7 +46,7 @@ var _ = Describe("Session", func() {
 	Context("with read access mode", func() {
 		var (
 			err     error
-			driver  neo4j.Driver
+			driver  *neo4j.Driver
 			session neo4j.Session
 			result  *neo4j.Result
 			summary neo4j.ResultSummary
@@ -169,7 +169,7 @@ var _ = Describe("Session", func() {
 	Context("with write access mode", func() {
 		var (
 			err     error
-			driver  neo4j.Driver
+			driver  *neo4j.Driver
 			session neo4j.Session
 			result  *neo4j.Result
 			summary neo4j.ResultSummary
@@ -416,7 +416,7 @@ var _ = Describe("Session", func() {
 	Context("V3", func() {
 		var (
 			err     error
-			driver  neo4j.Driver
+			driver  *neo4j.Driver
 			session neo4j.Session
 			result  *neo4j.Result
 		)
@@ -547,7 +547,7 @@ var _ = Describe("Session", func() {
 		Context("V3 API on V1 & V2", func() {
 			var (
 				err     error
-				driver  neo4j.Driver
+				driver  *neo4j.Driver
 				session neo4j.Session
 			)
 

@@ -12,7 +12,7 @@ var (
 	V350 = utils.VersionOf("3.5.0")
 )
 
-func versionOfDriver(driver neo4j.Driver) utils.Version {
+func versionOfDriver(driver *neo4j.Driver) utils.Version {
 	session, err := driver.Session(neo4j.AccessModeRead)
 	if err != nil {
 		panic(err)

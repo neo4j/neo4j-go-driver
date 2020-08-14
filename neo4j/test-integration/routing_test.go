@@ -41,7 +41,7 @@ var _ = Describe("Routing", func() {
 		Expect(cluster).NotTo(BeNil())
 	})
 
-	getDriver := func(address string) neo4j.Driver {
+	getDriver := func(address string) *neo4j.Driver {
 		driver, err := neo4j.NewDriver(address, cluster.AuthToken(), cluster.Config())
 		if err != nil {
 			panic(err.Error())
