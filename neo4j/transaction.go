@@ -22,7 +22,7 @@ package neo4j
 // Transaction represents a transaction in the Neo4j database
 type Transaction interface {
 	// Run executes a statement on this transaction and returns a result
-	Run(cypher string, params map[string]interface{}) (Result, error)
+	Run(cypher string, params map[string]interface{}) (*Result, error)
 	// Commit commits the transaction
 	Commit() error
 	// Rollback rolls back the transaction
@@ -34,12 +34,12 @@ type Transaction interface {
 
 type transaction struct {
 	done     bool
-	run      func(cypher string, params map[string]interface{}) (Result, error)
+	run      func(cypher string, params map[string]interface{}) (*Result, error)
 	commit   func() error
 	rollback func() error
 }
 
-func (t *transaction) Run(cypher string, params map[string]interface{}) (Result, error) {
+func (t *transaction) Run(cypher string, params map[string]interface{}) (*Result, error) {
 	return t.run(cypher, params)
 }
 

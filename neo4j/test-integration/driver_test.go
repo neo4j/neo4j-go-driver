@@ -63,7 +63,7 @@ var _ = Describe("Driver", func() {
 			err     error
 			driver  neo4j.Driver
 			session neo4j.Session
-			result  neo4j.Result
+			result  *neo4j.Result
 		)
 
 		BeforeEach(func() {
@@ -89,7 +89,7 @@ var _ = Describe("Driver", func() {
 			Expect(err).To(BeNil())
 
 			if result.Next() {
-				Expect(result.Record().Values[0]).To(BeEquivalentTo(1))
+				Expect(result.Record.Values[0]).To(BeEquivalentTo(1))
 			}
 			Expect(result.Next()).To(BeFalse())
 			Expect(result.Err()).To(BeNil())
@@ -106,7 +106,7 @@ var _ = Describe("Driver", func() {
 			Expect(err).To(BeNil())
 
 			if result.Next() {
-				Expect(result.Record().Values[0]).To(BeEquivalentTo(1))
+				Expect(result.Record.Values[0]).To(BeEquivalentTo(1))
 			}
 			Expect(result.Next()).To(BeFalse())
 			Expect(result.Err()).To(BeNil())

@@ -66,7 +66,7 @@ var _ = Describe("Bookmark", func() {
 			err     error
 			driver  neo4j.Driver
 			session neo4j.Session
-			result  neo4j.Result
+			result  *neo4j.Result
 			summary neo4j.ResultSummary
 		)
 
