@@ -48,7 +48,7 @@ var _ = Describe("Session", func() {
 			err     error
 			driver  neo4j.Driver
 			session neo4j.Session
-			result  neo4j.Result
+			result  *neo4j.Result
 			summary neo4j.ResultSummary
 		)
 
@@ -171,7 +171,7 @@ var _ = Describe("Session", func() {
 			err     error
 			driver  neo4j.Driver
 			session neo4j.Session
-			result  neo4j.Result
+			result  *neo4j.Result
 			summary neo4j.ResultSummary
 		)
 
@@ -209,13 +209,13 @@ var _ = Describe("Session", func() {
 			properties, err := session.Run("MATCH (p:Property) RETURN p", nil)
 			Expect(err).To(BeNil())
 			for properties.Next() {
-				Expect(properties.Record()).ToNot(BeNil())
+				Expect(properties.Record).ToNot(BeNil())
 				seenProps++
 
 				resources, err := session.Run("MATCH (r:Resource) RETURN r", nil)
 				Expect(err).To(BeNil())
 				for resources.Next() {
-					Expect(resources.Record()).ToNot(BeNil())
+					Expect(resources.Record).ToNot(BeNil())
 					seenResources++
 				}
 				Expect(resources.Err()).To(BeNil())
@@ -266,7 +266,7 @@ var _ = Describe("Session", func() {
 			Expect(err).To(BeNil())
 
 			if result.Next() {
-				Expect(result.Record().Values[0]).To(BeEquivalentTo(1))
+				Expect(result.Record.Values[0]).To(BeEquivalentTo(1))
 			}
 			Expect(result.Next()).To(BeFalse())
 			Expect(result.Err()).To(BeNil())
@@ -280,7 +280,7 @@ var _ = Describe("Session", func() {
 
 			result2Values := []int(nil)
 			for result2.Next() {
-				if val, ok := result2.Record().Get("N"); ok {
+				if val, ok := result2.Record.Get("N"); ok {
 					result2Values = append(result2Values, int(val.(int64)))
 				}
 			}
@@ -288,7 +288,7 @@ var _ = Describe("Session", func() {
 
 			result1Values := []int(nil)
 			for result1.Next() {
-				if val, ok := result1.Record().Get("N"); ok {
+				if val, ok := result1.Record.Get("N"); ok {
 					result1Values = append(result1Values, int(val.(int64)))
 				}
 			}
@@ -299,7 +299,7 @@ var _ = Describe("Session", func() {
 		})
 
 		Specify("when session is closed, pending query should be executed", func() {
-			var result neo4j.Result
+			var result *neo4j.Result
 			var err error
 
 			innerExecutor := func() error {
@@ -325,7 +325,7 @@ var _ = Describe("Session", func() {
 		})
 
 		Specify("when session is closed, pending queries should be executed", func() {
-			var result1, result2 neo4j.Result
+			var result1, result2 *neo4j.Result
 			var err error
 
 			innerExecutor := func() error {
@@ -361,7 +361,7 @@ var _ = Describe("Session", func() {
 		})
 
 		Specify("when session is closed, pending explicit transaction should be rolled-back", func() {
-			var result1, result2 neo4j.Result
+			var result1, result2 *neo4j.Result
 			var err error
 
 			innerExecutor := func() error {
@@ -418,7 +418,7 @@ var _ = Describe("Session", func() {
 			err     error
 			driver  neo4j.Driver
 			session neo4j.Session
-			result  neo4j.Result
+			result  *neo4j.Result
 		)
 
 		BeforeEach(func() {
@@ -458,7 +458,7 @@ var _ = Describe("Session", func() {
 
 			var matched bool = false
 			for result.Next() {
-				if txMetadataInt, ok := result.Record().Get("metaData"); ok {
+				if txMetadataInt, ok := result.Record.Get("metaData"); ok {
 					if txMetadata, ok := txMetadataInt.(map[string]interface{}); ok {
 						if reflect.DeepEqual(metadata, txMetadata) {
 							matched = true

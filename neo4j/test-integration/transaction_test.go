@@ -39,7 +39,7 @@ var _ = Describe("Transaction", func() {
 	var driver neo4j.Driver
 	var session neo4j.Session
 	var tx neo4j.Transaction
-	var result neo4j.Result
+	var result *neo4j.Result
 
 	BeforeEach(func() {
 		server, err = control.EnsureSingleInstance()
@@ -125,7 +125,7 @@ var _ = Describe("Transaction", func() {
 		result, err = tx.Run("RETURN 1 AS N, 2 AS M", nil)
 		Expect(err).To(BeNil())
 
-		Expect(result.Keys()).To(BeEquivalentTo([]string{"N", "M"}))
+		Expect(result.Keys).To(BeEquivalentTo([]string{"N", "M"}))
 	})
 
 	It("should have keys available after run and consume", func() {
@@ -136,12 +136,12 @@ var _ = Describe("Transaction", func() {
 		result, err = tx.Run("RETURN 1 AS N, 2 AS M", nil)
 		Expect(err).To(BeNil())
 
-		Expect(result.Keys()).To(BeEquivalentTo([]string{"N", "M"}))
+		Expect(result.Keys).To(BeEquivalentTo([]string{"N", "M"}))
 
 		_, err = result.Consume()
 		Expect(err).To(BeNil())
 
-		Expect(result.Keys()).To(BeEquivalentTo([]string{"N", "M"}))
+		Expect(result.Keys).To(BeEquivalentTo([]string{"N", "M"}))
 	})
 
 	It("should have keys available for consecutive runs", func() {
@@ -155,8 +155,8 @@ var _ = Describe("Transaction", func() {
 		result2, err := tx.Run("RETURN 1 AS X, 2 AS Y", nil)
 		Expect(err).To(BeNil())
 
-		Expect(result1.Keys()).To(BeEquivalentTo([]string{"N", "M"}))
-		Expect(result2.Keys()).To(BeEquivalentTo([]string{"X", "Y"}))
+		Expect(result1.Keys).To(BeEquivalentTo([]string{"N", "M"}))
+		Expect(result2.Keys).To(BeEquivalentTo([]string{"X", "Y"}))
 	})
 
 	It("should have keys available for consecutive runs and consumes", func() {
@@ -175,8 +175,8 @@ var _ = Describe("Transaction", func() {
 		_, err = result2.Consume()
 		Expect(err).To(BeNil())
 
-		Expect(result1.Keys()).To(BeEquivalentTo([]string{"N", "M"}))
-		Expect(result2.Keys()).To(BeEquivalentTo([]string{"X", "Y"}))
+		Expect(result1.Keys).To(BeEquivalentTo([]string{"N", "M"}))
+		Expect(result2.Keys).To(BeEquivalentTo([]string{"X", "Y"}))
 	})
 
 	It("should have keys available for consecutive runs independent of order", func() {
@@ -190,8 +190,8 @@ var _ = Describe("Transaction", func() {
 		result2, err := tx.Run("RETURN 1 AS X, 2 AS Y", nil)
 		Expect(err).To(BeNil())
 
-		Expect(result2.Keys()).To(BeEquivalentTo([]string{"X", "Y"}))
-		Expect(result1.Keys()).To(BeEquivalentTo([]string{"N", "M"}))
+		Expect(result2.Keys).To(BeEquivalentTo([]string{"X", "Y"}))
+		Expect(result1.Keys).To(BeEquivalentTo([]string{"N", "M"}))
 	})
 
 	It("should have keys available for consecutive runs and consumes independent of order", func() {
@@ -210,8 +210,8 @@ var _ = Describe("Transaction", func() {
 		_, err = result2.Consume()
 		Expect(err).To(BeNil())
 
-		Expect(result2.Keys()).To(BeEquivalentTo([]string{"X", "Y"}))
-		Expect(result1.Keys()).To(BeEquivalentTo([]string{"N", "M"}))
+		Expect(result2.Keys).To(BeEquivalentTo([]string{"X", "Y"}))
+		Expect(result1.Keys).To(BeEquivalentTo([]string{"N", "M"}))
 	})
 
 	Context("V3", func() {

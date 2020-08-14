@@ -307,7 +307,7 @@ func helloWorld(uri, username, password string, encrypted bool) (string, error) 
 		}
 
 		if result.Next() {
-			return result.Record().Values[0], nil
+			return result.Record.Values[0], nil
 		}
 
 		return nil, result.Err()
@@ -497,7 +497,7 @@ func countNodes(driver neo4j.Driver, label string, property string, value string
 	}
 
 	if result.Next() {
-		return result.Record().Values[0].(int64), nil
+		return result.Record.Values[0].(int64), nil
 	}
 
 	return -1, errors.New("expected at least one record")
@@ -608,7 +608,7 @@ func printFriendsTxFunc() neo4j.TransactionWork {
 		}
 
 		for result.Next() {
-			fmt.Printf("%s knows %s\n", result.Record().Values[0], result.Record().Values[1])
+			fmt.Printf("%s knows %s\n", result.Record.Values[0], result.Record.Values[1])
 		}
 
 		return result.Consume()
@@ -700,7 +700,7 @@ func matchPersonNodeTxFunc(name string) neo4j.TransactionWork {
 		}
 
 		if result.Next() {
-			return result.Record().Values[0], nil
+			return result.Record.Values[0], nil
 		}
 
 		return nil, errors.New("one record was expected")
@@ -745,7 +745,7 @@ func getPeople(driver neo4j.Driver) ([]string, error) {
 		}
 
 		for result.Next() {
-			list = append(list, result.Record().Values[0].(string))
+			list = append(list, result.Record.Values[0].(string))
 		}
 
 		if err = result.Err(); err != nil {

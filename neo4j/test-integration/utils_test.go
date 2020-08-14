@@ -36,7 +36,7 @@ func intReturningWork(query string, params map[string]interface{}) neo4j.Transac
 
 		returnValue := int64(0)
 		if create.Next() {
-			returnValue = create.Record().Values[0].(int64)
+			returnValue = create.Record.Values[0].(int64)
 		}
 		Expect(create.Next()).To(BeFalse())
 		Expect(create.Err()).To(BeNil())
@@ -84,7 +84,7 @@ func newSessionAndTx(driver neo4j.Driver, mode neo4j.AccessMode, configurers ...
 func createNode(session neo4j.Session, label string, props map[string]interface{}) {
 	var (
 		err     error
-		result  neo4j.Result
+		result  *neo4j.Result
 		summary neo4j.ResultSummary
 	)
 
@@ -104,7 +104,7 @@ func createNode(session neo4j.Session, label string, props map[string]interface{
 func createNodeInTx(tx neo4j.Transaction, label string, props map[string]interface{}) {
 	var (
 		err     error
-		result  neo4j.Result
+		result  *neo4j.Result
 		summary neo4j.ResultSummary
 	)
 
@@ -125,7 +125,7 @@ func createNodeWork(label string, props map[string]interface{}) neo4j.Transactio
 	return func(tx neo4j.Transaction) (interface{}, error) {
 		var (
 			err    error
-			result neo4j.Result
+			result *neo4j.Result
 		)
 
 		if len(props) > 0 {
@@ -144,7 +144,7 @@ func createNodeWork(label string, props map[string]interface{}) neo4j.Transactio
 func updateNode(session neo4j.Session, label string, newProps map[string]interface{}) {
 	var (
 		err     error
-		result  neo4j.Result
+		result  *neo4j.Result
 		summary neo4j.ResultSummary
 	)
 
@@ -164,7 +164,7 @@ func updateNode(session neo4j.Session, label string, newProps map[string]interfa
 func updateNodeInTx(tx neo4j.Transaction, label string, newProps map[string]interface{}) {
 	var (
 		err     error
-		result  neo4j.Result
+		result  *neo4j.Result
 		summary neo4j.ResultSummary
 	)
 
@@ -185,7 +185,7 @@ func updateNodeWork(label string, newProps map[string]interface{}) neo4j.Transac
 	return func(tx neo4j.Transaction) (interface{}, error) {
 		var (
 			err    error
-			result neo4j.Result
+			result *neo4j.Result
 		)
 
 		if len(newProps) == 0 {
@@ -210,7 +210,7 @@ func listTransactionsAndMatchMetadataWork(metadata map[string]interface{}) neo4j
 
 		var matched = false
 		for result.Next() {
-			if txMetadataInt, ok := result.Record().Get("metaData"); ok {
+			if txMetadataInt, ok := result.Record.Get("metaData"); ok {
 				if txMetadata, ok := txMetadataInt.(map[string]interface{}); ok {
 					if reflect.DeepEqual(metadata, txMetadata) {
 						matched = true
