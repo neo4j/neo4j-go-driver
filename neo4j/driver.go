@@ -44,6 +44,25 @@ const (
 	AccessModeRead AccessMode = 1
 )
 
+// Driver represents a pool(s) of connections to a neo4j server or cluster. It's
+// safe for concurrent use.
+/*
+type Driver interface {
+	// The url this driver is bootstrapped
+	Target() url.URL
+	Session(accessMode AccessMode, bookmarks ...string) (Session, error)
+	// Creates a new session based on the specified session configuration.
+	// The session configuration contains access mode, bookmarks and database name.
+	NewSession(config SessionConfig) (Session, error)
+	// Verifies that the driver can connect to a remote server or cluster by
+	// establishing a network connection with the remote. Returns nil if succesful
+	// or error describing the problem.
+	VerifyConnectivity() error
+	// Close the driver and all underlying connections
+	Close() error
+}
+*/
+
 // NewDriver is the entry point to the neo4j driver to create an instance of a Driver. It is the first function to
 // be called in order to establish a connection to a neo4j database. It requires a Bolt URI and an authentication
 // token as parameters and can also take optional configuration function(s) as variadic parameters.
@@ -53,7 +72,7 @@ const (
 //
 // In order to connect to a causal cluster database, you need to pass a URI with scheme 'bolt+routing' or 'neo4j'
 // and its host part set to be one of the core cluster members. Please note that 'bolt+routing' scheme will be
-// removed with 4.0 series of drivers.
+// removed with 2.0 series of drivers.
 //	driver, err = NewDriver("bolt+routing://core.db.server:7687", BasicAuth(username, password))
 //
 // You can override default configuration options by providing a configuration function(s)
@@ -171,8 +190,6 @@ type sessionRouter interface {
 	CleanUp()
 }
 
-// Driver represents a pool(s) of connections to a neo4j server or cluster. It's
-// safe for concurrent use.
 type Driver struct {
 	target *url.URL
 	config *Config
@@ -183,13 +200,10 @@ type Driver struct {
 	log    log.Logger
 }
 
-// The url this driver is bootstrapped
 func (d *Driver) Target() url.URL {
 	return *d.target
 }
 
-// Session creates a new session
-// Deprecated: Use NewSession
 func (d *Driver) Session(accessMode AccessMode, bookmarks ...string) (Session, error) {
 	d.mut.Lock()
 	defer d.mut.Unlock()
@@ -201,8 +215,6 @@ func (d *Driver) Session(accessMode AccessMode, bookmarks ...string) (Session, e
 		d.pool, db.AccessMode(accessMode), bookmarks, db.DefaultDatabase, d.log), nil
 }
 
-// NewSession creates a new session based on the specified session configuration.
-// The session configuration contains access mode, bookmarks and database name.
 func (d *Driver) NewSession(config SessionConfig) (Session, error) {
 	databaseName := db.DefaultDatabase
 	if config.DatabaseName != "" {
@@ -219,9 +231,6 @@ func (d *Driver) NewSession(config SessionConfig) (Session, error) {
 		d.pool, db.AccessMode(config.AccessMode), config.Bookmarks, databaseName, d.log), nil
 }
 
-// VerifyConnectivity verifies that the driver can connect to a remote server or cluster by
-// establishing a network connection with the remote. Returns nil if succesful
-// or error describing the problem.
 func (d *Driver) VerifyConnectivity() error {
 	session, err := d.NewSession(SessionConfig{AccessMode: AccessModeRead})
 	if err != nil {
@@ -235,8 +244,6 @@ func (d *Driver) VerifyConnectivity() error {
 	return err
 }
 
-// Close closes all underlying connections
-// The driver instance cannot be used after close.
 func (d *Driver) Close() error {
 	d.mut.Lock()
 	defer d.mut.Unlock()
