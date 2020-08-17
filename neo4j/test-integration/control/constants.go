@@ -28,7 +28,7 @@ import (
 const (
 	enterpriseEdition = "enterprise"
 
-	defaultVersionAndEdition = "-e 3.5"
+	defaultVersionAndEdition = "-e 4.0"
 	defaultLogLevel          = neo4j.ERROR
 
 	username = "neo4j"
