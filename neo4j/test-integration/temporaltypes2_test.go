@@ -36,7 +36,7 @@ func TestTemporalTypes(tt *testing.T) {
 
 	driver := server.Driver2()
 	if versionOfDriver(driver).LessThan(V340) {
-		tt.Skip("Spatial types are only available after neo4j 3.4.0 release")
+		tt.Skip("Temporal types are only available after neo4j 3.4.0 release")
 	}
 
 	sendAndReceive := func(t *testing.T, p interface{}) interface{} {
