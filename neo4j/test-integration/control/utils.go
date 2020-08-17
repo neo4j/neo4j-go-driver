@@ -127,7 +127,7 @@ func deleteData(driver neo4j.Driver) error {
 		}
 
 		if result.Next() {
-			deleted := result.Record.Values[0].(int64)
+			deleted := result.Record().Values[0].(int64)
 			if deleted == 0 {
 				break
 			}

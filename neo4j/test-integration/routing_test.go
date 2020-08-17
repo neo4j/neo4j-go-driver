@@ -31,7 +31,7 @@ var _ = Describe("Routing", func() {
 	var cluster *control.Cluster
 
 	var session neo4j.Session
-	var result *neo4j.Result
+	var result neo4j.Result
 	var summary neo4j.ResultSummary
 	var err error
 
@@ -83,7 +83,7 @@ var _ = Describe("Routing", func() {
 			}
 
 			if writeResult.Next() {
-				return writeResult.Record.Values[0], nil
+				return writeResult.Record().Values[0], nil
 			}
 
 			if err := writeResult.Err(); err != nil {
@@ -102,7 +102,7 @@ var _ = Describe("Routing", func() {
 			}
 
 			if readResult.Next() {
-				return readResult.Record.Values[0], nil
+				return readResult.Record().Values[0], nil
 			}
 
 			if err := readResult.Err(); err != nil {

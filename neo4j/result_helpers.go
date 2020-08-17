@@ -22,33 +22,60 @@ package neo4j
 // Single returns one and only one record from the result stream. Any error passed in
 // or reported while navigating the result stream is returned without any conversion.
 // If the result stream contains zero or more than one records error is returned.
-// TODO: Show example with tx func
 func Single(from interface{}, err error) (*Record, error) {
+	var result Result
+	var record *Record
+	var ok bool
+
 	if err != nil {
 		return nil, err
 	}
 
-	result, ok := from.(*Result)
-	if !ok {
+	if result, ok = from.(Result); !ok {
 		return nil, newDriverError("expected from to be a result but it was '%v'", from)
 	}
 
-	return result.Single()
+	if result.Next() {
+		record = result.Record()
+	}
+
+	if err := result.Err(); err != nil {
+		return nil, err
+	}
+
+	if record == nil {
+		return nil, newDriverError("result contains no records")
+	}
+
+	if result.Next() {
+		return nil, newDriverError("result contains more than one record")
+	}
+
+	return record, nil
 }
 
 // Collect loops through the result stream, collects records into a slice and returns the
 // resulting slice. Any error passed in or reported while navigating the result stream is
 // returned without any conversion.
-// TODO: Show example with tx func
 func Collect(from interface{}, err error) ([]*Record, error) {
+	var result Result
+	var list []*Record
+	var ok bool
+
 	if err != nil {
 		return nil, err
 	}
 
-	result, ok := from.(*Result)
-	if !ok {
+	if result, ok = from.(Result); !ok {
 		return nil, newDriverError("expected from to be a result but it was '%v'", from)
 	}
 
-	return result.Collect()
+	for result.Next() {
+		list = append(list, result.Record())
+	}
+	if err := result.Err(); err != nil {
+		return nil, err
+	}
+
+	return list, nil
 }

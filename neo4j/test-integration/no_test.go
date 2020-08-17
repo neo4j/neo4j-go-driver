@@ -65,7 +65,7 @@ func createRandomNode(t *testing.T, sess neo4j.Session) int64 {
 			return nil, err
 		}
 		res.Next()
-		return res.Record.Values[0], nil
+		return res.Record().Values[0], nil
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -83,7 +83,7 @@ func findRandomNode(t *testing.T, sess neo4j.Session, randomId int64) *neo4j.Nod
 		if !res.Next() {
 			return nil, nil
 		}
-		return res.Record.Values[0], nil
+		return res.Record().Values[0], nil
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -124,7 +124,7 @@ func single(t *testing.T, driver neo4j.Driver, cypher string, params map[string]
 	if !result.Next() {
 		t.Fatalf("No result or error retrieving result: %s", result.Err())
 	}
-	val := result.Record.Values[0]
+	val := result.Record().Values[0]
 	_, err = result.Consume()
 	if err != nil {
 		t.Fatal(err)

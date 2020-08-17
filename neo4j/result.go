@@ -25,12 +25,25 @@ import (
 	"github.com/neo4j/neo4j-go-driver/v4/neo4j/db"
 )
 
-type Result struct {
-	// Keys available on the result set.
-	Keys []string
-	// Current record. Initially nil, set by a succesfull call to Next()
-	Record *db.Record
+type Result interface {
+	// Keys returns the keys available on the result set.
+	Keys() ([]string, error)
+	// Next returns true only if there is a record to be processed.
+	Next() bool
+	// Err returns the latest error that caused this Next to return false.
+	Err() error
+	// Record returns the current record.
+	Record() *Record
+	// Consume discards all remaining records and returns the summary information
+	// about the statement execution.
+	Consume() (ResultSummary, error)
+}
 
+type iterator interface {
+	Next(s db.Handle) (*Record, *db.Summary, error)
+}
+
+type result struct {
 	err         error
 	iter        iterator
 	stream      *db.Stream
@@ -38,25 +51,21 @@ type Result struct {
 	params      map[string]interface{}
 	allReceived bool
 	unconsumed  list.List
+	record      *Record
 	summary     *db.Summary
 }
 
-type iterator interface {
-	Next(s db.Handle) (*Record, *db.Summary, error)
-}
-
-func newResult(iter iterator, stream *db.Stream, cypher string, params map[string]interface{}) *Result {
-	return &Result{
-		Keys:   stream.Keys,
+func newResult(iter iterator, str *db.Stream, cypher string, params map[string]interface{}) *result {
+	return &result{
 		iter:   iter,
-		stream: stream,
+		stream: str,
 		cypher: cypher,
 		params: params,
 	}
 }
 
 // Receive another record.
-func (r *Result) doFetch() *Record {
+func (r *result) doFetch() *Record {
 	var rec *Record
 	var sum *db.Summary
 	rec, sum, r.err = r.iter.Next(r.stream.Handle)
@@ -65,34 +74,47 @@ func (r *Result) doFetch() *Record {
 	return rec
 }
 
-// Next returns true only if there is a record to be processed.
-func (r *Result) Next() bool {
+func (r *result) Keys() ([]string, error) {
+	if r.err != nil {
+		return nil, r.err
+	}
+	return r.stream.Keys, nil
+}
+
+func (r *result) Next() bool {
 	e := r.unconsumed.Front()
 	if e == nil {
 		// All has been received and consumed
 		if r.allReceived {
-			r.Record = nil
+			r.record = nil
 			return false
 		}
 
 		// Receive another record
-		r.Record = r.doFetch()
-		return r.Record != nil
+		r.record = r.doFetch()
+		return r.record != nil
 	}
 
 	// Remove the record from list of unconsumed and return it
 	r.unconsumed.Remove(e)
-	r.Record = e.Value.(*Record)
+	r.record = e.Value.(*Record)
 	return true
 }
 
-// Err returns the latest error that caused Next to return false or Consume to fail.
-func (r *Result) Err() error {
+func (r *result) Record() *Record {
+	// Unbox for better client experience
+	if r.record == nil {
+		return nil
+	}
+	return r.record
+}
+
+func (r *result) Err() error {
 	return r.err
 }
 
 // Used internally to fetch all records from stream and put them in unconsumed list.
-func (r *Result) fetchAll() {
+func (r *result) fetchAll() {
 	for !r.allReceived {
 		rec := r.doFetch()
 		if rec != nil {
@@ -101,11 +123,7 @@ func (r *Result) fetchAll() {
 	}
 }
 
-// Consume discards all remaining records and returns the summary information
-// about the statement execution.
-// Should be called when records of resultset if of no interest to indicate
-// to the driver that records don't need to be buffered in memory.
-func (r *Result) Consume() (ResultSummary, error) {
+func (r *result) Consume() (ResultSummary, error) {
 	for !r.allReceived {
 		r.doFetch()
 	}
@@ -117,34 +135,4 @@ func (r *Result) Consume() (ResultSummary, error) {
 		cypher: r.cypher,
 		params: r.params,
 	}, nil
-}
-
-// Collect loops through the result, collects records into a slice and returns the
-// resulting slice.
-func (r *Result) Collect() ([]*Record, error) {
-	list := make([]*Record, 0, 100)
-	for r.Next() {
-		list = append(list, r.Record)
-	}
-	if r.err != nil {
-		return nil, r.err
-	}
-	return list, nil
-}
-
-// Single returns one and only one record from the result stream.
-// If the result contains zero or more than one record error is returned.
-func (r *Result) Single() (*Record, error) {
-	r.Next()
-	if r.err != nil {
-		return nil, r.err
-	}
-	record := r.Record
-	if record == nil {
-		return nil, newDriverError("result contains no records")
-	}
-	if r.Next() {
-		return nil, newDriverError("result contains more than one record")
-	}
-	return record, nil
 }

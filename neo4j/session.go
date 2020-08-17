@@ -50,7 +50,7 @@ type Session interface {
 	// retry logic in place
 	WriteTransaction(work TransactionWork, configurers ...func(*TransactionConfig)) (interface{}, error)
 	// Run executes an auto-commit statement and returns a result
-	Run(cypher string, params map[string]interface{}, configurers ...func(*TransactionConfig)) (*Result, error)
+	Run(cypher string, params map[string]interface{}, configurers ...func(*TransactionConfig)) (Result, error)
 	// Close closes any open resources and marks this session as unusable
 	Close() error
 }
@@ -77,7 +77,7 @@ type session struct {
 	router       sessionRouter
 	conn         db.Connection
 	inTx         bool
-	res          *Result
+	res          *result
 	sleep        func(d time.Duration)
 	now          func() time.Time
 	logId        string
@@ -196,7 +196,7 @@ func (s *session) beginTransaction(mode db.AccessMode, config *TransactionConfig
 	// with the connection since the handle is invalid. Also use local connection variable
 	// to avoid relying on state.
 	return &transaction{
-		run: func(cypher string, params map[string]interface{}) (*Result, error) {
+		run: func(cypher string, params map[string]interface{}) (Result, error) {
 			// The previous result should receive all records
 			err := s.fetchAllInCurrentResult()
 			if err != nil {
@@ -427,7 +427,7 @@ func (s *session) fetchAllInCurrentResult() error {
 }
 
 func (s *session) Run(
-	cypher string, params map[string]interface{}, configurers ...func(*TransactionConfig)) (*Result, error) {
+	cypher string, params map[string]interface{}, configurers ...func(*TransactionConfig)) (Result, error) {
 
 	if s.inTx {
 		err := errors.New("Trying to run auto-commit transaction while in explicit transaction")
