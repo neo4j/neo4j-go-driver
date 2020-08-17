@@ -70,8 +70,9 @@ func Collect(from interface{}, err error) ([]*Record, error) {
 		return nil, newDriverError("expected from to be a result but it was '%v'", from)
 	}
 
-	for result.Next() {
-		list = append(list, result.Record())
+	var record *Record
+	for result.NextRecord(&record) {
+		list = append(list, record)
 	}
 	if err := result.Err(); err != nil {
 		return nil, err

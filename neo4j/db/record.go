@@ -34,7 +34,7 @@ type Record struct {
 // values from Values slice directly or make a key -> index map before iterating. This implementation
 // does not make or use a key -> index map since the overhead of making the map might not be beneficial
 // for small and few records.
-func (r *Record) Get(key string) (interface{}, bool) {
+func (r Record) Get(key string) (interface{}, bool) {
 	for i, ckey := range r.Keys {
 		if key == ckey {
 			return r.Values[i], true
@@ -46,6 +46,6 @@ func (r *Record) Get(key string) (interface{}, bool) {
 // GetByIndex returns the value in the record at the specified index.
 //
 // Deprecated: Prefer to access Values directly instead.
-func (r *Record) GetByIndex(i int) interface{} {
+func (r Record) GetByIndex(i int) interface{} {
 	return r.Values[i]
 }

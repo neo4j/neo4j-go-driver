@@ -30,6 +30,9 @@ type Result interface {
 	Keys() ([]string, error)
 	// Next returns true only if there is a record to be processed.
 	Next() bool
+	// NextRecord returns true if there is a record to be processed, record parameter is set
+	// to point to current record.
+	NextRecord(record **Record) bool
 	// Err returns the latest error that caused this Next to return false.
 	Err() error
 	// Record returns the current record.
@@ -81,24 +84,37 @@ func (r *result) Keys() ([]string, error) {
 	return r.stream.Keys, nil
 }
 
-func (r *result) Next() bool {
+func (r *result) next() {
 	e := r.unconsumed.Front()
 	if e == nil {
 		// All has been received and consumed
 		if r.allReceived {
 			r.record = nil
-			return false
+			return
 		}
 
 		// Receive another record
 		r.record = r.doFetch()
-		return r.record != nil
+		return
 	}
 
 	// Remove the record from list of unconsumed and return it
 	r.unconsumed.Remove(e)
 	r.record = e.Value.(*Record)
-	return true
+	return
+}
+
+func (r *result) Next() bool {
+	r.next()
+	return r.record != nil
+}
+
+func (r *result) NextRecord(record **Record) bool {
+	r.next()
+	if record != nil {
+		*record = r.record
+	}
+	return r.record != nil
 }
 
 func (r *result) Record() *Record {
