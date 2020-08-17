@@ -80,7 +80,7 @@ func TestResult(ot *testing.T) {
 	ot.Run("Initialization", func(t *testing.T) {
 		fetcher := &testFetcher{}
 		res := newResult(fetcher, stream, cypher, params)
-		rec := res.Record
+		rec := res.Record()
 		if rec != nil {
 			t.Errorf("Should be no record")
 		}
@@ -168,7 +168,7 @@ func TestResult(ot *testing.T) {
 				if gotNext != call.expectNext {
 					t.Fatalf("Next at iter %d returned %t but expected to return %t", i, gotNext, call.expectNext)
 				}
-				gotRec := res.Record
+				gotRec := res.Record()
 				if (gotRec == nil) != (call.expectRec == nil) {
 					if gotRec == nil {
 						t.Fatalf("Expected to get record but didn't at iter %d", i)

@@ -65,7 +65,7 @@ var _ = Describe("Authentication", func() {
 			Expect(err).To(BeNil())
 
 			if result.Next() {
-				Expect(result.Record.Values[0]).Should(BeEquivalentTo(1))
+				Expect(result.Record().Values[0]).Should(BeEquivalentTo(1))
 			}
 			Expect(result.Next()).To(BeFalse())
 			Expect(result.Err()).To(BeNil())

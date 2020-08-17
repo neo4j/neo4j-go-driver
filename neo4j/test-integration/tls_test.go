@@ -46,7 +46,7 @@ var _ = Describe("Trust", func() {
 	verifySuccessfulConnection := func(uri string, strategy neo4j.TrustStrategy) {
 		var driver neo4j.Driver
 		var session neo4j.Session
-		var result *neo4j.Result
+		var result neo4j.Result
 		var resultSummary neo4j.ResultSummary
 		var err error
 

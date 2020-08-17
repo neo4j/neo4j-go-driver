@@ -49,7 +49,7 @@ func Test_Query(t *testing.T) {
 
 		var count int64
 		for result.Next() {
-			if x, ok := result.Record.Get("x"); ok {
+			if x, ok := result.Record().Get("x"); ok {
 				count += x.(int64)
 			}
 		}

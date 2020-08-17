@@ -36,7 +36,7 @@ var _ = Describe("Types", func() {
 	var err error
 	var driver neo4j.Driver
 	var session neo4j.Session
-	var result *neo4j.Result
+	var result neo4j.Result
 
 	BeforeEach(func() {
 		server, err = control.EnsureSingleInstance()
@@ -68,7 +68,7 @@ var _ = Describe("Types", func() {
 		Expect(err).To(BeNil())
 
 		if result.Next() {
-			Expect(result.Record.Values[0]).To(Equal(value))
+			Expect(result.Record().Values[0]).To(Equal(value))
 		}
 		Expect(result.Next()).To(BeFalse())
 		Expect(result.Err()).To(BeNil())
@@ -80,8 +80,8 @@ var _ = Describe("Types", func() {
 		Expect(err).To(BeNil())
 
 		if result.Next() {
-			Expect(result.Record.Values[0]).To(BeAssignableToTypeOf(int64(0)))
-			Expect(result.Record.Values[0]).To(BeNumerically("==", value))
+			Expect(result.Record().Values[0]).To(BeAssignableToTypeOf(int64(0)))
+			Expect(result.Record().Values[0]).To(BeNumerically("==", value))
 		}
 		Expect(result.Next()).To(BeFalse())
 		Expect(result.Err()).To(BeNil())
@@ -93,8 +93,8 @@ var _ = Describe("Types", func() {
 		Expect(err).To(BeNil())
 
 		if result.Next() {
-			Expect(result.Record.Values[0]).To(BeAssignableToTypeOf(int64(0)))
-			Expect(result.Record.Values[0]).To(BeNumerically("==", value))
+			Expect(result.Record().Values[0]).To(BeAssignableToTypeOf(int64(0)))
+			Expect(result.Record().Values[0]).To(BeNumerically("==", value))
 		}
 		Expect(result.Next()).To(BeFalse())
 		Expect(result.Err()).To(BeNil())
@@ -106,8 +106,8 @@ var _ = Describe("Types", func() {
 		Expect(err).To(BeNil())
 
 		if result.Next() {
-			Expect(result.Record.Values[0]).To(BeAssignableToTypeOf(int64(0)))
-			Expect(result.Record.Values[0]).To(BeNumerically("==", value))
+			Expect(result.Record().Values[0]).To(BeAssignableToTypeOf(int64(0)))
+			Expect(result.Record().Values[0]).To(BeNumerically("==", value))
 		}
 		Expect(result.Next()).To(BeFalse())
 		Expect(result.Err()).To(BeNil())
@@ -119,8 +119,8 @@ var _ = Describe("Types", func() {
 		Expect(err).To(BeNil())
 
 		if result.Next() {
-			Expect(result.Record.Values[0]).To(BeAssignableToTypeOf(int64(0)))
-			Expect(result.Record.Values[0]).To(BeNumerically("==", value))
+			Expect(result.Record().Values[0]).To(BeAssignableToTypeOf(int64(0)))
+			Expect(result.Record().Values[0]).To(BeNumerically("==", value))
 		}
 		Expect(result.Next()).To(BeFalse())
 		Expect(result.Err()).To(BeNil())
@@ -132,8 +132,8 @@ var _ = Describe("Types", func() {
 		Expect(err).To(BeNil())
 
 		if result.Next() {
-			Expect(result.Record.Values[0]).To(BeAssignableToTypeOf(int64(0)))
-			Expect(result.Record.Values[0]).To(BeNumerically("==", value))
+			Expect(result.Record().Values[0]).To(BeAssignableToTypeOf(int64(0)))
+			Expect(result.Record().Values[0]).To(BeNumerically("==", value))
 		}
 		Expect(result.Next()).To(BeFalse())
 		Expect(result.Err()).To(BeNil())
@@ -145,8 +145,8 @@ var _ = Describe("Types", func() {
 		Expect(err).To(BeNil())
 
 		if result.Next() {
-			Expect(result.Record.Values[0]).To(BeAssignableToTypeOf(int64(0)))
-			Expect(result.Record.Values[0]).To(BeNumerically("==", value))
+			Expect(result.Record().Values[0]).To(BeAssignableToTypeOf(int64(0)))
+			Expect(result.Record().Values[0]).To(BeNumerically("==", value))
 		}
 		Expect(result.Next()).To(BeFalse())
 		Expect(result.Err()).To(BeNil())
@@ -158,8 +158,8 @@ var _ = Describe("Types", func() {
 		Expect(err).To(BeNil())
 
 		if result.Next() {
-			Expect(result.Record.Values[0]).To(BeAssignableToTypeOf(float64(0)))
-			Expect(result.Record.Values[0]).To(BeNumerically("==", value))
+			Expect(result.Record().Values[0]).To(BeAssignableToTypeOf(float64(0)))
+			Expect(result.Record().Values[0]).To(BeNumerically("==", value))
 		}
 		Expect(result.Next()).To(BeFalse())
 		Expect(result.Err()).To(BeNil())
@@ -171,8 +171,8 @@ var _ = Describe("Types", func() {
 		Expect(err).To(BeNil())
 
 		if result.Next() {
-			Expect(result.Record.Values[0]).To(BeAssignableToTypeOf(float64(0)))
-			Expect(result.Record.Values[0]).To(BeNumerically("==", value))
+			Expect(result.Record().Values[0]).To(BeAssignableToTypeOf(float64(0)))
+			Expect(result.Record().Values[0]).To(BeNumerically("==", value))
 		}
 		Expect(result.Next()).To(BeFalse())
 		Expect(result.Err()).To(BeNil())
@@ -184,8 +184,8 @@ var _ = Describe("Types", func() {
 		Expect(err).To(BeNil())
 
 		if result.Next() {
-			Expect(result.Record.Values[0]).To(BeAssignableToTypeOf(""))
-			Expect(result.Record.Values[0]).To(Equal(value))
+			Expect(result.Record().Values[0]).To(BeAssignableToTypeOf(""))
+			Expect(result.Record().Values[0]).To(Equal(value))
 		}
 		Expect(result.Next()).To(BeFalse())
 		Expect(result.Err()).To(BeNil())
@@ -197,8 +197,8 @@ var _ = Describe("Types", func() {
 		Expect(err).To(BeNil())
 
 		if result.Next() {
-			Expect(result.Record.Values[0]).To(BeAssignableToTypeOf([]byte(nil)))
-			Expect(result.Record.Values[0]).To(BeEquivalentTo(value))
+			Expect(result.Record().Values[0]).To(BeAssignableToTypeOf([]byte(nil)))
+			Expect(result.Record().Values[0]).To(BeEquivalentTo(value))
 		}
 		Expect(result.Next()).To(BeFalse())
 		Expect(result.Err()).To(BeNil())
@@ -210,8 +210,8 @@ var _ = Describe("Types", func() {
 		Expect(err).To(BeNil())
 
 		if result.Next() {
-			Expect(result.Record.Values[0]).To(BeAssignableToTypeOf([]interface{}(nil)))
-			Expect(result.Record.Values[0]).To(Equal([]interface{}{value[0], value[1], value[2], value[3]}))
+			Expect(result.Record().Values[0]).To(BeAssignableToTypeOf([]interface{}(nil)))
+			Expect(result.Record().Values[0]).To(Equal([]interface{}{value[0], value[1], value[2], value[3]}))
 		}
 		Expect(result.Next()).To(BeFalse())
 		Expect(result.Err()).To(BeNil())
@@ -223,8 +223,8 @@ var _ = Describe("Types", func() {
 		Expect(err).To(BeNil())
 
 		if result.Next() {
-			Expect(result.Record.Values[0]).To(BeAssignableToTypeOf([]interface{}(nil)))
-			Expect(result.Record.Values[0]).To(Equal([]interface{}{int64(1), int64(2), int64(3), int64(4), int64(5)}))
+			Expect(result.Record().Values[0]).To(BeAssignableToTypeOf([]interface{}(nil)))
+			Expect(result.Record().Values[0]).To(Equal([]interface{}{int64(1), int64(2), int64(3), int64(4), int64(5)}))
 		}
 		Expect(result.Next()).To(BeFalse())
 		Expect(result.Err()).To(BeNil())
@@ -236,8 +236,8 @@ var _ = Describe("Types", func() {
 		Expect(err).To(BeNil())
 
 		if result.Next() {
-			Expect(result.Record.Values[0]).To(BeAssignableToTypeOf([]interface{}(nil)))
-			Expect(result.Record.Values[0]).To(Equal([]interface{}{1.11, 2.22, 3.33, 4.44, 5.55}))
+			Expect(result.Record().Values[0]).To(BeAssignableToTypeOf([]interface{}(nil)))
+			Expect(result.Record().Values[0]).To(Equal([]interface{}{1.11, 2.22, 3.33, 4.44, 5.55}))
 		}
 		Expect(result.Next()).To(BeFalse())
 		Expect(result.Err()).To(BeNil())
@@ -249,8 +249,8 @@ var _ = Describe("Types", func() {
 		Expect(err).To(BeNil())
 
 		if result.Next() {
-			Expect(result.Record.Values[0]).To(BeAssignableToTypeOf([]interface{}(nil)))
-			Expect(result.Record.Values[0]).To(Equal([]interface{}{"a", "b", "c", "d", "e"}))
+			Expect(result.Record().Values[0]).To(BeAssignableToTypeOf([]interface{}(nil)))
+			Expect(result.Record().Values[0]).To(Equal([]interface{}{"a", "b", "c", "d", "e"}))
 		}
 		Expect(result.Next()).To(BeFalse())
 		Expect(result.Err()).To(BeNil())
@@ -273,8 +273,8 @@ var _ = Describe("Types", func() {
 		Expect(err).To(BeNil())
 
 		if result.Next() {
-			Expect(result.Record.Values[0]).To(BeAssignableToTypeOf(""))
-			Expect(result.Record.Values[0]).To(Equal(value))
+			Expect(result.Record().Values[0]).To(BeAssignableToTypeOf(""))
+			Expect(result.Record().Values[0]).To(Equal(value))
 		}
 		Expect(result.Next()).To(BeFalse())
 		Expect(result.Err()).To(BeNil())
@@ -285,7 +285,7 @@ var _ = Describe("Types", func() {
 		Expect(err).To(BeNil())
 
 		if result.Next() {
-			node := result.Record.Values[0].(neo4j.Node)
+			node := result.Record().Values[0].(neo4j.Node)
 
 			Expect(node).NotTo(BeNil())
 			Expect(node.Id).NotTo(BeNil())
@@ -305,9 +305,9 @@ var _ = Describe("Types", func() {
 		Expect(err).To(BeNil())
 
 		if result.Next() {
-			employee := result.Record.Values[0].(neo4j.Node)
-			worksFor := result.Record.Values[1].(neo4j.Relationship)
-			manager := result.Record.Values[2].(neo4j.Node)
+			employee := result.Record().Values[0].(neo4j.Node)
+			worksFor := result.Record().Values[1].(neo4j.Relationship)
+			manager := result.Record().Values[2].(neo4j.Node)
 
 			Expect(employee).NotTo(BeNil())
 			Expect(employee.Id).NotTo(BeNil())
@@ -344,10 +344,10 @@ var _ = Describe("Types", func() {
 		Expect(err).To(BeNil())
 
 		if result.Next() {
-			path := result.Record.Values[0].(neo4j.Path)
-			employee := result.Record.Values[1].(neo4j.Node)
-			worksFor := result.Record.Values[2].(neo4j.Relationship)
-			manager := result.Record.Values[3].(neo4j.Node)
+			path := result.Record().Values[0].(neo4j.Path)
+			employee := result.Record().Values[1].(neo4j.Node)
+			worksFor := result.Record().Values[2].(neo4j.Relationship)
+			manager := result.Record().Values[3].(neo4j.Node)
 
 			Expect(path).NotTo(BeNil())
 			Expect(path.Nodes).To(HaveLen(2))
@@ -382,12 +382,12 @@ var _ = Describe("Types", func() {
 		Expect(err).To(BeNil())
 
 		if result.Next() {
-			path := result.Record.Values[0].(neo4j.Path)
-			employee := result.Record.Values[1].(neo4j.Node)
-			lead := result.Record.Values[2].(neo4j.Node)
-			manager := result.Record.Values[3].(neo4j.Node)
-			ledBy := result.Record.Values[4].(neo4j.Relationship)
-			reportsTo := result.Record.Values[5].(neo4j.Relationship)
+			path := result.Record().Values[0].(neo4j.Path)
+			employee := result.Record().Values[1].(neo4j.Node)
+			lead := result.Record().Values[2].(neo4j.Node)
+			manager := result.Record().Values[3].(neo4j.Node)
+			ledBy := result.Record().Values[4].(neo4j.Relationship)
+			reportsTo := result.Record().Values[5].(neo4j.Relationship)
 
 			Expect(path).NotTo(BeNil())
 			Expect(path.Nodes).To(HaveLen(3))
@@ -408,7 +408,7 @@ var _ = Describe("Types", func() {
 			Expect(err).To(BeNil())
 
 			if result.Next() {
-				Expect(result.Record.Values[0]).To(BeNil())
+				Expect(result.Record().Values[0]).To(BeNil())
 			}
 			Expect(result.Next()).To(BeFalse())
 			Expect(result.Err()).To(BeNil())
@@ -585,7 +585,7 @@ var _ = Describe("Types", func() {
 				Expect(err).To(BeNil())
 
 				if result.Next() {
-					Expect(result.Record.Values[0]).To(BeNil())
+					Expect(result.Record().Values[0]).To(BeNil())
 				}
 				Expect(result.Next()).To(BeFalse())
 				Expect(result.Err()).To(BeNil())
@@ -659,8 +659,8 @@ var _ = Describe("Types", func() {
 				Expect(err).To(BeNil())
 
 				if result.Next() {
-					assertEquals(result.Record.Values[0])
-					assertEquals(result.Record.Values[1])
+					assertEquals(result.Record().Values[0])
+					assertEquals(result.Record().Values[1])
 				}
 				Expect(result.Next()).To(BeFalse())
 				Expect(result.Err()).To(BeNil())
