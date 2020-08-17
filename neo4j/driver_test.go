@@ -31,25 +31,25 @@ import (
 	"github.com/neo4j/neo4j-go-driver/v4/neo4j/internal/router"
 )
 
-func assertNoRouter(t *testing.T, d *Driver) {
+func assertNoRouter(t *testing.T, d Driver) {
 	t.Helper()
-	_, isDirectRouter := d.router.(*directRouter)
+	_, isDirectRouter := d.(*driver).router.(*directRouter)
 	if !isDirectRouter {
 		t.Error("Expected no router")
 	}
 }
 
-func assertRouter(t *testing.T, d *Driver) {
+func assertRouter(t *testing.T, d Driver) {
 	t.Helper()
-	_, isRouter := d.router.(*router.Router)
+	_, isRouter := d.(*driver).router.(*router.Router)
 	if !isRouter {
 		t.Error("Expected router")
 	}
 }
 
-func assertRouterContext(t *testing.T, d *Driver, context map[string]string) {
+func assertRouterContext(t *testing.T, d Driver, context map[string]string) {
 	t.Helper()
-	r := d.router.(*router.Router)
+	r := d.(*driver).router.(*router.Router)
 	c := r.Context()
 	if !reflect.DeepEqual(c, context) {
 		t.Errorf("Router contexts differ: %#v vs %#v", c, context)

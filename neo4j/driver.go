@@ -46,7 +46,6 @@ const (
 
 // Driver represents a pool(s) of connections to a neo4j server or cluster. It's
 // safe for concurrent use.
-/*
 type Driver interface {
 	// The url this driver is bootstrapped
 	Target() url.URL
@@ -61,7 +60,6 @@ type Driver interface {
 	// Close the driver and all underlying connections
 	Close() error
 }
-*/
 
 // NewDriver is the entry point to the neo4j driver to create an instance of a Driver. It is the first function to
 // be called in order to establish a connection to a neo4j database. It requires a Bolt URI and an authentication
@@ -79,7 +77,7 @@ type Driver interface {
 //	driver, err = NewDriver(uri, BasicAuth(username, password), function (config *Config) {
 // 		config.MaxConnectionPoolSize = 10
 // 	})
-func NewDriver(target string, auth AuthToken, configurers ...func(*Config)) (*Driver, error) {
+func NewDriver(target string, auth AuthToken, configurers ...func(*Config)) (Driver, error) {
 	parsed, err := url.Parse(target)
 	if err != nil {
 		return nil, err
@@ -149,7 +147,7 @@ func NewDriver(target string, auth AuthToken, configurers ...func(*Config)) (*Dr
 		sessRouter = router.New(parsed.Host, routersResolver, routingContext, pool, logger)
 	}
 
-	driver := &Driver{
+	driver := &driver{
 		target: parsed,
 		config: config,
 		pool:   pool,
@@ -190,7 +188,7 @@ type sessionRouter interface {
 	CleanUp()
 }
 
-type Driver struct {
+type driver struct {
 	target *url.URL
 	config *Config
 	pool   *pool.Pool
@@ -200,11 +198,11 @@ type Driver struct {
 	log    log.Logger
 }
 
-func (d *Driver) Target() url.URL {
+func (d *driver) Target() url.URL {
 	return *d.target
 }
 
-func (d *Driver) Session(accessMode AccessMode, bookmarks ...string) (Session, error) {
+func (d *driver) Session(accessMode AccessMode, bookmarks ...string) (Session, error) {
 	d.mut.Lock()
 	defer d.mut.Unlock()
 	if d.pool == nil {
@@ -215,7 +213,7 @@ func (d *Driver) Session(accessMode AccessMode, bookmarks ...string) (Session, e
 		d.pool, db.AccessMode(accessMode), bookmarks, db.DefaultDatabase, d.log), nil
 }
 
-func (d *Driver) NewSession(config SessionConfig) (Session, error) {
+func (d *driver) NewSession(config SessionConfig) (Session, error) {
 	databaseName := db.DefaultDatabase
 	if config.DatabaseName != "" {
 		databaseName = config.DatabaseName
@@ -231,7 +229,7 @@ func (d *Driver) NewSession(config SessionConfig) (Session, error) {
 		d.pool, db.AccessMode(config.AccessMode), config.Bookmarks, databaseName, d.log), nil
 }
 
-func (d *Driver) VerifyConnectivity() error {
+func (d *driver) VerifyConnectivity() error {
 	session, err := d.NewSession(SessionConfig{AccessMode: AccessModeRead})
 	if err != nil {
 		return err
@@ -244,7 +242,7 @@ func (d *Driver) VerifyConnectivity() error {
 	return err
 }
 
-func (d *Driver) Close() error {
+func (d *driver) Close() error {
 	d.mut.Lock()
 	defer d.mut.Unlock()
 	// Safeguard against closing more than once

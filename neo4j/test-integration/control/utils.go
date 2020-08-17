@@ -113,7 +113,7 @@ func executeCommand(command string, arguments ...string) (string, error) {
 	return stdoutBuf.String(), nil
 }
 
-func deleteData(driver *neo4j.Driver) error {
+func deleteData(driver neo4j.Driver) error {
 	session, err := driver.Session(neo4j.AccessModeWrite)
 	if err != nil {
 		return err

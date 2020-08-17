@@ -61,7 +61,7 @@ var _ = Describe("Driver", func() {
 	Context("Direct", func() {
 		var (
 			err     error
-			driver  *neo4j.Driver
+			driver  neo4j.Driver
 			session neo4j.Session
 			result  *neo4j.Result
 		)
@@ -123,7 +123,7 @@ var _ = Describe("Driver", func() {
 	Context("Pooling without Connection Acquisition Timeout", func() {
 		var (
 			err    error
-			driver *neo4j.Driver
+			driver neo4j.Driver
 		)
 
 		BeforeEach(func() {
@@ -168,7 +168,7 @@ var _ = Describe("Driver", func() {
 	Context("Pooling with Connection Acquisition Timeout", func() {
 		var (
 			err    error
-			driver *neo4j.Driver
+			driver neo4j.Driver
 		)
 
 		BeforeEach(func() {
