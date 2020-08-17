@@ -67,7 +67,7 @@ func TestDefaultConfig(t *testing.T) {
 
 func TestValidateAndNormaliseConfig(rt *testing.T) {
 
-	rt.Run("MaxTransactionRetryTime < 0", func(t *testing.T) {
+	rt.Run("MaxTransactionRetryTime less than zero", func(t *testing.T) {
 		config := defaultConfig()
 
 		config.MaxTransactionRetryTime = -1 * time.Second
@@ -77,7 +77,7 @@ func TestValidateAndNormaliseConfig(rt *testing.T) {
 		}
 	})
 
-	rt.Run("MaxConnectionPoolSize == 0", func(t *testing.T) {
+	rt.Run("MaxConnectionPoolSize equals zero", func(t *testing.T) {
 		config := defaultConfig()
 
 		config.MaxConnectionPoolSize = 0
@@ -87,7 +87,7 @@ func TestValidateAndNormaliseConfig(rt *testing.T) {
 		}
 	})
 
-	rt.Run("MaxConnectionPoolSize == -1", func(t *testing.T) {
+	rt.Run("MaxConnectionPoolSize less than zero", func(t *testing.T) {
 		config := defaultConfig()
 
 		config.MaxConnectionPoolSize = -1
@@ -100,7 +100,7 @@ func TestValidateAndNormaliseConfig(rt *testing.T) {
 		}
 	})
 
-	rt.Run("ConnectionAcquisitionTimeout == -1*time.Second", func(t *testing.T) {
+	rt.Run("ConnectionAcquisitionTimeout less than zero", func(t *testing.T) {
 		config := defaultConfig()
 
 		config.ConnectionAcquisitionTimeout = -1 * time.Second
@@ -113,7 +113,7 @@ func TestValidateAndNormaliseConfig(rt *testing.T) {
 		}
 	})
 
-	rt.Run("SocketConnectTimeout == -1*time.Second", func(t *testing.T) {
+	rt.Run("SocketConnectTimeout less than zero", func(t *testing.T) {
 		config := defaultConfig()
 
 		config.SocketConnectTimeout = -1 * time.Second
