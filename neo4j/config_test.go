@@ -21,97 +21,108 @@ package neo4j
 
 import (
 	"math"
+	"testing"
 	"time"
-
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
 )
 
-var _ = Describe("Config", func() {
-	Context("defaultConfig", func() {
+func TestDefaultConfig(t *testing.T) {
+	config := defaultConfig()
+
+	if config.Encrypted != true {
+		t.Errorf("should have TLS encryption enabled by default")
+	}
+
+	if config.TrustStrategy.skipVerifyHostname != true {
+		t.Errorf("should verify host name by default")
+	}
+
+	if config.TrustStrategy.skipVerify != true {
+		t.Errorf("should not verify TLS certificates by default")
+	}
+
+	if config.MaxTransactionRetryTime != 30*time.Second {
+		t.Errorf("should have max transaction retry duration set to 30 sconds by default")
+	}
+
+	if config.MaxConnectionPoolSize != 100 {
+		t.Errorf("should have max connection pool size set to 100 by default")
+	}
+
+	if config.MaxConnectionLifetime != 1*time.Hour {
+		t.Errorf("should have max connection lifetime set to 1 hour by default")
+	}
+
+	if config.ConnectionAcquisitionTimeout != 1*time.Minute {
+		t.Errorf("should have connection acquisition timeout set to 1 minute by default")
+	}
+
+	if config.SocketConnectTimeout != 5*time.Second {
+		t.Errorf("should have socket connect timeout set to 5 seconds by default")
+	}
+
+	if config.SocketKeepalive != true {
+		t.Errorf("should have socket keep alive enabled by default")
+	}
+}
+
+func TestValidateAndNormaliseConfig(rt *testing.T) {
+
+	rt.Run("MaxTransactionRetryTime less than zero", func(t *testing.T) {
 		config := defaultConfig()
 
-		It("should have encryption turned on", func() {
-			Expect(config.Encrypted).To(BeTrue())
-		})
-
-		It("should have trust strategy equal to TrustAny(false)", func() {
-			Expect(config.TrustStrategy).To(Equal(TrustAny(false)))
-		})
-
-		It("should have max transaction retry duration as 30s", func() {
-			Expect(config.MaxTransactionRetryTime).To(BeIdenticalTo(30 * time.Second))
-		})
-
-		It("should have max connection pool size to be 100", func() {
-			Expect(config.MaxConnectionPoolSize).To(BeEquivalentTo(100))
-		})
-
-		It("should have max connection lifetime to be 1h", func() {
-			Expect(config.MaxConnectionLifetime).To(BeIdenticalTo(1 * time.Hour))
-		})
-
-		It("should have connection acquisition timeout to be 1m", func() {
-			Expect(config.ConnectionAcquisitionTimeout).To(BeIdenticalTo(1 * time.Minute))
-		})
-
-		It("should have socket connect timeout to be 5s", func() {
-			Expect(config.SocketConnectTimeout).To(BeIdenticalTo(5 * time.Second))
-		})
-
-		It("should have socket keep alive enabled", func() {
-			Expect(config.SocketKeepalive).To(BeTrue())
-		})
+		config.MaxTransactionRetryTime = -1 * time.Second
+		err := validateAndNormaliseConfig(config)
+		if err == nil {
+			t.Errorf("MaxTransactionRetryTime is less than 0 but never returned an error")
+		}
 	})
 
-	Context("validateAndNormaliseConfig", func() {
-		It("should return error when MaxTransactionRetryTime is less than 0", func() {
-			config := defaultConfig()
-			config.MaxTransactionRetryTime = -1 * time.Second
+	rt.Run("MaxConnectionPoolSize equals zero", func(t *testing.T) {
+		config := defaultConfig()
 
-			err := validateAndNormaliseConfig(config)
-			Expect(err).NotTo(BeNil())
-			Expect(err.Error()).To(ContainSubstring("maximum transaction retry time cannot be smaller than 0"))
-		})
-
-		It("should return error when MaxConnectionPoolSize is 0", func() {
-			config := defaultConfig()
-			config.MaxConnectionPoolSize = 0
-
-			err := validateAndNormaliseConfig(config)
-			Expect(err).NotTo(BeNil())
-			Expect(err.Error()).To(ContainSubstring("maximum connection pool size cannot be 0"))
-		})
-
-		It("should normalize MaxConnectionPoolSize to MaxInt32 when negative", func() {
-			config := defaultConfig()
-			config.MaxConnectionPoolSize = -1
-
-			err := validateAndNormaliseConfig(config)
-			Expect(err).To(BeNil())
-
-			Expect(config.MaxConnectionPoolSize).To(Equal(math.MaxInt32))
-		})
-
-		It("should normalize ConnectionAcquisitionTimeout to -1ns when negative", func() {
-			config := defaultConfig()
-			config.ConnectionAcquisitionTimeout = -1 * time.Second
-
-			err := validateAndNormaliseConfig(config)
-			Expect(err).To(BeNil())
-
-			Expect(config.ConnectionAcquisitionTimeout).To(Equal(-1 * time.Nanosecond))
-		})
-
-		It("should normalize SocketConnectTimeout to 0 when negative", func() {
-			config := defaultConfig()
-			config.SocketConnectTimeout = -1 * time.Second
-
-			err := validateAndNormaliseConfig(config)
-			Expect(err).To(BeNil())
-
-			Expect(config.SocketConnectTimeout).To(Equal(0 * time.Nanosecond))
-		})
+		config.MaxConnectionPoolSize = 0
+		err := validateAndNormaliseConfig(config)
+		if err == nil {
+			t.Errorf("MaxConnectionPoolSize is 0 but never returned an error")
+		}
 	})
 
-})
+	rt.Run("MaxConnectionPoolSize less than zero", func(t *testing.T) {
+		config := defaultConfig()
+
+		config.MaxConnectionPoolSize = -1
+		err := validateAndNormaliseConfig(config)
+		if err != nil {
+			t.Errorf("MaxConnectionPoolSize is negative but returned an error")
+		}
+		if config.MaxConnectionPoolSize != math.MaxInt32 {
+			t.Errorf("MaxConnectionPoolSize should be set to math.MaxInt32 when negative")
+		}
+	})
+
+	rt.Run("ConnectionAcquisitionTimeout less than zero", func(t *testing.T) {
+		config := defaultConfig()
+
+		config.ConnectionAcquisitionTimeout = -1 * time.Second
+		err := validateAndNormaliseConfig(config)
+		if err != nil {
+			t.Errorf("ConnectionAcquisitionTimeout is negative but returned an error")
+		}
+		if config.ConnectionAcquisitionTimeout != -1*time.Nanosecond {
+			t.Errorf("MaxConnectionPoolSize should be set to (-1 * time.Nanosecond) when negative")
+		}
+	})
+
+	rt.Run("SocketConnectTimeout less than zero", func(t *testing.T) {
+		config := defaultConfig()
+
+		config.SocketConnectTimeout = -1 * time.Second
+		err := validateAndNormaliseConfig(config)
+		if err != nil {
+			t.Errorf("SocketConnectTimeout is negative but returned an error")
+		}
+		if config.SocketConnectTimeout != 0*time.Nanosecond {
+			t.Errorf("SocketConnectTimeout should be set to (0 * time.Nanosecond) when negative")
+		}
+	})
+}
