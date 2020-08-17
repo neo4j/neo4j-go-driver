@@ -83,7 +83,7 @@ func assertStringEq(t *testing.T, s1, s2 string) {
 	}
 }
 
-func newDriver(t *testing.T, uri string) *neo4j.Driver {
+func newDriver(t *testing.T, uri string) neo4j.Driver {
 	driver, err := neo4j.NewDriver(uri, neo4j.NoAuth(), func(config *neo4j.Config) {
 		config.Encrypted = false
 		config.Log = neo4j.ConsoleLogger(logLevel())
@@ -93,14 +93,14 @@ func newDriver(t *testing.T, uri string) *neo4j.Driver {
 	return driver
 }
 
-func createWriteSession(t *testing.T, driver *neo4j.Driver, bookmarks ...string) neo4j.Session {
+func createWriteSession(t *testing.T, driver neo4j.Driver, bookmarks ...string) neo4j.Session {
 	session, err := driver.Session(neo4j.AccessModeWrite, bookmarks...)
 	assertNoError(t, err)
 
 	return session
 }
 
-func createReadSession(t *testing.T, driver *neo4j.Driver, bookmarks ...string) neo4j.Session {
+func createReadSession(t *testing.T, driver neo4j.Driver, bookmarks ...string) neo4j.Session {
 	session, err := driver.Session(neo4j.AccessModeRead, bookmarks...)
 	assertNoError(t, err)
 

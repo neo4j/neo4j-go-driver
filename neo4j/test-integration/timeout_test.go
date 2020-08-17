@@ -45,7 +45,7 @@ var _ = Describe("Timeout and Lifetime", func() {
 
 	It("should error when ConnectionAcquisitionTimeout is hit", func() {
 		var err error
-		var driver *neo4j.Driver
+		var driver neo4j.Driver
 		var session1, session2 neo4j.Session
 
 		driver, err = neo4j.NewDriver(server.BoltURI(), server.AuthToken(), server.Config(), func(config *neo4j.Config) {
@@ -73,7 +73,7 @@ var _ = Describe("Timeout and Lifetime", func() {
 	/*
 		It("should close connection when MaxConnectionLifetime is hit", func() {
 			var err error
-			var driver *neo4j.Driver
+			var driver neo4j.Driver
 			var session1, session2 neo4j.Session
 
 			driver, err = neo4j.NewDriver(server.BoltURI(), server.AuthToken(), server.Config(), func(config *neo4j.Config) {
@@ -99,7 +99,7 @@ var _ = Describe("Timeout and Lifetime", func() {
 
 	It("should timeout connection when SocketConnectTimeout is hit", func() {
 		var err error
-		var driver *neo4j.Driver
+		var driver neo4j.Driver
 		var session neo4j.Session
 
 		driver, err = neo4j.NewDriver("bolt://10.255.255.1:8080", server.AuthToken(), server.Config(), func(config *neo4j.Config) {

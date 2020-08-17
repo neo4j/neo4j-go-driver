@@ -71,7 +71,7 @@ var _ = Describe("Stress Test", func() {
 
 	Context("Single Instance", func() {
 		var ctx *stress.TestContext
-		var driver *neo4j.Driver
+		var driver neo4j.Driver
 		var server *control.SingleInstance
 		var err error
 		var successfulQueryExecutors []func(*stress.TestContext)
@@ -129,7 +129,7 @@ var _ = Describe("Stress Test", func() {
 	/*
 		Context("Causal Cluster", func() {
 			var ctx *stress.TestContext
-			var driver *neo4j.Driver
+			var driver neo4j.Driver
 			var cluster *control.Cluster
 			var err error
 			var successfulQueryExecutors []func(*stress.TestContext)
