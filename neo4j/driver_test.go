@@ -24,10 +24,6 @@ import (
 	"strings"
 	"testing"
 
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/ginkgo/extensions/table"
-	. "github.com/onsi/gomega"
-
 	"github.com/neo4j/neo4j-go-driver/v4/neo4j/internal/router"
 )
 
@@ -84,150 +80,210 @@ func assertStringContain(t *testing.T, str, substr string) {
 	}
 }
 
-func TestDriverN(t0 *testing.T) {
-	t0.Run("URI", func(t1 *testing.T) {
-		t1.Run("Should support bolt:// scheme", func(t *testing.T) {
-			driver, err := NewDriver("bolt://localhost:7687", NoAuth())
+func TestDriverURISchemes(t *testing.T) {
 
-			assertNoError(t, err)
-			assertStringEqual(t, driver.Target().Scheme, "bolt")
-			assertNoRouter(t, driver)
-		})
-
-		t1.Run("should support neo4j:// scheme", func(t *testing.T) {
-			driver, err := NewDriver("neo4j://localhost:7687", NoAuth())
-
-			assertNoError(t, err)
-			assertStringEqual(t, driver.Target().Scheme, "neo4j")
-			assertRouter(t, driver)
-		})
-
-		t1.Run("should error anotherscheme:// scheme", func(t *testing.T) {
-			_, err := NewDriver("anotherscheme://localhost:7687", NoAuth())
-
-			assertError(t, err)
-			assertStringContain(t, err.Error(), "scheme")
-		})
-
-		t1.Run("should support neo4j:// routing context", func(t *testing.T) {
-			driver, err := NewDriver("neo4j://localhost:7687?x=y&a=b", NoAuth())
-
-			assertNoError(t, err)
-			assertRouterContext(t, driver, map[string]string{"x": "y", "a": "b"})
-		})
-
-		t1.Run("should error neo4j:// routing context with duplicate keys", func(t *testing.T) {
-			_, err := NewDriver("neo4j://localhost:7687?x=y&x=b", NoAuth())
-
-			assertError(t, err)
-		})
-
-		t1.Run("should default to port 7687 neo4j://localhost", func(t *testing.T) {
-			driver, err := NewDriver("neo4j://localhost?x=y&a=b", NoAuth())
-			driverTarget := driver.Target()
-
-			assertNoError(t, err)
-			assertStringEqual(t, driverTarget.Port(), "7687")
-		})
-	})
-}
-
-var _ = Describe("Driver", func() {
-	When("constructed with bolt://localhost:7687", func() {
+	t.Run("bolt://", func(t1 *testing.T) {
 		driver, err := NewDriver("bolt://localhost:7687", NoAuth())
 
-		It("no errors should be returned", func() {
-			Expect(err).To(BeNil())
-		})
+		assertNoError(t1, err)
+		assertStringEqual(t1, driver.Target().Scheme, "bolt")
+		assertNoRouter(t1, driver)
+	})
 
-		When("closed", func() {
-			err := driver.Close()
-			It("no errors should be returned", func() {
-				Expect(err).To(BeNil())
-			})
+	t.Run("neo4j://", func(t1 *testing.T) {
+		driver, err := NewDriver("neo4j://localhost:7687", NoAuth())
 
-			It("should not allow new read mode sessions", func() {
-				session, err := driver.Session(AccessModeRead)
-				Expect(err).NotTo(BeNil())
-				Expect(session).To(BeNil())
-			})
+		assertNoError(t1, err)
+		assertStringEqual(t1, driver.Target().Scheme, "neo4j")
+		assertRouter(t1, driver)
+	})
 
-			It("should not allow new write mode sessions", func() {
-				session, err := driver.Session(AccessModeWrite)
-				Expect(err).NotTo(BeNil())
-				Expect(session).To(BeNil())
-			})
+	//old bolt+routing should be removed in 4.0 and only use neo4j scheme
+	t.Run("bolt+routing://", func(t1 *testing.T) {
+		driver, err := NewDriver("bolt+routing://localhost:7687", NoAuth())
 
-			It("should allow more close calls", func() {
-				err := driver.Close()
-				Expect(err).To(BeNil())
-			})
-		})
+		assertNoError(t1, err)
+		assertStringEqual(t1, driver.Target().Scheme, "bolt+routing")
+		assertRouter(t1, driver)
+	})
 
+	//TODO
+	//bolt+ssc://
+	//neo4j+ssc://
+	//bolt+s://
+	//neo4j+s://
+}
+
+func TestDriverInvalidURISchemes(t *testing.T) {
+
+	t.Run("anotherscheme://", func(t1 *testing.T) {
+		_, err := NewDriver("anotherscheme://localhost:7687", NoAuth())
+
+		assertError(t1, err)
+		assertStringContain(t1, err.Error(), "scheme")
+	})
+
+}
+
+func TestDriverURIRoutingContext(t *testing.T) {
+
+	t.Run("neo4j:// routing context query support", func(t1 *testing.T) {
+		driver, err := NewDriver("neo4j://localhost:7687?x=y&a=b", NoAuth())
+
+		assertNoError(t1, err)
+		assertRouterContext(t1, driver, map[string]string{"x": "y", "a": "b"})
+	})
+
+	t.Run("neo4j:// routing context with duplicate keys should error", func(t1 *testing.T) {
+		_, err := NewDriver("neo4j://localhost:7687?x=y&x=b", NoAuth())
+
+		assertError(t, err)
+	})
+
+}
+
+func TestDriverDefaultPort(t *testing.T) {
+
+	t.Run("neo4j://localhost should default to port 7687", func(t1 *testing.T) {
+		driver, err := NewDriver("neo4j://localhost?x=y&a=b", NoAuth())
 		driverTarget := driver.Target()
 
-		Context("driver's", func() {
-			It("target scheme should be bolt", func() {
-				Expect(driverTarget.Scheme).To(BeIdenticalTo("bolt"))
-			})
-
-			It("target hostname should be localhost", func() {
-				Expect(driverTarget.Hostname()).To(BeIdenticalTo("localhost"))
-			})
-
-			It("target port should be 7687", func() {
-				Expect(driverTarget.Port()).To(BeIdenticalTo("7687"))
-			})
-		})
+		assertNoError(t1, err)
+		assertStringEqual(t1, driverTarget.Port(), "7687")
 	})
 
-	Describe("Session", func() {
-		When("constructed", func() {
-			type SessionTestCase struct {
-				uri       string
-				mode      AccessMode
-				bookmarks []string
-			}
+}
 
-			DescribeTable("should conform to given parameters", func(testCase SessionTestCase) {
-				driver, err := NewDriver(testCase.uri, NoAuth())
-				Expect(err).To(BeNil())
+func TestNewDriverAndClose(t *testing.T) {
 
-				sessi, err := driver.Session(testCase.mode, testCase.bookmarks...)
-				Expect(err).To(BeNil())
+	driver, err := NewDriver("bolt://localhost:7687", NoAuth())
+	assertNoError(t, err)
 
-				sess := sessi.(*session)
+	driverTarget := driver.Target()
 
-				Expect(AccessMode(sess.defaultMode)).To(BeIdenticalTo(testCase.mode))
+	if driverTarget.Scheme != "bolt" {
+		t.Errorf("the URI scheme was not properly set %v", driverTarget.Scheme)
+	}
 
-				Expect(sess.bookmarks).To(HaveLen(len(testCase.bookmarks)))
-				Expect(sess.bookmarks).To(ConsistOf(testCase.bookmarks))
-			}, Entry("(write, no_bookmark)", SessionTestCase{
-				uri:       "bolt://localhost:7687",
-				mode:      AccessModeWrite,
-				bookmarks: []string(nil),
-			}), Entry("(read, no_bookmark)", SessionTestCase{
-				uri:       "bolt://localhost:7687",
-				mode:      AccessModeRead,
-				bookmarks: []string(nil),
-			}), Entry("(write, one bookmark)", SessionTestCase{
-				uri:       "bolt://localhost:7687",
-				mode:      AccessModeWrite,
-				bookmarks: []string{"B1"},
-			}), Entry("(read, one bookmark)", SessionTestCase{
-				uri:       "bolt://localhost:7687",
-				mode:      AccessModeRead,
-				bookmarks: []string{"B1"},
-			}), Entry("(write, multiple bookmarks)", SessionTestCase{
-				uri:       "bolt://localhost:7687",
-				mode:      AccessModeWrite,
-				bookmarks: []string{"B1", "B2"},
-			}), Entry("(read, multiple bookmarks)", SessionTestCase{
-				uri:       "bolt://localhost:7687",
-				mode:      AccessModeRead,
-				bookmarks: []string{"B3", "B4"},
-			}))
+	if driverTarget.Hostname() != "localhost" {
+		t.Errorf("the hostname is not the expected %v", driverTarget.Hostname())
+	}
 
-		})
+	if driverTarget.Port() != "7687" {
+		t.Errorf("the port is not the expected %v", driverTarget.Port())
+	}
+
+	err = driver.Close()
+	assertNoError(t, err)
+
+	session, err := driver.Session(AccessModeRead)
+	assertError(t, err)
+
+	if session != nil {
+		t.Errorf("should not allow new session (AccessModeRead) after driver being closed")
+	}
+
+	session, err = driver.Session(AccessModeWrite)
+	assertError(t, err)
+
+	if session != nil {
+		t.Errorf("should not allow new session (AccessModeWrite) after driver being closed")
+	}
+
+	err = driver.Close()
+	if err != nil {
+		t.Errorf("should allow the close call on a closed driver")
+	}
+
+}
+
+func TestDriverSessionCreation(t *testing.T) {
+
+	t.Run("case one", func(t1 *testing.T) {
+		uri := "bolt://localhost:7687"
+		mode := AccessModeWrite
+		bookmarks := []string(nil)
+
+		driver, err := NewDriver(uri, NoAuth())
+		assertNoError(t1, err)
+
+		sessi, err := driver.Session(mode, bookmarks...)
+		assertNoError(t1, err)
+
+		sess := sessi.(*session)
+
+		if AccessMode(sess.defaultMode) != mode {
+			t1.Errorf("the defaultMode was not correctly set %v", AccessMode(sess.defaultMode))
+		}
+
+		if len(sess.bookmarks) != len(bookmarks) {
+			t1.Errorf("the bookmarks was not correctly set %v", sess.bookmarks)
+		}
 	})
-})
+
+	t.Run("case two", func(t1 *testing.T) {
+		uri := "bolt://localhost:7687"
+		mode := AccessModeRead
+		bookmarks := []string(nil)
+
+		driver, err := NewDriver(uri, NoAuth())
+		assertNoError(t1, err)
+
+		sessi, err := driver.Session(mode, bookmarks...)
+		assertNoError(t1, err)
+
+		sess := sessi.(*session)
+
+		if AccessMode(sess.defaultMode) != mode {
+			t1.Errorf("the defaultMode was not correctly set %v", AccessMode(sess.defaultMode))
+		}
+
+		if len(sess.bookmarks) != len(bookmarks) {
+			t1.Errorf("the bookmarks was not correctly set %v", sess.bookmarks)
+		}
+	})
+
+	t.Run("case three", func(t1 *testing.T) {
+		uri := "bolt://localhost:7687"
+		mode := AccessModeWrite
+		bookmarks := []string{"B1", "B2", "B3"}
+
+		driver, err := NewDriver(uri, NoAuth())
+		assertNoError(t1, err)
+
+		sessi, err := driver.Session(mode, bookmarks...)
+		assertNoError(t1, err)
+
+		sess := sessi.(*session)
+
+		if AccessMode(sess.defaultMode) != mode {
+			t1.Errorf("the defaultMode was not correctly set %v", AccessMode(sess.defaultMode))
+		}
+
+		if len(sess.bookmarks) != len(bookmarks) {
+			t1.Errorf("the bookmarks was not correctly set %v", sess.bookmarks)
+		}
+	})
+
+	t.Run("case four", func(t1 *testing.T) {
+		uri := "bolt://localhost:7687"
+		mode := AccessModeRead
+		bookmarks := []string{"B1", "B2", "B3", "B4"}
+
+		driver, err := NewDriver(uri, NoAuth())
+		assertNoError(t1, err)
+
+		sessi, err := driver.Session(mode, bookmarks...)
+		assertNoError(t1, err)
+
+		sess := sessi.(*session)
+
+		if AccessMode(sess.defaultMode) != mode {
+			t1.Errorf("the defaultMode was not correctly set %v", AccessMode(sess.defaultMode))
+		}
+
+		if len(sess.bookmarks) != len(bookmarks) {
+			t1.Errorf("the bookmarks was not correctly set %v", sess.bookmarks)
+		}
+	})
+}
