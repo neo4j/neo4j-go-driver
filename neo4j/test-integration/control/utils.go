@@ -71,7 +71,7 @@ func logLevel() neo4j.LogLevel {
 func useEncryption() bool {
 	// We will be able infer this by the URI scheme later on
 	switch os.Getenv("NEOENCRYPTION") {
-	case "False", "FALSE", "false":
+	case "False", "FALSE", "false", "":
 		return false
 	default:
 		return true
