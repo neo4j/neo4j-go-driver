@@ -32,11 +32,11 @@ import (
 
 var _ = Describe("Timeout and Lifetime", func() {
 	var err error
-	var log *utils.MemoryLogging
+	var log *utils.MemoryLog
 	var server *control.SingleInstance
 
 	BeforeEach(func() {
-		log = &utils.MemoryLogging{}
+		log = &utils.MemoryLog{}
 
 		server, err = control.EnsureSingleInstance()
 		Expect(err).To(BeNil())

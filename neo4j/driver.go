@@ -23,12 +23,14 @@ package neo4j
 import (
 	"fmt"
 	"net/url"
+	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
 
 	"github.com/neo4j/neo4j-go-driver/v4/neo4j/db"
-	"github.com/neo4j/neo4j-go-driver/v4/neo4j/internal/log"
+	"github.com/neo4j/neo4j-go-driver/v4/neo4j/log"
+
 	"github.com/neo4j/neo4j-go-driver/v4/neo4j/internal/pool"
 	"github.com/neo4j/neo4j-go-driver/v4/neo4j/internal/router"
 )
@@ -60,6 +62,8 @@ type Driver interface {
 	// Close the driver and all underlying connections
 	Close() error
 }
+
+var driverLogName = "driver"
 
 // NewDriver is the entry point to the neo4j driver to create an instance of a Driver. It is the first function to
 // be called in order to establish a connection to a neo4j database. It requires a Bolt URI and an authentication
@@ -108,16 +112,13 @@ func NewDriver(target string, auth AuthToken, configurers ...func(*Config)) (Dri
 	}
 
 	// Setup logging
-	var logger log.Logger
-	if config.Log != nil {
-		// Wrap obsolete logging system in internal
-		logger = &adaptorLogger{logging: config.Log}
-	} else {
+	var logger log.Logger = config.Log
+	if logger == nil {
 		// Default to void logger
-		logger = &log.VoidLogger{}
+		logger = &VoidLog{}
 	}
 	id := atomic.AddUint32(&driverid, 1)
-	logId := fmt.Sprintf("driver %d", id)
+	logId := strconv.FormatUint(uint64(id), 10)
 
 	connector := newConnector(config, auth.tokens, logger)
 	pool := pool.New(config.MaxConnectionPoolSize, config.MaxConnectionLifetime, connector.connect, logger)
@@ -128,7 +129,7 @@ func NewDriver(target string, auth AuthToken, configurers ...func(*Config)) (Dri
 	} else {
 		routingContext, err := routingContextFromUrl(parsed)
 		if err != nil {
-			logger.Error(logId, err)
+			logger.Error(driverLogName, logId, err)
 			return nil, err
 		}
 
@@ -155,7 +156,7 @@ func NewDriver(target string, auth AuthToken, configurers ...func(*Config)) (Dri
 		log:    logger,
 		logId:  logId,
 	}
-	logger.Infof(logId, "Created { target: %s }", target)
+	logger.Infof(driverLogName, logId, "Created { target: %s }", target)
 	return driver, nil
 }
 
@@ -250,6 +251,6 @@ func (d *driver) Close() error {
 		d.pool.Close()
 	}
 	d.pool = nil
-	d.log.Infof(d.logId, "Closed")
+	d.log.Infof(driverLogName, d.logId, "Closed")
 	return nil
 }

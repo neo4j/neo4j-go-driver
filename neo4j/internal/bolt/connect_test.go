@@ -23,10 +23,10 @@ import (
 	"testing"
 
 	"github.com/neo4j/neo4j-go-driver/v4/neo4j/db"
-	"github.com/neo4j/neo4j-go-driver/v4/neo4j/internal/log"
+	"github.com/neo4j/neo4j-go-driver/v4/neo4j/internal/testutil"
 )
 
-var logger = &log.ConsoleLogger{Errors: true, Infos: true, Warns: true}
+var logger = &testutil.ConsoleLogger{Errors: true, Infos: true, Warns: true}
 
 func TestConnect(ot *testing.T) {
 	// TODO: Test connect timeout

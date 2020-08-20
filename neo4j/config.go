@@ -24,6 +24,8 @@ import (
 	"math"
 	"net/url"
 	"time"
+
+	"github.com/neo4j/neo4j-go-driver/v4/neo4j/log"
 )
 
 // TrustStrategy defines how the driver will establish trust with the neo4j instance
@@ -80,8 +82,11 @@ type Config struct {
 	TrustStrategy TrustStrategy
 	// Logging target the driver will send its log outputs
 	//
-	// default: No Op Logger
-	Log Logging
+	// Possible to use custom logger (implement neo4j.log.Logger interface) or
+	// use neo4j.ConsoleLog.
+	//
+	// default: No Op Logger (neo4j.VoidLog)
+	Log log.Logger
 	// Resolver that would be used to resolve initial router address. This may
 	// be useful if you want to provide more than one URL for initial router.
 	// If not specified, the provided bolt+routing URL is used as the initial

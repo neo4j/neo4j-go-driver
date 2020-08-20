@@ -25,13 +25,13 @@ import (
 	"container/list"
 	"context"
 	"errors"
-	"fmt"
 	"sort"
+	"strconv"
 	"sync"
 	"sync/atomic"
 	"time"
 
-	"github.com/neo4j/neo4j-go-driver/v4/neo4j/internal/log"
+	"github.com/neo4j/neo4j-go-driver/v4/neo4j/log"
 )
 
 type Connection interface {
@@ -64,6 +64,7 @@ type Pool struct {
 	logId      string
 }
 
+var logName = "pool"
 var poolid uint32
 
 type serverPenalty struct {
@@ -84,10 +85,10 @@ func New(maxSize int, maxAge time.Duration, connect Connect, log log.Logger) *Po
 		connect: connect,
 		servers: make(map[string]*server),
 		now:     time.Now,
-		logId:   fmt.Sprintf("pool %d", id),
+		logId:   strconv.FormatUint(uint64(id), 10),
 		log:     log,
 	}
-	log.Infof(p.logId, "Created")
+	log.Infof(logName, p.logId, "Created")
 	return p
 }
 
@@ -104,7 +105,7 @@ func (p *Pool) Close() {
 		delete(p.servers, n)
 	}
 	p.serversMut.Unlock()
-	p.log.Infof(p.logId, "Closed")
+	p.log.Infof(logName, p.logId, "Closed")
 }
 
 func (p *Pool) anyExistingConnectionsOnServers(serverNames []string) bool {
@@ -235,7 +236,7 @@ func (p *Pool) Borrow(ctx context.Context, serverNames []string, wait bool) (Con
 	timeOut := func() bool {
 		select {
 		case <-ctx.Done():
-			p.log.Warnf(p.logId, "Borrow time-out")
+			p.log.Warnf(logName, p.logId, "Borrow time-out")
 			return true
 		default:
 			return false
@@ -245,7 +246,7 @@ func (p *Pool) Borrow(ctx context.Context, serverNames []string, wait bool) (Con
 	if p.closed {
 		return nil, &PoolClosed{}
 	}
-	p.log.Debugf(p.logId, "Trying to borrow connection from %s", serverNames)
+	p.log.Debugf(logName, p.logId, "Trying to borrow connection from %s", serverNames)
 
 	// Retrieve penalty for each server
 	penalties := p.getPenaltiesForServers(serverNames)
@@ -303,7 +304,7 @@ func (p *Pool) Borrow(ctx context.Context, serverNames []string, wait bool) (Con
 	e := p.queue.PushBack(q)
 	p.queueMut.Unlock()
 
-	p.log.Warnf(p.logId, "Borrow queued")
+	p.log.Warnf(logName, p.logId, "Borrow queued")
 	// Wait for either a wake up signal that indicates that we got a connection or a timeout.
 	select {
 	case <-q.wakeup:
@@ -315,7 +316,7 @@ func (p *Pool) Borrow(ctx context.Context, serverNames []string, wait bool) (Con
 		if q.conn != nil {
 			return q.conn, nil
 		}
-		p.log.Warnf(p.logId, "Borrow time-out")
+		p.log.Warnf(logName, p.logId, "Borrow time-out")
 		return nil, &PoolTimeout{err: ctx.Err(), servers: serverNames}
 	}
 }
@@ -332,7 +333,7 @@ func (p *Pool) unreg(serverName string, c Connection, now time.Time) {
 	server := p.servers[serverName]
 	// Check for strange condition of not finding the server.
 	if server == nil {
-		p.log.Warnf(p.logId, "Server %s not found", serverName)
+		p.log.Warnf(logName, p.logId, "Server %s not found", serverName)
 		return
 	}
 
@@ -354,14 +355,14 @@ func (p *Pool) removeIdleOlderThanOnServer(serverName string, now time.Time, max
 
 func (p *Pool) Return(c Connection) {
 	if p.closed {
-		p.log.Warnf(p.logId, "Trying to return connection to closed pool")
+		p.log.Warnf(logName, p.logId, "Trying to return connection to closed pool")
 		return
 	}
 
 	// Get the name of the server that the connection belongs to.
 	serverName := c.ServerName()
 	isAlive := c.IsAlive()
-	p.log.Debugf(p.logId, "Returning connection to %s {alive:%t}", serverName, isAlive)
+	p.log.Debugf(logName, p.logId, "Returning connection to %s {alive:%t}", serverName, isAlive)
 
 	// If the connection is dead, remove all other idle connections on the same server that older
 	// or of the same age as the dead connection, otherwise perform normal cleanup of old connections
@@ -374,7 +375,7 @@ func (p *Pool) Return(c Connection) {
 		if age < maxAge {
 			maxAge = age
 		}
-		p.log.Infof(p.logId, "Pruning %s for connections that might be dead", serverName)
+		p.log.Infof(logName, p.logId, "Pruning %s for connections that might be dead", serverName)
 	}
 	p.removeIdleOlderThanOnServer(serverName, now, maxAge)
 
@@ -389,7 +390,7 @@ func (p *Pool) Return(c Connection) {
 	// Shouldn't return a too old or dead connection back to the pool
 	if !isAlive || age >= p.maxAge {
 		p.unreg(serverName, c, now)
-		p.log.Infof(p.logId, "Unregistering dead or too old connection to %s", serverName)
+		p.log.Infof(logName, p.logId, "Unregistering dead or too old connection to %s", serverName)
 		// Returning here could cause a waiting thread to wait until it times out, to do it
 		// properly we could wake up threads that waits on the server and wake them up if there
 		// are no more connections to wait for.
@@ -420,6 +421,6 @@ func (p *Pool) Return(c Connection) {
 	if server != nil { // Strange when server not found
 		server.returnBusy(c)
 	} else {
-		p.log.Warnf(p.logId, "Server %s not found", serverName)
+		p.log.Warnf(logName, p.logId, "Server %s not found", serverName)
 	}
 }

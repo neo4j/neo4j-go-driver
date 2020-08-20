@@ -22,14 +22,14 @@ package router
 import (
 	"context"
 	"errors"
-	"fmt"
+	"strconv"
 	"sync"
 	"sync/atomic"
 	"time"
 
 	"github.com/neo4j/neo4j-go-driver/v4/neo4j/db"
-	"github.com/neo4j/neo4j-go-driver/v4/neo4j/internal/log"
 	"github.com/neo4j/neo4j-go-driver/v4/neo4j/internal/pool"
+	"github.com/neo4j/neo4j-go-driver/v4/neo4j/log"
 )
 
 const missingWriterRetries = 100
@@ -38,6 +38,8 @@ type databaseRouter struct {
 	dueUnix int64
 	table   *db.RoutingTable
 }
+
+var logName = "router"
 
 // Thread safe
 type Router struct {
@@ -71,9 +73,9 @@ func New(rootRouter string, getRouters func() []string, routerContext map[string
 		now:           time.Now,
 		sleep:         time.Sleep,
 		log:           logger,
-		logId:         fmt.Sprintf("router %d", id),
+		logId:         strconv.FormatUint(uint64(id), 10),
 	}
-	r.log.Infof(r.logId, "Created {context: %v}", routerContext)
+	r.log.Infof(logName, r.logId, "Created {context: %v}", routerContext)
 	return r
 }
 
@@ -96,7 +98,7 @@ func (r *Router) getTable(database string) (*db.RoutingTable, error) {
 		routers = []string{r.rootRouter}
 	}
 
-	r.log.Infof(r.logId, "Reading routing table for '%s' from any of %v", database, routers)
+	r.log.Infof(logName, r.logId, "Reading routing table for '%s' from any of %v", database, routers)
 	table, err := readTable(context.Background(), r.pool, database, routers, r.routerContext)
 	if err != nil {
 		// Use hook to retrieve possibly different set of routers and retry
@@ -105,7 +107,7 @@ func (r *Router) getTable(database string) (*db.RoutingTable, error) {
 			table, err = readTable(context.Background(), r.pool, database, routers, r.routerContext)
 		}
 		if err != nil {
-			r.log.Error(r.logId, err)
+			r.log.Error(logName, r.logId, err)
 			return nil, err
 		}
 	}
@@ -113,7 +115,7 @@ func (r *Router) getTable(database string) (*db.RoutingTable, error) {
 		table:   table,
 		dueUnix: now.Add(time.Duration(table.TimeToLive) * time.Second).Unix(),
 	}
-	r.log.Debugf(r.logId, "New routing table for '%s', TTL %d", database, table.TimeToLive)
+	r.log.Debugf(logName, r.logId, "New routing table for '%s', TTL %d", database, table.TimeToLive)
 
 	return table, nil
 }
@@ -139,7 +141,7 @@ func (r *Router) Writers(database string) ([]string, error) {
 		if retries == 0 {
 			break
 		}
-		r.log.Debugf(r.logId, "Invalidating routing table, no writers")
+		r.log.Debugf(logName, r.logId, "Invalidating routing table, no writers")
 		r.sleep(100 * time.Millisecond)
 		r.Invalidate(database)
 		table, err = r.getTable(database)
@@ -159,7 +161,7 @@ func (r *Router) Context() map[string]string {
 }
 
 func (r *Router) Invalidate(database string) {
-	r.log.Infof(r.logId, "Invalidating routing table for '%s'", database)
+	r.log.Infof(logName, r.logId, "Invalidating routing table for '%s'", database)
 	r.dbRoutersMut.Lock()
 	defer r.dbRoutersMut.Unlock()
 	// Reset due time to the 70s, this will make next access refresh the routing table using
@@ -171,7 +173,7 @@ func (r *Router) Invalidate(database string) {
 }
 
 func (r *Router) CleanUp() {
-	r.log.Debugf(r.logId, "Cleaning up")
+	r.log.Debugf(logName, r.logId, "Cleaning up")
 	now := r.now().Unix()
 	r.dbRoutersMut.Lock()
 	defer r.dbRoutersMut.Unlock()

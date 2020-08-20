@@ -22,9 +22,9 @@ package utils
 
 import "fmt"
 
-// MemoryLogging collects all log messages into its own data structures, mostly to
+// MemoryLog collects all log messages into its own data structures, mostly to
 // be used in tests
-type MemoryLogging struct {
+type MemoryLog struct {
 	// Errors contains all log messages written at Error level
 	Errors []string
 	// Warnings contains all log messages written at Warning level
@@ -35,42 +35,21 @@ type MemoryLogging struct {
 	Debugs []string
 }
 
-// ErrorEnabled returns whether Error level is enabled
-func (log *MemoryLogging) ErrorEnabled() bool {
-	return true
+func (l *MemoryLog) Error(name, id string, err error) {
 }
 
-// WarningEnabled returns whether Warning level is enabled
-func (log *MemoryLogging) WarningEnabled() bool {
-	return true
+func (l *MemoryLog) Errorf(name, id string, msg string, args ...interface{}) {
+	l.Errors = append(l.Errors, fmt.Sprintf(msg, args...))
 }
 
-// InfoEnabled returns whether Info level is enabled
-func (log *MemoryLogging) InfoEnabled() bool {
-	return true
+func (l *MemoryLog) Infof(name, id string, msg string, args ...interface{}) {
+	l.Infos = append(l.Infos, fmt.Sprintf(msg, args...))
 }
 
-// DebugEnabled returns whether Debug level is enabled
-func (log *MemoryLogging) DebugEnabled() bool {
-	return true
+func (l *MemoryLog) Warnf(name, id string, msg string, args ...interface{}) {
+	l.Warnings = append(l.Warnings, fmt.Sprintf(msg, args...))
 }
 
-// Errorf writes a log message at Error level
-func (log *MemoryLogging) Errorf(message string, args ...interface{}) {
-	log.Errors = append(log.Errors, fmt.Sprintf(message, args...))
-}
-
-// Warningf writes a log message at Warning level
-func (log *MemoryLogging) Warningf(message string, args ...interface{}) {
-	log.Warnings = append(log.Warnings, fmt.Sprintf(message, args...))
-}
-
-// Infof writes a log message at Info level
-func (log *MemoryLogging) Infof(message string, args ...interface{}) {
-	log.Infos = append(log.Infos, fmt.Sprintf(message, args...))
-}
-
-// Debugf writes a log message at Debug level
-func (log *MemoryLogging) Debugf(message string, args ...interface{}) {
-	log.Debugs = append(log.Debugs, fmt.Sprintf(message, args...))
+func (l *MemoryLog) Debugf(name, id string, msg string, args ...interface{}) {
+	l.Debugs = append(l.Debugs, fmt.Sprintf(msg, args...))
 }
