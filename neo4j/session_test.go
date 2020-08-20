@@ -25,11 +25,10 @@ import (
 	"time"
 
 	"github.com/neo4j/neo4j-go-driver/v4/neo4j/db"
-	"github.com/neo4j/neo4j-go-driver/v4/neo4j/internal/log"
 )
 
 func TestSession(st *testing.T) {
-	logger := log.ConsoleLogger{Errors: true, Infos: true, Warns: false}
+	logger := ConsoleLog{Errors: true, Infos: true, Warns: false}
 
 	assertCleanSessionState := func(t *testing.T, sess *session) {
 		if sess.inTx {

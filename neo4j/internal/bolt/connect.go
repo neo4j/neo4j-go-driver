@@ -27,14 +27,8 @@ import (
 	"net"
 
 	"github.com/neo4j/neo4j-go-driver/v4/neo4j/db"
-	"github.com/neo4j/neo4j-go-driver/v4/neo4j/internal/log"
+	"github.com/neo4j/neo4j-go-driver/v4/neo4j/log"
 )
-
-type Logger interface {
-	ConnectError(c net.Conn, err error)
-	ConnectionError(c db.Connection, err error)
-	ConnectionInfo(c db.Connection, msg string, args ...interface{})
-}
 
 // Negotiate version of bolt protocol.
 // Returns instance of bolt protocol implmenting low-level abstract connection Connection interface.
@@ -59,7 +53,8 @@ func Connect(serverName string, conn net.Conn, auth map[string]interface{}, log 
 		return nil, err
 	}
 
-	logId := "boltconnect@" + serverName
+	logName := "boltconnect"
+	logId := serverName
 
 	// Parse received version and construct the correct instance
 	ver := binary.BigEndian.Uint32(buf)
@@ -71,7 +66,7 @@ func Connect(serverName string, conn net.Conn, auth map[string]interface{}, log 
 		if err != nil {
 			return nil, err
 		}
-		log.Infof(logId, "Connected to %s", boltConn.ServerVersion())
+		log.Infof(logName, logId, "Connected to %s", boltConn.ServerVersion())
 		return boltConn, nil
 	case 4:
 		// Handover rest of connection handshaking
@@ -87,6 +82,6 @@ func Connect(serverName string, conn net.Conn, auth map[string]interface{}, log 
 		err = errors.New(fmt.Sprintf("Server responded with unsupported version %d", ver))
 	}
 
-	log.Error(logId, err)
+	log.Error(logName, logId, err)
 	return nil, err
 }
