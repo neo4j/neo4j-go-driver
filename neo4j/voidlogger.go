@@ -17,21 +17,21 @@
  *  limitations under the License.
  */
 
-package log
+package neo4j
 
-type VoidLogger struct{}
+type VoidLog struct{}
 
-func (l VoidLogger) Error(id string, err error) {
+func (l VoidLog) Error(name, id string, err error) {
 }
 
-func (l VoidLogger) Errorf(id string, msg string, args ...interface{}) {
+func (l VoidLog) Errorf(name, id string, msg string, args ...interface{}) {
 }
 
-func (l VoidLogger) Infof(id string, msg string, args ...interface{}) {
+func (l VoidLog) Infof(name, id string, msg string, args ...interface{}) {
 }
 
-func (l VoidLogger) Warnf(id string, msg string, args ...interface{}) {
+func (l VoidLog) Warnf(name, id string, msg string, args ...interface{}) {
 }
 
-func (l VoidLogger) Debugf(id string, msg string, args ...interface{}) {
+func (l VoidLog) Debugf(name, id string, msg string, args ...interface{}) {
 }

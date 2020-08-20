@@ -22,12 +22,13 @@ package neo4j
 import (
 	"context"
 	"errors"
-	"fmt"
+	"strconv"
 	"sync/atomic"
 	"time"
 
 	"github.com/neo4j/neo4j-go-driver/v4/neo4j/db"
-	"github.com/neo4j/neo4j-go-driver/v4/neo4j/internal/log"
+	"github.com/neo4j/neo4j-go-driver/v4/neo4j/log"
+
 	"github.com/neo4j/neo4j-go-driver/v4/neo4j/internal/pool"
 )
 
@@ -86,6 +87,7 @@ type session struct {
 }
 
 var sessionid uint32
+var sessionLogName = "session"
 
 // Remove empty string bookmarks to check for "bad" callers
 // To avoid allocating, first check if this is a problem
@@ -115,8 +117,8 @@ func newSession(config *Config, router sessionRouter, pool sessionPool,
 	mode db.AccessMode, bookmarks []string, databaseName string, logger log.Logger) *session {
 
 	id := atomic.AddUint32(&sessionid, 1)
-	logId := fmt.Sprintf("sess %d", id)
-	logger.Debugf(logId, "Created")
+	logId := strconv.FormatUint(uint64(id), 10)
+	logger.Debugf(sessionLogName, logId, "Created")
 
 	return &session{
 		config:       config,
@@ -154,7 +156,7 @@ func (s *session) BeginTransaction(configurers ...func(*TransactionConfig)) (Tra
 	// Guard for more than one transaction per session
 	if s.inTx {
 		err := errors.New("Already in transaction")
-		s.log.Error(s.logId, err)
+		s.log.Error(sessionLogName, s.logId, err)
 		return nil, err
 	}
 
@@ -288,11 +290,11 @@ func (s *session) runRetriable(
 			return x, nil
 		}
 
-		s.log.Debugf(s.logId, "Retriable transaction evaluating error: %s", err)
+		s.log.Debugf(sessionLogName, s.logId, "Retriable transaction evaluating error: %s", err)
 
 		// If we failed due to connect problem, just give up since the pool tries really hard
 		if s.conn == nil {
-			s.log.Errorf(s.logId, "Retriable transaction failed due to no available connection: %s", err)
+			s.log.Errorf(sessionLogName, s.logId, "Retriable transaction failed due to no available connection: %s", err)
 			return nil, err
 		}
 
@@ -301,7 +303,7 @@ func (s *session) runRetriable(
 			start = s.now()
 		}
 		if time.Since(start) > s.config.MaxTransactionRetryTime {
-			s.log.Errorf(s.logId, "Retriable transaction failed due to reaching MaxTransactionRetryTime: %s", s.config.MaxTransactionRetryTime.String())
+			s.log.Errorf(sessionLogName, s.logId, "Retriable transaction failed due to reaching MaxTransactionRetryTime: %s", s.config.MaxTransactionRetryTime.String())
 			return nil, err
 		}
 
@@ -313,10 +315,10 @@ func (s *session) runRetriable(
 		if !commitFailure && !s.conn.IsAlive() {
 			maxDeadErrors--
 			if maxDeadErrors < 0 {
-				s.log.Errorf(s.logId, "Retriable transaction failed due to too many dead connections")
+				s.log.Errorf(sessionLogName, s.logId, "Retriable transaction failed due to too many dead connections")
 				return nil, err
 			}
-			s.log.Debugf(s.logId, "Retrying transaction due to dead connection")
+			s.log.Debugf(sessionLogName, s.logId, "Retrying transaction due to dead connection")
 			continue
 		}
 
@@ -330,14 +332,14 @@ func (s *session) runRetriable(
 				s.router.Invalidate(s.databaseName)
 				maxClusterErrors--
 				if maxClusterErrors < 0 {
-					s.log.Errorf(s.logId, "Retriable transaction failed due to encountering too many cluster errors")
+					s.log.Errorf(sessionLogName, s.logId, "Retriable transaction failed due to encountering too many cluster errors")
 					return nil, err
 				}
-				s.log.Debugf(s.logId, "Retrying transaction due to cluster error")
+				s.log.Debugf(sessionLogName, s.logId, "Retrying transaction due to cluster error")
 			case e.IsRetriableTransient():
 				throttle = throttle.next()
 				d := throttle.delay()
-				s.log.Debugf(s.logId, "Retrying transaction due to transient error after sleeping for %s", d.String())
+				s.log.Debugf(sessionLogName, s.logId, "Retrying transaction due to transient error after sleeping for %s", d.String())
 				s.sleep(d)
 			default:
 				return nil, err
@@ -431,7 +433,7 @@ func (s *session) Run(
 
 	if s.inTx {
 		err := errors.New("Trying to run auto-commit transaction while in explicit transaction")
-		s.log.Error(s.logId, err)
+		s.log.Error(sessionLogName, s.logId, err)
 		return nil, err
 	}
 
@@ -463,7 +465,7 @@ func (s *session) Run(
 func (s *session) Close() error {
 	s.fetchAllInCurrentResult()
 	s.returnConn()
-	s.log.Debugf(s.logId, "Closed")
+	s.log.Debugf(sessionLogName, s.logId, "Closed")
 	// Schedule cleanups
 	go func() {
 		s.pool.CleanUp()
