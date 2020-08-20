@@ -26,8 +26,8 @@ import (
 	"time"
 
 	"github.com/neo4j/neo4j-go-driver/v4/neo4j/db"
-	"github.com/neo4j/neo4j-go-driver/v4/neo4j/internal/log"
 	"github.com/neo4j/neo4j-go-driver/v4/neo4j/internal/packstream"
+	"github.com/neo4j/neo4j-go-driver/v4/neo4j/log"
 )
 
 const (
@@ -81,6 +81,7 @@ type bolt4 struct {
 	unpacker      *packstream.Unpacker
 	connId        string
 	logId         string
+	logName       string
 	serverVersion string
 	tfirst        int64        // Time that server started streaming
 	pendingTx     *internalTx4 // Stashed away when tx started explcitly
@@ -98,10 +99,11 @@ func NewBolt4(serverName string, conn net.Conn, log log.Logger) *bolt4 {
 		serverName:    serverName,
 		chunker:       newChunker(),
 		receiveBuffer: make([]byte, 4096),
-		packer:        &packstream.Packer{}, //packstream.NewPacker(chunker, dehydrate),
+		packer:        &packstream.Packer{},
 		unpacker:      &packstream.Unpacker{},
 		birthDate:     time.Now(),
 		log:           log,
+		logName:       "bolt4",
 	}
 }
 
@@ -122,7 +124,7 @@ func (b *bolt4) appendMsg(tag packstream.StructTag, field ...interface{}) error 
 		// At this point we do not know the state of what has been written to the chunks.
 		// Either we should support rolling back whatever that has been written or just
 		// bail out this session.
-		b.log.Error(b.logId, err)
+		b.log.Error(b.logName, b.logId, err)
 		b.state = bolt4_dead
 		return err
 	}
@@ -135,7 +137,7 @@ func (b *bolt4) sendMsg(tag packstream.StructTag, field ...interface{}) error {
 		return err
 	}
 	if err := b.chunker.send(b.conn); err != nil {
-		b.log.Error(b.logId, err)
+		b.log.Error(b.logName, b.logId, err)
 		b.state = bolt4_dead
 		return err
 	}
@@ -146,14 +148,14 @@ func (b *bolt4) receiveMsg() (interface{}, error) {
 	var err error
 	b.receiveBuffer, err = dechunkMessage(b.conn, b.receiveBuffer)
 	if err != nil {
-		b.log.Error(b.logId, err)
+		b.log.Error(b.logName, b.logId, err)
 		b.state = bolt4_dead
 		return nil, err
 	}
 
 	msg, err := b.unpacker.UnpackStruct(b.receiveBuffer, hydrate)
 	if err != nil {
-		b.log.Error(b.logId, err)
+		b.log.Error(b.logName, b.logId, err)
 		b.state = bolt4_dead
 		return nil, err
 	}
@@ -176,15 +178,15 @@ func (b *bolt4) receiveSuccess() (*successResponse, error) {
 		b.state = bolt4_failed
 		if v.IsClient() {
 			// These could include potentially large cypher statement, only log to debug
-			b.log.Debugf(b.logId, "%s", v)
+			b.log.Debugf(b.logName, b.logId, "%s", v)
 		} else {
-			b.log.Error(b.logId, v)
+			b.log.Error(b.logName, b.logId, v)
 		}
 		return nil, v
 	}
 	b.state = bolt4_dead
 	err = errors.New("Expected success or database error")
-	b.log.Error(b.logId, err)
+	b.log.Error(b.logName, b.logId, err)
 	return nil, err
 }
 
@@ -220,12 +222,12 @@ func (b *bolt4) connect(auth map[string]interface{}) error {
 		return errors.New(fmt.Sprintf("Unexpected server response: %+v", succRes))
 	}
 	b.connId = helloRes.connectionId
-	b.logId = fmt.Sprintf("%s@%s/v4", b.connId, b.serverName)
+	b.logId = fmt.Sprintf("%s@%s", b.connId, b.serverName)
 	b.serverVersion = helloRes.server
 
 	// Transition into ready state
 	b.state = bolt4_ready
-	b.log.Infof(b.logId, "Connected")
+	b.log.Infof(b.logName, b.logId, "Connected")
 	return nil
 }
 
@@ -308,7 +310,7 @@ func (b *bolt4) TxCommit(txh db.Handle) error {
 	if commitSuccess == nil {
 		b.state = bolt4_dead
 		err := errors.New(fmt.Sprintf("Failed to parse commit response: %+v", succRes))
-		b.log.Error(b.logId, err)
+		b.log.Error(b.logName, b.logId, err)
 		return err
 	}
 
@@ -380,7 +382,7 @@ func (b *bolt4) consumeStream() error {
 }
 
 func (b *bolt4) run(cypher string, params map[string]interface{}, tx *internalTx4) (*db.Stream, error) {
-	b.log.Debugf(b.logId, "run")
+	b.log.Debugf(b.logName, b.logId, "run")
 	// If already streaming, consume the whole thing first
 	if err := b.consumeStream(); err != nil {
 		return nil, err
@@ -432,7 +434,7 @@ func (b *bolt4) run(cypher string, params map[string]interface{}, tx *internalTx
 	if runRes == nil {
 		b.state = bolt4_dead
 		err = errors.New(fmt.Sprintf("Failed to parse RUN response: %+v", res))
-		b.log.Error(b.logId, err)
+		b.log.Error(b.logName, b.logId, err)
 		return nil, err
 	}
 	b.tfirst = runRes.t_first
@@ -450,11 +452,11 @@ func (b *bolt4) run(cypher string, params map[string]interface{}, tx *internalTx
 }
 
 func (b *bolt4) logError(err error) {
-	b.log.Error(b.logId, err)
+	b.log.Error(b.logName, b.logId, err)
 }
 
 func (b *bolt4) logDebug(err error) {
-	b.log.Debugf(b.logId, "%s", err)
+	b.log.Debugf(b.logName, b.logId, "%s", err)
 }
 
 func (b *bolt4) Run(
@@ -511,7 +513,7 @@ func (b *bolt4) Next(shandle db.Handle) (*db.Record, *db.Summary, error) {
 		if sum == nil {
 			b.state = bolt4_dead
 			err = errors.New("Failed to parse summary")
-			b.log.Error(b.logId, err)
+			b.log.Error(b.logName, b.logId, err)
 			return nil, nil, err
 		}
 		if b.state == bolt4_streamingtx {
@@ -533,15 +535,15 @@ func (b *bolt4) Next(shandle db.Handle) (*db.Record, *db.Summary, error) {
 		b.state = bolt4_failed
 		if x.IsClient() {
 			// These could include potentially large cypher statement, only log to debug
-			b.log.Debugf(b.logId, "%s", x)
+			b.log.Debugf(b.logName, b.logId, "%s", x)
 		} else {
-			b.log.Error(b.logId, x)
+			b.log.Error(b.logName, b.logId, x)
 		}
 		return nil, nil, x
 	default:
 		b.state = bolt4_dead
 		err = errors.New("Unknown response")
-		b.log.Error(b.logId, err)
+		b.log.Error(b.logName, b.logId, err)
 		return nil, nil, err
 	}
 }
@@ -659,7 +661,7 @@ func (b *bolt4) Close() {
 	}
 	b.conn.Close()
 	b.state = bolt4_dead
-	b.log.Infof(b.logId, "Disconnected")
+	b.log.Infof(b.logName, b.logId, "Disconnected")
 }
 
 func (b *bolt4) SelectDatabase(database string) {

@@ -28,11 +28,11 @@ import (
 	"time"
 
 	"github.com/neo4j/neo4j-go-driver/v4/neo4j/db"
-	"github.com/neo4j/neo4j-go-driver/v4/neo4j/internal/log"
 	poolpackage "github.com/neo4j/neo4j-go-driver/v4/neo4j/internal/pool"
+	"github.com/neo4j/neo4j-go-driver/v4/neo4j/internal/testutil"
 )
 
-var logger = &log.ConsoleLogger{Errors: true, Infos: true, Warns: true}
+var logger = &testutil.ConsoleLogger{Errors: true, Infos: true, Warns: true}
 
 // Verifies that concurrent access works as expected relying on the race detector to
 // report supicious behavior.
