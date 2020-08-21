@@ -24,9 +24,10 @@ it should not have much of impact other than the inconvenince of hitting the ali
 real one  when navigating driver code. Reason for moving the types is to be able to have subpackages
 and avoid unnecessary copying/conversion between types (and avoid circular references neo4j -> subpackage -> neo4j reference chains).
 These types have been aliased:
-* Record -> db.Record
-* Node -> dbtype.Node, Relationship -> dbtype.Relationship, Path -> dbtype.Path
-* Point split into Point2D and Point3D ->> dbtype.Point2D and dbtype.Point3D
+* neo4j.Record is alias for neo4j/db.Record
+* All graph types (Node, Relationship, Path) are aliased from neo4j to corresponsing type for neo4j/dbtype.X
+* Point split into Point2D and Point3D aliased as neo4j/dbtype.Point2D and neo4j/dbtype.Point3D
+* All temporal types are aliased from neo4j to neo4j/dbtype.X
 
 Spatial types
 Point has been splitted into two types to better correlate with types in database.
@@ -58,3 +59,23 @@ built in duration.
 
 
 Error handling
+Previously syntax errors in Cypher queries and other errors originating from the database were
+returned when iteration of a result started, now these errors are returned directly upon call
+to Run (on session and transaction).
+1.x
+    _, result := tx.Run("invalid cypher")
+    for result.Next() {
+        // Would not happen, result.Err() will  return the error
+    }
+4.x
+    err, result := tx.Run("invalid cypher")
+    // err will contain the error
+
+Result interface
+The Summary function has been removed, the same functionality can be accomplished by iterating
+through the result and then call Consume or if only the summary is wanted and not the records,
+directly call Consume. The previous implementation of summary was a bit magic, it buffered all
+rows in memory until it received the summary wich could potentially consume a lot of memory.
+An alternative to Next has been added called NextRecord that saves a function call per iteration of
+the result.
+
