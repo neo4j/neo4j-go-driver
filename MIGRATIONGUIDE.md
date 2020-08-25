@@ -79,3 +79,10 @@ rows in memory until it received the summary wich could potentially consume a lo
 An alternative to Next has been added called NextRecord that saves a function call per iteration of
 the result.
 
+Logging
+The interface used for custom driver logging has been changed to match the interfaced used
+internally since 1.8. Since 1.8 driver was backwards compatible with 1.7 all internal logging
+calls were remapped to the public interface, this is now gone.
+
+Driver config (include logging here???)
+
