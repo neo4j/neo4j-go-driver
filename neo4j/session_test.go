@@ -25,6 +25,7 @@ import (
 	"time"
 
 	"github.com/neo4j/neo4j-go-driver/v4/neo4j/db"
+	"github.com/neo4j/neo4j-go-driver/v4/neo4j/internal/testutil"
 )
 
 func TestSession(st *testing.T) {
@@ -54,7 +55,7 @@ func TestSession(st *testing.T) {
 			pool.returnHook = func() {
 				numReturns++
 			}
-			conn := &testConn{isAlive: true}
+			conn := &testutil.ConnFake{Alive: true}
 			pool.borrowConn = conn
 			transientErr := &db.DatabaseError{Code: "Neo.TransientError.General.MemoryPoolOutOfMemoryError"}
 			numRetries := 0
@@ -81,7 +82,7 @@ func TestSession(st *testing.T) {
 			_, pool, sess := createSession()
 			rollbackErr := errors.New("Rollback error")
 			causeOfRollbackErr := errors.New("Cause of rollback")
-			pool.borrowConn = &testConn{isAlive: true, txRollbackErr: rollbackErr}
+			pool.borrowConn = &testutil.ConnFake{Alive: true, TxRollbackErr: rollbackErr}
 			_, err := sess.WriteTransaction(func(tx Transaction) (interface{}, error) {
 				return nil, causeOfRollbackErr
 			})
@@ -93,7 +94,7 @@ func TestSession(st *testing.T) {
 		rt.Run("Failed commit", func(t *testing.T) {
 			_, pool, sess := createSession()
 			commitErr := errors.New("Commit error")
-			pool.borrowConn = &testConn{isAlive: true, txCommitErr: commitErr}
+			pool.borrowConn = &testutil.ConnFake{Alive: true, TxCommitErr: commitErr}
 			_, err := sess.WriteTransaction(func(tx Transaction) (interface{}, error) {
 				return nil, nil
 			})

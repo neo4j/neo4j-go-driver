@@ -51,7 +51,7 @@ var _ = Describe("Routing", func() {
 
 	Specify("should successfully execute read/write when initial address contains unusable items", func() {
 		// Rely on address resolving
-		driver := getDriver("bolt+routing://localhost")
+		driver := getDriver("neo4j://localhost")
 		Expect(err).To(BeNil())
 		defer driver.Close()
 

@@ -94,14 +94,6 @@ func TestDriverN(t0 *testing.T) {
 			assertNoRouter(t, driver)
 		})
 
-		t1.Run("Should support bolt+routing:// sceme", func(t *testing.T) {
-			driver, err := NewDriver("bolt+routing://localhost:7687", NoAuth())
-
-			assertNoError(t, err)
-			assertStringEqual(t, driver.Target().Scheme, "bolt+routing")
-			assertRouter(t, driver)
-		})
-
 		t1.Run("should support neo4j:// scheme", func(t *testing.T) {
 			driver, err := NewDriver("neo4j://localhost:7687", NoAuth())
 

@@ -171,7 +171,6 @@ func (b *backend) handleRequest(req map[string]interface{}) {
 			return
 		}
 		driver, err := neo4j.NewDriver(data["uri"].(string), authToken, func(c *neo4j.Config) {
-			c.Encrypted = false
 			c.Log = &streamLog{wr: b.wr} //neo4j.ConsoleLogger(neo4j.DEBUG)
 		})
 		if err != nil {

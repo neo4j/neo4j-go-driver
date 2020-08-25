@@ -27,6 +27,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/neo4j/neo4j-go-driver/v4/neo4j/db"
 	"github.com/neo4j/neo4j-go-driver/v4/neo4j/internal/testutil"
 )
 
@@ -37,12 +38,12 @@ func TestPoolBorrowReturn(ot *testing.T) {
 	maxAge := 1 * time.Second
 	birthdate := time.Now()
 
-	succeedingConnect := func(s string) (Connection, error) {
-		return &fakeConn{serverName: s, isAlive: true, birthdate: birthdate}, nil
+	succeedingConnect := func(s string) (db.Connection, error) {
+		return &testutil.ConnFake{Name: s, Alive: true, Birth: birthdate}, nil
 	}
 
 	failingError := errors.New("whatever")
-	failingConnect := func(s string) (Connection, error) {
+	failingConnect := func(s string) (db.Connection, error) {
 		return nil, failingError
 	}
 
@@ -196,8 +197,8 @@ func TestPoolResourceUsage(ot *testing.T) {
 	maxAge := 1 * time.Second
 	birthdate := time.Now()
 
-	succeedingConnect := func(s string) (Connection, error) {
-		return &fakeConn{serverName: s, isAlive: true, birthdate: birthdate}, nil
+	succeedingConnect := func(s string) (db.Connection, error) {
+		return &testutil.ConnFake{Name: s, Alive: true, Birth: birthdate}, nil
 	}
 
 	ot.Run("Use order of named servers as priority when creating new servers", func(t *testing.T) {
@@ -217,7 +218,7 @@ func TestPoolResourceUsage(ot *testing.T) {
 		defer p.Close()
 		serverNames := []string{"srvA"}
 		c, _ := p.Borrow(context.Background(), serverNames, true)
-		c.(*fakeConn).isAlive = false
+		c.(*testutil.ConnFake).Alive = false
 		p.Return(c)
 		servers := p.getServers()
 		if len(servers) > 0 && servers[serverNames[0]].size() > 0 {
@@ -246,19 +247,19 @@ func TestPoolResourceUsage(ot *testing.T) {
 		c3, _ := p.Borrow(context.Background(), []string{"A"}, true)
 		// Manipulate birthdate on the connections
 		now := time.Now()
-		c1.(*fakeConn).birthdate = now.Add(-1 * time.Second)
-		c1.(*fakeConn).id = 1
-		c2.(*fakeConn).birthdate = now
-		c2.(*fakeConn).id = 2
-		c3.(*fakeConn).birthdate = now.Add(1 * time.Second)
-		c3.(*fakeConn).id = 3
+		c1.(*testutil.ConnFake).Birth = now.Add(-1 * time.Second)
+		c1.(*testutil.ConnFake).Id = 1
+		c2.(*testutil.ConnFake).Birth = now
+		c2.(*testutil.ConnFake).Id = 2
+		c3.(*testutil.ConnFake).Birth = now.Add(1 * time.Second)
+		c3.(*testutil.ConnFake).Id = 3
 		// Return the old and young connections to make them idle
 		p.Return(c1)
 		p.Return(c3)
 		assertNumberOfServers(t, p, 1)
 		assertNumberOfIdle(t, p, "A", 2)
 		// Kill the middle aged connection and return it
-		c2.(*fakeConn).isAlive = false
+		c2.(*testutil.ConnFake).Alive = false
 		p.Return(c2)
 		assertNumberOfIdle(t, p, "A", 1)
 	})
@@ -275,7 +276,7 @@ func TestPoolResourceUsage(ot *testing.T) {
 		defer p.Close()
 		serverNames := []string{"srvA"}
 		c1, _ := p.Borrow(context.Background(), serverNames, true)
-		c1.(*fakeConn).id = 123
+		c1.(*testutil.ConnFake).Id = 123
 		// It's alive when returning it
 		p.Return(c1)
 		nowMut.Lock()
@@ -283,7 +284,7 @@ func TestPoolResourceUsage(ot *testing.T) {
 		nowMut.Unlock()
 		// Shouldn't get the same one back!
 		c2, _ := p.Borrow(context.Background(), serverNames, true)
-		if c2.(*fakeConn).id == 123 {
+		if c2.(*testutil.ConnFake).Id == 123 {
 			t.Errorf("Got the old connection back!")
 		}
 	})
@@ -303,12 +304,12 @@ func TestPoolResourceUsage(ot *testing.T) {
 func TestPoolCleanup(ot *testing.T) {
 	birthdate := time.Now()
 	maxLife := 1 * time.Second
-	succeedingConnect := func(s string) (Connection, error) {
-		return &fakeConn{serverName: s, isAlive: true, birthdate: birthdate}, nil
+	succeedingConnect := func(s string) (db.Connection, error) {
+		return &testutil.ConnFake{Name: s, Alive: true, Birth: birthdate}, nil
 	}
 
 	// Borrows a connection in server A and another in server B
-	borrowConnections := func(t *testing.T, p *Pool) (Connection, Connection) {
+	borrowConnections := func(t *testing.T, p *Pool) (db.Connection, db.Connection) {
 		c1, err := p.Borrow(context.Background(), []string{"A"}, true)
 		assertConnection(t, c1, err)
 		c2, err := p.Borrow(context.Background(), []string{"B"}, true)
@@ -350,7 +351,7 @@ func TestPoolCleanup(ot *testing.T) {
 	})
 
 	ot.Run("Should not remove servers with only idle connections but with recent connect failures ", func(t *testing.T) {
-		failingConnect := func(s string) (Connection, error) {
+		failingConnect := func(s string) (db.Connection, error) {
 			return nil, errors.New("an error")
 		}
 		p := New(0, maxLife, failingConnect, logger)

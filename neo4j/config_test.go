@@ -28,18 +28,6 @@ import (
 func TestDefaultConfig(t *testing.T) {
 	config := defaultConfig()
 
-	if config.Encrypted != true {
-		t.Errorf("should have TLS encryption enabled by default")
-	}
-
-	if config.TrustStrategy.skipVerifyHostname != true {
-		t.Errorf("should verify host name by default")
-	}
-
-	if config.TrustStrategy.skipVerify != true {
-		t.Errorf("should not verify TLS certificates by default")
-	}
-
 	if config.MaxTransactionRetryTime != 30*time.Second {
 		t.Errorf("should have max transaction retry duration set to 30 sconds by default")
 	}

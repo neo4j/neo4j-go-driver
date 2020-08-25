@@ -28,7 +28,6 @@ import (
 	"time"
 
 	"github.com/neo4j/neo4j-go-driver/v4/neo4j/db"
-	"github.com/neo4j/neo4j-go-driver/v4/neo4j/internal/pool"
 	"github.com/neo4j/neo4j-go-driver/v4/neo4j/log"
 )
 
@@ -56,8 +55,8 @@ type Router struct {
 }
 
 type Pool interface {
-	Borrow(ctx context.Context, servers []string, wait bool) (pool.Connection, error)
-	Return(c pool.Connection)
+	Borrow(ctx context.Context, servers []string, wait bool) (db.Connection, error)
+	Return(c db.Connection)
 }
 
 var routerid uint32
