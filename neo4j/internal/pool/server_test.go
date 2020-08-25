@@ -22,6 +22,9 @@ package pool
 import (
 	"testing"
 	"time"
+
+	"github.com/neo4j/neo4j-go-driver/v4/neo4j/db"
+	"github.com/neo4j/neo4j-go-driver/v4/neo4j/internal/testutil"
 )
 
 func assertTrue(t *testing.T, v bool) {
@@ -47,14 +50,14 @@ func TestServer(ot *testing.T) {
 		}
 	}
 
-	assertConnection := func(t *testing.T, conn Connection) {
+	assertConnection := func(t *testing.T, conn db.Connection) {
 		t.Helper()
 		if conn == nil {
 			t.Fatal("Expected connection")
 		}
 	}
 
-	assertNilConnection := func(t *testing.T, conn Connection) {
+	assertNilConnection := func(t *testing.T, conn db.Connection) {
 		t.Helper()
 		if conn != nil {
 			t.Fatal("Expected nil connection")
@@ -66,10 +69,10 @@ func TestServer(ot *testing.T) {
 		assertSize(t, s, 0)
 
 		// Register should increase size
-		c1 := &fakeConn{}
+		c1 := &testutil.ConnFake{}
 		s.registerBusy(c1)
 		assertSize(t, s, 1)
-		c2 := &fakeConn{}
+		c2 := &testutil.ConnFake{}
 		s.registerBusy(c2)
 		assertSize(t, s, 2)
 
@@ -82,7 +85,7 @@ func TestServer(ot *testing.T) {
 
 	ot.Run("getIdle/returnBusy", func(t *testing.T) {
 		s := &server{}
-		c1 := &fakeConn{}
+		c1 := &testutil.ConnFake{}
 		s.registerBusy(c1)
 		s.returnBusy(c1)
 
@@ -99,17 +102,17 @@ func TestServer(ot *testing.T) {
 	ot.Run("removeIdleOlderThan", func(t *testing.T) {
 		s := &server{}
 		// Register and return three connections
-		conns := make([]*fakeConn, 3)
+		conns := make([]*testutil.ConnFake, 3)
 		now := time.Now()
 		for i := range conns {
-			c := &fakeConn{birthdate: now}
+			c := &testutil.ConnFake{Birth: now}
 			conns[i] = c
 			s.registerBusy(c)
 			s.returnBusy(c)
 		}
 
 		// Let the conn in the middle be too old
-		conns[1].birthdate = now.Add(-20 * time.Second)
+		conns[1].Birth = now.Add(-20 * time.Second)
 		s.removeIdleOlderThan(now, 10*time.Second)
 		assertSize(t, s, 2)
 
@@ -124,8 +127,8 @@ func TestServer(ot *testing.T) {
 		// Return the connections and let all of them be too old
 		s.returnBusy(b1)
 		s.returnBusy(b2)
-		conns[0].birthdate = now.Add(-20 * time.Second)
-		conns[2].birthdate = now.Add(-20 * time.Second)
+		conns[0].Birth = now.Add(-20 * time.Second)
+		conns[2].Birth = now.Add(-20 * time.Second)
 		s.removeIdleOlderThan(now, 10*time.Second)
 
 		// Shouldn't be able to borrow anything and size should be zero
@@ -151,7 +154,7 @@ func TestServerPenalty(t *testing.T) {
 
 	// Add one busy connection to srv1
 	// Higher penalty to srv1 since it is in use
-	c11 := &fakeConn{id: 11}
+	c11 := &testutil.ConnFake{Id: 11}
 	srv1.registerBusy(c11)
 	assertGt(srv1, srv2, now)
 
@@ -162,7 +165,7 @@ func TestServerPenalty(t *testing.T) {
 	assertGt(srv2, srv1, now)
 
 	// Add an idle connection to srv2 to make both servers have one idle connection each.
-	c21 := &fakeConn{id: 21}
+	c21 := &testutil.ConnFake{Id: 21}
 	srv2.registerBusy(c21)
 	srv2.returnBusy(c21)
 
@@ -176,10 +179,10 @@ func TestServerPenalty(t *testing.T) {
 	assertGt(srv1, srv2, now)
 
 	// Add one more connection each to the servers
-	c12 := &fakeConn{id: 12}
+	c12 := &testutil.ConnFake{Id: 12}
 	srv1.registerBusy(c12)
 	srv1.returnBusy(c12)
-	c22 := &fakeConn{id: 22}
+	c22 := &testutil.ConnFake{Id: 22}
 	srv2.registerBusy(c22)
 	srv2.returnBusy(c22)
 

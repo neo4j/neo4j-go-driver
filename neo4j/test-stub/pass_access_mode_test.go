@@ -100,7 +100,7 @@ func Test_PassingAccessMode(t *testing.T) {
 			server := control.NewStubServer(t, port, script)
 			defer server.Finished(t)
 
-			driver := newDriver(t, "bolt+routing://localhost:9001")
+			driver := newDriver(t, "neo4j://localhost:9001")
 			defer driver.Close()
 
 			session, err := driver.Session(mode)
@@ -122,7 +122,7 @@ func Test_PassingAccessMode(t *testing.T) {
 			server := control.NewStubServer(t, port, script)
 			defer server.Finished(t)
 
-			driver := newDriver(t, "bolt+routing://localhost:9001")
+			driver := newDriver(t, "neo4j://localhost:9001")
 			defer driver.Close()
 
 			session, err := driver.Session(mode)

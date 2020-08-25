@@ -31,23 +31,16 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/neo4j/neo4j-go-driver/v4/neo4j/db"
 	"github.com/neo4j/neo4j-go-driver/v4/neo4j/log"
 )
 
-type Connection interface {
-	ServerName() string
-	IsAlive() bool
-	Reset()
-	Close()
-	Birthdate() time.Time
-}
-
-type Connect func(string) (Connection, error)
+type Connect func(string) (db.Connection, error)
 
 type qitem struct {
 	servers []string
 	wakeup  chan bool
-	conn    Connection
+	conn    db.Connection
 }
 
 type Pool struct {
@@ -156,7 +149,7 @@ func (p *Pool) CleanUp() {
 	}
 }
 
-func (p *Pool) tryBorrow(serverName string) (Connection, error) {
+func (p *Pool) tryBorrow(serverName string) (db.Connection, error) {
 	// For now, lock complete servers map to avoid over connecting but with the downside
 	// that long connect times will block connects to other servers as well. To fix this
 	// we would need to add a pending connect to the server and lock per server.
@@ -179,10 +172,12 @@ func (p *Pool) tryBorrow(serverName string) (Connection, error) {
 	}
 
 	// No idle connection, try to connect
+	p.log.Infof(logName, p.logId, "Connecting to %s", serverName)
 	c, err := p.connect(serverName)
 	if err != nil {
 		// Failed to connect, keep track that it was bad for a while
 		srv.notifyFailedConnect(p.now())
+		p.log.Warnf(logName, p.logId, "Failed to connect to %s: %s", serverName, err)
 		return nil, err
 	}
 
@@ -213,7 +208,7 @@ func (p *Pool) getPenaltiesForServers(serverNames []string) []serverPenalty {
 	return penalties
 }
 
-func (p *Pool) tryAnyIdle(serverNames []string) Connection {
+func (p *Pool) tryAnyIdle(serverNames []string) db.Connection {
 	p.serversMut.Lock()
 	defer p.serversMut.Unlock()
 	for _, serverName := range serverNames {
@@ -232,7 +227,7 @@ func (p *Pool) tryAnyIdle(serverNames []string) Connection {
 // Borrow tries to borrow an existing database connection or tries to create a new one
 // if none exists. The wait flag indicates if the caller wants to wait for a connection
 // to be returned if there aren't any idle connection available.
-func (p *Pool) Borrow(ctx context.Context, serverNames []string, wait bool) (Connection, error) {
+func (p *Pool) Borrow(ctx context.Context, serverNames []string, wait bool) (db.Connection, error) {
 	timeOut := func() bool {
 		select {
 		case <-ctx.Done():
@@ -256,7 +251,7 @@ func (p *Pool) Borrow(ctx context.Context, serverNames []string, wait bool) (Con
 	})
 
 	var err error
-	var conn Connection
+	var conn db.Connection
 	for _, s := range penalties {
 		// Check if we have timed out
 		if timeOut() {
@@ -321,7 +316,7 @@ func (p *Pool) Borrow(ctx context.Context, serverNames []string, wait bool) (Con
 	}
 }
 
-func (p *Pool) unreg(serverName string, c Connection, now time.Time) {
+func (p *Pool) unreg(serverName string, c db.Connection, now time.Time) {
 	p.serversMut.Lock()
 	defer p.serversMut.Unlock()
 
@@ -353,7 +348,7 @@ func (p *Pool) removeIdleOlderThanOnServer(serverName string, now time.Time, max
 	server.removeIdleOlderThan(now, maxAge)
 }
 
-func (p *Pool) Return(c Connection) {
+func (p *Pool) Return(c db.Connection) {
 	if p.closed {
 		p.log.Warnf(logName, p.logId, "Trying to return connection to closed pool")
 		return

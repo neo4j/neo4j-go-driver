@@ -21,35 +21,11 @@ package pool
 
 import (
 	"testing"
-	"time"
+
+	"github.com/neo4j/neo4j-go-driver/v4/neo4j/db"
 )
 
-type fakeConn struct {
-	serverName string
-	isAlive    bool
-	birthdate  time.Time
-	id         int
-}
-
-func (c *fakeConn) IsAlive() bool {
-	return c.isAlive
-}
-
-func (c *fakeConn) ServerName() string {
-	return c.serverName
-}
-
-func (c *fakeConn) Close() {
-}
-
-func (c *fakeConn) Reset() {
-}
-
-func (c *fakeConn) Birthdate() time.Time {
-	return c.birthdate
-}
-
-func assertConnection(t *testing.T, c Connection, err error) {
+func assertConnection(t *testing.T, c db.Connection, err error) {
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -58,7 +34,7 @@ func assertConnection(t *testing.T, c Connection, err error) {
 	}
 }
 
-func assertNoConnection(t *testing.T, c Connection, err error) {
+func assertNoConnection(t *testing.T, c db.Connection, err error) {
 	t.Helper()
 	if c != nil {
 		t.Fatal("Should not have connection")

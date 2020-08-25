@@ -69,10 +69,10 @@ There will be an updated driver version that supports Bolt protocol version 4 to
 
 ## Connecting to a causal cluster
 
-You just need to use `bolt+routing` as the URL scheme and set host of the URL to one of your core members of the cluster.
+You just need to use `neo4j` as the URL scheme and set host of the URL to one of your core members of the cluster.
 
 ```go
-if driver, err = neo4j.NewDriver("bolt+routing://localhost:7687", neo4j.BasicAuth("username", "password", "")); err != nil {
+if driver, err = neo4j.NewDriver("neo4j://localhost:7687", neo4j.BasicAuth("username", "password", "")); err != nil {
 	return err // handle error
 }
 ```

@@ -23,10 +23,8 @@ import (
 	"context"
 	"reflect"
 	"testing"
-	"time"
 
 	"github.com/neo4j/neo4j-go-driver/v4/neo4j/db"
-	"github.com/neo4j/neo4j-go-driver/v4/neo4j/internal/pool"
 )
 
 func assertErrorEq(t *testing.T, err1, err2 error) {
@@ -58,16 +56,16 @@ func (r *testRouter) CleanUp() {
 
 // Fake implementation of connection pool
 type testPool struct {
-	borrowConn pool.Connection
+	borrowConn db.Connection
 	err        error
 	returnHook func()
 }
 
-func (p *testPool) Borrow(ctx context.Context, serverNames []string, wait bool) (pool.Connection, error) {
+func (p *testPool) Borrow(ctx context.Context, serverNames []string, wait bool) (db.Connection, error) {
 	return p.borrowConn, p.err
 }
 
-func (p *testPool) Return(c pool.Connection) {
+func (p *testPool) Return(c db.Connection) {
 	if p.returnHook != nil {
 		p.returnHook()
 	}
@@ -76,6 +74,7 @@ func (p *testPool) Return(c pool.Connection) {
 func (p *testPool) CleanUp() {
 }
 
+/*
 // Fake implementation of db connection
 type testConn struct {
 	err           error
@@ -146,3 +145,4 @@ func (c *testConn) Reset() {
 
 func (c *testConn) Close() {
 }
+*/

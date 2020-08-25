@@ -28,58 +28,16 @@ import (
 	"github.com/neo4j/neo4j-go-driver/v4/neo4j/log"
 )
 
-// TrustStrategy defines how the driver will establish trust with the neo4j instance
-type TrustStrategy struct {
-	certificates       []*x509.Certificate
-	skipVerify         bool
-	skipVerifyHostname bool
-}
-
-// TrustAny returns a trust strategy which skips trust verification (trusts any certificate
-// provided) and whose hostname verification can be enabled/disabled based on the provided
-// parameter
-func TrustAny(verifyHostname bool) TrustStrategy {
-	return TrustStrategy{
-		certificates:       nil,
-		skipVerify:         true,
-		skipVerifyHostname: !verifyHostname,
-	}
-}
-
-// TrustSystem returns a trust strategy which uses system provided certificates for
-// trust verification and whose hostname verification can be enabled/disabled based
-// on the provided parameter
-func TrustSystem(verifyHostname bool) TrustStrategy {
-	return TrustStrategy{
-		certificates:       nil,
-		skipVerify:         false,
-		skipVerifyHostname: !verifyHostname,
-	}
-}
-
-// TrustOnly returns a trust strategy which uses provided certificates for trust
-// verification and whose hostname verification can be enabled/disabled based
-// on the provided parameter
-func TrustOnly(verifyHostname bool, certs ...*x509.Certificate) TrustStrategy {
-	return TrustStrategy{
-		certificates:       certs,
-		skipVerify:         false,
-		skipVerifyHostname: !verifyHostname,
-	}
-}
-
 // A Config contains options that can be used to customize certain
 // aspects of the driver
 type Config struct {
-	// Whether to turn on/off TLS encryption.
+	// RootCAs defines the set of certificate authorities that the driver trusts. If set
+	// to nil, the driver uses hosts system certificates.
 	//
-	// default: true
-	Encrypted bool
-	// Sets how the driver establishes trust with the Neo4j instance
-	// it is connected to.
-	//
-	// default: TrustAny(false)
-	TrustStrategy TrustStrategy
+	// The trusted certificates are used to validate connections for URI schemes 'bolt+s'
+	// and 'neo4j+s'.
+	RootCAs *x509.CertPool
+
 	// Logging target the driver will send its log outputs
 	//
 	// Possible to use custom logger (implement neo4j.log.Logger interface) or
@@ -89,7 +47,7 @@ type Config struct {
 	Log log.Logger
 	// Resolver that would be used to resolve initial router address. This may
 	// be useful if you want to provide more than one URL for initial router.
-	// If not specified, the provided bolt+routing URL is used as the initial
+	// If not specified, the URL provided to NewDriver is used as the initial
 	// router.
 	//
 	// default: nil
@@ -130,8 +88,6 @@ type Config struct {
 
 func defaultConfig() *Config {
 	return &Config{
-		Encrypted:                    true,
-		TrustStrategy:                TrustAny(false),
 		AddressResolver:              nil,
 		MaxTransactionRetryTime:      30 * time.Second,
 		MaxConnectionPoolSize:        100,
@@ -139,6 +95,7 @@ func defaultConfig() *Config {
 		ConnectionAcquisitionTimeout: 1 * time.Minute,
 		SocketConnectTimeout:         5 * time.Second,
 		SocketKeepalive:              true,
+		RootCAs:                      nil,
 	}
 }
 

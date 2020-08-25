@@ -132,7 +132,6 @@ func newCluster(path string) (*Cluster, error) {
 
 	authToken := neo4j.BasicAuth(username, password, "")
 	config := func(config *neo4j.Config) {
-		config.Encrypted = useEncryption()
 		config.Log = neo4j.ConsoleLogger(logLevel())
 		config.AddressResolver = func(address neo4j.ServerAddress) []neo4j.ServerAddress {
 			servers := make([]neo4j.ServerAddress, len(cluster.Members))
@@ -202,6 +201,6 @@ func newClusterMember(uri string, path string) (*ClusterMember, error) {
 
 	return &ClusterMember{
 		HostnameAndPort: fmt.Sprintf("%s:%s", parsedURI.Hostname(), port),
-		RoutingURI:      fmt.Sprintf("bolt+routing://%s:%s", parsedURI.Hostname(), port),
+		RoutingURI:      fmt.Sprintf("neo4j://%s:%s", parsedURI.Hostname(), port),
 	}, nil
 }

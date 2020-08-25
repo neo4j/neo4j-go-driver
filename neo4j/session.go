@@ -28,8 +28,6 @@ import (
 
 	"github.com/neo4j/neo4j-go-driver/v4/neo4j/db"
 	"github.com/neo4j/neo4j-go-driver/v4/neo4j/log"
-
-	"github.com/neo4j/neo4j-go-driver/v4/neo4j/internal/pool"
 )
 
 // TransactionWork represents a unit of work that will be executed against the provided
@@ -64,8 +62,8 @@ type SessionConfig struct {
 
 // Connection pool as seen by the session.
 type sessionPool interface {
-	Borrow(ctx context.Context, serverNames []string, wait bool) (pool.Connection, error)
-	Return(c pool.Connection)
+	Borrow(ctx context.Context, serverNames []string, wait bool) (db.Connection, error)
+	Return(c db.Connection)
 	CleanUp()
 }
 

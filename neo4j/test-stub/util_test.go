@@ -85,7 +85,6 @@ func assertStringEq(t *testing.T, s1, s2 string) {
 
 func newDriver(t *testing.T, uri string) neo4j.Driver {
 	driver, err := neo4j.NewDriver(uri, neo4j.NoAuth(), func(config *neo4j.Config) {
-		config.Encrypted = false
 		config.Log = neo4j.ConsoleLogger(logLevel())
 	})
 	assertNoError(t, err)
