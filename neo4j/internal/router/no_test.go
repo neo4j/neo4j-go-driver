@@ -21,72 +21,20 @@ package router
 
 import (
 	"context"
-	"time"
 
 	"github.com/neo4j/neo4j-go-driver/v4/neo4j/db"
-	poolpackage "github.com/neo4j/neo4j-go-driver/v4/neo4j/internal/pool"
 )
 
 type poolFake struct {
-	borrow   func(names []string, cancel context.CancelFunc) (poolpackage.Connection, error)
-	returned []poolpackage.Connection
+	borrow   func(names []string, cancel context.CancelFunc) (db.Connection, error)
+	returned []db.Connection
 	cancel   context.CancelFunc
 }
 
-func (p *poolFake) Borrow(ctx context.Context, servers []string, wait bool) (poolpackage.Connection, error) {
+func (p *poolFake) Borrow(ctx context.Context, servers []string, wait bool) (db.Connection, error) {
 	return p.borrow(servers, p.cancel)
 }
 
-func (p *poolFake) Return(c poolpackage.Connection) {
+func (p *poolFake) Return(c db.Connection) {
 	p.returned = append(p.returned, c)
-}
-
-type connFake struct {
-	name  string
-	table *db.RoutingTable
-	err   error
-}
-
-func (c *connFake) ServerName() string {
-	return c.name
-}
-
-func (c *connFake) IsAlive() bool {
-	return true
-}
-
-func (c *connFake) Reset() {
-}
-
-func (c *connFake) Close() {
-}
-
-func (c *connFake) Birthdate() time.Time {
-	return time.Now()
-}
-
-func (c *connFake) GetRoutingTable(database string, context map[string]string) (*db.RoutingTable, error) {
-	return c.table, c.err
-}
-
-type connFakeNoDiscovery struct {
-	name string
-}
-
-func (c *connFakeNoDiscovery) ServerName() string {
-	return c.name
-}
-
-func (c *connFakeNoDiscovery) IsAlive() bool {
-	return true
-}
-
-func (c *connFakeNoDiscovery) Reset() {
-}
-
-func (c *connFakeNoDiscovery) Close() {
-}
-
-func (c *connFakeNoDiscovery) Birthdate() time.Time {
-	return time.Now()
 }

@@ -31,6 +31,7 @@ import (
 	"github.com/neo4j/neo4j-go-driver/v4/neo4j/db"
 	"github.com/neo4j/neo4j-go-driver/v4/neo4j/log"
 
+	"github.com/neo4j/neo4j-go-driver/v4/neo4j/internal/connector"
 	"github.com/neo4j/neo4j-go-driver/v4/neo4j/internal/pool"
 	"github.com/neo4j/neo4j-go-driver/v4/neo4j/internal/router"
 )
@@ -69,13 +70,12 @@ var driverLogName = "driver"
 // be called in order to establish a connection to a neo4j database. It requires a Bolt URI and an authentication
 // token as parameters and can also take optional configuration function(s) as variadic parameters.
 //
-// In order to connect to a single instance database, you need to pass a URI with scheme 'bolt'
+// In order to connect to a single instance database, you need to pass a URI with scheme 'bolt', 'bolt+s' or 'bolt+ssc'.
 //	driver, err = NewDriver("bolt://db.server:7687", BasicAuth(username, password))
 //
-// In order to connect to a causal cluster database, you need to pass a URI with scheme 'bolt+routing' or 'neo4j'
-// and its host part set to be one of the core cluster members. Please note that 'bolt+routing' scheme will be
-// removed with 2.0 series of drivers.
-//	driver, err = NewDriver("bolt+routing://core.db.server:7687", BasicAuth(username, password))
+// In order to connect to a causal cluster database, you need to pass a URI with scheme 'neo4j', 'neo4j+s' or 'neo4j+ssc'
+// and its host part set to be one of the core cluster members.
+//	driver, err = NewDriver("neo4j://core.db.server:7687", BasicAuth(username, password))
 //
 // You can override default configuration options by providing a configuration function(s)
 //	driver, err = NewDriver(uri, BasicAuth(username, password), function (config *Config) {
@@ -86,55 +86,70 @@ func NewDriver(target string, auth AuthToken, configurers ...func(*Config)) (Dri
 	if err != nil {
 		return nil, err
 	}
-
 	if parsed.Port() == "" {
 		parsed.Host = parsed.Host + ":7687"
 	}
 
-	directRouting := false
+	d := driver{target: parsed}
+
+	routing := true
 	switch parsed.Scheme {
 	case "bolt":
-		if len(parsed.RawQuery) > 0 {
-			return nil, newDriverError("routing context is not supported for direct driver")
-		}
-		directRouting = true
-	case "bolt+routing", "neo4j":
+		routing = false
+		d.connector.SkipEncryption = true
+	case "bolt+s":
+		routing = false
+	case "bolt+ssc":
+		d.connector.SkipVerify = true
+		routing = false
+	case "neo4j":
+		d.connector.SkipEncryption = true
+	case "neo4j+ssc":
+		d.connector.SkipVerify = true
+	case "neo4j+s":
 	default:
 		return nil, newDriverError("url scheme %s is not supported", parsed.Scheme)
 	}
 
-	config := defaultConfig()
-	for _, configurer := range configurers {
-		configurer(config)
+	if !routing && len(parsed.RawQuery) > 0 {
+		return nil, newDriverError("routing context is not supported for direct driver")
 	}
-	if err := validateAndNormaliseConfig(config); err != nil {
+
+	// Apply client hooks for setting up configuration
+	d.config = defaultConfig()
+	for _, configurer := range configurers {
+		configurer(d.config)
+	}
+	if err := validateAndNormaliseConfig(d.config); err != nil {
 		return nil, err
 	}
 
 	// Setup logging
-	var logger log.Logger = config.Log
-	if logger == nil {
+	d.log = d.config.Log
+	if d.log == nil {
 		// Default to void logger
-		logger = &VoidLog{}
+		d.log = &VoidLog{}
 	}
-	id := atomic.AddUint32(&driverid, 1)
-	logId := strconv.FormatUint(uint64(id), 10)
+	d.logId = strconv.FormatUint(uint64(atomic.AddUint32(&driverid, 1)), 10)
 
-	connector := newConnector(config, auth.tokens, logger)
-	pool := pool.New(config.MaxConnectionPoolSize, config.MaxConnectionLifetime, connector.connect, logger)
+	// Continue to setup connector
+	d.connector.RootCAs = d.config.RootCAs
+	d.connector.Log = d.log
+	d.connector.Auth = auth.tokens
 
-	var sessRouter sessionRouter
-	if directRouting {
-		sessRouter = &directRouter{server: parsed.Host}
+	d.pool = pool.New(d.config.MaxConnectionPoolSize, d.config.MaxConnectionLifetime, d.connector.Connect, d.log)
+
+	if !routing {
+		d.router = &directRouter{server: parsed.Host}
 	} else {
 		routingContext, err := routingContextFromUrl(parsed)
 		if err != nil {
-			logger.Error(driverLogName, logId, err)
+			d.log.Error(driverLogName, d.logId, err)
 			return nil, err
 		}
 
 		var routersResolver func() []string
-		addressResolverHook := config.AddressResolver
+		addressResolverHook := d.config.AddressResolver
 		if addressResolverHook != nil {
 			routersResolver = func() []string {
 				addresses := addressResolverHook(parsed)
@@ -145,19 +160,11 @@ func NewDriver(target string, auth AuthToken, configurers ...func(*Config)) (Dri
 				return servers
 			}
 		}
-		sessRouter = router.New(parsed.Host, routersResolver, routingContext, pool, logger)
+		d.router = router.New(parsed.Host, routersResolver, routingContext, d.pool, d.log)
 	}
 
-	driver := &driver{
-		target: parsed,
-		config: config,
-		pool:   pool,
-		router: sessRouter,
-		log:    logger,
-		logId:  logId,
-	}
-	logger.Infof(driverLogName, logId, "Created { target: %s }", target)
-	return driver, nil
+	d.log.Infof(driverLogName, d.logId, "Created { target: %s }", target)
+	return &d, nil
 }
 
 var driverid uint32
@@ -190,13 +197,14 @@ type sessionRouter interface {
 }
 
 type driver struct {
-	target *url.URL
-	config *Config
-	pool   *pool.Pool
-	mut    sync.Mutex
-	router sessionRouter
-	logId  string
-	log    log.Logger
+	target    *url.URL
+	config    *Config
+	pool      *pool.Pool
+	mut       sync.Mutex
+	connector connector.Connector
+	router    sessionRouter
+	logId     string
+	log       log.Logger
 }
 
 func (d *driver) Target() url.URL {

@@ -28,7 +28,6 @@ import (
 	"time"
 
 	"github.com/neo4j/neo4j-go-driver/v4/neo4j/db"
-	poolpackage "github.com/neo4j/neo4j-go-driver/v4/neo4j/internal/pool"
 	"github.com/neo4j/neo4j-go-driver/v4/neo4j/internal/testutil"
 )
 
@@ -43,9 +42,9 @@ func TestMultithreading(t *testing.T) {
 	num := 0
 	table := &db.RoutingTable{Readers: []string{"rd1", "rd2"}, Writers: []string{"wr"}, TimeToLive: 1}
 	pool := &poolFake{
-		borrow: func(names []string, cancel context.CancelFunc) (poolpackage.Connection, error) {
+		borrow: func(names []string, cancel context.CancelFunc) (db.Connection, error) {
 			num++
-			return &connFake{table: table}, nil
+			return &testutil.ConnFake{Table: table}, nil
 		},
 	}
 	n := time.Now()
@@ -99,9 +98,9 @@ func TestRespectsTimeToLiveAndInvalidate(t *testing.T) {
 	numfetch := 0
 	table := &db.RoutingTable{TimeToLive: 1}
 	pool := &poolFake{
-		borrow: func(names []string, cancel context.CancelFunc) (poolpackage.Connection, error) {
+		borrow: func(names []string, cancel context.CancelFunc) (db.Connection, error) {
 			numfetch++
-			return &connFake{table: table}, nil
+			return &testutil.ConnFake{Table: table}, nil
 		},
 	}
 	nzero := time.Now()
@@ -204,7 +203,7 @@ func TestUsesRootRouterWhenPreviousRoutersFails(t *testing.T) {
 func TestUseGetRoutersHookWhenInitialRouterFails(t *testing.T) {
 	tried := []string{}
 	pool := &poolFake{
-		borrow: func(names []string, cancel context.CancelFunc) (poolpackage.Connection, error) {
+		borrow: func(names []string, cancel context.CancelFunc) (db.Connection, error) {
 			tried = append(tried, names...)
 			return nil, errors.New("fail")
 		},
@@ -229,10 +228,10 @@ func TestWritersFailAfterNRetries(t *testing.T) {
 	numfetch := 0
 	tableNoWriters := &db.RoutingTable{TimeToLive: 1, Routers: []string{"rt1", "rt2"}, Readers: []string{"rd1"}}
 	pool := &poolFake{
-		borrow: func(names []string, cancel context.CancelFunc) (poolpackage.Connection, error) {
+		borrow: func(names []string, cancel context.CancelFunc) (db.Connection, error) {
 			// Return no writers first time and writers the second time
 			numfetch++
-			return &connFake{table: tableNoWriters}, nil
+			return &testutil.ConnFake{Table: tableNoWriters}, nil
 		},
 	}
 	numsleep := 0
@@ -263,13 +262,13 @@ func TestWritersRetriesWhenNoWriters(t *testing.T) {
 	tableNoWriters := &db.RoutingTable{TimeToLive: 1, Routers: []string{"rt1", "rt2"}, Readers: []string{"rd1"}}
 	tableWriters := &db.RoutingTable{TimeToLive: 1, Routers: []string{"rt1", "rt2"}, Readers: []string{"rd1"}, Writers: []string{"wr1"}}
 	pool := &poolFake{
-		borrow: func(names []string, cancel context.CancelFunc) (poolpackage.Connection, error) {
+		borrow: func(names []string, cancel context.CancelFunc) (db.Connection, error) {
 			// Return no writers first time and writers the second time
 			numfetch++
 			if numfetch == 1 {
-				return &connFake{table: tableNoWriters}, nil
+				return &testutil.ConnFake{Table: tableNoWriters}, nil
 			}
-			return &connFake{table: tableWriters}, nil
+			return &testutil.ConnFake{Table: tableWriters}, nil
 		},
 	}
 	numsleep := 0
@@ -299,8 +298,8 @@ func TestWritersRetriesWhenNoWriters(t *testing.T) {
 func TestCleanUp(t *testing.T) {
 	table := &db.RoutingTable{TimeToLive: 1}
 	pool := &poolFake{
-		borrow: func(names []string, cancel context.CancelFunc) (poolpackage.Connection, error) {
-			return &connFake{table: table}, nil
+		borrow: func(names []string, cancel context.CancelFunc) (db.Connection, error) {
+			return &testutil.ConnFake{Table: table}, nil
 		},
 	}
 	now := time.Now()

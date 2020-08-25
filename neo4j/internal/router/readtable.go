@@ -23,7 +23,6 @@ import (
 	"context"
 
 	"github.com/neo4j/neo4j-go-driver/v4/neo4j/db"
-	poolpackage "github.com/neo4j/neo4j-go-driver/v4/neo4j/internal/pool"
 )
 
 // Tries to read routing table from any of the specified routers using new or existing connection
@@ -36,7 +35,7 @@ func readTable(ctx context.Context, pool Pool, database string, routers []string
 	// can't force the pool to not re-use these when putting them back in the pool and retrieving
 	// another db.
 	for _, router := range routers {
-		var conn poolpackage.Connection
+		var conn db.Connection
 		if conn, err = pool.Borrow(ctx, []string{router}, true); err != nil {
 			// Check if failed due to context timing out
 			if ctx.Err() != nil {
@@ -46,16 +45,8 @@ func readTable(ctx context.Context, pool Pool, database string, routers []string
 			continue
 		}
 
-		discovery, ok := conn.(db.ClusterDiscovery)
-		if !ok {
-			err = &db.RoutingNotSupportedError{Server: conn.ServerName()}
-			err = wrapInReadRoutingTableError(router, err)
-			pool.Return(conn)
-			continue
-		}
-
 		var table *db.RoutingTable
-		table, err = discovery.GetRoutingTable(database, routerContext)
+		table, err = conn.GetRoutingTable(database, routerContext)
 		pool.Return(conn)
 		if err == nil {
 			return table, nil
