@@ -73,15 +73,17 @@ func (b *backend) writeError(err error) {
 	// Convert error if it is a known type of error.
 	// This is very simple right now, no extra information is sent at all just keep
 	// track of this error so that we can reuse the real thing within a retryable tx
-	if neo4j.IsTransientError(err) {
+	if neo4j.IsTransientError(err) || neo4j.IsClientError(err) || neo4j.IsServiceUnavailable(err) || neo4j.IsAuthenticationError(err) || neo4j.IsSecurityError(err) {
 		id := b.setError(err)
 		b.writeResponse("DriverError", map[string]interface{}{"id": id})
 		return
 	}
 
+	// This is an error that originated in frontend
 	clientErr, isClientErr := err.(*clientError)
 	if isClientErr {
 		b.writeResponse("ClientError", map[string]interface{}{"msg": clientErr.msg})
+		return
 	}
 
 	// TODO: Return the other kinds of errors as well...
@@ -128,6 +130,7 @@ func (b *backend) process() bool {
 			if !in_request {
 				panic("Line while not in request")
 			}
+
 			request = request + line
 		}
 	}
@@ -140,7 +143,18 @@ func (b *backend) writeResponse(name string, data interface{}) {
 	if err != nil {
 		panic(err.Error())
 	}
-	b.wr.WriteString("#response begin\n" + string(responseJson) + "\n" + "#response end\n")
+	_, err = b.wr.WriteString("#response begin\n")
+	if err != nil {
+		panic(err.Error())
+	}
+	_, err = b.wr.WriteString(string(responseJson) + "\n")
+	if err != nil {
+		panic(err.Error())
+	}
+	_, err = b.wr.WriteString("#response end\n")
+	if err != nil {
+		panic(err.Error())
+	}
 	b.wr.Flush()
 }
 
