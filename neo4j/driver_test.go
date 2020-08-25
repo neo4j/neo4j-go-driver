@@ -93,7 +93,6 @@ var uriSchemeTests = []struct {
 }{
 	{"bolt://", "bolt", "bolt://localhost:7687", false},
 	{"neo4j://", "neo4j", "neo4j://localhost:7687", true},
-	//{"bolt+routing://", "bolt+routing", "bolt+routing://localhost:7687", true},
 }
 
 func TestDriverURISchemesX(t *testing.T) {
@@ -206,93 +205,37 @@ func TestNewDriverAndClose(t *testing.T) {
 
 }
 
-func TestDriverSessionCreation(t *testing.T) {
+var driverSessionCreationTests = []struct {
+	name      string
+	testing   string
+	mode      AccessMode
+	bookmarks []string
+}{
+	{"case one", "bolt://localhost:7687", AccessModeWrite, []string(nil)},
+	{"case two", "bolt://localhost:7687", AccessModeRead, []string(nil)},
+	{"case three", "bolt://localhost:7687", AccessModeWrite, []string{"B1", "B2", "B3"}},
+	{"case four", "bolt://localhost:7687", AccessModeRead, []string{"B1", "B2", "B3", "B4"}},
+}
 
-	t.Run("case one", func(t1 *testing.T) {
-		uri := "bolt://localhost:7687"
-		mode := AccessModeWrite
-		bookmarks := []string(nil)
+func TestDriverSessionCreationX(t *testing.T) {
+	for _, tt := range driverSessionCreationTests {
+		t.Run(tt.name, func(t *testing.T) {
+			driver, err := NewDriver(tt.testing, NoAuth())
+			assertNoError(t, err)
 
-		driver, err := NewDriver(uri, NoAuth())
-		assertNoError(t1, err)
+			sessi, err := driver.Session(tt.mode, tt.bookmarks...)
+			assertNoError(t, err)
 
-		sessi, err := driver.Session(mode, bookmarks...)
-		assertNoError(t1, err)
+			sess := sessi.(*session)
 
-		sess := sessi.(*session)
+			if AccessMode(sess.defaultMode) != tt.mode {
+				t.Errorf("the defaultMode was not correctly set %v", AccessMode(sess.defaultMode))
+			}
 
-		if AccessMode(sess.defaultMode) != mode {
-			t1.Errorf("the defaultMode was not correctly set %v", AccessMode(sess.defaultMode))
-		}
+			if len(sess.bookmarks) != len(tt.bookmarks) {
+				t.Errorf("the bookmarks was not correctly set %v", sess.bookmarks)
+			}
+		})
 
-		if len(sess.bookmarks) != len(bookmarks) {
-			t1.Errorf("the bookmarks was not correctly set %v", sess.bookmarks)
-		}
-	})
-
-	t.Run("case two", func(t1 *testing.T) {
-		uri := "bolt://localhost:7687"
-		mode := AccessModeRead
-		bookmarks := []string(nil)
-
-		driver, err := NewDriver(uri, NoAuth())
-		assertNoError(t1, err)
-
-		sessi, err := driver.Session(mode, bookmarks...)
-		assertNoError(t1, err)
-
-		sess := sessi.(*session)
-
-		if AccessMode(sess.defaultMode) != mode {
-			t1.Errorf("the defaultMode was not correctly set %v", AccessMode(sess.defaultMode))
-		}
-
-		if len(sess.bookmarks) != len(bookmarks) {
-			t1.Errorf("the bookmarks was not correctly set %v", sess.bookmarks)
-		}
-	})
-
-	t.Run("case three", func(t1 *testing.T) {
-		uri := "bolt://localhost:7687"
-		mode := AccessModeWrite
-		bookmarks := []string{"B1", "B2", "B3"}
-
-		driver, err := NewDriver(uri, NoAuth())
-		assertNoError(t1, err)
-
-		sessi, err := driver.Session(mode, bookmarks...)
-		assertNoError(t1, err)
-
-		sess := sessi.(*session)
-
-		if AccessMode(sess.defaultMode) != mode {
-			t1.Errorf("the defaultMode was not correctly set %v", AccessMode(sess.defaultMode))
-		}
-
-		if len(sess.bookmarks) != len(bookmarks) {
-			t1.Errorf("the bookmarks was not correctly set %v", sess.bookmarks)
-		}
-	})
-
-	t.Run("case four", func(t1 *testing.T) {
-		uri := "bolt://localhost:7687"
-		mode := AccessModeRead
-		bookmarks := []string{"B1", "B2", "B3", "B4"}
-
-		driver, err := NewDriver(uri, NoAuth())
-		assertNoError(t1, err)
-
-		sessi, err := driver.Session(mode, bookmarks...)
-		assertNoError(t1, err)
-
-		sess := sessi.(*session)
-
-		if AccessMode(sess.defaultMode) != mode {
-			t1.Errorf("the defaultMode was not correctly set %v", AccessMode(sess.defaultMode))
-		}
-
-		if len(sess.bookmarks) != len(bookmarks) {
-			t1.Errorf("the bookmarks was not correctly set %v", sess.bookmarks)
-		}
-	})
+	}
 }
