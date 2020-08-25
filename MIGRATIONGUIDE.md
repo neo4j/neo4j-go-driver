@@ -85,4 +85,5 @@ internally since 1.8. Since 1.8 driver was backwards compatible with 1.7 all int
 calls were remapped to the public interface, this is now gone.
 
 Driver config (include logging here???)
+TODO: Trust strategies has been removed from config, relies on 4.0 URI scheme instead.
 
