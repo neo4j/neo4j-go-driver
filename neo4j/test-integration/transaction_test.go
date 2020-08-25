@@ -20,10 +20,10 @@
 package test_integration
 
 import (
+	"errors"
 	"time"
 
 	//"github.com/neo4j/neo4j-go-driver/v4/neo4j/test-integration/utils"
-	"github.com/pkg/errors"
 
 	"github.com/neo4j/neo4j-go-driver/v4/neo4j"
 	"github.com/neo4j/neo4j-go-driver/v4/neo4j/test-integration/control"
