@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 
 	"github.com/neo4j/neo4j-go-driver/v4/neo4j"
 )
@@ -13,7 +14,7 @@ import (
 // Tracks all objects (and errors) that is created by testkit frontend.
 type backend struct {
 	rd             *bufio.Reader // Socket to read requests from
-	wr             *bufio.Writer // Socket to write responses (and logs) on
+	wr             io.Writer     // Socket to write responses (and logs) on, don't buffer (WriteString on bufio was weird...)
 	drivers        map[string]neo4j.Driver
 	sessionStates  map[string]*sessionState
 	results        map[string]neo4j.Result
@@ -36,7 +37,7 @@ const (
 	retryable_negative = -1
 )
 
-func newBackend(rd *bufio.Reader, wr *bufio.Writer) *backend {
+func newBackend(rd *bufio.Reader, wr io.Writer) *backend {
 	return &backend{
 		rd:             rd,
 		wr:             wr,
@@ -55,6 +56,12 @@ type clientError struct {
 
 func (e *clientError) Error() string {
 	return e.msg
+}
+
+func (b *backend) writeLine(s string) error {
+	bs := []byte(s + "\n")
+	_, err := b.wr.Write(bs)
+	return err
 }
 
 // Reads and writes to the socket until it is closed
@@ -107,8 +114,7 @@ func (b *backend) process() bool {
 	for {
 		line, err := b.rd.ReadString('\n')
 		if err != nil {
-			b.wr.WriteString(err.Error() + "\n")
-			b.wr.Flush()
+			b.writeLine(err.Error())
 			return false
 		}
 
@@ -143,19 +149,18 @@ func (b *backend) writeResponse(name string, data interface{}) {
 	if err != nil {
 		panic(err.Error())
 	}
-	_, err = b.wr.WriteString("#response begin\n")
+	err = b.writeLine("#response begin")
 	if err != nil {
 		panic(err.Error())
 	}
-	_, err = b.wr.WriteString(string(responseJson) + "\n")
+	err = b.writeLine(string(responseJson))
 	if err != nil {
 		panic(err.Error())
 	}
-	_, err = b.wr.WriteString("#response end\n")
+	err = b.writeLine("#response end")
 	if err != nil {
 		panic(err.Error())
 	}
-	b.wr.Flush()
 }
 
 func (b *backend) toRequest(s string) map[string]interface{} {
@@ -185,7 +190,7 @@ func (b *backend) handleRequest(req map[string]interface{}) {
 			return
 		}
 		driver, err := neo4j.NewDriver(data["uri"].(string), authToken, func(c *neo4j.Config) {
-			c.Log = &streamLog{wr: b.wr} //neo4j.ConsoleLogger(neo4j.DEBUG)
+			c.Log = &streamLog{writeLine: b.writeLine}
 		})
 		if err != nil {
 			b.writeError(err)
