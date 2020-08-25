@@ -80,49 +80,58 @@ func assertStringContain(t *testing.T, str, substr string) {
 	}
 }
 
-func TestDriverURISchemes(t *testing.T) {
-
-	t.Run("bolt://", func(t1 *testing.T) {
-		driver, err := NewDriver("bolt://localhost:7687", NoAuth())
-
-		assertNoError(t1, err)
-		assertStringEqual(t1, driver.Target().Scheme, "bolt")
-		assertNoRouter(t1, driver)
-	})
-
-	t.Run("neo4j://", func(t1 *testing.T) {
-		driver, err := NewDriver("neo4j://localhost:7687", NoAuth())
-
-		assertNoError(t1, err)
-		assertStringEqual(t1, driver.Target().Scheme, "neo4j")
-		assertRouter(t1, driver)
-	})
-
-	//old bolt+routing should be removed in 4.0 and only use neo4j scheme
-	t.Run("bolt+routing://", func(t1 *testing.T) {
-		driver, err := NewDriver("bolt+routing://localhost:7687", NoAuth())
-
-		assertNoError(t1, err)
-		assertStringEqual(t1, driver.Target().Scheme, "bolt+routing")
-		assertRouter(t1, driver)
-	})
-
-	//TODO
-	//bolt+ssc://
-	//neo4j+ssc://
-	//bolt+s://
-	//neo4j+s://
+//TODO
+//bolt+ssc://
+//neo4j+ssc://
+//bolt+s://
+//neo4j+s://
+var uriSchemeTests = []struct {
+	name    string
+	scheme  string
+	testing string
+	router  bool
+}{
+	{"bolt://", "bolt", "bolt://localhost:7687", false},
+	{"neo4j://", "neo4j", "neo4j://localhost:7687", true},
+	//{"bolt+routing://", "bolt+routing", "bolt+routing://localhost:7687", true},
 }
 
-func TestDriverInvalidURISchemes(t *testing.T) {
+func TestDriverURISchemesX(t *testing.T) {
+	for _, tt := range uriSchemeTests {
+		t.Run(tt.name, func(t *testing.T) {
+			driver, err := NewDriver(tt.testing, NoAuth())
 
-	t.Run("anotherscheme://", func(t1 *testing.T) {
-		_, err := NewDriver("anotherscheme://localhost:7687", NoAuth())
+			assertNoError(t, err)
+			assertStringEqual(t, driver.Target().Scheme, tt.scheme)
+			if !tt.router {
+				assertNoRouter(t, driver)
+			} else {
+				assertRouter(t, driver)
+			}
+		})
 
-		assertError(t1, err)
-		assertStringContain(t1, err.Error(), "scheme")
-	})
+	}
+}
 
+var invalidURISchemeTests = []struct {
+	name    string
+	scheme  string
+	testing string
+}{
+	{"bolt+routing://", "bolt+routing", "bolt+routing://localhost:7687"},
+	{"invalid://", "invalid", "invalid://localhost:7687"},
+}
+
+func TestDriverInvalidURISchemesX(t *testing.T) {
+	for _, tt := range invalidURISchemeTests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := NewDriver(tt.testing, NoAuth())
+
+			assertError(t, err)
+			assertStringContain(t, err.Error(), "scheme")
+		})
+
+	}
 }
 
 func TestDriverURIRoutingContext(t *testing.T) {
