@@ -19,7 +19,7 @@ func main() {
 			panic(err)
 		}
 		// Hand over connection to backend
-		backend := newBackend(bufio.NewReader(conn), bufio.NewWriter(conn))
+		backend := newBackend(bufio.NewReader(conn), conn)
 		backend.serve()
 	}
 }
