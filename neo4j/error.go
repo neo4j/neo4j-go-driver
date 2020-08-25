@@ -22,6 +22,7 @@ package neo4j
 import (
 	"fmt"
 	"github.com/neo4j/neo4j-go-driver/v4/neo4j/db"
+	"github.com/neo4j/neo4j-go-driver/v4/neo4j/internal/connector"
 	"github.com/neo4j/neo4j-go-driver/v4/neo4j/internal/pool"
 )
 
@@ -40,7 +41,7 @@ func newDriverError(format string, args ...interface{}) *driverError {
 // IsSecurityError is a utility method to check if the provided error is related with any
 // TLS failure or authentication issues.
 func IsSecurityError(err error) bool {
-	_, is := err.(*tlsError)
+	_, is := err.(connector.TlsError)
 	return is
 }
 
@@ -83,7 +84,7 @@ func IsSessionExpired(err error) bool {
 // IsServiceUnavailable is a utility method to check if the provided error can be classified
 // to be in service unavailable category.
 func IsServiceUnavailable(err error) bool {
-	_, is := err.(*connectError)
+	_, is := err.(connector.TlsError)
 	if is {
 		return true
 	}

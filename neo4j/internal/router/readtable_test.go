@@ -25,7 +25,7 @@ import (
 	"testing"
 
 	"github.com/neo4j/neo4j-go-driver/v4/neo4j/db"
-	poolpackage "github.com/neo4j/neo4j-go-driver/v4/neo4j/internal/pool"
+	"github.com/neo4j/neo4j-go-driver/v4/neo4j/internal/testutil"
 )
 
 func TestReadTableTable(ot *testing.T) {
@@ -72,7 +72,7 @@ func TestReadTableTable(ot *testing.T) {
 			routers: standardRouters,
 			assert:  assertNoTable,
 			pool: &poolFake{
-				borrow: func(names []string, cancel context.CancelFunc) (poolpackage.Connection, error) {
+				borrow: func(names []string, cancel context.CancelFunc) (db.Connection, error) {
 					return nil, errors.New("borrow fail")
 				},
 			},
@@ -83,8 +83,8 @@ func TestReadTableTable(ot *testing.T) {
 			routers: standardRouters,
 			assert:  assertTable,
 			pool: &poolFake{
-				borrow: func(names []string, cancel context.CancelFunc) (poolpackage.Connection, error) {
-					return &connFake{table: &db.RoutingTable{}}, nil
+				borrow: func(names []string, cancel context.CancelFunc) (db.Connection, error) {
+					return &testutil.ConnFake{Table: &db.RoutingTable{}}, nil
 				},
 			},
 			numReturns: 1,
@@ -94,9 +94,9 @@ func TestReadTableTable(ot *testing.T) {
 			routers: standardRouters,
 			assert:  assertTable,
 			pool: &poolFake{
-				borrow: func(names []string, cancel context.CancelFunc) (poolpackage.Connection, error) {
+				borrow: func(names []string, cancel context.CancelFunc) (db.Connection, error) {
 					if names[0] == "router2" {
-						return &connFake{table: &db.RoutingTable{}}, nil
+						return &testutil.ConnFake{Table: &db.RoutingTable{}}, nil
 					}
 					return nil, errors.New("borrow fail")
 				},
@@ -104,23 +104,12 @@ func TestReadTableTable(ot *testing.T) {
 			numReturns: 1,
 		},
 		{
-			name:    "Connection not implementing ClusterDiscovery",
-			routers: standardRouters,
-			assert:  assertNoTable,
-			pool: &poolFake{
-				borrow: func(names []string, cancel context.CancelFunc) (poolpackage.Connection, error) {
-					return &connFakeNoDiscovery{}, nil
-				},
-			},
-			numReturns: len(standardRouters),
-		},
-		{
 			name:    "All routing table calls fail",
 			routers: standardRouters,
 			assert:  assertNoTable,
 			pool: &poolFake{
-				borrow: func(names []string, cancel context.CancelFunc) (poolpackage.Connection, error) {
-					return &connFake{err: errors.New("GetRoutingTable fail")}, nil
+				borrow: func(names []string, cancel context.CancelFunc) (db.Connection, error) {
+					return &testutil.ConnFake{Err: errors.New("GetRoutingTable fail")}, nil
 				},
 			},
 			numReturns: len(standardRouters),
@@ -129,7 +118,7 @@ func TestReadTableTable(ot *testing.T) {
 			name:    "Cancel context",
 			routers: standardRouters,
 			pool: &poolFake{
-				borrow: func(names []string, cancel context.CancelFunc) (poolpackage.Connection, error) {
+				borrow: func(names []string, cancel context.CancelFunc) (db.Connection, error) {
 					if names[0] == "router2" {
 						panic("Should not be called")
 					}
