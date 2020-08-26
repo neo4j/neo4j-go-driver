@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"sync"
 
 	"github.com/neo4j/neo4j-go-driver/v4/neo4j"
 )
@@ -21,6 +22,7 @@ type backend struct {
 	transactions   map[string]neo4j.Transaction
 	recordedErrors map[string]error
 	id             int // Id to use for next object created by frontend
+	wrLock         sync.Mutex
 }
 
 // To implement transactional functions a bit of extra state is needed on the
@@ -62,6 +64,12 @@ func (b *backend) writeLine(s string) error {
 	bs := []byte(s + "\n")
 	_, err := b.wr.Write(bs)
 	return err
+}
+
+func (b *backend) writeLineLocked(s string) error {
+	b.wrLock.Lock()
+	defer b.wrLock.Unlock()
+	return b.writeLine(s)
 }
 
 // Reads and writes to the socket until it is closed
@@ -114,7 +122,6 @@ func (b *backend) process() bool {
 	for {
 		line, err := b.rd.ReadString('\n')
 		if err != nil {
-			b.writeLine(err.Error())
 			return false
 		}
 
@@ -149,6 +156,9 @@ func (b *backend) writeResponse(name string, data interface{}) {
 	if err != nil {
 		panic(err.Error())
 	}
+	// Make sure that logging framework doesn't write anything inbetween here...
+	b.wrLock.Lock()
+	defer b.wrLock.Unlock()
 	err = b.writeLine("#response begin")
 	if err != nil {
 		panic(err.Error())
@@ -190,7 +200,7 @@ func (b *backend) handleRequest(req map[string]interface{}) {
 			return
 		}
 		driver, err := neo4j.NewDriver(data["uri"].(string), authToken, func(c *neo4j.Config) {
-			c.Log = &streamLog{writeLine: b.writeLine}
+			c.Log = &streamLog{writeLine: b.writeLineLocked}
 		})
 		if err != nil {
 			b.writeError(err)
