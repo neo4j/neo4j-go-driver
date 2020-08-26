@@ -200,7 +200,7 @@ func (b *backend) handleRequest(req map[string]interface{}) {
 			return
 		}
 		driver, err := neo4j.NewDriver(data["uri"].(string), authToken, func(c *neo4j.Config) {
-			c.Log = &streamLog{writeLine: b.writeLine}
+			c.Log = &streamLog{writeLine: b.writeLineLocked}
 		})
 		if err != nil {
 			b.writeError(err)
