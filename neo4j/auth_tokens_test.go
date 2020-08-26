@@ -20,193 +20,184 @@
 package neo4j
 
 import (
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
+	"testing"
 )
 
-var _ = Describe("AuthTokens", func() {
-	Describe("NoAuth", func() {
-		When("invoked", func() {
-			token := NoAuth()
+func TestNoAuth(t *testing.T) {
+	token := NoAuth()
 
-			tokenMap := token.tokens
+	if len(token.tokens) != 1 {
+		t.Errorf("should only contain the key scheme")
+	}
 
-			Context("the token", func() {
-				It("should have 1 item", func() {
-					Expect(tokenMap).To(HaveLen(1))
-				})
+	if token.tokens[keyScheme] != schemeNone {
+		t.Errorf("the key scheme should be 'none' %v", token.tokens[keyScheme])
+	}
+}
 
-				It("should contain scheme=none", func() {
-					Expect(tokenMap).To(HaveKeyWithValue(keyScheme, schemeNone))
-				})
-			})
-		})
-	})
+func TestBasicAuth(t *testing.T) {
+	userName := "user"
+	password := "password"
+	realm := ""
 
-	Describe("BasicAuth", func() {
-		When("invoked with username and password only", func() {
-			token := BasicAuth("test", "1234", "")
+	token := BasicAuth(userName, password, realm)
 
-			tokenMap := token.tokens
+	if len(token.tokens) != 3 {
+		t.Errorf("should contain 3 keys when no realm data was passed")
+	}
 
-			Context("the token", func() {
-				It("should have 3 items", func() {
-					Expect(tokenMap).To(HaveLen(3))
-				})
+	if token.tokens[keyScheme] != schemeBasic {
+		t.Errorf("the key scheme should be 'basic' %v", token.tokens[keyScheme])
+	}
 
-				It("should contain scheme=basic", func() {
-					Expect(tokenMap).To(HaveKeyWithValue(keyScheme, schemeBasic))
-				})
+	if token.tokens[keyPrincipal] != userName {
+		t.Errorf("the key principal was not properly set %v", token.tokens[keyPrincipal])
+	}
 
-				It("should contain principal=test", func() {
-					Expect(tokenMap).To(HaveKeyWithValue(keyPrincipal, "test"))
-				})
+	if token.tokens[keyCredentials] != password {
+		t.Errorf("the key credentials was not properly set %v", token.tokens[keyCredentials])
+	}
+}
 
-				It("should contain credentials=1234", func() {
-					Expect(tokenMap).To(HaveKeyWithValue(keyCredentials, "1234"))
-				})
-			})
-		})
+func TestBasicAuthWithRealm(t *testing.T) {
+	userName := "user"
+	password := "password"
+	realm := "test"
 
-		When("invoked with username, password and realm", func() {
-			token := BasicAuth("test", "1234", "a_realm")
+	token := BasicAuth(userName, password, realm)
 
-			tokenMap := token.tokens
+	if len(token.tokens) != 4 {
+		t.Errorf("should contain 4 keys when realm data was passed")
+	}
 
-			Context("the token", func() {
-				It("should have 4 items", func() {
-					Expect(tokenMap).To(HaveLen(4))
-				})
+	if token.tokens[keyScheme] != schemeBasic {
+		t.Errorf("the key scheme should be 'basic' %v", token.tokens[keyScheme])
+	}
 
-				It("should contain scheme=basic", func() {
-					Expect(tokenMap).To(HaveKeyWithValue(keyScheme, schemeBasic))
-				})
+	if token.tokens[keyPrincipal] != userName {
+		t.Errorf("the key principal was not properly set %v", token.tokens[keyPrincipal])
+	}
 
-				It("should contain principal=test", func() {
-					Expect(tokenMap).To(HaveKeyWithValue(keyPrincipal, "test"))
-				})
+	if token.tokens[keyCredentials] != password {
+		t.Errorf("the key credentials was not properly set %v", token.tokens[keyCredentials])
+	}
 
-				It("should contain credentials=1234", func() {
-					Expect(tokenMap).To(HaveKeyWithValue(keyCredentials, "1234"))
-				})
+	if token.tokens[keyRealm] != realm {
+		t.Errorf("the key realm was not properly set %v", token.tokens[keyRealm])
+	}
+}
 
-				It("should contain realm=a_realm", func() {
-					Expect(tokenMap).To(HaveKeyWithValue(keyRealm, "a_realm"))
-				})
-			})
-		})
-	})
+func TestKerberosAuth(t *testing.T) {
+	ticket := "123456789"
 
-	Describe("KerberosAuth", func() {
-		When("invoked with ticket data", func() {
-			token := KerberosAuth("ticket_data")
+	token := KerberosAuth(ticket)
 
-			tokenMap := token.tokens
+	if len(token.tokens) != 2 {
+		t.Errorf("should contain 2 keys")
+	}
 
-			Context("the token", func() {
-				It("should have 2 items", func() {
-					Expect(tokenMap).To(HaveLen(2))
-				})
+	if token.tokens[keyScheme] != schemeKerberos {
+		t.Errorf("the key scheme should be 'kerberos' %v", token.tokens[keyScheme])
+	}
 
-				It("should contain scheme=kerberos", func() {
-					Expect(tokenMap).To(HaveKeyWithValue(keyScheme, schemeKerberos))
-				})
+	if token.tokens[keyTicket] != ticket {
+		t.Errorf("the key ticket was not properly set %v", token.tokens[keyTicket])
+	}
+}
 
-				It("should contain ticket=ticket_data", func() {
-					Expect(tokenMap).To(HaveKeyWithValue(keyTicket, "ticket_data"))
-				})
-			})
-		})
-	})
+func TestCustomAuthWithNilParamters(t *testing.T) {
+	scheme := "custom_scheme"
+	userName := "user"
+	password := "password"
+	realm := "test"
+	//parameters := map[string]interface{}{}
 
-	Describe("CustomAuth", func() {
-		When("invoked with scheme, username and password", func() {
-			token := CustomAuth("custom", "un", "pw", "", nil)
+	token := CustomAuth(scheme, userName, password, realm, nil)
 
-			tokenMap := token.tokens
+	if len(token.tokens) != 4 {
+		t.Errorf("should contain 4 keys no parameters data was passed %v", len(token.tokens))
+	}
 
-			Context("the token", func() {
-				It("should have 3 items", func() {
-					Expect(tokenMap).To(HaveLen(3))
-				})
+	if token.tokens[keyScheme] != scheme {
+		t.Errorf("the key scheme was not properly set %v", token.tokens[keyScheme])
+	}
 
-				It("should contain scheme=custom", func() {
-					Expect(tokenMap).To(HaveKeyWithValue(keyScheme, "custom"))
-				})
+	if token.tokens[keyPrincipal] != userName {
+		t.Errorf("the key principal was not properly set %v", token.tokens[keyPrincipal])
+	}
 
-				It("should contain principal=un", func() {
-					Expect(tokenMap).To(HaveKeyWithValue(keyPrincipal, "un"))
-				})
+	if token.tokens[keyCredentials] != password {
+		t.Errorf("the key credentials was not properly set %v", token.tokens[keyCredentials])
+	}
 
-				It("should contain credentials=pw", func() {
-					Expect(tokenMap).To(HaveKeyWithValue(keyCredentials, "pw"))
-				})
-			})
-		})
+	if token.tokens[keyRealm] != realm {
+		t.Errorf("the key realm was not properly set %v", token.tokens[keyRealm])
+	}
+}
 
-		When("invoked with scheme, username, password and realm", func() {
-			token := CustomAuth("custom", "un", "pw", "realm", nil)
+func TestCustomAuthWithEmptyParameters(t *testing.T) {
+	scheme := "custom_scheme"
+	userName := "user"
+	password := "password"
+	realm := "test"
+	parameters := map[string]interface{}{}
 
-			tokenMap := token.tokens
+	token := CustomAuth(scheme, userName, password, realm, parameters)
 
-			Context("the token", func() {
-				It("should have 4 items", func() {
-					Expect(tokenMap).To(HaveLen(4))
-				})
+	if len(token.tokens) != 5 {
+		t.Errorf("should contain 5 keys when parameters data was passed %v", len(token.tokens))
+	}
 
-				It("should contain scheme=custom", func() {
-					Expect(tokenMap).To(HaveKeyWithValue(keyScheme, "custom"))
-				})
+	if token.tokens[keyScheme] != scheme {
+		t.Errorf("the key scheme was not properly set %v", token.tokens[keyScheme])
+	}
 
-				It("should contain principal=un", func() {
-					Expect(tokenMap).To(HaveKeyWithValue(keyPrincipal, "un"))
-				})
+	if token.tokens[keyPrincipal] != userName {
+		t.Errorf("the key principal was not properly set %v", token.tokens[keyPrincipal])
+	}
 
-				It("should contain credentials=pw", func() {
-					Expect(tokenMap).To(HaveKeyWithValue(keyCredentials, "pw"))
-				})
+	if token.tokens[keyCredentials] != password {
+		t.Errorf("the key credentials was not properly set %v", token.tokens[keyCredentials])
+	}
 
-				It("should contain realm=realm", func() {
-					Expect(tokenMap).To(HaveKeyWithValue(keyRealm, "realm"))
-				})
-			})
-		})
+	if token.tokens[keyRealm] != realm {
+		t.Errorf("the key realm was not properly set %v", token.tokens[keyRealm])
+	}
+}
 
-		When("invoked with scheme, username, password, realm and parameters", func() {
-			params := map[string]interface{}{
-				"user_id":     "1234",
-				"user_emails": []string{"a@b.com", "b@c.com"},
-			}
+func TestCustomAuthWithParameters(t *testing.T) {
+	scheme := "custom_scheme"
+	userName := "user"
+	password := "password"
+	realm := "test"
+	parameters := map[string]interface{}{
+		"user_id":     "1234",
+		"user_emails": []string{"a@b.com", "b@c.com"},
+	}
 
-			token := CustomAuth("custom", "un", "pw", "realm", params)
+	token := CustomAuth(scheme, userName, password, realm, parameters)
 
-			tokenMap := token.tokens
+	if len(token.tokens) != 5 {
+		t.Errorf("should contain 5 keys when parameters data was passed %v", len(token.tokens))
+	}
 
-			Context("the token", func() {
-				It("should have 5 items", func() {
-					Expect(tokenMap).To(HaveLen(5))
-				})
+	if token.tokens[keyScheme] != scheme {
+		t.Errorf("the key scheme was not properly set %v", token.tokens[keyScheme])
+	}
 
-				It("should contain scheme=custom", func() {
-					Expect(tokenMap).To(HaveKeyWithValue(keyScheme, "custom"))
-				})
+	if token.tokens[keyPrincipal] != userName {
+		t.Errorf("the key principal was not properly set %v", token.tokens[keyPrincipal])
+	}
 
-				It("should contain principal=un", func() {
-					Expect(tokenMap).To(HaveKeyWithValue(keyPrincipal, "un"))
-				})
+	if token.tokens[keyCredentials] != password {
+		t.Errorf("the key credentials was not properly set %v", token.tokens[keyCredentials])
+	}
 
-				It("should contain credentials=pw", func() {
-					Expect(tokenMap).To(HaveKeyWithValue(keyCredentials, "pw"))
-				})
+	if token.tokens[keyRealm] != realm {
+		t.Errorf("the key realm was not properly set %v", token.tokens[keyRealm])
+	}
 
-				It("should contain realm=realm", func() {
-					Expect(tokenMap).To(HaveKeyWithValue(keyRealm, "realm"))
-				})
-
-				It("should contain given parameters", func() {
-					Expect(tokenMap).To(HaveKeyWithValue("parameters", params))
-				})
-			})
-		})
-	})
-})
+	if token.tokens["parameters"] == nil {
+		t.Errorf("the key parameters was not properly set %v", token.tokens["parameters"])
+	}
+}
