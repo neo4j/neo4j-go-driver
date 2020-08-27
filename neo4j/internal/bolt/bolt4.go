@@ -618,13 +618,19 @@ func (b *bolt4) GetRoutingTable(database string, context map[string]string) (*db
 		return nil, err
 	}
 
+	// The query should run in system database, preserve current setting and restore it when
+	// done.
+	originalDatabaseName := b.databaseName
+	b.databaseName = "system"
+	defer func() { b.databaseName = originalDatabaseName }()
+
+	// Query for the users default database or a specific database
 	const (
 		queryDefault  = "CALL dbms.routing.getRoutingTable($context)"
 		queryDatabase = "CALL dbms.routing.getRoutingTable($context, $db)"
 	)
 	query := queryDefault
 	params := map[string]interface{}{"context": context}
-
 	if database != db.DefaultDatabase {
 		query = queryDatabase
 		params["db"] = database
@@ -634,7 +640,6 @@ func (b *bolt4) GetRoutingTable(database string, context map[string]string) (*db
 	if err != nil {
 		return nil, err
 	}
-
 	rec, _, err := b.Next(stream.Handle)
 	if err != nil {
 		return nil, err
@@ -649,7 +654,6 @@ func (b *bolt4) GetRoutingTable(database string, context map[string]string) (*db
 	if table == nil {
 		return nil, errors.New("Unable to parse routing table")
 	}
-
 	return table, nil
 }
 
