@@ -268,18 +268,20 @@ func (p *Pool) Borrow(ctx context.Context, serverNames []string, wait bool) (Con
 		}
 	}
 
-	if !wait {
-		return nil, &PoolFull{servers: serverNames}
-	}
-
 	// If there are no connections for any of the servers, there is no point in waiting for anything
 	// to be returned.
 	if !p.anyExistingConnectionsOnServers(serverNames) {
+		p.log.Warnf(p.logId, "No server connection available to any of %v", serverNames)
 		if err == nil {
-			err = &PoolTimeout{err: errors.New("No connection to wait for"), servers: serverNames}
+			err = errors.New(fmt.Sprintf("No server connection available to any of %v", serverNames))
 		}
-		p.log.Error(p.logId, err)
+		// Intentionally return last error from last connection attempt to make it easier to
+		// see connection errors for users.
 		return nil, err
+	}
+
+	if !wait {
+		return nil, &PoolFull{servers: serverNames}
 	}
 
 	// Wait for a matching connection to be returned from another thread.
