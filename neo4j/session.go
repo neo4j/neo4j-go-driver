@@ -235,10 +235,10 @@ func (s *session) beginTransaction(mode db.AccessMode, config *TransactionConfig
 	}, nil
 }
 
-func (s *session) runOneTry(mode db.AccessMode, work TransactionWork, config *TransactionConfig) (interface{}, error) {
+func (s *session) runOneTry(mode db.AccessMode, work TransactionWork, config *TransactionConfig) (interface{}, bool, error) {
 	tx, err := s.beginTransaction(mode, config)
 	if err != nil {
-		return nil, err
+		return nil, false, err
 	}
 	defer func() {
 		tx.Close()
@@ -246,15 +246,16 @@ func (s *session) runOneTry(mode db.AccessMode, work TransactionWork, config *Tr
 
 	x, err := work(tx)
 	if err != nil {
-		return nil, err
+		return nil, false, err
 	}
 
 	err = tx.Commit()
 	if err != nil {
-		return nil, err
+		// Indicate that Commit failed, not safe to retry network error in this case
+		return nil, true, err
 	}
 
-	return x, nil
+	return x, false, nil
 }
 
 func (s *session) runRetriable(
@@ -278,42 +279,52 @@ func (s *session) runRetriable(
 	}
 
 	var (
-		maxDeadErrors    = s.config.MaxConnectionPoolSize / 2
-		maxClusterErrors = 1
-		throttle         = throttler(s.throttleTime)
-		start            time.Time
+		maxDeadErrors = s.config.MaxConnectionPoolSize / 2
+		throttle      = throttler(s.throttleTime)
+		start         time.Time
 	)
 	for {
 		// Always return the current connection before trying (again)
 		s.returnConn()
 		s.res = nil
 
-		x, err := s.runOneTry(mode, work, &config)
+		x, commitFailure, err := s.runOneTry(mode, work, &config)
 		if err == nil {
 			return x, nil
 		}
 
 		s.log.Debugf(s.logId, "Retriable transaction evaluating error: %s", err)
 
-		// If we failed due to connect problem, just give up since the pool tries really hard
-		if s.conn == nil {
-			s.log.Errorf(s.logId, "Retriable transaction failed due to no available connection: %s", err)
-			return nil, err
-		}
-
 		// Check retry timeout
 		if start.IsZero() {
 			start = s.now()
 		}
 		if time.Since(start) > s.config.MaxTransactionRetryTime {
-			s.log.Errorf(s.logId, "Retriable transaction failed due to reaching MaxTransactionRetryTime: %s", s.config.MaxTransactionRetryTime.String())
+			s.log.Errorf(s.logId, "Retriable transaction failed due to reaching MaxTransactionRetryTime (%s): %s",
+				s.config.MaxTransactionRetryTime.String(), err)
 			return nil, err
 		}
 
 		// Failed, check cause and determine next action
 
+		// If we failed due to connect problem, wait a bit and retry
+		if s.conn == nil {
+			throttle = throttle.next()
+			d := throttle.delay()
+			s.log.Debugf(s.logId, "Retrying transaction due to no available connection after sleeping for %s", d.String())
+			s.sleep(d)
+			continue
+		}
+
 		// If the connection is dead just return the connection, get another and try again, no sleep
+		// Do not do this if the connection died during commit phase since we don't know if we have
+		// succesfully committed or not, might corrupt data otherwise!
 		if !s.conn.IsAlive() {
+			if commitFailure {
+				err = errors.New(fmt.Sprintf("Retriable transaction failed due to lost connection during commit: %s", err))
+				s.log.Error(s.logId, err)
+				return nil, err
+			}
 			maxDeadErrors--
 			if maxDeadErrors < 0 {
 				s.log.Errorf(s.logId, "Retriable transaction failed due to too many dead connections")
@@ -331,12 +342,10 @@ func (s *session) runRetriable(
 			case e.IsRetriableCluster():
 				// Force routing tables to be updated before trying again
 				s.router.Invalidate(s.databaseName)
-				maxClusterErrors--
-				if maxClusterErrors < 0 {
-					s.log.Errorf(s.logId, "Retriable transaction failed due to encountering too many cluster errors")
-					return nil, err
-				}
-				s.log.Debugf(s.logId, "Retrying transaction due to cluster error")
+				throttle = throttle.next()
+				d := throttle.delay()
+				s.log.Debugf(s.logId, "Retrying transaction due to cluster error after sleeping for %s", d.String())
+				s.sleep(d)
 			case e.IsRetriableTransient():
 				throttle = throttle.next()
 				d := throttle.delay()
