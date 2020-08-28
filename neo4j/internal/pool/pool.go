@@ -25,6 +25,7 @@ import (
 	"container/list"
 	"context"
 	"errors"
+	"fmt"
 	"sort"
 	"strconv"
 	"sync"
@@ -267,7 +268,7 @@ func (p *Pool) Borrow(ctx context.Context, serverNames []string, wait bool) (db.
 	// If there are no connections for any of the servers, there is no point in waiting for anything
 	// to be returned.
 	if !p.anyExistingConnectionsOnServers(serverNames) {
-		p.log.Warnf(p.logId, "No server connection available to any of %v", serverNames)
+		p.log.Warnf(logName, p.logId, "No server connection available to any of %v", serverNames)
 		if err == nil {
 			err = errors.New(fmt.Sprintf("No server connection available to any of %v", serverNames))
 		}
