@@ -22,6 +22,7 @@ package neo4j
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strconv"
 	"sync/atomic"
 	"time"
@@ -316,7 +317,7 @@ func (s *session) runRetriable(
 		if !s.conn.IsAlive() {
 			if commitFailure {
 				err = errors.New(fmt.Sprintf("Retriable transaction failed due to lost connection during commit: %s", err))
-				s.log.Error(s.logId, err)
+				s.log.Error(sessionLogName, s.logId, err)
 				return nil, err
 			}
 			maxDeadErrors--
