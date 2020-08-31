@@ -22,12 +22,12 @@ package neo4j
 import (
 	"context"
 	"errors"
-	"fmt"
 	"strconv"
 	"sync/atomic"
 	"time"
 
 	"github.com/neo4j/neo4j-go-driver/v4/neo4j/db"
+	"github.com/neo4j/neo4j-go-driver/v4/neo4j/internal/retry"
 	"github.com/neo4j/neo4j-go-driver/v4/neo4j/log"
 )
 
@@ -204,11 +204,11 @@ func (s *session) beginTransaction(mode db.AccessMode, config *TransactionConfig
 				return nil, err
 			}
 
-			streamHandle, err := conn.RunTx(txHandle, cypher, params)
+			stream, err := conn.RunTx(txHandle, cypher, params)
 			if err != nil {
 				return nil, err
 			}
-			s.res = newResult(conn, streamHandle, cypher, params)
+			s.res = newResult(conn, stream, cypher, params)
 			return s.res, nil
 		},
 		commit: func() error {
@@ -230,29 +230,6 @@ func (s *session) beginTransaction(mode db.AccessMode, config *TransactionConfig
 	}, nil
 }
 
-func (s *session) runOneTry(mode db.AccessMode, work TransactionWork, config *TransactionConfig) (interface{}, bool, error) {
-	tx, err := s.beginTransaction(mode, config)
-	if err != nil {
-		return nil, false, err
-	}
-	defer func() {
-		tx.Close()
-	}()
-
-	x, err := work(tx)
-	if err != nil {
-		return nil, false, err
-	}
-
-	err = tx.Commit()
-	if err != nil {
-		// Indicate that Commit failed, not safe to retry network error in this case
-		return nil, true, err
-	}
-
-	return x, false, nil
-}
-
 func (s *session) runRetriable(
 	mode db.AccessMode,
 	work TransactionWork, configurers ...func(*TransactionConfig)) (interface{}, error) {
@@ -272,87 +249,107 @@ func (s *session) runRetriable(
 	if err != nil {
 		return nil, err
 	}
+	s.returnConn()
 
-	var (
-		maxDeadErrors = s.config.MaxConnectionPoolSize / 2
-		throttle      = throttler(s.throttleTime)
-		start         time.Time
-	)
-	for {
-		// Always return the current connection before trying (again)
-		s.returnConn()
-		s.res = nil
-
-		x, commitFailure, err := s.runOneTry(mode, work, &config)
-		if err == nil {
-			return x, nil
-		}
-
-		s.log.Debugf(sessionLogName, s.logId, "Retriable transaction evaluating error: %s", err)
-
-		// Check retry timeout
-		if start.IsZero() {
-			start = s.now()
-		}
-		if time.Since(start) > s.config.MaxTransactionRetryTime {
-			s.log.Errorf(s.logId, "Retriable transaction failed due to reaching MaxTransactionRetryTime (%s): %s",
-				s.config.MaxTransactionRetryTime.String(), err)
-			return nil, err
-		}
-
-		// Failed, check cause and determine next action
-
-		// If we failed due to connect problem, wait a bit and retry
-		if s.conn == nil {
-			throttle = throttle.next()
-			d := throttle.delay()
-			s.log.Debugf(s.logId, "Retrying transaction due to no available connection after sleeping for %s", d.String())
-			s.sleep(d)
+	state := retry.State{
+		MaxTransactionRetryTime: s.config.MaxTransactionRetryTime,
+		Log:                     s.log,
+		LogName:                 sessionLogName,
+		LogId:                   s.logId,
+		Now:                     s.now,
+		Sleep:                   s.sleep,
+		Throttle:                retry.Throttler(s.throttleTime),
+		MaxDeadConnections:      s.config.MaxConnectionPoolSize,
+		Router:                  s.router,
+		DatabaseName:            s.databaseName,
+	}
+	for state.Continue() {
+		// Establish new connection
+		conn, err := s.getConnection(mode)
+		if err != nil {
+			state.OnFailure(conn, err, false)
+			s.pool.Return(conn)
 			continue
 		}
 
-		// If the connection is dead just return the connection, get another and try again, no sleep
-		// Do not do this if the connection died during commit phase since we don't know if we have
-		// succesfully committed or not, might corrupt data otherwise!
-		if !s.conn.IsAlive() {
-			if commitFailure {
-				err = errors.New(fmt.Sprintf("Retriable transaction failed due to lost connection during commit: %s", err))
-				s.log.Error(sessionLogName, s.logId, err)
-				return nil, err
-			}
-			maxDeadErrors--
-			if maxDeadErrors < 0 {
-				s.log.Errorf(sessionLogName, s.logId, "Retriable transaction failed due to too many dead connections")
-				return nil, err
-			}
-			s.log.Debugf(sessionLogName, s.logId, "Retrying transaction due to dead connection")
+		// Begin transaction
+		txHandle, err := conn.TxBegin(mode, s.bookmarks, config.Timeout, config.Metadata)
+		if err != nil {
+			state.OnFailure(conn, err, false)
+			s.pool.Return(conn)
 			continue
 		}
 
-		// Check type of error, this assumes a well behaved transaction func, could be better
-		// to keep last error in the connection in the future.
-		switch e := err.(type) {
-		case *db.DatabaseError:
-			switch {
-			case e.IsRetriableCluster():
-				// Force routing tables to be updated before trying again
-				s.router.Invalidate(s.databaseName)
-				throttle = throttle.next()
-				d := throttle.delay()
-				s.log.Debugf(s.logId, "Retrying transaction due to cluster error after sleeping for %s", d.String())
-				s.sleep(d)
-			case e.IsRetriableTransient():
-				throttle = throttle.next()
-				d := throttle.delay()
-				s.log.Debugf(sessionLogName, s.logId, "Retrying transaction due to transient error after sleeping for %s", d.String())
-				s.sleep(d)
-			default:
-				return nil, err
-			}
-		default:
+		// Construct a transaction like thing for client to execute stuff on.
+		// Evaluate the returned error from all the work for retryable, this means
+		// that client can mess up the error handling.
+		tx := retryableTransaction{conn: conn, txHandle: txHandle}
+		x, err := work(&tx)
+		if err != nil {
+			state.OnFailure(conn, err, false)
+			s.pool.Return(conn)
+			continue
+		}
+
+		// Fetch all in last result before committing, allows for:
+		//   records, err := neo4j.Collect(session.ReadTransaction(...) { return tx.Run(...) )
+		//if res, isRes := x.(*result); isRes {
+		if tx.res != nil {
+			tx.res.fetchAll()
+		}
+
+		// Commit transaction
+		err = conn.TxCommit(txHandle)
+		if err != nil {
+			state.OnFailure(conn, err, true)
+			s.pool.Return(conn)
+			continue
+		}
+
+		// Collect bookmark and return connection to pool
+		s.retrieveBookmarks(conn)
+		s.pool.Return(conn)
+
+		return x, nil
+	}
+	return nil, state.Err
+}
+
+type retryableTransaction struct {
+	conn     db.Connection
+	txHandle db.Handle
+	res      *result
+}
+
+func (tx *retryableTransaction) Run(cypher string, params map[string]interface{}) (Result, error) {
+	// Fetch all in previous result
+	if tx.res != nil {
+		tx.res.fetchAll()
+		err := tx.res.err
+		tx.res = nil
+		if err != nil {
 			return nil, err
 		}
 	}
+
+	stream, err := tx.conn.RunTx(tx.txHandle, cypher, params)
+	if err != nil {
+		return nil, err
+	}
+	tx.res = newResult(tx.conn, stream, cypher, params)
+	return tx.res, nil
+}
+
+func (tx *retryableTransaction) Commit() error {
+	return errors.New("Commit not allowed on retryable transaction")
+}
+
+func (tx *retryableTransaction) Rollback() error {
+	return errors.New("Rollback not allowed on retryable transaction")
+}
+
+func (tx *retryableTransaction) Close() error {
+	return errors.New("Close not allowed on retryable transaction")
 }
 
 func (s *session) ReadTransaction(
@@ -367,57 +364,70 @@ func (s *session) WriteTransaction(
 	return s.runRetriable(db.WriteMode, work, configurers...)
 }
 
-func (s *session) borrowConn(mode db.AccessMode) error {
-	var servers []string
-	var err error
+func (s *session) getServers(mode db.AccessMode) ([]string, error) {
 	if mode == db.ReadMode {
-		servers, err = s.router.Readers(s.databaseName)
+		return s.router.Readers(s.databaseName)
 	} else {
-		servers, err = s.router.Writers(s.databaseName)
+		return s.router.Writers(s.databaseName)
 	}
+}
+
+func (s *session) getConnection(mode db.AccessMode) (db.Connection, error) {
+	servers, err := s.getServers(mode)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	var (
-		ctx    context.Context
-		cancel context.CancelFunc
-	)
-
+	var ctx context.Context
 	if s.config.ConnectionAcquisitionTimeout > 0 {
+		var cancel context.CancelFunc
 		ctx, cancel = context.WithTimeout(context.Background(), s.config.ConnectionAcquisitionTimeout)
+		if cancel != nil {
+			defer cancel()
+		}
 	} else {
 		ctx = context.Background()
 	}
-	if cancel != nil {
-		defer cancel()
-	}
 	conn, err := s.pool.Borrow(ctx, servers, s.config.ConnectionAcquisitionTimeout != 0)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	s.conn = conn.(db.Connection)
 
 	// Select database on server
 	if s.databaseName != db.DefaultDatabase {
 		dbSelector, ok := s.conn.(db.DatabaseSelector)
 		if !ok {
-			return errors.New("Database does not support multidatabase")
+			s.pool.Return(conn)
+			return nil, errors.New("Database does not support multidatabase")
 		}
 		dbSelector.SelectDatabase(s.databaseName)
 	}
+
+	return conn, nil
+}
+
+func (s *session) borrowConn(mode db.AccessMode) error {
+	conn, err := s.getConnection(mode)
+	if err != nil {
+		return err
+	}
+	s.conn = conn
 	return nil
+}
+
+func (s *session) retrieveBookmarks(conn db.Connection) {
+	if conn == nil {
+		return
+	}
+	bookmark := conn.Bookmark()
+	if len(bookmark) > 0 {
+		s.bookmarks = []string{bookmark}
+	}
 }
 
 func (s *session) returnConn() {
 	if s.conn != nil {
-		// Retrieve bookmark before returning connection, useful as input to next transaction
-		// on another db.
-		bookmark := s.conn.Bookmark()
-		if len(bookmark) > 0 {
-			s.bookmarks = []string{bookmark}
-		}
-
+		s.retrieveBookmarks(s.conn)
 		s.pool.Return(s.conn)
 		s.conn = nil
 	}
