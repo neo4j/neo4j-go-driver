@@ -17,22 +17,22 @@
  * limitations under the License.
  */
 
-package neo4j
+package retry
 
 import (
 	"math/rand"
 	"time"
 )
 
-type throttler time.Duration
+type Throttler time.Duration
 
-func (t throttler) next() throttler {
+func (t Throttler) next() Throttler {
 	delay := time.Duration(t)
 	const delayJitter = 0.2
 	jitter := float64(delay) * delayJitter
-	return throttler(delay - time.Duration(jitter) + time.Duration(2*jitter*rand.Float64()))
+	return Throttler(delay - time.Duration(jitter) + time.Duration(2*jitter*rand.Float64()))
 }
 
-func (t throttler) delay() time.Duration {
+func (t Throttler) delay() time.Duration {
 	return time.Duration(t)
 }

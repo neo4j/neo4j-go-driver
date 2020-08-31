@@ -17,7 +17,7 @@
  * limitations under the License.
  */
 
-package neo4j
+package retry
 
 import (
 	"testing"
@@ -32,7 +32,7 @@ func TestThrottler(t *testing.T) {
 		}
 	}
 
-	thr := throttler(1 * time.Second)
+	thr := Throttler(1 * time.Second)
 	d1 := thr.delay()
 	var d2 time.Duration
 	for i := 0; i < 10; i++ {
