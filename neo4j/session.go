@@ -291,13 +291,6 @@ func (s *session) runRetriable(
 			continue
 		}
 
-		// Fetch all in last result before committing, allows for:
-		//   records, err := neo4j.Collect(session.ReadTransaction(...) { return tx.Run(...) )
-		//if res, isRes := x.(*result); isRes {
-		if tx.res != nil {
-			tx.res.fetchAll()
-		}
-
 		// Commit transaction
 		err = conn.TxCommit(txHandle)
 		if err != nil {

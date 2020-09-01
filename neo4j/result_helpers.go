@@ -22,61 +22,53 @@ package neo4j
 // Single returns one and only one record from the result stream. Any error passed in
 // or reported while navigating the result stream is returned without any conversion.
 // If the result stream contains zero or more than one records error is returned.
-func Single(from interface{}, err error) (*Record, error) {
-	var result Result
-	var record *Record
-	var ok bool
-
+//   record, err := neo4j.Single(session.Run(...))
+func Single(result Result, err error) (*Record, error) {
 	if err != nil {
 		return nil, err
 	}
-
-	if result, ok = from.(Result); !ok {
-		return nil, newDriverError("expected from to be a result but it was '%v'", from)
-	}
-
-	if result.Next() {
-		record = result.Record()
-	}
-
-	if err := result.Err(); err != nil {
-		return nil, err
-	}
-
-	if record == nil {
-		return nil, newDriverError("result contains no records")
-	}
-
-	if result.Next() {
-		return nil, newDriverError("result contains more than one record")
-	}
-
-	return record, nil
+	return result.Single()
 }
 
 // Collect loops through the result stream, collects records into a slice and returns the
 // resulting slice. Any error passed in or reported while navigating the result stream is
 // returned without any conversion.
-func Collect(from interface{}, err error) ([]*Record, error) {
-	var result Result
-	var list []*Record
-	var ok bool
-
+//   records, err := neo4j.Collect(session.Run(...))
+func Collect(result Result, err error) ([]*Record, error) {
 	if err != nil {
 		return nil, err
 	}
+	return result.Collect()
+}
 
-	if result, ok = from.(Result); !ok {
-		return nil, newDriverError("expected from to be a result but it was '%v'", from)
-	}
-
-	var record *Record
-	for result.NextRecord(&record) {
-		list = append(list, record)
-	}
-	if err := result.Err(); err != nil {
+// AsRecords passes any existing error or casts from to a slice of records.
+// Use in combination with Collect and transactional functions:
+//   records, err := neo4j.AsRecords(session.ReadTransaction(func (tx neo4j.Transaction) {
+//       return neo4j.Collect(tx.Run(...))
+//   }))
+func AsRecords(from interface{}, err error) ([]*Record, error) {
+	if err != nil {
 		return nil, err
 	}
+	recs, ok := from.([]*Record)
+	if !ok {
+		return nil, newDriverError("Expected []*Record")
+	}
+	return recs, nil
+}
 
-	return list, nil
+// AsRecord passes any existing error or casts from to a record.
+// Use in combination with Single and transactional functions:
+//   record, err := neo4j.AsRecord(session.ReadTransaction(func (tx neo4j.Transaction) {
+//       return neo4j.Single(tx.Run(...))
+//   }))
+func AsRecord(from interface{}, err error) (*Record, error) {
+	if err != nil {
+		return nil, err
+	}
+	rec, ok := from.(*Record)
+	if !ok {
+		return nil, newDriverError("Expected *Record")
+	}
+	return rec, nil
 }
