@@ -746,9 +746,7 @@ func addPersonsAsEmployees(driver neo4j.Driver, companyName string) (int, error)
 	}
 	defer session.Close()
 
-	persons, err := neo4j.Collect(session.ReadTransaction(func(tx neo4j.Transaction) (interface{}, error) {
-		return tx.Run("MATCH (a:Person) RETURN a.name AS name", nil)
-	}))
+	persons, err := neo4j.Collect(session.Run("MATCH (a:Person) RETURN a.name AS name", nil))
 	if err != nil {
 		return 0, err
 	}

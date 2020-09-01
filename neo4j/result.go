@@ -37,6 +37,11 @@ type Result interface {
 	Err() error
 	// Record returns the current record.
 	Record() *Record
+	// Collect fetches all remaining records and returns them.
+	Collect() ([]*Record, error)
+	// Single returns one and only one record from the stream.
+	// If the result stream contains zero or more than one records, error is returned.
+	Single() (*Record, error)
 	// Consume discards all remaining records and returns the summary information
 	// about the statement execution.
 	Consume() (ResultSummary, error)
@@ -137,6 +142,34 @@ func (r *result) fetchAll() {
 			r.unconsumed.PushBack(rec)
 		}
 	}
+}
+
+func (r *result) Collect() ([]*Record, error) {
+	recs := make([]*Record, 0, 1024)
+	var rec *Record
+	// Need to consider unconsumed
+	for r.NextRecord(&rec) {
+		recs = append(recs, rec)
+	}
+	if r.err != nil {
+		return nil, r.err
+	}
+	return recs, nil
+}
+
+func (r *result) Single() (*Record, error) {
+	var rec *Record
+	// Need to consider unconsumed
+	if !r.NextRecord(&rec) {
+		if r.err != nil {
+			return nil, r.err
+		}
+		return nil, newDriverError("result contains no records")
+	}
+	if r.Next() {
+		return nil, newDriverError("result contains more than one record")
+	}
+	return rec, nil
 }
 
 func (r *result) Consume() (ResultSummary, error) {

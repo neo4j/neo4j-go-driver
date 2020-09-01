@@ -65,13 +65,13 @@ func Test_PassingAccessMode(t *testing.T) {
 				txFunc = session.ReadTransaction
 			}
 
-			result, err := neo4j.Single(txFunc(func(tx neo4j.Transaction) (interface{}, error) {
-				return tx.Run("RETURN 1", nil)
+			record, err := neo4j.AsRecord(txFunc(func(tx neo4j.Transaction) (interface{}, error) {
+				return neo4j.Single(tx.Run("RETURN 1", nil))
 			}))
 			assertNoError(t, err)
-			assertNotNil(t, result)
+			assertNotNil(t, record)
 
-			assertInt64Eq(t, int64(1), result.Values[0].(int64))
+			assertInt64Eq(t, int64(1), record.Values[0].(int64))
 		}
 
 		t.Run("shouldPassAccessModeForReadSessionRun", func(t *testing.T) {
@@ -135,13 +135,13 @@ func Test_PassingAccessMode(t *testing.T) {
 				txFunc = session.ReadTransaction
 			}
 
-			result, err := neo4j.Single(txFunc(func(tx neo4j.Transaction) (interface{}, error) {
-				return tx.Run("RETURN 1", nil)
+			record, err := neo4j.AsRecord(txFunc(func(tx neo4j.Transaction) (interface{}, error) {
+				return neo4j.Single(tx.Run("RETURN 1", nil))
 			}))
 			assertNoError(t, err)
-			assertNotNil(t, result)
+			assertNotNil(t, record)
 
-			assertInt64Eq(t, int64(1), result.Values[0].(int64))
+			assertInt64Eq(t, int64(1), record.Values[0].(int64))
 		}
 
 		t.Run("shouldPassAccessModeForReadSessionRun", func(t *testing.T) {
