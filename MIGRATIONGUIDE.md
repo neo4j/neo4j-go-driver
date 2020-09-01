@@ -86,3 +86,12 @@ calls were remapped to the public interface, this is now gone.
 
 Driver config (include logging here???)
 
+Utilities
+neo4j.Collect and neo4j.Single that are used to collect a slice of records or a single record
+from a result has been changed to use the Result interface. Previous example of usage:
+    records, err := neo4j.Collect(session.ReadTransaction("MATCH (n) RETURN n", nil))
+is now discouraged and will not compile anymore
+Ssince Collect function previously could consume a result returned from a transactional function,
+which isn't allowed and doesn't work unless all records are buffered internally and that could
+cause unintential buffering of very large results.
+
