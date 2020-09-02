@@ -164,70 +164,35 @@ func (s *session) BeginTransaction(configurers ...func(*TransactionConfig)) (Tra
 	if err != nil {
 		return nil, err
 	}
+	s.returnConn()
 
+	// Apply configuration functions
 	config := TransactionConfig{Timeout: 0, Metadata: nil}
 	for _, c := range configurers {
 		c(&config)
 	}
 
-	s.returnConn()
-
-	return s.beginTransaction(s.defaultMode, &config)
-}
-
-func (s *session) beginTransaction(mode db.AccessMode, config *TransactionConfig) (Transaction, error) {
-	// Ensure that the session has a connection
-	err := s.borrowConn(mode)
+	// Get a connection from the pool. This could fail in clustered environment.
+	conn, err := s.getConnection(s.defaultMode)
 	if err != nil {
 		return nil, err
 	}
-	conn := s.conn
 
-	// Start a transaction on the connection
-	txHandle, err := s.conn.TxBegin(mode, s.bookmarks, config.Timeout, config.Metadata)
+	tx, err := beginTransaction(conn, s.defaultMode, s.bookmarks, config.Timeout, config.Metadata,
+		// On transaction closed (rollbacked or committed)
+		func(committed bool) {
+			if committed {
+				s.retrieveBookmarks(conn)
+			}
+			s.pool.Return(conn)
+			s.inTx = false
+		})
 	if err != nil {
 		return nil, err
 	}
 	s.inTx = true
 
-	// Wrap the returned transaction in something directly connected to this instance to
-	// make sure state is synced. Only one active transaction per session is allowed.
-	// This wrapped transaction is bound to the local txHandle so if a transaction is
-	// kept around after the connection has been returned to the pool it will not mess
-	// with the connection since the handle is invalid. Also use local connection variable
-	// to avoid relying on state.
-	return &transaction{
-		run: func(cypher string, params map[string]interface{}) (Result, error) {
-			// The previous result should receive all records
-			err := s.fetchAllInCurrentResult()
-			if err != nil {
-				return nil, err
-			}
-
-			stream, err := conn.RunTx(txHandle, cypher, params)
-			if err != nil {
-				return nil, err
-			}
-			s.res = newResult(conn, stream, cypher, params)
-			return s.res, nil
-		},
-		commit: func() error {
-			// The last result should receive all records
-			if s.res != nil {
-				s.res.fetchAll()
-				s.res = nil
-			}
-
-			err := conn.TxCommit(txHandle)
-			s.inTx = false
-			return err
-		},
-		rollback: func() error {
-			err := conn.TxRollback(txHandle)
-			s.inTx = false
-			return err
-		},
-	}, nil
+	return tx, nil
 }
 
 func (s *session) runRetriable(
@@ -306,43 +271,6 @@ func (s *session) runRetriable(
 		return x, nil
 	}
 	return nil, state.Err
-}
-
-type retryableTransaction struct {
-	conn     db.Connection
-	txHandle db.Handle
-	res      *result
-}
-
-func (tx *retryableTransaction) Run(cypher string, params map[string]interface{}) (Result, error) {
-	// Fetch all in previous result
-	if tx.res != nil {
-		tx.res.fetchAll()
-		err := tx.res.err
-		tx.res = nil
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	stream, err := tx.conn.RunTx(tx.txHandle, cypher, params)
-	if err != nil {
-		return nil, err
-	}
-	tx.res = newResult(tx.conn, stream, cypher, params)
-	return tx.res, nil
-}
-
-func (tx *retryableTransaction) Commit() error {
-	return errors.New("Commit not allowed on retryable transaction")
-}
-
-func (tx *retryableTransaction) Rollback() error {
-	return errors.New("Rollback not allowed on retryable transaction")
-}
-
-func (tx *retryableTransaction) Close() error {
-	return errors.New("Close not allowed on retryable transaction")
 }
 
 func (s *session) ReadTransaction(
