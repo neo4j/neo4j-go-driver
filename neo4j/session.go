@@ -388,7 +388,7 @@ func (s *session) getConnection(mode db.AccessMode) (db.Connection, error) {
 
 	// Select database on server
 	if s.databaseName != db.DefaultDatabase {
-		dbSelector, ok := s.conn.(db.DatabaseSelector)
+		dbSelector, ok := conn.(db.DatabaseSelector)
 		if !ok {
 			s.pool.Return(conn)
 			return nil, errors.New("Database does not support multidatabase")
