@@ -75,9 +75,8 @@ type session struct {
 	databaseName string
 	pool         sessionPool
 	router       sessionRouter
-	conn         db.Connection
-	inTx         bool
-	res          *result
+	txExplicit   *transaction
+	txAuto       *autoTransaction
 	sleep        func(d time.Duration)
 	now          func() time.Time
 	logId        string
@@ -85,8 +84,10 @@ type session struct {
 	throttleTime time.Duration
 }
 
-var sessionid uint32
-var sessionLogName = "session"
+var (
+	sessionid      uint32
+	sessionLogName = "session"
+)
 
 // Remove empty string bookmarks to check for "bad" callers
 // To avoid allocating, first check if this is a problem
@@ -135,14 +136,6 @@ func newSession(config *Config, router sessionRouter, pool sessionPool,
 }
 
 func (s *session) LastBookmark() string {
-	// Report bookmark on current connection if any
-	if s.conn != nil {
-		currentBookmark := s.conn.Bookmark()
-		if len(currentBookmark) > 0 {
-			return currentBookmark
-		}
-	}
-
 	// Report bookmark from previously closed connection or from initial set
 	if len(s.bookmarks) > 0 {
 		return s.bookmarks[len(s.bookmarks)-1]
@@ -153,18 +146,15 @@ func (s *session) LastBookmark() string {
 
 func (s *session) BeginTransaction(configurers ...func(*TransactionConfig)) (Transaction, error) {
 	// Guard for more than one transaction per session
-	if s.inTx {
+	if s.txExplicit != nil {
 		err := errors.New("Already in transaction")
 		s.log.Error(sessionLogName, s.logId, err)
 		return nil, err
 	}
 
-	// Fetch all in current result if any
-	err := s.fetchAllInCurrentResult()
-	if err != nil {
-		return nil, err
+	if s.txAuto != nil {
+		s.txAuto.done()
 	}
-	s.returnConn()
 
 	// Apply configuration functions
 	config := TransactionConfig{Timeout: 0, Metadata: nil}
@@ -178,21 +168,26 @@ func (s *session) BeginTransaction(configurers ...func(*TransactionConfig)) (Tra
 		return nil, err
 	}
 
-	tx, err := beginTransaction(conn, s.defaultMode, s.bookmarks, config.Timeout, config.Metadata,
-		// On transaction closed (rollbacked or committed)
-		func(committed bool) {
-			if committed {
-				s.retrieveBookmarks(conn)
-			}
-			s.pool.Return(conn)
-			s.inTx = false
-		})
+	// Begin transaction
+	txHandle, err := conn.TxBegin(s.defaultMode, s.bookmarks, config.Timeout, config.Metadata)
 	if err != nil {
+		s.pool.Return(conn)
 		return nil, err
 	}
-	s.inTx = true
 
-	return tx, nil
+	// Create transaction wrapper
+	s.txExplicit = &transaction{
+		conn:     conn,
+		txHandle: txHandle,
+		onClosed: func() {
+			// On transaction closed (rollbacked or committed)
+			s.retrieveBookmarks(conn)
+			s.pool.Return(conn)
+			s.txExplicit = nil
+		},
+	}
+
+	return s.txExplicit, nil
 }
 
 func (s *session) runRetriable(
@@ -200,21 +195,18 @@ func (s *session) runRetriable(
 	work TransactionWork, configurers ...func(*TransactionConfig)) (interface{}, error) {
 
 	// Guard for more than one transaction per session
-	if s.inTx {
+	if s.txExplicit != nil {
 		return nil, errors.New("Already in tx")
+	}
+
+	if s.txAuto != nil {
+		s.txAuto.done()
 	}
 
 	config := TransactionConfig{Timeout: 0, Metadata: nil}
 	for _, c := range configurers {
 		c(&config)
 	}
-
-	// Fetch all in current result if any
-	err := s.fetchAllInCurrentResult()
-	if err != nil {
-		return nil, err
-	}
-	s.returnConn()
 
 	state := retry.State{
 		MaxTransactionRetryTime: s.config.MaxTransactionRetryTime,
@@ -233,7 +225,6 @@ func (s *session) runRetriable(
 		conn, err := s.getConnection(mode)
 		if err != nil {
 			state.OnFailure(conn, err, false)
-			s.pool.Return(conn)
 			continue
 		}
 
@@ -327,15 +318,6 @@ func (s *session) getConnection(mode db.AccessMode) (db.Connection, error) {
 	return conn, nil
 }
 
-func (s *session) borrowConn(mode db.AccessMode) error {
-	conn, err := s.getConnection(mode)
-	if err != nil {
-		return err
-	}
-	s.conn = conn
-	return nil
-}
-
 func (s *session) retrieveBookmarks(conn db.Connection) {
 	if conn == nil {
 		return
@@ -346,42 +328,17 @@ func (s *session) retrieveBookmarks(conn db.Connection) {
 	}
 }
 
-func (s *session) returnConn() {
-	if s.conn != nil {
-		s.retrieveBookmarks(s.conn)
-		s.pool.Return(s.conn)
-		s.conn = nil
-	}
-}
-
-func (s *session) fetchAllInCurrentResult() error {
-	if s.res != nil {
-		s.res.fetchAll()
-		err := s.res.err
-		s.res = nil
-		return err
-	}
-	return nil
-}
-
 func (s *session) Run(
 	cypher string, params map[string]interface{}, configurers ...func(*TransactionConfig)) (Result, error) {
 
-	if s.inTx {
+	if s.txExplicit != nil {
 		err := errors.New("Trying to run auto-commit transaction while in explicit transaction")
 		s.log.Error(sessionLogName, s.logId, err)
 		return nil, err
 	}
 
-	err := s.fetchAllInCurrentResult()
-	if err != nil {
-		return nil, err
-	}
-	s.returnConn()
-
-	err = s.borrowConn(s.defaultMode)
-	if err != nil {
-		return nil, err
+	if s.txAuto != nil {
+		s.txAuto.done()
 	}
 
 	config := TransactionConfig{Timeout: 0, Metadata: nil}
@@ -389,23 +346,49 @@ func (s *session) Run(
 		c(&config)
 	}
 
-	stream, err := s.conn.Run(cypher, params, s.defaultMode, s.bookmarks, config.Timeout, config.Metadata)
+	conn, err := s.getConnection(s.defaultMode)
 	if err != nil {
-		s.returnConn()
 		return nil, err
 	}
-	s.res = newResult(s.conn, stream, cypher, params)
-	return s.res, nil
+
+	stream, err := conn.Run(cypher, params, s.defaultMode, s.bookmarks, config.Timeout, config.Metadata)
+	if err != nil {
+		s.pool.Return(conn)
+		return nil, err
+	}
+
+	s.txAuto = &autoTransaction{
+		conn: conn,
+		res:  newResult(conn, stream, cypher, params),
+		onClosed: func() {
+			s.retrieveBookmarks(conn)
+			s.pool.Return(conn)
+			s.txAuto = nil
+		},
+	}
+
+	return s.txAuto, nil
 }
 
 func (s *session) Close() error {
-	s.fetchAllInCurrentResult()
-	s.returnConn()
+	var err error
+
+	if s.txExplicit != nil {
+		s.txExplicit.Close()
+		err = errors.New("Closing session with a pending transaction")
+		s.log.Warnf(sessionLogName, s.logId, err.Error())
+	}
+
+	if s.txAuto != nil {
+		s.txAuto.done()
+	}
+
 	s.log.Debugf(sessionLogName, s.logId, "Closed")
+
 	// Schedule cleanups
 	go func() {
 		s.pool.CleanUp()
 		s.router.CleanUp()
 	}()
-	return nil
+	return err
 }

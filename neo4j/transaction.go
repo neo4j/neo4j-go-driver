@@ -21,7 +21,6 @@ package neo4j
 
 import (
 	"errors"
-	"time"
 
 	"github.com/neo4j/neo4j-go-driver/v4/neo4j/db"
 )
@@ -46,25 +45,7 @@ type transaction struct {
 	res      *result
 	done     bool
 	err      error
-	onClosed func(bool)
-}
-
-type onClosedCallback func(committed bool)
-
-func beginTransaction(
-	conn db.Connection, mode db.AccessMode, bookmarks []string, timeout time.Duration, meta map[string]interface{},
-	onClosed onClosedCallback) (*transaction, error) {
-
-	txHandle, err := conn.TxBegin(mode, bookmarks, timeout, meta)
-	if err != nil {
-		return nil, err
-	}
-
-	return &transaction{
-		conn:     conn,
-		txHandle: txHandle,
-		onClosed: onClosed,
-	}, nil
+	onClosed func()
 }
 
 func (tx *transaction) Run(cypher string, params map[string]interface{}) (Result, error) {
@@ -87,7 +68,7 @@ func (tx *transaction) Commit() error {
 	}
 	tx.err = tx.conn.TxCommit(tx.txHandle)
 	tx.done = true
-	tx.onClosed(tx.err == nil)
+	tx.onClosed()
 	return tx.err
 }
 
@@ -97,7 +78,7 @@ func (tx *transaction) Rollback() error {
 	}
 	tx.err = tx.conn.TxRollback(tx.txHandle)
 	tx.done = true
-	tx.onClosed(false)
+	tx.onClosed()
 	return tx.err
 }
 
@@ -147,4 +128,65 @@ func (tx *retryableTransaction) Rollback() error {
 
 func (tx *retryableTransaction) Close() error {
 	return errors.New("Close not allowed on retryable transaction")
+}
+
+// Represents an auto commit transaction.
+// Does not implement the Transaction interface.
+// Implements Result interface to hook into when all records has been fetched and
+// invoke onClosed when that happens.
+type autoTransaction struct {
+	conn     db.Connection
+	res      *result
+	closed   bool
+	onClosed func()
+}
+
+func (tx *autoTransaction) done() {
+	tx.res.fetchAll()
+	tx.onAllReceivedEdge()
+}
+
+func (tx *autoTransaction) onAllReceivedEdge() {
+	if tx.res.allReceived && !tx.closed {
+		tx.closed = true
+		tx.onClosed()
+	}
+}
+
+func (tx *autoTransaction) Keys() ([]string, error) {
+	return tx.res.Keys()
+}
+
+func (tx *autoTransaction) Next() bool {
+	x := tx.res.Next()
+	tx.onAllReceivedEdge()
+	return x
+}
+
+func (tx *autoTransaction) NextRecord(record **Record) bool {
+	x := tx.res.NextRecord(record)
+	tx.onAllReceivedEdge()
+	return x
+}
+
+func (tx *autoTransaction) Err() error {
+	return tx.res.Err()
+}
+
+func (tx *autoTransaction) Record() *Record {
+	return tx.res.Record()
+}
+
+func (tx *autoTransaction) Collect() ([]*Record, error) {
+	return tx.res.Collect()
+}
+
+func (tx *autoTransaction) Single() (*Record, error) {
+	return tx.res.Single()
+}
+
+func (tx *autoTransaction) Consume() (ResultSummary, error) {
+	x, err := tx.res.Consume()
+	tx.onAllReceivedEdge()
+	return x, err
 }

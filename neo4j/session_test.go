@@ -32,7 +32,7 @@ func TestSession(st *testing.T) {
 	logger := ConsoleLog{Errors: true, Infos: true, Warns: false}
 
 	assertCleanSessionState := func(t *testing.T, sess *session) {
-		if sess.inTx {
+		if sess.txExplicit != nil {
 			t.Errorf("Session should not be in tx mode")
 		}
 	}
