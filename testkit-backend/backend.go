@@ -184,8 +184,9 @@ func (b *backend) toRequest(s string) map[string]interface{} {
 }
 
 func (b *backend) handleRequest(req map[string]interface{}) {
+	name := req["name"].(string)
 	data := req["data"].(map[string]interface{})
-	switch req["name"] {
+	switch name {
 	case "NewDriver":
 		authTokenMap := data["authorizationToken"].(map[string]interface{})["data"].(map[string]interface{})
 		var authToken neo4j.AuthToken
@@ -343,6 +344,6 @@ func (b *backend) handleRequest(req map[string]interface{}) {
 			b.writeResponse("NullRecord", nil)
 		}
 	default:
-		b.writeError(errors.New("Unknown request: " + req["name"].(string)))
+		b.writeError(errors.New("Unknown request: " + name))
 	}
 }
