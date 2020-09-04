@@ -95,3 +95,5 @@ Ssince Collect function previously could consume a result returned from a transa
 which isn't allowed and doesn't work unless all records are buffered internally and that could
 cause unintential buffering of very large results.
 
+NO LONGER ALLOWED TO USE RESULTS OUTSIDE OF TX BOUNDARY!!!!
+
