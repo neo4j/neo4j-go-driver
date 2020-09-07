@@ -301,7 +301,7 @@ func TestConnectionConformance(ot *testing.T) {
 				if err == nil || s != nil {
 					t.Fatal("Should have received error")
 				}
-				_, isDbError := err.(*db.DatabaseError)
+				_, isDbError := err.(*db.Neo4jError)
 				if !isDbError {
 					t.Error("Should be db error")
 				}
@@ -317,7 +317,7 @@ func TestConnectionConformance(ot *testing.T) {
 				if err == nil {
 					t.Error("Should have error")
 				}
-				_, isDbError := err.(*db.DatabaseError)
+				_, isDbError := err.(*db.Neo4jError)
 				if !isDbError {
 					t.Error("Should be db error")
 				}
@@ -603,7 +603,7 @@ func TestConnectionConformance(ot *testing.T) {
 		boltConn.Run("DROP DATABASE test1 IF EXISTS", nil, db.WriteMode, nil, 0, nil)
 		_, err := boltConn.Run("CREATE DATABASE test1", nil, db.WriteMode, nil, 0, nil)
 		if err != nil {
-			dbErr, _ := err.(*db.DatabaseError)
+			dbErr, _ := err.(*db.Neo4jError)
 			if dbErr == nil || dbErr.Code != "Neo.ClientError.Database.ExistingDatabaseFound" {
 				tt.Fatal(err)
 			}

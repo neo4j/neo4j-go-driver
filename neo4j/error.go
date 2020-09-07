@@ -21,77 +21,97 @@ package neo4j
 
 import (
 	"fmt"
+	"io"
+
 	"github.com/neo4j/neo4j-go-driver/v4/neo4j/db"
 	"github.com/neo4j/neo4j-go-driver/v4/neo4j/internal/connector"
 	"github.com/neo4j/neo4j-go-driver/v4/neo4j/internal/pool"
 )
 
-type driverError struct {
-	message string
+// Neo4jError represents errors originating from Neo4j service.
+// Alias for convenience. This error is defined in db package and
+// used internally.
+type Neo4jError = db.Neo4jError
+
+// UsageError represents errors caused by incorrect usage of the driver API.
+// This does not include Cypher syntax (those errors will be Neo4jError).
+type UsageError struct {
+	Message string
 }
 
-func (failure *driverError) Error() string {
-	return failure.message
+func (e *UsageError) Error() string {
+	return e.Message
 }
 
-func newDriverError(format string, args ...interface{}) *driverError {
-	return &driverError{message: fmt.Sprintf(format, args...)}
+// TransactionExecutionLimit error indicates that a retryable transaction has
+// failed due to reaching a limit like a timeout or maximum number of attempts.
+type TransactionExecutionLimit struct {
+	Errors []error
+	Causes []string
 }
 
-// IsSecurityError is a utility method to check if the provided error is related with any
-// TLS failure or authentication issues.
-func IsSecurityError(err error) bool {
-	_, is := err.(connector.TlsError)
+func (e *TransactionExecutionLimit) Error() string {
+	cause := "Unknown cause"
+	l := len(e.Causes)
+	if l > 0 {
+		cause = e.Causes[l-1]
+	}
+	var err error
+	l = len(e.Errors)
+	if l > 0 {
+		err = e.Errors[l-1]
+	}
+	return fmt.Sprintf("TransactionExecutionLimit: %s after %d attempts, last error: %s", cause, len(e.Errors), err)
+}
+
+// ConnectivityError represent errors caused by the driver not being able to connect to Neo4j services,
+// or lost connections.
+type ConnectivityError struct {
+	inner error
+}
+
+func (e *ConnectivityError) Error() string {
+	return fmt.Sprintf("ConnectivityError: %s", e.inner.Error())
+}
+
+// IsNeo4jError returns true if the provided error is an instance of Neo4jError.
+func IsNeo4jError(err error) bool {
+	_, is := err.(*Neo4jError)
 	return is
 }
 
-// IsAuthenticationError is a utility method to check if the provided error is related with any
-// authentication issues.
-func IsAuthenticationError(err error) bool {
-	dbErr, is := err.(*db.DatabaseError)
-	if !is {
-		return false
-	}
-	return dbErr.IsAuthentication()
-}
-
-// IsClientError is a utility method to check if the provided error is related with the client
-// carrying out an invalid operation.
-func IsClientError(err error) bool {
-	dbErr, is := err.(*db.DatabaseError)
-	if !is {
-		return false
-	}
-	return dbErr.IsClient()
-}
-
-// IsTransientError is a utility method to check if the provided error is related with a temporary
-// failure that may be worked around by retrying.
-func IsTransientError(err error) bool {
-	dbErr, is := err.(*db.DatabaseError)
-	if !is {
-		return false
-	}
-	return dbErr.IsRetriableTransient()
-}
-
-// IsSessionExpired is a utility method to check if the session no longer satisfy the criteria
-// under which it was acquired, e.g. a server no longer accepts write requests.
-func IsSessionExpired(err error) bool {
-	return false
-}
-
-// IsServiceUnavailable is a utility method to check if the provided error can be classified
-// to be in service unavailable category.
-func IsServiceUnavailable(err error) bool {
-	_, is := err.(connector.TlsError)
-	if is {
-		return true
-	}
-	_, is = err.(*pool.PoolTimeout)
-	if is {
-		return true
-	}
-	_, is = err.(*pool.PoolFull)
+// IsUsageError returns true if the provided error is an instance of UsageError.
+func IsUsageError(err error) bool {
+	_, is := err.(*UsageError)
 	return is
+}
+
+// IsConnectivityError returns true if the provided error is an instance of ConnectivityError.
+func IsConnectivityError(err error) bool {
+	_, is := err.(*ConnectivityError)
+	return is
+}
+
+// Wraps errors that can happen on Bolt protocol level to external error
+func wrapBoltError(err error) error {
+	if err == io.EOF {
+		return &ConnectivityError{inner: err}
+	}
+	return err
+}
+
+// Wraps errors that can happen during connect to external error
+func wrapConnectError(err error) error {
+	if err == io.EOF {
+		return &ConnectivityError{inner: err}
+	}
+
+	switch err.(type) {
+	case *connector.TlsError, *connector.ConnectError:
+		return &ConnectivityError{inner: err}
+	case *pool.PoolTimeout, *pool.PoolFull:
+		return &ConnectivityError{inner: err}
+	}
+
+	return err
 }

@@ -102,12 +102,12 @@ func defaultConfig() *Config {
 func validateAndNormaliseConfig(config *Config) error {
 	// Max Transaction Retry Time
 	if config.MaxTransactionRetryTime < 0 {
-		return newDriverError("maximum transaction retry time cannot be smaller than 0, but was %v", config.MaxTransactionRetryTime)
+		return &UsageError{Message: "Maximum transaction retry time cannot be smaller than 0"}
 	}
 
 	// Max Connection Pool Size
 	if config.MaxConnectionPoolSize == 0 {
-		return newDriverError("maximum connection pool size cannot be 0")
+		return &UsageError{Message: "Maximum connection pool cannot be 0"}
 	}
 
 	if config.MaxConnectionPoolSize < 0 {

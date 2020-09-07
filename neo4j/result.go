@@ -131,7 +131,7 @@ func (r *result) Record() *Record {
 }
 
 func (r *result) Err() error {
-	return r.err
+	return wrapBoltError(r.err)
 }
 
 // Used internally to fetch all records from stream and put them in unconsumed list.
@@ -152,7 +152,7 @@ func (r *result) Collect() ([]*Record, error) {
 		recs = append(recs, rec)
 	}
 	if r.err != nil {
-		return nil, r.err
+		return nil, wrapBoltError(r.err)
 	}
 	return recs, nil
 }
@@ -162,12 +162,12 @@ func (r *result) Single() (*Record, error) {
 	// Need to consider unconsumed
 	if !r.NextRecord(&rec) {
 		if r.err != nil {
-			return nil, r.err
+			return nil, wrapBoltError(r.err)
 		}
-		return nil, newDriverError("result contains no records")
+		return nil, &UsageError{Message: "Result contains no records"}
 	}
 	if r.Next() {
-		return nil, newDriverError("result contains more than one record")
+		return nil, &UsageError{Message: "Result contains more than one record"}
 	}
 	return rec, nil
 }
@@ -177,7 +177,7 @@ func (r *result) Consume() (ResultSummary, error) {
 		r.doFetch()
 	}
 	if r.summary == nil || r.err != nil {
-		return nil, r.err
+		return nil, wrapBoltError(r.err)
 	}
 	return &resultSummary{
 		sum:    r.summary,

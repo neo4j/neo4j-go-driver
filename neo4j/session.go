@@ -21,7 +21,6 @@ package neo4j
 
 import (
 	"context"
-	"errors"
 	"strconv"
 	"sync/atomic"
 	"time"
@@ -147,7 +146,7 @@ func (s *session) LastBookmark() string {
 func (s *session) BeginTransaction(configurers ...func(*TransactionConfig)) (Transaction, error) {
 	// Guard for more than one transaction per session
 	if s.txExplicit != nil {
-		err := errors.New("Already in transaction")
+		err := &UsageError{Message: "Session already has a pending transaction"}
 		s.log.Error(sessionLogName, s.logId, err)
 		return nil, err
 	}
@@ -196,7 +195,8 @@ func (s *session) runRetriable(
 
 	// Guard for more than one transaction per session
 	if s.txExplicit != nil {
-		return nil, errors.New("Already in tx")
+		err := &UsageError{Message: "Session already has a pending transaction"}
+		return nil, err
 	}
 
 	if s.txAuto != nil {
@@ -259,9 +259,16 @@ func (s *session) runRetriable(
 		s.retrieveBookmarks(conn)
 		s.pool.Return(conn)
 
+		// All well
 		return x, nil
 	}
-	return nil, state.Err
+
+	// When retries has occured wrap the error
+	if state.LastErrWasRetryable {
+		return nil, &TransactionExecutionLimit{Errors: state.Errs, Causes: state.Causes}
+	}
+	// Return the non-retriable error as is
+	return nil, state.LastErr
 }
 
 func (s *session) ReadTransaction(
@@ -302,7 +309,7 @@ func (s *session) getConnection(mode db.AccessMode) (db.Connection, error) {
 	}
 	conn, err := s.pool.Borrow(ctx, servers, s.config.ConnectionAcquisitionTimeout != 0)
 	if err != nil {
-		return nil, err
+		return nil, wrapConnectError(err)
 	}
 
 	// Select database on server
@@ -310,7 +317,7 @@ func (s *session) getConnection(mode db.AccessMode) (db.Connection, error) {
 		dbSelector, ok := conn.(db.DatabaseSelector)
 		if !ok {
 			s.pool.Return(conn)
-			return nil, errors.New("Database does not support multidatabase")
+			return nil, &UsageError{Message: "Database does not support multidatabase"}
 		}
 		dbSelector.SelectDatabase(s.databaseName)
 	}
@@ -332,7 +339,7 @@ func (s *session) Run(
 	cypher string, params map[string]interface{}, configurers ...func(*TransactionConfig)) (Result, error) {
 
 	if s.txExplicit != nil {
-		err := errors.New("Trying to run auto-commit transaction while in explicit transaction")
+		err := &UsageError{Message: "Trying to run auto-commit transaction while in explicit transaction"}
 		s.log.Error(sessionLogName, s.logId, err)
 		return nil, err
 	}
@@ -354,7 +361,7 @@ func (s *session) Run(
 	stream, err := conn.Run(cypher, params, s.defaultMode, s.bookmarks, config.Timeout, config.Metadata)
 	if err != nil {
 		s.pool.Return(conn)
-		return nil, err
+		return nil, wrapBoltError(err)
 	}
 
 	s.txAuto = &autoTransaction{
@@ -375,7 +382,7 @@ func (s *session) Close() error {
 
 	if s.txExplicit != nil {
 		s.txExplicit.Close()
-		err = errors.New("Closing session with a pending transaction")
+		err = &UsageError{Message: "Closing session with a pending transaction"}
 		s.log.Warnf(sessionLogName, s.logId, err.Error())
 	}
 

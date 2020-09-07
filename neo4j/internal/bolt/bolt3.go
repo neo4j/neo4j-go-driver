@@ -172,9 +172,9 @@ func (b *bolt3) receiveSuccess() (*successResponse, error) {
 	switch v := msg.(type) {
 	case *successResponse:
 		return v, nil
-	case *db.DatabaseError:
+	case *db.Neo4jError:
 		b.state = bolt3_failed
-		if v.IsClient() {
+		if v.Classification() == "ClientError" {
 			// These could include potentially large cypher statement, only log to debug
 			b.log.Debugf(b.logName, b.logId, "%s", v)
 		} else {
@@ -526,9 +526,9 @@ func (b *bolt3) Next(shandle db.Handle) (*db.Record, *db.Summary, error) {
 		sum.ServerName = b.serverName
 		sum.TFirst = b.tfirst
 		return nil, sum, nil
-	case *db.DatabaseError:
+	case *db.Neo4jError:
 		b.state = bolt3_failed
-		if x.IsClient() {
+		if x.Classification() == "ClientError" {
 			// These could include potentially large cypher statement, only log to debug
 			b.log.Debugf(b.logName, b.logId, "%s", x)
 		} else {
@@ -618,7 +618,7 @@ func (b *bolt3) GetRoutingTable(database string, context map[string]string) (*db
 	stream, err := b.Run(query, map[string]interface{}{"context": context}, db.ReadMode, nil, 0, nil)
 	if err != nil {
 		// Give a better error
-		dbError, isDbError := err.(*db.DatabaseError)
+		dbError, isDbError := err.(*db.Neo4jError)
 		if isDbError && dbError.Code == "Neo.ClientError.Procedure.ProcedureNotFound" {
 			return nil, &db.RoutingNotSupportedError{Server: b.serverName}
 		}

@@ -126,7 +126,7 @@ func TestHydrator(ot *testing.T) {
 			name:     "Failure response",
 			tag:      msgFailure,
 			fields:   []interface{}{map[string]interface{}{"code": "Code", "message": "Msg"}},
-			hydrated: &db.DatabaseError{Code: "Code", Msg: "Msg"},
+			hydrated: &db.Neo4jError{Code: "Code", Msg: "Msg"},
 		},
 		{
 			name:     "Record response",

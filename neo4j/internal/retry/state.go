@@ -30,8 +30,11 @@ type Router interface {
 }
 
 type State struct {
-	IsRetryable             bool
-	Err                     error
+	LastErrWasRetryable     bool
+	LastErr                 error
+	stop                    bool
+	Errs                    []error
+	Causes                  []string
 	MaxTransactionRetryTime time.Duration
 	Log                     log.Logger
 	LogName                 string
@@ -50,8 +53,8 @@ type State struct {
 }
 
 func (s *State) OnFailure(conn db.Connection, err error, isCommitting bool) {
-	s.Err = err
-	s.IsRetryable = false
+	s.LastErrWasRetryable = false
+	s.LastErr = err
 	s.cause = ""
 	s.skipSleep = false
 
@@ -60,13 +63,14 @@ func (s *State) OnFailure(conn db.Connection, err error, isCommitting bool) {
 		s.start = s.Now()
 	}
 	if s.Now().Sub(s.start) > s.MaxTransactionRetryTime {
+		s.stop = true
 		s.cause = "Timeout"
 		return
 	}
 
 	// Failed to connect
 	if conn == nil {
-		s.IsRetryable = true
+		s.LastErrWasRetryable = true
 		s.cause = "No available connection"
 		return
 	}
@@ -74,60 +78,70 @@ func (s *State) OnFailure(conn db.Connection, err error, isCommitting bool) {
 	// Check if the connection died, if it died during commit it is not safe to retry.
 	if !conn.IsAlive() {
 		if isCommitting {
+			s.stop = true
 			s.cause = "Connection lost during commit"
 			return
 		}
 
 		s.deadErrors += 1
-		s.IsRetryable = s.deadErrors <= s.MaxDeadConnections
+		s.stop = s.deadErrors > s.MaxDeadConnections
+		s.LastErrWasRetryable = true
 		s.cause = "Connection lost"
 		s.skipSleep = true
 		return
 	}
 
-	if dbErr, isDbErr := err.(*db.DatabaseError); isDbErr {
+	if dbErr, isDbErr := err.(*db.Neo4jError); isDbErr {
 		if dbErr.IsRetriableCluster() {
 			// Force routing tables to be updated before trying again
 			s.Router.Invalidate(s.DatabaseName)
 			s.cause = "Cluster error"
-			s.IsRetryable = true
+			s.LastErrWasRetryable = true
 			return
 		}
 
 		if dbErr.IsRetriableTransient() {
 			s.cause = "Transient error"
-			s.IsRetryable = true
+			s.LastErrWasRetryable = true
 			return
 		}
 	}
+
+	s.stop = true
 }
 
 func (s *State) Continue() bool {
-	if s.Err == nil {
+	// No error happened yet
+	if !s.stop && s.LastErr == nil {
 		return true
 	}
 
-	if !s.IsRetryable {
-		// When there is a cause we failed due to a reason we should be able to handle, therefore
-		// log it as an error. The transaction could fail due to many other reasons, not sure if
-		// these are errors that the driver should log.
-		if s.cause != "" {
-			s.Log.Errorf(s.LogName, s.LogId, "Transaction failed (%s): %s", s.cause, s.Err)
+	// Track the error and the cause
+	s.Errs = append(s.Errs, s.LastErr)
+	if s.cause != "" {
+		s.Causes = append(s.Causes, s.cause)
+	}
+
+	// Retry after optional sleep
+	if !s.stop {
+		if s.skipSleep {
+			s.Log.Debugf(s.LogName, s.LogId, "Retrying transaction (%s): %s", s.cause, s.LastErr)
+		} else {
+			s.Throttle = s.Throttle.next()
+			sleepTime := s.Throttle.delay()
+			s.Log.Debugf(s.LogName, s.LogId,
+				"Retrying transaction (%s): %s [after %s]", s.cause, s.LastErr, sleepTime)
+			s.Sleep(sleepTime)
 		}
-		return false
+		return true
 	}
 
-	if s.skipSleep {
-		s.Log.Debugf(s.LogName, s.LogId, "Retrying transaction (%s): %s", s.cause, s.Err)
-	} else {
-		s.Throttle = s.Throttle.next()
-		sleepTime := s.Throttle.delay()
-		s.Log.Debugf(s.LogName, s.LogId, "Retrying transaction (%s): %s [after %s]", s.cause, s.Err, sleepTime)
-		s.Sleep(sleepTime)
+	// Stop retrying
+	// When last error was retryable we gave up for some reason, log this as an error
+	// since it is somewhat our fault.
+	if s.cause != "" {
+		s.Log.Errorf(s.LogName, s.LogId,
+			"Transaction failed (%s): %s after %d retries", s.cause, s.LastErr, len(s.Errs)-1)
 	}
-
-	// Reset
-	s.Err = nil
-	s.IsRetryable = false
-	return true
+	return false
 }

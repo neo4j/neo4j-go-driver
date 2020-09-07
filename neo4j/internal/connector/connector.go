@@ -41,8 +41,21 @@ type Connector struct {
 	Log             log.Logger
 }
 
-type ConnectError error
-type TlsError error
+type ConnectError struct {
+	inner error
+}
+
+func (e *ConnectError) Error() string {
+	return e.inner.Error()
+}
+
+type TlsError struct {
+	inner error
+}
+
+func (e *TlsError) Error() string {
+	return e.inner.Error()
+}
 
 func (c Connector) Connect(address string) (db.Connection, error) {
 	dialer := net.Dialer{Timeout: c.DialTimeout}
@@ -52,7 +65,7 @@ func (c Connector) Connect(address string) (db.Connection, error) {
 
 	conn, err := dialer.Dial("tcp", address)
 	if err != nil {
-		return nil, ConnectError(err)
+		return nil, &ConnectError{inner: err}
 	}
 
 	// TLS not requested, perform Bolt handshake
@@ -75,7 +88,7 @@ func (c Connector) Connect(address string) (db.Connection, error) {
 			err = errors.New("Remote end closed the connection, check that TLS is enabled on the server")
 		}
 		conn.Close()
-		return nil, TlsError(err)
+		return nil, &TlsError{inner: err}
 	}
 	// Perform Bolt handshake
 	return bolt.Connect(address, tlsconn, c.Auth, c.Log)

@@ -20,6 +20,7 @@ package retry
 
 import (
 	"errors"
+	"io"
 	"testing"
 	"time"
 
@@ -45,8 +46,8 @@ func TestState(tt *testing.T) {
 		halfTime       = baseTime.Add(maxRetryTime / 2)
 		maxDead        = 2
 		dbName         = "thedb"
-		clusterErr     = &db.DatabaseError{Code: "Neo.ClientError.Cluster.NotALeader"}
-		dbTransientErr = &db.DatabaseError{Code: "Neo.TransientError.Some.Some"}
+		clusterErr     = &db.Neo4jError{Code: "Neo.ClientError.Cluster.NotALeader"}
+		dbTransientErr = &db.Neo4jError{Code: "Neo.TransientError.Some.Some"}
 	)
 
 	cases := map[string][]TStateInvocation{
@@ -83,6 +84,12 @@ func TestState(tt *testing.T) {
 		"Database transient error timeout": []TStateInvocation{
 			{conn: &testutil.ConnFake{Alive: true}, err: dbTransientErr, expectContinued: true},
 			{conn: &testutil.ConnFake{Alive: true}, err: dbTransientErr, expectContinued: false, now: overTime},
+		},
+		"User defined error": []TStateInvocation{
+			{conn: &testutil.ConnFake{Alive: true}, err: errors.New("client error"), expectContinued: false},
+		},
+		"Fail during commit": []TStateInvocation{
+			{conn: &testutil.ConnFake{Alive: false}, err: io.EOF, isCommitting: true, expectContinued: false},
 		},
 	}
 
