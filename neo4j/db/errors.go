@@ -24,65 +24,61 @@ import (
 	"strings"
 )
 
-type dbErrCls int
-
-const (
-	dbErrClsSentinel dbErrCls = iota
-	dbErrClsClient
-	dbErrClsTransient
-	dbErrClsUnknown
-)
-
-// TODO: Check naming consistency, now exported!
-
 // Database server failed to fullfill request.
-type DatabaseError struct {
-	Code string
-	Msg  string
-	cls  dbErrCls
+type Neo4jError struct {
+	Code           string
+	Msg            string
+	parsed         bool
+	classification string
+	category       string
+	title          string
 }
 
-func (e *DatabaseError) Error() string {
-	return fmt.Sprintf("Server error: [%s] %s", e.Code, e.Msg)
+func (e *Neo4jError) Error() string {
+	return fmt.Sprintf("Neo4jError: %s (%s)", e.Code, e.Msg)
 }
 
-func (e *DatabaseError) getCls() dbErrCls {
-	// Code is on format: Neo.{classification}.X.Y like for example:
-	// Neo.ClientError.General.ForbiddenOnReadOnlyDatabase
-	if e.cls == dbErrClsSentinel {
-		parts := strings.Split(e.Code, ".")
-		if len(parts) < 2 {
-			e.cls = dbErrClsUnknown
-			return e.cls
-		}
-		if parts[0] != "Neo" {
-			e.cls = dbErrClsUnknown
-			return e.cls
-		}
-		switch parts[1] {
-		case "TransientError":
-			e.cls = dbErrClsTransient
-			return e.cls
-		case "ClientError":
-			e.cls = dbErrClsClient
-			return e.cls
-		default:
-			e.cls = dbErrClsUnknown
-		}
+func (e *Neo4jError) Classification() string {
+	e.parse()
+	return e.classification
+}
+
+func (e *Neo4jError) Category() string {
+	e.parse()
+	return e.category
+}
+
+func (e *Neo4jError) Title() string {
+	e.parse()
+	return e.title
+}
+
+// parse parses code from Neo4j into usable parts.
+// Code Neo.ClientError.General.ForbiddenReadOnlyDatabase is split into:
+//   Classification: ClientError
+//   Category: General
+//   Title: ForbiddernReadOnlyDatabase
+func (e *Neo4jError) parse() {
+	if e.parsed {
+		return
 	}
-	return e.cls
+	e.parsed = true
+	parts := strings.Split(e.Code, ".")
+	if len(parts) != 4 {
+		return
+	}
+	e.classification = parts[1]
+	e.category = parts[2]
+	e.title = parts[3]
 }
 
-func (e *DatabaseError) IsAuthentication() bool {
+func (e *Neo4jError) IsAuthenticationFailed() bool {
 	return e.Code == "Neo.ClientError.Security.Unauthorized"
 }
 
-func (e *DatabaseError) IsTransient() bool {
-	return e.getCls() == dbErrClsTransient
-}
-
-func (e *DatabaseError) IsRetriableTransient() bool {
-	if e.getCls() != dbErrClsTransient {
+func (e *Neo4jError) IsRetriableTransient() bool {
+	e.parse()
+	if e.classification != "TransientError" {
 		return false
 	}
 	switch e.Code {
@@ -93,20 +89,13 @@ func (e *DatabaseError) IsRetriableTransient() bool {
 	return true
 }
 
-func (e *DatabaseError) IsRetriableCluster() bool {
+func (e *Neo4jError) IsRetriableCluster() bool {
 	switch e.Code {
 	case "Neo.ClientError.Cluster.NotALeader", "Neo.ClientError.General.ForbiddenOnReadOnlyDatabase":
 		return true
 	}
 	return false
 }
-
-func (e *DatabaseError) IsClient() bool {
-	return e.getCls() == dbErrClsClient
-}
-
-// TODO: IsSyntaxError
-// TODO: IsArithmeticError
 
 type RoutingNotSupportedError struct {
 	Server string

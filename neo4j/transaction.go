@@ -20,8 +20,6 @@
 package neo4j
 
 import (
-	"errors"
-
 	"github.com/neo4j/neo4j-go-driver/v4/neo4j/db"
 )
 
@@ -51,12 +49,12 @@ type transaction struct {
 func (tx *transaction) Run(cypher string, params map[string]interface{}) (Result, error) {
 	err := fetchAllInResult(&tx.res)
 	if err != nil {
-		return nil, err
+		return nil, wrapBoltError(err)
 	}
 
 	stream, err := tx.conn.RunTx(tx.txHandle, cypher, params)
 	if err != nil {
-		return nil, err
+		return nil, wrapBoltError(err)
 	}
 	tx.res = newResult(tx.conn, stream, cypher, params)
 	return tx.res, nil
@@ -69,7 +67,7 @@ func (tx *transaction) Commit() error {
 	tx.err = tx.conn.TxCommit(tx.txHandle)
 	tx.done = true
 	tx.onClosed()
-	return tx.err
+	return wrapBoltError(tx.err)
 }
 
 func (tx *transaction) Rollback() error {
@@ -79,7 +77,7 @@ func (tx *transaction) Rollback() error {
 	tx.err = tx.conn.TxRollback(tx.txHandle)
 	tx.done = true
 	tx.onClosed()
-	return tx.err
+	return wrapBoltError(tx.err)
 }
 
 func (tx *transaction) Close() error {
@@ -107,27 +105,27 @@ func (tx *retryableTransaction) Run(cypher string, params map[string]interface{}
 	// Fetch all in previous result
 	err := fetchAllInResult(&tx.res)
 	if err != nil {
-		return nil, err
+		return nil, wrapBoltError(err)
 	}
 
 	stream, err := tx.conn.RunTx(tx.txHandle, cypher, params)
 	if err != nil {
-		return nil, err
+		return nil, wrapBoltError(err)
 	}
 	tx.res = newResult(tx.conn, stream, cypher, params)
 	return tx.res, nil
 }
 
 func (tx *retryableTransaction) Commit() error {
-	return errors.New("Commit not allowed on retryable transaction")
+	return &UsageError{Message: "Commit not allowed on retryable transaction"}
 }
 
 func (tx *retryableTransaction) Rollback() error {
-	return errors.New("Rollback not allowed on retryable transaction")
+	return &UsageError{Message: "Rollback not allowed on retryable transaction"}
 }
 
 func (tx *retryableTransaction) Close() error {
-	return errors.New("Close not allowed on retryable transaction")
+	return &UsageError{Message: "Close not allowed on retryable transaction"}
 }
 
 // Represents an auto commit transaction.

@@ -224,7 +224,7 @@ func TestBolt3(ot *testing.T) {
 
 		// Fake syntax error that doesn't really matter...
 		_, err := bolt.Run("MATCH (n RETURN n", nil, db.ReadMode, nil, 0, nil)
-		assertDatabaseError(t, err)
+		assertNeo4jError(t, err)
 		assertBoltState(t, bolt3_failed, bolt)
 
 		bolt.Reset()

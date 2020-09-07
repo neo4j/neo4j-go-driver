@@ -28,7 +28,6 @@ import (
 	"github.com/neo4j/neo4j-go-driver/v4/neo4j"
 	"github.com/neo4j/neo4j-go-driver/v4/neo4j/test-integration/control"
 
-	"github.com/neo4j/neo4j-go-driver/v4/neo4j/utils/test"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
@@ -64,7 +63,7 @@ var _ = Describe("Transaction", func() {
 	})
 
 	Context("Retry Mechanism", func() {
-		transientError := test.NewDatabaseErrorForTest("Neo.TransientError.Transaction.Outdated")
+		transientError := &neo4j.Neo4jError{Code: "Neo.TransientError.Transaction.Outdated"}
 
 		It("should work on WriteTransaction", func() {
 			times := 0

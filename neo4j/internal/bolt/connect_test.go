@@ -92,8 +92,8 @@ func TestConnect(ot *testing.T) {
 
 		boltconn, err := Connect("serverName", conn, auth, logger)
 		// Make sure that we get the right error type
-		dbErr := err.(*db.DatabaseError)
-		if !dbErr.IsAuthentication() {
+		dbErr := err.(*db.Neo4jError)
+		if !dbErr.IsAuthenticationFailed() {
 			t.Errorf("Should be authentication error: %s", dbErr)
 		}
 		if boltconn != nil {

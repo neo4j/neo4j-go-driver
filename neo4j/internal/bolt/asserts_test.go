@@ -92,10 +92,10 @@ func assertError(t *testing.T, err error) {
 	}
 }
 
-func assertDatabaseError(t *testing.T, err error) {
+func assertNeo4jError(t *testing.T, err error) {
 	t.Helper()
 	assertError(t, err)
-	_, isDbErr := err.(*db.DatabaseError)
+	_, isDbErr := err.(*db.Neo4jError)
 	if !isDbErr {
 		t.Errorf("Expected database error but was %T: %s", err, err)
 	}

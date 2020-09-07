@@ -160,7 +160,7 @@ var _ = Describe("Driver", func() {
 			Expect(err).To(BeNil())
 
 			_, err = session3.Run("UNWIND RANGE(1, 100) AS N RETURN N", nil)
-			Expect(neo4j.IsServiceUnavailable(err)).To(BeTrue())
+			Expect(neo4j.IsConnectivityError(err)).To(BeTrue())
 			//Expect(err).To(BeConnectorErrorWithCode(0x600))
 		})
 	})
@@ -207,7 +207,7 @@ var _ = Describe("Driver", func() {
 			start := time.Now()
 			_, err = session3.Run("UNWIND RANGE(1, 100) AS N RETURN N", nil)
 			elapsed := time.Since(start)
-			Expect(neo4j.IsServiceUnavailable(err)).To(BeTrue())
+			Expect(neo4j.IsConnectivityError(err)).To(BeTrue())
 			//Expect(err).To(BeConnectorErrorWithCode(0x601))
 			Expect(math.Round(float64(elapsed / time.Second))).To(BeNumerically(">=", 10))
 		})

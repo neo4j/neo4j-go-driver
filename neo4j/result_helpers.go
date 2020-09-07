@@ -19,6 +19,8 @@
 
 package neo4j
 
+import "fmt"
+
 // Single returns one and only one record from the result stream. Any error passed in
 // or reported while navigating the result stream is returned without any conversion.
 // If the result stream contains zero or more than one records error is returned.
@@ -52,7 +54,9 @@ func AsRecords(from interface{}, err error) ([]*Record, error) {
 	}
 	recs, ok := from.([]*Record)
 	if !ok {
-		return nil, newDriverError("Expected []*Record")
+		return nil, &UsageError{
+			Message: fmt.Sprintf("Expected type []*Record, not %T", from),
+		}
 	}
 	return recs, nil
 }
@@ -68,7 +72,9 @@ func AsRecord(from interface{}, err error) (*Record, error) {
 	}
 	rec, ok := from.(*Record)
 	if !ok {
-		return nil, newDriverError("Expected *Record")
+		return nil, &UsageError{
+			Message: fmt.Sprintf("Expected type *Record, not %T", from),
+		}
 	}
 	return rec, nil
 }

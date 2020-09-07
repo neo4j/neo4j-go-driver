@@ -52,11 +52,11 @@ func newBackend(rd *bufio.Reader, wr io.Writer) *backend {
 	}
 }
 
-type clientError struct {
+type frontendError struct {
 	msg string
 }
 
-func (e *clientError) Error() string {
+func (e *frontendError) Error() string {
 	return e.msg
 }
 
@@ -88,16 +88,20 @@ func (b *backend) writeError(err error) {
 	// Convert error if it is a known type of error.
 	// This is very simple right now, no extra information is sent at all just keep
 	// track of this error so that we can reuse the real thing within a retryable tx
-	if neo4j.IsTransientError(err) || neo4j.IsClientError(err) || neo4j.IsServiceUnavailable(err) || neo4j.IsAuthenticationError(err) || neo4j.IsSecurityError(err) {
+	isDriverError := neo4j.IsNeo4jError(err) ||
+		neo4j.IsUsageError(err) ||
+		neo4j.IsNetworkError(err)
+
+	if isDriverError {
 		id := b.setError(err)
 		b.writeResponse("DriverError", map[string]interface{}{"id": id})
 		return
 	}
 
 	// This is an error that originated in frontend
-	clientErr, isClientErr := err.(*clientError)
-	if isClientErr {
-		b.writeResponse("ClientError", map[string]interface{}{"msg": clientErr.msg})
+	frontendErr, isFrontendErr := err.(*frontendError)
+	if isFrontendErr {
+		b.writeResponse("FrontendError", map[string]interface{}{"msg": frontendErr.msg})
 		return
 	}
 
@@ -302,7 +306,7 @@ func (b *backend) handleRequest(req map[string]interface{}) {
 					if sessionState.retryableErrorId != "" {
 						return nil, b.recordedErrors[sessionState.retryableErrorId]
 					} else {
-						return nil, &clientError{msg: "Error from client"}
+						return nil, &frontendError{msg: "Error from client"}
 					}
 				case retryable_nothing:
 					// Client did something not related to the retryable state

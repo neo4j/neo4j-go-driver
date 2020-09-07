@@ -108,11 +108,15 @@ func NewDriver(target string, auth AuthToken, configurers ...func(*Config)) (Dri
 		d.connector.SkipVerify = true
 	case "neo4j+s":
 	default:
-		return nil, newDriverError("url scheme %s is not supported", parsed.Scheme)
+		return nil, &UsageError{
+			Message: fmt.Sprintf("URL scheme %s is not supported", parsed.Scheme),
+		}
 	}
 
 	if !routing && len(parsed.RawQuery) > 0 {
-		return nil, newDriverError("routing context is not supported for direct driver")
+		return nil, &UsageError{
+			Message: fmt.Sprintf("Routing context is not supported for URL scheme %s", parsed.Scheme),
+		}
 	}
 
 	// Apply client hooks for setting up configuration
@@ -174,15 +178,21 @@ func routingContextFromUrl(u *url.URL) (map[string]string, error) {
 	routingContext := make(map[string]string, len(queryValues))
 	for k, vs := range queryValues {
 		if len(vs) > 1 {
-			return nil, newDriverError("Duplicated routing context key '%s'", k)
+			return nil, &UsageError{
+				Message: fmt.Sprintf("Duplicated routing context key '%s'", k),
+			}
 		}
 		if len(vs) == 0 {
-			return nil, newDriverError("Empty routing context key '%s'", k)
+			return nil, &UsageError{
+				Message: fmt.Sprintf("Empty routing context key '%s'", k),
+			}
 		}
 		v := vs[0]
 		v = strings.TrimSpace(v)
 		if len(v) == 0 {
-			return nil, newDriverError("Empty routing context key '%s'", k)
+			return nil, &UsageError{
+				Message: fmt.Sprintf("Empty routing context value for key '%s'", k),
+			}
 		}
 		routingContext[k] = v
 	}
@@ -215,7 +225,9 @@ func (d *driver) Session(accessMode AccessMode, bookmarks ...string) (Session, e
 	d.mut.Lock()
 	defer d.mut.Unlock()
 	if d.pool == nil {
-		return nil, newDriverError("Driver closed")
+		return nil, &UsageError{
+			Message: "Trying to create session on closed driver",
+		}
 	}
 	return newSession(
 		d.config, d.router,
@@ -231,7 +243,9 @@ func (d *driver) NewSession(config SessionConfig) (Session, error) {
 	d.mut.Lock()
 	defer d.mut.Unlock()
 	if d.pool == nil {
-		return nil, newDriverError("Driver closed")
+		return nil, &UsageError{
+			Message: "Trying to create session on closed driver",
+		}
 	}
 	return newSession(
 		d.config, d.router,
@@ -243,7 +257,7 @@ func (d *driver) VerifyConnectivity() error {
 	if err != nil {
 		return err
 	}
-	result, err := session.Run("RETURN 1", nil)
+	result, err := session.Run("RETURN 1 AS n", nil)
 	if err != nil {
 		return err
 	}

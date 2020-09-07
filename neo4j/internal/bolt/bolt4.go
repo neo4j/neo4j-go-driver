@@ -174,9 +174,9 @@ func (b *bolt4) receiveSuccess() (*successResponse, error) {
 	switch v := msg.(type) {
 	case *successResponse:
 		return v, nil
-	case *db.DatabaseError:
+	case *db.Neo4jError:
 		b.state = bolt4_failed
-		if v.IsClient() {
+		if v.Classification() == "ClientError" {
 			// These could include potentially large cypher statement, only log to debug
 			b.log.Debugf(b.logName, b.logId, "%s", v)
 		} else {
@@ -531,9 +531,9 @@ func (b *bolt4) Next(shandle db.Handle) (*db.Record, *db.Summary, error) {
 		sum.ServerName = b.serverName
 		sum.TFirst = b.tfirst
 		return nil, sum, nil
-	case *db.DatabaseError:
+	case *db.Neo4jError:
 		b.state = bolt4_failed
-		if x.IsClient() {
+		if x.Classification() == "ClientError" {
 			// These could include potentially large cypher statement, only log to debug
 			b.log.Debugf(b.logName, b.logId, "%s", x)
 		} else {

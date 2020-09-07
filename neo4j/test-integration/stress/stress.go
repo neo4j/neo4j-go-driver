@@ -156,11 +156,12 @@ func newStressTransaction(session neo4j.Session, useBookmark bool, ctx *TestCont
 				return tx
 			}
 
-			if neo4j.IsTransientError(err) {
+			neo4jErr, isNeo4jErr := err.(*neo4j.Neo4jError)
+			if isNeo4jErr && neo4jErr.Classification() == "TransientError" {
 				ctx.addBookmarkFailure()
 			} else {
-				Expect(neo4j.IsTransientError(err)).To(BeTrue())
-				//Expect(err).To(BeTransientError(nil, nil))
+				// Fail
+				Expect(err).To(BeNil())
 			}
 		}
 	}

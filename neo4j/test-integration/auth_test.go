@@ -48,7 +48,10 @@ var _ = Describe("Authentication", func() {
 		defer session.Close()
 
 		_, err = session.Run("RETURN 1", nil)
-		Expect(neo4j.IsAuthenticationError(err)).To(BeTrue())
+
+		neo4jErr, isNeo4jErr := err.(*neo4j.Neo4jError)
+		Expect(isNeo4jErr).To(BeTrue())
+		Expect(neo4jErr.IsAuthenticationFailed()).To(BeTrue())
 	})
 
 	verifyConnect := func(token neo4j.AuthToken) func() {

@@ -29,7 +29,7 @@ import (
 )
 
 func TestSession(st *testing.T) {
-	logger := ConsoleLog{Errors: true, Infos: true, Warns: false}
+	logger := ConsoleLog{Errors: true, Infos: true, Warns: true, Debugs: true}
 
 	assertCleanSessionState := func(t *testing.T, sess *session) {
 		if sess.txExplicit != nil {
@@ -57,9 +57,8 @@ func TestSession(st *testing.T) {
 			}
 			conn := &testutil.ConnFake{Alive: true}
 			pool.borrowConn = conn
-			transientErr := &db.DatabaseError{Code: "Neo.TransientError.General.MemoryPoolOutOfMemoryError"}
+			transientErr := &db.Neo4jError{Code: "Neo.TransientError.General.MemoryPoolOutOfMemoryError"}
 			numRetries := 0
-
 			_, err := sess.WriteTransaction(func(tx Transaction) (interface{}, error) {
 				// Previous connection should be returned to pool since it failed
 				if numRetries > 0 && numReturns != numRetries {
@@ -80,12 +79,17 @@ func TestSession(st *testing.T) {
 		// "User" initiates rollback by letting the transaction function return a custom error.
 		rt.Run("Failed rollback", func(t *testing.T) {
 			_, pool, sess := createSession()
-			rollbackErr := errors.New("Rollback error")
-			causeOfRollbackErr := errors.New("Cause of rollback")
+			rollbackErr := errors.New("RollbackErrorFake")
+			causeOfRollbackErr := errors.New("UserErrorFake")
 			pool.borrowConn = &testutil.ConnFake{Alive: true, TxRollbackErr: rollbackErr}
+			numRetries := 0
 			_, err := sess.WriteTransaction(func(tx Transaction) (interface{}, error) {
+				numRetries++
 				return nil, causeOfRollbackErr
 			})
+			if numRetries != 1 {
+				t.Error("Should not retry on user error")
+			}
 			assertErrorEq(t, causeOfRollbackErr, err)
 			assertCleanSessionState(t, sess)
 		})
@@ -95,9 +99,14 @@ func TestSession(st *testing.T) {
 			_, pool, sess := createSession()
 			commitErr := errors.New("Commit error")
 			pool.borrowConn = &testutil.ConnFake{Alive: true, TxCommitErr: commitErr}
+			numRetries := 0
 			_, err := sess.WriteTransaction(func(tx Transaction) (interface{}, error) {
+				numRetries++
 				return nil, nil
 			})
+			if numRetries != 1 {
+				t.Error("Should not retry on commit error")
+			}
 			assertErrorEq(t, commitErr, err)
 			assertCleanSessionState(t, sess)
 		})

@@ -127,7 +127,9 @@ var _ = Describe("Session", func() {
 
 			result, err = session.Run(stmt, nil)
 			Expect(result).To(BeNil())
-			Expect(neo4j.IsClientError(err)).To(BeTrue())
+			neo4jErr, isNeo4jErr := err.(*neo4j.Neo4jError)
+			Expect(isNeo4jErr).To(BeTrue())
+			Expect(neo4jErr.Classification()).To(Equal("ClientError"))
 		})
 
 		Specify("when a fail-on-streaming query is executed, it should run and return error when consuming", func() {
@@ -138,17 +140,23 @@ var _ = Describe("Session", func() {
 			if err != nil {
 				Expect(result).To(BeNil())
 				//Expect(err).To(BeArithmeticError())
-				Expect(neo4j.IsClientError(err)).To(BeTrue())
+				neo4jErr, isNeo4jErr := err.(*neo4j.Neo4jError)
+				Expect(isNeo4jErr).To(BeTrue())
+				Expect(neo4jErr.Classification()).To(Equal("ClientError"))
 				return
 			}
 			Expect(result).NotTo(BeNil())
 			summary, err = result.Consume()
-			Expect(neo4j.IsClientError(err)).To(BeTrue())
+			neo4jErr, isNeo4jErr := err.(*neo4j.Neo4jError)
+			Expect(isNeo4jErr).To(BeTrue())
+			Expect(neo4jErr.Classification()).To(Equal("ClientError"))
 			//Expect(err).To(BeArithmeticError())
 			Expect(summary).To(BeNil())
 
 			Expect(result.Next()).To(BeFalse())
-			Expect(neo4j.IsClientError(err)).To(BeTrue())
+			neo4jErr, isNeo4jErr = err.(*neo4j.Neo4jError)
+			Expect(isNeo4jErr).To(BeTrue())
+			Expect(neo4jErr.Classification()).To(Equal("ClientError"))
 			//Expect(result.Err()).To(BeArithmeticError())
 		})
 
@@ -259,7 +267,9 @@ var _ = Describe("Session", func() {
 		Specify("when one statement fails, the next one should run successfully", func() {
 			result, err = session.Run("Invalid Cypher", nil)
 			Expect(result).To(BeNil())
-			Expect(neo4j.IsClientError(err)).To(BeTrue())
+			neo4jErr, isNeo4jErr := err.(*neo4j.Neo4jError)
+			Expect(isNeo4jErr).To(BeTrue())
+			Expect(neo4jErr.Classification()).To(Equal("ClientError"))
 
 			result, err = session.Run("RETURN 1", nil)
 			Expect(err).To(BeNil())
@@ -514,7 +524,7 @@ var _ = Describe("Session", func() {
 			result3, err := session3.Run("MATCH (n:RunTxTimeOut) SET n.id = 2", nil, neo4j.WithTxTimeout(1*time.Second))
 			// Up to db to determine when error occures
 			if err != nil {
-				dbErr := err.(*db.DatabaseError)
+				dbErr := err.(*db.Neo4jError)
 				Expect(dbErr.Msg).To(ContainSubstring("terminated"))
 				return
 			}
@@ -523,7 +533,7 @@ var _ = Describe("Session", func() {
 			// Should be a database error of class Transient indicating that the transaction
 			// has been terminated. For some reason this should not be considered transient
 			// by the IsTransientError.
-			dbErr := err.(*db.DatabaseError)
+			dbErr := err.(*db.Neo4jError)
 			Expect(dbErr.Msg).To(ContainSubstring("terminated"))
 			//Expect(err).To(BeTransientError(nil, ContainSubstring("terminated")))
 		})
@@ -540,7 +550,7 @@ var _ = Describe("Session", func() {
 
 			_, err := session3.WriteTransaction(updateNodeWork("WriteTransactionTxTimeOut", map[string]interface{}{"id": 2}), neo4j.WithTxTimeout(1*time.Second))
 			Expect(err).ToNot(BeNil())
-			dbErr := err.(*db.DatabaseError)
+			dbErr := err.(*db.Neo4jError)
 			Expect(dbErr.Msg).To(ContainSubstring("terminated"))
 			//Expect(err).To(BeTransientError(nil, ContainSubstring("terminated")))
 		})

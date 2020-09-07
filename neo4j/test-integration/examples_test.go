@@ -445,18 +445,6 @@ func createItem(driver neo4j.Driver) error {
 	return err
 }
 
-func addItem(driver neo4j.Driver) bool {
-	if err := createItem(driver); err != nil {
-		if neo4j.IsServiceUnavailable(err) {
-			// perform some action
-		}
-
-		return false
-	}
-
-	return true
-}
-
 // end::service-unavailable[]
 
 func countNodes(driver neo4j.Driver, label string, property string, value string) (int64, error) {

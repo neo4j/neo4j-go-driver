@@ -399,9 +399,9 @@ var _ = Describe("Bookmark", func() {
 			tx, err := session.BeginTransaction()
 
 			Expect(tx).To(BeNil())
-			Expect(neo4j.IsTransientError(err)).To(BeTrue())
-			errDesc := err.Error()
-			Expect(errDesc).To(ContainSubstring("not up to the requested version"))
+			neo4jErr := err.(*neo4j.Neo4jError)
+			Expect(neo4jErr.IsRetriableTransient()).To(BeTrue())
+			Expect(neo4jErr.Msg).To(ContainSubstring("not up to the requested version"))
 		})
 	})
 

@@ -28,6 +28,7 @@ import (
 )
 
 func assertErrorEq(t *testing.T, err1, err2 error) {
+	t.Helper()
 	if !reflect.DeepEqual(err1, err2) {
 		t.Errorf("Wrong type of error, '%s' != '%s'", err1, err2)
 	}

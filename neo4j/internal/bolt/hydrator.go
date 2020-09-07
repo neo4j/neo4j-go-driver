@@ -212,7 +212,7 @@ func hydrateFailure(fields []interface{}) (interface{}, error) {
 	}
 	// Hydrate right into error defined in connection package to avoid remapping at a later
 	// state.
-	return &db.DatabaseError{Code: code, Msg: msg}, nil
+	return &db.Neo4jError{Code: code, Msg: msg}, nil
 }
 
 func hydratePoint2d(fields []interface{}) (interface{}, error) {
