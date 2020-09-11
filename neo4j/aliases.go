@@ -30,14 +30,15 @@ import (
 // compatibility with 1.x driver.
 //
 // A separate dbtype package is needed to avoid circular package references and to avoid
-// unnecessary copying/conversions between structs.
+// unnecessary copying/conversions between structs since serializing/deserializing is
+// handled within bolt package and bolt package is used from this package.
 type (
 	Point2D       = dbtype.Point2D
 	Point3D       = dbtype.Point3D
 	Date          = dbtype.Date
 	LocalTime     = dbtype.LocalTime
 	LocalDateTime = dbtype.LocalDateTime
-	Time          = dbtype.Time // AKA OffsetTime
+	Time          = dbtype.Time
 	OffsetTime    = dbtype.Time
 	Duration      = dbtype.Duration
 	Node          = dbtype.Node
@@ -46,41 +47,52 @@ type (
 	Record        = db.Record
 )
 
-// TODO: Point is gone, Point2D and Point3D is the new
-
-func DurationOf(months, days, seconds int64, nanos int) dbtype.Duration {
-	return Duration{Months: months, Days: days, Seconds: seconds, Nanos: nanos}
-}
-
-// TODO: Move these time funcs somewhere
-// TODO: Document these and make note that explicit casting is to be preferred to func call.
-// TODO: For backwards compatibility with 1.8 driver, provide casting of temporal types as functions
-// When serializing to the database only the relevant parts of the time.Time component
-// will be used and deserializing will set the irrelevant parts to a known value.
+// DateOf creates a neo4j.Date from time.Time.
+// Hour, minute, second and nanoseconds are set to zero and location is set to UTC.
 //
-// But to avoid confusion we make the returned time look more like the expected (makes
-// writing tests simpler since they ensure equality reflect.Equal).
-// Extensive use of t.Local() to force applying monotonic clock to wall time when t is from time.Now
-
-func DateOf(t time.Time) dbtype.Date {
+// Conversion can also be done by casting a time.Time to neo4j.Date but beware that time
+// components and location will be left as is but ignored when used as query parameter.
+func DateOf(t time.Time) Date {
 	y, m, d := t.Date()
 	t = time.Date(y, m, d, 0, 0, 0, 0, time.UTC)
 	return dbtype.Date(t)
 }
 
-func LocalTimeOf(t time.Time) dbtype.LocalTime {
+// LocalTimeOf creates a neo4j.LocalTime from time.Time.
+// Year, month and day are set to zero and location is set to local.
+//
+// Conversion can also be done by casting a time.Time to neo4j.LocalTime but beware that date
+// components and location will be left as is but ignored when used as query parameter.
+func LocalTimeOf(t time.Time) LocalTime {
 	t = time.Date(0, 0, 0, t.Hour(), t.Minute(), t.Second(), t.Nanosecond(), time.Local)
 	return dbtype.LocalTime(t)
 }
 
-func LocalDateTimeOf(t time.Time) dbtype.LocalDateTime {
+// LocalDateTimeOf creates a neo4j.Local from time.Time.
+//
+// Conversion can also be done by casting a time.Time to neo4j.LocalTime but beware that location
+// will be left as is but interpreted as local when used as query parameter.
+func LocalDateTimeOf(t time.Time) LocalDateTime {
 	t = time.Date(t.Year(), t.Month(), t.Day(), t.Hour(), t.Minute(), t.Second(), t.Nanosecond(), time.Local)
 	return dbtype.LocalDateTime(t)
 }
 
-func OffsetTimeOf(t time.Time) dbtype.Time {
+// OffsetTimeOf creates a neo4j.OffsetTime from time.Time.
+// Year, month and day are set to zero and location is set to "Offset" using zone offset from
+// time.Time.
+//
+// Conversion can also be done by casting a time.Time to neo4j.OffsetTime but beware that date
+// components and location will be left as is but ignored when used as query parameter. Since
+// location will contain the original value, the value "offset" will not be used by the driver
+// but the actual name of the location in time.Time and that offset.
+func OffsetTimeOf(t time.Time) OffsetTime {
 	_, offset := t.Zone()
 	l := time.FixedZone("Offset", int(offset))
 	t = time.Date(0, 0, 0, t.Hour(), t.Minute(), t.Second(), t.Nanosecond(), l)
 	return dbtype.Time(t)
+}
+
+// DurationOf creates neo4j.Duration from specified time parts.
+func DurationOf(months, days, seconds int64, nanos int) Duration {
+	return Duration{Months: months, Days: days, Seconds: seconds, Nanos: nanos}
 }
