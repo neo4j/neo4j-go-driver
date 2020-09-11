@@ -90,7 +90,7 @@ func (b *backend) writeError(err error) {
 	// track of this error so that we can reuse the real thing within a retryable tx
 	isDriverError := neo4j.IsNeo4jError(err) ||
 		neo4j.IsUsageError(err) ||
-		neo4j.IsNetworkError(err)
+		neo4j.IsConnectivityError(err)
 
 	if isDriverError {
 		id := b.setError(err)
