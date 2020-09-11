@@ -26,17 +26,17 @@ Connect, execute a statement and handle results
 Make sure to use the configuration in the code that matches the version of Neo4j server that you run.
 
 ```go
-// configForNeo4j35 := func(conf *neo4j.Config) {}
-configForNeo4j40 := func(conf *neo4j.Config) { conf.Encrypted = false }
+// Neo4j 4.0, defaults to no TLS therefore use bolt:// or neo4j://
+// Neo4j 3.5, defaults to self-signed cetificates, TLS on, therefore use bolt+ssc:// or neo4j+ssc://
+dbUri := "neo4j://localhost:7687"
+driver, err := neo4j.NewDriver(dbUri, neo4j.BasicAuth("username", "password", ""))
 
-driver, err := neo4j.NewDriver("bolt://localhost:7687", neo4j.BasicAuth("username", "password", ""), configForNeo4j40)
-if err != nil {
-	return err
-}
-// handle driver lifetime based on your application lifetime requirements
-// driver's lifetime is usually bound by the application lifetime, which usually implies one driver instance per application
+// Handle driver lifetime based on your application lifetime requirements  driver's lifetime is usually
+// bound by the application lifetime, which usually implies one driver instance per application
 defer driver.Close()
 
+// Sessions are shortlived, cheap to create and NOT thread safe. Typically create one or more sessiond 
+// per request in your web application. Make sure to call Close on the session when done.
 // For multidatabase support, set sessionConfig.DatabaseName to requested database
 sessionConfig := neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite}
 session, err := driver.NewSession(sessionConfig)
@@ -53,8 +53,9 @@ if err != nil {
 	return err
 }
 
-for result.Next() {
-	fmt.Printf("Created Item with Id = '%d' and Name = '%s'\n", result.Record().Values[0].(int64), result.Record().Values[1].(string))
+var record * neo4j.Record
+for result.NextRecord(&record) {
+	fmt.Printf("Created Item with Id = '%d' and Name = '%s'\n", record.Values[0].(int64), record.Values[1].(string))
 }
 return result.Err()
 ```
@@ -64,8 +65,6 @@ return result.Err()
 The driver implements Bolt protocol version 3. This means that either Neo4j server 3.5 or above can be used with the driver.
 
 Neo4j server 4 supports both Bolt protocol version 3 and version 4.
-
-There will be an updated driver version that supports Bolt protocol version 4 to make use of new features introduced there.
 
 ## Connecting to a causal cluster
 
@@ -102,7 +101,7 @@ if value, ok := record.Get('field_name'); ok {
 ```
 
 ### Value Types
-The driver currently exposes values in the record as an `interface{}` type. 
+The driver exposes values in the record as an `interface{}` type. 
 The underlying types of the returned values depend on the corresponding Cypher types.
 
 The mapping between Cypher types and the types used by this driver (to represent the Cypher type):
@@ -125,24 +124,26 @@ The mapping between Cypher types and the types used by this driver (to represent
 
 | Cypher Type | Driver Type
 | ---: | :--- |
-| Point| neo4j.Point |
+| Point| neo4j.Point2D |
+| Point| neo4j.Point3D |
 
 The temporal types are introduced in Neo4j 3.4 series.
 
 You can create a 2-dimensional `Point` value using;
 
 ```go
-point := NewPoint2D(srId, 1.0, 2.0)
+point := neo4j.Point2D {X: 1.0, Y: 2.0, SpatialRefId: srId }
 ```
 
-or a 3-dimensional `Point` value using;
+or a 3-dimensional point value using;
 
 ```go
-point := NewPoint3D(srId, 1.0, 2.0, 3.0)
+point := neo4j.Point3D {X: 1.0, Y: 2.0, Z: 3.0, SpatialRefId: srId }
 ```
 
 NOTE:
-* For a list of supported `srId` values, please refer to the docs [here](https://neo4j.com/docs/developer-manual/current/cypher/functions/spatial/).
+
+* For a list of supported `srId` values, please refer to the docs [here](https://neo4j.com/docs/cypher-manual/current/syntax/spatial/#cypher-spatial-crs-geographic).
 
 ### Temporal Types - Date and Time
 
@@ -152,7 +153,7 @@ The mapping among the Cypher temporal types and actual exposed types are as foll
 
 | Cypher Type | Driver Type |
 | :----------: | :-----------: |
-| Date | neo4j.Date | 
+| Date | neo4j.Date |
 | Time | neo4j.OffsetTime |
 | LocalTime| neo4j.LocalTime |
 | DateTime | time.Time |
@@ -182,7 +183,7 @@ Note:
 
 ## Logging
 
-Logging at the driver level can be configured by setting `Log` field of `neo4j.Config` through configuration functions that can be passed to `neo4j.NewDriver` function. 
+Logging at the driver level can be configured by setting `Log` field of `neo4j.Config` through configuration functions that can be passed to `neo4j.NewDriver` function.
 
 ### Console Logger
 
@@ -206,19 +207,15 @@ defer driver.Close()
 
 ### Custom Logger
 
-The `Log` field of the `neo4j.Config` struct is defined to be of interface `neo4j.Logging` which has the following definition.
+The `Log` field of the `neo4j.Config` struct is defined to be of interface `neo4j/log.Logger` which has the following definition.
 
 ```go
-type Logging interface {
-	ErrorEnabled() bool
-	WarningEnabled() bool
-	InfoEnabled() bool
-	DebugEnabled() bool
-
-	Errorf(message string, args ...interface{})
-	Warningf(message string, args ...interface{})
-	Infof(message string, args ...interface{})
-	Debugf(message string, args ...interface{})
+type Logger interface {
+	Error(name string, id string, err error)
+	Errorf(name string, id string, msg string, args ...interface{})
+	Warnf(name string, id string, msg string, args ...interface{})
+	Infof(name string, id string, msg string, args ...interface{})
+	Debugf(name string, id string, msg string, args ...interface{})
 }
 ```
 

@@ -272,7 +272,6 @@ func hydrateDateTimeNamedZone(fields []interface{}) (interface{}, error) {
 	t := time.Unix(secs, nans).UTC()
 	l, err := time.LoadLocation(zone)
 	if err != nil {
-		// TODO: Wrap error
 		return nil, err
 	}
 	return time.Date(t.Year(), t.Month(), t.Day(), t.Hour(), t.Minute(), t.Second(), t.Nanosecond(), l), nil
