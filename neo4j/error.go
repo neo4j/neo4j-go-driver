@@ -94,3 +94,13 @@ func IsServiceUnavailable(err error) bool {
 	_, is = err.(*pool.PoolFull)
 	return is
 }
+
+// GetDatabaseErrorCode is a utility method to check if the provided error is DatabaseError and if so
+// it gets the error code.
+func GetDatabaseErrorCode(err error) string {
+	dbErr, is := err.(*db.DatabaseError)
+	if !is {
+		return ""
+	}
+	return dbErr.Code
+}
