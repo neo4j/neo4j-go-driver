@@ -16,6 +16,10 @@ func nativeToCypher(v interface{}) map[string]interface{} {
 		return valueResponse("CypherInt", x)
 	case string:
 		return valueResponse("CypherString", x)
+	case bool:
+		return valueResponse("CypherBool", x)
+	case float64:
+		return valueResponse("CypherFloat", x)
 	case []interface{}:
 		values := make([]interface{}, len(x))
 		for i, y := range x {
