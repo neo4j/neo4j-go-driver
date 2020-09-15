@@ -88,27 +88,44 @@ func (r *Router) getTable(database string) (*db.RoutingTable, error) {
 		return dbRouter.table, nil
 	}
 
-	var routers []string
-	if dbRouter != nil {
-		routers = dbRouter.table.Routers
-	}
-	if len(routers) == 0 {
-		routers = []string{r.rootRouter}
+	var (
+		table *db.RoutingTable
+		err   error
+	)
+
+	// Try last known set of routers if there are any
+	if dbRouter != nil && len(dbRouter.table.Routers) > 0 {
+		routers := dbRouter.table.Routers
+		r.log.Infof(r.logId, "Reading routing table for '%s' from previously known routers: %v", database, routers)
+		table, err = readTable(context.Background(), r.pool, database, routers, r.routerContext)
 	}
 
-	r.log.Infof(r.logId, "Reading routing table for '%s' from any of %v", database, routers)
-	table, err := readTable(context.Background(), r.pool, database, routers, r.routerContext)
-	if err != nil {
-		// Use hook to retrieve possibly different set of routers and retry
-		if r.getRouters != nil {
-			routers = r.getRouters()
-			table, err = readTable(context.Background(), r.pool, database, routers, r.routerContext)
-		}
-		if err != nil {
-			r.log.Error(r.logId, err)
-			return nil, err
-		}
+	// Try initial router if no routers or failed
+	if table == nil || err != nil {
+		r.log.Infof(r.logId, "Reading routing table from initial router: %s", r.rootRouter)
+		table, err = readTable(context.Background(), r.pool, database, []string{r.rootRouter}, r.routerContext)
 	}
+
+	// Use hook to retrieve possibly different set of routers and retry
+	if err != nil && r.getRouters != nil {
+		routers := r.getRouters()
+		r.log.Infof(r.logId, "Reading routing table for '%s' from custom routers: %v", routers)
+		table, err = readTable(context.Background(), r.pool, database, routers, r.routerContext)
+	}
+
+	if err != nil {
+		r.log.Error(r.logId, err)
+		return nil, err
+	}
+
+	if table == nil {
+		// Safe guard for logical error somewhere else
+		err = errors.New("No error and no table")
+		r.log.Error(r.logId, err)
+		return nil, err
+	}
+
+	// Store the routing table
 	r.dbRouters[database] = &databaseRouter{
 		table:   table,
 		dueUnix: now.Add(time.Duration(table.TimeToLive) * time.Second).Unix(),
