@@ -135,6 +135,70 @@ func TestRespectsTimeToLiveAndInvalidate(t *testing.T) {
 	assertNum(t, numfetch, 3, "Should have have fetched")
 }
 
+func TestUsesRootRouterWhenPreviousRoutersFails(t *testing.T) {
+	borrows := [][]string{}
+
+	conn := &connFake{table: &db.RoutingTable{TimeToLive: 1, Routers: []string{"otherRouter"}}}
+	var err error
+	pool := &poolFake{
+		borrow: func(names []string, cancel context.CancelFunc) (poolpackage.Connection, error) {
+			//numfetch++
+			borrows = append(borrows, names)
+			return conn, err //&connFake{table: table}, nil
+		},
+	}
+	nzero := time.Now()
+	n := nzero
+	router := New("rootRouter", func() []string { return []string{} }, nil, pool, logger)
+	router.now = func() time.Time {
+		return n
+	}
+	dbName := "dbname"
+
+	// First access should trigger initial table read from root router
+	router.Readers(dbName)
+	if borrows[0][0] != "rootRouter" {
+		t.Errorf("Should have connected to root upon first router request")
+	}
+	// Next access should go to otherRouter
+	n = n.Add(2 * time.Second)
+	router.Readers(dbName)
+	if borrows[1][0] != "otherRouter" {
+		t.Errorf("Should have queried other router")
+	}
+	// Let the next access first fail when requesting otherRouter and then succeed requesting
+	// rootRouter
+	requestedOther := false
+	requestedRoot := false
+	pool.borrow = func(names []string, cancel context.CancelFunc) (poolpackage.Connection, error) {
+		if !requestedOther {
+			if names[0] != "otherRouter" {
+				t.Errorf("Expected request for otherRouter")
+				return nil, errors.New("Wrong")
+			}
+			requestedOther = true
+			return nil, errors.New("some err")
+		}
+		if names[0] != "rootRouter" {
+			t.Errorf("Expected request for rootRouter")
+			return nil, errors.New("oh")
+		}
+		requestedRoot = true
+		return &connFake{table: &db.RoutingTable{TimeToLive: 1, Readers: []string{"aReader"}}}, nil
+	}
+	n = n.Add(2 * time.Second)
+	readers, err := router.Readers(dbName)
+	if err != nil {
+		t.Error(err)
+	}
+	if readers[0] != "aReader" {
+		t.Errorf("Didn't get the expected reader")
+	}
+	if !requestedOther || !requestedRoot {
+		t.Errorf("Should have requested both other and root routers")
+	}
+}
+
 // Verify that when the routing table can not be retrieved from the root router, a callback
 // should be invoked to get backup routers.
 func TestUseGetRoutersHookWhenInitialRouterFails(t *testing.T) {
