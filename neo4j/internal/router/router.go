@@ -115,7 +115,7 @@ func (r *Router) getTable(database string) (*db.RoutingTable, error) {
 	}
 
 	if err != nil {
-		r.log.Error(r.logId, err)
+		r.log.Error(logName, r.logId, err)
 		return nil, err
 	}
 
