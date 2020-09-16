@@ -45,17 +45,18 @@ func readTable(ctx context.Context, pool Pool, database string, routers []string
 			err = wrapInReadRoutingTableError(router, err)
 			continue
 		}
-		defer pool.Return(conn)
 
 		discovery, ok := conn.(db.ClusterDiscovery)
 		if !ok {
 			err = &db.RoutingNotSupportedError{Server: conn.ServerName()}
 			err = wrapInReadRoutingTableError(router, err)
+			pool.Return(conn)
 			continue
 		}
 
 		var table *db.RoutingTable
 		table, err = discovery.GetRoutingTable(database, routerContext)
+		pool.Return(conn)
 		if err == nil {
 			return table, nil
 		}
