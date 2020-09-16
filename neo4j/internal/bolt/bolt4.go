@@ -190,7 +190,7 @@ func (b *bolt4) receiveSuccess() (*successResponse, error) {
 	return nil, err
 }
 
-func (b *bolt4) connect(auth map[string]interface{}) error {
+func (b *bolt4) connect(auth map[string]interface{}, userAgent string) error {
 	// Only allowed to connect when in disconnected state
 	if err := assertState(b.logError, b.state, bolt4_dead); err != nil {
 		return err

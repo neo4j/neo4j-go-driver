@@ -61,7 +61,7 @@ func makeRawConnection(logger log.Logger) db.Connection {
 		"credentials": server.Password(),
 	}
 
-	boltConn, err := bolt.Connect(parsedUri.Host, tcpConn, authMap, logger)
+	boltConn, err := bolt.Connect(parsedUri.Host, tcpConn, authMap, "007", logger)
 	if err != nil {
 		panic(err)
 	}

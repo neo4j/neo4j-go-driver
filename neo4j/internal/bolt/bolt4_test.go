@@ -84,7 +84,7 @@ func TestBolt4(ot *testing.T) {
 		tcpConn, srv, cleanup := setupBolt4Pipe(t)
 		go serverJob(srv)
 
-		c, err := Connect("name", tcpConn, auth, logger)
+		c, err := Connect("name", tcpConn, auth, "007", logger)
 		if err != nil {
 			t.Fatal(err)
 		}

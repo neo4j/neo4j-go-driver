@@ -64,7 +64,7 @@ func TestConnect(ot *testing.T) {
 
 		// Pass the connection to bolt connect
 		serverName := "theServerName"
-		boltconn, err := Connect(serverName, conn, auth, logger)
+		boltconn, err := Connect(serverName, conn, auth, "007", logger)
 		assertNoError(t, err)
 
 		// Check some properties on the connection that is related to connecting
@@ -90,7 +90,7 @@ func TestConnect(ot *testing.T) {
 			srv.rejectHelloUnauthorized()
 		}()
 
-		boltconn, err := Connect("serverName", conn, auth, logger)
+		boltconn, err := Connect("serverName", conn, auth, "007", logger)
 		// Make sure that we get the right error type
 		dbErr := err.(*db.Neo4jError)
 		if !dbErr.IsAuthenticationFailed() {
@@ -112,7 +112,7 @@ func TestConnect(ot *testing.T) {
 			srv.closeConnection()
 		}()
 
-		_, err := Connect("servername", conn, auth, logger)
+		_, err := Connect("servername", conn, auth, "007", logger)
 		assertError(t, err)
 	})
 
@@ -126,7 +126,7 @@ func TestConnect(ot *testing.T) {
 			srv.acceptVersion(1)
 		}()
 
-		boltconn, err := Connect("servername", conn, auth, logger)
+		boltconn, err := Connect("servername", conn, auth, "007", logger)
 		assertError(t, err)
 		if boltconn != nil {
 			t.Error("Shouldn't returned conn")
