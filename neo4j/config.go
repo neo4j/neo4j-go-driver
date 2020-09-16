@@ -84,6 +84,10 @@ type Config struct {
 	//
 	// default: true
 	SocketKeepalive bool
+	// Optionally override the user agent string sent to Neo4j server.
+	//
+	// default: neo4j.UserAgent
+	UserAgent string
 }
 
 func defaultConfig() *Config {
@@ -96,6 +100,7 @@ func defaultConfig() *Config {
 		SocketConnectTimeout:         5 * time.Second,
 		SocketKeepalive:              true,
 		RootCAs:                      nil,
+		UserAgent:                    UserAgent,
 	}
 }
 

@@ -137,6 +137,7 @@ func NewDriver(target string, auth AuthToken, configurers ...func(*Config)) (Dri
 	d.logId = strconv.FormatUint(uint64(atomic.AddUint32(&driverid, 1)), 10)
 
 	// Continue to setup connector
+	d.connector.UserAgent = d.config.UserAgent
 	d.connector.RootCAs = d.config.RootCAs
 	d.connector.Log = d.log
 	d.connector.Auth = auth.tokens

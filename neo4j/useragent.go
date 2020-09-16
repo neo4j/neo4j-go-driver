@@ -17,6 +17,6 @@
  *  limitations under the License.
  */
 
-package bolt
+package neo4j
 
-const userAgent = "Go Driver/4.0"
+const UserAgent = "Go Driver/4.0"
