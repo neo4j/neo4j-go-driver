@@ -137,13 +137,13 @@ func TestRespectsTimeToLiveAndInvalidate(t *testing.T) {
 func TestUsesRootRouterWhenPreviousRoutersFails(t *testing.T) {
 	borrows := [][]string{}
 
-	conn := &connFake{table: &db.RoutingTable{TimeToLive: 1, Routers: []string{"otherRouter"}}}
+	conn := &testutil.ConnFake{Table: &db.RoutingTable{TimeToLive: 1, Routers: []string{"otherRouter"}}}
 	var err error
 	pool := &poolFake{
-		borrow: func(names []string, cancel context.CancelFunc) (poolpackage.Connection, error) {
+		borrow: func(names []string, cancel context.CancelFunc) (db.Connection, error) {
 			//numfetch++
 			borrows = append(borrows, names)
-			return conn, err //&connFake{table: table}, nil
+			return conn, err
 		},
 	}
 	nzero := time.Now()
@@ -169,7 +169,7 @@ func TestUsesRootRouterWhenPreviousRoutersFails(t *testing.T) {
 	// rootRouter
 	requestedOther := false
 	requestedRoot := false
-	pool.borrow = func(names []string, cancel context.CancelFunc) (poolpackage.Connection, error) {
+	pool.borrow = func(names []string, cancel context.CancelFunc) (db.Connection, error) {
 		if !requestedOther {
 			if names[0] != "otherRouter" {
 				t.Errorf("Expected request for otherRouter")
@@ -183,7 +183,7 @@ func TestUsesRootRouterWhenPreviousRoutersFails(t *testing.T) {
 			return nil, errors.New("oh")
 		}
 		requestedRoot = true
-		return &connFake{table: &db.RoutingTable{TimeToLive: 1, Readers: []string{"aReader"}}}, nil
+		return &testutil.ConnFake{Table: &db.RoutingTable{TimeToLive: 1, Readers: []string{"aReader"}}}, nil
 	}
 	n = n.Add(2 * time.Second)
 	readers, err := router.Readers(dbName)
