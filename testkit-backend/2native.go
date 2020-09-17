@@ -27,6 +27,13 @@ func cypherToNative(c interface{}) interface{} {
 			ln[i] = cypherToNative(x)
 		}
 		return ln
+	case "CypherMap":
+		mc := d["value"].(map[string]interface{})
+		mn := make(map[string]interface{})
+		for k, x := range mc {
+			mn[k] = cypherToNative(x)
+		}
+		return mn
 	}
 	panic(fmt.Sprintf("Don't know how to convert %s to native", n))
 }

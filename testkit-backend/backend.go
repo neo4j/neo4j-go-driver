@@ -156,7 +156,7 @@ func (b *backend) process() bool {
 func (b *backend) writeResponse(name string, data interface{}) {
 	response := map[string]interface{}{"name": name, "data": data}
 	responseJson, err := json.Marshal(response)
-	fmt.Printf("RES: %s\n", string(responseJson))
+	fmt.Printf("RES: %s\n", name) //string(responseJson))
 	if err != nil {
 		panic(err.Error())
 	}
@@ -178,11 +178,10 @@ func (b *backend) writeResponse(name string, data interface{}) {
 }
 
 func (b *backend) toRequest(s string) map[string]interface{} {
-	fmt.Printf("REQ: %s\n", s)
 	req := map[string]interface{}{}
 	err := json.Unmarshal([]byte(s), &req)
 	if err != nil {
-		panic(err)
+		panic(fmt.Sprintf("Unable to parse: '%s' as a request: %s", s, err))
 	}
 	return req
 }
@@ -190,6 +189,7 @@ func (b *backend) toRequest(s string) map[string]interface{} {
 func (b *backend) handleRequest(req map[string]interface{}) {
 	name := req["name"].(string)
 	data := req["data"].(map[string]interface{})
+	fmt.Printf("REQ: %s\n", name)
 	switch name {
 	case "NewDriver":
 		// Parse authorization token
