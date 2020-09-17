@@ -54,11 +54,30 @@ type Session interface {
 	Close() error
 }
 
+// SessionConfig is used to configure a new session, its zero value uses safe defaults.
 type SessionConfig struct {
-	AccessMode   AccessMode
-	Bookmarks    []string
+	// AccessMode used when using Session.Run and explicit transactions. Used to route query to
+	// to read or write servers when running in a cluster. Session.ReadTransaction and Session.WriteTransaction
+	// does not rely on this mode.
+	AccessMode AccessMode
+	// Bookmarks are the initial bookmarks used to ensure that the executing server is at least up
+	// to date to the point represented by the latest of the provided bookmarks. After running commands
+	// on the session the bookmark can be retrieved with Session.LastBookmark. All commands executing
+	// within the same session will automatically use the bookmark from the previous command in the
+	// session.
+	Bookmarks []string
+	// DatabaseName contains the name of the database that the commands in the session will execute on.
 	DatabaseName string
+	// FetchSize defines how many records to pull from server in each batch.
+	// From Bolt protocol v4 (Neo4j 4+) records can be fetched in batches as compared to fetching
+	// all in previous versions. If FetchSize is set to 0, the driver decides the appropriate
+	// size. If set to a positive value that size is used if the underlying protocol supports it
+	// otherwise it is ignored. To turn of batching, set FetchSize to FetchAll.
+	FetchSize int
 }
+
+// Turns off fetching records in batches.
+const FetchAll = -1
 
 // Connection pool as seen by the session.
 type sessionPool interface {

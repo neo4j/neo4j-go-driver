@@ -52,10 +52,10 @@ const (
 type Driver interface {
 	// The url this driver is bootstrapped
 	Target() url.URL
-	Session(accessMode AccessMode, bookmarks ...string) (Session, error)
 	// Creates a new session based on the specified session configuration.
-	// The session configuration contains access mode, bookmarks and database name.
 	NewSession(config SessionConfig) (Session, error)
+	// Deprecated: Use NewSession instead
+	Session(accessMode AccessMode, bookmarks ...string) (Session, error)
 	// Verifies that the driver can connect to a remote server or cluster by
 	// establishing a network connection with the remote. Returns nil if succesful
 	// or error describing the problem.
