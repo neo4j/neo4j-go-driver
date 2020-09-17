@@ -192,8 +192,9 @@ func (b *backend) handleRequest(req map[string]interface{}) {
 	data := req["data"].(map[string]interface{})
 	switch name {
 	case "NewDriver":
-		authTokenMap := data["authorizationToken"].(map[string]interface{})["data"].(map[string]interface{})
+		// Parse authorization token
 		var authToken neo4j.AuthToken
+		authTokenMap := data["authorizationToken"].(map[string]interface{})["data"].(map[string]interface{})
 		switch authTokenMap["scheme"] {
 		case "basic":
 			authToken = neo4j.BasicAuth(
@@ -204,15 +205,26 @@ func (b *backend) handleRequest(req map[string]interface{}) {
 			b.writeError(errors.New("Unsupported scheme"))
 			return
 		}
-		driver, err := neo4j.NewDriver(data["uri"].(string), authToken, func(c *neo4j.Config) {
+		// Parse URI (or rather type cast)
+		uri := data["uri"].(string)
+		// Create the driver instance
+		driver, err := neo4j.NewDriver(uri, authToken, func(c *neo4j.Config) {
+			// Setup custom logger that redirects log entries back to frontend
 			c.Log = &streamLog{writeLine: b.writeLineLocked}
+			// Optional custom user agent from frontend
+			userAgentX := data["userAgent"]
+			if userAgentX != nil {
+				c.UserAgent = userAgentX.(string)
+			}
 		})
 		if err != nil {
 			b.writeError(err)
 			return
 		}
+		// Store the instance for later referal
 		idKey := b.nextId()
 		b.drivers[idKey] = driver
+
 		b.writeResponse("Driver", map[string]interface{}{"id": idKey})
 	case "DriverClose":
 		driverId := data["driverId"].(string)
