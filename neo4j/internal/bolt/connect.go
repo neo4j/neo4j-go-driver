@@ -20,7 +20,6 @@
 package bolt
 
 import (
-	"encoding/binary"
 	"errors"
 	"fmt"
 	"io"
@@ -30,6 +29,19 @@ import (
 	"github.com/neo4j/neo4j-go-driver/v4/neo4j/log"
 )
 
+type protocolVersion struct {
+	major byte
+	minor byte
+}
+
+// Supported versions in priority order
+var versions = [4]protocolVersion{
+	protocolVersion{major: 4, minor: 0},
+	protocolVersion{major: 3, minor: 0},
+	protocolVersion{major: 0, minor: 0},
+	protocolVersion{major: 0, minor: 0},
+}
+
 // Negotiate version of bolt protocol.
 // Returns instance of bolt protocol implmenting low-level abstract connection Connection interface.
 func Connect(serverName string, conn net.Conn, auth map[string]interface{}, userAgent string, log log.Logger) (db.Connection, error) {
@@ -37,10 +49,11 @@ func Connect(serverName string, conn net.Conn, auth map[string]interface{}, user
 	// Send handshake to server
 	handshake := []byte{
 		0x60, 0x60, 0xb0, 0x17, // Magic: GoGoBolt
-		0x00, 0x00, 0x00, 0x04, // Versions in priority order, big endian.
-		0x00, 0x00, 0x00, 0x03,
-		0x00, 0x00, 0x00, 0x00,
-		0x00, 0x00, 0x00, 0x00}
+		0x00, 0x00, versions[0].minor, versions[0].major,
+		0x00, 0x00, versions[1].minor, versions[1].major,
+		0x00, 0x00, versions[2].minor, versions[2].major,
+		0x00, 0x00, versions[3].minor, versions[3].major,
+	}
 	_, err := conn.Write(handshake)
 	if err != nil {
 		return nil, err
@@ -54,8 +67,9 @@ func Connect(serverName string, conn net.Conn, auth map[string]interface{}, user
 	}
 
 	// Parse received version and construct the correct instance
-	ver := binary.BigEndian.Uint32(buf)
-	switch ver {
+	major := buf[3]
+	minor := buf[2]
+	switch major {
 	case 3:
 		// Handover rest of connection handshaking
 		boltConn := NewBolt3(serverName, conn, log)
@@ -73,10 +87,9 @@ func Connect(serverName string, conn net.Conn, auth map[string]interface{}, user
 		}
 		return boltConn, nil
 	case 0:
-		err = errors.New("Server did not accept any of the requested Bolt protocol versions. " +
-			"Only Neo4j version 3.5 and version 4 currently supports Bolt protocol version 3")
+		err = errors.New(fmt.Sprintf("Server did not accept any of the requested Bolt versions (%#v)", versions))
 	default:
-		err = errors.New(fmt.Sprintf("Server responded with unsupported version %d", ver))
+		err = errors.New(fmt.Sprintf("Server responded with unsupported version %d.%d", major, minor))
 	}
 
 	return nil, err
