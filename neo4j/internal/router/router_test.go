@@ -48,7 +48,7 @@ func TestMultithreading(t *testing.T) {
 		},
 	}
 	n := time.Now()
-	router := New("router", func() []string { return []string{} }, nil, pool, logger)
+	router := New("router", func() []string { return []string{} }, nil, pool, logger, "routerid")
 	mut := sync.Mutex{}
 	router.now = func() time.Time {
 		// Need to lock here to make race detector happy
@@ -105,7 +105,7 @@ func TestRespectsTimeToLiveAndInvalidate(t *testing.T) {
 	}
 	nzero := time.Now()
 	n := nzero
-	router := New("router", func() []string { return []string{} }, nil, pool, logger)
+	router := New("router", func() []string { return []string{} }, nil, pool, logger, "routerid")
 	router.now = func() time.Time {
 		return n
 	}
@@ -148,7 +148,7 @@ func TestUsesRootRouterWhenPreviousRoutersFails(t *testing.T) {
 	}
 	nzero := time.Now()
 	n := nzero
-	router := New("rootRouter", func() []string { return []string{} }, nil, pool, logger)
+	router := New("rootRouter", func() []string { return []string{} }, nil, pool, logger, "routerid")
 	router.now = func() time.Time {
 		return n
 	}
@@ -210,7 +210,7 @@ func TestUseGetRoutersHookWhenInitialRouterFails(t *testing.T) {
 	}
 	rootRouter := "rootRouter"
 	backupRouters := []string{"bup1", "bup2"}
-	router := New(rootRouter, func() []string { return backupRouters }, nil, pool, logger)
+	router := New(rootRouter, func() []string { return backupRouters }, nil, pool, logger, "routerid")
 	dbName := "dbname"
 
 	// Trigger read of routing table
@@ -235,7 +235,7 @@ func TestWritersFailAfterNRetries(t *testing.T) {
 		},
 	}
 	numsleep := 0
-	router := New("router", func() []string { return []string{} }, nil, pool, logger)
+	router := New("router", func() []string { return []string{} }, nil, pool, logger, "routerid")
 	router.sleep = func(time.Duration) {
 		numsleep++
 	}
@@ -272,7 +272,7 @@ func TestWritersRetriesWhenNoWriters(t *testing.T) {
 		},
 	}
 	numsleep := 0
-	router := New("router", func() []string { return []string{} }, nil, pool, logger)
+	router := New("router", func() []string { return []string{} }, nil, pool, logger, "routerid")
 	router.sleep = func(time.Duration) {
 		numsleep++
 	}
@@ -303,7 +303,7 @@ func TestCleanUp(t *testing.T) {
 		},
 	}
 	now := time.Now()
-	router := New("router", func() []string { return []string{} }, nil, pool, logger)
+	router := New("router", func() []string { return []string{} }, nil, pool, logger, "routerid")
 	router.now = func() time.Time { return now }
 
 	router.Readers("db1")

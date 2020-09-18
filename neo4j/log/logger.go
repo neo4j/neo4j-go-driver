@@ -19,6 +19,11 @@
 
 package log
 
+import (
+	"strconv"
+	"sync/atomic"
+)
+
 // Logger is used throughout the driver for logging purposes.
 // Driver client can implement this interface and provide an implementation
 // upon driver creation.
@@ -36,4 +41,22 @@ type Logger interface {
 	Warnf(name string, id string, msg string, args ...interface{})
 	Infof(name string, id string, msg string, args ...interface{})
 	Debugf(name string, id string, msg string, args ...interface{})
+}
+
+// List of component names used as parameter to logger functions.
+const (
+	Bolt3   = "bolt3"
+	Bolt4   = "bolt4"
+	Driver  = "driver"
+	Pool    = "pool"
+	Router  = "router"
+	Session = "session"
+)
+
+// Last used component id
+var id uint32
+
+// NewId generates a new id atomically.
+func NewId() string {
+	return strconv.FormatUint(uint64(atomic.AddUint32(&id, 1)), 10)
 }

@@ -23,10 +23,8 @@ package neo4j
 import (
 	"fmt"
 	"net/url"
-	"strconv"
 	"strings"
 	"sync"
-	"sync/atomic"
 
 	"github.com/neo4j/neo4j-go-driver/v4/neo4j/db"
 	"github.com/neo4j/neo4j-go-driver/v4/neo4j/log"
@@ -63,8 +61,6 @@ type Driver interface {
 	// Close the driver and all underlying connections
 	Close() error
 }
-
-var driverLogName = "driver"
 
 // NewDriver is the entry point to the neo4j driver to create an instance of a Driver. It is the first function to
 // be called in order to establish a connection to a neo4j database. It requires a Bolt URI and an authentication
@@ -132,9 +128,9 @@ func NewDriver(target string, auth AuthToken, configurers ...func(*Config)) (Dri
 	d.log = d.config.Log
 	if d.log == nil {
 		// Default to void logger
-		d.log = &VoidLog{}
+		d.log = &log.Void{}
 	}
-	d.logId = strconv.FormatUint(uint64(atomic.AddUint32(&driverid, 1)), 10)
+	d.logId = log.NewId()
 
 	// Continue to setup connector
 	d.connector.UserAgent = d.config.UserAgent
@@ -142,14 +138,15 @@ func NewDriver(target string, auth AuthToken, configurers ...func(*Config)) (Dri
 	d.connector.Log = d.log
 	d.connector.Auth = auth.tokens
 
-	d.pool = pool.New(d.config.MaxConnectionPoolSize, d.config.MaxConnectionLifetime, d.connector.Connect, d.log)
+	// Let the pool use the same logid as the driver to simplify log reading.
+	d.pool = pool.New(d.config.MaxConnectionPoolSize, d.config.MaxConnectionLifetime, d.connector.Connect, d.log, d.logId)
 
 	if !routing {
 		d.router = &directRouter{server: parsed.Host}
 	} else {
 		routingContext, err := routingContextFromUrl(parsed)
 		if err != nil {
-			d.log.Error(driverLogName, d.logId, err)
+			d.log.Error(log.Driver, d.logId, err)
 			return nil, err
 		}
 
@@ -165,14 +162,13 @@ func NewDriver(target string, auth AuthToken, configurers ...func(*Config)) (Dri
 				return servers
 			}
 		}
-		d.router = router.New(parsed.Host, routersResolver, routingContext, d.pool, d.log)
+		// Let the router use the same logid as the driver to simplify log reading.
+		d.router = router.New(parsed.Host, routersResolver, routingContext, d.pool, d.log, d.logId)
 	}
 
-	d.log.Infof(driverLogName, d.logId, "Created { target: %s }", target)
+	d.log.Infof(log.Driver, d.logId, "Created { target: %s }", target)
 	return &d, nil
 }
-
-var driverid uint32
 
 func routingContextFromUrl(u *url.URL) (map[string]string, error) {
 	queryValues := u.Query()
@@ -274,6 +270,6 @@ func (d *driver) Close() error {
 		d.pool.Close()
 	}
 	d.pool = nil
-	d.log.Infof(driverLogName, d.logId, "Closed")
+	d.log.Infof(log.Driver, d.logId, "Closed")
 	return nil
 }

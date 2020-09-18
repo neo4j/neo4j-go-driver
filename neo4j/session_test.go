@@ -26,10 +26,11 @@ import (
 
 	"github.com/neo4j/neo4j-go-driver/v4/neo4j/db"
 	"github.com/neo4j/neo4j-go-driver/v4/neo4j/internal/testutil"
+	"github.com/neo4j/neo4j-go-driver/v4/neo4j/log"
 )
 
 func TestSession(st *testing.T) {
-	logger := ConsoleLog{Errors: true, Infos: true, Warns: true, Debugs: true}
+	logger := log.Console{Errors: true, Infos: true, Warns: true, Debugs: true}
 
 	assertCleanSessionState := func(t *testing.T, sess *session) {
 		if sess.txExplicit != nil {
