@@ -48,7 +48,7 @@ func TestPoolBorrowReturn(ot *testing.T) {
 	}
 
 	ot.Run("Single thread borrow+return", func(t *testing.T) {
-		p := New(1, maxAge, succeedingConnect, logger)
+		p := New(1, maxAge, succeedingConnect, logger, "poolid")
 		p.now = func() time.Time { return birthdate }
 		defer p.Close()
 		serverNames := []string{"srv1"}
@@ -64,7 +64,7 @@ func TestPoolBorrowReturn(ot *testing.T) {
 	})
 
 	ot.Run("First thread borrows, second thread blocks on borrow", func(t *testing.T) {
-		p := New(1, maxAge, succeedingConnect, logger)
+		p := New(1, maxAge, succeedingConnect, logger, "poolid")
 		p.now = func() time.Time { return birthdate }
 		defer p.Close()
 		serverNames := []string{"srv1"}
@@ -99,7 +99,7 @@ func TestPoolBorrowReturn(ot *testing.T) {
 	})
 
 	ot.Run("First thread borrows, second thread should not block on borrow without wait", func(t *testing.T) {
-		p := New(1, maxAge, succeedingConnect, logger)
+		p := New(1, maxAge, succeedingConnect, logger, "poolid")
 		p.now = func() time.Time { return birthdate }
 		defer p.Close()
 		serverNames := []string{"srv1"}
@@ -119,7 +119,7 @@ func TestPoolBorrowReturn(ot *testing.T) {
 
 	ot.Run("Multiple threads borrows and returns randomly", func(t *testing.T) {
 		maxConns := 2
-		p := New(maxConns, maxAge, succeedingConnect, logger)
+		p := New(maxConns, maxAge, succeedingConnect, logger, "poolid")
 		p.now = func() time.Time { return birthdate }
 		serverNames := []string{"srv1"}
 		numWorkers := 5
@@ -151,7 +151,7 @@ func TestPoolBorrowReturn(ot *testing.T) {
 	})
 
 	ot.Run("Failing connect", func(t *testing.T) {
-		p := New(2, maxAge, failingConnect, logger)
+		p := New(2, maxAge, failingConnect, logger, "poolid")
 		p.now = func() time.Time { return birthdate }
 		serverNames := []string{"srv1"}
 		c, err := p.Borrow(context.Background(), serverNames, true)
@@ -163,7 +163,7 @@ func TestPoolBorrowReturn(ot *testing.T) {
 	})
 
 	ot.Run("Cancel Borrow", func(t *testing.T) {
-		p := New(1, maxAge, succeedingConnect, logger)
+		p := New(1, maxAge, succeedingConnect, logger, "poolid")
 		p.now = func() time.Time { return birthdate }
 		c1, _ := p.Borrow(context.Background(), []string{"A"}, true)
 		ctx, cancel := context.WithCancel(context.Background())
@@ -202,7 +202,7 @@ func TestPoolResourceUsage(ot *testing.T) {
 	}
 
 	ot.Run("Use order of named servers as priority when creating new servers", func(t *testing.T) {
-		p := New(1, maxAge, succeedingConnect, logger)
+		p := New(1, maxAge, succeedingConnect, logger, "poolid")
 		p.now = func() time.Time { return birthdate }
 		defer p.Close()
 		serverNames := []string{"srvA", "srvB", "srvC", "srvD"}
@@ -213,7 +213,7 @@ func TestPoolResourceUsage(ot *testing.T) {
 	})
 
 	ot.Run("Do not put dead connection back to server", func(t *testing.T) {
-		p := New(2, maxAge, succeedingConnect, logger)
+		p := New(2, maxAge, succeedingConnect, logger, "poolid")
 		p.now = func() time.Time { return birthdate }
 		defer p.Close()
 		serverNames := []string{"srvA"}
@@ -227,7 +227,7 @@ func TestPoolResourceUsage(ot *testing.T) {
 	})
 
 	ot.Run("Do not put too old connection back to server", func(t *testing.T) {
-		p := New(2, maxAge, succeedingConnect, logger)
+		p := New(2, maxAge, succeedingConnect, logger, "poolid")
 		p.now = func() time.Time { return birthdate.Add(maxAge * 2) }
 		defer p.Close()
 		serverNames := []string{"srvA"}
@@ -240,7 +240,7 @@ func TestPoolResourceUsage(ot *testing.T) {
 	})
 
 	ot.Run("Returning dead connection to server should remove older idle connections", func(t *testing.T) {
-		p := New(3, 0, succeedingConnect, logger)
+		p := New(3, 0, succeedingConnect, logger, "poolid")
 		// Trigger creation of three connections on the same server
 		c1, _ := p.Borrow(context.Background(), []string{"A"}, true)
 		c2, _ := p.Borrow(context.Background(), []string{"A"}, true)
@@ -265,7 +265,7 @@ func TestPoolResourceUsage(ot *testing.T) {
 	})
 
 	ot.Run("Do not borrow too old connections", func(t *testing.T) {
-		p := New(1, maxAge, succeedingConnect, logger)
+		p := New(1, maxAge, succeedingConnect, logger, "poolid")
 		nowMut := sync.Mutex{}
 		now := birthdate
 		p.now = func() time.Time {
@@ -290,7 +290,7 @@ func TestPoolResourceUsage(ot *testing.T) {
 	})
 
 	ot.Run("Add servers when existing servers are full", func(t *testing.T) {
-		p := New(1, maxAge, succeedingConnect, logger)
+		p := New(1, maxAge, succeedingConnect, logger, "poolid")
 		p.now = func() time.Time { return birthdate }
 		defer p.Close()
 		c1, err := p.Borrow(context.Background(), []string{"A"}, true)
@@ -318,7 +318,7 @@ func TestPoolCleanup(ot *testing.T) {
 	}
 
 	ot.Run("Should remove servers with only idle too old connections", func(t *testing.T) {
-		p := New(0, maxLife, succeedingConnect, logger)
+		p := New(0, maxLife, succeedingConnect, logger, "poolid")
 		defer p.Close()
 		p.now = func() time.Time { return birthdate }
 		c1, c2 := borrowConnections(t, p)
@@ -335,7 +335,7 @@ func TestPoolCleanup(ot *testing.T) {
 	})
 
 	ot.Run("Should not remove servers with busy connections", func(t *testing.T) {
-		p := New(0, maxLife, succeedingConnect, logger)
+		p := New(0, maxLife, succeedingConnect, logger, "poolid")
 		defer p.Close()
 		p.now = func() time.Time { return birthdate }
 		_, c2 := borrowConnections(t, p)
@@ -354,7 +354,7 @@ func TestPoolCleanup(ot *testing.T) {
 		failingConnect := func(s string) (db.Connection, error) {
 			return nil, errors.New("an error")
 		}
-		p := New(0, maxLife, failingConnect, logger)
+		p := New(0, maxLife, failingConnect, logger, "poolid")
 		defer p.Close()
 		c1, err := p.Borrow(context.Background(), []string{"A"}, true)
 		assertNoConnection(t, c1, err)

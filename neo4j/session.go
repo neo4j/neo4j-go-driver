@@ -21,8 +21,6 @@ package neo4j
 
 import (
 	"context"
-	"strconv"
-	"sync/atomic"
 	"time"
 
 	"github.com/neo4j/neo4j-go-driver/v4/neo4j/db"
@@ -102,11 +100,6 @@ type session struct {
 	throttleTime time.Duration
 }
 
-var (
-	sessionid      uint32
-	sessionLogName = "session"
-)
-
 // Remove empty string bookmarks to check for "bad" callers
 // To avoid allocating, first check if this is a problem
 func cleanupBookmarks(bookmarks []string) []string {
@@ -134,9 +127,8 @@ func cleanupBookmarks(bookmarks []string) []string {
 func newSession(config *Config, router sessionRouter, pool sessionPool,
 	mode db.AccessMode, bookmarks []string, databaseName string, logger log.Logger) *session {
 
-	id := atomic.AddUint32(&sessionid, 1)
-	logId := strconv.FormatUint(uint64(id), 10)
-	logger.Debugf(sessionLogName, logId, "Created")
+	logId := log.NewId()
+	logger.Debugf(log.Session, logId, "Created")
 
 	return &session{
 		config:       config,
@@ -166,7 +158,7 @@ func (s *session) BeginTransaction(configurers ...func(*TransactionConfig)) (Tra
 	// Guard for more than one transaction per session
 	if s.txExplicit != nil {
 		err := &UsageError{Message: "Session already has a pending transaction"}
-		s.log.Error(sessionLogName, s.logId, err)
+		s.log.Error(log.Session, s.logId, err)
 		return nil, err
 	}
 
@@ -230,7 +222,7 @@ func (s *session) runRetriable(
 	state := retry.State{
 		MaxTransactionRetryTime: s.config.MaxTransactionRetryTime,
 		Log:                     s.log,
-		LogName:                 sessionLogName,
+		LogName:                 log.Session,
 		LogId:                   s.logId,
 		Now:                     s.now,
 		Sleep:                   s.sleep,
@@ -359,7 +351,7 @@ func (s *session) Run(
 
 	if s.txExplicit != nil {
 		err := &UsageError{Message: "Trying to run auto-commit transaction while in explicit transaction"}
-		s.log.Error(sessionLogName, s.logId, err)
+		s.log.Error(log.Session, s.logId, err)
 		return nil, err
 	}
 
@@ -402,14 +394,14 @@ func (s *session) Close() error {
 	if s.txExplicit != nil {
 		s.txExplicit.Close()
 		err = &UsageError{Message: "Closing session with a pending transaction"}
-		s.log.Warnf(sessionLogName, s.logId, err.Error())
+		s.log.Warnf(log.Session, s.logId, err.Error())
 	}
 
 	if s.txAuto != nil {
 		s.txAuto.done()
 	}
 
-	s.log.Debugf(sessionLogName, s.logId, "Closed")
+	s.log.Debugf(log.Session, s.logId, "Closed")
 
 	// Schedule cleanups
 	go func() {

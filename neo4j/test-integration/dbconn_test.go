@@ -30,7 +30,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/neo4j/neo4j-go-driver/v4/neo4j"
 	"github.com/neo4j/neo4j-go-driver/v4/neo4j/db"
 	"github.com/neo4j/neo4j-go-driver/v4/neo4j/dbtype"
 	"github.com/neo4j/neo4j-go-driver/v4/neo4j/internal/bolt"
@@ -69,7 +68,7 @@ func makeRawConnection(logger log.Logger) db.Connection {
 }
 
 func BenchmarkQuery(b *testing.B) {
-	conn := makeRawConnection(&neo4j.VoidLog{})
+	conn := makeRawConnection(&log.Void{})
 	defer conn.Close()
 	params := map[string]interface{}{
 		"one": 1,
@@ -89,7 +88,7 @@ func BenchmarkQuery(b *testing.B) {
 
 // Tests the specification of the internal db connection API
 func TestConnectionConformance(ot *testing.T) {
-	logger := &neo4j.ConsoleLog{Errors: true, Infos: true, Warns: true}
+	logger := &log.Console{Errors: true, Infos: true, Warns: true}
 	boltConn := makeRawConnection(logger)
 	defer boltConn.Close()
 

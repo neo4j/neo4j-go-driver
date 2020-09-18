@@ -84,7 +84,6 @@ type bolt3 struct {
 	bookmark      string       // Last bookmark
 	birthDate     time.Time
 	log           log.Logger
-	logName       string
 	receiveBufer  []byte
 	sendBuffers   [][]byte
 }
@@ -101,7 +100,6 @@ func NewBolt3(serverName string, conn net.Conn, log log.Logger) *bolt3 {
 		unpacker:     &packstream.Unpacker{},
 		birthDate:    time.Now(),
 		log:          log,
-		logName:      "bolt3",
 	}
 }
 
@@ -122,7 +120,7 @@ func (b *bolt3) appendMsg(tag packstream.StructTag, field ...interface{}) error 
 		// At this point we do not know the state of what has been written to the chunks.
 		// Either we should support rolling back whatever that has been written or just
 		// bail out this session.
-		b.log.Error(b.logName, b.logId, err)
+		b.log.Error(log.Bolt3, b.logId, err)
 		b.state = bolt3_dead
 		return err
 	}
@@ -135,7 +133,7 @@ func (b *bolt3) sendMsg(tag packstream.StructTag, field ...interface{}) error {
 		return err
 	}
 	if err := b.chunker.send(b.conn); err != nil {
-		b.log.Error(b.logName, b.logId, err)
+		b.log.Error(log.Bolt3, b.logId, err)
 		b.state = bolt3_dead
 		return err
 	}
@@ -146,14 +144,14 @@ func (b *bolt3) receiveMsg() (interface{}, error) {
 	var err error
 	b.receiveBufer, err = dechunkMessage(b.conn, b.receiveBufer)
 	if err != nil {
-		b.log.Error(b.logName, b.logId, err)
+		b.log.Error(log.Bolt3, b.logId, err)
 		b.state = bolt3_dead
 		return nil, err
 	}
 
 	msg, err := b.unpacker.UnpackStruct(b.receiveBufer, hydrate)
 	if err != nil {
-		b.log.Error(b.logName, b.logId, err)
+		b.log.Error(log.Bolt3, b.logId, err)
 		b.state = bolt3_dead
 		return nil, err
 	}
@@ -176,15 +174,15 @@ func (b *bolt3) receiveSuccess() (*successResponse, error) {
 		b.state = bolt3_failed
 		if v.Classification() == "ClientError" {
 			// These could include potentially large cypher statement, only log to debug
-			b.log.Debugf(b.logName, b.logId, "%s", v)
+			b.log.Debugf(log.Bolt3, b.logId, "%s", v)
 		} else {
-			b.log.Error(b.logName, b.logId, v)
+			b.log.Error(log.Bolt3, b.logId, v)
 		}
 		return nil, v
 	}
 	b.state = bolt3_dead
 	err = errors.New("Expected success or database error")
-	b.log.Error(b.logName, b.logId, err)
+	b.log.Error(log.Bolt3, b.logId, err)
 	return nil, err
 }
 
@@ -225,7 +223,7 @@ func (b *bolt3) connect(auth map[string]interface{}, userAgent string) error {
 
 	// Transition into ready state
 	b.state = bolt3_ready
-	b.log.Infof(b.logName, b.logId, "Connected")
+	b.log.Infof(log.Bolt3, b.logId, "Connected")
 	return nil
 }
 
@@ -307,7 +305,7 @@ func (b *bolt3) TxCommit(txh db.Handle) error {
 	if commitSuccess == nil {
 		b.state = bolt3_dead
 		err := errors.New(fmt.Sprintf("Failed to parse commit response: %+v", succRes))
-		b.log.Error(b.logName, b.logId, err)
+		b.log.Error(log.Bolt3, b.logId, err)
 		return err
 	}
 
@@ -430,7 +428,7 @@ func (b *bolt3) run(cypher string, params map[string]interface{}, tx *internalTx
 	if runRes == nil {
 		b.state = bolt3_dead
 		err = errors.New(fmt.Sprintf("Failed to parse RUN response: %+v", res))
-		b.log.Error(b.logName, b.logId, err)
+		b.log.Error(log.Bolt3, b.logId, err)
 		return nil, err
 	}
 	b.tfirst = runRes.t_first
@@ -448,11 +446,11 @@ func (b *bolt3) run(cypher string, params map[string]interface{}, tx *internalTx
 }
 
 func (b *bolt3) logError(err error) {
-	b.log.Error(b.logName, b.logId, err)
+	b.log.Error(log.Bolt3, b.logId, err)
 }
 
 func (b *bolt3) logDebug(err error) {
-	b.log.Debugf(b.logName, b.logId, "%s", err)
+	b.log.Debugf(log.Bolt3, b.logId, "%s", err)
 }
 
 func (b *bolt3) Run(
@@ -508,7 +506,7 @@ func (b *bolt3) Next(shandle db.Handle) (*db.Record, *db.Summary, error) {
 		if sum == nil {
 			b.state = bolt3_dead
 			err = errors.New("Failed to parse summary")
-			b.log.Error(b.logName, b.logId, err)
+			b.log.Error(log.Bolt3, b.logId, err)
 			return nil, nil, err
 		}
 		if b.state == bolt3_streamingtx {
@@ -530,15 +528,15 @@ func (b *bolt3) Next(shandle db.Handle) (*db.Record, *db.Summary, error) {
 		b.state = bolt3_failed
 		if x.Classification() == "ClientError" {
 			// These could include potentially large cypher statement, only log to debug
-			b.log.Debugf(b.logName, b.logId, "%s", x)
+			b.log.Debugf(log.Bolt3, b.logId, "%s", x)
 		} else {
-			b.log.Error(b.logName, b.logId, x)
+			b.log.Error(log.Bolt3, b.logId, x)
 		}
 		return nil, nil, x
 	default:
 		b.state = bolt3_dead
 		err = errors.New("Unknown response")
-		b.log.Error(b.logName, b.logId, err)
+		b.log.Error(log.Bolt3, b.logId, err)
 		return nil, nil, err
 	}
 }
@@ -645,7 +643,7 @@ func (b *bolt3) GetRoutingTable(database string, context map[string]string) (*db
 
 // Beware, could be called on another thread when driver is closed.
 func (b *bolt3) Close() {
-	b.log.Infof(b.logName, b.logId, "Disconnected")
+	b.log.Infof(log.Bolt3, b.logId, "Disconnected")
 	if b.state != bolt3_dead {
 		b.sendMsg(msgGoodbye)
 	}
