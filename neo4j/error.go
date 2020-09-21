@@ -92,6 +92,12 @@ func IsConnectivityError(err error) bool {
 	return is
 }
 
+// IsTransactionExecutionLimit returns true if the provided error is an instance of TransactionExecutionLimit.
+func IsTransactionExecutionLimit(err error) bool {
+	_, is := err.(*TransactionExecutionLimit)
+	return is
+}
+
 // Wraps errors that can happen on Bolt protocol level to external error
 func wrapBoltError(err error) error {
 	if err == io.EOF {

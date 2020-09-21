@@ -34,6 +34,13 @@ func assertErrorEq(t *testing.T, err1, err2 error) {
 	}
 }
 
+func assertTrue(t *testing.T, b bool) {
+	t.Helper()
+	if !b {
+		t.Errorf("Expected true")
+	}
+}
+
 // Fake implementation of router
 type testRouter struct {
 	readers []string
@@ -74,76 +81,3 @@ func (p *testPool) Return(c db.Connection) {
 
 func (p *testPool) CleanUp() {
 }
-
-/*
-// Fake implementation of db connection
-type testConn struct {
-	err           error
-	txBeginHandle db.Handle
-	runStream     *db.Stream
-	runTxStream   *db.Stream
-	nextRecord    *db.Record
-	nextSummary   *db.Summary
-	bookmark      string
-	serverName    string
-	serverVersion string
-	isAlive       bool
-	birthDate     time.Time
-	txCommitErr   error
-	txRollbackErr error
-	resetHook     func()
-}
-
-func (c *testConn) TxBegin(mode db.AccessMode, bookmarks []string, timeout time.Duration, meta map[string]interface{}) (db.Handle, error) {
-	return c.txBeginHandle, c.err
-}
-
-func (c *testConn) TxRollback(tx db.Handle) error {
-	return c.txRollbackErr
-}
-
-func (c *testConn) TxCommit(tx db.Handle) error {
-	return c.txCommitErr
-}
-
-func (c *testConn) Run(cypher string, params map[string]interface{}, mode db.AccessMode, bookmarks []string, timeout time.Duration, meta map[string]interface{}) (*db.Stream, error) {
-	return c.runStream, c.err
-}
-
-func (c *testConn) RunTx(tx db.Handle, cypher string, params map[string]interface{}) (*db.Stream, error) {
-	return c.runTxStream, c.err
-}
-
-func (c *testConn) Next(streamHandle db.Handle) (*db.Record, *db.Summary, error) {
-	return c.nextRecord, c.nextSummary, c.err
-}
-
-func (c *testConn) Bookmark() string {
-	return c.bookmark
-}
-
-func (c *testConn) ServerName() string {
-	return c.serverName
-}
-
-func (c *testConn) ServerVersion() string {
-	return c.serverVersion
-}
-
-func (c *testConn) IsAlive() bool {
-	return c.isAlive
-}
-
-func (c *testConn) Birthdate() time.Time {
-	return c.birthDate
-}
-
-func (c *testConn) Reset() {
-	if c.resetHook != nil {
-		c.resetHook()
-	}
-}
-
-func (c *testConn) Close() {
-}
-*/

@@ -72,7 +72,9 @@ func TestSession(st *testing.T) {
 			if numRetries < 2 {
 				t.Errorf("Should have retried at least once but executed %d", numRetries)
 			}
-			assertErrorEq(t, transientErr, err)
+			assertTrue(t, IsTransactionExecutionLimit(err))
+			errL := err.(*TransactionExecutionLimit)
+			assertErrorEq(t, transientErr, errL.Errors[len(errL.Errors)-1])
 			assertCleanSessionState(t, sess)
 		})
 

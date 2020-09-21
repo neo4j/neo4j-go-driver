@@ -274,8 +274,9 @@ func (s *session) runRetriable(
 		return x, nil
 	}
 
-	// When retries has occured wrap the error
-	if state.LastErrWasRetryable {
+	// When retries has occured wrap the error, the last error is always added but
+	// cause is only set when the retry logic could detect something strange.
+	if len(state.Causes) > 0 {
 		return nil, &TransactionExecutionLimit{Errors: state.Errs, Causes: state.Causes}
 	}
 	// Return the non-retriable error as is
