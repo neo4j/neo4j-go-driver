@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"sync"
+	"time"
 
 	"github.com/neo4j/neo4j-go-driver/v4/neo4j"
 )
@@ -238,17 +239,25 @@ func (b *backend) handleRequest(req map[string]interface{}) {
 		b.writeResponse("Driver", map[string]interface{}{"id": driverId})
 	case "NewSession":
 		driver := b.drivers[data["driverId"].(string)]
-		var accessMode neo4j.AccessMode
+		sessionConfig := neo4j.SessionConfig{}
 		switch data["accessMode"].(string) {
 		case "r":
-			accessMode = neo4j.AccessModeRead
+			sessionConfig.AccessMode = neo4j.AccessModeRead
 		case "w":
-			accessMode = neo4j.AccessModeWrite
+			sessionConfig.AccessMode = neo4j.AccessModeWrite
 		default:
 			b.writeError(errors.New("Unknown accessmode: " + data["accessMode"].(string)))
 			return
 		}
-		session, err := driver.Session(accessMode, "")
+		if data["bookmarks"] != nil {
+			bookmarksx := data["bookmarks"].([]interface{})
+			bookmarks := make([]string, len(bookmarksx))
+			for i, x := range bookmarksx {
+				bookmarks[i] = x.(string)
+			}
+			sessionConfig.Bookmarks = bookmarks
+		}
+		session, err := driver.NewSession(sessionConfig)
 		if err != nil {
 			b.writeError(err)
 			return
@@ -273,7 +282,21 @@ func (b *backend) handleRequest(req map[string]interface{}) {
 		for i, p := range params {
 			params[i] = cypherToNative(p)
 		}
-		result, err := sessionState.session.Run(cypher, params)
+		txConfig := neo4j.TransactionConfig{}
+		// Optional transaction meta data
+		if data["txMeta"] != nil {
+			txConfig.Metadata = data["txMeta"].(map[string]interface{})
+		}
+		// Optional timeout in milliseconds
+		if data["timeout"] != nil {
+			txConfig.Timeout = time.Millisecond * time.Duration((data["timeout"].(float64)))
+		}
+		result, err := sessionState.session.Run(cypher, params, func(conf *neo4j.TransactionConfig) {
+			if txConfig.Metadata != nil {
+				conf.Metadata = txConfig.Metadata
+			}
+			conf.Timeout = txConfig.Timeout
+		})
 		if err != nil {
 			b.writeError(err)
 			return
