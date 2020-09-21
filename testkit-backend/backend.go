@@ -91,7 +91,8 @@ func (b *backend) writeError(err error) {
 	// track of this error so that we can reuse the real thing within a retryable tx
 	isDriverError := neo4j.IsNeo4jError(err) ||
 		neo4j.IsUsageError(err) ||
-		neo4j.IsConnectivityError(err)
+		neo4j.IsConnectivityError(err) ||
+		neo4j.IsTransactionExecutionLimit(err)
 
 	if isDriverError {
 		id := b.setError(err)
@@ -185,6 +186,49 @@ func (b *backend) toRequest(s string) map[string]interface{} {
 		panic(fmt.Sprintf("Unable to parse: '%s' as a request: %s", s, err))
 	}
 	return req
+}
+
+func (b *backend) handleTransactionFunc(isRead bool, data map[string]interface{}) {
+	sid := data["sessionId"].(string)
+	sessionState := b.sessionStates[sid]
+	blockingRetry := func(tx neo4j.Transaction) (interface{}, error) {
+		sessionState.retryableState = retryable_nothing
+		// Instruct client to start doing it's work
+		txid := b.nextId()
+		b.transactions[txid] = tx
+		b.writeResponse("RetryableTry", map[string]interface{}{"id": txid})
+		defer delete(b.transactions, txid)
+		// Process all things that the client might do within the transaction
+		for {
+			b.process()
+			switch sessionState.retryableState {
+			case retryable_positive:
+				// Client succeeded and wants to commit
+				return nil, nil
+			case retryable_negative:
+				// Client failed in some way
+				if sessionState.retryableErrorId != "" {
+					return nil, b.recordedErrors[sessionState.retryableErrorId]
+				} else {
+					return nil, &frontendError{msg: "Error from client"}
+				}
+			case retryable_nothing:
+				// Client did something not related to the retryable state
+			}
+		}
+	}
+	var err error
+	if isRead {
+		_, err = sessionState.session.ReadTransaction(blockingRetry)
+	} else {
+		_, err = sessionState.session.WriteTransaction(blockingRetry)
+	}
+
+	if err != nil {
+		b.writeError(err)
+	} else {
+		b.writeResponse("RetryableDone", map[string]interface{}{})
+	}
 }
 
 func (b *backend) handleRequest(req map[string]interface{}) {
@@ -319,41 +363,12 @@ func (b *backend) handleRequest(req map[string]interface{}) {
 		idKey := b.nextId()
 		b.results[idKey] = result
 		b.writeResponse("Result", map[string]interface{}{"id": idKey})
-	case "SessionReadTransaction":
-		sid := data["sessionId"].(string)
-		sessionState := b.sessionStates[sid]
-		_, err := sessionState.session.ReadTransaction(func(tx neo4j.Transaction) (interface{}, error) {
-			sessionState.retryableState = retryable_nothing
-			// Instruct client to start doing it's work
-			txid := b.nextId()
-			b.transactions[txid] = tx
-			b.writeResponse("RetryableTry", map[string]interface{}{"id": txid})
-			defer delete(b.transactions, txid)
-			// Process all things that the client might do within the transaction
-			for {
-				b.process()
-				switch sessionState.retryableState {
-				case retryable_positive:
-					// Client succeeded and wants to commit
-					return nil, nil
-				case retryable_negative:
-					// Client failed in some way
-					if sessionState.retryableErrorId != "" {
-						return nil, b.recordedErrors[sessionState.retryableErrorId]
-					} else {
-						return nil, &frontendError{msg: "Error from client"}
-					}
-				case retryable_nothing:
-					// Client did something not related to the retryable state
-				}
-			}
-		})
 
-		if err != nil {
-			b.writeError(err)
-		} else {
-			b.writeResponse("RetryableDone", map[string]interface{}{})
-		}
+	case "SessionReadTransaction":
+		b.handleTransactionFunc(true, data)
+
+	case "SessionWriteTransaction":
+		b.handleTransactionFunc(false, data)
 
 	case "RetryablePositive":
 		sessionState := b.sessionStates[data["sessionId"].(string)]
