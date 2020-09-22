@@ -89,7 +89,7 @@ func (b *backend) writeError(err error) {
 	// Convert error if it is a known type of error.
 	// This is very simple right now, no extra information is sent at all just keep
 	// track of this error so that we can reuse the real thing within a retryable tx
-	fmt.Println("Error: " + err.Error())
+	fmt.Printf("Error: %s (%T)\n", err.Error(), err)
 	isDriverError := neo4j.IsNeo4jError(err) ||
 		neo4j.IsUsageError(err) ||
 		neo4j.IsConnectivityError(err) ||

@@ -306,7 +306,7 @@ func (s *session) getServers(mode db.AccessMode) ([]string, error) {
 func (s *session) getConnection(mode db.AccessMode) (db.Connection, error) {
 	servers, err := s.getServers(mode)
 	if err != nil {
-		return nil, err
+		return nil, wrapConnectError(err)
 	}
 
 	var ctx context.Context

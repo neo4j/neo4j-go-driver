@@ -134,6 +134,9 @@ func (r *Router) Readers(database string) ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
+	if len(table.Readers) == 0 {
+		return nil, wrapInReadRoutingTableError(r.rootRouter, errors.New("No readers"))
+	}
 	return table.Readers, nil
 }
 

@@ -26,6 +26,7 @@ import (
 	"github.com/neo4j/neo4j-go-driver/v4/neo4j/db"
 	"github.com/neo4j/neo4j-go-driver/v4/neo4j/internal/connector"
 	"github.com/neo4j/neo4j-go-driver/v4/neo4j/internal/pool"
+	"github.com/neo4j/neo4j-go-driver/v4/neo4j/internal/router"
 )
 
 // Neo4jError represents errors originating from Neo4j service.
@@ -115,7 +116,7 @@ func wrapConnectError(err error) error {
 	switch err.(type) {
 	case *connector.TlsError, *connector.ConnectError:
 		return &ConnectivityError{inner: err}
-	case *pool.PoolTimeout, *pool.PoolFull:
+	case *pool.PoolTimeout, *pool.PoolFull, *router.ReadRoutingTableError:
 		return &ConnectivityError{inner: err}
 	}
 
