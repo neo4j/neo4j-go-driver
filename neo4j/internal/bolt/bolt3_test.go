@@ -231,6 +231,25 @@ func TestBolt3(ot *testing.T) {
 		assertBoltState(t, bolt3_ready, bolt)
 	})
 
+	ot.Run("Server fail on run continue to commit", func(t *testing.T) {
+		bolt, cleanup := connectToServer(t, func(srv *bolt3server) {
+			srv.accept(3)
+			srv.waitForTxBegin()
+			srv.waitForRun()
+			srv.waitForPullAll()
+			srv.sendFailureMsg("code", "msg")
+		})
+		defer cleanup()
+		defer bolt.Close()
+
+		tx, err := bolt.TxBegin(db.ReadMode, nil, 0, nil)
+		assertNoError(t, err)
+		_, err = bolt.RunTx(tx, "MATCH (n) RETURN n", nil)
+		assertNeo4jError(t, err)
+		err = bolt.TxCommit(tx)  // This will fail due to above failed
+		assertNeo4jError(t, err) // Should have same error as from run since that is original cause
+	})
+
 	ot.Run("Reset while streaming ", func(t *testing.T) {
 		bolt, cleanup := connectToServer(t, func(srv *bolt3server) {
 			srv.accept(3)
