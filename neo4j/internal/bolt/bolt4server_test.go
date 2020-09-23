@@ -129,7 +129,7 @@ func (s *bolt4server) waitForTxRollback() {
 	s.assertStructType(msg, msgRollback)
 }
 
-func (s *bolt4server) waitForPullAll() {
+func (s *bolt4server) waitForPullN() {
 	msg := s.receiveMsg()
 	s.assertStructType(msg, msgPullAll)
 }
@@ -193,7 +193,7 @@ func (s *bolt4server) accept(ver byte) {
 // Utility to wait and serve a auto commit query
 func (s *bolt4server) serveRun(stream []packstream.Struct) {
 	s.waitForRun()
-	s.waitForPullAll()
+	s.waitForPullN()
 	for _, x := range stream {
 		s.send(x.Tag, x.Fields...)
 	}
@@ -203,7 +203,7 @@ func (s *bolt4server) serveRunTx(stream []packstream.Struct, commit bool) {
 	s.waitForTxBegin()
 	s.send(msgSuccess, map[string]interface{}{})
 	s.waitForRun()
-	s.waitForPullAll()
+	s.waitForPullN()
 	for _, x := range stream {
 		s.send(x.Tag, x.Fields...)
 	}

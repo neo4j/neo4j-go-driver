@@ -181,7 +181,7 @@ func TestBolt4(ot *testing.T) {
 		bolt, cleanup := connectToServer(t, func(srv *bolt4server) {
 			srv.accept(4)
 			srv.waitForRun()
-			srv.waitForPullAll()
+			srv.waitForPullN()
 			// Send response to run and first record as response to pull
 			srv.send(msgSuccess, map[string]interface{}{
 				"fields":  keys,
@@ -212,7 +212,7 @@ func TestBolt4(ot *testing.T) {
 		bolt, cleanup := connectToServer(t, func(srv *bolt4server) {
 			srv.accept(4)
 			srv.waitForRun()
-			srv.waitForPullAll()
+			srv.waitForPullN()
 			srv.sendFailureMsg("code", "msg")
 			srv.waitForReset()
 			srv.sendIgnoredMsg()
@@ -229,6 +229,25 @@ func TestBolt4(ot *testing.T) {
 
 		bolt.Reset()
 		assertBoltState(t, bolt4_ready, bolt)
+	})
+
+	ot.Run("Server fail on run continue to commit", func(t *testing.T) {
+		bolt, cleanup := connectToServer(t, func(srv *bolt4server) {
+			srv.accept(4)
+			srv.waitForTxBegin()
+			srv.waitForRun()
+			srv.waitForPullN()
+			srv.sendFailureMsg("code", "msg")
+		})
+		defer cleanup()
+		defer bolt.Close()
+
+		tx, err := bolt.TxBegin(db.ReadMode, nil, 0, nil)
+		assertNoError(t, err)
+		_, err = bolt.RunTx(tx, "MATCH (n) RETURN n", nil)
+		assertNeo4jError(t, err)
+		err = bolt.TxCommit(tx)  // This will fail due to above failed
+		assertNeo4jError(t, err) // Should have same error as from run since that is original cause
 	})
 
 	ot.Run("Reset while streaming ", func(t *testing.T) {
