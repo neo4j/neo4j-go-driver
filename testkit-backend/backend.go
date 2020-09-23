@@ -376,6 +376,11 @@ func (b *backend) handleRequest(req map[string]interface{}) {
 		b.transactions[idKey] = tx
 		b.writeResponse("Transaction", map[string]interface{}{"id": idKey})
 
+	case "SessionLastBookmarks":
+		sessionState := b.sessionStates[data["sessionId"].(string)]
+		bookmark := sessionState.session.LastBookmark()
+		b.writeResponse("Bookmarks", map[string]interface{}{"bookmarks": []string{bookmark}})
+
 	case "TransactionRun":
 		tx := b.transactions[data["txId"].(string)]
 		cypher, params := b.toCypherAndParams(data)
