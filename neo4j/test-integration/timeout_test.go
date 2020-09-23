@@ -24,7 +24,6 @@ import (
 
 	"github.com/neo4j/neo4j-go-driver/v4/neo4j"
 	"github.com/neo4j/neo4j-go-driver/v4/neo4j/test-integration/control"
-	"github.com/neo4j/neo4j-go-driver/v4/neo4j/test-integration/utils"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -32,12 +31,9 @@ import (
 
 var _ = Describe("Timeout and Lifetime", func() {
 	var err error
-	var log *utils.MemoryLog
 	var server *control.SingleInstance
 
 	BeforeEach(func() {
-		log = &utils.MemoryLog{}
-
 		server, err = control.EnsureSingleInstance()
 		Expect(err).To(BeNil())
 		Expect(server).NotTo(BeNil())
@@ -49,7 +45,6 @@ var _ = Describe("Timeout and Lifetime", func() {
 		var session1, session2 neo4j.Session
 
 		driver, err = neo4j.NewDriver(server.BoltURI(), server.AuthToken(), server.Config(), func(config *neo4j.Config) {
-			config.Log = log
 			config.ConnectionAcquisitionTimeout = 1 * time.Second
 			config.MaxConnectionPoolSize = 1
 		})
@@ -103,7 +98,6 @@ var _ = Describe("Timeout and Lifetime", func() {
 		var session neo4j.Session
 
 		driver, err = neo4j.NewDriver("bolt://10.255.255.1:8080", server.AuthToken(), server.Config(), func(config *neo4j.Config) {
-			config.Log = log
 			config.SocketConnectTimeout = 1 * time.Second
 		})
 		Expect(err).To(BeNil())

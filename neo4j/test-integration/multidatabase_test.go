@@ -24,7 +24,6 @@ import (
 
 	"github.com/neo4j/neo4j-go-driver/v4/neo4j"
 	"github.com/neo4j/neo4j-go-driver/v4/neo4j/test-integration/control"
-	"github.com/neo4j/neo4j-go-driver/v4/neo4j/utils"
 )
 
 func TestMultidatabase(ot *testing.T) {
@@ -37,7 +36,7 @@ func TestMultidatabase(ot *testing.T) {
 
 	// Need > 4.0 for database support
 	version := versionOfDriver(driver)
-	if version.LessThan(utils.VersionOf("4.0.0")) {
+	if version.LessThan(VersionOf("4.0.0")) {
 		ot.Skip("Versions prior to 4.0 does not support multidatabase")
 	}
 
