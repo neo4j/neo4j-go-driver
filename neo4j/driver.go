@@ -133,6 +133,8 @@ func NewDriver(target string, auth AuthToken, configurers ...func(*Config)) (Dri
 	d.logId = log.NewId()
 
 	// Continue to setup connector
+	d.connector.DialTimeout = d.config.SocketConnectTimeout
+	d.connector.SocketKeepAlive = d.config.SocketKeepalive
 	d.connector.UserAgent = d.config.UserAgent
 	d.connector.RootCAs = d.config.RootCAs
 	d.connector.Log = d.log
