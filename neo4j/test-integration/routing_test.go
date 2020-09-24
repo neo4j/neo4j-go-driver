@@ -24,25 +24,19 @@ import (
 	. "github.com/onsi/gomega"
 
 	"github.com/neo4j/neo4j-go-driver/v4/neo4j"
-	"github.com/neo4j/neo4j-go-driver/v4/neo4j/test-integration/control"
+	"github.com/neo4j/neo4j-go-driver/v4/neo4j/test-integration/dbserver"
 )
 
 var _ = Describe("Routing", func() {
-	var cluster *control.Cluster
+	server := dbserver.GetDbServer()
 
 	var session neo4j.Session
 	var result neo4j.Result
 	var summary neo4j.ResultSummary
 	var err error
 
-	BeforeEach(func() {
-		cluster, err = control.EnsureCluster()
-		Expect(err).To(BeNil())
-		Expect(cluster).NotTo(BeNil())
-	})
-
 	getDriver := func(address string) neo4j.Driver {
-		driver, err := neo4j.NewDriver(address, cluster.AuthToken(), cluster.Config())
+		driver, err := neo4j.NewDriver(address, server.AuthToken(), server.ConfigFunc())
 		if err != nil {
 			panic(err.Error())
 		}
@@ -50,6 +44,9 @@ var _ = Describe("Routing", func() {
 	}
 
 	Specify("should successfully execute read/write when initial address contains unusable items", func() {
+		if !server.IsCluster {
+			Skip("Needs cluster")
+		}
 		// Rely on address resolving
 		driver := getDriver("neo4j://localhost")
 		Expect(err).To(BeNil())
@@ -68,9 +65,12 @@ var _ = Describe("Routing", func() {
 	})
 
 	Specify("writes should be visible on followers", func() {
+		if !server.IsCluster {
+			Skip("Needs cluster")
+		}
 		var readCount, writeCount interface{}
 
-		driver := getDriver(cluster.RoutingURI)
+		driver := getDriver(server.URI())
 		Expect(err).To(BeNil())
 
 		session, err = driver.Session(neo4j.AccessModeWrite)

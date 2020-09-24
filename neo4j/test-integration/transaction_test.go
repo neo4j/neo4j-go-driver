@@ -23,17 +23,15 @@ import (
 	"errors"
 	"time"
 
-	//"github.com/neo4j/neo4j-go-driver/v4/neo4j/test-integration/utils"
-
 	"github.com/neo4j/neo4j-go-driver/v4/neo4j"
-	"github.com/neo4j/neo4j-go-driver/v4/neo4j/test-integration/control"
+	"github.com/neo4j/neo4j-go-driver/v4/neo4j/test-integration/dbserver"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
 
 var _ = Describe("Transaction", func() {
-	var server *control.SingleInstance
+	server := dbserver.GetDbServer()
 	var err error
 	var driver neo4j.Driver
 	var session neo4j.Session
@@ -41,12 +39,7 @@ var _ = Describe("Transaction", func() {
 	var result neo4j.Result
 
 	BeforeEach(func() {
-		server, err = control.EnsureSingleInstance()
-		Expect(err).To(BeNil())
-		Expect(server).NotTo(BeNil())
-
-		driver, err = server.Driver()
-		Expect(err).To(BeNil())
+		driver = server.Driver()
 
 		session, err = driver.Session(neo4j.AccessModeWrite)
 		Expect(err).To(BeNil())
@@ -56,10 +49,7 @@ var _ = Describe("Transaction", func() {
 		if session != nil {
 			session.Close()
 		}
-
-		if driver != nil {
-			driver.Close()
-		}
+		driver.Close()
 	})
 
 	Context("Retry Mechanism", func() {
@@ -216,7 +206,7 @@ var _ = Describe("Transaction", func() {
 	Context("V3", func() {
 
 		BeforeEach(func() {
-			if versionOfDriver(driver).LessThan(V350) {
+			if server.Version.LessThan(V350) {
 				Skip("this test is targeted for server version after neo4j 3.5.0")
 			}
 		})
@@ -235,6 +225,10 @@ var _ = Describe("Transaction", func() {
 
 			number := transactionWithIntWork(tx, intReturningWork("RETURN $x", map[string]interface{}{"x": 1}))
 			Expect(number).To(BeEquivalentTo(1))
+
+			if !server.IsEnterprise {
+				Skip("Can not use dbms.listTransactions on non-enterprise version")
+			}
 
 			session2 := newSession(driver, neo4j.AccessModeRead)
 			defer session2.Close()
@@ -265,7 +259,7 @@ var _ = Describe("Transaction", func() {
 
 	Context("V3 API on V1 & V2", func() {
 		BeforeEach(func() {
-			if versionOfDriver(driver).GreaterThanOrEqual(V350) {
+			if server.Version.GreaterThanOrEqual(V350) {
 				Skip("this test is targeted for server versions less than neo4j 3.5.0")
 			}
 		})

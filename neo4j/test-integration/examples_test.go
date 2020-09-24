@@ -22,11 +22,11 @@ package test_integration
 import (
 	"errors"
 	"fmt"
-	"net/url"
+	//	"net/url"
 	"time"
 
 	"github.com/neo4j/neo4j-go-driver/v4/neo4j"
-	"github.com/neo4j/neo4j-go-driver/v4/neo4j/test-integration/control"
+	"github.com/neo4j/neo4j-go-driver/v4/neo4j/test-integration/dbserver"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -41,17 +41,12 @@ var _ = Describe("Examples", func() {
 			password string
 		)
 
+		server := dbserver.GetDbServer()
+
 		BeforeEach(func() {
-			var singleInstance *control.SingleInstance
-			var err error
-
-			if singleInstance, err = control.EnsureSingleInstance(); err != nil {
-				Fail(err.Error())
-			}
-
-			uri = singleInstance.BoltURI()
-			username = singleInstance.Username()
-			password = singleInstance.Password()
+			uri = server.BoltURI()
+			username = server.Username
+			password = server.Password
 		})
 
 		Specify("Hello World", func() {
@@ -223,40 +218,33 @@ var _ = Describe("Examples", func() {
 		})
 	})
 
-	Context("Causal Cluster", func() {
-		var (
-			err      error
-			cluster  *control.Cluster
-			username string
-			password string
-		)
+	/*
+		Context("Causal Cluster", func() {
+			server := dbserver.GetDbServer()
+			username := server.Username
+			password := server.Password
 
-		BeforeEach(func() {
-			if cluster, err = control.EnsureCluster(); err != nil {
-				Fail(err.Error())
-			}
+			Specify("Config - Address Resolver", func() {
+				if !server.IsCluster {
+					Skip("Need cluster")
+				}
+				var addresses []neo4j.ServerAddress
+				for _, server := range server.ClusterMembers {
+					addresses = append(addresses, &url.URL{Host: server.HostnameAndPort})
+				}
 
-			username = cluster.Username()
-			password = cluster.Password()
+				driver, err := createDriverWithAddressResolver("neo4j://x.acme.com", username, password, addresses...)
+				Expect(err).To(BeNil())
+				Expect(driver).NotTo(BeNil())
+
+				err = createItem(driver)
+				Expect(err).To(BeNil())
+
+				err = driver.Close()
+				Expect(err).To(BeNil())
+			})
 		})
-
-		Specify("Config - Address Resolver", func() {
-			var addresses []neo4j.ServerAddress
-			for _, server := range cluster.Members {
-				addresses = append(addresses, &url.URL{Host: server.HostnameAndPort})
-			}
-
-			driver, err := createDriverWithAddressResolver("neo4j://x.acme.com", username, password, addresses...)
-			Expect(err).To(BeNil())
-			Expect(driver).NotTo(BeNil())
-
-			err = createItem(driver)
-			Expect(err).To(BeNil())
-
-			err = driver.Close()
-			Expect(err).To(BeNil())
-		})
-	})
+	*/
 })
 
 // tag::hello-world[]

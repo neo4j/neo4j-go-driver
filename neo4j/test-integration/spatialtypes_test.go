@@ -24,7 +24,7 @@ import (
 	"testing"
 
 	"github.com/neo4j/neo4j-go-driver/v4/neo4j"
-	"github.com/neo4j/neo4j-go-driver/v4/neo4j/test-integration/control"
+	"github.com/neo4j/neo4j-go-driver/v4/neo4j/test-integration/dbserver"
 )
 
 func TestSpatialTypes(st *testing.T) {
@@ -35,13 +35,9 @@ func TestSpatialTypes(st *testing.T) {
 		Cartesian3DSrID uint32 = 9157
 	)
 
-	server, err := control.EnsureSingleInstance()
-	if err != nil {
-		panic(err)
-	}
-
-	driver := server.Driver2()
-	if versionOfDriver(driver).LessThan(V340) {
+	server := dbserver.GetDbServer()
+	driver := server.Driver()
+	if server.Version.LessThan(V340) {
 		st.Skip("Spatial types are only available after neo4j 3.4.0 release")
 	}
 

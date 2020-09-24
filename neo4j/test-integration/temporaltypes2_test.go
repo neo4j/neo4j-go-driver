@@ -25,17 +25,13 @@ import (
 	"time"
 
 	"github.com/neo4j/neo4j-go-driver/v4/neo4j"
-	"github.com/neo4j/neo4j-go-driver/v4/neo4j/test-integration/control"
+	"github.com/neo4j/neo4j-go-driver/v4/neo4j/test-integration/dbserver"
 )
 
 func TestTemporalTypes(tt *testing.T) {
-	server, err := control.EnsureSingleInstance()
-	if err != nil {
-		panic(err)
-	}
-
-	driver := server.Driver2()
-	if versionOfDriver(driver).LessThan(V340) {
+	server := dbserver.GetDbServer()
+	driver := server.Driver()
+	if server.Version.LessThan(V340) {
 		tt.Skip("Temporal types are only available after neo4j 3.4.0 release")
 	}
 

@@ -25,8 +25,17 @@ import (
 	"math/big"
 	"testing"
 
+	"github.com/neo4j/neo4j-go-driver/v4/neo4j/test-integration/dbserver"
+
 	"github.com/neo4j/neo4j-go-driver/v4/neo4j"
 	"github.com/neo4j/neo4j-go-driver/v4/neo4j/db"
+)
+
+// Not the best place for this...
+var (
+	V340 = dbserver.VersionOf("3.4.0")
+	V350 = dbserver.VersionOf("3.5.0")
+	V4   = dbserver.VersionOf("4.0.0")
 )
 
 func assertNoError(t *testing.T, err error) {

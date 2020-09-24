@@ -20,78 +20,72 @@
 package test_integration
 
 import (
-	"github.com/neo4j/neo4j-go-driver/v4/neo4j"
-	"github.com/neo4j/neo4j-go-driver/v4/neo4j/test-integration/control"
+	"testing"
 
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
+	"github.com/neo4j/neo4j-go-driver/v4/neo4j"
+	"github.com/neo4j/neo4j-go-driver/v4/neo4j/test-integration/dbserver"
 )
 
-var _ = Describe("Authentication", func() {
-	var server *control.SingleInstance
-	var err error
+func TestAuthentication(tt *testing.T) {
+	server := dbserver.GetDbServer()
 
-	BeforeEach(func() {
-		server, err = control.EnsureSingleInstance()
-		Expect(err).To(BeNil())
-		Expect(server).NotTo(BeNil())
-	})
-
-	Specify("when wrong credentials are provided, it should fail with authentication error", func() {
-		token := neo4j.BasicAuth("wrong", "wrong", "")
-		driver, err := neo4j.NewDriver(server.BoltURI(), token, server.Config())
-		Expect(err).To(BeNil())
-		defer driver.Close()
+	getDriverAndSession := func(token neo4j.AuthToken) (neo4j.Driver, neo4j.Session) {
+		driver, err := neo4j.NewDriver(server.URI(), token, server.ConfigFunc())
+		if err != nil {
+			panic(err)
+		}
 
 		session, err := driver.Session(neo4j.AccessModeRead)
-		Expect(err).To(BeNil())
+		if err != nil {
+			panic(err)
+		}
+		return driver, session
+	}
+
+	assertConnect := func(t *testing.T, token neo4j.AuthToken) {
+		driver, session := getDriverAndSession(token)
+		defer driver.Close()
 		defer session.Close()
 
-		_, err = session.Run("RETURN 1", nil)
-
-		neo4jErr, isNeo4jErr := err.(*neo4j.Neo4jError)
-		Expect(isNeo4jErr).To(BeTrue())
-		Expect(neo4jErr.IsAuthenticationFailed()).To(BeTrue())
-	})
-
-	verifyConnect := func(token neo4j.AuthToken) func() {
-		return func() {
-			driver, err := neo4j.NewDriver(server.BoltURI(), token, server.Config())
-			Expect(err).To(BeNil())
-			defer driver.Close()
-
-			session, err := driver.Session(neo4j.AccessModeRead)
-			Expect(err).To(BeNil())
-			defer session.Close()
-
-			result, err := session.Run("RETURN 1", nil)
-			Expect(err).To(BeNil())
-
-			if result.Next() {
-				Expect(result.Record().Values[0]).Should(BeEquivalentTo(1))
-			}
-			Expect(result.Next()).To(BeFalse())
-			Expect(result.Err()).To(BeNil())
+		_, err := session.Run("RETURN 1", nil)
+		if err != nil {
+			t.Errorf("Failed to run query when connect should succeed: %s", err)
 		}
 	}
 
-	When("when credentials are provided as a basic token with realm", func() {
-		token := neo4j.BasicAuth(server.Username(), server.Password(), "native")
-
-		Specify("it should be able to connect", verifyConnect(token))
+	tt.Run("when credentials are provided as a basic token with realm", func(t *testing.T) {
+		token := neo4j.BasicAuth(server.Username, server.Password, "native")
+		assertConnect(t, token)
 	})
 
-	When("when credentials are provided as a custom token", func() {
-		token := neo4j.CustomAuth("basic", server.Username(), server.Password(), "native", nil)
-
-		Specify("it should be able to connect", verifyConnect(token))
+	tt.Run("when credentials are provided as a custom token", func(t *testing.T) {
+		token := neo4j.CustomAuth("basic", server.Username, server.Password, "native", nil)
+		assertConnect(t, token)
 	})
 
-	When("when credentials are provided as a custom token with parameters", func() {
-		token := neo4j.CustomAuth("basic", server.Username(), server.Password(), "native", map[string]interface{}{
+	tt.Run("when credentials are provided as a custom token with parameters", func(t *testing.T) {
+		token := neo4j.CustomAuth("basic", server.Username, server.Password, "native", map[string]interface{}{
 			"otp": "12345",
 		})
-
-		Specify("it should be able to connect", verifyConnect(token))
+		assertConnect(t, token)
 	})
-})
+
+	tt.Run("when wrong credentials are provided, it should fail with authentication error", func(t *testing.T) {
+		token := neo4j.BasicAuth("wrong", "wrong", "")
+		driver, session := getDriverAndSession(token)
+		defer driver.Close()
+		defer session.Close()
+
+		_, err := session.Run("RETURN 1", nil)
+		if err == nil {
+			t.Fatal("Should NOT be able to connect")
+		}
+		if !neo4j.IsNeo4jError(err) {
+			t.Fatalf("Should be Neo4jError but was: %s (%T)", err, err)
+		}
+		neo4jErr := err.(*neo4j.Neo4jError)
+		if !neo4jErr.IsAuthenticationFailed() {
+			t.Errorf("Should be authentication error but was: %s", neo4jErr)
+		}
+	})
+}

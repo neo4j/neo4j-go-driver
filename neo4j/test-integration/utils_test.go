@@ -67,7 +67,7 @@ func writeTransactionWithIntWork(session neo4j.Session, work neo4j.TransactionWo
 }
 
 func newSession(driver neo4j.Driver, mode neo4j.AccessMode) neo4j.Session {
-	session, err := driver.Session(neo4j.AccessModeWrite)
+	session, err := driver.Session(mode)
 	Expect(err).To(BeNil())
 	return session
 }
