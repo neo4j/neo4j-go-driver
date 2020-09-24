@@ -34,15 +34,11 @@ import (
 	"github.com/neo4j/neo4j-go-driver/v4/neo4j/dbtype"
 	"github.com/neo4j/neo4j-go-driver/v4/neo4j/internal/bolt"
 	"github.com/neo4j/neo4j-go-driver/v4/neo4j/log"
-	"github.com/neo4j/neo4j-go-driver/v4/neo4j/test-integration/control"
+	"github.com/neo4j/neo4j-go-driver/v4/neo4j/test-integration/dbserver"
 )
 
-func makeRawConnection(logger log.Logger) db.Connection {
-	server, err := control.EnsureSingleInstance()
-	if err != nil {
-		panic(err)
-	}
-
+func makeRawConnection(logger log.Logger) (dbserver.DbServer, db.Connection) {
+	server := dbserver.GetDbServer()
 	uri := server.BoltURI()
 	parsedUri, err := url.Parse(uri)
 	if err != nil {
@@ -56,19 +52,19 @@ func makeRawConnection(logger log.Logger) db.Connection {
 
 	authMap := map[string]interface{}{
 		"scheme":      "basic",
-		"principal":   server.Username(),
-		"credentials": server.Password(),
+		"principal":   server.Username,
+		"credentials": server.Password,
 	}
 
 	boltConn, err := bolt.Connect(parsedUri.Host, tcpConn, authMap, "007", logger)
 	if err != nil {
 		panic(err)
 	}
-	return boltConn
+	return server, boltConn
 }
 
 func BenchmarkQuery(b *testing.B) {
-	conn := makeRawConnection(&log.Void{})
+	_, conn := makeRawConnection(&log.Void{})
 	defer conn.Close()
 	params := map[string]interface{}{
 		"one": 1,
@@ -89,7 +85,7 @@ func BenchmarkQuery(b *testing.B) {
 // Tests the specification of the internal db connection API
 func TestConnectionConformance(ot *testing.T) {
 	logger := &log.Console{Errors: true, Infos: true, Warns: true}
-	boltConn := makeRawConnection(logger)
+	server, boltConn := makeRawConnection(logger)
 	defer boltConn.Close()
 
 	randInt := func() int64 {
@@ -593,6 +589,10 @@ func TestConnectionConformance(ot *testing.T) {
 		selector, supportsMultidatabase := boltConn.(db.DatabaseSelector)
 		if !supportsMultidatabase {
 			tt.Skipf("Database %s:%s does not support multidatabase functionality", boltConn.ServerName(), boltConn.ServerVersion())
+		}
+
+		if !server.IsEnterprise {
+			tt.Skip("Need enterprise edition to test multidatabase")
 		}
 
 		// Should always reset before selecting a database

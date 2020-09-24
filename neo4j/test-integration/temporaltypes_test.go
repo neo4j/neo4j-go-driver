@@ -25,7 +25,7 @@ import (
 	"time"
 
 	"github.com/neo4j/neo4j-go-driver/v4/neo4j"
-	"github.com/neo4j/neo4j-go-driver/v4/neo4j/test-integration/control"
+	"github.com/neo4j/neo4j-go-driver/v4/neo4j/test-integration/dbserver"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/ginkgo/extensions/table"
@@ -37,24 +37,18 @@ var _ = Describe("Temporal Types", func() {
 		numberOfRandomValues = 200
 	)
 
-	var server *control.SingleInstance
-	var err error
+	server := dbserver.GetDbServer()
 	var driver neo4j.Driver
 	var session neo4j.Session
 	var result neo4j.Result
+	var err error
 
 	rand.Seed(time.Now().UnixNano())
 
 	BeforeEach(func() {
-		server, err = control.EnsureSingleInstance()
-		Expect(err).To(BeNil())
-		Expect(server).NotTo(BeNil())
+		driver := server.Driver()
 
-		driver, err = server.Driver()
-		Expect(err).To(BeNil())
-		Expect(driver).NotTo(BeNil())
-
-		if versionOfDriver(driver).LessThan(V340) {
+		if server.Version.LessThan(V340) {
 			Skip("temporal types are only available after neo4j 3.4.0 release")
 		}
 

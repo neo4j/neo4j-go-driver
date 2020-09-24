@@ -23,28 +23,21 @@ import (
 	"time"
 
 	"github.com/neo4j/neo4j-go-driver/v4/neo4j"
-	"github.com/neo4j/neo4j-go-driver/v4/neo4j/test-integration/control"
+	"github.com/neo4j/neo4j-go-driver/v4/neo4j/test-integration/dbserver"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
 
 var _ = Describe("Timeout and Lifetime", func() {
-	var err error
-	var server *control.SingleInstance
-
-	BeforeEach(func() {
-		server, err = control.EnsureSingleInstance()
-		Expect(err).To(BeNil())
-		Expect(server).NotTo(BeNil())
-	})
+	server := dbserver.GetDbServer()
 
 	It("should error when ConnectionAcquisitionTimeout is hit", func() {
 		var err error
 		var driver neo4j.Driver
 		var session1, session2 neo4j.Session
 
-		driver, err = neo4j.NewDriver(server.BoltURI(), server.AuthToken(), server.Config(), func(config *neo4j.Config) {
+		driver, err = neo4j.NewDriver(server.BoltURI(), server.AuthToken(), server.ConfigFunc(), func(config *neo4j.Config) {
 			config.ConnectionAcquisitionTimeout = 1 * time.Second
 			config.MaxConnectionPoolSize = 1
 		})
@@ -97,7 +90,7 @@ var _ = Describe("Timeout and Lifetime", func() {
 		var driver neo4j.Driver
 		var session neo4j.Session
 
-		driver, err = neo4j.NewDriver("bolt://10.255.255.1:8080", server.AuthToken(), server.Config(), func(config *neo4j.Config) {
+		driver, err = neo4j.NewDriver("bolt://10.255.255.1:8080", server.AuthToken(), server.ConfigFunc(), func(config *neo4j.Config) {
 			config.SocketConnectTimeout = 1 * time.Second
 		})
 		Expect(err).To(BeNil())

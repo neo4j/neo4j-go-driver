@@ -24,25 +24,18 @@ import (
 	"time"
 
 	"github.com/neo4j/neo4j-go-driver/v4/neo4j"
-	"github.com/neo4j/neo4j-go-driver/v4/neo4j/test-integration/control"
+	"github.com/neo4j/neo4j-go-driver/v4/neo4j/test-integration/dbserver"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
 
 var _ = Describe("Driver", func() {
-	var server *control.SingleInstance
-	var err error
-
-	BeforeEach(func() {
-		server, err = control.EnsureSingleInstance()
-		Expect(err).To(BeNil())
-		Expect(server).NotTo(BeNil())
-	})
+	server := dbserver.GetDbServer()
 
 	Context("VerifyConnectivity", func() {
 		It("should return nil upon good connection", func() {
-			driver, _ := server.Driver()
+			driver := server.Driver()
 			defer driver.Close()
 			err := driver.VerifyConnectivity()
 			Expect(err).To(BeNil())
@@ -50,7 +43,7 @@ var _ = Describe("Driver", func() {
 
 		It("should return error upon bad connection", func() {
 			auth := neo4j.BasicAuth("bad user", "bad pass", "bad area")
-			driver, err := neo4j.NewDriver(server.BoltURI(), auth, server.Config())
+			driver, err := neo4j.NewDriver(server.BoltURI(), auth, server.ConfigFunc())
 			Expect(err).To(BeNil())
 			defer driver.Close()
 			err = driver.VerifyConnectivity()
@@ -67,8 +60,7 @@ var _ = Describe("Driver", func() {
 		)
 
 		BeforeEach(func() {
-			driver, err = server.Driver()
-			Expect(err).To(BeNil())
+			driver = server.Driver()
 
 			session, err = driver.Session(neo4j.AccessModeWrite)
 			Expect(err).To(BeNil())
@@ -127,7 +119,7 @@ var _ = Describe("Driver", func() {
 		)
 
 		BeforeEach(func() {
-			driver, err = neo4j.NewDriver(server.BoltURI(), server.AuthToken(), server.Config(), func(config *neo4j.Config) {
+			driver, err = neo4j.NewDriver(server.BoltURI(), server.AuthToken(), server.ConfigFunc(), func(config *neo4j.Config) {
 				config.MaxConnectionPoolSize = 2
 				config.ConnectionAcquisitionTimeout = 0
 			})
@@ -172,7 +164,7 @@ var _ = Describe("Driver", func() {
 		)
 
 		BeforeEach(func() {
-			driver, err = neo4j.NewDriver(server.BoltURI(), server.AuthToken(), server.Config(), func(config *neo4j.Config) {
+			driver, err = neo4j.NewDriver(server.BoltURI(), server.AuthToken(), server.ConfigFunc(), func(config *neo4j.Config) {
 				config.MaxConnectionPoolSize = 2
 				config.ConnectionAcquisitionTimeout = 10 * time.Second
 			})

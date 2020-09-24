@@ -23,21 +23,22 @@ import (
 	"testing"
 
 	"github.com/neo4j/neo4j-go-driver/v4/neo4j"
-	"github.com/neo4j/neo4j-go-driver/v4/neo4j/test-integration/control"
+	"github.com/neo4j/neo4j-go-driver/v4/neo4j/test-integration/dbserver"
 )
 
 func TestMultidatabase(ot *testing.T) {
-	server, err := control.EnsureSingleInstance()
-	assertNoError(ot, err)
+	server := dbserver.GetDbServer()
 
-	driver, err := server.Driver()
-	assertNoError(ot, err)
+	driver := server.Driver()
 	defer driver.Close()
 
 	// Need > 4.0 for database support
-	version := versionOfDriver(driver)
-	if version.LessThan(VersionOf("4.0.0")) {
+	if server.Version.LessThan(V4) {
 		ot.Skip("Versions prior to 4.0 does not support multidatabase")
+	}
+
+	if !server.IsEnterprise {
+		ot.Skip("Need enterprise version to test multidatabase")
 	}
 
 	// Ensure that a test database exists using system database

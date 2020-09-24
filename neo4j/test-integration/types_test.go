@@ -24,29 +24,23 @@ import (
 	"reflect"
 
 	"github.com/neo4j/neo4j-go-driver/v4/neo4j"
-	"github.com/neo4j/neo4j-go-driver/v4/neo4j/test-integration/control"
+	"github.com/neo4j/neo4j-go-driver/v4/neo4j/test-integration/dbserver"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/ginkgo/extensions/table"
 	. "github.com/onsi/gomega"
 )
 
 var _ = Describe("Types", func() {
-	var server *control.SingleInstance
+	server := dbserver.GetDbServer()
 	var err error
 	var driver neo4j.Driver
 	var session neo4j.Session
 	var result neo4j.Result
 
 	BeforeEach(func() {
-		server, err = control.EnsureSingleInstance()
-		Expect(err).To(BeNil())
-		Expect(server).NotTo(BeNil())
+		driver = server.Driver()
 
-		driver, err = server.Driver()
-		Expect(err).To(BeNil())
-		Expect(driver).NotTo(BeNil())
-
-		session, err = driver.Session(neo4j.AccessModeRead)
+		session, err = driver.Session(neo4j.AccessModeWrite)
 		Expect(err).To(BeNil())
 		Expect(session).NotTo(BeNil())
 	})

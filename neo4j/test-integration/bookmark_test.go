@@ -23,21 +23,14 @@ import (
 	"errors"
 
 	"github.com/neo4j/neo4j-go-driver/v4/neo4j"
-	"github.com/neo4j/neo4j-go-driver/v4/neo4j/test-integration/control"
+	"github.com/neo4j/neo4j-go-driver/v4/neo4j/test-integration/dbserver"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
 
 var _ = Describe("Bookmark", func() {
-	var server *control.SingleInstance
-	var err error
-
-	BeforeEach(func() {
-		server, err = control.EnsureSingleInstance()
-		Expect(err).To(BeNil())
-		Expect(server).NotTo(BeNil())
-	})
+	server := dbserver.GetDbServer()
 
 	createNodeInTx := func(driver neo4j.Driver) string {
 		session, err := driver.Session(neo4j.AccessModeWrite)
@@ -70,9 +63,7 @@ var _ = Describe("Bookmark", func() {
 		)
 
 		BeforeEach(func() {
-			driver, err = server.Driver()
-			Expect(err).To(BeNil())
-
+			driver = server.Driver()
 			session, err = driver.Session(neo4j.AccessModeWrite)
 			Expect(err).To(BeNil())
 		})
@@ -92,7 +83,7 @@ var _ = Describe("Bookmark", func() {
 		})
 
 		Specify("when a node is created in auto-commit mode, last bookmark should be empty", func() {
-			if versionOfDriver(driver).GreaterThanOrEqual(V350) {
+			if server.Version.GreaterThanOrEqual(V350) {
 				Skip("this test is targeted for server version less than neo4j 3.5.0")
 			}
 
@@ -106,7 +97,7 @@ var _ = Describe("Bookmark", func() {
 		})
 
 		Specify("when a node is created in auto-commit mode, last bookmark should not be empty", func() {
-			if versionOfDriver(driver).LessThan(V350) {
+			if server.Version.GreaterThanOrEqual(V350) {
 				Skip("this test is targeted for server version after neo4j 3.5.0")
 			}
 
@@ -233,8 +224,7 @@ var _ = Describe("Bookmark", func() {
 		)
 
 		BeforeEach(func() {
-			driver, err = server.Driver()
-			Expect(err).To(BeNil())
+			driver = server.Driver()
 
 			bookmark = createNodeInTx(driver)
 
@@ -316,8 +306,7 @@ var _ = Describe("Bookmark", func() {
 		)
 
 		BeforeEach(func() {
-			driver, err = server.Driver()
-			Expect(err).To(BeNil())
+			driver = server.Driver()
 
 			bookmark1 = createNodeInTx(driver)
 			bookmark2 = createNodeInTx(driver)
@@ -375,8 +364,7 @@ var _ = Describe("Bookmark", func() {
 		)
 
 		BeforeEach(func() {
-			driver, err = server.Driver()
-			Expect(err).To(BeNil())
+			driver = server.Driver()
 
 			bookmark = createNodeInTx(driver)
 
@@ -399,8 +387,13 @@ var _ = Describe("Bookmark", func() {
 
 			Expect(tx).To(BeNil())
 			neo4jErr := err.(*neo4j.Neo4jError)
-			Expect(neo4jErr.IsRetriableTransient()).To(BeTrue())
-			Expect(neo4jErr.Msg).To(ContainSubstring("not up to the requested version"))
+			if server.Version.GreaterThan(V4) {
+				// The error is not retriable since it is on the wrong format
+				Expect(neo4jErr.Code, Equal("Neo.ClientError.Transaction.InvalidBookmark"))
+			} else {
+				Expect(neo4jErr.IsRetriableTransient()).To(BeTrue())
+				Expect(neo4jErr.Msg).To(ContainSubstring("not up to the requested version"))
+			}
 		})
 	})
 

@@ -26,21 +26,14 @@ import (
 
 	"github.com/neo4j/neo4j-go-driver/v4/neo4j"
 	"github.com/neo4j/neo4j-go-driver/v4/neo4j/db"
-	"github.com/neo4j/neo4j-go-driver/v4/neo4j/test-integration/control"
+	"github.com/neo4j/neo4j-go-driver/v4/neo4j/test-integration/dbserver"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
 
 var _ = Describe("Session", func() {
-	var server *control.SingleInstance
-	var err error
-
-	BeforeEach(func() {
-		server, err = control.EnsureSingleInstance()
-		Expect(err).To(BeNil())
-		Expect(server).NotTo(BeNil())
-	})
+	server := dbserver.GetDbServer()
 
 	Context("with read access mode", func() {
 		var (
@@ -52,8 +45,7 @@ var _ = Describe("Session", func() {
 		)
 
 		BeforeEach(func() {
-			driver, err = server.Driver()
-			Expect(err).To(BeNil())
+			driver = server.Driver()
 			Expect(driver).NotTo(BeNil())
 
 			session, err = driver.Session(neo4j.AccessModeRead)
@@ -183,8 +175,7 @@ var _ = Describe("Session", func() {
 		)
 
 		BeforeEach(func() {
-			driver, err = server.Driver()
-			Expect(err).To(BeNil())
+			driver = server.Driver()
 
 			session, err = driver.Session(neo4j.AccessModeWrite)
 			Expect(err).To(BeNil())
@@ -435,15 +426,14 @@ var _ = Describe("Session", func() {
 		)
 
 		BeforeEach(func() {
-			driver, err = server.Driver()
-			Expect(err).To(BeNil())
+			driver = server.Driver()
 			Expect(driver).NotTo(BeNil())
 
-			if versionOfDriver(driver).LessThan(V350) {
+			if server.Version.LessThan(V350) {
 				Skip("this test is targeted for server version after neo4j 3.5.0")
 			}
 
-			session, err = driver.Session(neo4j.AccessModeRead)
+			session, err = driver.Session(neo4j.AccessModeWrite)
 			Expect(err).To(BeNil())
 			Expect(session).NotTo(BeNil())
 		})
@@ -464,6 +454,10 @@ var _ = Describe("Session", func() {
 				"m2": "some string",
 				"m3": 4.0,
 				"m4": neo4j.LocalDateTimeOf(time.Now()),
+			}
+
+			if !server.IsEnterprise {
+				Skip("Can not use dbms.listTransactions on non-enterprise version")
 			}
 
 			result, err = session.Run("CALL dbms.listTransactions()", nil, neo4j.WithTxMetadata(metadata))
@@ -493,6 +487,10 @@ var _ = Describe("Session", func() {
 				"m4": neo4j.DateOf(time.Now()),
 			}
 
+			if !server.IsEnterprise {
+				Skip("Can not use dbms.listTransactions on non-enterprise version")
+			}
+
 			matched, err := session.ReadTransaction(listTransactionsAndMatchMetadataWork(metadata), neo4j.WithTxMetadata(metadata))
 			Expect(err).To(BeNil())
 			Expect(matched).To(BeTrue(), fmt.Sprintf("dbms.listTransactions did not include a metadata of %v", metadata))
@@ -504,6 +502,10 @@ var _ = Describe("Session", func() {
 				"m2": []byte{0x00, 0x01, 0x02},
 				"m3": []interface{}{"a", "b", "c"},
 				"m4": neo4j.OffsetTimeOf(time.Now()),
+			}
+
+			if !server.IsEnterprise {
+				Skip("Can not use dbms.listTransactions on non-enterprise version")
 			}
 
 			matched, err := session.WriteTransaction(listTransactionsAndMatchMetadataWork(metadata), neo4j.WithTxMetadata(metadata))
