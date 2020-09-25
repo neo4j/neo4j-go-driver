@@ -39,19 +39,20 @@ func readTable(ctx context.Context, pool Pool, database string, routers []string
 		if conn, err = pool.Borrow(ctx, []string{router}, true); err != nil {
 			// Check if failed due to context timing out
 			if ctx.Err() != nil {
-				return nil, wrapInReadRoutingTableError(router, ctx.Err())
+				return nil, wrapError(router, ctx.Err())
 			}
-			err = wrapInReadRoutingTableError(router, err)
+			err = wrapError(router, err)
 			continue
 		}
 
+		// We have a connection to the "router"
 		var table *db.RoutingTable
 		table, err = conn.GetRoutingTable(database, routerContext)
 		pool.Return(conn)
 		if err == nil {
 			return table, nil
 		}
-		err = wrapInReadRoutingTableError(router, err)
+		err = wrapError(router, err)
 	}
 	return nil, err
 }

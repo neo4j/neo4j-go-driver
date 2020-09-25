@@ -135,7 +135,7 @@ func (r *Router) Readers(database string) ([]string, error) {
 		return nil, err
 	}
 	if len(table.Readers) == 0 {
-		return nil, wrapInReadRoutingTableError(r.rootRouter, errors.New("No readers"))
+		return nil, wrapError(r.rootRouter, errors.New("No readers"))
 	}
 	return table.Readers, nil
 }
@@ -162,7 +162,7 @@ func (r *Router) Writers(database string) ([]string, error) {
 		}
 	}
 	if len(table.Writers) == 0 {
-		return nil, wrapInReadRoutingTableError(r.rootRouter, errors.New("No writers"))
+		return nil, wrapError(r.rootRouter, errors.New("No writers"))
 	}
 
 	return table.Writers, nil
