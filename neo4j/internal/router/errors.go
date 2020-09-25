@@ -21,6 +21,8 @@ package router
 
 import (
 	"fmt"
+
+	"github.com/neo4j/neo4j-go-driver/v4/neo4j/db"
 )
 
 type ReadRoutingTableError struct {
@@ -35,6 +37,11 @@ func (e *ReadRoutingTableError) Error() string {
 	return "Unable to retrieve routing table, no router provided"
 }
 
-func wrapInReadRoutingTableError(server string, err error) *ReadRoutingTableError {
+func wrapError(server string, err error) error {
+	// Preserve error originating from the database, wrap other errors
+	_, isNeo4jErr := err.(*db.Neo4jError)
+	if isNeo4jErr {
+		return err
+	}
 	return &ReadRoutingTableError{server: server, err: err}
 }
