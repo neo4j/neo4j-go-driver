@@ -654,7 +654,7 @@ func (b *bolt4) GetRoutingTable(database string, context map[string]string) (*db
 	params := map[string]interface{}{"context": context}
 	if database != db.DefaultDatabase {
 		query = queryDatabase
-		params["connection"] = database
+		params["db"] = database
 	}
 
 	stream, err := b.Run(query, params, db.ReadMode, nil, 0, nil)
