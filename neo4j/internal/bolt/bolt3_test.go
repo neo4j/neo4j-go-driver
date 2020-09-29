@@ -103,16 +103,17 @@ func TestBolt3(ot *testing.T) {
 		defer bolt.Close()
 
 		str, _ := bolt.Run("MATCH (n) RETURN n", nil, db.ReadMode, nil, 0, nil)
-		assertKeys(t, keys, str)
+		skeys, _ := bolt.Keys(str)
+		assertKeys(t, keys, skeys)
 		assertBoltState(t, bolt3_streaming, bolt)
 
 		// Retrieve the records
 		for i := 1; i < len(recsStrm)-1; i++ {
-			rec, sum, err := bolt.Next(str.Handle)
+			rec, sum, err := bolt.Next(str)
 			assertOnlyRecord(t, rec, sum, err)
 		}
 		// Retrieve the summary
-		rec, sum, err := bolt.Next(str.Handle)
+		rec, sum, err := bolt.Next(str)
 		assertOnlySummary(t, rec, sum, err)
 		assertBoltState(t, bolt3_ready, bolt)
 	})
@@ -131,15 +132,16 @@ func TestBolt3(ot *testing.T) {
 		str, err := bolt.RunTx(tx, "MATCH (n) RETURN n", nil)
 		assertBoltState(t, bolt3_streamingtx, bolt)
 		assertNoError(t, err)
-		assertKeys(t, keys, str)
+		skeys, _ := bolt.Keys(str)
+		assertKeys(t, keys, skeys)
 
 		// Retrieve the records
 		for i := 1; i < len(recsStrm)-1; i++ {
-			rec, sum, err := bolt.Next(str.Handle)
+			rec, sum, err := bolt.Next(str)
 			assertOnlyRecord(t, rec, sum, err)
 		}
 		// Retrieve the summary
-		rec, sum, err := bolt.Next(str.Handle)
+		rec, sum, err := bolt.Next(str)
 		assertOnlySummary(t, rec, sum, err)
 		assertBoltState(t, bolt3_tx, bolt)
 
@@ -161,15 +163,16 @@ func TestBolt3(ot *testing.T) {
 		str, err := bolt.RunTx(tx, "MATCH (n) RETURN n", nil)
 		assertNoError(t, err)
 		assertBoltState(t, bolt3_streamingtx, bolt)
-		assertKeys(t, keys, str)
+		skeys, _ := bolt.Keys(str)
+		assertKeys(t, keys, skeys)
 
 		// Retrieve the records
 		for i := 1; i < len(recsStrm)-1; i++ {
-			rec, sum, err := bolt.Next(str.Handle)
+			rec, sum, err := bolt.Next(str)
 			assertOnlyRecord(t, rec, sum, err)
 		}
 		// Retrieve the summary
-		rec, sum, err := bolt.Next(str.Handle)
+		rec, sum, err := bolt.Next(str)
 		assertOnlySummary(t, rec, sum, err)
 		assertBoltState(t, bolt3_tx, bolt)
 
@@ -199,11 +202,11 @@ func TestBolt3(ot *testing.T) {
 		assertBoltState(t, bolt3_streaming, bolt)
 
 		// Retrieve the first record
-		rec, sum, err := bolt.Next(str.Handle)
+		rec, sum, err := bolt.Next(str)
 		assertOnlyRecord(t, rec, sum, err)
 
 		// Next one should fail due to connection closed
-		rec, sum, err = bolt.Next(str.Handle)
+		rec, sum, err = bolt.Next(str)
 		assertOnlyError(t, rec, sum, err)
 		assertBoltDead(t, bolt)
 	})

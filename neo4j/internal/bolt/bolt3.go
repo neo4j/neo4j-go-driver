@@ -69,9 +69,8 @@ func (i *internalTx3) toMeta() map[string]interface{} {
 
 type bolt3 struct {
 	state         int
-	txId          int64
-	streamId      int64
-	streamKeys    []string
+	txId          db.TxHandle
+	currStream    *stream
 	conn          net.Conn
 	serverName    string
 	chunker       *chunker
@@ -226,17 +225,17 @@ func (b *bolt3) connect(auth map[string]interface{}, userAgent string) error {
 }
 
 func (b *bolt3) TxBegin(
-	mode db.AccessMode, bookmarks []string, timeout time.Duration, txMeta map[string]interface{}) (db.Handle, error) {
+	mode db.AccessMode, bookmarks []string, timeout time.Duration, txMeta map[string]interface{}) (db.TxHandle, error) {
 
 	// Ok, to begin transaction while streaming auto-commit, just empty the stream and continue.
 	if b.state == bolt3_streaming {
-		if err := b.consumeStream(); err != nil {
-			return nil, err
+		if err := b.bufferStream(); err != nil {
+			return 0, err
 		}
 	}
 
 	if err := b.assertState(bolt3_ready); err != nil {
-		return nil, err
+		return 0, err
 	}
 
 	tx := &internalTx3{
@@ -250,28 +249,26 @@ func (b *bolt3) TxBegin(
 	// reasons, otherwise delay it to save a round-trip
 	if len(bookmarks) > 0 {
 		if b.sendMsg(msgBegin, tx.toMeta()); b.err != nil {
-			return nil, b.err
+			return 0, b.err
 		}
 		if b.receiveSuccess(); b.err != nil {
-			return nil, b.err
+			return 0, b.err
 		}
-		b.txId = time.Now().Unix()
 		b.state = bolt3_tx
 	} else {
 		// Stash this into pending internal tx
 		b.pendingTx = tx
-		b.txId = time.Now().Unix()
 		b.state = bolt3_pendingtx
 	}
+	b.txId = db.TxHandle(time.Now().Unix())
 	return b.txId, nil
 }
 
 // Should NOT set b.err or change b.state as this is used to guard from
 // misuse from clients that stick to their connections when they shouldn't.
-func (b *bolt3) assertHandle(id int64, h db.Handle) error {
-	hid, ok := h.(int64)
-	if !ok || hid != id {
-		err := errors.New("Invalid handle")
+func (b *bolt3) assertTxHandle(h1, h2 db.TxHandle) error {
+	if h1 != h2 {
+		err := errors.New("Invalid transaction handle")
 		b.log.Error(log.Bolt3, b.logId, err)
 		return err
 	}
@@ -297,8 +294,8 @@ func (b *bolt3) assertState(allowed ...int) error {
 	return err
 }
 
-func (b *bolt3) TxCommit(txh db.Handle) error {
-	if err := b.assertHandle(b.txId, txh); err != nil {
+func (b *bolt3) TxCommit(txh db.TxHandle) error {
+	if err := b.assertTxHandle(b.txId, txh); err != nil {
 		return err
 	}
 
@@ -309,8 +306,10 @@ func (b *bolt3) TxCommit(txh db.Handle) error {
 	}
 
 	// Consume pending stream if any to turn state from streamingtx to tx
+	// Access to streams outside of tx boundary is not allowed, therefore we should discard
+	// the stream (not buffer).
 	if b.state == bolt3_streamingtx {
-		if err := b.consumeStream(); err != nil {
+		if err := b.discardStream(); err != nil {
 			return err
 		}
 	}
@@ -348,8 +347,8 @@ func (b *bolt3) TxCommit(txh db.Handle) error {
 	return nil
 }
 
-func (b *bolt3) TxRollback(txh db.Handle) error {
-	if err := b.assertHandle(b.txId, txh); err != nil {
+func (b *bolt3) TxRollback(txh db.TxHandle) error {
+	if err := b.assertTxHandle(b.txId, txh); err != nil {
 		return err
 	}
 
@@ -360,8 +359,10 @@ func (b *bolt3) TxRollback(txh db.Handle) error {
 	}
 
 	// Can not send rollback while still streaming, consume to turn state into tx
+	// Access to streams outside of tx boundary is not allowed, therefore we should discard
+	// the stream (not buffer).
 	if b.state == bolt3_streamingtx {
-		if err := b.consumeStream(); err != nil {
+		if err := b.discardStream(); err != nil {
 			return err
 		}
 	}
@@ -385,28 +386,47 @@ func (b *bolt3) TxRollback(txh db.Handle) error {
 	return nil
 }
 
-// Discards all records, keeps bookmark
-func (b *bolt3) consumeStream() error {
+// Discards all records in current stream
+func (b *bolt3) discardStream() error {
+	if b.state != bolt3_streaming && b.state != bolt3_streamingtx {
+		// Nothing to do
+		return nil
+	}
+
+	var (
+		sum *db.Summary
+		err error
+	)
+	for sum == nil && err == nil {
+		_, sum, err = b.receiveNext()
+	}
+	return err
+}
+
+// Collects all records in current stream
+func (b *bolt3) bufferStream() error {
 	if b.state != bolt3_streaming && b.state != bolt3_streamingtx {
 		// Nothing to do
 		return nil
 	}
 
 	for {
-		_, sum, err := b.Next(b.streamId)
+		rec, sum, err := b.receiveNext()
 		if err != nil {
 			return err
 		}
 		if sum != nil {
-			break
+			return nil
 		}
+		b.currStream.push(rec)
 	}
+
 	return nil
 }
 
-func (b *bolt3) run(cypher string, params map[string]interface{}, tx *internalTx3) (*db.Stream, error) {
-	// If already streaming, consume the whole thing first
-	if err := b.consumeStream(); err != nil {
+func (b *bolt3) run(cypher string, params map[string]interface{}, tx *internalTx3) (*stream, error) {
+	// If already streaming, finish current stream first
+	if err := b.bufferStream(); err != nil {
 		return nil, err
 	}
 
@@ -460,7 +480,6 @@ func (b *bolt3) run(cypher string, params map[string]interface{}, tx *internalTx
 		return nil, b.err
 	}
 	b.tfirst = runRes.t_first
-	b.streamKeys = runRes.fields
 	// Change state to streaming
 	if b.state == bolt3_ready {
 		b.state = bolt3_streaming
@@ -468,14 +487,13 @@ func (b *bolt3) run(cypher string, params map[string]interface{}, tx *internalTx
 		b.state = bolt3_streamingtx
 	}
 
-	b.streamId = time.Now().Unix()
-	stream := &db.Stream{Keys: b.streamKeys, Handle: b.streamId}
-	return stream, nil
+	b.currStream = &stream{keys: runRes.fields}
+	return b.currStream, nil
 }
 
 func (b *bolt3) Run(
 	cypher string, params map[string]interface{}, mode db.AccessMode,
-	bookmarks []string, timeout time.Duration, txMeta map[string]interface{}) (*db.Stream, error) {
+	bookmarks []string, timeout time.Duration, txMeta map[string]interface{}) (db.StreamHandle, error) {
 
 	if err := b.assertState(bolt3_streaming, bolt3_ready); err != nil {
 		return nil, err
@@ -487,25 +505,101 @@ func (b *bolt3) Run(
 		timeout:   timeout,
 		txMeta:    txMeta,
 	}
-	return b.run(cypher, params, &tx)
+	stream, err := b.run(cypher, params, &tx)
+	if err != nil {
+		return nil, err
+	}
+	return stream, nil
 }
 
-func (b *bolt3) RunTx(txh db.Handle, cypher string, params map[string]interface{}) (*db.Stream, error) {
-	if err := b.assertHandle(b.txId, txh); err != nil {
+func (b *bolt3) RunTx(txh db.TxHandle, cypher string, params map[string]interface{}) (db.StreamHandle, error) {
+	if err := b.assertTxHandle(b.txId, txh); err != nil {
 		return nil, err
 	}
 
 	stream, err := b.run(cypher, params, b.pendingTx)
 	b.pendingTx = nil
-	return stream, err
+	if err != nil {
+		return nil, err
+	}
+	return stream, nil
+}
+
+func (b *bolt3) Keys(streamHandle db.StreamHandle) ([]string, error) {
+	stream, ok := streamHandle.(*stream)
+	if !ok {
+		return nil, errors.New("Invalid stream handle")
+	}
+	// Don't care about if the stream is the current or even if it belongs to this connection.
+	return stream.keys, nil
 }
 
 // Reads one record from the stream.
-func (b *bolt3) Next(shandle db.Handle) (*db.Record, *db.Summary, error) {
-	if err := b.assertHandle(b.streamId, shandle); err != nil {
-		return nil, nil, err
+func (b *bolt3) Next(streamHandle db.StreamHandle) (*db.Record, *db.Summary, error) {
+	stream, ok := streamHandle.(*stream)
+	if !ok {
+		return nil, nil, errors.New("Invalid stream handle")
 	}
 
+	// Buffered stream or someone elses stream, doesn't matter...
+	buf, rec, sum, err := stream.bufferedNext()
+	if buf {
+		return rec, sum, err
+	}
+
+	// Nothing in the stream buffer, the stream must be the current
+	// one to fetch on it otherwise something is wrong.
+	if stream != b.currStream {
+		return nil, nil, errors.New("Invalid stream handle")
+	}
+
+	return b.receiveNext()
+}
+
+func (b *bolt3) Consume(streamHandle db.StreamHandle) (*db.Summary, error) {
+	stream, ok := streamHandle.(*stream)
+	if !ok {
+		return nil, errors.New("Invalid stream handle")
+	}
+
+	// If the stream isn't current, it should either already be complete
+	// or have an error.
+	if stream != b.currStream {
+		return stream.sum, stream.err
+	}
+
+	// It is the current stream, it should not be complete but...
+	if stream.err != nil || stream.sum != nil {
+		return stream.sum, stream.err
+	}
+
+	b.discardStream()
+	return stream.sum, stream.err
+}
+
+func (b *bolt3) Buffer(streamHandle db.StreamHandle) error {
+	stream, ok := streamHandle.(*stream)
+	if !ok {
+		return errors.New("Invalid stream handle")
+	}
+
+	// If the stream isn't current, it should either already be complete
+	// or have an error.
+	if stream != b.currStream {
+		return stream.err
+	}
+
+	// It is the current stream, it should not be complete but...
+	if stream.err != nil || stream.sum != nil {
+		return stream.err
+	}
+
+	b.bufferStream()
+	return stream.err
+}
+
+// Reads one record from the network.
+func (b *bolt3) receiveNext() (*db.Record, *db.Summary, error) {
 	if err := b.assertState(bolt3_streaming, bolt3_streamingtx); err != nil {
 		return nil, nil, err
 	}
@@ -517,15 +611,16 @@ func (b *bolt3) Next(shandle db.Handle) (*db.Record, *db.Summary, error) {
 
 	switch x := res.(type) {
 	case *db.Record:
-		x.Keys = b.streamKeys
+		x.Keys = b.currStream.keys
 		return x, nil, nil
 	case *successResponse:
-		// End of stream
-		// Parse summary
+		// End of stream, parse summary
 		sum := x.summary()
 		if sum == nil {
 			b.state = bolt3_dead
 			b.err = errors.New("Failed to parse summary")
+			b.currStream.err = b.err
+			b.currStream = nil
 			b.log.Error(log.Bolt3, b.logId, b.err)
 			return nil, nil, b.err
 		}
@@ -538,7 +633,8 @@ func (b *bolt3) Next(shandle db.Handle) (*db.Record, *db.Summary, error) {
 				b.bookmark = sum.Bookmark
 			}
 		}
-		b.streamId = 0
+		b.currStream.sum = sum
+		b.currStream = nil
 		// Add some extras to the summary
 		sum.ServerVersion = b.serverVersion
 		sum.ServerName = b.serverName
@@ -546,6 +642,8 @@ func (b *bolt3) Next(shandle db.Handle) (*db.Record, *db.Summary, error) {
 		return nil, sum, nil
 	case *db.Neo4jError:
 		b.err = x
+		b.currStream.err = b.err
+		b.currStream = nil
 		b.state = bolt3_failed
 		if x.Classification() == "ClientError" {
 			// These could include potentially large cypher statement, only log to debug
@@ -557,6 +655,8 @@ func (b *bolt3) Next(shandle db.Handle) (*db.Record, *db.Summary, error) {
 	default:
 		b.state = bolt3_dead
 		b.err = errors.New("Unknown response")
+		b.currStream.err = b.err
+		b.currStream = nil
 		b.log.Error(log.Bolt3, b.logId, b.err)
 		return nil, nil, b.err
 	}
@@ -578,8 +678,7 @@ func (b *bolt3) Reset() {
 	defer func() {
 		// Reset internal state
 		b.txId = 0
-		b.streamId = 0
-		b.streamKeys = []string{}
+		b.currStream = nil
 		b.bookmark = ""
 		b.pendingTx = nil
 		b.err = nil
@@ -590,8 +689,14 @@ func (b *bolt3) Reset() {
 		return
 	}
 
-	// Will consume ongoing stream if any
-	b.consumeStream()
+	if b.state == bolt3_streaming {
+		// Buffer for auto-commit streams
+		b.bufferStream()
+	} else if b.state == bolt3_streamingtx {
+		// Streams bound to a tx is not allowed to use outside of tx
+		b.discardStream()
+	}
+
 	if b.state == bolt3_ready || b.state == bolt3_dead {
 		// No need for reset
 		return
@@ -633,7 +738,7 @@ func (b *bolt3) GetRoutingTable(database string, context map[string]string) (*db
 
 	// Only available when Neo4j is setup with clustering
 	const query = "CALL dbms.cluster.routing.getRoutingTable($context)"
-	stream, err := b.Run(query, map[string]interface{}{"context": context}, db.ReadMode, nil, 0, nil)
+	streamHandle, err := b.Run(query, map[string]interface{}{"context": context}, db.ReadMode, nil, 0, nil)
 	if err != nil {
 		// Give a better error
 		dbError, isDbError := err.(*db.Neo4jError)
@@ -643,7 +748,7 @@ func (b *bolt3) GetRoutingTable(database string, context map[string]string) (*db
 		return nil, err
 	}
 
-	rec, _, err := b.Next(stream.Handle)
+	rec, _, err := b.Next(streamHandle)
 	if err != nil {
 		return nil, err
 	}
@@ -651,7 +756,7 @@ func (b *bolt3) GetRoutingTable(database string, context map[string]string) (*db
 		return nil, errors.New("No routing table record")
 	}
 	// Just empty the stream, ignore the summary should leave the connecion in ready state
-	b.Next(stream.Handle)
+	b.Next(streamHandle)
 
 	table := parseRoutingTableRecord(rec)
 	if table == nil {

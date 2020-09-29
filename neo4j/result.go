@@ -20,8 +20,6 @@
 package neo4j
 
 import (
-	"container/list"
-
 	"github.com/neo4j/neo4j-go-driver/v4/neo4j/db"
 )
 
@@ -47,86 +45,43 @@ type Result interface {
 	Consume() (ResultSummary, error)
 }
 
-type iterator interface {
-	Next(s db.Handle) (*Record, *db.Summary, error)
-}
-
 type result struct {
-	err         error
-	iter        iterator
-	stream      *db.Stream
-	cypher      string
-	params      map[string]interface{}
-	allReceived bool
-	unconsumed  list.List
-	record      *Record
-	summary     *db.Summary
+	err          error
+	conn         db.Connection
+	streamHandle db.StreamHandle
+	cypher       string
+	params       map[string]interface{}
+	record       *Record
+	summary      *db.Summary
 }
 
-func newResult(iter iterator, str *db.Stream, cypher string, params map[string]interface{}) *result {
+func newResult(conn db.Connection, str db.StreamHandle, cypher string, params map[string]interface{}) *result {
 	return &result{
-		iter:   iter,
-		stream: str,
-		cypher: cypher,
-		params: params,
+		conn:         conn,
+		streamHandle: str,
+		cypher:       cypher,
+		params:       params,
 	}
-}
-
-// Receive another record.
-func (r *result) doFetch() *Record {
-	var rec *Record
-	var sum *db.Summary
-	rec, sum, r.err = r.iter.Next(r.stream.Handle)
-	r.allReceived = r.err != nil || rec == nil
-	r.summary = sum
-	return rec
 }
 
 func (r *result) Keys() ([]string, error) {
-	if r.err != nil {
-		return nil, r.err
-	}
-	return r.stream.Keys, nil
-}
-
-func (r *result) next() {
-	e := r.unconsumed.Front()
-	if e == nil {
-		// All has been received and consumed
-		if r.allReceived {
-			r.record = nil
-			return
-		}
-
-		// Receive another record
-		r.record = r.doFetch()
-		return
-	}
-
-	// Remove the record from list of unconsumed and return it
-	r.unconsumed.Remove(e)
-	r.record = e.Value.(*Record)
-	return
+	return r.conn.Keys(r.streamHandle)
 }
 
 func (r *result) Next() bool {
-	r.next()
+	r.record, r.summary, r.err = r.conn.Next(r.streamHandle)
 	return r.record != nil
 }
 
-func (r *result) NextRecord(record **Record) bool {
-	r.next()
-	if record != nil {
-		*record = r.record
+func (r *result) NextRecord(out **Record) bool {
+	r.record, r.summary, r.err = r.conn.Next(r.streamHandle)
+	if out != nil {
+		*out = r.record
 	}
 	return r.record != nil
 }
 
 func (r *result) Record() *Record {
-	// Unbox for better client experience
-	if r.record == nil {
-		return nil
-	}
 	return r.record
 }
 
@@ -134,22 +89,13 @@ func (r *result) Err() error {
 	return wrapBoltError(r.err)
 }
 
-// Used internally to fetch all records from stream and put them in unconsumed list.
-func (r *result) fetchAll() {
-	for !r.allReceived {
-		rec := r.doFetch()
-		if rec != nil {
-			r.unconsumed.PushBack(rec)
-		}
-	}
-}
-
 func (r *result) Collect() ([]*Record, error) {
 	recs := make([]*Record, 0, 1024)
-	var rec *Record
-	// Need to consider unconsumed
-	for r.NextRecord(&rec) {
-		recs = append(recs, rec)
+	for r.summary == nil && r.err == nil {
+		r.record, r.summary, r.err = r.conn.Next(r.streamHandle)
+		if r.record != nil {
+			recs = append(recs, r.record)
+		}
 	}
 	if r.err != nil {
 		return nil, wrapBoltError(r.err)
@@ -157,9 +103,12 @@ func (r *result) Collect() ([]*Record, error) {
 	return recs, nil
 }
 
+func (r *result) buffer() {
+	r.err = r.conn.Buffer(r.streamHandle)
+}
+
 func (r *result) Single() (*Record, error) {
 	var rec *Record
-	// Need to consider unconsumed
 	if !r.NextRecord(&rec) {
 		if r.err != nil {
 			return nil, wrapBoltError(r.err)
@@ -173,10 +122,9 @@ func (r *result) Single() (*Record, error) {
 }
 
 func (r *result) Consume() (ResultSummary, error) {
-	for !r.allReceived {
-		r.doFetch()
-	}
-	if r.summary == nil || r.err != nil {
+	r.record = nil
+	r.summary, r.err = r.conn.Consume(r.streamHandle)
+	if r.err != nil {
 		return nil, wrapBoltError(r.err)
 	}
 	return &resultSummary{

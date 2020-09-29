@@ -31,24 +31,28 @@ const (
 	ReadMode  AccessMode = 1
 )
 
-type Handle interface{}
-
-type Stream struct {
-	Handle Handle
-	Keys   []string
-}
+type (
+	TxHandle     uint64
+	StreamHandle interface{}
+)
 
 // Abstract database server connection.
 type Connection interface {
-	TxBegin(mode AccessMode, bookmarks []string, timeout time.Duration, meta map[string]interface{}) (Handle, error)
-	TxRollback(tx Handle) error
-	TxCommit(tx Handle) error
-	Run(cypher string, params map[string]interface{}, mode AccessMode, bookmarks []string, timeout time.Duration, meta map[string]interface{}) (*Stream, error)
-	RunTx(tx Handle, cypher string, params map[string]interface{}) (*Stream, error)
+	TxBegin(mode AccessMode, bookmarks []string, timeout time.Duration, meta map[string]interface{}) (TxHandle, error)
+	TxRollback(tx TxHandle) error
+	TxCommit(tx TxHandle) error
+	Run(cypher string, params map[string]interface{}, mode AccessMode, bookmarks []string, timeout time.Duration, meta map[string]interface{}) (StreamHandle, error)
+	RunTx(tx TxHandle, cypher string, params map[string]interface{}) (StreamHandle, error)
+	// Keys for the specified stream.
+	Keys(streamHandle StreamHandle) ([]string, error)
 	// Moves to next item in the stream.
 	// If error is nil, either Record or Summary has a value, if Record is nil there are no more records.
 	// If error is non nil, neither Record or Summary has a value.
-	Next(streamHandle Handle) (*Record, *Summary, error)
+	Next(streamHandle StreamHandle) (*Record, *Summary, error)
+	// Discards all records on the stream and returns the summary otherwise it will return the error.
+	Consume(streamHandle StreamHandle) (*Summary, error)
+	// Buffers all records on the stream, records, summary and error will be received through call to Next
+	Buffer(streamHandle StreamHandle) error
 	// Returns bookmark from last committed transaction or last finished auto-commit transaction.
 	// Note that if there is an ongoing auto-commit transaction (stream active) the bookmark
 	// from that is not included. Empty string if no bookmark.

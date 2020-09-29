@@ -66,12 +66,12 @@ func assertOnlyError(t *testing.T, rec *db.Record, sum *db.Summary, err error) {
 	}
 }
 
-func assertKeys(t *testing.T, ekeys []interface{}, s *db.Stream) {
+func assertKeys(t *testing.T, ekeys []interface{}, keys []string) {
 	t.Helper()
-	if s == nil {
-		t.Fatal("No stream")
+	if len(ekeys) != len(keys) {
+		t.Errorf("Stream key lengths differ")
 	}
-	for i, k := range s.Keys {
+	for i, k := range keys {
 		if k != ekeys[i] {
 			t.Errorf("Stream keys differ")
 		}

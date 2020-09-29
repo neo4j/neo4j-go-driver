@@ -39,25 +39,18 @@ type Transaction interface {
 // Transaction implementation when explicit transaction started
 type transaction struct {
 	conn     db.Connection
-	txHandle db.Handle
-	res      *result
+	txHandle db.TxHandle
 	done     bool
 	err      error
 	onClosed func()
 }
 
 func (tx *transaction) Run(cypher string, params map[string]interface{}) (Result, error) {
-	err := fetchAllInResult(&tx.res)
-	if err != nil {
-		return nil, wrapBoltError(err)
-	}
-
 	stream, err := tx.conn.RunTx(tx.txHandle, cypher, params)
 	if err != nil {
 		return nil, wrapBoltError(err)
 	}
-	tx.res = newResult(tx.conn, stream, cypher, params)
-	return tx.res, nil
+	return newResult(tx.conn, stream, cypher, params), nil
 }
 
 func (tx *transaction) Commit() error {
@@ -84,36 +77,18 @@ func (tx *transaction) Close() error {
 	return tx.Rollback()
 }
 
-func fetchAllInResult(respp **result) error {
-	res := *respp
-	if res == nil {
-		return nil
-	}
-	res.fetchAll()
-	*respp = nil
-	return res.err
-}
-
 // Transaction implementation used as parameter to transactional functions
 type retryableTransaction struct {
 	conn     db.Connection
-	txHandle db.Handle
-	res      *result
+	txHandle db.TxHandle
 }
 
 func (tx *retryableTransaction) Run(cypher string, params map[string]interface{}) (Result, error) {
-	// Fetch all in previous result
-	err := fetchAllInResult(&tx.res)
-	if err != nil {
-		return nil, wrapBoltError(err)
-	}
-
 	stream, err := tx.conn.RunTx(tx.txHandle, cypher, params)
 	if err != nil {
 		return nil, wrapBoltError(err)
 	}
-	tx.res = newResult(tx.conn, stream, cypher, params)
-	return tx.res, nil
+	return newResult(tx.conn, stream, cypher, params), nil
 }
 
 func (tx *retryableTransaction) Commit() error {
@@ -140,12 +115,15 @@ type autoTransaction struct {
 }
 
 func (tx *autoTransaction) done() {
-	tx.res.fetchAll()
-	tx.onAllReceivedEdge()
+	if !tx.closed {
+		tx.res.buffer()
+		tx.closed = true
+		tx.onClosed()
+	}
 }
 
 func (tx *autoTransaction) onAllReceivedEdge() {
-	if tx.res.allReceived && !tx.closed {
+	if !tx.closed && (tx.res.err != nil || tx.res.summary != nil) {
 		tx.closed = true
 		tx.onClosed()
 	}
