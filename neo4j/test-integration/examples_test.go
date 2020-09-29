@@ -22,7 +22,6 @@ package test_integration
 import (
 	"errors"
 	"fmt"
-	//	"net/url"
 	"time"
 
 	"github.com/neo4j/neo4j-go-driver/v4/neo4j"

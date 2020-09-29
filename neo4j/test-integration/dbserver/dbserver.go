@@ -104,7 +104,7 @@ func (s DbServer) deleteData() {
 // Returns the default URI to connect to the datbase.
 // This should be used when tests don't care about the specifics of different URI schemes.
 func (s DbServer) URI() string {
-	return fmt.Sprintf("neo4j://%s:%d", s.Hostname, s.Port)
+	return fmt.Sprintf("%s://%s:%d", s.Scheme, s.Hostname, s.Port)
 }
 
 func (s DbServer) BoltURI() string {

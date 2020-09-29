@@ -24,6 +24,12 @@ import (
 	"github.com/neo4j/neo4j-go-driver/v4/neo4j/db"
 )
 
+type Next struct {
+	Record  *db.Record
+	Summary *db.Summary
+	Err     error
+}
+
 type ConnFake struct {
 	Name          string
 	Version       string
@@ -32,11 +38,10 @@ type ConnFake struct {
 	Table         *db.RoutingTable
 	Err           error
 	Id            int
-	TxBeginHandle db.Handle
-	RunStream     *db.Stream
-	RunTxStream   *db.Stream
-	NextRecord    *db.Record
-	NextSummary   *db.Summary
+	TxBeginHandle db.TxHandle
+	RunStream     db.StreamHandle
+	RunTxStream   db.StreamHandle
+	Nexts         []Next
 	Bookm         string
 	TxCommitErr   error
 	TxRollbackErr error
@@ -69,30 +74,46 @@ func (c *ConnFake) ServerVersion() string {
 	return "serverVersion"
 }
 
+func (c *ConnFake) Buffer(streamHandle db.StreamHandle) error {
+	return nil
+}
+
+func (c *ConnFake) Consume(streamHandle db.StreamHandle) (*db.Summary, error) {
+	return nil, nil
+}
+
 func (c *ConnFake) GetRoutingTable(database string, context map[string]string) (*db.RoutingTable, error) {
 	return c.Table, c.Err
 }
 
-func (c *ConnFake) TxBegin(mode db.AccessMode, bookmarks []string, timeout time.Duration, meta map[string]interface{}) (db.Handle, error) {
+func (c *ConnFake) TxBegin(mode db.AccessMode, bookmarks []string, timeout time.Duration, meta map[string]interface{}) (db.TxHandle, error) {
 	return c.TxBeginHandle, c.Err
 }
 
-func (c *ConnFake) TxRollback(tx db.Handle) error {
+func (c *ConnFake) TxRollback(tx db.TxHandle) error {
 	return c.TxRollbackErr
 }
 
-func (c *ConnFake) TxCommit(tx db.Handle) error {
+func (c *ConnFake) TxCommit(tx db.TxHandle) error {
 	return c.TxCommitErr
 }
 
-func (c *ConnFake) Run(cypher string, params map[string]interface{}, mode db.AccessMode, bookmarks []string, timeout time.Duration, meta map[string]interface{}) (*db.Stream, error) {
+func (c *ConnFake) Run(cypher string, params map[string]interface{}, mode db.AccessMode, bookmarks []string, timeout time.Duration, meta map[string]interface{}) (db.StreamHandle, error) {
 	return c.RunStream, c.Err
 }
 
-func (c *ConnFake) RunTx(tx db.Handle, cypher string, params map[string]interface{}) (*db.Stream, error) {
+func (c *ConnFake) RunTx(tx db.TxHandle, cypher string, params map[string]interface{}) (db.StreamHandle, error) {
 	return c.RunTxStream, c.Err
 }
 
-func (c *ConnFake) Next(streamHandle db.Handle) (*db.Record, *db.Summary, error) {
-	return c.NextRecord, c.NextSummary, c.Err
+func (c *ConnFake) Keys(streamHandle db.StreamHandle) ([]string, error) {
+	return nil, nil
+}
+
+func (c *ConnFake) Next(streamHandle db.StreamHandle) (*db.Record, *db.Summary, error) {
+	next := c.Nexts[0]
+	if len(c.Nexts) > 1 {
+		c.Nexts = c.Nexts[1:]
+	}
+	return next.Record, next.Summary, next.Err
 }

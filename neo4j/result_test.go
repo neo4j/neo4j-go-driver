@@ -22,8 +22,10 @@ package neo4j
 import (
 	"errors"
 	"fmt"
-	"github.com/neo4j/neo4j-go-driver/v4/neo4j/db"
 	"testing"
+
+	"github.com/neo4j/neo4j-go-driver/v4/neo4j/db"
+	"github.com/neo4j/neo4j-go-driver/v4/neo4j/internal/testutil"
 )
 
 type iter struct {
@@ -32,36 +34,10 @@ type iter struct {
 	expectSum    *db.Summary
 	expectSumErr error
 	expectErr    error
-	consume      bool
-	panicOnFetch bool
-}
-
-type fetchRet struct {
-	rec *db.Record
-	sum *db.Summary
-	err error
-}
-
-type testFetcher struct {
-	rets         []fetchRet
-	panicOnFetch bool
-}
-
-func (f *testFetcher) Next(s db.Handle) (*db.Record, *db.Summary, error) {
-	if len(f.rets) == 0 || f.panicOnFetch {
-		// If signalling is made correctly in test case this shouldn't happen and if it does
-		// it is an error in test setup.
-		panic("boom")
-	}
-	ret := f.rets[0]
-	f.rets = f.rets[1:]
-	return ret.rec, ret.sum, ret.err
 }
 
 func TestResult(ot *testing.T) {
-	stream := &db.Stream{
-		Keys: []string{"key1", "key2"},
-	}
+	streamHandle := db.StreamHandle(0)
 	cypher := ""
 	params := map[string]interface{}{}
 	recs := []*db.Record{
@@ -78,8 +54,8 @@ func TestResult(ot *testing.T) {
 
 	// Initialization
 	ot.Run("Initialization", func(t *testing.T) {
-		fetcher := &testFetcher{}
-		res := newResult(fetcher, stream, cypher, params)
+		conn := &testutil.ConnFake{}
+		res := newResult(conn, streamHandle, cypher, params)
 		rec := res.Record()
 		if rec != nil {
 			t.Errorf("Should be no record")
@@ -96,74 +72,52 @@ func TestResult(ot *testing.T) {
 	// Iterate without any unconsumed (no push from connection)
 	iterCases := []struct {
 		name   string
-		stream []fetchRet
+		stream []testutil.Next
 		iters  []iter
 		sum    db.Summary
 	}{
 		{
 			name: "happy",
-			stream: []fetchRet{
-				fetchRet{rec: recs[0]},
-				fetchRet{rec: recs[1]},
-				fetchRet{sum: sums[0]},
+			stream: []testutil.Next{
+				testutil.Next{Record: recs[0]},
+				testutil.Next{Record: recs[1]},
+				testutil.Next{Summary: sums[0]},
 			},
 			iters: []iter{
 				iter{expectNext: true, expectRec: recs[0]},
 				iter{expectNext: true, expectRec: recs[1]},
 				iter{expectNext: false},
-				iter{expectNext: false, consume: true, expectSum: sums[0]},
 			},
 		},
 		{
 			name: "error after one record",
-			stream: []fetchRet{
-				fetchRet{rec: recs[0]},
-				fetchRet{err: errs[0]},
+			stream: []testutil.Next{
+				testutil.Next{Record: recs[0]},
+				testutil.Next{Err: errs[0]},
 			},
 			iters: []iter{
 				iter{expectNext: true, expectRec: recs[0]},
 				iter{expectNext: false, expectErr: errs[0]},
-				iter{expectNext: false, expectErr: errs[0], consume: true, expectSumErr: errs[0]},
 			},
 		},
 		{
 			name: "proceed after error",
-			stream: []fetchRet{
-				fetchRet{rec: recs[0]},
-				fetchRet{err: errs[0]},
+			stream: []testutil.Next{
+				testutil.Next{Record: recs[0]},
+				testutil.Next{Err: errs[0]},
 			},
 			iters: []iter{
 				iter{expectNext: true, expectRec: recs[0]},
 				iter{expectNext: false, expectErr: errs[0]},
 				iter{expectNext: false, expectErr: errs[0]},
-			},
-		},
-		{
-			name: "consume all",
-			stream: []fetchRet{
-				fetchRet{rec: recs[0]},
-				fetchRet{rec: recs[1]},
-				fetchRet{sum: sums[0]},
-			},
-			iters: []iter{
-				iter{expectNext: true, expectRec: recs[0]},
-				iter{consume: true, expectNext: false},
-				iter{panicOnFetch: true, expectNext: false},
 			},
 		},
 	}
 	for _, c := range iterCases {
 		ot.Run(fmt.Sprintf("Iteration-%s", c.name), func(t *testing.T) {
-			fetcher := &testFetcher{rets: c.stream}
-			res := newResult(fetcher, stream, cypher, params)
+			conn := &testutil.ConnFake{Nexts: c.stream}
+			res := newResult(conn, streamHandle, cypher, params)
 			for i, call := range c.iters {
-				fetcher.panicOnFetch = call.panicOnFetch
-				if call.consume {
-					res.Consume()
-					if len(fetcher.rets) > 0 {
-						t.Fatalf("Consume should have emptied stream")
-					}
-				}
 				gotNext := res.Next()
 				if gotNext != call.expectNext {
 					t.Fatalf("Next at iter %d returned %t but expected to return %t", i, gotNext, call.expectNext)

@@ -45,7 +45,9 @@ var _ = Describe("Session", func() {
 		)
 
 		BeforeEach(func() {
-			driver = server.Driver()
+			driver = server.Driver(func(c *neo4j.Config) {
+				c.Log = neo4j.ConsoleLogger(neo4j.DEBUG)
+			})
 			Expect(driver).NotTo(BeNil())
 
 			session, err = driver.Session(neo4j.AccessModeRead)
