@@ -48,6 +48,14 @@ func (s *stream) bufferedNext() (bool, *db.Record, *db.Summary, error) {
 	return false, nil, nil, nil
 }
 
+// Delayed error until fifo emptied
+func (s *stream) Err() error {
+	if s.fifo.Len() > 0 {
+		return nil
+	}
+	return s.err
+}
+
 func (s *stream) push(rec *db.Record) {
 	s.fifo.PushBack(rec)
 }

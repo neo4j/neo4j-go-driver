@@ -26,9 +26,8 @@ import (
 	"time"
 
 	"github.com/neo4j/neo4j-go-driver/v4/neo4j/db"
-	"github.com/neo4j/neo4j-go-driver/v4/neo4j/log"
-
 	"github.com/neo4j/neo4j-go-driver/v4/neo4j/internal/packstream"
+	"github.com/neo4j/neo4j-go-driver/v4/neo4j/log"
 )
 
 const (
@@ -84,21 +83,21 @@ type bolt3 struct {
 	bookmark      string       // Last bookmark
 	birthDate     time.Time
 	log           log.Logger
-	receiveBufer  []byte
+	receiveBuffer []byte
 	err           error // Last fatal error
 }
 
 func NewBolt3(serverName string, conn net.Conn, log log.Logger) *bolt3 {
 	return &bolt3{
-		state:        bolt3_unauthorized,
-		conn:         conn,
-		serverName:   serverName,
-		chunker:      newChunker(),
-		receiveBufer: make([]byte, 4096),
-		packer:       &packstream.Packer{},
-		unpacker:     &packstream.Unpacker{},
-		birthDate:    time.Now(),
-		log:          log,
+		state:         bolt3_unauthorized,
+		conn:          conn,
+		serverName:    serverName,
+		chunker:       newChunker(),
+		receiveBuffer: make([]byte, 4096),
+		packer:        &packstream.Packer{},
+		unpacker:      &packstream.Unpacker{},
+		birthDate:     time.Now(),
+		log:           log,
 	}
 }
 
@@ -110,6 +109,7 @@ func (b *bolt3) ServerVersion() string {
 	return b.serverVersion
 }
 
+// Sets b.err and b.state on failure
 func (b *bolt3) appendMsg(tag packstream.StructTag, field ...interface{}) {
 	b.chunker.beginMessage()
 	// Setup the message and let packstream write the packed bytes to the chunk
@@ -125,6 +125,7 @@ func (b *bolt3) appendMsg(tag packstream.StructTag, field ...interface{}) {
 	b.chunker.endMessage()
 }
 
+// Sets b.err and b.state on failure
 func (b *bolt3) sendMsg(tag packstream.StructTag, field ...interface{}) {
 	if b.appendMsg(tag, field...); b.err != nil {
 		return
@@ -135,15 +136,16 @@ func (b *bolt3) sendMsg(tag packstream.StructTag, field ...interface{}) {
 	}
 }
 
+// Sets b.err and b.state on failure
 func (b *bolt3) receiveMsg() interface{} {
-	b.receiveBufer, b.err = dechunkMessage(b.conn, b.receiveBufer)
+	b.receiveBuffer, b.err = dechunkMessage(b.conn, b.receiveBuffer)
 	if b.err != nil {
 		b.log.Error(log.Bolt3, b.logId, b.err)
 		b.state = bolt3_dead
 		return nil
 	}
 
-	msg, err := b.unpacker.UnpackStruct(b.receiveBufer, hydrate)
+	msg, err := b.unpacker.UnpackStruct(b.receiveBuffer, hydrate)
 	if err != nil {
 		b.log.Error(log.Bolt3, b.logId, err)
 		b.state = bolt3_dead
@@ -156,13 +158,9 @@ func (b *bolt3) receiveMsg() interface{} {
 
 // Receives a message that is assumed to be a success response or a failure in response
 // to a sent command.
+// Sets b.err and b.state on failure
 func (b *bolt3) receiveSuccess() *successResponse {
-	msg := b.receiveMsg()
-	if b.err != nil {
-		return nil
-	}
-
-	switch v := msg.(type) {
+	switch v := b.receiveMsg().(type) {
 	case *successResponse:
 		return v
 	case *db.Neo4jError:
@@ -175,11 +173,17 @@ func (b *bolt3) receiveSuccess() *successResponse {
 			b.log.Error(log.Bolt3, b.logId, v)
 		}
 		return nil
+	default:
+		// Receive failed, state has been set
+		if b.err != nil {
+			return nil
+		}
+		// Unexpected message received
+		b.state = bolt3_dead
+		b.err = errors.New("Expected success or database error")
+		b.log.Error(log.Bolt3, b.logId, b.err)
+		return nil
 	}
-	b.state = bolt3_dead
-	b.err = errors.New("Expected success or database error")
-	b.log.Error(log.Bolt3, b.logId, b.err)
-	return nil
 }
 
 func (b *bolt3) connect(auth map[string]interface{}, userAgent string) error {
@@ -187,10 +191,10 @@ func (b *bolt3) connect(auth map[string]interface{}, userAgent string) error {
 		return err
 	}
 
-	// Merge authentication info into hello message
 	hello := map[string]interface{}{
 		"user_agent": userAgent,
 	}
+	// Merge authentication info into hello message
 	for k, v := range auth {
 		_, exists := hello[k]
 		if exists {
@@ -245,8 +249,8 @@ func (b *bolt3) TxBegin(
 		txMeta:    txMeta,
 	}
 
-	// If there are bookmarks, begin the transaction immediately for backwards compatible
-	// reasons, otherwise delay it to save a round-trip
+	// If there are bookmarks, begin the transaction immediately to get the error from the
+	// server early on. Requires a network roundtrip.
 	if len(bookmarks) > 0 {
 		if b.sendMsg(msgBegin, tx.toMeta()); b.err != nil {
 			return 0, b.err
@@ -410,18 +414,25 @@ func (b *bolt3) bufferStream() error {
 		return nil
 	}
 
-	for {
-		rec, sum, err := b.receiveNext()
-		if err != nil {
-			return err
+	n := 0
+	var (
+		sum *db.Summary
+		err error
+		rec *db.Record
+	)
+	for sum == nil && err == nil {
+		rec, sum, err = b.receiveNext()
+		if rec != nil {
+			b.currStream.push(rec)
+			n++
 		}
-		if sum != nil {
-			return nil
-		}
-		b.currStream.push(rec)
 	}
 
-	return nil
+	if n > 0 {
+		b.log.Warnf(log.Bolt3, b.logId, "Buffered %d records", n)
+	}
+
+	return err
 }
 
 func (b *bolt3) run(cypher string, params map[string]interface{}, tx *internalTx3) (*stream, error) {
@@ -586,16 +597,16 @@ func (b *bolt3) Buffer(streamHandle db.StreamHandle) error {
 	// If the stream isn't current, it should either already be complete
 	// or have an error.
 	if stream != b.currStream {
-		return stream.err
+		return stream.Err()
 	}
 
 	// It is the current stream, it should not be complete but...
 	if stream.err != nil || stream.sum != nil {
-		return stream.err
+		return stream.Err()
 	}
 
 	b.bufferStream()
-	return stream.err
+	return stream.Err()
 }
 
 // Reads one record from the network.
@@ -689,13 +700,8 @@ func (b *bolt3) Reset() {
 		return
 	}
 
-	if b.state == bolt3_streaming {
-		// Buffer for auto-commit streams
-		b.bufferStream()
-	} else if b.state == bolt3_streamingtx {
-		// Streams bound to a tx is not allowed to use outside of tx
-		b.discardStream()
-	}
+	// Discard any pending stream
+	b.discardStream()
 
 	if b.state == bolt3_ready || b.state == bolt3_dead {
 		// No need for reset
@@ -768,7 +774,7 @@ func (b *bolt3) GetRoutingTable(database string, context map[string]string) (*db
 
 // Beware, could be called on another thread when driver is closed.
 func (b *bolt3) Close() {
-	b.log.Infof(log.Bolt3, b.logId, "Disconnected")
+	b.log.Infof(log.Bolt3, b.logId, "Close")
 	if b.state != bolt3_dead {
 		b.sendMsg(msgGoodbye)
 	}

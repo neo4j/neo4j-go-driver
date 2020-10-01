@@ -183,11 +183,17 @@ func (b *bolt4) receiveSuccess() *successResponse {
 			b.log.Error(log.Bolt4, b.logId, v)
 		}
 		return nil
+	default:
+		// Receive failed, state has been set
+		if b.err != nil {
+			return nil
+		}
+		// Unexpected message received
+		b.state = bolt4_dead
+		b.err = errors.New("Expected success or database error")
+		b.log.Error(log.Bolt4, b.logId, b.err)
+		return nil
 	}
-	b.state = bolt4_dead
-	b.err = errors.New("Expected success or database error")
-	b.log.Error(log.Bolt4, b.logId, b.err)
-	return nil
 }
 
 func (b *bolt4) connect(auth map[string]interface{}, userAgent string) error {
@@ -278,7 +284,7 @@ func (b *bolt4) TxBegin(
 func (b *bolt4) assertTxHandle(h1, h2 db.TxHandle) error {
 	if h1 != h2 {
 		err := errors.New("Invalid transaction handle")
-		b.log.Error(log.Bolt3, b.logId, err)
+		b.log.Error(log.Bolt4, b.logId, err)
 		return err
 	}
 	return nil
@@ -604,16 +610,16 @@ func (b *bolt4) Buffer(streamHandle db.StreamHandle) error {
 	// If the stream isn't current, it should either already be complete
 	// or have an error.
 	if stream != b.currStream {
-		return stream.err
+		return stream.Err()
 	}
 
 	// It is the current stream, it should not be complete but...
 	if stream.err != nil || stream.sum != nil {
-		return stream.err
+		return stream.Err()
 	}
 
 	b.bufferStream()
-	return stream.err
+	return stream.Err()
 }
 
 // Reads one record from the network.
@@ -708,16 +714,9 @@ func (b *bolt4) Reset() {
 		return
 	}
 
-	if b.state == bolt4_streaming {
-		// Buffer for auto-commit streams
-		b.bufferStream()
-	} else if b.state == bolt4_streamingtx {
-		// Streams bound to a tx is not allowed to use outside of tx
-		b.discardStream()
-	}
-
-	// Will consume ongoing stream if any
+	// Discard any pending stream
 	b.discardStream()
+
 	if b.state == bolt4_ready || b.state == bolt4_dead {
 		// No need for reset
 		return
@@ -794,12 +793,12 @@ func (b *bolt4) GetRoutingTable(database string, context map[string]string) (*db
 
 // Beware, could be called on another thread when driver is closed.
 func (b *bolt4) Close() {
+	b.log.Infof(log.Bolt4, b.logId, "Close")
 	if b.state != bolt4_dead {
 		b.sendMsg(msgGoodbye)
 	}
 	b.conn.Close()
 	b.state = bolt4_dead
-	b.log.Infof(log.Bolt4, b.logId, "Disconnected")
 }
 
 func (b *bolt4) SelectDatabase(database string) {

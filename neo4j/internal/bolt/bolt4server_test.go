@@ -199,7 +199,7 @@ func (s *bolt4server) serveRun(stream []packstream.Struct) {
 	}
 }
 
-func (s *bolt4server) serveRunTx(stream []packstream.Struct, commit bool) {
+func (s *bolt4server) serveRunTx(stream []packstream.Struct, commit bool, bookmark string) {
 	s.waitForTxBegin()
 	s.send(msgSuccess, map[string]interface{}{})
 	s.waitForRun()
@@ -210,7 +210,7 @@ func (s *bolt4server) serveRunTx(stream []packstream.Struct, commit bool) {
 	if commit {
 		s.waitForTxCommit()
 		s.send(msgSuccess, map[string]interface{}{
-			"bookmark": "abookmark",
+			"bookmark": bookmark,
 		})
 	} else {
 		s.waitForTxRollback()

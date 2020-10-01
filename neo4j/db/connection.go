@@ -52,10 +52,14 @@ type Connection interface {
 	// Discards all records on the stream and returns the summary otherwise it will return the error.
 	Consume(streamHandle StreamHandle) (*Summary, error)
 	// Buffers all records on the stream, records, summary and error will be received through call to Next
+	// The Connection implementation should preserve/buffer streams automatically if needed when new
+	// streams are created and the server doesn't support multiple streams. Use Buffer to force
+	// buffering before calling Reset to get all records and the bookmark.
 	Buffer(streamHandle StreamHandle) error
 	// Returns bookmark from last committed transaction or last finished auto-commit transaction.
 	// Note that if there is an ongoing auto-commit transaction (stream active) the bookmark
-	// from that is not included. Empty string if no bookmark.
+	// from that is not included, use Buffer or Consume to end the stream with a bookmark.
+	// Empty string if no bookmark.
 	Bookmark() string
 	// Returns name of the remote server
 	ServerName() string
@@ -68,6 +72,7 @@ type Connection interface {
 	// Returns the point in time when this connection was established.
 	Birthdate() time.Time
 	// Resets connection to same state as directly after a connect.
+	// Active streams will be discarded and the bookmark will be lost.
 	Reset()
 	// Closes the database connection as well as any underlying connection.
 	// The instance should not be used after being closed.
