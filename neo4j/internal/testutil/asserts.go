@@ -117,6 +117,16 @@ func AssertLen(t *testing.T, x interface{}, el int) {
 	}
 }
 
+func AssertSliceEqual(t *testing.T, x, y interface{}) {
+	t.Helper()
+	lenx := reflect.ValueOf(x).Len()
+	leny := reflect.ValueOf(y).Len()
+	if lenx != leny {
+		t.Errorf("Lengths of slices differ %d vs %d", lenx, leny)
+		return
+	}
+}
+
 func AssertEmptyString(t *testing.T, s string) {
 	t.Helper()
 	if s != "" {
@@ -135,5 +145,8 @@ func AssertIntEqual(t *testing.T, ai, ei int) {
 	t.Helper()
 	if ai != ei {
 		t.Errorf("%d != %d", ai, ei)
+	}
+	if !reflect.DeepEqual(ai, ei) {
+		t.Errorf("Differs %+v vs %+v", ai, ei)
 	}
 }
