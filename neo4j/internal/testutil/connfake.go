@@ -30,6 +30,14 @@ type Next struct {
 	Err     error
 }
 
+type RecordedTx struct {
+	Origin    string
+	Mode      db.AccessMode
+	Bookmarks []string
+	Timeout   time.Duration
+	Meta      map[string]interface{}
+}
+
 type ConnFake struct {
 	Name          string
 	Version       string
@@ -44,8 +52,15 @@ type ConnFake struct {
 	Nexts         []Next
 	Bookm         string
 	TxCommitErr   error
+	TxCommitHook  func()
 	TxRollbackErr error
 	ResetHook     func()
+	ConsumeSum    *db.Summary
+	ConsumeErr    error
+	ConsumeHook   func()
+	RecordedTxs   []RecordedTx // Appended to by Run/TxBegin
+	BufferErr     error
+	BufferHook    func()
 }
 
 func (c *ConnFake) ServerName() string {
@@ -75,11 +90,17 @@ func (c *ConnFake) ServerVersion() string {
 }
 
 func (c *ConnFake) Buffer(streamHandle db.StreamHandle) error {
-	return nil
+	if c.BufferHook != nil {
+		c.BufferHook()
+	}
+	return c.BufferErr
 }
 
 func (c *ConnFake) Consume(streamHandle db.StreamHandle) (*db.Summary, error) {
-	return nil, nil
+	if c.ConsumeHook != nil {
+		c.ConsumeHook()
+	}
+	return c.ConsumeSum, c.ConsumeErr
 }
 
 func (c *ConnFake) GetRoutingTable(database string, context map[string]string) (*db.RoutingTable, error) {
@@ -87,6 +108,7 @@ func (c *ConnFake) GetRoutingTable(database string, context map[string]string) (
 }
 
 func (c *ConnFake) TxBegin(mode db.AccessMode, bookmarks []string, timeout time.Duration, meta map[string]interface{}) (db.TxHandle, error) {
+	c.RecordedTxs = append(c.RecordedTxs, RecordedTx{Origin: "TxBegin", Mode: mode, Bookmarks: bookmarks, Timeout: timeout, Meta: meta})
 	return c.TxBeginHandle, c.Err
 }
 
@@ -95,10 +117,15 @@ func (c *ConnFake) TxRollback(tx db.TxHandle) error {
 }
 
 func (c *ConnFake) TxCommit(tx db.TxHandle) error {
+	if c.TxCommitHook != nil {
+		c.TxCommitHook()
+	}
 	return c.TxCommitErr
 }
 
 func (c *ConnFake) Run(cypher string, params map[string]interface{}, mode db.AccessMode, bookmarks []string, timeout time.Duration, meta map[string]interface{}) (db.StreamHandle, error) {
+
+	c.RecordedTxs = append(c.RecordedTxs, RecordedTx{Origin: "Run", Mode: mode, Bookmarks: bookmarks, Timeout: timeout, Meta: meta})
 	return c.RunStream, c.Err
 }
 

@@ -24,6 +24,7 @@ import (
 
 	"github.com/neo4j/neo4j-go-driver/v4/neo4j/db"
 	"github.com/neo4j/neo4j-go-driver/v4/neo4j/internal/packstream"
+	. "github.com/neo4j/neo4j-go-driver/v4/neo4j/internal/testutil"
 )
 
 // bolt3.connect is tested through Connect, no need to test it here
@@ -110,11 +111,11 @@ func TestBolt3(ot *testing.T) {
 		// Retrieve the records
 		for i := 1; i < len(recsStrm)-1; i++ {
 			rec, sum, err := bolt.Next(str)
-			assertOnlyRecord(t, rec, sum, err)
+			AssertNextOnlyRecord(t, rec, sum, err)
 		}
 		// Retrieve the summary
 		rec, sum, err := bolt.Next(str)
-		assertOnlySummary(t, rec, sum, err)
+		AssertNextOnlySummary(t, rec, sum, err)
 		assertBoltState(t, bolt3_ready, bolt)
 	})
 
@@ -127,22 +128,22 @@ func TestBolt3(ot *testing.T) {
 		defer bolt.Close()
 
 		tx, err := bolt.TxBegin(db.ReadMode, nil, 0, nil)
-		assertNoError(t, err)
+		AssertNoError(t, err)
 		assertBoltState(t, bolt3_pendingtx, bolt)
 		str, err := bolt.RunTx(tx, "MATCH (n) RETURN n", nil)
 		assertBoltState(t, bolt3_streamingtx, bolt)
-		assertNoError(t, err)
+		AssertNoError(t, err)
 		skeys, _ := bolt.Keys(str)
 		assertKeys(t, keys, skeys)
 
 		// Retrieve the records
 		for i := 1; i < len(recsStrm)-1; i++ {
 			rec, sum, err := bolt.Next(str)
-			assertOnlyRecord(t, rec, sum, err)
+			AssertNextOnlyRecord(t, rec, sum, err)
 		}
 		// Retrieve the summary
 		rec, sum, err := bolt.Next(str)
-		assertOnlySummary(t, rec, sum, err)
+		AssertNextOnlySummary(t, rec, sum, err)
 		assertBoltState(t, bolt3_tx, bolt)
 
 		bolt.TxCommit(tx)
@@ -158,10 +159,10 @@ func TestBolt3(ot *testing.T) {
 		defer bolt.Close()
 
 		tx, err := bolt.TxBegin(db.ReadMode, nil, 0, nil)
-		assertNoError(t, err)
+		AssertNoError(t, err)
 		assertBoltState(t, bolt3_pendingtx, bolt)
 		str, err := bolt.RunTx(tx, "MATCH (n) RETURN n", nil)
-		assertNoError(t, err)
+		AssertNoError(t, err)
 		assertBoltState(t, bolt3_streamingtx, bolt)
 		skeys, _ := bolt.Keys(str)
 		assertKeys(t, keys, skeys)
@@ -169,11 +170,11 @@ func TestBolt3(ot *testing.T) {
 		// Retrieve the records
 		for i := 1; i < len(recsStrm)-1; i++ {
 			rec, sum, err := bolt.Next(str)
-			assertOnlyRecord(t, rec, sum, err)
+			AssertNextOnlyRecord(t, rec, sum, err)
 		}
 		// Retrieve the summary
 		rec, sum, err := bolt.Next(str)
-		assertOnlySummary(t, rec, sum, err)
+		AssertNextOnlySummary(t, rec, sum, err)
 		assertBoltState(t, bolt3_tx, bolt)
 
 		bolt.TxRollback(tx)
@@ -198,16 +199,16 @@ func TestBolt3(ot *testing.T) {
 		defer bolt.Close()
 
 		str, err := bolt.Run("MATCH (n) RETURN n", nil, db.ReadMode, nil, 0, nil)
-		assertNoError(t, err)
+		AssertNoError(t, err)
 		assertBoltState(t, bolt3_streaming, bolt)
 
 		// Retrieve the first record
 		rec, sum, err := bolt.Next(str)
-		assertOnlyRecord(t, rec, sum, err)
+		AssertNextOnlyRecord(t, rec, sum, err)
 
 		// Next one should fail due to connection closed
 		rec, sum, err = bolt.Next(str)
-		assertOnlyError(t, rec, sum, err)
+		AssertNextOnlyError(t, rec, sum, err)
 		assertBoltDead(t, bolt)
 	})
 
@@ -227,7 +228,7 @@ func TestBolt3(ot *testing.T) {
 
 		// Fake syntax error that doesn't really matter...
 		_, err := bolt.Run("MATCH (n RETURN n", nil, db.ReadMode, nil, 0, nil)
-		assertNeo4jError(t, err)
+		AssertNeo4jError(t, err)
 		assertBoltState(t, bolt3_failed, bolt)
 
 		bolt.Reset()
@@ -246,11 +247,11 @@ func TestBolt3(ot *testing.T) {
 		defer bolt.Close()
 
 		tx, err := bolt.TxBegin(db.ReadMode, nil, 0, nil)
-		assertNoError(t, err)
+		AssertNoError(t, err)
 		_, err = bolt.RunTx(tx, "MATCH (n) RETURN n", nil)
-		assertNeo4jError(t, err)
+		AssertNeo4jError(t, err)
 		err = bolt.TxCommit(tx)  // This will fail due to above failed
-		assertNeo4jError(t, err) // Should have same error as from run since that is original cause
+		AssertNeo4jError(t, err) // Should have same error as from run since that is original cause
 	})
 
 	ot.Run("Reset while streaming ", func(t *testing.T) {
@@ -263,7 +264,7 @@ func TestBolt3(ot *testing.T) {
 		defer bolt.Close()
 
 		_, err := bolt.Run("MATCH (n) RETURN n", nil, db.ReadMode, nil, 0, nil)
-		assertNoError(t, err)
+		AssertNoError(t, err)
 		assertBoltState(t, bolt3_streaming, bolt)
 
 		bolt.Reset()

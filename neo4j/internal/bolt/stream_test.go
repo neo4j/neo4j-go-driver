@@ -23,6 +23,7 @@ import (
 	"testing"
 
 	"github.com/neo4j/neo4j-go-driver/v4/neo4j/db"
+	. "github.com/neo4j/neo4j-go-driver/v4/neo4j/internal/testutil"
 )
 
 func TestStream(ot *testing.T) {
@@ -52,7 +53,7 @@ func TestStream(ot *testing.T) {
 		s.push(&db.Record{Values: []interface{}{1}})
 		buffed, rec, sum, err = s.bufferedNext()
 		assertBuffered(t, buffed, rec, sum, err)
-		assertOnlyRecord(t, rec, sum, err)
+		AssertNextOnlyRecord(t, rec, sum, err)
 
 		// Empty stream, not buffered
 		buffed, rec, sum, err = s.bufferedNext()
@@ -64,15 +65,15 @@ func TestStream(ot *testing.T) {
 		// Get the record
 		buffed, rec, sum, err = s.bufferedNext()
 		assertBuffered(t, buffed, rec, sum, err)
-		assertOnlyRecord(t, rec, sum, err)
+		AssertNextOnlyRecord(t, rec, sum, err)
 		// Get the summary
 		buffed, rec, sum, err = s.bufferedNext()
 		assertBuffered(t, buffed, rec, sum, err)
-		assertOnlySummary(t, rec, sum, err)
+		AssertNextOnlySummary(t, rec, sum, err)
 		// Get the summary again
 		buffed, rec, sum, err = s.bufferedNext()
 		assertBuffered(t, buffed, rec, sum, err)
-		assertOnlySummary(t, rec, sum, err)
+		AssertNextOnlySummary(t, rec, sum, err)
 
 		// Start of with a new stream that fails
 		s = &stream{}
@@ -82,10 +83,10 @@ func TestStream(ot *testing.T) {
 		// Get the record
 		buffed, rec, sum, err = s.bufferedNext()
 		assertBuffered(t, buffed, rec, sum, err)
-		assertOnlyRecord(t, rec, sum, err)
+		AssertNextOnlyRecord(t, rec, sum, err)
 		// Get the error
 		buffed, rec, sum, err = s.bufferedNext()
 		assertBuffered(t, buffed, rec, sum, err)
-		assertOnlyError(t, rec, sum, err)
+		AssertNextOnlyError(t, rec, sum, err)
 	})
 }

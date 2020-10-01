@@ -21,9 +21,27 @@ package testutil
 type RouterFake struct {
 	Invalidated   bool
 	InvalidatedDb string
+	ReadersRet    []string
+	WritersRet    []string
+	Err           error
+	CleanUpHook   func()
 }
 
 func (r *RouterFake) Invalidate(database string) {
 	r.InvalidatedDb = database
 	r.Invalidated = true
+}
+
+func (r *RouterFake) Readers(database string) ([]string, error) {
+	return r.ReadersRet, r.Err
+}
+
+func (r *RouterFake) Writers(database string) ([]string, error) {
+	return r.WritersRet, r.Err
+}
+
+func (r *RouterFake) CleanUp() {
+	if r.CleanUpHook != nil {
+		r.CleanUpHook()
+	}
 }

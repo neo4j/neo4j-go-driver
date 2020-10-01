@@ -23,10 +23,11 @@ import (
 	"testing"
 
 	"github.com/neo4j/neo4j-go-driver/v4/neo4j/db"
-	"github.com/neo4j/neo4j-go-driver/v4/neo4j/internal/testutil"
+	. "github.com/neo4j/neo4j-go-driver/v4/neo4j/internal/testutil"
+	"github.com/neo4j/neo4j-go-driver/v4/neo4j/log"
 )
 
-var logger = &testutil.ConsoleLogger{Errors: true, Infos: true, Warns: true}
+var logger = &log.Console{Errors: true, Infos: true, Warns: true}
 
 func TestConnect(ot *testing.T) {
 	// TODO: Test connect timeout
@@ -65,7 +66,7 @@ func TestConnect(ot *testing.T) {
 		// Pass the connection to bolt connect
 		serverName := "theServerName"
 		boltconn, err := Connect(serverName, conn, auth, "007", logger)
-		assertNoError(t, err)
+		AssertNoError(t, err)
 
 		// Check some properties on the connection that is related to connecting
 		if boltconn.ServerName() != serverName {
@@ -113,7 +114,7 @@ func TestConnect(ot *testing.T) {
 		}()
 
 		_, err := Connect("servername", conn, auth, "007", logger)
-		assertError(t, err)
+		AssertError(t, err)
 	})
 
 	ot.Run("Server answers with invalid version", func(t *testing.T) {
@@ -127,7 +128,7 @@ func TestConnect(ot *testing.T) {
 		}()
 
 		boltconn, err := Connect("servername", conn, auth, "007", logger)
-		assertError(t, err)
+		AssertError(t, err)
 		if boltconn != nil {
 			t.Error("Shouldn't returned conn")
 		}

@@ -16,24 +16,33 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-
-package neo4j
+package testutil
 
 import (
-	"reflect"
-	"testing"
+	"context"
+
+	"github.com/neo4j/neo4j-go-driver/v4/neo4j/db"
 )
 
-func assertErrorEq(t *testing.T, err1, err2 error) {
-	t.Helper()
-	if !reflect.DeepEqual(err1, err2) {
-		t.Errorf("Wrong type of error, '%s' != '%s'", err1, err2)
+type PoolFake struct {
+	BorrowConn  db.Connection
+	BorrowErr   error
+	ReturnHook  func()
+	CleanUpHook func()
+}
+
+func (p *PoolFake) Borrow(ctx context.Context, serverNames []string, wait bool) (db.Connection, error) {
+	return p.BorrowConn, p.BorrowErr
+}
+
+func (p *PoolFake) Return(c db.Connection) {
+	if p.ReturnHook != nil {
+		p.ReturnHook()
 	}
 }
 
-func assertUsageError(t *testing.T, err error) {
-	t.Helper()
-	if !IsUsageError(err) {
-		t.Errorf("Expected %T but was %T:%s", &UsageError{}, err, err)
+func (p *PoolFake) CleanUp() {
+	if p.CleanUpHook != nil {
+		p.CleanUpHook()
 	}
 }

@@ -23,6 +23,8 @@ import (
 	"bytes"
 	"io"
 	"testing"
+
+	. "github.com/neo4j/neo4j-go-driver/v4/neo4j/internal/testutil"
 )
 
 func TestChunker(ot *testing.T) {
@@ -80,7 +82,7 @@ func TestChunker(ot *testing.T) {
 	receiveAndAssertMessage := func(t *testing.T, rd io.Reader, expected []byte) {
 		t.Helper()
 		msg, err := dechunkMessage(rd, []byte{})
-		assertNoError(t, err)
+		AssertNoError(t, err)
 		assertSlices(t, msg, expected)
 	}
 
@@ -91,7 +93,7 @@ func TestChunker(ot *testing.T) {
 		chunked := []byte{}
 		chunked = writeSmall(chunker, chunked)
 		err := chunker.send(cbuf)
-		assertNoError(t, err)
+		AssertNoError(t, err)
 		assertBuf(t, cbuf, chunked)
 
 		// Dechunk
@@ -107,7 +109,7 @@ func TestChunker(ot *testing.T) {
 		chunked = writeSmall(chunker, chunked)
 		chunked = writeSmall(chunker, chunked)
 		err := chunker.send(cbuf)
-		assertNoError(t, err)
+		AssertNoError(t, err)
 		assertBuf(t, cbuf, chunked)
 
 		// Dechunk
@@ -123,7 +125,7 @@ func TestChunker(ot *testing.T) {
 		chunked := []byte{}
 		chunked = writeLarge(chunker, chunked)
 		err := chunker.send(cbuf)
-		assertNoError(t, err)
+		AssertNoError(t, err)
 		assertBuf(t, cbuf, chunked)
 
 		// Dechunk
@@ -139,7 +141,7 @@ func TestChunker(ot *testing.T) {
 		chunked = writeSmall(chunker, chunked)
 		chunked = writeLarge(chunker, chunked)
 		err := chunker.send(cbuf)
-		assertNoError(t, err)
+		AssertNoError(t, err)
 		assertBuf(t, cbuf, chunked)
 
 		// Dechunk

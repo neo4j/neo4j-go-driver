@@ -28,6 +28,7 @@ import (
 	"github.com/neo4j/neo4j-go-driver/v4/neo4j/db"
 	"github.com/neo4j/neo4j-go-driver/v4/neo4j/dbtype"
 	"github.com/neo4j/neo4j-go-driver/v4/neo4j/internal/packstream"
+	. "github.com/neo4j/neo4j-go-driver/v4/neo4j/internal/testutil"
 )
 
 func TestHydrator(ot *testing.T) {
@@ -170,7 +171,7 @@ func TestDehydrator(ot *testing.T) {
 	for _, c := range cases {
 		ot.Run(c.name, func(t *testing.T) {
 			s, err := dehydrate(c.x)
-			assertNoError(t, err)
+			AssertNoError(t, err)
 			// Compare Structs
 			if s.Tag != c.s.Tag {
 				t.Errorf("Wrong tags, expected %d but was %d", c.s.Tag, s.Tag)
@@ -195,10 +196,10 @@ func TestDehydrateHydrate(ot *testing.T) {
 		packer := packstream.Packer{}
 		var err error
 		buf, err = packer.Pack(buf, dehydrate, xi)
-		assertNoError(t, err)
+		AssertNoError(t, err)
 		unpacker := &packstream.Unpacker{}
 		xo, err := unpacker.UnpackStruct(buf, hydrate)
-		assertNoError(t, err)
+		AssertNoError(t, err)
 		return xo
 	}
 
