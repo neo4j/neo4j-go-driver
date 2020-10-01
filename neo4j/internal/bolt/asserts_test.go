@@ -23,48 +23,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/neo4j/neo4j-go-driver/v4/neo4j/db"
 	"github.com/neo4j/neo4j-go-driver/v4/neo4j/dbtype"
 )
-
-func assertOnlyRecord(t *testing.T, rec *db.Record, sum *db.Summary, err error) {
-	t.Helper()
-	if rec == nil {
-		t.Errorf("Expected record")
-	}
-	if sum != nil {
-		t.Errorf("Didn't expect summary")
-	}
-	if err != nil {
-		t.Errorf("Didn't expect error: %s", err)
-	}
-}
-
-func assertOnlySummary(t *testing.T, rec *db.Record, sum *db.Summary, err error) {
-	t.Helper()
-	if rec != nil {
-		t.Errorf("Didn't expect record")
-	}
-	if sum == nil {
-		t.Errorf("Expected summary")
-	}
-	if err != nil {
-		t.Errorf("Didn't expect error")
-	}
-}
-
-func assertOnlyError(t *testing.T, rec *db.Record, sum *db.Summary, err error) {
-	t.Helper()
-	if rec != nil {
-		t.Errorf("Didn't expect record")
-	}
-	if sum != nil {
-		t.Errorf("Didn't expect summary")
-	}
-	if err == nil {
-		t.Errorf("Expected error")
-	}
-}
 
 func assertKeys(t *testing.T, ekeys []interface{}, keys []string) {
 	t.Helper()
@@ -75,29 +35,6 @@ func assertKeys(t *testing.T, ekeys []interface{}, keys []string) {
 		if k != ekeys[i] {
 			t.Errorf("Stream keys differ")
 		}
-	}
-}
-
-func assertNoError(t *testing.T, err error) {
-	t.Helper()
-	if err != nil {
-		t.Fatal(err)
-	}
-}
-
-func assertError(t *testing.T, err error) {
-	t.Helper()
-	if err == nil {
-		t.Fatal("Should be err but wasn't")
-	}
-}
-
-func assertNeo4jError(t *testing.T, err error) {
-	t.Helper()
-	assertError(t, err)
-	_, isDbErr := err.(*db.Neo4jError)
-	if !isDbErr {
-		t.Errorf("Expected database error but was %T: %s", err, err)
 	}
 }
 

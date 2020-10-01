@@ -29,9 +29,10 @@ import (
 
 	"github.com/neo4j/neo4j-go-driver/v4/neo4j/db"
 	"github.com/neo4j/neo4j-go-driver/v4/neo4j/internal/testutil"
+	"github.com/neo4j/neo4j-go-driver/v4/neo4j/log"
 )
 
-var logger = &testutil.ConsoleLogger{Errors: true, Infos: true, Warns: true}
+var logger = &log.Console{Errors: true, Infos: true, Warns: true}
 
 // Scenarios for Borrow and Return
 func TestPoolBorrowReturn(ot *testing.T) {

@@ -46,13 +46,13 @@ type Result interface {
 }
 
 type result struct {
-	err          error
 	conn         db.Connection
 	streamHandle db.StreamHandle
 	cypher       string
 	params       map[string]interface{}
 	record       *Record
 	summary      *db.Summary
+	err          error
 }
 
 func newResult(conn db.Connection, str db.StreamHandle, cypher string, params map[string]interface{}) *result {
@@ -108,28 +108,60 @@ func (r *result) buffer() {
 }
 
 func (r *result) Single() (*Record, error) {
-	var rec *Record
-	if !r.NextRecord(&rec) {
-		if r.err != nil {
-			return nil, wrapBoltError(r.err)
-		}
-		return nil, &UsageError{Message: "Result contains no records"}
+	// Try retrieving the single record
+	r.record, r.summary, r.err = r.conn.Next(r.streamHandle)
+	if r.err != nil {
+		return nil, wrapBoltError(r.err)
 	}
-	if r.Next() {
-		return nil, &UsageError{Message: "Result contains more than one record"}
+	if r.summary != nil {
+		r.err = &UsageError{Message: "Result contains no more records"}
+		return nil, r.err
 	}
-	return rec, nil
+
+	// This is the potential single record
+	single := r.record
+
+	// Probe connection for more records
+	r.record, r.summary, r.err = r.conn.Next(r.streamHandle)
+	if r.record != nil {
+		// There were more records, consume the stream since the user didn't
+		// expect more records and should therefore not use them.
+		r.summary, _ = r.conn.Consume(r.streamHandle)
+		r.err = &UsageError{Message: "Result contains more than one record"}
+		r.record = nil
+		return nil, r.err
+	}
+	if r.err != nil {
+		// Might be more records or not, anyway something is bad.
+		// Both r.record and r.summary are nil at this point which is good.
+		return nil, wrapBoltError(r.err)
+	}
+	// We got the expected summary
+	// r.record contains the single record and r.summary the summary.
+	r.record = single
+	return single, nil
+}
+
+func (r *result) toResultSummary() ResultSummary {
+	return &resultSummary{
+		sum:    r.summary,
+		cypher: r.cypher,
+		params: r.params,
+	}
 }
 
 func (r *result) Consume() (ResultSummary, error) {
+	// Already failed, reuse the internal error, might have been
+	// set by Single to indicate some kind of usage error that "destroyed"
+	// the result.
+	if r.err != nil {
+		return nil, wrapBoltError(r.err)
+	}
+
 	r.record = nil
 	r.summary, r.err = r.conn.Consume(r.streamHandle)
 	if r.err != nil {
 		return nil, wrapBoltError(r.err)
 	}
-	return &resultSummary{
-		sum:    r.summary,
-		cypher: r.cypher,
-		params: r.params,
-	}, nil
+	return r.toResultSummary(), nil
 }

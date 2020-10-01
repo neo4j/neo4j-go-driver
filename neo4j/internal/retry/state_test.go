@@ -26,6 +26,7 @@ import (
 
 	"github.com/neo4j/neo4j-go-driver/v4/neo4j/db"
 	"github.com/neo4j/neo4j-go-driver/v4/neo4j/internal/testutil"
+	"github.com/neo4j/neo4j-go-driver/v4/neo4j/log"
 )
 
 type TStateInvocation struct {
@@ -98,7 +99,7 @@ func TestState(tt *testing.T) {
 			now := baseTime
 			state := State{
 				Now:                     func() time.Time { return now },
-				Log:                     &testutil.ConsoleLogger{Errors: true, Debugs: true},
+				Log:                     &log.Console{Errors: true, Debugs: true},
 				LogName:                 "TEST",
 				LogId:                   "State",
 				Sleep:                   func(time.Duration) {},
