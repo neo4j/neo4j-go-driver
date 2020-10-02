@@ -105,8 +105,6 @@ func (tx *retryableTransaction) Close() error {
 
 // Represents an auto commit transaction.
 // Does not implement the Transaction interface.
-// Implements Result interface to hook into when all records has been fetched and
-// invoke onClosed when that happens.
 type autoTransaction struct {
 	conn     db.Connection
 	res      *result
@@ -120,49 +118,4 @@ func (tx *autoTransaction) done() {
 		tx.closed = true
 		tx.onClosed()
 	}
-}
-
-func (tx *autoTransaction) onAllReceivedEdge() {
-	if !tx.closed && (tx.res.err != nil || tx.res.summary != nil) {
-		tx.closed = true
-		tx.onClosed()
-	}
-}
-
-func (tx *autoTransaction) Keys() ([]string, error) {
-	return tx.res.Keys()
-}
-
-func (tx *autoTransaction) Next() bool {
-	x := tx.res.Next()
-	tx.onAllReceivedEdge()
-	return x
-}
-
-func (tx *autoTransaction) NextRecord(record **Record) bool {
-	x := tx.res.NextRecord(record)
-	tx.onAllReceivedEdge()
-	return x
-}
-
-func (tx *autoTransaction) Err() error {
-	return tx.res.Err()
-}
-
-func (tx *autoTransaction) Record() *Record {
-	return tx.res.Record()
-}
-
-func (tx *autoTransaction) Collect() ([]*Record, error) {
-	return tx.res.Collect()
-}
-
-func (tx *autoTransaction) Single() (*Record, error) {
-	return tx.res.Single()
-}
-
-func (tx *autoTransaction) Consume() (ResultSummary, error) {
-	x, err := tx.res.Consume()
-	tx.onAllReceivedEdge()
-	return x, err
 }
