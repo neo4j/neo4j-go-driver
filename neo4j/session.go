@@ -146,6 +146,11 @@ func newSession(config *Config, router sessionRouter, pool sessionPool,
 }
 
 func (s *session) LastBookmark() string {
+	// Pick up bookmark from pending auto-commit if there is a bookmark on it
+	if s.txAuto != nil {
+		s.retrieveBookmarks(s.txAuto.conn)
+	}
+
 	// Report bookmark from previously closed connection or from initial set
 	if len(s.bookmarks) > 0 {
 		return s.bookmarks[len(s.bookmarks)-1]
@@ -386,7 +391,7 @@ func (s *session) Run(
 		},
 	}
 
-	return s.txAuto, nil
+	return s.txAuto.res, nil
 }
 
 func (s *session) Close() error {
