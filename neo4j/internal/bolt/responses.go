@@ -41,6 +41,7 @@ type successResponse struct {
 type runSuccess struct {
 	fields  []string
 	t_first int64
+	qid     int64
 }
 
 func (s *successResponse) run() *runSuccess {
@@ -48,7 +49,6 @@ func (s *successResponse) run() *runSuccess {
 	if !fok {
 		return nil
 	}
-	t_first, _ := s.meta["t_first"].(int64)
 	fields := make([]string, len(fieldsx))
 	for i, x := range fieldsx {
 		s, ok := x.(string)
@@ -57,7 +57,12 @@ func (s *successResponse) run() *runSuccess {
 		}
 		fields[i] = s
 	}
-	return &runSuccess{fields: fields, t_first: t_first}
+	t_first, _ := s.meta["t_first"].(int64)
+	qid, hasqid := s.meta["qid"].(int64)
+	if !hasqid {
+		qid = -1
+	}
+	return &runSuccess{fields: fields, t_first: t_first, qid: qid}
 }
 
 type commitSuccess struct {
@@ -86,6 +91,11 @@ func (s *successResponse) hello() *helloSuccess {
 	}
 	exp, _ := s.meta["credentials_expired"].(bool)
 	return &helloSuccess{connectionId: id, server: server, credentialsExpired: exp}
+}
+
+func (s *successResponse) hasMore() bool {
+	more, _ := s.meta["has_more"].(bool)
+	return more
 }
 
 // Extracted from SuccessResponse.meta on end of stream.

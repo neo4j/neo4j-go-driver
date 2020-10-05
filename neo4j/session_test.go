@@ -45,7 +45,7 @@ func TestSession(st *testing.T) {
 		conf := Config{MaxTransactionRetryTime: 3 * time.Millisecond}
 		router := RouterFake{}
 		pool := PoolFake{}
-		sess := newSession(&conf, &router, &pool, db.ReadMode, []string{}, "", &logger)
+		sess := newSession(&conf, &router, &pool, db.ReadMode, []string{}, "", 0, &logger)
 		sess.throttleTime = time.Millisecond * 1
 		return &router, &pool, sess
 	}
@@ -54,7 +54,7 @@ func TestSession(st *testing.T) {
 		conf := Config{MaxTransactionRetryTime: 3 * time.Millisecond}
 		router := RouterFake{}
 		pool := PoolFake{}
-		sess := newSession(&conf, &router, &pool, db.ReadMode, bookmarks, "", &logger)
+		sess := newSession(&conf, &router, &pool, db.ReadMode, bookmarks, "", 0, &logger)
 		sess.throttleTime = time.Millisecond * 1
 		return &router, &pool, sess
 	}

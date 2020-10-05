@@ -129,9 +129,45 @@ func (s *bolt4server) waitForTxRollback() {
 	s.assertStructType(msg, msgRollback)
 }
 
-func (s *bolt4server) waitForPullN() {
+func (s *bolt4server) waitForPullN(n int) {
 	msg := s.receiveMsg()
-	s.assertStructType(msg, msgPullAll)
+	s.assertStructType(msg, msgPullN)
+	extra := msg.Fields[0].(map[string]interface{})
+	sentN := int(extra["n"].(int64))
+	if sentN != n {
+		panic(fmt.Sprintf("Expected PULL n:%d but got PULL %d", n, sentN))
+	}
+	_, hasQid := extra["qid"]
+	if hasQid {
+		panic("Expected PULL without qid")
+	}
+}
+
+func (s *bolt4server) waitForPullNandQid(n, qid int) {
+	msg := s.receiveMsg()
+	s.assertStructType(msg, msgPullN)
+	extra := msg.Fields[0].(map[string]interface{})
+	sentN := int(extra["n"].(int64))
+	if sentN != n {
+		panic(fmt.Sprintf("Expected PULL n:%d but got PULL %d", n, sentN))
+	}
+	sentQid := int(extra["qid"].(int64))
+	if sentQid != qid {
+		panic(fmt.Sprintf("Expected PULL qid:%d but got PULL %d", qid, sentQid))
+	}
+}
+func (s *bolt4server) waitForDiscardN(n, qid int) {
+	msg := s.receiveMsg()
+	s.assertStructType(msg, msgDiscardN)
+	extra := msg.Fields[0].(map[string]interface{})
+	sentN := int(extra["n"].(int64))
+	if sentN != n {
+		panic(fmt.Sprintf("Expected DISCARD n:%d but got DISCARD %d", n, sentN))
+	}
+	sentQid := int(extra["qid"].(int64))
+	if sentQid != qid {
+		panic(fmt.Sprintf("Expected DISCARD qid:%d but got DISCARD %d", qid, sentQid))
+	}
 }
 
 func (s *bolt4server) acceptVersion(ver byte) {
@@ -193,7 +229,7 @@ func (s *bolt4server) accept(ver byte) {
 // Utility to wait and serve a auto commit query
 func (s *bolt4server) serveRun(stream []packstream.Struct) {
 	s.waitForRun()
-	s.waitForPullN()
+	s.waitForPullN(bolt4_fetchsize)
 	for _, x := range stream {
 		s.send(x.Tag, x.Fields...)
 	}
@@ -203,7 +239,7 @@ func (s *bolt4server) serveRunTx(stream []packstream.Struct, commit bool, bookma
 	s.waitForTxBegin()
 	s.send(msgSuccess, map[string]interface{}{})
 	s.waitForRun()
-	s.waitForPullN()
+	s.waitForPullN(bolt4_fetchsize)
 	for _, x := range stream {
 		s.send(x.Tag, x.Fields...)
 	}
