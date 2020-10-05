@@ -33,6 +33,7 @@ func TestBolt4(ot *testing.T) {
 	// Faked returns from a server
 	runKeys := []interface{}{"f1", "f2"}
 	runBookmark := "bm"
+	runQid := 7
 	runResponse := []packstream.Struct{
 		packstream.Struct{
 			Tag: msgSuccess,
@@ -40,6 +41,7 @@ func TestBolt4(ot *testing.T) {
 				map[string]interface{}{
 					"fields":  runKeys,
 					"t_first": int64(1),
+					"qid":     int64(runQid),
 				},
 			},
 		},
@@ -57,7 +59,7 @@ func TestBolt4(ot *testing.T) {
 		},
 		packstream.Struct{
 			Tag:    msgSuccess,
-			Fields: []interface{}{map[string]interface{}{"bookmark": "bm", "type": "r"}},
+			Fields: []interface{}{map[string]interface{}{"bookmark": runBookmark, "type": "r"}},
 		},
 	}
 
@@ -117,6 +119,30 @@ func TestBolt4(ot *testing.T) {
 		str, _ := bolt.Run(db.Command{Cypher: "MATCH (n) RETURN n"}, db.TxConfig{Mode: db.ReadMode})
 		skeys, _ := bolt.Keys(str)
 		assertKeys(t, runKeys, skeys)
+		assertBoltState(t, bolt4_streaming, bolt)
+
+		// Retrieve the records
+		assertRunResponseOk(t, bolt, str)
+		assertBoltState(t, bolt4_ready, bolt)
+	})
+
+	ot.Run("Run auto-commit with fetch size 2 of 3", func(t *testing.T) {
+		bolt, cleanup := connectToServer(t, func(srv *bolt4server) {
+			srv.accept(4)
+			srv.waitForRun()
+			srv.waitForPullN(2)
+			srv.send(runResponse[0].Tag, runResponse[0].Fields...)
+			srv.send(runResponse[1].Tag, runResponse[1].Fields...)
+			srv.send(runResponse[2].Tag, runResponse[2].Fields...)
+			srv.send(msgSuccess, map[string]interface{}{"has_more": true})
+			srv.waitForPullNandQid(2, runQid)
+			srv.send(runResponse[3].Tag, runResponse[3].Fields...)
+			srv.send(runResponse[4].Tag, runResponse[4].Fields...)
+		})
+		defer cleanup()
+		defer bolt.Close()
+
+		str, _ := bolt.Run(db.Command{Cypher: "cypher", FetchSize: 2}, db.TxConfig{Mode: db.ReadMode})
 		assertBoltState(t, bolt4_streaming, bolt)
 
 		// Retrieve the records
@@ -215,7 +241,7 @@ func TestBolt4(ot *testing.T) {
 		bolt, cleanup := connectToServer(t, func(srv *bolt4server) {
 			srv.accept(4)
 			srv.waitForRun()
-			srv.waitForPullN()
+			srv.waitForPullN(bolt4_fetchsize)
 			// Send response to run and first record as response to pull
 			srv.send(msgSuccess, map[string]interface{}{
 				"fields":  runKeys,
@@ -246,7 +272,7 @@ func TestBolt4(ot *testing.T) {
 		bolt, cleanup := connectToServer(t, func(srv *bolt4server) {
 			srv.accept(4)
 			srv.waitForRun()
-			srv.waitForPullN()
+			srv.waitForPullN(bolt4_fetchsize)
 			srv.sendFailureMsg("code", "msg")
 			srv.waitForReset()
 			srv.sendIgnoredMsg()
@@ -270,7 +296,7 @@ func TestBolt4(ot *testing.T) {
 			srv.accept(4)
 			srv.waitForTxBegin()
 			srv.waitForRun()
-			srv.waitForPullN()
+			srv.waitForPullN(bolt4_fetchsize)
 			srv.sendFailureMsg("code", "msg")
 		})
 		defer cleanup()
@@ -332,11 +358,55 @@ func TestBolt4(ot *testing.T) {
 		AssertNextOnlySummary(t, rec, sum, err)
 	})
 
+	ot.Run("Buffer stream with fetch size", func(t *testing.T) {
+		qid := 3
+		keys := []interface{}{"k1"}
+		bookmark := "x"
+		bolt, cleanup := connectToServer(t, func(srv *bolt4server) {
+			srv.accept(4)
+			srv.waitForRun()
+			srv.waitForPullN(3)
+			srv.send(msgSuccess, map[string]interface{}{"fields": keys, "qid": int64(qid)})
+			srv.send(msgRecord, []interface{}{"1"})
+			srv.send(msgRecord, []interface{}{"2"})
+			srv.send(msgRecord, []interface{}{"3"})
+			srv.send(msgSuccess, map[string]interface{}{"has_more": true, "qid": int64(qid)})
+			srv.waitForPullNandQid(-1, qid)
+			srv.send(msgRecord, []interface{}{"4"})
+			srv.send(msgRecord, []interface{}{"5"})
+			srv.send(msgSuccess, map[string]interface{}{"bookmark": bookmark, "type": "r"})
+		})
+		defer cleanup()
+		defer bolt.Close()
+
+		stream, _ := bolt.Run(db.Command{Cypher: "cypher", FetchSize: 3}, db.TxConfig{Mode: db.ReadMode})
+		// Read one to put it in less comfortable state
+		rec, sum, err := bolt.Next(stream)
+		AssertNextOnlyRecord(t, rec, sum, err)
+		// Buffer the rest
+		err = bolt.Buffer(stream)
+		AssertNoError(t, err)
+		// The bookmark should be set
+		AssertStringEqual(t, bolt.Bookmark(), bookmark)
+
+		for i := 0; i < 4; i++ {
+			rec, sum, err = bolt.Next(stream)
+			AssertNextOnlyRecord(t, rec, sum, err)
+		}
+		rec, sum, err = bolt.Next(stream)
+		AssertNextOnlySummary(t, rec, sum, err)
+		// Buffering again should not affect anything
+		err = bolt.Buffer(stream)
+		AssertNoError(t, err)
+		rec, sum, err = bolt.Next(stream)
+		AssertNextOnlySummary(t, rec, sum, err)
+	})
+
 	ot.Run("Buffer stream with error", func(t *testing.T) {
 		bolt, cleanup := connectToServer(t, func(srv *bolt4server) {
 			srv.accept(4)
 			srv.waitForRun()
-			srv.waitForPullN()
+			srv.waitForPullN(bolt4_fetchsize)
 			// Send response to run and first record as response to pull
 			srv.send(msgSuccess, map[string]interface{}{
 				"fields":  runKeys,
@@ -403,11 +473,53 @@ func TestBolt4(ot *testing.T) {
 		AssertNotNil(t, sum)
 	})
 
+	ot.Run("Consume stream with fetch size", func(t *testing.T) {
+		qid := 3
+		keys := []interface{}{"k1"}
+		bookmark := "x"
+		bolt, cleanup := connectToServer(t, func(srv *bolt4server) {
+			srv.accept(4)
+			srv.waitForRun()
+			srv.waitForPullN(3)
+			srv.send(msgSuccess, map[string]interface{}{"fields": keys, "qid": int64(qid)})
+			srv.send(msgRecord, []interface{}{"1"})
+			srv.send(msgRecord, []interface{}{"2"})
+			srv.send(msgRecord, []interface{}{"3"})
+			srv.send(msgSuccess, map[string]interface{}{"has_more": true, "qid": int64(qid)})
+			srv.waitForDiscardN(-1, qid)
+			srv.send(msgSuccess, map[string]interface{}{"bookmark": bookmark, "type": "r"})
+		})
+		defer cleanup()
+		defer bolt.Close()
+
+		stream, _ := bolt.Run(db.Command{Cypher: "cypher", FetchSize: 3}, db.TxConfig{Mode: db.ReadMode})
+		// Read one to put it in less comfortable state
+		rec, sum, err := bolt.Next(stream)
+		AssertNextOnlyRecord(t, rec, sum, err)
+		// Consume the rest
+		sum, err = bolt.Consume(stream)
+		AssertNoError(t, err)
+		AssertNotNil(t, sum)
+
+		// The bookmark should be set
+		AssertStringEqual(t, bolt.Bookmark(), bookmark)
+		AssertStringEqual(t, sum.Bookmark, bookmark)
+
+		// Should only get the summary from the stream since we consumed everything
+		rec, sum, err = bolt.Next(stream)
+		AssertNextOnlySummary(t, rec, sum, err)
+
+		// Consuming again should just return the summary again
+		sum, err = bolt.Consume(stream)
+		AssertNoError(t, err)
+		AssertNotNil(t, sum)
+	})
+
 	ot.Run("Consume stream with error", func(t *testing.T) {
 		bolt, cleanup := connectToServer(t, func(srv *bolt4server) {
 			srv.accept(4)
 			srv.waitForRun()
-			srv.waitForPullN()
+			srv.waitForPullN(bolt4_fetchsize)
 			// Send response to run and first record as response to pull
 			srv.send(msgSuccess, map[string]interface{}{
 				"fields":  runKeys,

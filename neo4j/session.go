@@ -70,12 +70,16 @@ type SessionConfig struct {
 	// From Bolt protocol v4 (Neo4j 4+) records can be fetched in batches as compared to fetching
 	// all in previous versions. If FetchSize is set to 0, the driver decides the appropriate
 	// size. If set to a positive value that size is used if the underlying protocol supports it
-	// otherwise it is ignored. To turn of batching, set FetchSize to FetchAll.
+	// otherwise it is ignored. To turn of fetching in batches and always fetch everything, set
+	//  FetchSize to FetchAll.
 	FetchSize int
 }
 
 // Turns off fetching records in batches.
 const FetchAll = -1
+
+// Lets the driver decide fetch size
+const FetchDefault = 0
 
 // Connection pool as seen by the session.
 type sessionPool interface {
@@ -98,6 +102,7 @@ type session struct {
 	logId        string
 	log          log.Logger
 	throttleTime time.Duration
+	fetchSize    int
 }
 
 // Remove empty string bookmarks to check for "bad" callers
@@ -125,7 +130,7 @@ func cleanupBookmarks(bookmarks []string) []string {
 }
 
 func newSession(config *Config, router sessionRouter, pool sessionPool,
-	mode db.AccessMode, bookmarks []string, databaseName string, logger log.Logger) *session {
+	mode db.AccessMode, bookmarks []string, databaseName string, fetchSize int, logger log.Logger) *session {
 
 	logId := log.NewId()
 	logger.Debugf(log.Session, logId, "Created")
@@ -142,6 +147,7 @@ func newSession(config *Config, router sessionRouter, pool sessionPool,
 		log:          logger,
 		logId:        logId,
 		throttleTime: time.Second * 1,
+		fetchSize:    fetchSize,
 	}
 }
 
@@ -385,12 +391,18 @@ func (s *session) Run(
 		return nil, err
 	}
 
-	stream, err := conn.Run(db.Command{Cypher: cypher, Params: params}, db.TxConfig{
-		Mode:      s.defaultMode,
-		Bookmarks: s.bookmarks,
-		Timeout:   config.Timeout,
-		Meta:      config.Metadata,
-	})
+	stream, err := conn.Run(
+		db.Command{
+			Cypher:    cypher,
+			Params:    params,
+			FetchSize: s.fetchSize,
+		},
+		db.TxConfig{
+			Mode:      s.defaultMode,
+			Bookmarks: s.bookmarks,
+			Timeout:   config.Timeout,
+			Meta:      config.Metadata,
+		})
 	if err != nil {
 		s.pool.Return(conn)
 		return nil, wrapBoltError(err)

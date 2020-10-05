@@ -230,7 +230,7 @@ func (d *driver) Session(accessMode AccessMode, bookmarks ...string) (Session, e
 	}
 	return newSession(
 		d.config, d.router,
-		d.pool, db.AccessMode(accessMode), bookmarks, db.DefaultDatabase, d.log), nil
+		d.pool, db.AccessMode(accessMode), bookmarks, db.DefaultDatabase, 0, d.log), nil
 }
 
 func (d *driver) NewSession(config SessionConfig) (Session, error) {
@@ -248,7 +248,7 @@ func (d *driver) NewSession(config SessionConfig) (Session, error) {
 	}
 	return newSession(
 		d.config, d.router,
-		d.pool, db.AccessMode(config.AccessMode), config.Bookmarks, databaseName, d.log), nil
+		d.pool, db.AccessMode(config.AccessMode), config.Bookmarks, databaseName, config.FetchSize, d.log), nil
 }
 
 func (d *driver) VerifyConnectivity() error {

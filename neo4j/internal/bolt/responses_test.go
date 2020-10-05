@@ -58,8 +58,36 @@ func TestSuccessResponseExtraction(ot *testing.T) {
 				"fields":  []interface{}{"f1", "f2"},
 				"t_first": int64(3),
 			},
-			expected: &runSuccess{fields: []string{"f1", "f2"}, t_first: 3},
+			expected: &runSuccess{fields: []string{"f1", "f2"}, t_first: 3, qid: -1},
 			extract:  func(r *successResponse) interface{} { return r.run() },
+		},
+		{
+			name: "Run with qid",
+			meta: map[string]interface{}{
+				"fields":  []interface{}{"f1", "f2"},
+				"t_first": int64(3),
+				"qid":     int64(7),
+			},
+			expected: &runSuccess{fields: []string{"f1", "f2"}, t_first: 3, qid: 7},
+			extract:  func(r *successResponse) interface{} { return r.run() },
+		},
+		{
+			name: "Has more",
+			meta: map[string]interface{}{
+				"has_more": true,
+			},
+			expected: true,
+			extract:  func(r *successResponse) interface{} { return r.hasMore() },
+		},
+		{
+			name: "Has more on summary",
+			meta: map[string]interface{}{
+				"type":     "w",
+				"t_last":   int64(3),
+				"bookmark": "bookm",
+			},
+			expected: false,
+			extract:  func(r *successResponse) interface{} { return r.hasMore() },
 		},
 		{
 			name: "Summary",

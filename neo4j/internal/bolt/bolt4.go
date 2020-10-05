@@ -41,6 +41,9 @@ const (
 	bolt4_unauthorized        // Initial state, not sent hello message with authentication
 )
 
+// Default fetch size
+const bolt4_fetchsize = 1000
+
 type internalTx4 struct {
 	mode         db.AccessMode
 	bookmarks    []string
@@ -407,12 +410,30 @@ func (b *bolt4) discardStream() error {
 	}
 
 	var (
-		sum *db.Summary
-		err error
+		sum   *db.Summary
+		err   error
+		batch bool
 	)
-	for sum == nil && err == nil {
-		_, sum, err = b.receiveNext()
+	if b.currStream.fetchSize > 0 {
+		for sum == nil && err == nil {
+			_, batch, sum, err = b.receiveNext()
+			if batch {
+				b.currStream.fetchSize = -1
+				b.sendMsg(msgDiscardAll, map[string]interface{}{"n": b.currStream.fetchSize, "qid": b.currStream.qid})
+				if b.err != nil {
+					b.currStream.err = b.err
+					b.detachStream()
+					b.log.Error(log.Bolt4, b.logId, b.err)
+					return b.err
+				}
+				break
+			}
+		}
 	}
+	for sum == nil && err == nil {
+		_, _, sum, err = b.receiveNext()
+	}
+
 	return err
 }
 
@@ -425,12 +446,34 @@ func (b *bolt4) bufferStream() error {
 
 	n := 0
 	var (
-		sum *db.Summary
-		err error
-		rec *db.Record
+		sum   *db.Summary
+		err   error
+		rec   *db.Record
+		batch bool
 	)
+	if b.currStream.fetchSize > 0 {
+		// Buffer current batch and start infinite batch
+		for sum == nil && err == nil {
+			rec, batch, sum, err = b.receiveNext()
+			if rec != nil {
+				b.currStream.push(rec)
+				n++
+			}
+			if batch {
+				b.currStream.fetchSize = -1
+				b.sendMsg(msgPullN, map[string]interface{}{"n": b.currStream.fetchSize, "qid": b.currStream.qid})
+				if b.err != nil {
+					b.currStream.err = b.err
+					b.detachStream()
+					b.log.Error(log.Bolt4, b.logId, b.err)
+				}
+				break
+			}
+		}
+	}
+	// Buffer complete stream
 	for sum == nil && err == nil {
-		rec, sum, err = b.receiveNext()
+		rec, _, sum, err = b.receiveNext()
 		if rec != nil {
 			b.currStream.push(rec)
 			n++
@@ -444,7 +487,7 @@ func (b *bolt4) bufferStream() error {
 	return err
 }
 
-func (b *bolt4) run(cypher string, params map[string]interface{}, tx *internalTx4) (*stream, error) {
+func (b *bolt4) run(cypher string, params map[string]interface{}, fetchSize int, tx *internalTx4) (*stream, error) {
 	b.log.Debugf(log.Bolt4, b.logId, "run")
 	// If already streaming, consume the whole thing first
 	if err := b.bufferStream(); err != nil {
@@ -473,8 +516,15 @@ func (b *bolt4) run(cypher string, params map[string]interface{}, tx *internalTx
 		return nil, b.err
 	}
 
+	// Ensure that fetchSize is in a valid range
+	switch {
+	case fetchSize < 0:
+		fetchSize = -1
+	case fetchSize == 0:
+		fetchSize = bolt4_fetchsize
+	}
 	// Append pull message and send it along with other pending messages
-	if b.sendMsg(msgPullN, map[string]interface{}{"n": -1}); b.err != nil {
+	if b.sendMsg(msgPullN, map[string]interface{}{"n": fetchSize}); b.err != nil {
 		return nil, b.err
 	}
 
@@ -508,11 +558,11 @@ func (b *bolt4) run(cypher string, params map[string]interface{}, tx *internalTx
 		b.state = bolt4_streamingtx
 	}
 
-	b.currStream = &stream{keys: runRes.fields}
+	b.currStream = &stream{keys: runRes.fields, qid: runRes.qid, fetchSize: fetchSize}
 	return b.currStream, nil
 }
 
-func (b *bolt4) Run(runCommand db.Command, txConfig db.TxConfig) (db.StreamHandle, error) {
+func (b *bolt4) Run(cmd db.Command, txConfig db.TxConfig) (db.StreamHandle, error) {
 	if err := b.assertState(bolt4_streaming, bolt4_ready); err != nil {
 		return nil, err
 	}
@@ -524,19 +574,19 @@ func (b *bolt4) Run(runCommand db.Command, txConfig db.TxConfig) (db.StreamHandl
 		txMeta:       txConfig.Meta,
 		databaseName: b.databaseName,
 	}
-	stream, err := b.run(runCommand.Cypher, runCommand.Params, &tx)
+	stream, err := b.run(cmd.Cypher, cmd.Params, cmd.FetchSize, &tx)
 	if err != nil {
 		return nil, err
 	}
 	return stream, nil
 }
 
-func (b *bolt4) RunTx(txh db.TxHandle, runCommand db.Command) (db.StreamHandle, error) {
+func (b *bolt4) RunTx(txh db.TxHandle, cmd db.Command) (db.StreamHandle, error) {
 	if err := b.assertTxHandle(b.txId, txh); err != nil {
 		return nil, err
 	}
 
-	stream, err := b.run(runCommand.Cypher, runCommand.Params, b.pendingTx)
+	stream, err := b.run(cmd.Cypher, cmd.Params, cmd.FetchSize, b.pendingTx)
 	b.pendingTx = nil
 	if err != nil {
 		return nil, err
@@ -572,7 +622,18 @@ func (b *bolt4) Next(streamHandle db.StreamHandle) (*db.Record, *db.Summary, err
 		return nil, nil, errors.New("Invalid stream handle")
 	}
 
-	return b.receiveNext()
+	rec, batchCompleted, sum, err := b.receiveNext()
+	if batchCompleted {
+		b.sendMsg(msgPullN, map[string]interface{}{"n": b.currStream.fetchSize, "qid": b.currStream.qid})
+		if b.err != nil {
+			b.currStream.err = b.err
+			b.detachStream()
+			b.log.Error(log.Bolt4, b.logId, b.err)
+			return nil, nil, b.err
+		}
+		rec, _, sum, err = b.receiveNext()
+	}
+	return rec, sum, err
 }
 
 func (b *bolt4) Consume(streamHandle db.StreamHandle) (*db.Summary, error) {
@@ -617,31 +678,46 @@ func (b *bolt4) Buffer(streamHandle db.StreamHandle) error {
 	return stream.Err()
 }
 
-// Reads one record from the network.
-func (b *bolt4) receiveNext() (*db.Record, *db.Summary, error) {
+// Detaches the current stream
+func (b *bolt4) detachStream() {
+	if b.currStream == nil {
+		return
+	}
+
+	b.currStream = nil
+}
+
+// Reads one record from the network and returns either a record, a flag that indicates that
+// a PULL N batch completed, a summary indicating end of stream or an error.
+func (b *bolt4) receiveNext() (*db.Record, bool, *db.Summary, error) {
 	if err := b.assertState(bolt4_streaming, bolt4_streamingtx); err != nil {
-		return nil, nil, err
+		return nil, false, nil, err
 	}
 
 	res := b.receiveMsg()
 	if b.err != nil {
-		return nil, nil, b.err
+		return nil, false, nil, b.err
 	}
 
 	switch x := res.(type) {
 	case *db.Record:
 		x.Keys = b.currStream.keys
-		return x, nil, nil
+		return x, false, nil, nil
 	case *successResponse:
+		// End of batch or end of stream?
+		if x.hasMore() {
+			// End of batch
+			return nil, true, nil, nil
+		}
 		// End of stream, parse summary
 		sum := x.summary()
 		if sum == nil {
 			b.state = bolt4_dead
 			b.err = errors.New("Failed to parse summary")
 			b.currStream.err = b.err
-			b.currStream = nil
+			b.detachStream()
 			b.log.Error(log.Bolt4, b.logId, b.err)
-			return nil, nil, b.err
+			return nil, false, nil, b.err
 		}
 		if b.state == bolt4_streamingtx {
 			b.state = bolt4_tx
@@ -653,16 +729,16 @@ func (b *bolt4) receiveNext() (*db.Record, *db.Summary, error) {
 			}
 		}
 		b.currStream.sum = sum
-		b.currStream = nil
+		b.detachStream()
 		// Add some extras to the summary
 		sum.ServerVersion = b.serverVersion
 		sum.ServerName = b.serverName
 		sum.TFirst = b.tfirst
-		return nil, sum, nil
+		return nil, false, sum, nil
 	case *db.Neo4jError:
 		b.err = x
 		b.currStream.err = b.err
-		b.currStream = nil
+		b.detachStream()
 		b.state = bolt4_failed
 		if x.Classification() == "ClientError" {
 			// These could include potentially large cypher statement, only log to debug
@@ -670,14 +746,14 @@ func (b *bolt4) receiveNext() (*db.Record, *db.Summary, error) {
 		} else {
 			b.log.Error(log.Bolt4, b.logId, x)
 		}
-		return nil, nil, x
+		return nil, false, nil, x
 	default:
 		b.state = bolt4_dead
 		b.err = errors.New("Unknown response")
 		b.currStream.err = b.err
-		b.currStream = nil
+		b.detachStream()
 		b.log.Error(log.Bolt4, b.logId, b.err)
-		return nil, nil, b.err
+		return nil, false, nil, b.err
 	}
 }
 
@@ -697,7 +773,6 @@ func (b *bolt4) Reset() {
 	defer func() {
 		// Reset internal state
 		b.txId = 0
-		b.currStream = nil
 		b.bookmark = ""
 		b.pendingTx = nil
 		b.databaseName = db.DefaultDatabase

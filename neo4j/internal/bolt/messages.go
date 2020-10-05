@@ -29,6 +29,7 @@ const (
 	msgReset      packstream.StructTag = 0x0f
 	msgRun        packstream.StructTag = 0x10
 	msgDiscardAll packstream.StructTag = 0x2f
+	msgDiscardN                        = msgDiscardAll // Different name >= 4.0
 	msgPullAll    packstream.StructTag = 0x3f
 	msgPullN                           = msgPullAll // Different name >= 4.0
 	msgRecord     packstream.StructTag = 0x71

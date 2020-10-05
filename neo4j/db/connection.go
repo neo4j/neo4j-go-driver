@@ -37,8 +37,9 @@ type (
 )
 
 type Command struct {
-	Cypher string
-	Params map[string]interface{}
+	Cypher    string
+	Params    map[string]interface{}
+	FetchSize int
 }
 
 type TxConfig struct {
