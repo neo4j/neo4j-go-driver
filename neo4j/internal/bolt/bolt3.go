@@ -228,9 +228,7 @@ func (b *bolt3) connect(auth map[string]interface{}, userAgent string) error {
 	return nil
 }
 
-func (b *bolt3) TxBegin(
-	mode db.AccessMode, bookmarks []string, timeout time.Duration, txMeta map[string]interface{}) (db.TxHandle, error) {
-
+func (b *bolt3) TxBegin(txConfig db.TxConfig) (db.TxHandle, error) {
 	// Ok, to begin transaction while streaming auto-commit, just empty the stream and continue.
 	if b.state == bolt3_streaming {
 		if err := b.bufferStream(); err != nil {
@@ -243,15 +241,15 @@ func (b *bolt3) TxBegin(
 	}
 
 	tx := &internalTx3{
-		mode:      mode,
-		bookmarks: bookmarks,
-		timeout:   timeout,
-		txMeta:    txMeta,
+		mode:      txConfig.Mode,
+		bookmarks: txConfig.Bookmarks,
+		timeout:   txConfig.Timeout,
+		txMeta:    txConfig.Meta,
 	}
 
 	// If there are bookmarks, begin the transaction immediately to get the error from the
 	// server early on. Requires a network roundtrip.
-	if len(bookmarks) > 0 {
+	if len(tx.bookmarks) > 0 {
 		if b.sendMsg(msgBegin, tx.toMeta()); b.err != nil {
 			return 0, b.err
 		}
@@ -502,33 +500,30 @@ func (b *bolt3) run(cypher string, params map[string]interface{}, tx *internalTx
 	return b.currStream, nil
 }
 
-func (b *bolt3) Run(
-	cypher string, params map[string]interface{}, mode db.AccessMode,
-	bookmarks []string, timeout time.Duration, txMeta map[string]interface{}) (db.StreamHandle, error) {
-
+func (b *bolt3) Run(runCommand db.Command, txConfig db.TxConfig) (db.StreamHandle, error) {
 	if err := b.assertState(bolt3_streaming, bolt3_ready); err != nil {
 		return nil, err
 	}
 
 	tx := internalTx3{
-		mode:      mode,
-		bookmarks: bookmarks,
-		timeout:   timeout,
-		txMeta:    txMeta,
+		mode:      txConfig.Mode,
+		bookmarks: txConfig.Bookmarks,
+		timeout:   txConfig.Timeout,
+		txMeta:    txConfig.Meta,
 	}
-	stream, err := b.run(cypher, params, &tx)
+	stream, err := b.run(runCommand.Cypher, runCommand.Params, &tx)
 	if err != nil {
 		return nil, err
 	}
 	return stream, nil
 }
 
-func (b *bolt3) RunTx(txh db.TxHandle, cypher string, params map[string]interface{}) (db.StreamHandle, error) {
+func (b *bolt3) RunTx(txh db.TxHandle, runCommand db.Command) (db.StreamHandle, error) {
 	if err := b.assertTxHandle(b.txId, txh); err != nil {
 		return nil, err
 	}
 
-	stream, err := b.run(cypher, params, b.pendingTx)
+	stream, err := b.run(runCommand.Cypher, runCommand.Params, b.pendingTx)
 	b.pendingTx = nil
 	if err != nil {
 		return nil, err
@@ -743,8 +738,12 @@ func (b *bolt3) GetRoutingTable(database string, context map[string]string) (*db
 	}
 
 	// Only available when Neo4j is setup with clustering
-	const query = "CALL dbms.cluster.routing.getRoutingTable($context)"
-	streamHandle, err := b.Run(query, map[string]interface{}{"context": context}, db.ReadMode, nil, 0, nil)
+	runCommand := db.Command{
+		Cypher: "CALL dbms.cluster.routing.getRoutingTable($context)",
+		Params: map[string]interface{}{"context": context},
+	}
+	txConfig := db.TxConfig{Mode: db.ReadMode}
+	streamHandle, err := b.Run(runCommand, txConfig)
 	if err != nil {
 		// Give a better error
 		dbError, isDbError := err.(*db.Neo4jError)

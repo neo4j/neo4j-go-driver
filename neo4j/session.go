@@ -184,7 +184,12 @@ func (s *session) BeginTransaction(configurers ...func(*TransactionConfig)) (Tra
 	}
 
 	// Begin transaction
-	txHandle, err := conn.TxBegin(s.defaultMode, s.bookmarks, config.Timeout, config.Metadata)
+	txHandle, err := conn.TxBegin(db.TxConfig{
+		Mode:      s.defaultMode,
+		Bookmarks: s.bookmarks,
+		Timeout:   config.Timeout,
+		Meta:      config.Metadata,
+	})
 	if err != nil {
 		s.pool.Return(conn)
 		return nil, err
@@ -245,7 +250,12 @@ func (s *session) runRetriable(
 		}
 
 		// Begin transaction
-		txHandle, err := conn.TxBegin(mode, s.bookmarks, config.Timeout, config.Metadata)
+		txHandle, err := conn.TxBegin(db.TxConfig{
+			Mode:      mode,
+			Bookmarks: s.bookmarks,
+			Timeout:   config.Timeout,
+			Meta:      config.Metadata,
+		})
 		if err != nil {
 			state.OnFailure(conn, err, false)
 			s.pool.Return(conn)
@@ -375,7 +385,12 @@ func (s *session) Run(
 		return nil, err
 	}
 
-	stream, err := conn.Run(cypher, params, s.defaultMode, s.bookmarks, config.Timeout, config.Metadata)
+	stream, err := conn.Run(db.Command{Cypher: cypher, Params: params}, db.TxConfig{
+		Mode:      s.defaultMode,
+		Bookmarks: s.bookmarks,
+		Timeout:   config.Timeout,
+		Meta:      config.Metadata,
+	})
 	if err != nil {
 		s.pool.Return(conn)
 		return nil, wrapBoltError(err)

@@ -107,8 +107,8 @@ func (c *ConnFake) GetRoutingTable(database string, context map[string]string) (
 	return c.Table, c.Err
 }
 
-func (c *ConnFake) TxBegin(mode db.AccessMode, bookmarks []string, timeout time.Duration, meta map[string]interface{}) (db.TxHandle, error) {
-	c.RecordedTxs = append(c.RecordedTxs, RecordedTx{Origin: "TxBegin", Mode: mode, Bookmarks: bookmarks, Timeout: timeout, Meta: meta})
+func (c *ConnFake) TxBegin(txConfig db.TxConfig) (db.TxHandle, error) {
+	c.RecordedTxs = append(c.RecordedTxs, RecordedTx{Origin: "TxBegin", Mode: txConfig.Mode, Bookmarks: txConfig.Bookmarks, Timeout: txConfig.Timeout, Meta: txConfig.Meta})
 	return c.TxBeginHandle, c.Err
 }
 
@@ -123,13 +123,13 @@ func (c *ConnFake) TxCommit(tx db.TxHandle) error {
 	return c.TxCommitErr
 }
 
-func (c *ConnFake) Run(cypher string, params map[string]interface{}, mode db.AccessMode, bookmarks []string, timeout time.Duration, meta map[string]interface{}) (db.StreamHandle, error) {
+func (c *ConnFake) Run(runCommand db.Command, txConfig db.TxConfig) (db.StreamHandle, error) {
 
-	c.RecordedTxs = append(c.RecordedTxs, RecordedTx{Origin: "Run", Mode: mode, Bookmarks: bookmarks, Timeout: timeout, Meta: meta})
+	c.RecordedTxs = append(c.RecordedTxs, RecordedTx{Origin: "Run", Mode: txConfig.Mode, Bookmarks: txConfig.Bookmarks, Timeout: txConfig.Timeout, Meta: txConfig.Meta})
 	return c.RunStream, c.Err
 }
 
-func (c *ConnFake) RunTx(tx db.TxHandle, cypher string, params map[string]interface{}) (db.StreamHandle, error) {
+func (c *ConnFake) RunTx(tx db.TxHandle, runCommand db.Command) (db.StreamHandle, error) {
 	return c.RunTxStream, c.Err
 }
 

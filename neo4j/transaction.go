@@ -46,7 +46,7 @@ type transaction struct {
 }
 
 func (tx *transaction) Run(cypher string, params map[string]interface{}) (Result, error) {
-	stream, err := tx.conn.RunTx(tx.txHandle, cypher, params)
+	stream, err := tx.conn.RunTx(tx.txHandle, db.Command{Cypher: cypher, Params: params})
 	if err != nil {
 		return nil, wrapBoltError(err)
 	}
@@ -84,7 +84,7 @@ type retryableTransaction struct {
 }
 
 func (tx *retryableTransaction) Run(cypher string, params map[string]interface{}) (Result, error) {
-	stream, err := tx.conn.RunTx(tx.txHandle, cypher, params)
+	stream, err := tx.conn.RunTx(tx.txHandle, db.Command{Cypher: cypher, Params: params})
 	if err != nil {
 		return nil, wrapBoltError(err)
 	}
