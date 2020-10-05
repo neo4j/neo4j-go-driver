@@ -36,13 +36,25 @@ type (
 	StreamHandle interface{}
 )
 
+type Command struct {
+	Cypher string
+	Params map[string]interface{}
+}
+
+type TxConfig struct {
+	Mode      AccessMode
+	Bookmarks []string
+	Timeout   time.Duration
+	Meta      map[string]interface{}
+}
+
 // Abstract database server connection.
 type Connection interface {
-	TxBegin(mode AccessMode, bookmarks []string, timeout time.Duration, meta map[string]interface{}) (TxHandle, error)
+	TxBegin(txConfig TxConfig) (TxHandle, error)
 	TxRollback(tx TxHandle) error
 	TxCommit(tx TxHandle) error
-	Run(cypher string, params map[string]interface{}, mode AccessMode, bookmarks []string, timeout time.Duration, meta map[string]interface{}) (StreamHandle, error)
-	RunTx(tx TxHandle, cypher string, params map[string]interface{}) (StreamHandle, error)
+	Run(cmd Command, txConfig TxConfig) (StreamHandle, error)
+	RunTx(tx TxHandle, cmd Command) (StreamHandle, error)
 	// Keys for the specified stream.
 	Keys(streamHandle StreamHandle) ([]string, error)
 	// Moves to next item in the stream.
