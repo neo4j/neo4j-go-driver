@@ -269,20 +269,20 @@ func TestConnectionConformance(ot *testing.T) {
 			}
 		})
 	}
-	// Run some of the above at random
-	randoms := make([]int, 25)
-	for i := range randoms {
-		randoms[i] = int(randInt() % int64(len(cases)))
-	}
-	for _, i := range randoms {
-		c := cases[i]
-		ot.Run("Random "+c.name, func(t *testing.T) {
+	// Run some of the above at random as one test
+	ot.Run("Random sequence", func(t *testing.T) {
+		randoms := make([]int, 25)
+		for i := range randoms {
+			randoms[i] = int(randInt() % int64(len(cases)))
+		}
+		for _, i := range randoms {
+			c := cases[i]
 			c.fun(t, boltConn)
 			if !boltConn.IsAlive() {
 				t.Error("Connection died")
 			}
-		})
-	}
+		}
+	})
 
 	// All of these tests should leave the connection in a good state after a reset but not
 	// necessarily without it. All tests share the same connection.
