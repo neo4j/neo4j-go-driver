@@ -333,6 +333,9 @@ func (b *backend) handleRequest(req map[string]interface{}) {
 			}
 			sessionConfig.Bookmarks = bookmarks
 		}
+		if data["database"] != nil {
+			sessionConfig.DatabaseName = data["database"].(string)
+		}
 		session, err := driver.NewSession(sessionConfig)
 		if err != nil {
 			b.writeError(err)
