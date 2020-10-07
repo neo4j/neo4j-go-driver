@@ -419,7 +419,7 @@ func (b *bolt4) discardStream() error {
 			_, batch, sum, err = b.receiveNext()
 			if batch {
 				b.currStream.fetchSize = -1
-				b.sendMsg(msgDiscardAll, map[string]interface{}{"n": b.currStream.fetchSize, "qid": b.currStream.qid})
+				b.sendMsg(msgDiscardN, map[string]interface{}{"n": b.currStream.fetchSize, "qid": b.currStream.qid})
 				if b.err != nil {
 					b.currStream.err = b.err
 					b.detachStream()
@@ -435,6 +435,23 @@ func (b *bolt4) discardStream() error {
 	}
 
 	return err
+}
+
+func (b *bolt4) sendPullN() {
+	switch b.state {
+	case bolt4_streaming:
+		// No qid
+		b.sendMsg(msgPullN, map[string]interface{}{"n": b.currStream.fetchSize})
+	case bolt4_streamingtx:
+		b.sendMsg(msgPullN, map[string]interface{}{"n": b.currStream.fetchSize, "qid": b.currStream.qid})
+	default:
+		b.err = errors.New("Expected to be streaming")
+	}
+	if b.err != nil {
+		b.currStream.err = b.err
+		b.detachStream()
+		b.log.Error(log.Bolt4, b.logId, b.err)
+	}
 }
 
 // Collects all records in current stream
@@ -461,12 +478,8 @@ func (b *bolt4) bufferStream() error {
 			}
 			if batch {
 				b.currStream.fetchSize = -1
-				b.sendMsg(msgPullN, map[string]interface{}{"n": b.currStream.fetchSize, "qid": b.currStream.qid})
-				if b.err != nil {
-					b.currStream.err = b.err
-					b.detachStream()
-					b.log.Error(log.Bolt4, b.logId, b.err)
-				}
+				b.sendPullN()
+				err = b.err
 				break
 			}
 		}
@@ -624,11 +637,8 @@ func (b *bolt4) Next(streamHandle db.StreamHandle) (*db.Record, *db.Summary, err
 
 	rec, batchCompleted, sum, err := b.receiveNext()
 	if batchCompleted {
-		b.sendMsg(msgPullN, map[string]interface{}{"n": b.currStream.fetchSize, "qid": b.currStream.qid})
+		b.sendPullN()
 		if b.err != nil {
-			b.currStream.err = b.err
-			b.detachStream()
-			b.log.Error(log.Bolt4, b.logId, b.err)
 			return nil, nil, b.err
 		}
 		rec, _, sum, err = b.receiveNext()

@@ -336,6 +336,9 @@ func (b *backend) handleRequest(req map[string]interface{}) {
 		if data["database"] != nil {
 			sessionConfig.DatabaseName = data["database"].(string)
 		}
+		if data["fetchSize"] != nil {
+			sessionConfig.FetchSize = int(data["fetchSize"].(float64))
+		}
 		session, err := driver.NewSession(sessionConfig)
 		if err != nil {
 			b.writeError(err)

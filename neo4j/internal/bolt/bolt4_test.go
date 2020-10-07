@@ -135,7 +135,7 @@ func TestBolt4(ot *testing.T) {
 			srv.send(runResponse[1].Tag, runResponse[1].Fields...)
 			srv.send(runResponse[2].Tag, runResponse[2].Fields...)
 			srv.send(msgSuccess, map[string]interface{}{"has_more": true})
-			srv.waitForPullNandQid(2, runQid)
+			srv.waitForPullN(2)
 			srv.send(runResponse[3].Tag, runResponse[3].Fields...)
 			srv.send(runResponse[4].Tag, runResponse[4].Fields...)
 		})
@@ -359,19 +359,18 @@ func TestBolt4(ot *testing.T) {
 	})
 
 	ot.Run("Buffer stream with fetch size", func(t *testing.T) {
-		qid := 3
 		keys := []interface{}{"k1"}
 		bookmark := "x"
 		bolt, cleanup := connectToServer(t, func(srv *bolt4server) {
 			srv.accept(4)
 			srv.waitForRun()
 			srv.waitForPullN(3)
-			srv.send(msgSuccess, map[string]interface{}{"fields": keys, "qid": int64(qid)})
+			srv.send(msgSuccess, map[string]interface{}{"fields": keys})
 			srv.send(msgRecord, []interface{}{"1"})
 			srv.send(msgRecord, []interface{}{"2"})
 			srv.send(msgRecord, []interface{}{"3"})
-			srv.send(msgSuccess, map[string]interface{}{"has_more": true, "qid": int64(qid)})
-			srv.waitForPullNandQid(-1, qid)
+			srv.send(msgSuccess, map[string]interface{}{"has_more": true})
+			srv.waitForPullN(-1)
 			srv.send(msgRecord, []interface{}{"4"})
 			srv.send(msgRecord, []interface{}{"5"})
 			srv.send(msgSuccess, map[string]interface{}{"bookmark": bookmark, "type": "r"})
