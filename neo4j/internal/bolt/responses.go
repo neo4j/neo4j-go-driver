@@ -78,9 +78,8 @@ func (s *successResponse) commit() *commitSuccess {
 
 // Extracted from SuccessResponse.meta for a HELLO request.
 type helloSuccess struct {
-	connectionId       string
-	credentialsExpired bool
-	server             string
+	connectionId string
+	server       string
 }
 
 func (s *successResponse) hello() *helloSuccess {
@@ -89,8 +88,7 @@ func (s *successResponse) hello() *helloSuccess {
 	if !iok || !sok {
 		return nil
 	}
-	exp, _ := s.meta["credentials_expired"].(bool)
-	return &helloSuccess{connectionId: id, server: server, credentialsExpired: exp}
+	return &helloSuccess{connectionId: id, server: server}
 }
 
 func (s *successResponse) hasMore() bool {
@@ -102,11 +100,8 @@ func (s *successResponse) hasMore() bool {
 // Maps directly to shared internal summary type to avoid unnecessary conversions.
 func (s *successResponse) summary() *db.Summary {
 	t_last, _ := s.meta["t_last"].(int64)
-	qtype, tok := s.meta["type"].(string)
+	qtype, _ := s.meta["type"].(string)
 	bookmark, _ := s.meta["bookmark"].(string) // Only for auto-commit transactions
-	if !tok {
-		return nil
-	}
 
 	// Map statement type received to internal type
 	stmntType := db.StatementTypeUnknown

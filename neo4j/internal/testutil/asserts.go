@@ -109,6 +109,13 @@ func AssertTrue(t *testing.T, b bool) {
 	}
 }
 
+func AssertFalse(t *testing.T, b bool) {
+	t.Helper()
+	if b {
+		t.Error("Expected false but was true")
+	}
+}
+
 func AssertLen(t *testing.T, x interface{}, el int) {
 	t.Helper()
 	al := reflect.ValueOf(x).Len()
@@ -131,6 +138,13 @@ func AssertEmptyString(t *testing.T, s string) {
 	t.Helper()
 	if s != "" {
 		t.Errorf("Expected empty string but was '%s'", s)
+	}
+}
+
+func AssertStringNotEmpty(t *testing.T, s string) {
+	t.Helper()
+	if s == "" {
+		t.Errorf("Expected non empty string")
 	}
 }
 

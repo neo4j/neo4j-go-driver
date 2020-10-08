@@ -273,10 +273,9 @@ func TestBolt4(ot *testing.T) {
 			srv.accept(4)
 			srv.waitForRun()
 			srv.waitForPullN(bolt4_fetchsize)
-			srv.sendFailureMsg("code", "msg")
+			srv.sendFailureMsg("code", "msg") // RUN failed
 			srv.waitForReset()
-			srv.sendIgnoredMsg()
-			srv.sendIgnoredMsg()
+			srv.sendIgnoredMsg() // PULL Ignored
 			srv.sendSuccess(map[string]interface{}{})
 		})
 		defer cleanup()
@@ -310,11 +309,18 @@ func TestBolt4(ot *testing.T) {
 		AssertNeo4jError(t, err) // Should have same error as from run since that is original cause
 	})
 
-	ot.Run("Reset while streaming ", func(t *testing.T) {
+	ot.Run("Reset while streaming", func(t *testing.T) {
 		bolt, cleanup := connectToServer(t, func(srv *bolt4server) {
 			srv.accept(4)
-			srv.serveRun(runResponse)
-			// Reset message is never sent to server since stream is consumed
+			srv.waitForRun()
+			srv.waitForPullN(bolt4_fetchsize)
+			// Send RUN response and a record
+			for i := 0; i < 2; i++ {
+				srv.send(runResponse[i].Tag, runResponse[i].Fields...)
+			}
+			srv.waitForReset()
+			// Acknowledge reset, no fields
+			srv.sendSuccess(map[string]interface{}{})
 		})
 		defer cleanup()
 		defer bolt.Close()
@@ -326,6 +332,23 @@ func TestBolt4(ot *testing.T) {
 		bolt.Reset()
 		assertBoltState(t, bolt4_ready, bolt)
 	})
+
+	ot.Run("Reset in ready state", func(t *testing.T) {
+		bolt, cleanup := connectToServer(t, func(srv *bolt4server) {
+			srv.accept(4)
+			srv.serveRun(runResponse)
+		})
+		defer cleanup()
+		defer bolt.Close()
+		s, err := bolt.Run(db.Command{Cypher: "MATCH (n) RETURN n"}, db.TxConfig{Mode: db.ReadMode})
+		AssertNoError(t, err)
+		_, err = bolt.Consume(s)
+		AssertNoError(t, err)
+		// Should be no-op since state already is ready
+		bolt.Reset()
+	})
+
+	// Reset where state is ready
 
 	ot.Run("Buffer stream", func(t *testing.T) {
 		bolt, cleanup := connectToServer(t, func(srv *bolt4server) {
