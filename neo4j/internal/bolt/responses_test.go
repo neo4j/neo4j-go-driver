@@ -39,17 +39,7 @@ func TestSuccessResponseExtraction(ot *testing.T) {
 				"server":        "Neo4j/3.5.0",
 				"connection_id": "x1",
 			},
-			expected: &helloSuccess{connectionId: "x1", credentialsExpired: false, server: "Neo4j/3.5.0"},
-			extract:  func(r *successResponse) interface{} { return r.hello() },
-		},
-		{
-			name: "Hello credentials expired",
-			meta: map[string]interface{}{
-				"server":              "Neo4j/3.5.0",
-				"connection_id":       "x1",
-				"credentials_expired": true,
-			},
-			expected: &helloSuccess{connectionId: "x1", credentialsExpired: true, server: "Neo4j/3.5.0"},
+			expected: &helloSuccess{connectionId: "x1", server: "Neo4j/3.5.0"},
 			extract:  func(r *successResponse) interface{} { return r.hello() },
 		},
 		{

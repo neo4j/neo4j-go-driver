@@ -76,7 +76,7 @@ func (i *internalTx4) toMeta() map[string]interface{} {
 type bolt4 struct {
 	state         int
 	txId          db.TxHandle
-	currStream    *stream
+	streams       openstreams
 	conn          net.Conn
 	serverName    string
 	chunker       *chunker
@@ -96,7 +96,7 @@ type bolt4 struct {
 }
 
 func NewBolt4(serverName string, conn net.Conn, log log.Logger) *bolt4 {
-	return &bolt4{
+	b := &bolt4{
 		state:         bolt4_unauthorized,
 		conn:          conn,
 		serverName:    serverName,
@@ -106,7 +106,30 @@ func NewBolt4(serverName string, conn net.Conn, log log.Logger) *bolt4 {
 		unpacker:      &packstream.Unpacker{},
 		birthDate:     time.Now(),
 		log:           log,
+		streams:       openstreams{},
 	}
+	// Setup open streams. Errors reported to callback are assertion like errors, let them
+	// bubble up to kill them off when they happen, alternatively they could be logged.
+	b.streams.onAssertFail = func(err error) {
+		b.setError(err, false)
+	}
+	b.streams.onClose = func(s *stream) { // Current stream succesfully closed (no error)
+		if len(s.sum.Bookmark) > 0 {
+			b.bookmark = s.sum.Bookmark
+		}
+	}
+	b.streams.onEmpty = func() { // All streams closed (succesfully or with error)
+		// Perform state transition from streaming, if in that state otherwise keep the current
+		// state as we are in some kind of bad shape
+		switch b.state {
+		case bolt4_streamingtx:
+			b.state = bolt4_tx
+		case bolt4_streaming:
+			b.state = bolt4_ready
+		}
+	}
+
+	return b
 }
 
 func (b *bolt4) ServerName() string {
@@ -117,56 +140,82 @@ func (b *bolt4) ServerVersion() string {
 	return b.serverVersion
 }
 
-// Sets b.err and b.state on failure
+// Sets b.err and b.state to bolt4_failed or bolt4_dead when fatal is true.
+func (b *bolt4) setError(err error, fatal bool) {
+	// Has no effect, can reduce nested ifs
+	if err == nil {
+		return
+	}
+
+	// No previous error
+	if b.err == nil {
+		b.err = err
+		b.state = bolt4_failed
+	}
+
+	// Increase severity even if it was a previous error
+	if fatal {
+		b.state = bolt4_dead
+	}
+
+	// Forward error to current stream if there is one
+	if b.streams.curr != nil {
+		b.streams.detach(nil, err)
+	}
+
+	// Do not log big cypher statements as errors
+	neo4jErr, _ := err.(*db.Neo4jError)
+	if neo4jErr != nil && neo4jErr.Classification() == "ClientError" {
+		b.log.Debugf(log.Bolt4, b.logId, "%s", err)
+	} else {
+		b.log.Error(log.Bolt4, b.logId, err)
+	}
+}
+
 func (b *bolt4) appendMsg(tag packstream.StructTag, field ...interface{}) {
 	b.chunker.beginMessage()
 	// Setup the message and let packstream write the packed bytes to the chunk
-	b.chunker.buf, b.err = b.packer.PackStruct(b.chunker.buf, dehydrate, tag, field...)
-	if b.err != nil {
+	var err error
+	b.chunker.buf, err = b.packer.PackStruct(b.chunker.buf, dehydrate, tag, field...)
+	if err != nil {
 		// At this point we do not know the state of what has been written to the chunks.
 		// Either we should support rolling back whatever that has been written or just
 		// bail out this session.
-		b.log.Error(log.Bolt4, b.logId, b.err)
-		b.state = bolt4_dead
+		b.setError(err, true)
 		return
 	}
 	b.chunker.endMessage()
 }
 
-// Sets b.err and b.state on failure
 func (b *bolt4) sendMsg(tag packstream.StructTag, field ...interface{}) {
 	if b.appendMsg(tag, field...); b.err != nil {
 		return
 	}
-	if b.err = b.chunker.send(b.conn); b.err != nil {
-		b.log.Error(log.Bolt4, b.logId, b.err)
-		b.state = bolt4_dead
-	}
+	err := b.chunker.send(b.conn)
+	b.setError(err, true)
 }
 
-// Sets b.err and b.state on failure
 func (b *bolt4) receiveMsg() interface{} {
-	b.receiveBuffer, b.err = dechunkMessage(b.conn, b.receiveBuffer)
+	// Potentially dangerous to receive when an error has occured, could hang.
+	// Important, a lot of code has been simplified relying on this check.
 	if b.err != nil {
-		b.log.Error(log.Bolt4, b.logId, b.err)
-		b.state = bolt4_dead
+		return nil
+	}
+
+	var err error
+	b.receiveBuffer, err = dechunkMessage(b.conn, b.receiveBuffer)
+	if err != nil {
+		b.setError(err, true)
 		return nil
 	}
 
 	msg, err := b.unpacker.UnpackStruct(b.receiveBuffer, hydrate)
-	if err != nil {
-		b.log.Error(log.Bolt4, b.logId, err)
-		b.state = bolt4_dead
-		b.err = err
-		return nil
-	}
-
+	b.setError(err, true)
 	return msg
 }
 
-// Receives a message that is assumed to be a success response or a failure in response
-// to a sent command.
-// Sets b.err and b.state on failure
+// Receives a message that is assumed to be a success response or a failure in response to a
+// sent command. Sets b.err and b.state on failure
 func (b *bolt4) receiveSuccess() *successResponse {
 	msg := b.receiveMsg()
 	if b.err != nil {
@@ -177,24 +226,11 @@ func (b *bolt4) receiveSuccess() *successResponse {
 	case *successResponse:
 		return v
 	case *db.Neo4jError:
-		b.state = bolt4_failed
-		b.err = v
-		if v.Classification() == "ClientError" {
-			// These could include potentially large cypher statement, only log to debug
-			b.log.Debugf(log.Bolt4, b.logId, "%s", v)
-		} else {
-			b.log.Error(log.Bolt4, b.logId, v)
-		}
+		b.setError(v, false)
 		return nil
 	default:
-		// Receive failed, state has been set
-		if b.err != nil {
-			return nil
-		}
 		// Unexpected message received
-		b.state = bolt4_dead
-		b.err = errors.New("Expected success or database error")
-		b.log.Error(log.Bolt4, b.logId, b.err)
+		b.setError(errors.New("Expected success or database error"), true)
 		return nil
 	}
 }
@@ -204,39 +240,38 @@ func (b *bolt4) connect(auth map[string]interface{}, userAgent string) error {
 		return err
 	}
 
+	// Prepare hello message by merging authentication info
 	hello := map[string]interface{}{
 		"user_agent": userAgent,
 	}
-	// Merge authentication info into hello message
 	for k, v := range auth {
 		_, exists := hello[k]
-		if exists {
-			continue
+		if !exists {
+			hello[k] = v
 		}
-		hello[k] = v
 	}
 
 	// Send hello message and wait for confirmation
-	if b.sendMsg(msgHello, hello); b.err != nil {
-		return b.err
-	}
-	succRes := b.receiveSuccess()
+	b.sendMsg(msgHello, hello)
+	successResponse := b.receiveSuccess()
 	if b.err != nil {
 		return b.err
 	}
 
-	helloRes := succRes.hello()
-	if helloRes == nil {
-		b.state = bolt4_dead
-		b.err = errors.New(fmt.Sprintf("Unexpected server response: %+v", succRes))
+	helloResponse := successResponse.hello()
+	if helloResponse == nil {
+		b.setError(errors.New(fmt.Sprintf("Unexpected server response: %+v", successResponse)), true)
 		return b.err
 	}
-	b.connId = helloRes.connectionId
+	b.connId = helloResponse.connectionId
+	b.serverVersion = helloResponse.server
+
+	// Construct log identity
 	b.logId = fmt.Sprintf("%s@%s", b.connId, b.serverName)
-	b.serverVersion = helloRes.server
 
 	// Transition into ready state
 	b.state = bolt4_ready
+	b.streams.reset()
 	b.log.Infof(log.Bolt4, b.logId, "Connected")
 	return nil
 }
@@ -244,10 +279,12 @@ func (b *bolt4) connect(auth map[string]interface{}, userAgent string) error {
 func (b *bolt4) TxBegin(txConfig db.TxConfig) (db.TxHandle, error) {
 	// Ok, to begin transaction while streaming auto-commit, just empty the stream and continue.
 	if b.state == bolt4_streaming {
-		if err := b.bufferStream(); err != nil {
-			return 0, err
+		if b.bufferStream(); b.err != nil {
+			return 0, b.err
 		}
 	}
+	// Makes all outstanding streams invalid
+	b.streams.reset()
 
 	if err := b.assertState(bolt4_ready); err != nil {
 		return 0, err
@@ -264,10 +301,9 @@ func (b *bolt4) TxBegin(txConfig db.TxConfig) (db.TxHandle, error) {
 	// If there are bookmarks, begin the transaction immediately for backwards compatible
 	// reasons, otherwise delay it to save a round-trip
 	if len(tx.bookmarks) > 0 {
-		if b.sendMsg(msgBegin, tx.toMeta()); b.err != nil {
-			return 0, b.err
-		}
-		if b.receiveSuccess(); b.err != nil {
+		b.sendMsg(msgBegin, tx.toMeta())
+		b.receiveSuccess()
+		if b.err != nil {
 			return 0, b.err
 		}
 		b.state = bolt4_tx
@@ -324,10 +360,8 @@ func (b *bolt4) TxCommit(txh db.TxHandle) error {
 	// Consume pending stream if any to turn state from streamingtx to tx
 	// Access to streams outside of tx boundary is not allowed, therefore we should discard
 	// the stream (not buffer).
-	if b.state == bolt4_streamingtx {
-		if err := b.discardStream(); err != nil {
-			return err
-		}
+	if b.discardAllStreams(); b.err != nil {
+		return b.err
 	}
 
 	// Should be in vanilla tx state now
@@ -336,24 +370,14 @@ func (b *bolt4) TxCommit(txh db.TxHandle) error {
 	}
 
 	// Send request to server to commit
-	if b.sendMsg(msgCommit); b.err != nil {
-		return b.err
-	}
-
-	// Evaluate server response
+	b.sendMsg(msgCommit)
 	succRes := b.receiveSuccess()
 	if b.err != nil {
 		return b.err
 	}
-	commitSuccess := succRes.commit()
-	if commitSuccess == nil {
-		b.state = bolt4_dead
-		b.err = errors.New(fmt.Sprintf("Failed to parse commit response: %+v", succRes))
-		b.log.Error(log.Bolt4, b.logId, b.err)
-		return b.err
-	}
-
 	// Keep track of bookmark
+	// Parsing assumed not to fail
+	commitSuccess := succRes.commit()
 	if len(commitSuccess.bookmark) > 0 {
 		b.bookmark = commitSuccess.bookmark
 	}
@@ -377,10 +401,8 @@ func (b *bolt4) TxRollback(txh db.TxHandle) error {
 	// Can not send rollback while still streaming, consume to turn state into tx
 	// Access to streams outside of tx boundary is not allowed, therefore we should discard
 	// the stream (not buffer).
-	if b.state == bolt4_streamingtx {
-		if err := b.discardStream(); err != nil {
-			return err
-		}
+	if b.discardAllStreams(); b.err != nil {
+		return b.err
 	}
 
 	// Should be in vanilla tx state now
@@ -389,11 +411,7 @@ func (b *bolt4) TxRollback(txh db.TxHandle) error {
 	}
 
 	// Send rollback request to server
-	if b.sendMsg(msgRollback); b.err != nil {
-		return b.err
-	}
-
-	// Receive rollback confirmation
+	b.sendMsg(msgRollback)
 	if b.receiveSuccess(); b.err != nil {
 		return b.err
 	}
@@ -402,132 +420,129 @@ func (b *bolt4) TxRollback(txh db.TxHandle) error {
 	return nil
 }
 
-// Discards all records in current stream
-func (b *bolt4) discardStream() error {
+// Discards all records in current stream if in streaming state and there is a current stream.
+func (b *bolt4) discardStream() {
 	if b.state != bolt4_streaming && b.state != bolt4_streamingtx {
-		// Nothing to do
-		return nil
+		return
 	}
 
-	var (
-		sum   *db.Summary
-		err   error
-		batch bool
-	)
-	if b.currStream.fetchSize > 0 {
-		for sum == nil && err == nil {
-			_, batch, sum, err = b.receiveNext()
-			if batch {
-				b.currStream.fetchSize = -1
-				b.sendMsg(msgDiscardN, map[string]interface{}{"n": b.currStream.fetchSize, "qid": b.currStream.qid})
-				if b.err != nil {
-					b.currStream.err = b.err
-					b.detachStream()
-					b.log.Error(log.Bolt4, b.logId, b.err)
-					return b.err
-				}
-				break
-			}
+	stream := b.streams.curr
+	if stream == nil {
+		return
+	}
+
+	for {
+		_, batch, sum := b.receiveNext()
+		if batch {
+			stream.fetchSize = -1
+			b.sendMsg(msgDiscardN, map[string]interface{}{"n": stream.fetchSize, "qid": stream.qid})
+		} else if sum != nil || b.err != nil {
+			return
 		}
 	}
-	for sum == nil && err == nil {
-		_, _, sum, err = b.receiveNext()
-	}
-
-	return err
 }
 
+func (b *bolt4) discardAllStreams() {
+	if b.state != bolt4_streaming && b.state != bolt4_streamingtx {
+		return
+	}
+
+	// Discard current
+	b.discardStream()
+	b.streams.reset()
+}
+
+// Sends a PULL n request to server. State should be streaming and there should be a current stream.
 func (b *bolt4) sendPullN() {
-	switch b.state {
-	case bolt4_streaming:
-		// No qid
-		b.sendMsg(msgPullN, map[string]interface{}{"n": b.currStream.fetchSize})
-	case bolt4_streamingtx:
-		b.sendMsg(msgPullN, map[string]interface{}{"n": b.currStream.fetchSize, "qid": b.currStream.qid})
-	default:
-		b.err = errors.New("Expected to be streaming")
-	}
-	if b.err != nil {
-		b.currStream.err = b.err
-		b.detachStream()
-		b.log.Error(log.Bolt4, b.logId, b.err)
+	b.assertState(bolt4_streaming, bolt3_streamingtx)
+	if b.state == bolt4_streaming {
+		b.sendMsg(msgPullN, map[string]interface{}{"n": b.streams.curr.fetchSize})
+	} else if b.state == bolt4_streamingtx {
+		b.sendMsg(msgPullN, map[string]interface{}{"n": b.streams.curr.fetchSize, "qid": b.streams.curr.qid})
 	}
 }
 
-// Collects all records in current stream
-func (b *bolt4) bufferStream() error {
-	if b.state != bolt4_streaming && b.state != bolt4_streamingtx {
-		// Nothing to do
-		return nil
+// Collects all records in current stream if in streaming state and there is a current stream.
+func (b *bolt4) bufferStream() {
+	stream := b.streams.curr
+	if stream == nil {
+		return
 	}
 
-	n := 0
-	var (
-		sum   *db.Summary
-		err   error
-		rec   *db.Record
-		batch bool
-	)
-	if b.currStream.fetchSize > 0 {
-		// Buffer current batch and start infinite batch
-		for sum == nil && err == nil {
-			rec, batch, sum, err = b.receiveNext()
-			if rec != nil {
-				b.currStream.push(rec)
-				n++
-			}
-			if batch {
-				b.currStream.fetchSize = -1
-				b.sendPullN()
-				err = b.err
-				break
-			}
-		}
-	}
-	// Buffer complete stream
-	for sum == nil && err == nil {
-		rec, _, sum, err = b.receiveNext()
+	// Buffer current batch and start infinite batch and/or buffer the infinite batch
+	for {
+		rec, batch, _ := b.receiveNext()
 		if rec != nil {
-			b.currStream.push(rec)
-			n++
+			stream.push(rec)
+		} else if batch {
+			stream.fetchSize = -1
+			b.sendPullN()
+		} else {
+			// Either summary or an error
+			return
 		}
 	}
+}
 
-	if n > 0 {
-		b.log.Warnf(log.Bolt4, b.logId, "Buffered %d records", n)
+// Prepares the current stream for being switched out by collecting all records in the current
+// stream up until the next batch. Assumes that we are in a streaming state.
+func (b *bolt4) pauseStream() {
+	stream := b.streams.curr
+	if stream == nil {
+		return
 	}
 
-	return err
+	for {
+		rec, batch, _ := b.receiveNext()
+		if rec != nil {
+			stream.push(rec)
+		} else if batch {
+			b.streams.pause()
+			return
+		} else {
+			// Either summary or an error
+			return
+		}
+	}
+}
+
+func (b *bolt4) resumeStream(s *stream) {
+	b.streams.resume(s)
+	b.sendPullN()
+	if b.err != nil {
+		return
+	}
 }
 
 func (b *bolt4) run(cypher string, params map[string]interface{}, fetchSize int, tx *internalTx4) (*stream, error) {
-	b.log.Debugf(log.Bolt4, b.logId, "run")
 	// If already streaming, consume the whole thing first
-	if err := b.bufferStream(); err != nil {
+	if b.state == bolt4_streaming {
+		if b.bufferStream(); b.err != nil {
+			return nil, b.err
+		}
+	} else if b.state == bolt4_streamingtx {
+		if b.pauseStream(); b.err != nil {
+			return nil, b.err
+		}
+	}
+
+	if err := b.assertState(bolt4_tx, bolt4_ready, bolt4_pendingtx, bolt4_streamingtx); err != nil {
 		return nil, err
 	}
 
-	if err := b.assertState(bolt4_tx, bolt4_ready, bolt4_pendingtx); err != nil {
-		return nil, err
-	}
-
+	// Transaction meta data, used either in lazily started transaction or to run message.
 	var meta map[string]interface{}
 	if tx != nil {
 		meta = tx.toMeta()
 	}
-
-	// Append lazy begin transaction message
 	if b.state == bolt4_pendingtx {
-		if b.appendMsg(msgBegin, meta); b.err != nil {
-			return nil, b.err
-		}
-		meta = nil
+		// Append lazy begin transaction message
+		b.appendMsg(msgBegin, meta)
+		meta = nil // Don't add this to run message again
 	}
 
 	// Append run message
-	if b.appendMsg(msgRun, cypher, params, meta); b.err != nil {
-		return nil, b.err
-	}
+	b.appendMsg(msgRun, cypher, params, meta)
 
 	// Ensure that fetchSize is in a valid range
 	switch {
@@ -537,9 +552,7 @@ func (b *bolt4) run(cypher string, params map[string]interface{}, fetchSize int,
 		fetchSize = bolt4_fetchsize
 	}
 	// Append pull message and send it along with other pending messages
-	if b.sendMsg(msgPullN, map[string]interface{}{"n": fetchSize}); b.err != nil {
-		return nil, b.err
-	}
+	b.sendMsg(msgPullN, map[string]interface{}{"n": fetchSize})
 
 	// Process server responses
 	// Receive confirmation of transaction begin if it was started above
@@ -553,14 +566,14 @@ func (b *bolt4) run(cypher string, params map[string]interface{}, fetchSize int,
 	// Receive confirmation of run message
 	res := b.receiveSuccess()
 	if b.err != nil {
+		// If failed with a database error, there will be an ignored response for the
+		// pull message as well, this will be cleaned up by Reset
 		return nil, b.err
 	}
 	// Extract the RUN response from success response
 	runRes := res.run()
 	if runRes == nil {
-		b.state = bolt4_dead
-		b.err = errors.New(fmt.Sprintf("Failed to parse RUN response: %+v", res))
-		b.log.Error(log.Bolt4, b.logId, b.err)
+		b.setError(errors.New(fmt.Sprintf("Failed to parse RUN response: %+v", res)), true)
 		return nil, b.err
 	}
 	b.tfirst = runRes.t_first
@@ -571,8 +584,11 @@ func (b *bolt4) run(cypher string, params map[string]interface{}, fetchSize int,
 		b.state = bolt4_streamingtx
 	}
 
-	b.currStream = &stream{keys: runRes.fields, qid: runRes.qid, fetchSize: fetchSize}
-	return b.currStream, nil
+	// Create a stream representation, set it to current and track it
+	stream := &stream{keys: runRes.fields, qid: runRes.qid, fetchSize: fetchSize}
+	(&b.streams).attach(stream)
+
+	return stream, nil
 }
 
 func (b *bolt4) Run(cmd db.Command, txConfig db.TxConfig) (db.StreamHandle, error) {
@@ -608,162 +624,170 @@ func (b *bolt4) RunTx(txh db.TxHandle, cmd db.Command) (db.StreamHandle, error) 
 }
 
 func (b *bolt4) Keys(streamHandle db.StreamHandle) ([]string, error) {
-	stream, ok := streamHandle.(*stream)
-	if !ok {
-		return nil, errors.New("Invalid stream handle")
-	}
 	// Don't care about if the stream is the current or even if it belongs to this connection.
+	// Do NOT set b.err for this error
+	stream, err := b.streams.getUnsafe(streamHandle)
+	if err != nil {
+		return nil, err
+	}
 	return stream.keys, nil
 }
 
 // Reads one record from the stream.
 func (b *bolt4) Next(streamHandle db.StreamHandle) (*db.Record, *db.Summary, error) {
-	stream, ok := streamHandle.(*stream)
-	if !ok {
-		return nil, nil, errors.New("Invalid stream handle")
+	// Do NOT set b.err for this error
+	stream, err := b.streams.getUnsafe(streamHandle)
+	if err != nil {
+		return nil, nil, err
 	}
 
 	// Buffered stream or someone elses stream, doesn't matter...
+	// Summary and error are considered buffered as well.
 	buf, rec, sum, err := stream.bufferedNext()
 	if buf {
 		return rec, sum, err
 	}
 
-	// Nothing in the stream buffer, the stream must be the current
-	// one to fetch on it otherwise something is wrong.
-	if stream != b.currStream {
-		return nil, nil, errors.New("Invalid stream handle")
+	// Make sure that the stream belongs to this bolt instance otherwise we might mess
+	// up the internal state machine really bad. If clients stick to streams out of
+	// transaction scope or after the connection been sent back to the pool we might end
+	// up here.
+	if err = b.streams.isSafe(stream); err != nil {
+		return nil, nil, err
 	}
 
-	rec, batchCompleted, sum, err := b.receiveNext()
+	// If the stream isn't the current we must finish what we're doing with the current stream
+	// and make it the current one.
+	if stream != b.streams.curr {
+		b.pauseStream()
+		if b.err != nil {
+			return nil, nil, b.err
+		}
+		b.resumeStream(stream)
+	}
+
+	rec, batchCompleted, sum := b.receiveNext()
 	if batchCompleted {
 		b.sendPullN()
 		if b.err != nil {
 			return nil, nil, b.err
 		}
-		rec, _, sum, err = b.receiveNext()
+		rec, _, sum = b.receiveNext()
 	}
-	return rec, sum, err
+	return rec, sum, b.err
 }
 
 func (b *bolt4) Consume(streamHandle db.StreamHandle) (*db.Summary, error) {
-	stream, ok := streamHandle.(*stream)
-	if !ok {
-		return nil, errors.New("Invalid stream handle")
+	// Do NOT set b.err for this error
+	stream, err := b.streams.getUnsafe(streamHandle)
+	if err != nil {
+		return nil, err
 	}
 
-	// If the stream isn't current, it should either already be complete
-	// or have an error.
-	if stream != b.currStream {
+	// If the stream already is complete we don't care about who it belongs to
+	if stream.sum != nil || stream.err != nil {
 		return stream.sum, stream.err
 	}
 
-	// It is the current stream, it should not be complete but...
-	if stream.err != nil || stream.sum != nil {
-		return stream.sum, stream.err
+	// Make sure the stream is safe (tied to this bolt instance and scope)
+	if err = b.streams.isSafe(stream); err != nil {
+		return nil, err
 	}
 
+	// We should be streaming otherwise it is a an internal error, shouldn't be
+	// a safe stream while not streaming.
+	if err = b.assertState(bolt4_streaming, bolt4_streamingtx); err != nil {
+		return nil, err
+	}
+
+	// If the stream isn't current, we need to pause the current one.
+	if stream != b.streams.curr {
+		b.pauseStream()
+		if b.err != nil {
+			return nil, b.err
+		}
+		b.resumeStream(stream)
+	}
+
+	// If the stream is current, discard everything up to next batch and discard the
+	// stream on the server.
 	b.discardStream()
 	return stream.sum, stream.err
 }
 
 func (b *bolt4) Buffer(streamHandle db.StreamHandle) error {
-	stream, ok := streamHandle.(*stream)
-	if !ok {
-		return errors.New("Invalid stream handle")
+	// Do NOT set b.err for this error
+	stream, err := b.streams.getUnsafe(streamHandle)
+	if err != nil {
+		return err
 	}
 
-	// If the stream isn't current, it should either already be complete
-	// or have an error.
-	if stream != b.currStream {
+	// If the stream already is complete we don't care about who it belongs to
+	if stream.sum != nil || stream.err != nil {
 		return stream.Err()
 	}
 
-	// It is the current stream, it should not be complete but...
-	if stream.err != nil || stream.sum != nil {
-		return stream.Err()
+	// Make sure the stream is safe
+	// Do NOT set b.err for this error
+	if err = b.streams.isSafe(stream); err != nil {
+		return err
+	}
+
+	// We should be streaming otherwise it is a an internal error, shouldn't be
+	// a safe stream while not streaming.
+	if err = b.assertState(bolt4_streaming, bolt4_streamingtx); err != nil {
+		return err
+	}
+
+	// If the stream isn't current, we need to pause the current one.
+	if stream != b.streams.curr {
+		b.pauseStream()
+		if b.err != nil {
+			return b.err
+		}
+		b.resumeStream(stream)
 	}
 
 	b.bufferStream()
 	return stream.Err()
 }
 
-// Detaches the current stream
-func (b *bolt4) detachStream() {
-	if b.currStream == nil {
-		return
-	}
-
-	b.currStream = nil
-}
-
 // Reads one record from the network and returns either a record, a flag that indicates that
 // a PULL N batch completed, a summary indicating end of stream or an error.
-func (b *bolt4) receiveNext() (*db.Record, bool, *db.Summary, error) {
-	if err := b.assertState(bolt4_streaming, bolt4_streamingtx); err != nil {
-		return nil, false, nil, err
-	}
-
+// Assumes that there is a current stream and that streaming is active.
+func (b *bolt4) receiveNext() (*db.Record, bool, *db.Summary) {
 	res := b.receiveMsg()
 	if b.err != nil {
-		return nil, false, nil, b.err
+		return nil, false, nil
 	}
 
 	switch x := res.(type) {
 	case *db.Record:
-		x.Keys = b.currStream.keys
-		return x, false, nil, nil
+		// A new record
+		x.Keys = b.streams.curr.keys
+		return x, false, nil
 	case *successResponse:
 		// End of batch or end of stream?
 		if x.hasMore() {
 			// End of batch
-			return nil, true, nil, nil
+			return nil, true, nil
 		}
-		// End of stream, parse summary
+		// End of stream, parse summary. Current implementation never fails.
 		sum := x.summary()
-		if sum == nil {
-			b.state = bolt4_dead
-			b.err = errors.New("Failed to parse summary")
-			b.currStream.err = b.err
-			b.detachStream()
-			b.log.Error(log.Bolt4, b.logId, b.err)
-			return nil, false, nil, b.err
-		}
-		if b.state == bolt4_streamingtx {
-			b.state = bolt4_tx
-		} else {
-			b.state = bolt4_ready
-			// Keep bookmark for auto-commit tx
-			if len(sum.Bookmark) > 0 {
-				b.bookmark = sum.Bookmark
-			}
-		}
-		b.currStream.sum = sum
-		b.detachStream()
 		// Add some extras to the summary
 		sum.ServerVersion = b.serverVersion
 		sum.ServerName = b.serverName
 		sum.TFirst = b.tfirst
-		return nil, false, sum, nil
+		// Done with this stream
+		b.streams.detach(sum, nil)
+		return nil, false, sum
 	case *db.Neo4jError:
-		b.err = x
-		b.currStream.err = b.err
-		b.detachStream()
-		b.state = bolt4_failed
-		if x.Classification() == "ClientError" {
-			// These could include potentially large cypher statement, only log to debug
-			b.log.Debugf(log.Bolt4, b.logId, "%s", x)
-		} else {
-			b.log.Error(log.Bolt4, b.logId, x)
-		}
-		return nil, false, nil, x
+		b.setError(x, false) // Will detach the stream
+		return nil, false, nil
 	default:
-		b.state = bolt4_dead
-		b.err = errors.New("Unknown response")
-		b.currStream.err = b.err
-		b.detachStream()
-		b.log.Error(log.Bolt4, b.logId, b.err)
-		return nil, false, nil, b.err
+		// Unknown territory
+		b.setError(errors.New("Unknown response"), true)
+		return nil, false, nil
 	}
 }
 
@@ -787,6 +811,7 @@ func (b *bolt4) Reset() {
 		b.pendingTx = nil
 		b.databaseName = db.DefaultDatabase
 		b.err = nil
+		b.streams.reset()
 	}()
 
 	if b.state == bolt4_ready || b.state == bolt4_dead {
@@ -794,32 +819,30 @@ func (b *bolt4) Reset() {
 		return
 	}
 
-	// Discard any pending stream
-	b.discardStream()
-
-	if b.state == bolt4_ready || b.state == bolt4_dead {
-		// No need for reset
-		return
-	}
+	// Reset any pending error, should be matching bolt4_failed so
+	// it should be recoverable.
+	b.err = nil
 
 	// Send the reset message to the server
 	if b.sendMsg(msgReset); b.err != nil {
 		return
 	}
 
-	// Should receive x number of ignores until we get a success
 	for {
 		msg := b.receiveMsg()
 		if b.err != nil {
 			return
 		}
-		switch msg.(type) {
-		case *ignoredResponse:
+		switch x := msg.(type) {
+		case *ignoredResponse, *db.Record:
 			// Command ignored
 		case *successResponse:
-			// Reset confirmed
-			b.state = bolt4_ready
-			return
+			// Reset success are always empty, none of the other responses are.
+			if len(x.meta) == 0 {
+				// Reset confirmed
+				b.state = bolt4_ready
+				return
+			}
 		default:
 			b.state = bolt4_dead
 			return
