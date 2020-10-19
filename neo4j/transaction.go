@@ -38,15 +38,16 @@ type Transaction interface {
 
 // Transaction implementation when explicit transaction started
 type transaction struct {
-	conn     db.Connection
-	txHandle db.TxHandle
-	done     bool
-	err      error
-	onClosed func()
+	conn      db.Connection
+	fetchSize int
+	txHandle  db.TxHandle
+	done      bool
+	err       error
+	onClosed  func()
 }
 
 func (tx *transaction) Run(cypher string, params map[string]interface{}) (Result, error) {
-	stream, err := tx.conn.RunTx(tx.txHandle, db.Command{Cypher: cypher, Params: params})
+	stream, err := tx.conn.RunTx(tx.txHandle, db.Command{Cypher: cypher, Params: params, FetchSize: tx.fetchSize})
 	if err != nil {
 		return nil, wrapBoltError(err)
 	}
@@ -79,12 +80,13 @@ func (tx *transaction) Close() error {
 
 // Transaction implementation used as parameter to transactional functions
 type retryableTransaction struct {
-	conn     db.Connection
-	txHandle db.TxHandle
+	conn      db.Connection
+	fetchSize int
+	txHandle  db.TxHandle
 }
 
 func (tx *retryableTransaction) Run(cypher string, params map[string]interface{}) (Result, error) {
-	stream, err := tx.conn.RunTx(tx.txHandle, db.Command{Cypher: cypher, Params: params})
+	stream, err := tx.conn.RunTx(tx.txHandle, db.Command{Cypher: cypher, Params: params, FetchSize: tx.fetchSize})
 	if err != nil {
 		return nil, wrapBoltError(err)
 	}

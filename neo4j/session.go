@@ -203,8 +203,9 @@ func (s *session) BeginTransaction(configurers ...func(*TransactionConfig)) (Tra
 
 	// Create transaction wrapper
 	s.txExplicit = &transaction{
-		conn:     conn,
-		txHandle: txHandle,
+		conn:      conn,
+		fetchSize: s.fetchSize,
+		txHandle:  txHandle,
 		onClosed: func() {
 			// On transaction closed (rollbacked or committed)
 			s.retrieveBookmarks(conn)
@@ -271,7 +272,7 @@ func (s *session) runRetriable(
 		// Construct a transaction like thing for client to execute stuff on.
 		// Evaluate the returned error from all the work for retryable, this means
 		// that client can mess up the error handling.
-		tx := retryableTransaction{conn: conn, txHandle: txHandle}
+		tx := retryableTransaction{conn: conn, fetchSize: s.fetchSize, txHandle: txHandle}
 		x, err := work(&tx)
 		if err != nil {
 			state.OnFailure(conn, err, false)
