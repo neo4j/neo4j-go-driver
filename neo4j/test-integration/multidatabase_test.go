@@ -43,10 +43,9 @@ func TestMultidatabase(ot *testing.T) {
 
 	// Ensure that a test database exists using system database
 	func() {
-		sysSess, err := driver.NewSession(neo4j.SessionConfig{DatabaseName: "system"})
-		assertNoError(ot, err)
+		sysSess := driver.NewSession(neo4j.SessionConfig{DatabaseName: "system"})
 		defer sysSess.Close()
-		_, err = sysSess.Run("DROP DATABASE testdb IF EXISTS", nil)
+		_, err := sysSess.Run("DROP DATABASE testdb IF EXISTS", nil)
 		assertNoError(ot, err)
 		_, err = sysSess.Run("CREATE DATABASE testdb", nil)
 		assertNoError(ot, err)
@@ -54,20 +53,17 @@ func TestMultidatabase(ot *testing.T) {
 
 	ot.Run("Node created in test db should not be visible in default db", func(t *testing.T) {
 		// Create node in testdb session
-		testSess, err := driver.NewSession(neo4j.SessionConfig{DatabaseName: "testdb"})
-		assertNoError(t, err)
+		testSess := driver.NewSession(neo4j.SessionConfig{DatabaseName: "testdb"})
 		randId := createRandomNode(t, testSess)
 		testSess.Close()
 
 		// Look for above node in default database session, it shouldn't exist there
-		defaultSess, err := driver.NewSession(neo4j.SessionConfig{})
-		assertNoError(t, err)
+		defaultSess := driver.NewSession(neo4j.SessionConfig{})
 		assertNoRandomNode(t, defaultSess, randId)
 		defaultSess.Close()
 
 		// Look again in testdb session, should of course exist here
-		testSess, err = driver.NewSession(neo4j.SessionConfig{DatabaseName: "testdb"})
-		assertNoError(t, err)
+		testSess = driver.NewSession(neo4j.SessionConfig{DatabaseName: "testdb"})
 		assertRandomNode(t, testSess, randId)
 		testSess.Close()
 	})

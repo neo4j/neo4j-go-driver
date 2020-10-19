@@ -35,11 +35,7 @@ func TestAuthentication(tt *testing.T) {
 			panic(err)
 		}
 
-		session, err := driver.Session(neo4j.AccessModeRead)
-		if err != nil {
-			panic(err)
-		}
-		return driver, session
+		return driver, driver.NewSession(neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead})
 	}
 
 	assertConnect := func(t *testing.T, token neo4j.AuthToken) {

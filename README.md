@@ -15,6 +15,9 @@ Drivers manual that describes general driver concepts in depth [here](https://ne
 
 Go package API documentation [here](https://pkg.go.dev/github.com/neo4j/neo4j-go-driver/neo4j).
 
+## Migration from 1.8
+See [migrationguide](MIGRATIONGUIDE.md) for information on how to migrate from 1.8 (and 1.7) version of the driver.
+
 ## Minimum Viable Snippet
 
 Connect, execute a statement and handle results
@@ -31,14 +34,12 @@ driver, err := neo4j.NewDriver(dbUri, neo4j.BasicAuth("username", "password", ""
 // bound by the application lifetime, which usually implies one driver instance per application
 defer driver.Close()
 
-// Sessions are shortlived, cheap to create and NOT thread safe. Typically create one or more sessiond 
+// Sessions are shortlived, cheap to create and NOT thread safe. Typically create one or more sessions
 // per request in your web application. Make sure to call Close on the session when done.
 // For multidatabase support, set sessionConfig.DatabaseName to requested database
-sessionConfig := neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite}
-session, err := driver.NewSession(sessionConfig)
-if err != nil {
-	return err
-}
+// Session config will default to write mode, if only reads are to be used configure session for
+// read mode.
+session := driver.NewSession(neo4j.SessionConfig{})
 defer session.Close()
 
 result, err := session.Run("CREATE (n:Item { id: $id, name: $name }) RETURN n.id, n.name", map[string]interface{}{

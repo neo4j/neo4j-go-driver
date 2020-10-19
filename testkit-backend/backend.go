@@ -339,11 +339,7 @@ func (b *backend) handleRequest(req map[string]interface{}) {
 		if data["fetchSize"] != nil {
 			sessionConfig.FetchSize = int(data["fetchSize"].(float64))
 		}
-		session, err := driver.NewSession(sessionConfig)
-		if err != nil {
-			b.writeError(err)
-			return
-		}
+		session := driver.NewSession(sessionConfig)
 		idKey := b.nextId()
 		b.sessionStates[idKey] = &sessionState{session: session}
 		b.writeResponse("Session", map[string]interface{}{"id": idKey})

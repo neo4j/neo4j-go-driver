@@ -125,10 +125,7 @@ func assertNoRandomNode(t *testing.T, sess neo4j.Session, randomId int64) {
 // Utility that executes Cypher and retrieves the expected single value from single record.
 func single(t *testing.T, driver neo4j.Driver, cypher string, params map[string]interface{}) interface{} {
 	t.Helper()
-	session, err := driver.NewSession(neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
-	if err != nil {
-		t.Fatal(err)
-	}
+	session := driver.NewSession(neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
 	defer session.Close()
 	result, err := session.Run(cypher, params)
 	if err != nil {

@@ -76,10 +76,7 @@ func GetDbServer() DbServer {
 
 func (s DbServer) deleteData() {
 	driver := s.Driver()
-	session, err := driver.NewSession(neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
-	if err != nil {
-		panic(err)
-	}
+	session := driver.NewSession(neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
 	defer session.Close()
 
 	for {

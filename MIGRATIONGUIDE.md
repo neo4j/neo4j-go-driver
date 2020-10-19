@@ -33,6 +33,12 @@ record.GetByIndex(0) with record.Values[0].
 All access to data in these needs to be changed from function calls to direct access:
     node.Id() changes to node.Id.
 
+## Session creation
+For simplification the NewSession function on driver no longer returns an error, for the rare
+occasion where an error occured the error will be returned when the session is used.
+This reduces amount of error checking. Only error that could happen on session creation
+was creating a session on a closed driver.
+
 ## Aliases
 A lot of types has been moved from neo4j to a subpackages. These types are aliased in the neo4j
 package so it should not have any impact other than the inconvenince of hitting the alias type

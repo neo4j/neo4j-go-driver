@@ -51,7 +51,7 @@ type Driver interface {
 	// The url this driver is bootstrapped
 	Target() url.URL
 	// Creates a new session based on the specified session configuration.
-	NewSession(config SessionConfig) (Session, error)
+	NewSession(config SessionConfig) Session
 	// Deprecated: Use NewSession instead
 	Session(accessMode AccessMode, bookmarks ...string) (Session, error)
 	// Verifies that the driver can connect to a remote server or cluster by
@@ -233,7 +233,7 @@ func (d *driver) Session(accessMode AccessMode, bookmarks ...string) (Session, e
 		d.pool, db.AccessMode(accessMode), bookmarks, db.DefaultDatabase, 0, d.log), nil
 }
 
-func (d *driver) NewSession(config SessionConfig) (Session, error) {
+func (d *driver) NewSession(config SessionConfig) Session {
 	databaseName := db.DefaultDatabase
 	if config.DatabaseName != "" {
 		databaseName = config.DatabaseName
@@ -242,20 +242,16 @@ func (d *driver) NewSession(config SessionConfig) (Session, error) {
 	d.mut.Lock()
 	defer d.mut.Unlock()
 	if d.pool == nil {
-		return nil, &UsageError{
-			Message: "Trying to create session on closed driver",
-		}
+		return &sessionWithError{
+			err: &UsageError{Message: "Trying to create session on closed driver"}}
 	}
 	return newSession(
 		d.config, d.router,
-		d.pool, db.AccessMode(config.AccessMode), config.Bookmarks, databaseName, config.FetchSize, d.log), nil
+		d.pool, db.AccessMode(config.AccessMode), config.Bookmarks, databaseName, config.FetchSize, d.log)
 }
 
 func (d *driver) VerifyConnectivity() error {
-	session, err := d.NewSession(SessionConfig{AccessMode: AccessModeRead})
-	if err != nil {
-		return err
-	}
+	session := d.NewSession(SessionConfig{AccessMode: AccessModeRead})
 	result, err := session.Run("RETURN 1 AS n", nil)
 	if err != nil {
 		return err

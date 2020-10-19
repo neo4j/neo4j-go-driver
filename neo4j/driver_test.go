@@ -184,25 +184,16 @@ func TestNewDriverAndClose(t *testing.T) {
 	err = driver.Close()
 	assertNoError(t, err)
 
-	session, err := driver.Session(AccessModeRead)
-	assertError(t, err)
-
-	if session != nil {
-		t.Errorf("should not allow new session (AccessModeRead) after driver being closed")
-	}
-
-	session, err = driver.Session(AccessModeWrite)
-	assertError(t, err)
-
-	if session != nil {
-		t.Errorf("should not allow new session (AccessModeWrite) after driver being closed")
+	session := driver.NewSession(SessionConfig{})
+	_, err = session.Run("cypher", nil)
+	if !IsUsageError(err) {
+		t.Errorf("should not allow new session after driver being closed")
 	}
 
 	err = driver.Close()
 	if err != nil {
 		t.Errorf("should allow the close call on a closed driver")
 	}
-
 }
 
 var driverSessionCreationTests = []struct {
@@ -223,9 +214,7 @@ func TestDriverSessionCreationX(t *testing.T) {
 			driver, err := NewDriver(tt.testing, NoAuth())
 			assertNoError(t, err)
 
-			sessi, err := driver.Session(tt.mode, tt.bookmarks...)
-			assertNoError(t, err)
-
+			sessi := driver.NewSession(SessionConfig{AccessMode: tt.mode, Bookmarks: tt.bookmarks})
 			sess := sessi.(*session)
 
 			if AccessMode(sess.defaultMode) != tt.mode {
