@@ -863,8 +863,9 @@ func (b *bolt4) GetRoutingTable(database string, context map[string]string) (*db
 
 	// Query for the users default database or a specific database
 	runCommand := db.Command{
-		Cypher: "CALL dbms.routing.getRoutingTable($context)",
-		Params: map[string]interface{}{"context": context},
+		Cypher:    "CALL dbms.routing.getRoutingTable($context)",
+		Params:    map[string]interface{}{"context": context},
+		FetchSize: -1,
 	}
 	if database != db.DefaultDatabase {
 		runCommand.Cypher = "CALL dbms.routing.getRoutingTable($context, $db)"

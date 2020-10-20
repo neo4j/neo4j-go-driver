@@ -21,6 +21,7 @@ package testutil
 
 import (
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/neo4j/neo4j-go-driver/v4/neo4j/db"
@@ -152,6 +153,13 @@ func AssertStringEqual(t *testing.T, as, es string) {
 	t.Helper()
 	if as != es {
 		t.Errorf("'%s' != '%s'", as, es)
+	}
+}
+
+func AssertStringContain(t *testing.T, s, sub string) {
+	t.Helper()
+	if !strings.Contains(s, sub) {
+		t.Errorf("Expected %s to contain %s", s, sub)
 	}
 }
 

@@ -172,9 +172,11 @@ func NewDriver(target string, auth AuthToken, configurers ...func(*Config)) (Dri
 	return &d, nil
 }
 
+const routingcontext_address_key = "address"
+
 func routingContextFromUrl(u *url.URL) (map[string]string, error) {
 	queryValues := u.Query()
-	routingContext := make(map[string]string, len(queryValues))
+	routingContext := make(map[string]string, len(queryValues)+1 /*For address*/)
 	for k, vs := range queryValues {
 		if len(vs) > 1 {
 			return nil, &UsageError{
@@ -193,8 +195,12 @@ func routingContextFromUrl(u *url.URL) (map[string]string, error) {
 				Message: fmt.Sprintf("Empty routing context value for key '%s'", k),
 			}
 		}
+		if k == routingcontext_address_key {
+			return nil, &UsageError{Message: fmt.Sprintf("Illegal key '%s' for routing context", k)}
+		}
 		routingContext[k] = v
 	}
+	routingContext[routingcontext_address_key] = u.Host
 	return routingContext, nil
 }
 

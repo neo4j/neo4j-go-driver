@@ -21,10 +21,10 @@ package neo4j
 
 import (
 	"reflect"
-	"strings"
 	"testing"
 
 	"github.com/neo4j/neo4j-go-driver/v4/neo4j/internal/router"
+	. "github.com/neo4j/neo4j-go-driver/v4/neo4j/internal/testutil"
 )
 
 func assertNoRouter(t *testing.T, d Driver) {
@@ -52,39 +52,6 @@ func assertRouterContext(t *testing.T, d Driver, context map[string]string) {
 	}
 }
 
-func assertNoError(t *testing.T, err error) {
-	t.Helper()
-	if err != nil {
-		t.Fatalf("Expected no error but was %s", err)
-	}
-}
-
-func assertError(t *testing.T, err error) {
-	t.Helper()
-	if err == nil {
-		t.Errorf("Expected error")
-	}
-}
-
-func assertStringEqual(t *testing.T, s1, s2 string) {
-	t.Helper()
-	if s1 != s2 {
-		t.Errorf("Expected %s to equal %s", s1, s2)
-	}
-}
-
-func assertStringContain(t *testing.T, str, substr string) {
-	t.Helper()
-	if !strings.Contains(str, substr) {
-		t.Errorf("Expected %s to contain %s", str, substr)
-	}
-}
-
-//TODO
-//bolt+ssc://
-//neo4j+ssc://
-//bolt+s://
-//neo4j+s://
 var uriSchemeTests = []struct {
 	name    string
 	scheme  string
@@ -92,7 +59,11 @@ var uriSchemeTests = []struct {
 	router  bool
 }{
 	{"bolt://", "bolt", "bolt://localhost:7687", false},
+	{"bolt+s://", "bolt", "bolt://localhost:7687", false},
+	{"bolt+ssc://", "bolt", "bolt://localhost:7687", false},
 	{"neo4j://", "neo4j", "neo4j://localhost:7687", true},
+	{"neo4j+s://", "neo4j", "neo4j://localhost:7687", true},
+	{"neo4j+ssc://", "neo4j", "neo4j://localhost:7687", true},
 }
 
 func TestDriverURISchemesX(t *testing.T) {
@@ -100,15 +71,14 @@ func TestDriverURISchemesX(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			driver, err := NewDriver(tt.testing, NoAuth())
 
-			assertNoError(t, err)
-			assertStringEqual(t, driver.Target().Scheme, tt.scheme)
+			AssertNoError(t, err)
+			AssertStringEqual(t, driver.Target().Scheme, tt.scheme)
 			if !tt.router {
 				assertNoRouter(t, driver)
 			} else {
 				assertRouter(t, driver)
 			}
 		})
-
 	}
 }
 
@@ -126,46 +96,52 @@ func TestDriverInvalidURISchemesX(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			_, err := NewDriver(tt.testing, NoAuth())
 
-			assertError(t, err)
-			assertStringContain(t, err.Error(), "scheme")
+			AssertError(t, err)
+			assertUsageError(t, err)
+			AssertStringContain(t, err.Error(), "scheme")
 		})
-
 	}
 }
 
 func TestDriverURIRoutingContext(t *testing.T) {
-
-	t.Run("neo4j:// routing context query support", func(t1 *testing.T) {
+	t.Run("Extracts keys", func(t1 *testing.T) {
 		driver, err := NewDriver("neo4j://localhost:7687?x=y&a=b", NoAuth())
 
-		assertNoError(t1, err)
-		assertRouterContext(t1, driver, map[string]string{"x": "y", "a": "b"})
+		AssertNoError(t1, err)
+		assertRouterContext(t1, driver, map[string]string{"x": "y", "a": "b", "address": "localhost:7687"})
 	})
 
-	t.Run("neo4j:// routing context with duplicate keys should error", func(t1 *testing.T) {
+	t.Run("Duplicate keys should error", func(t1 *testing.T) {
 		_, err := NewDriver("neo4j://localhost:7687?x=y&x=b", NoAuth())
 
-		assertError(t, err)
+		AssertError(t, err)
+		assertUsageError(t, err)
 	})
 
+	t.Run("Reserved key 'address' should error", func(t *testing.T) {
+		_, err := NewDriver("neo4j://localhost:7687?x=y&address=b", NoAuth())
+
+		AssertError(t, err)
+		assertUsageError(t, err)
+	})
 }
 
 func TestDriverDefaultPort(t *testing.T) {
 
 	t.Run("neo4j://localhost should default to port 7687", func(t1 *testing.T) {
-		driver, err := NewDriver("neo4j://localhost?x=y&a=b", NoAuth())
+		driver, err := NewDriver("neo4j://localhost", NoAuth())
 		driverTarget := driver.Target()
 
-		assertNoError(t1, err)
-		assertStringEqual(t1, driverTarget.Port(), "7687")
+		AssertNoError(t1, err)
+		AssertStringEqual(t1, driverTarget.Port(), "7687")
+		assertRouterContext(t1, driver, map[string]string{"address": "localhost:7687"})
 	})
-
 }
 
 func TestNewDriverAndClose(t *testing.T) {
 
 	driver, err := NewDriver("bolt://localhost:7687", NoAuth())
-	assertNoError(t, err)
+	AssertNoError(t, err)
 
 	driverTarget := driver.Target()
 
@@ -182,7 +158,7 @@ func TestNewDriverAndClose(t *testing.T) {
 	}
 
 	err = driver.Close()
-	assertNoError(t, err)
+	AssertNoError(t, err)
 
 	session := driver.NewSession(SessionConfig{})
 	_, err = session.Run("cypher", nil)
@@ -212,7 +188,7 @@ func TestDriverSessionCreationX(t *testing.T) {
 	for _, tt := range driverSessionCreationTests {
 		t.Run(tt.name, func(t *testing.T) {
 			driver, err := NewDriver(tt.testing, NoAuth())
-			assertNoError(t, err)
+			AssertNoError(t, err)
 
 			sessi := driver.NewSession(SessionConfig{AccessMode: tt.mode, Bookmarks: tt.bookmarks})
 			sess := sessi.(*session)
@@ -225,6 +201,5 @@ func TestDriverSessionCreationX(t *testing.T) {
 				t.Errorf("the bookmarks was not correctly set %v", sess.bookmarks)
 			}
 		})
-
 	}
 }
