@@ -27,7 +27,6 @@ import (
 	. "github.com/neo4j/neo4j-go-driver/v4/neo4j/internal/testutil"
 )
 
-// bolt3.connect is tested through Connect, no need to test it here
 func TestBolt3(ot *testing.T) {
 	// Test streams
 	// Faked returns from a server
@@ -96,7 +95,7 @@ func TestBolt3(ot *testing.T) {
 		tcpConn, srv, cleanup := setupBolt3Pipe(t)
 		go serverJob(srv)
 
-		c, err := Connect("name", tcpConn, auth, "007", logger)
+		c, err := Connect("serverName", tcpConn, auth, "007", nil, logger)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -105,6 +104,54 @@ func TestBolt3(ot *testing.T) {
 		assertBoltState(t, bolt3_ready, bolt)
 		return bolt, cleanup
 	}
+
+	// Simple succesful connect
+	ot.Run("Connect success", func(t *testing.T) {
+		bolt, cleanup := connectToServer(t, func(srv *bolt3server) {
+			handshake := srv.waitForHandshake()
+			// There should be a version 3 somewhere
+			foundV3 := false
+			for i := 0; i < 5; i++ {
+				ver := handshake[(i * 4) : (i*4)+4]
+				if ver[3] == 3 {
+					foundV3 = true
+				}
+			}
+			if !foundV3 {
+				t.Fatalf("Didn't find version 3 in handshake: %+v", handshake)
+			}
+
+			// Accept bolt version 3
+			srv.acceptVersion(3)
+			srv.waitForHello()
+			srv.acceptHello()
+		})
+		defer cleanup()
+		defer bolt.Close()
+
+		// Check Bolt properties
+		AssertStringEqual(t, bolt.ServerName(), "serverName")
+		AssertTrue(t, bolt.IsAlive())
+	})
+
+	ot.Run("Failed authentication", func(t *testing.T) {
+		conn, srv, cleanup := setupBolt3Pipe(t)
+		defer cleanup()
+		defer conn.Close()
+		go func() {
+			srv.waitForHandshake()
+			srv.acceptVersion(3)
+			srv.waitForHello()
+			srv.rejectHelloUnauthorized()
+		}()
+		bolt, err := Connect("serverName", conn, auth, "007", nil, logger)
+		AssertNil(t, bolt)
+		AssertError(t, err)
+		dbErr := err.(*db.Neo4jError)
+		if !dbErr.IsAuthenticationFailed() {
+			t.Errorf("Should be authentication error: %s", dbErr)
+		}
+	})
 
 	ot.Run("Run auto-commit", func(t *testing.T) {
 		bolt, cleanup := connectToServer(t, func(srv *bolt3server) {

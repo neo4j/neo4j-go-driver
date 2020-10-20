@@ -44,7 +44,7 @@ var versions = [4]protocolVersion{
 
 // Negotiate version of bolt protocol.
 // Returns instance of bolt protocol implmenting low-level abstract connection Connection interface.
-func Connect(serverName string, conn net.Conn, auth map[string]interface{}, userAgent string, log log.Logger) (db.Connection, error) {
+func Connect(serverName string, conn net.Conn, auth map[string]interface{}, userAgent string, routingContext map[string]string, log log.Logger) (db.Connection, error) {
 	// Perform Bolt handshake to negotiate version
 	// Send handshake to server
 	handshake := []byte{
@@ -81,7 +81,7 @@ func Connect(serverName string, conn net.Conn, auth map[string]interface{}, user
 	case 4:
 		// Handover rest of connection handshaking
 		boltConn := NewBolt4(serverName, conn, log)
-		err = boltConn.connect(auth, userAgent)
+		err = boltConn.connect(auth, userAgent, routingContext)
 		if err != nil {
 			return nil, err
 		}

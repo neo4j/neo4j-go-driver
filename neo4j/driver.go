@@ -132,6 +132,11 @@ func NewDriver(target string, auth AuthToken, configurers ...func(*Config)) (Dri
 	}
 	d.logId = log.NewId()
 
+	routingContext, err := routingContextFromUrl(routing, parsed)
+	if err != nil {
+		return nil, err
+	}
+
 	// Continue to setup connector
 	d.connector.DialTimeout = d.config.SocketConnectTimeout
 	d.connector.SocketKeepAlive = d.config.SocketKeepalive
@@ -139,6 +144,7 @@ func NewDriver(target string, auth AuthToken, configurers ...func(*Config)) (Dri
 	d.connector.RootCAs = d.config.RootCAs
 	d.connector.Log = d.log
 	d.connector.Auth = auth.tokens
+	d.connector.RoutingContext = routingContext
 
 	// Let the pool use the same logid as the driver to simplify log reading.
 	d.pool = pool.New(d.config.MaxConnectionPoolSize, d.config.MaxConnectionLifetime, d.connector.Connect, d.log, d.logId)
@@ -146,12 +152,6 @@ func NewDriver(target string, auth AuthToken, configurers ...func(*Config)) (Dri
 	if !routing {
 		d.router = &directRouter{server: parsed.Host}
 	} else {
-		routingContext, err := routingContextFromUrl(parsed)
-		if err != nil {
-			d.log.Error(log.Driver, d.logId, err)
-			return nil, err
-		}
-
 		var routersResolver func() []string
 		addressResolverHook := d.config.AddressResolver
 		if addressResolverHook != nil {
@@ -174,7 +174,10 @@ func NewDriver(target string, auth AuthToken, configurers ...func(*Config)) (Dri
 
 const routingcontext_address_key = "address"
 
-func routingContextFromUrl(u *url.URL) (map[string]string, error) {
+func routingContextFromUrl(useRouting bool, u *url.URL) (map[string]string, error) {
+	if !useRouting {
+		return nil, nil
+	}
 	queryValues := u.Query()
 	routingContext := make(map[string]string, len(queryValues)+1 /*For address*/)
 	for k, vs := range queryValues {

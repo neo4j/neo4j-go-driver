@@ -77,7 +77,8 @@ func (s *bolt4server) sendIgnoredMsg() {
 	s.send(msgIgnored)
 }
 
-func (s *bolt4server) waitForHello() {
+// Returns the first hello field
+func (s *bolt4server) waitForHello() map[string]interface{} {
 	msg := s.receiveMsg()
 	s.assertStructType(msg, msgHello)
 	m := msg.Fields[0].(map[string]interface{})
@@ -90,6 +91,7 @@ func (s *bolt4server) waitForHello() {
 	if !exists {
 		s.sendFailureMsg("?", "Missing user_agent in hello")
 	}
+	return m
 }
 
 func (s *bolt4server) receiveMsg() *packstream.Struct {

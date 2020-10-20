@@ -35,7 +35,7 @@ func TestBolt4(ot *testing.T) {
 	runBookmark := "bm"
 	runQid := 7
 	runResponse := []packstream.Struct{
-		packstream.Struct{
+		{
 			Tag: msgSuccess,
 			Fields: []interface{}{
 				map[string]interface{}{
@@ -45,19 +45,19 @@ func TestBolt4(ot *testing.T) {
 				},
 			},
 		},
-		packstream.Struct{
+		{
 			Tag:    msgRecord,
 			Fields: []interface{}{[]interface{}{"1v1", "1v2"}},
 		},
-		packstream.Struct{
+		{
 			Tag:    msgRecord,
 			Fields: []interface{}{[]interface{}{"2v1", "2v2"}},
 		},
-		packstream.Struct{
+		{
 			Tag:    msgRecord,
 			Fields: []interface{}{[]interface{}{"3v1", "3v2"}},
 		},
-		packstream.Struct{
+		{
 			Tag:    msgSuccess,
 			Fields: []interface{}{map[string]interface{}{"bookmark": runBookmark, "type": "r"}},
 		},
@@ -98,7 +98,7 @@ func TestBolt4(ot *testing.T) {
 		tcpConn, srv, cleanup := setupBolt4Pipe(t)
 		go serverJob(srv)
 
-		c, err := Connect("name", tcpConn, auth, "007", logger)
+		c, err := Connect("serverName", tcpConn, auth, "007", nil, logger)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -107,6 +107,91 @@ func TestBolt4(ot *testing.T) {
 		assertBoltState(t, bolt4_ready, bolt)
 		return bolt, cleanup
 	}
+
+	// Simple succesful connect
+	ot.Run("Connect success", func(t *testing.T) {
+		bolt, cleanup := connectToServer(t, func(srv *bolt4server) {
+			handshake := srv.waitForHandshake()
+			// There should be a version 4 somewhere
+			foundV := false
+			for i := 0; i < 5; i++ {
+				ver := handshake[(i * 4) : (i*4)+4]
+				if ver[3] == 4 {
+					foundV = true
+				}
+			}
+			if !foundV {
+				t.Fatalf("Didn't find version 4 in handshake: %+v", handshake)
+			}
+
+			// Accept bolt version 4
+			srv.acceptVersion(4)
+			srv.waitForHello()
+			srv.acceptHello()
+		})
+		defer cleanup()
+		defer bolt.Close()
+
+		// Check Bolt properties
+		AssertStringEqual(t, bolt.ServerName(), "serverName")
+		AssertTrue(t, bolt.IsAlive())
+	})
+
+	ot.Run("Routing in hello", func(t *testing.T) {
+		routingContext := map[string]string{"some": "thing"}
+		conn, srv, cleanup := setupBolt4Pipe(t)
+		defer cleanup()
+		go func() {
+			srv.waitForHandshake()
+			srv.acceptVersion(4)
+			hmap := srv.waitForHello()
+			helloRoutingContext := hmap["routing"].(map[string]interface{})
+			if len(helloRoutingContext) != len(routingContext) {
+				panic("Routing contexts differ")
+			}
+			srv.acceptHello()
+		}()
+		bolt, err := Connect("serverName", conn, auth, "007", routingContext, logger)
+		AssertNoError(t, err)
+		bolt.Close()
+	})
+
+	ot.Run("No routing in hello", func(t *testing.T) {
+		conn, srv, cleanup := setupBolt4Pipe(t)
+		defer cleanup()
+		go func() {
+			srv.waitForHandshake()
+			srv.acceptVersion(4)
+			hmap := srv.waitForHello()
+			_, exists := hmap["routing"].(map[string]interface{})
+			if exists {
+				panic("Should be no routing entry")
+			}
+			srv.acceptHello()
+		}()
+		bolt, err := Connect("serverName", conn, auth, "007", nil, logger)
+		AssertNoError(t, err)
+		bolt.Close()
+	})
+
+	ot.Run("Failed authentication", func(t *testing.T) {
+		conn, srv, cleanup := setupBolt4Pipe(t)
+		defer cleanup()
+		defer conn.Close()
+		go func() {
+			srv.waitForHandshake()
+			srv.acceptVersion(4)
+			srv.waitForHello()
+			srv.rejectHelloUnauthorized()
+		}()
+		bolt, err := Connect("serverName", conn, auth, "007", nil, logger)
+		AssertNil(t, bolt)
+		AssertError(t, err)
+		dbErr := err.(*db.Neo4jError)
+		if !dbErr.IsAuthenticationFailed() {
+			t.Errorf("Should be authentication error: %s", dbErr)
+		}
+	})
 
 	ot.Run("Run auto-commit", func(t *testing.T) {
 		bolt, cleanup := connectToServer(t, func(srv *bolt4server) {

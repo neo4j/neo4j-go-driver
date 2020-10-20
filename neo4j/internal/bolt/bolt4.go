@@ -235,15 +235,19 @@ func (b *bolt4) receiveSuccess() *successResponse {
 	}
 }
 
-func (b *bolt4) connect(auth map[string]interface{}, userAgent string) error {
+func (b *bolt4) connect(auth map[string]interface{}, userAgent string, routingContext map[string]string) error {
 	if err := b.assertState(bolt4_unauthorized); err != nil {
 		return err
 	}
 
-	// Prepare hello message by merging authentication info
+	// Prepare hello message
 	hello := map[string]interface{}{
 		"user_agent": userAgent,
 	}
+	if routingContext != nil {
+		hello["routing"] = routingContext
+	}
+	// Merge authentication keys into hello, avoid overwriting existing keys
 	for k, v := range auth {
 		_, exists := hello[k]
 		if !exists {
