@@ -36,10 +36,10 @@ type protocolVersion struct {
 
 // Supported versions in priority order
 var versions = [4]protocolVersion{
-	protocolVersion{major: 4, minor: 0},
-	protocolVersion{major: 3, minor: 0},
-	protocolVersion{major: 0, minor: 0},
-	protocolVersion{major: 0, minor: 0},
+	{major: 4, minor: 2},
+	{major: 4, minor: 1},
+	{major: 4, minor: 0},
+	{major: 3, minor: 0},
 }
 
 // Negotiate version of bolt protocol.
