@@ -172,8 +172,8 @@ func (s *bolt4server) waitForDiscardN(n, qid int) {
 	}
 }
 
-func (s *bolt4server) acceptVersion(ver byte) {
-	acceptedVer := []byte{0x00, 0x00, 0x00, ver}
+func (s *bolt4server) acceptVersion(major, minor byte) {
+	acceptedVer := []byte{0x00, 0x00, minor, major}
 	_, err := s.conn.Write(acceptedVer)
 	if err != nil {
 		panic(err)
@@ -223,7 +223,7 @@ func (s *bolt4server) rejectHelloUnauthorized() {
 // Utility when something else but connect is to be tested
 func (s *bolt4server) accept(ver byte) {
 	s.waitForHandshake()
-	s.acceptVersion(ver)
+	s.acceptVersion(ver, 0)
 	s.waitForHello()
 	s.acceptHello()
 }

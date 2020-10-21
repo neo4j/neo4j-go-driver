@@ -125,7 +125,7 @@ func TestBolt4(ot *testing.T) {
 			}
 
 			// Accept bolt version 4
-			srv.acceptVersion(4)
+			srv.acceptVersion(4, 0)
 			srv.waitForHello()
 			srv.acceptHello()
 		})
@@ -143,7 +143,7 @@ func TestBolt4(ot *testing.T) {
 		defer cleanup()
 		go func() {
 			srv.waitForHandshake()
-			srv.acceptVersion(4)
+			srv.acceptVersion(4, 1)
 			hmap := srv.waitForHello()
 			helloRoutingContext := hmap["routing"].(map[string]interface{})
 			if len(helloRoutingContext) != len(routingContext) {
@@ -161,7 +161,7 @@ func TestBolt4(ot *testing.T) {
 		defer cleanup()
 		go func() {
 			srv.waitForHandshake()
-			srv.acceptVersion(4)
+			srv.acceptVersion(4, 1)
 			hmap := srv.waitForHello()
 			_, exists := hmap["routing"].(map[string]interface{})
 			if exists {
@@ -174,13 +174,32 @@ func TestBolt4(ot *testing.T) {
 		bolt.Close()
 	})
 
+	ot.Run("No routing in hello on 4.0", func(t *testing.T) {
+		routingContext := map[string]string{"some": "thing"}
+		conn, srv, cleanup := setupBolt4Pipe(t)
+		defer cleanup()
+		go func() {
+			srv.waitForHandshake()
+			srv.acceptVersion(4, 0)
+			hmap := srv.waitForHello()
+			_, exists := hmap["routing"].(map[string]interface{})
+			if exists {
+				panic("Should be no routing entry")
+			}
+			srv.acceptHello()
+		}()
+		bolt, err := Connect("serverName", conn, auth, "007", routingContext, logger)
+		AssertNoError(t, err)
+		bolt.Close()
+	})
+
 	ot.Run("Failed authentication", func(t *testing.T) {
 		conn, srv, cleanup := setupBolt4Pipe(t)
 		defer cleanup()
 		defer conn.Close()
 		go func() {
 			srv.waitForHandshake()
-			srv.acceptVersion(4)
+			srv.acceptVersion(4, 0)
 			srv.waitForHello()
 			srv.rejectHelloUnauthorized()
 		}()

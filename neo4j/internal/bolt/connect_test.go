@@ -61,7 +61,7 @@ func TestConnect(ot *testing.T) {
 		// Simulate server that rejects whatever version the client supports
 		go func() {
 			srv.waitForHandshake()
-			srv.acceptVersion(1)
+			srv.acceptVersion(1, 0)
 		}()
 
 		boltconn, err := Connect("servername", conn, auth, "007", nil, logger)

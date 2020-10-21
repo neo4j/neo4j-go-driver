@@ -235,7 +235,7 @@ func (b *bolt4) receiveSuccess() *successResponse {
 	}
 }
 
-func (b *bolt4) connect(auth map[string]interface{}, userAgent string, routingContext map[string]string) error {
+func (b *bolt4) connect(minor int, auth map[string]interface{}, userAgent string, routingContext map[string]string) error {
 	if err := b.assertState(bolt4_unauthorized); err != nil {
 		return err
 	}
@@ -244,8 +244,13 @@ func (b *bolt4) connect(auth map[string]interface{}, userAgent string, routingCo
 	hello := map[string]interface{}{
 		"user_agent": userAgent,
 	}
-	if routingContext != nil {
-		hello["routing"] = routingContext
+	// On bolt >= 4.1 add routing to enable/disable routing
+	if minor >= 1 {
+		if routingContext != nil {
+			hello["routing"] = routingContext
+		} else {
+			hello["routing"] = nil
+		}
 	}
 	// Merge authentication keys into hello, avoid overwriting existing keys
 	for k, v := range auth {

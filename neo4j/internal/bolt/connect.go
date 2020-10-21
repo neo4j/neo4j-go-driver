@@ -81,7 +81,7 @@ func Connect(serverName string, conn net.Conn, auth map[string]interface{}, user
 	case 4:
 		// Handover rest of connection handshaking
 		boltConn := NewBolt4(serverName, conn, log)
-		err = boltConn.connect(auth, userAgent, routingContext)
+		err = boltConn.connect(int(minor), auth, userAgent, routingContext)
 		if err != nil {
 			return nil, err
 		}
