@@ -859,6 +859,8 @@ func (b *bolt4) GetRoutingTable(database string, context map[string]string) (*db
 		return nil, err
 	}
 
+	b.log.Infof(log.Bolt4, b.logId, "Reading routing table")
+
 	// The query should run in system database, preserve current setting and restore it when
 	// done.
 	originalDatabaseName := b.databaseName

@@ -365,7 +365,6 @@ func (p *Pool) Return(c db.Connection) {
 		if age < maxAge {
 			maxAge = age
 		}
-		p.log.Infof(log.Pool, p.logId, "Pruning %s for connections that might be dead", serverName)
 	}
 	p.removeIdleOlderThanOnServer(serverName, now, maxAge)
 
