@@ -261,6 +261,7 @@ func (d *driver) NewSession(config SessionConfig) Session {
 
 func (d *driver) VerifyConnectivity() error {
 	session := d.NewSession(SessionConfig{AccessMode: AccessModeRead})
+	defer session.Close()
 	result, err := session.Run("RETURN 1 AS n", nil)
 	if err != nil {
 		return err
