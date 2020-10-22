@@ -34,35 +34,28 @@ type Dehydrate func(x interface{}) (*Struct, error)
 type Packer struct {
 	buf       []byte
 	dehydrate Dehydrate
+	err       error // Sticky error
 }
 
 func (p *Packer) PackStruct(buf []byte, dehydrate Dehydrate, tag StructTag, fields ...interface{}) ([]byte, error) {
 	p.buf = buf
 	p.dehydrate = dehydrate
-	return p.buf, p.writeStruct(tag, fields)
+	p.err = nil
+	p.writeStruct(tag, fields)
+	return p.buf, p.err
 }
 
-// TEMP!
-func (p *Packer) Pack(buf []byte, dehydrate Dehydrate, x interface{}) ([]byte, error) {
-	p.buf = buf
-	p.dehydrate = dehydrate
-	return p.buf, p.pack(x)
-}
-
-func (p *Packer) writeStruct(tag StructTag, fields []interface{}) error {
+func (p *Packer) writeStruct(tag StructTag, fields []interface{}) {
 	l := len(fields)
 	if l > 0x0f {
-		return &OverflowError{msg: "Trying to pack struct with too many fields"}
+		p.err = &OverflowError{msg: "Trying to pack struct with too many fields"}
+		return
 	}
 
 	p.buf = append(p.buf, 0xb0+byte(l), byte(tag))
 	for _, f := range fields {
-		err := p.pack(f)
-		if err != nil {
-			return err
-		}
+		p.pack(f)
 	}
-	return nil
 }
 
 func (p *Packer) writeInt(i int64) {
@@ -92,7 +85,7 @@ func (p *Packer) writeFloat(f float64) {
 	p.buf = append(p.buf, buf[:]...)
 }
 
-func (p *Packer) writeListHeader(ll int, shortOffset, longOffset byte) error {
+func (p *Packer) writeListHeader(ll int, shortOffset, longOffset byte) {
 	l := int64(ll)
 	hdr := make([]byte, 0, 1+4)
 	if l < 0x10 {
@@ -110,31 +103,27 @@ func (p *Packer) writeListHeader(ll int, shortOffset, longOffset byte) error {
 			hdr[0] = longOffset + 2
 			binary.BigEndian.PutUint32(hdr[1:], uint32(l))
 		default:
-			return &OverflowError{msg: fmt.Sprintf("Trying to pack too large list of size %d ", l)}
+			p.err = &OverflowError{msg: fmt.Sprintf("Trying to pack too large list of size %d ", l)}
+			return
 		}
 	}
 	p.buf = append(p.buf, hdr...)
-	return nil
 }
 
-func (p *Packer) writeString(s string) error {
-	err := p.writeListHeader(len(s), 0x80, 0xd0)
-	if err != nil {
-		return err
-	}
+func (p *Packer) writeString(s string) {
+	p.writeListHeader(len(s), 0x80, 0xd0)
 	p.buf = append(p.buf, []byte(s)...)
-	return nil
 }
 
-func (p *Packer) writeArrayHeader(l int) error {
-	return p.writeListHeader(l, 0x90, 0xd4)
+func (p *Packer) writeArrayHeader(l int) {
+	p.writeListHeader(l, 0x90, 0xd4)
 }
 
-func (p *Packer) writeMapHeader(l int) error {
-	return p.writeListHeader(l, 0xa0, 0xd8)
+func (p *Packer) writeMapHeader(l int) {
+	p.writeListHeader(l, 0xa0, 0xd8)
 }
 
-func (p *Packer) writeBytes(b []byte) error {
+func (p *Packer) writeBytes(b []byte) {
 	hdr := make([]byte, 0, 1+4)
 	l := int64(len(b))
 	switch {
@@ -149,11 +138,11 @@ func (p *Packer) writeBytes(b []byte) error {
 		hdr[0] = 0xce
 		binary.BigEndian.PutUint32(hdr[1:], uint32(l))
 	default:
-		return &OverflowError{msg: fmt.Sprintf("Trying to pack too large byte array of size %d", l)}
+		p.err = &OverflowError{msg: fmt.Sprintf("Trying to pack too large byte array of size %d", l)}
+		return
 	}
 	p.buf = append(p.buf, hdr...)
 	p.buf = append(p.buf, b...)
-	return nil
 }
 
 func (p *Packer) writeBool(b bool) {
@@ -168,419 +157,239 @@ func (p *Packer) writeNil() {
 	p.buf = append(p.buf, 0xc0)
 }
 
-func (p *Packer) tryDehydrate(x interface{}) error {
+func (p *Packer) tryDehydrate(x interface{}) {
 	s, err := p.dehydrate(x)
 	if err != nil {
-		return err
+		p.err = err
+		return
 	}
 	if s == nil {
 		p.writeNil()
-		return nil
+		return
 	}
-	return p.writeStruct(s.Tag, s.Fields)
+	p.writeStruct(s.Tag, s.Fields)
 }
 
-func (p *Packer) writeSlice(x interface{}) error {
+func (p *Packer) writeSlice(x interface{}) {
 	// Check for optimized cases, resort to slower reflection if not found
 	switch v := x.(type) {
 	case []byte:
-		return p.writeBytes(v)
+		p.writeBytes(v)
 	case []interface{}:
-		err := p.writeArrayHeader(len(v))
-		if err != nil {
-			return err
-		}
+		p.writeArrayHeader(len(v))
 		for _, s := range v {
 			// Recurse
-			err = p.pack(s)
-			if err != nil {
-				return err
-			}
+			p.pack(s)
 		}
-		return nil
 	case []string:
-		err := p.writeArrayHeader(len(v))
-		if err != nil {
-			return err
-		}
+		p.writeArrayHeader(len(v))
 		for _, s := range v {
-			err = p.writeString(s)
-			if err != nil {
-				return err
-			}
+			p.writeString(s)
 		}
-		return nil
 	case []int64:
-		err := p.writeArrayHeader(len(v))
-		if err != nil {
-			return err
-		}
+		p.writeArrayHeader(len(v))
 		for _, s := range v {
 			p.writeInt(s)
 		}
-		return nil
 	case []uint64:
-		err := p.writeArrayHeader(len(v))
-		if err != nil {
-			return err
-		}
+		p.writeArrayHeader(len(v))
 		for _, s := range v {
-			err = overflowInt(s)
-			if err != nil {
-				return err
-			}
+			p.checkOverflowInt(s)
 			p.writeInt(int64(s))
 		}
-		return nil
 	case []int:
-		err := p.writeArrayHeader(len(v))
-		if err != nil {
-			return err
-		}
+		p.writeArrayHeader(len(v))
 		for _, s := range v {
 			p.writeInt(int64(s))
 		}
-		return nil
 	case []int8:
-		err := p.writeArrayHeader(len(v))
-		if err != nil {
-			return err
-		}
+		p.writeArrayHeader(len(v))
 		for _, s := range v {
 			p.writeInt(int64(s))
 		}
-		return nil
 	case []uint16:
-		err := p.writeArrayHeader(len(v))
-		if err != nil {
-			return err
-		}
+		p.writeArrayHeader(len(v))
 		for _, s := range v {
 			p.writeInt(int64(s))
 		}
-		return nil
 	case []int16:
-		err := p.writeArrayHeader(len(v))
-		if err != nil {
-			return err
-		}
+		p.writeArrayHeader(len(v))
 		for _, s := range v {
 			p.writeInt(int64(s))
 		}
-		return nil
 	case []uint32:
-		err := p.writeArrayHeader(len(v))
-		if err != nil {
-			return err
-		}
+		p.writeArrayHeader(len(v))
 		for _, s := range v {
 			p.writeInt(int64(s))
 		}
-		return nil
 	case []int32:
-		err := p.writeArrayHeader(len(v))
-		if err != nil {
-			return err
-		}
+		p.writeArrayHeader(len(v))
 		for _, s := range v {
 			p.writeInt(int64(s))
 		}
-		return nil
 	case []float64:
-		err := p.writeArrayHeader(len(v))
-		if err != nil {
-			return err
-		}
+		p.writeArrayHeader(len(v))
 		for _, s := range v {
 			p.writeFloat(s)
 		}
-		return nil
 	case []float32:
-		err := p.writeArrayHeader(len(v))
-		if err != nil {
-			return err
-		}
+		p.writeArrayHeader(len(v))
 		for _, s := range v {
 			p.writeFloat(float64(s))
 		}
-		return nil
 	default:
 		// We know that this is some kind of slice
 		rv := reflect.ValueOf(x)
 		num := rv.Len()
-		if err := p.writeArrayHeader(num); err != nil {
-			return err
-		}
+		p.writeArrayHeader(num)
 		for i := 0; i < num; i++ {
 			rx := rv.Index(i)
-			if err := p.pack(rx.Interface()); err != nil {
-				return err
-			}
+			p.pack(rx.Interface())
 		}
-		return nil
 	}
 }
 
-func (p *Packer) writeMap(x interface{}) error {
+func (p *Packer) writeMap(x interface{}) {
 	switch v := x.(type) {
 	case map[string]interface{}:
-		err := p.writeMapHeader(len(v))
-		if err != nil {
-			return err
-		}
+		p.writeMapHeader(len(v))
 		for k, v := range v {
-			err = p.writeString(k)
-			if err != nil {
-				return err
-			}
+			p.writeString(k)
 			// Recurse
-			err = p.pack(v)
-			if err != nil {
-				return err
-			}
+			p.pack(v)
 		}
-		return nil
 	case map[string]string:
-		err := p.writeMapHeader(len(v))
-		if err != nil {
-			return err
-		}
+		p.writeMapHeader(len(v))
 		for k, v := range v {
-			err = p.writeString(k)
-			if err != nil {
-				return err
-			}
-			err = p.writeString(v)
-			if err != nil {
-				return err
-			}
+			p.writeString(k)
+			p.writeString(v)
 		}
-		return nil
 	case map[string]float64:
-		err := p.writeMapHeader(len(v))
-		if err != nil {
-			return err
-		}
+		p.writeMapHeader(len(v))
 		for k, v := range v {
-			err = p.writeString(k)
-			if err != nil {
-				return err
-			}
+			p.writeString(k)
 			p.writeFloat(v)
 		}
-		return nil
 	case map[string]float32:
-		err := p.writeMapHeader(len(v))
-		if err != nil {
-			return err
-		}
+		p.writeMapHeader(len(v))
 		for k, v := range v {
-			err = p.writeString(k)
-			if err != nil {
-				return err
-			}
+			p.writeString(k)
 			p.writeFloat(float64(v))
 		}
-		return nil
 	case map[string]int64:
-		err := p.writeMapHeader(len(v))
-		if err != nil {
-			return err
-		}
+		p.writeMapHeader(len(v))
 		for k, v := range v {
-			err = p.writeString(k)
-			if err != nil {
-				return err
-			}
+			p.writeString(k)
 			p.writeInt(v)
 		}
-		return nil
 	case map[string]uint64:
-		err := p.writeMapHeader(len(v))
-		if err != nil {
-			return err
-		}
+		p.writeMapHeader(len(v))
 		for k, v := range v {
-			err = overflowInt(v)
-			if err != nil {
-				return err
-			}
-			err = p.writeString(k)
-			if err != nil {
-				return err
-			}
+			p.writeString(k)
+			p.checkOverflowInt(v)
 			p.writeInt(int64(v))
 		}
-		return nil
 	case map[string]int:
-		err := p.writeMapHeader(len(v))
-		if err != nil {
-			return err
-		}
+		p.writeMapHeader(len(v))
 		for k, v := range v {
-			err = p.writeString(k)
-			if err != nil {
-				return err
-			}
+			p.writeString(k)
 			p.writeInt(int64(v))
 		}
-		return nil
 	case map[string]int8:
-		err := p.writeMapHeader(len(v))
-		if err != nil {
-			return err
-		}
+		p.writeMapHeader(len(v))
 		for k, v := range v {
-			err = p.writeString(k)
-			if err != nil {
-				return err
-			}
+			p.writeString(k)
 			p.writeInt(int64(v))
 		}
-		return nil
 	case map[string]uint8:
-		err := p.writeMapHeader(len(v))
-		if err != nil {
-			return err
-		}
+		p.writeMapHeader(len(v))
 		for k, v := range v {
-			err = p.writeString(k)
-			if err != nil {
-				return err
-			}
+			p.writeString(k)
 			p.writeInt(int64(v))
 		}
-		return nil
 	case map[string]uint16:
-		err := p.writeMapHeader(len(v))
-		if err != nil {
-			return err
-		}
+		p.writeMapHeader(len(v))
 		for k, v := range v {
-			err = p.writeString(k)
-			if err != nil {
-				return err
-			}
+			p.writeString(k)
 			p.writeInt(int64(v))
 		}
-		return nil
 	case map[string]int16:
-		err := p.writeMapHeader(len(v))
-		if err != nil {
-			return err
-		}
+		p.writeMapHeader(len(v))
 		for k, v := range v {
-			err = p.writeString(k)
-			if err != nil {
-				return err
-			}
+			p.writeString(k)
 			p.writeInt(int64(v))
 		}
-		return nil
 	case map[string]uint32:
-		err := p.writeMapHeader(len(v))
-		if err != nil {
-			return err
-		}
+		p.writeMapHeader(len(v))
 		for k, v := range v {
-			err = p.writeString(k)
-			if err != nil {
-				return err
-			}
+			p.writeString(k)
 			p.writeInt(int64(v))
 		}
-		return nil
 	case map[string]int32:
-		err := p.writeMapHeader(len(v))
-		if err != nil {
-			return err
-		}
+		p.writeMapHeader(len(v))
 		for k, v := range v {
-			err = p.writeString(k)
-			if err != nil {
-				return err
-			}
+			p.writeString(k)
 			p.writeInt(int64(v))
 		}
-		return nil
 	case map[string]bool:
-		err := p.writeMapHeader(len(v))
-		if err != nil {
-			return err
-		}
+		p.writeMapHeader(len(v))
 		for k, v := range v {
-			err = p.writeString(k)
-			if err != nil {
-				return err
-			}
+			p.writeString(k)
 			p.writeBool(v)
 		}
-		return nil
 	default:
 		// We know that this is some kind of map
 		rv := reflect.ValueOf(x)
 		num := rv.Len()
-		if err := p.writeMapHeader(num); err != nil {
-			return err
-		}
+		p.writeMapHeader(num)
 		// We will not detect if key is something else but a string until checking first
 		// element, this means that we will succeed in packaging map[int]string {} as an empty
 		// map. TODO: When Go 1.12 is min version use MapRange instead.
 		keys := rv.MapKeys()
 		for _, ik := range keys {
 			if ik.Kind() != reflect.String {
-				return &UnsupportedTypeError{t: reflect.TypeOf(x)}
+				p.err = &UnsupportedTypeError{t: reflect.TypeOf(x)}
+				return
 			}
-			if err := p.writeString(ik.String()); err != nil {
-				return err
-			}
+			p.writeString(ik.String())
 			iv := rv.MapIndex(ik)
-			if err := p.pack(iv.Interface()); err != nil {
-				return err
-			}
+			p.pack(iv.Interface())
 		}
-
-		return nil
 	}
 }
 
-func overflowInt(i uint64) error {
+func (p *Packer) checkOverflowInt(i uint64) {
 	if i > math.MaxInt64 {
-		return &OverflowError{msg: "Trying to pack uint64 that doesn't fit into int64"}
+		p.err = &OverflowError{msg: "Trying to pack uint64 that doesn't fit into int64"}
 	}
-	return nil
 }
 
-func (p *Packer) pack(x interface{}) error {
+func (p *Packer) pack(x interface{}) {
 	if x == nil {
 		p.writeNil()
-		return nil
+		return
 	}
 
+	// Use reflect to handle cases where users have done strange things like:
+	//   type SpecialInt int64
 	t := reflect.ValueOf(x)
 	switch t.Kind() {
 	case reflect.Bool:
 		p.writeBool(t.Bool())
-		return nil
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
 		p.writeInt(t.Int())
-		return nil
 	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
 		u := t.Uint()
-		if err := overflowInt(u); err != nil {
-			return err
-		}
+		p.checkOverflowInt(u)
 		p.writeInt(int64(u))
-		return nil
 	case reflect.Float32, reflect.Float64:
 		p.writeFloat(t.Float())
-		return nil
 	case reflect.String:
-		return p.writeString(t.String())
+		p.writeString(t.String())
 	case reflect.Ptr:
 		if t.IsNil() {
 			p.writeNil()
-			return nil
+			return
 		}
 		// Inspect what the pointer points to
 		i := reflect.Indirect(t)
@@ -588,20 +397,22 @@ func (p *Packer) pack(x interface{}) error {
 		case reflect.Struct:
 			s, isS := x.(*Struct)
 			if isS {
-				return p.writeStruct(s.Tag, s.Fields)
+				p.writeStruct(s.Tag, s.Fields)
+			} else {
+				// Unknown type, call dehydration hook to make it into a struct
+				p.tryDehydrate(x)
 			}
-			// Unknown type, call dehydration hook to make it into a struct
-			return p.tryDehydrate(x)
 		default:
-			return p.pack(i.Interface())
+			p.pack(i.Interface())
 		}
 	case reflect.Struct:
 		// Unknown type, call dehydration hook to make it into a struct
-		return p.tryDehydrate(x)
+		p.tryDehydrate(x)
 	case reflect.Slice:
-		return p.writeSlice(x)
+		p.writeSlice(x)
 	case reflect.Map:
-		return p.writeMap(x)
+		p.writeMap(x)
+	default:
+		p.err = &UnsupportedTypeError{t: reflect.TypeOf(x)}
 	}
-	return &UnsupportedTypeError{t: reflect.TypeOf(x)}
 }

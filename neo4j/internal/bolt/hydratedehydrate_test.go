@@ -195,7 +195,9 @@ func TestDehydrateHydrate(ot *testing.T) {
 		buf := []byte{}
 		packer := packstream.Packer{}
 		var err error
-		buf, err = packer.Pack(buf, dehydrate, xi)
+		s, err := dehydrate(xi)
+		AssertNoError(t, err)
+		buf, err = packer.PackStruct(buf, dehydrate, s.Tag, s.Fields...)
 		AssertNoError(t, err)
 		unpacker := &packstream.Unpacker{}
 		xo, err := unpacker.UnpackStruct(buf, hydrate)
