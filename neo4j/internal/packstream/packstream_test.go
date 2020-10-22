@@ -511,9 +511,9 @@ func TestPackStream(ot *testing.T) {
 		ot.Run(fmt.Sprintf("Packing of %s", c.name), func(t *testing.T) {
 			buf := []byte{}
 			p := Packer{buf: buf, dehydrate: c.dehydrate}
-			err := p.pack(c.value)
-			if err != nil {
-				t.Fatalf("Unable to pack: %s", err)
+			p.pack(c.value)
+			if p.err != nil {
+				t.Fatalf("Unable to pack: %s", p.err)
 			}
 			buf = p.buf
 			if len(c.expectPacked) != len(buf) {
@@ -582,9 +582,9 @@ func TestPackStream(ot *testing.T) {
 		p := Packer{buf: buf, dehydrate: func(x interface{}) (*Struct, error) {
 			return nil, &UnsupportedTypeError{t: reflect.TypeOf(x)}
 		}}
-		err := p.pack(m)
-		if err != nil {
-			ot.Fatalf("Unable to pack: %s", err)
+		p.pack(m)
+		if p.err != nil {
+			ot.Fatalf("Unable to pack: %s", p.err)
 		}
 		buf = p.buf
 
@@ -666,12 +666,12 @@ func TestPackStream(ot *testing.T) {
 			if c.valueFunc != nil {
 				v = c.valueFunc()
 			}
-			err := p.pack(v)
-			if err == nil {
+			p.pack(v)
+			if p.err == nil {
 				t.Fatal("Should have gotten an error!")
 			}
-			if reflect.TypeOf(err) != reflect.TypeOf(c.expectedErr) {
-				t.Errorf("Wrong type of error, expected %T but was %T", c.expectedErr, err)
+			if reflect.TypeOf(p.err) != reflect.TypeOf(c.expectedErr) {
+				t.Errorf("Wrong type of error, expected %T but was %T", c.expectedErr, p.err)
 			}
 		})
 	}

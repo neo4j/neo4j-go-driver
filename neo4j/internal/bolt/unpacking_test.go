@@ -81,3 +81,44 @@ func BenchmarkUnpackingStructs(b *testing.B) {
 		unpacker.UnpackStruct(buf, hydrate)
 	}
 }
+
+var manyInts = []int{
+	10, 20, 30, 40, 50, 60, 71, 100, 1000, 10, 20, 40, 1000, 6553223, 1212, 1212, 3543434, 1212, 12121, 10, -1, -100000, -56456,
+	10, 20, 30, 40, 50, 60, 71, 100, 1000, 10, 20, 40, 1000, 6553223, 1212, 1212, 3543434, 1212, 12121, 10, -1, -100000, -56456,
+	10, 20, 30, 40, 50, 60, 71, 100, 1000, 10, 20, 40, 1000, 6553223, 1212, 1212, 3543434, 1212, 12121, 10, -1, -100000, -56456,
+	10, 20, 30, 40, 50, 60, 71, 100, 1000, 10, 20, 40, 1000, 6553223, 1212, 1212, 3543434, 1212, 12121, 10, -1, -100000, -56456,
+	10, 20, 30, 40, 50, 60, 71, 100, 1000, 10, 20, 40, 1000, 6553223, 1212, 1212, 3543434, 1212, 12121, 10, -1, -100000, -56456,
+	10, 20, 30, 40, 50, 60, 71, 100, 1000, 10, 20, 40, 1000, 6553223, 1212, 1212, 3543434, 1212, 12121, 10, -1, -100000, -56456,
+	10, 20, 30, 40, 50, 60, 71, 100, 1000, 10, 20, 40, 1000, 6553223, 1212, 1212, 3543434, 1212, 12121, 10, -1, -100000, -56456,
+	10, 20, 30, 40, 50, 60, 71, 100, 1000, 10, 20, 40, 1000, 6553223, 1212, 1212, 3543434, 1212, 12121, 10, -1, -100000, -56456,
+}
+
+var manyStrings = []string{
+	"It is possible to set a property on a node or relationship using more complex expressions. For instance, in contrast to specifying the node directly, the following query shows how to set a property for a node selected by an expression",
+	"It", " is", " possible", " to", " set ", "", "a ", "property ", "on ", "a node or relationship ", "using more ", "complex expressions", ". For ", "instance, ", "in contrast to ", "specifying ", "the ", "node directly", ", ", "the ", "following query ", "shows how ", "to set ", "a ", "property for a node selected by an ", "expression",
+}
+
+func BenchmarkPackRunLarge(b *testing.B) {
+	chunker := newChunker()
+	packer := &packstream.Packer{}
+	cypher := "MATCH (n { name: 'Andy' }) SET ( CASE WHEN n.age = 36 THEN n END ).worksIn = 'Malmo' RETURN n.name, n.worksIn"
+	var err error
+	params := map[string]interface{}{
+		"aint":        12121,
+		"abiging":     int64(12121212121),
+		"manyints":    manyInts,
+		"manystrings": manyStrings,
+	}
+	meta := map[string]interface{}{}
+
+	for i := 0; i < b.N; i++ {
+		chunker.beginMessage()
+		chunker.buf, err = packer.PackStruct(chunker.buf, dehydrate, msgRun, cypher, params, meta)
+		if err != nil {
+			b.Fatal(err)
+		}
+		chunker.endMessage()
+		// Emulate what is done in chunker
+		chunker.buf = chunker.buf[:0]
+	}
+}
