@@ -21,63 +21,172 @@ package packstream
 
 import (
 	"encoding/hex"
-	"errors"
 	"fmt"
-	"io"
 	"math"
 	"os"
 	"reflect"
 	"testing"
 )
 
-type customStruct struct{}
-
-type testHydratorMock struct {
-	customHydrate Hydrate
-	err           error
+type testStruct struct {
+	tag    byte
+	fields []interface{}
 }
 
-func (m *testHydratorMock) hydrate(tag StructTag, fields []interface{}) (interface{}, error) {
-	if m.err != nil {
-		return nil, m.err
+// Utility to simplify testcase writing
+// Also an example of how a "generic" unpack function looks like.
+func unpack(u *Unpacker) interface{} {
+	u.Next()
+	switch u.Curr {
+	case PackedInt:
+		return u.Int()
+	case PackedFloat:
+		return u.Float()
+	case PackedStr:
+		return u.String()
+	case PackedByteArray:
+		return u.ByteArray()
+	case PackedNil:
+		return nil
+	case PackedTrue:
+		return true
+	case PackedFalse:
+		return false
+	case PackedArray:
+		l := u.Len()
+		a := make([]interface{}, l)
+		for i := range a {
+			a[i] = unpack(u)
+		}
+		return a
+	case PackedMap:
+		l := u.Len()
+		m := make(map[string]interface{}, l)
+		for i := uint32(0); i < l; i++ {
+			u.Next()
+			k := u.String()
+			m[k] = unpack(u)
+		}
+		return m
+	case PackedStruct:
+		t := u.StructTag()
+		l := u.Len()
+		s := testStruct{tag: t}
+		if l == 0 {
+			return &s
+		}
+		s.fields = make([]interface{}, l)
+		for i := range s.fields {
+			s.fields[i] = unpack(u)
+		}
+		return &s
+	default:
+		panic(fmt.Sprintf("Unhandled Curr: %d", u.Curr))
 	}
-	if m.customHydrate != nil {
-		return m.customHydrate(tag, fields)
-	}
-	// Need to copy fields
-	if len(fields) > 0 {
-		copiedFields := make([]interface{}, len(fields))
-		copy(copiedFields, fields)
-		fields = copiedFields
-	}
-	return &Struct{Tag: tag, Fields: fields}, nil
 }
 
-type testHydrationError struct{}
-
-func (e *testHydrationError) Error() string {
-	return ""
-}
-
-type limitedWriter struct {
-	max int
-}
-
-func (w *limitedWriter) Write(p []byte) (int, error) {
-	n := len(p)
-	if n <= w.max {
-		w.max -= n
-		return n, nil
+// Utility to simplify testcase writing
+// Also an example of how a "generic" pack function looks like.
+func pack(p *Packer, x interface{}) {
+	if x == nil {
+		p.Nil()
+		return
 	}
-
-	if w.max > 0 {
-		n = w.max
-		w.max = -1
-	} else {
-		n = 0
+	switch v := x.(type) {
+	case int64:
+		p.Int64(v)
+	case int32:
+		p.Int32(v)
+	case int16:
+		p.Int16(v)
+	case int8:
+		p.Int8(v)
+	case int:
+		p.Int(v)
+	case uint64:
+		p.Uint64(v)
+	case uint32:
+		p.Uint32(v)
+	case uint16:
+		p.Uint16(v)
+	case uint8:
+		p.Uint8(v)
+	case bool:
+		p.Bool(v)
+	case string:
+		p.String(v)
+	case float64:
+		p.Float64(v)
+	case float32:
+		p.Float32(v)
+	case []byte:
+		p.Bytes(v)
+	case []interface{}:
+		p.ArrayHeader(len(v))
+		for _, y := range v {
+			pack(p, y)
+		}
+	case []string:
+		p.Strings(v)
+	case []int64:
+		p.Int64s(v)
+	case []int16:
+		p.ArrayHeader(len(v))
+		for _, y := range v {
+			pack(p, y)
+		}
+	case []int:
+		p.Ints(v)
+	case []int8:
+		p.ArrayHeader(len(v))
+		for _, y := range v {
+			pack(p, y)
+		}
+	case []uint16:
+		p.ArrayHeader(len(v))
+		for _, y := range v {
+			pack(p, y)
+		}
+	case []uint32:
+		p.ArrayHeader(len(v))
+		for _, y := range v {
+			pack(p, y)
+		}
+	case []int32:
+		p.ArrayHeader(len(v))
+		for _, y := range v {
+			pack(p, y)
+		}
+	case []uint64:
+		p.ArrayHeader(len(v))
+		for _, y := range v {
+			pack(p, y)
+		}
+	case []float64:
+		p.Float64s(v)
+	case []float32:
+		p.ArrayHeader(len(v))
+		for _, y := range v {
+			pack(p, y)
+		}
+	case map[string]interface{}:
+		p.MapHeader(len(v))
+		for s, y := range v {
+			p.String(s)
+			pack(p, y)
+		}
+	case map[string]string:
+		p.StringMap(v)
+	case map[string]int:
+		p.IntMap(v)
+	case *testStruct:
+		p.StructHeader(byte(v.tag), len(v.fields))
+		for _, y := range v.fields {
+			pack(p, y)
+		}
+	default:
+		panic(fmt.Sprintf("Unhandled pack type: %T", v))
 	}
-
-	return n, errors.New("Whatever")
 }
 
 func TestPackStream(ot *testing.T) {
@@ -108,7 +217,7 @@ func TestPackStream(ot *testing.T) {
 
 	genStr := func(l int) (string, []byte) {
 		b := make([]byte, l)
-		for i, _ := range b {
+		for i := range b {
 			b[i] = byte('a')
 		}
 		return string(b), b
@@ -123,7 +232,7 @@ func TestPackStream(ot *testing.T) {
 
 	genByt := func(l int) []byte {
 		b := make([]byte, l)
-		for i, _ := range b {
+		for i := range b {
 			b[i] = 0x3f
 		}
 		return b
@@ -136,7 +245,7 @@ func TestPackStream(ot *testing.T) {
 
 	genArr := func(l int) []int16 {
 		b := make([]int16, l)
-		for i, _ := range b {
+		for i := range b {
 			b[i] = 1
 		}
 		return b
@@ -165,21 +274,15 @@ func TestPackStream(ot *testing.T) {
 		return b
 	}
 
-	// Some custom types wrapping primitive types
-	type (
-		customBool        bool
-		customFloat       float64
-		customInt         int64
-		customString      string
-		customByteSlice   []byte
-		customStringSlice []string
-		customMapOfInts   map[string]int
-	)
-
-	emptyStruct := &Struct{Tag: 0x66}
-	maxStruct := &Struct{Tag: 0x67, Fields: []interface{}{"1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15"}}
-	structOfStruct := &Struct{Tag: 0x66,
-		Fields: []interface{}{&Struct{Tag: 0x67, Fields: []interface{}{"1", "2"}}, &Struct{Tag: 0x68, Fields: []interface{}{"3", "4"}}}}
+	emptyStruct := &testStruct{tag: 0x66}
+	maxStruct := &testStruct{
+		tag:    0x67,
+		fields: []interface{}{"1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15"}}
+	structOfStruct := &testStruct{
+		tag: 0x66,
+		fields: []interface{}{
+			&testStruct{tag: 0x67, fields: []interface{}{"1", "2"}},
+			&testStruct{tag: 0x68, fields: []interface{}{"3", "4"}}}}
 
 	cases := []struct {
 		name           string
@@ -187,7 +290,6 @@ func TestPackStream(ot *testing.T) {
 		expectPacked   []byte
 		expectUnpacked interface{}
 		testUnpacked   bool
-		dehydrate      Dehydrate
 	}{
 		// Nil
 		{name: "nil", value: nil, testUnpacked: true,
@@ -196,9 +298,6 @@ func TestPackStream(ot *testing.T) {
 
 		// Bools
 		{name: "true", value: true, testUnpacked: true,
-			expectUnpacked: true,
-			expectPacked:   []byte{0xc3}},
-		{name: "custom true", value: customBool(true), testUnpacked: true,
 			expectUnpacked: true,
 			expectPacked:   []byte{0xc3}},
 		{name: "false", value: false, testUnpacked: true,
@@ -210,9 +309,6 @@ func TestPackStream(ot *testing.T) {
 			expectUnpacked: float64(zeroFloat64),
 			expectPacked:   []byte{0xc1, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}},
 		{name: "pi float64", value: piFloat64, testUnpacked: true,
-			expectUnpacked: float64(piFloat64),
-			expectPacked:   []byte{0xc1, 0x40, 0x09, 0x1e, 0xb8, 0x51, 0xeb, 0x85, 0x1f}},
-		{name: "pi custom float64", value: customFloat(piFloat64), testUnpacked: true,
 			expectUnpacked: float64(piFloat64),
 			expectPacked:   []byte{0xc1, 0x40, 0x09, 0x1e, 0xb8, 0x51, 0xeb, 0x85, 0x1f}},
 		{name: "pi float32", value: piFloat32, testUnpacked: true,
@@ -289,10 +385,6 @@ func TestPackStream(ot *testing.T) {
 		{name: "int32", value: aint32, testUnpacked: true,
 			expectUnpacked: int64(aint32),
 			expectPacked:   []byte{0xca, 0x80, 0x00, 0x00, 0x00}},
-		{name: "custom int", value: customInt(aint32), testUnpacked: true,
-			expectUnpacked: int64(aint32),
-			expectPacked:   []byte{0xca, 0x80, 0x00, 0x00, 0x00}},
-
 		// Strings
 		{name: "String, empty", value: "", testUnpacked: true,
 			expectUnpacked: "",
@@ -304,9 +396,6 @@ func TestPackStream(ot *testing.T) {
 			expectUnpacked: "12",
 			expectPacked:   []byte{0x82, 0x31, 0x32}},
 		{name: "string, 123", value: "123", testUnpacked: true,
-			expectUnpacked: "123",
-			expectPacked:   []byte{0x83, 0x31, 0x32, 0x33}},
-		{name: "custom string, 123", value: customString("123"), testUnpacked: true,
 			expectUnpacked: "123",
 			expectPacked:   []byte{0x83, 0x31, 0x32, 0x33}},
 		{name: "string, 4, 4->8", value: str15, testUnpacked: true,
@@ -335,10 +424,6 @@ func TestPackStream(ot *testing.T) {
 		{name: "[]byte, some", value: []byte{0x01, 0x02, 0x03}, testUnpacked: true,
 			expectUnpacked: []byte{0x01, 0x02, 0x03},
 			expectPacked:   []byte{0xcc, 0x03, 0x01, 0x02, 0x03}},
-		{name: "custom []byte", value: customByteSlice([]byte{0x01, 0x02, 0x03}),
-			expectUnpacked: []byte{0x01, 0x02, 0x03},
-			// Custom type will cause this to be like any slice, not bytes
-			expectPacked: []byte{0x93, 0x01, 0x02, 0x03}},
 		{name: "[]byte, 8, 8->16", value: byt255, testUnpacked: true,
 			expectUnpacked: byt255,
 			expectPacked:   append([]byte{0xcc, 0xff}, byt255...)},
@@ -370,11 +455,6 @@ func TestPackStream(ot *testing.T) {
 		{name: "[]int64, samples", value: []int64{1, posInt24To40 + 1, 0}, testUnpacked: true,
 			expectUnpacked: []interface{}{int64(1), int64(posInt24To40 + 1), int64(0)},
 			expectPacked:   []byte{0x93, 0x01, 0xca, 0x00, 0x00, 0x80, 0x00, 0x00}},
-		{name: "custom []string", value: customStringSlice([]string{"short", str16}), testUnpacked: true,
-			expectUnpacked: []interface{}{"short", str16},
-			expectPacked: []byte{
-				0x92, 0x85, 0x73, 0x68, 0x6f, 0x72, 0x74, 0xd0, 0x10, 0x61, 0x61, 0x61, 0x61, 0x61,
-				0x61, 0x61, 0x61, 0x61, 0x61, 0x61, 0x61, 0x61, 0x61, 0x61, 0x61}},
 
 		// Slice sizes
 		{name: "array size, 4, 4->8", value: arr15, testUnpacked: true,
@@ -398,8 +478,6 @@ func TestPackStream(ot *testing.T) {
 
 		// Slice of ints (bytes excluded)
 		{name: "[]int, type", value: []int{1},
-			expectPacked: []byte{0x91, 0x01}},
-		{name: "*[]int, type", value: &([]int{1}),
 			expectPacked: []byte{0x91, 0x01}},
 		{name: "[]int8, type", value: []int8{1},
 			expectPacked: []byte{0x91, 0x01}},
@@ -433,54 +511,20 @@ func TestPackStream(ot *testing.T) {
 		{name: "map[string]interface{}, sample", value: map[string]interface{}{"s": "str"}, testUnpacked: true,
 			expectUnpacked: map[string]interface{}{"s": interface{}("str")},
 			expectPacked:   []byte{0xa1, 0x81, 0x73, 0x83, 0x73, 0x74, 0x72}},
-
-		// Map[string] of ints
 		{name: "map[string]string, empty", value: map[string]string{},
-			expectPacked: []byte{0xa0}},
-		{name: "*map[string]string, empty", value: &(map[string]string{}),
 			expectPacked: []byte{0xa0}},
 		{name: "map[string]string, sample", value: map[string]string{"key": "value"},
 			expectPacked: []byte{
 				0xa1, 0x83, 0x6b, 0x65, 0x79, 0x85, 0x76, 0x61, 0x6c, 0x75, 0x65}},
-		{name: "map[string]int64, sample", value: map[string]int64{"l": posInt24To40 + 1},
-			expectPacked: []byte{0xa1, 0x81, 0x6c, 0xca, 0x00, 0x00, 0x80, 0x00}},
 		{name: "map[string]int, type", value: map[string]int{"l": 1},
 			expectPacked: []byte{0xa1, 0x81, 0x6c, 0x01}},
-		{name: "map[string]int8 , type", value: map[string]int8{"l": 1},
-			expectPacked: []byte{0xa1, 0x81, 0x6c, 0x01}},
-		{name: "map[string]uint8, type", value: map[string]uint8{"l": 1},
-			expectPacked: []byte{0xa1, 0x81, 0x6c, 0x01}},
-		{name: "map[string]uint16, type", value: map[string]uint16{"l": 1},
-			expectPacked: []byte{0xa1, 0x81, 0x6c, 0x01}},
-		{name: "map[string]int16, type", value: map[string]int16{"l": 1},
-			expectPacked: []byte{0xa1, 0x81, 0x6c, 0x01}},
-		{name: "map[string]uint32, type", value: map[string]uint32{"l": 1},
-			expectPacked: []byte{0xa1, 0x81, 0x6c, 0x01}},
-		{name: "map[string]int32, type", value: map[string]int32{"l": 1},
-			expectPacked: []byte{0xa1, 0x81, 0x6c, 0x01}},
-		{name: "map[string]uint64, type", value: map[string]uint64{"l": 1},
-			expectPacked: []byte{0xa1, 0x81, 0x6c, 0x01}},
-		{name: "custom map[string]int, type", value: customMapOfInts(map[string]int{"l": 1}),
-			expectPacked: []byte{0xa1, 0x81, 0x6c, 0x01}},
-
-		// Map[string] of floats
-		{name: "map[string]float64, sample", value: map[string]float64{"l": piFloat64},
-			expectPacked: []byte{
-				0xa1, 0x81, 0x6c, 0xc1, 0x40, 0x09, 0x1e, 0xb8, 0x51, 0xeb, 0x85, 0x1f}},
-		{name: "map[string]float32, type", value: map[string]float32{"l": piFloat32},
-			expectPacked: []byte{
-				0xa1, 0x81, 0x6c, 0xc1, 0x40, 0x09, 0x1e, 0xb8, 0x60, 0x00, 0x00, 0x00}},
-
-		// Map[string] of bools
-		{name: "map[string]bool, sample", value: map[string]bool{"b": true},
-			expectPacked: []byte{0xa1, 0x81, 0x62, 0xc3}},
 
 		// Structs
 		{name: "struct, empty", value: emptyStruct, testUnpacked: true,
 			expectUnpacked: emptyStruct,
 			expectPacked:   []byte{0xb0, 0x66}},
-		{name: "struct, one", value: &Struct{Tag: 0x01, Fields: []interface{}{1}}, testUnpacked: false,
-			expectUnpacked: &Struct{Tag: 0x01, Fields: []interface{}{1}},
+		{name: "struct, one", value: &testStruct{tag: 0x01, fields: []interface{}{1}}, testUnpacked: false,
+			expectUnpacked: &testStruct{tag: 0x01, fields: []interface{}{1}},
 			expectPacked:   []byte{0xb1, 0x01, 0x01}},
 		{name: "struct, max size", value: maxStruct, testUnpacked: true,
 			expectUnpacked: maxStruct,
@@ -493,29 +537,19 @@ func TestPackStream(ot *testing.T) {
 			expectPacked: []byte{
 				0xb2, 0x66, 0xb2, 0x67, 0x81, 0x31, 0x81, 0x32, 0xb2, 0x68, 0x81, 0x33, 0x81,
 				0x34}},
-
-		// Custom type using hook (for temporal, spatial types)
-		{name: "custom type to struct", value: &customStruct{},
-			dehydrate: func(x interface{}) (*Struct, error) {
-				switch x.(type) {
-				case *customStruct:
-					return &Struct{Tag: 0x01, Fields: []interface{}{1}}, nil
-				}
-				return nil, errors.New(".")
-			},
-			expectPacked: []byte{0xb1, 0x01, 0x01}},
 	}
 
 	for _, c := range cases {
-		// Packing
 		ot.Run(fmt.Sprintf("Packing of %s", c.name), func(t *testing.T) {
 			buf := []byte{}
-			p := Packer{buf: buf, dehydrate: c.dehydrate}
-			p.pack(c.value)
-			if p.err != nil {
+			p := Packer{}
+			p.Begin([]byte{})
+			pack(&p, c.value)
+			buf, err := p.End()
+
+			if err != nil {
 				t.Fatalf("Unable to pack: %s", p.err)
 			}
-			buf = p.buf
 			if len(c.expectPacked) != len(buf) {
 				dumper.Write(buf)
 				t.Fatalf("Packed buffer differs in size. Got %+v expected %+v",
@@ -535,13 +569,14 @@ func TestPackStream(ot *testing.T) {
 		if !c.testUnpacked {
 			continue
 		}
+
 		ot.Run(fmt.Sprintf("Unpacking of %s", c.name), func(t *testing.T) {
-			// Initialize buffer with expectation of pack test
-			u := &Unpacker{buf: c.expectPacked, offset: 0, length: uint32(len(c.expectPacked))}
-			hf := &testHydratorMock{}
-			x, err := u.unpack(hf.hydrate)
-			if err != nil {
-				t.Fatalf("Unable to unpack: %s", err)
+			u := &Unpacker{}
+			u.Reset(c.expectPacked)
+			// Use the unpacker as intended to unpack something generic
+			x := unpack(u)
+			if u.Err != nil {
+				t.Fatalf("Unable to unpack: %s", u.Err)
 			}
 			if !reflect.DeepEqual(x, c.expectUnpacked) {
 				t.Errorf("Unpacked differs, expected %+v (%T) but was %+v (%T)", c.expectUnpacked, c.expectUnpacked, x, x)
@@ -579,14 +614,13 @@ func TestPackStream(ot *testing.T) {
 
 		// Pack the map
 		buf := []byte{}
-		p := Packer{buf: buf, dehydrate: func(x interface{}) (*Struct, error) {
-			return nil, &UnsupportedTypeError{t: reflect.TypeOf(x)}
-		}}
-		p.pack(m)
-		if p.err != nil {
+		p := &Packer{}
+		p.Begin(buf)
+		pack(p, m)
+		buf, err := p.End()
+		if err != nil {
 			ot.Fatalf("Unable to pack: %s", p.err)
 		}
-		buf = p.buf
 
 		ot.Run(fmt.Sprintf("Packing of map size %s", c.name), func(t *testing.T) {
 			// Compare the header
@@ -602,9 +636,10 @@ func TestPackStream(ot *testing.T) {
 		})
 
 		ot.Run(fmt.Sprintf("Unpacking of map size %s", c.name), func(t *testing.T) {
-			u := &Unpacker{buf: buf, offset: 0, length: uint32(len(buf))}
-			hf := &testHydratorMock{}
-			ux, err := u.unpack(hf.hydrate)
+			u := &Unpacker{}
+			u.Reset(buf)
+			ux := unpack(u)
+
 			um, ok := ux.(map[string]interface{})
 			if !ok {
 				t.Errorf("Unpacked is not a map")
@@ -633,102 +668,28 @@ func TestPackStream(ot *testing.T) {
 	// Packer error cases, things that packer is expected to fail on
 	packerErrorCases := []struct {
 		name        string
-		valueFunc   func() interface{}
 		value       interface{}
 		expectedErr interface{}
-		wr          io.Writer
-		dehydrate   Dehydrate
 	}{
 		{name: "uin64 overflow", expectedErr: &OverflowError{},
 			value: (uint64(math.MaxInt64) + 1)},
-		{name: "map something else but string as key", expectedErr: &UnsupportedTypeError{},
-			value: map[int]string{1: "y"}},
 		{name: "too big struct", expectedErr: &OverflowError{},
-			value: &Struct{Tag: 0x67, Fields: []interface{}{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16}}},
-		{name: "a custom type no dehydrator", expectedErr: &UnsupportedTypeError{},
-			value: customStruct{}},
-		{name: "a custom type failing dehydrator", expectedErr: errors.New("x"),
-			dehydrate: func(interface{}) (*Struct, error) {
-				return nil, errors.New("x")
-			},
-			value: customStruct{}},
+			value: &testStruct{tag: 0x67, fields: []interface{}{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16}}},
 	}
 	for _, c := range packerErrorCases {
 		ot.Run(fmt.Sprintf("Packing error of %s", c.name), func(t *testing.T) {
 			buf := []byte{}
-			p := Packer{buf: buf, dehydrate: c.dehydrate}
-			if p.dehydrate == nil {
-				p.dehydrate = func(x interface{}) (*Struct, error) {
-					return nil, &UnsupportedTypeError{t: reflect.TypeOf(x)}
-				}
-			}
+			p := &Packer{}
 			v := c.value
-			if c.valueFunc != nil {
-				v = c.valueFunc()
-			}
-			p.pack(v)
-			if p.err == nil {
+			p.Begin(buf)
+			pack(p, v)
+			_, err := p.End()
+			if err == nil {
 				t.Fatal("Should have gotten an error!")
 			}
-			if reflect.TypeOf(p.err) != reflect.TypeOf(c.expectedErr) {
+			if reflect.TypeOf(err) != reflect.TypeOf(c.expectedErr) {
 				t.Errorf("Wrong type of error, expected %T but was %T", c.expectedErr, p.err)
 			}
 		})
 	}
-
-	// Unpacker error cases
-	unpackerErrorCases := []struct {
-		name        string
-		buf         []byte
-		expectedErr interface{}
-		hf          *testHydratorMock
-	}{
-		{name: "read error", expectedErr: &IoError{}},
-		{name: "no hydrator",
-			hf:          &testHydratorMock{err: &testHydrationError{}},
-			buf:         []byte{0xb0, 0x66},
-			expectedErr: &testHydrationError{},
-		},
-		{name: "hydration error",
-			hf: &testHydratorMock{
-				customHydrate: func(t StructTag, f []interface{}) (interface{}, error) {
-					return nil, &testHydrationError{}
-				}},
-			buf:         []byte{0xb1, 0x66, 0x01},
-			expectedErr: &testHydrationError{},
-		},
-	}
-	for _, c := range unpackerErrorCases {
-		ot.Run(fmt.Sprintf("Unpacking error of %s", c.name), func(t *testing.T) {
-			if c.hf == nil {
-				c.hf = &testHydratorMock{}
-			}
-			un := &Unpacker{buf: c.buf, offset: 0, length: uint32(len(c.buf))}
-			x, err := un.unpack(c.hf.hydrate)
-			if err == nil {
-				t.Fatal("Should have gotten an error!")
-			}
-			if x != nil {
-				t.Errorf("Unpack should not return value upon error: %+v", x)
-			}
-			if reflect.TypeOf(err) != reflect.TypeOf(c.expectedErr) {
-				t.Errorf("Wrong type of error, expected %T but was %T:%s", c.expectedErr, err, err)
-			}
-		})
-	}
-
-	// Unpacker UnpackStruct top level API smoke test
-	ot.Run("UnpackStruct smoke test", func(t *testing.T) {
-		// Initialize buffer with expectation of pack test
-		buf := []byte{0xb0, 0x66}
-		u := &Unpacker{} //NewUnpacker(buf)
-		hf := &testHydratorMock{}
-		x, err := u.UnpackStruct(buf, hf.hydrate)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if !reflect.DeepEqual(x, emptyStruct) {
-			t.Errorf("Unpacked differs: %+v vs %+v", x, emptyStruct)
-		}
-	})
 }

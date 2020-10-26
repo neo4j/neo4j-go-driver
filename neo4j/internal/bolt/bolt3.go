@@ -72,9 +72,8 @@ type bolt3 struct {
 	currStream    *stream
 	conn          net.Conn
 	serverName    string
-	chunker       *chunker
-	packer        *packstream.Packer
-	unpacker      *packstream.Unpacker
+	out           *outgoing
+	in            *incoming
 	connId        string
 	logId         string
 	serverVersion string
@@ -83,22 +82,29 @@ type bolt3 struct {
 	bookmark      string       // Last bookmark
 	birthDate     time.Time
 	log           log.Logger
-	receiveBuffer []byte
 	err           error // Last fatal error
 }
 
 func NewBolt3(serverName string, conn net.Conn, log log.Logger) *bolt3 {
-	return &bolt3{
-		state:         bolt3_unauthorized,
-		conn:          conn,
-		serverName:    serverName,
-		chunker:       newChunker(),
-		receiveBuffer: make([]byte, 4096),
-		packer:        &packstream.Packer{},
-		unpacker:      &packstream.Unpacker{},
-		birthDate:     time.Now(),
-		log:           log,
+	b := &bolt3{
+		state:      bolt3_unauthorized,
+		conn:       conn,
+		serverName: serverName,
+		in:         &incoming{buf: make([]byte, 4096)},
+		birthDate:  time.Now(),
+		log:        log,
 	}
+	b.out = &outgoing{
+		chunker: newChunker(),
+		packer:  &packstream.Packer{},
+		onErr: func(err error) {
+			if b.err == nil {
+				b.err = err
+			}
+			b.state = bolt3_dead
+		},
+	}
+	return b
 }
 
 func (b *bolt3) ServerName() string {
@@ -110,58 +116,23 @@ func (b *bolt3) ServerVersion() string {
 }
 
 // Sets b.err and b.state on failure
-func (b *bolt3) appendMsg(tag packstream.StructTag, field ...interface{}) {
-	b.chunker.beginMessage()
-	// Setup the message and let packstream write the packed bytes to the chunk
-	b.chunker.buf, b.err = b.packer.PackStruct(b.chunker.buf, dehydrate, tag, field...)
-	if b.err != nil {
-		// At this point we do not know the state of what has been written to the chunks.
-		// Either we should support rolling back whatever that has been written or just
-		// bail out this session.
-		b.log.Error(log.Bolt3, b.logId, b.err)
-		b.state = bolt3_dead
-		return
-	}
-	b.chunker.endMessage()
-}
-
-// Sets b.err and b.state on failure
-func (b *bolt3) sendMsg(tag packstream.StructTag, field ...interface{}) {
-	if b.appendMsg(tag, field...); b.err != nil {
-		return
-	}
-	if b.err = b.chunker.send(b.conn); b.err != nil {
-		b.log.Error(log.Bolt3, b.logId, b.err)
-		b.state = bolt3_dead
-	}
-}
-
-// Sets b.err and b.state on failure
 func (b *bolt3) receiveMsg() interface{} {
-	b.receiveBuffer, b.err = dechunkMessage(b.conn, b.receiveBuffer)
-	if b.err != nil {
+	msg, err := b.in.next(b.conn)
+	if err != nil {
+		b.err = err
 		b.log.Error(log.Bolt3, b.logId, b.err)
 		b.state = bolt3_dead
 		return nil
 	}
-
-	msg, err := b.unpacker.UnpackStruct(b.receiveBuffer, hydrate)
-	if err != nil {
-		b.log.Error(log.Bolt3, b.logId, err)
-		b.state = bolt3_dead
-		b.err = err
-		return nil
-	}
-
 	return msg
 }
 
 // Receives a message that is assumed to be a success response or a failure in response
 // to a sent command.
 // Sets b.err and b.state on failure
-func (b *bolt3) receiveSuccess() *successResponse {
+func (b *bolt3) receiveSuccess() *success {
 	switch v := b.receiveMsg().(type) {
-	case *successResponse:
+	case *success:
 		return v
 	case *db.Neo4jError:
 		b.state = bolt3_failed
@@ -204,23 +175,19 @@ func (b *bolt3) connect(auth map[string]interface{}, userAgent string) error {
 	}
 
 	// Send hello message and wait for confirmation
-	if b.sendMsg(msgHello, hello); b.err != nil {
+	b.out.appendHello(hello)
+	if b.out.send(b.conn); b.err != nil {
 		return b.err
 	}
-	succRes := b.receiveSuccess()
+
+	succ := b.receiveSuccess()
 	if b.err != nil {
 		return b.err
 	}
 
-	helloRes := succRes.hello()
-	if helloRes == nil {
-		b.state = bolt3_dead
-		b.err = errors.New(fmt.Sprintf("Unexpected server response: %+v", succRes))
-		return b.err
-	}
-	b.connId = helloRes.connectionId
+	b.connId = succ.connectionId
 	b.logId = fmt.Sprintf("%s@%s", b.connId, b.serverName)
-	b.serverVersion = helloRes.server
+	b.serverVersion = succ.server
 
 	// Transition into ready state
 	b.state = bolt3_ready
@@ -250,7 +217,8 @@ func (b *bolt3) TxBegin(txConfig db.TxConfig) (db.TxHandle, error) {
 	// If there are bookmarks, begin the transaction immediately to get the error from the
 	// server early on. Requires a network roundtrip.
 	if len(tx.bookmarks) > 0 {
-		if b.sendMsg(msgBegin, tx.toMeta()); b.err != nil {
+		b.out.appendBegin(tx.toMeta())
+		if b.out.send(b.conn); b.err != nil {
 			return 0, b.err
 		}
 		if b.receiveSuccess(); b.err != nil {
@@ -322,26 +290,19 @@ func (b *bolt3) TxCommit(txh db.TxHandle) error {
 	}
 
 	// Send request to server to commit
-	if b.sendMsg(msgCommit); b.err != nil {
+	b.out.appendCommit()
+	if b.out.send(b.conn); b.err != nil {
 		return b.err
 	}
 
 	// Evaluate server response
-	succRes := b.receiveSuccess()
+	succ := b.receiveSuccess()
 	if b.err != nil {
 		return b.err
 	}
-	commitSuccess := succRes.commit()
-	if commitSuccess == nil {
-		b.state = bolt3_dead
-		b.err = errors.New(fmt.Sprintf("Failed to parse commit response: %+v", succRes))
-		b.log.Error(log.Bolt3, b.logId, b.err)
-		return b.err
-	}
-
 	// Keep track of bookmark
-	if len(commitSuccess.bookmark) > 0 {
-		b.bookmark = commitSuccess.bookmark
+	if len(succ.bookmark) > 0 {
+		b.bookmark = succ.bookmark
 	}
 
 	// Transition into ready state
@@ -375,7 +336,8 @@ func (b *bolt3) TxRollback(txh db.TxHandle) error {
 	}
 
 	// Send rollback request to server
-	if b.sendMsg(msgRollback); b.err != nil {
+	b.out.appendRollback()
+	if b.out.send(b.conn); b.err != nil {
 		return b.err
 	}
 
@@ -450,19 +412,16 @@ func (b *bolt3) run(cypher string, params map[string]interface{}, tx *internalTx
 
 	// Append lazy begin transaction message
 	if b.state == bolt3_pendingtx {
-		if b.appendMsg(msgBegin, meta); b.err != nil {
-			return nil, b.err
-		}
+		b.out.appendBegin(meta)
 		meta = nil
 	}
 
 	// Append run message
-	if b.appendMsg(msgRun, cypher, params, meta); b.err != nil {
-		return nil, b.err
-	}
+	b.out.appendRun(cypher, params, meta)
 
 	// Append pull all message and send it along with other pending messages
-	if b.sendMsg(msgPullAll); b.err != nil {
+	b.out.appendPullAll()
+	if b.out.send(b.conn); b.err != nil {
 		return nil, b.err
 	}
 
@@ -476,19 +435,11 @@ func (b *bolt3) run(cypher string, params map[string]interface{}, tx *internalTx
 	}
 
 	// Receive confirmation of run message
-	res := b.receiveSuccess()
+	succ := b.receiveSuccess()
 	if b.err != nil {
 		return nil, b.err
 	}
-	// Extract the RUN response from success response
-	runRes := res.run()
-	if runRes == nil {
-		b.state = bolt3_dead
-		b.err = errors.New(fmt.Sprintf("Failed to parse RUN response: %+v", res))
-		b.log.Error(log.Bolt3, b.logId, b.err)
-		return nil, b.err
-	}
-	b.tfirst = runRes.t_first
+	b.tfirst = succ.tfirst
 	// Change state to streaming
 	if b.state == bolt3_ready {
 		b.state = bolt3_streaming
@@ -496,7 +447,7 @@ func (b *bolt3) run(cypher string, params map[string]interface{}, tx *internalTx
 		b.state = bolt3_streamingtx
 	}
 
-	b.currStream = &stream{keys: runRes.fields}
+	b.currStream = &stream{keys: succ.fields}
 	return b.currStream, nil
 }
 
@@ -619,7 +570,7 @@ func (b *bolt3) receiveNext() (*db.Record, *db.Summary, error) {
 	case *db.Record:
 		x.Keys = b.currStream.keys
 		return x, nil, nil
-	case *successResponse:
+	case *success:
 		// End of stream, parse summary
 		sum := x.summary()
 		if sum == nil {
@@ -704,7 +655,10 @@ func (b *bolt3) Reset() {
 	}
 
 	// Send the reset message to the server
-	if b.sendMsg(msgReset); b.err != nil {
+	// Need to clear any pending error
+	b.err = nil
+	b.out.appendReset()
+	if b.out.send(b.conn); b.err != nil {
 		return
 	}
 
@@ -715,9 +669,9 @@ func (b *bolt3) Reset() {
 			return
 		}
 		switch msg.(type) {
-		case *ignoredResponse:
+		case *ignored:
 			// Command ignored
-		case *successResponse:
+		case *success:
 			// Reset confirmed
 			b.state = bolt3_ready
 			return
@@ -775,7 +729,8 @@ func (b *bolt3) GetRoutingTable(database string, context map[string]string) (*db
 func (b *bolt3) Close() {
 	b.log.Infof(log.Bolt3, b.logId, "Close")
 	if b.state != bolt3_dead {
-		b.sendMsg(msgGoodbye)
+		b.out.appendGoodbye()
+		b.out.send(b.conn)
 	}
 	b.conn.Close()
 	b.state = bolt3_dead

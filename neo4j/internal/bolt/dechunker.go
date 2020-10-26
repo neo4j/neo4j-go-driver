@@ -26,34 +26,31 @@ import (
 
 func dechunkMessage(rd io.Reader, msgBuf []byte) ([]byte, error) {
 	sizeBuf := []byte{0x00, 0x00}
-	msgBuf = msgBuf[:0]
-	offset := 0
+	off := 0
 
 	for {
-		// Read size of chunk
 		_, err := io.ReadFull(rd, sizeBuf)
 		if err != nil {
 			return msgBuf, err
 		}
 		chunkSize := int(binary.BigEndian.Uint16(sizeBuf))
-
-		// A chunk size of 0 means either end of current message or it is just a no op sent
-		// from server to keep connection alive.
 		if chunkSize == 0 {
-			if len(msgBuf) > 0 {
-				// End of current message
-				return msgBuf, nil
+			if off > 0 {
+				return msgBuf[:off], nil
 			}
-			// A no op
+			// Got a nop chunk
 			continue
 		}
 
-		msgBuf = append(msgBuf, make([]byte, chunkSize)...)
-		chunkBuf := msgBuf[offset:]
-		offset += chunkSize
-		_, err = io.ReadFull(rd, chunkBuf)
+		// Need to expand buffer
+		if (off + chunkSize) > cap(msgBuf) {
+			msgBuf = append(msgBuf, make([]byte, off+chunkSize)...)
+		}
+		// Read the chunk into buffer
+		_, err = io.ReadFull(rd, msgBuf[off:(off+chunkSize)])
 		if err != nil {
 			return msgBuf, err
 		}
+		off += chunkSize
 	}
 }

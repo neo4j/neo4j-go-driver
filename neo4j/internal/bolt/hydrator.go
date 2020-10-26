@@ -29,324 +29,664 @@ import (
 	"github.com/neo4j/neo4j-go-driver/v4/neo4j/internal/packstream"
 )
 
-// Called by packstream unpacker to hydrate a packstream struct into something
-// more usable by the consumer.
-func hydrate(tag packstream.StructTag, fields []interface{}) (interface{}, error) {
-	switch tag {
+var hydrationInvalidState = errors.New("Hydration state error")
+
+type ignored struct{}
+type success struct {
+	fields        []string
+	tfirst        int64
+	qid           int64
+	bookmark      string
+	connectionId  string
+	server        string
+	db            string
+	hasMore       bool
+	tlast         int64
+	qtype         db.StatementType
+	counters      map[string]int
+	plan          *db.Plan
+	profile       *db.ProfiledPlan
+	notifications []db.Notification
+	num           uint32
+}
+
+func (s *success) String() string {
+	str := fmt.Sprintf("%#v", s)
+	if s.plan != nil {
+		str += fmt.Sprintf(" \nplan: %#v", s.plan)
+	}
+	if s.profile != nil {
+		str += fmt.Sprintf(" \nprofile: %#v", s.profile)
+	}
+	return str
+}
+
+func (s *success) summary() *db.Summary {
+	return &db.Summary{
+		Bookmark:      s.bookmark,
+		StmntType:     s.qtype,
+		Counters:      s.counters,
+		TLast:         s.tlast,
+		Plan:          s.plan,
+		ProfiledPlan:  s.profile,
+		Notifications: s.notifications,
+	}
+}
+
+func (s *success) isResetResponse() bool {
+	return s.num == 0
+}
+
+// Since it is reused
+func (s *success) clear() {
+	s.fields = nil
+	s.bookmark = ""
+	s.hasMore = false
+	s.notifications = nil
+	s.plan = nil
+	s.profile = nil
+	s.qid = -1
+	s.server = ""
+	s.connectionId = ""
+	s.server = ""
+	s.tfirst = 0
+	s.tlast = 0
+	s.db = ""
+	s.qtype = db.StatementTypeUnknown
+}
+
+type hydrator struct {
+	unpacker      packstream.Unpacker
+	unp           *packstream.Unpacker
+	err           error
+	cachedIgnored ignored
+	cachedSuccess success
+}
+
+func (h *hydrator) setErr(err error) {
+	if h.err != nil {
+		h.err = err
+	}
+}
+
+func (h *hydrator) getErr() error {
+	if h.unp.Err != nil {
+		return h.unp.Err
+	}
+	return h.err
+}
+
+func (h *hydrator) assertLength(expect, actual uint32) {
+	if expect != actual {
+		h.setErr(errors.New(fmt.Sprintf(
+			"Invalid length of struct, expected %d but was %d", expect, actual)))
+	}
+}
+
+// hydrate hydrates a top-level struct message
+func (h *hydrator) hydrate(buf []byte) (x interface{}, err error) {
+	h.unp = &h.unpacker
+	h.unp.Reset(buf)
+	h.unp.Next()
+
+	if h.unp.Curr != packstream.PackedStruct {
+		return nil, errors.New(fmt.Sprintf("Expected struct"))
+	}
+
+	n := h.unp.Len()
+	t := h.unp.StructTag()
+	switch t {
 	case msgSuccess:
-		return hydrateSuccess(fields)
+		x = h.success(n)
 	case msgIgnored:
-		return hydrateIgnored(fields)
+		x = h.ignored(n)
 	case msgFailure:
-		return hydrateFailure(fields)
+		x = h.failure(n)
 	case msgRecord:
-		return hydrateRecord(fields)
-	case 'N':
-		return hydrateNode(fields)
-	case 'R':
-		return hydrateRelationship(fields)
-	case 'r':
-		return hydrateRelNode(fields)
-	case 'P':
-		return hydratePath(fields)
-	case 'X':
-		return hydratePoint2d(fields)
-	case 'Y':
-		return hydratePoint3d(fields)
-	case 'F':
-		return hydrateDateTimeOffset(fields)
-	case 'f':
-		return hydrateDateTimeNamedZone(fields)
-	case 'd':
-		return hydrateLocalDateTime(fields)
-	case 'D':
-		return hydrateDate(fields)
-	case 'T':
-		return hydrateTime(fields)
-	case 't':
-		return hydrateLocalTime(fields)
-	case 'E':
-		return hydrateDuration(fields)
+		x = h.record(n)
 	default:
-		return nil, errors.New(fmt.Sprintf("Unknown tag: %02x", tag))
+		return nil, errors.New(fmt.Sprintf("Unexpected tag at top level: %d", t))
 	}
+	err = h.getErr()
+	return
 }
 
-func hydrateNode(fields []interface{}) (interface{}, error) {
-	if len(fields) != 3 {
-		return nil, errors.New("Node hydrate error")
+func (h *hydrator) ignored(n uint32) *ignored {
+	h.assertLength(0, n)
+	if h.getErr() != nil {
+		return nil
 	}
-	id, idok := fields[0].(int64)
-	tagsx, tagsok := fields[1].([]interface{})
-	props, propsok := fields[2].(map[string]interface{})
-	if !idok || !tagsok || !propsok {
-		return nil, errors.New("Node hydrate error")
+	return &h.cachedIgnored
+}
+
+func (h *hydrator) failure(n uint32) *db.Neo4jError {
+	h.assertLength(1, n)
+	if h.getErr() != nil {
+		return nil
 	}
-	n := dbtype.Node{Id: id, Props: props, Labels: make([]string, len(tagsx))}
-	// Convert tags to strings
-	for i, x := range tagsx {
-		t, tok := x.(string)
-		if !tok {
-			return nil, errors.New("Node hydrate error")
+	dberr := db.Neo4jError{}
+	h.unp.Next() // Detect map
+	for maplen := h.unp.Len(); maplen > 0; maplen-- {
+		h.unp.Next()
+		key := h.unp.String()
+		h.unp.Next()
+		switch key {
+		case "code":
+			dberr.Code = h.unp.String()
+		case "message":
+			dberr.Msg = h.unp.String()
+		default:
+			// Do not fail on unknown value in map
+			h.trash()
 		}
-		n.Labels[i] = t
 	}
-	return n, nil
+	return &dberr
 }
 
-func hydrateRelationship(fields []interface{}) (interface{}, error) {
-	if len(fields) != 5 {
-		return nil, errors.New("Relationship hydrate error")
+func (h *hydrator) success(n uint32) *success {
+	h.assertLength(1, n)
+	if h.getErr() != nil {
+		return nil
 	}
-	id, idok := fields[0].(int64)
-	sid, sidok := fields[1].(int64)
-	eid, eidok := fields[2].(int64)
-	lbl, lblok := fields[3].(string)
-	props, propsok := fields[4].(map[string]interface{})
-	if !idok || !sidok || !eidok || !lblok || !propsok {
-		return nil, errors.New("Relationship hydrate error")
+	// Use cached success but clear it first
+	succ := &h.cachedSuccess
+	succ.clear()
+
+	h.unp.Next() // Detect map
+	n = h.unp.Len()
+	succ.num = n
+	for ; n > 0; n-- {
+		// Key
+		h.unp.Next()
+		key := h.unp.String()
+		// Value
+		h.unp.Next()
+		switch key {
+		case "fields":
+			succ.fields = h.strings()
+		case "t_first":
+			succ.tfirst = h.unp.Int()
+		case "qid":
+			succ.qid = h.unp.Int()
+		case "bookmark":
+			succ.bookmark = h.unp.String()
+		case "connection_id":
+			succ.connectionId = h.unp.String()
+		case "server":
+			succ.server = h.unp.String()
+		case "has_more":
+			succ.hasMore = h.unp.Bool()
+		case "t_last":
+			succ.tlast = h.unp.Int()
+		case "type":
+			switch h.unp.String() {
+			case "r":
+				succ.qtype = db.StatementTypeRead
+			case "w":
+				succ.qtype = db.StatementTypeWrite
+			case "rw":
+				succ.qtype = db.StatementTypeReadWrite
+			case "s":
+				succ.qtype = db.StatementTypeSchemaWrite
+			}
+		case "db":
+			succ.db = h.unp.String()
+		case "stats":
+			succ.counters = h.successStats()
+		case "plan":
+			m := h.amap()
+			succ.plan = parsePlan(m)
+		case "profile":
+			m := h.amap()
+			succ.profile = parseProfile(m)
+		case "notifications":
+			l := h.array()
+			succ.notifications = parseNotifications(l)
+		default:
+			// Unknown key, waste it
+			h.trash()
+		}
 	}
-	return dbtype.Relationship{Id: id, StartId: sid, EndId: eid, Type: lbl, Props: props}, nil
+	return succ
 }
 
-func hydrateRelNode(fields []interface{}) (interface{}, error) {
-	if len(fields) != 3 {
-		return nil, errors.New("RelNode hydrate error")
+func (h *hydrator) successStats() map[string]int {
+	n := h.unp.Len()
+	if n == 0 {
+		return nil
 	}
-	id, idok := fields[0].(int64)
-	lbl, lblok := fields[1].(string)
-	props, propsok := fields[2].(map[string]interface{})
-	if !idok || !lblok || !propsok {
-		return nil, errors.New("RelNode hydrate error")
+	counts := make(map[string]int, n)
+	for ; n > 0; n-- {
+		h.unp.Next()
+		key := h.unp.String()
+		h.unp.Next()
+		val := h.unp.Int()
+		counts[key] = int(val)
 	}
-	s := &relNode{id: id, name: lbl, props: props}
-	return s, nil
+	return counts
 }
 
-func hydratePath(fields []interface{}) (interface{}, error) {
-	if len(fields) != 3 {
-		return nil, errors.New("Path hydrate error")
-	}
-	nodesx, nok := fields[0].([]interface{})
-	relnodesx, rok := fields[1].([]interface{})
-	indsx, iok := fields[2].([]interface{})
-	if !nok || !rok || !iok {
-		return nil, errors.New("Path hydrate error")
+/*
+func (h *hydrator) successPlanOperator() {
+}
+
+func (h *hydrator) successPlan() *db.Plan {
+	// Should be on a map
+	n := h.unp.Len()
+	if n == 0 {
+		return nil
 	}
 
-	nodes := make([]dbtype.Node, len(nodesx))
-	for i, nx := range nodesx {
-		n, ok := nx.(dbtype.Node)
+	plan := &db.Plan{}
+}
+*/
+
+func (h *hydrator) strings() []string {
+	n := h.unp.Len()
+	slice := make([]string, n)
+	for i := range slice {
+		h.unp.Next()
+		slice[i] = h.unp.String()
+	}
+	return slice
+}
+
+func (h *hydrator) amap() map[string]interface{} {
+	n := h.unp.Len()
+	m := make(map[string]interface{}, n)
+	for ; n > 0; n-- {
+		h.unp.Next()
+		key := h.unp.String()
+		h.unp.Next()
+		m[key] = h.value()
+	}
+	return m
+}
+
+func (h *hydrator) array() []interface{} {
+	n := h.unp.Len()
+	a := make([]interface{}, n)
+	for i := range a {
+		h.unp.Next()
+		a[i] = h.value()
+	}
+	return a
+}
+
+func (h *hydrator) record(n uint32) *db.Record {
+	h.assertLength(1, n)
+	if h.getErr() != nil {
+		return nil
+	}
+	rec := db.Record{}
+	h.unp.Next() // Detect array
+	n = h.unp.Len()
+	rec.Values = make([]interface{}, n)
+	for i := range rec.Values {
+		h.unp.Next()
+		rec.Values[i] = h.value()
+	}
+	return &rec
+}
+
+func (h *hydrator) value() interface{} {
+	switch h.unp.Curr {
+	case packstream.PackedInt:
+		return h.unp.Int()
+	case packstream.PackedFloat:
+		return h.unp.Float()
+	case packstream.PackedStr:
+		return h.unp.String()
+	case packstream.PackedStruct:
+		t := h.unp.StructTag()
+		n := h.unp.Len()
+		switch t {
+		case 'N':
+			return h.node(n)
+		case 'R':
+			return h.relationship(n)
+		case 'r':
+			return h.relationnode(n)
+		case 'P':
+			return h.path(n)
+		case 'X':
+			return h.point2d(n)
+		case 'Y':
+			return h.point3d(n)
+		case 'F':
+			return h.dateTimeOffset(n)
+		case 'f':
+			return h.dateTimeNamedZone(n)
+		case 'd':
+			return h.localDateTime(n)
+		case 'D':
+			return h.date(n)
+		case 'T':
+			return h.time(n)
+		case 't':
+			return h.localTime(n)
+		case 'E':
+			return h.duration(n)
+		default:
+			h.err = errors.New(fmt.Sprintf("Unknown tag: %02x", t))
+			return nil
+		}
+	case packstream.PackedByteArray:
+		return h.unp.ByteArray()
+	case packstream.PackedArray:
+		return h.array()
+	case packstream.PackedMap:
+		return h.amap()
+	case packstream.PackedNil:
+		return nil
+	case packstream.PackedTrue:
+		return true
+	case packstream.PackedFalse:
+		return false
+	default:
+		h.setErr(hydrationInvalidState)
+		return nil
+	}
+}
+
+// Trashes current value
+func (h *hydrator) trash() {
+	// TODO Less consuming implementation
+	h.value()
+}
+
+func (h *hydrator) node(num uint32) interface{} {
+	h.assertLength(3, num)
+	if h.getErr() != nil {
+		return nil
+	}
+	n := dbtype.Node{}
+	h.unp.Next()
+	n.Id = h.unp.Int()
+	h.unp.Next()
+	n.Labels = h.strings()
+	h.unp.Next()
+	n.Props = h.amap()
+	return n
+}
+
+func (h *hydrator) relationship(n uint32) interface{} {
+	h.assertLength(5, n)
+	if h.getErr() != nil {
+		return nil
+	}
+	r := dbtype.Relationship{}
+	h.unp.Next()
+	r.Id = h.unp.Int()
+	h.unp.Next()
+	r.StartId = h.unp.Int()
+	h.unp.Next()
+	r.EndId = h.unp.Int()
+	h.unp.Next()
+	r.Type = h.unp.String()
+	h.unp.Next()
+	r.Props = h.amap()
+	return r
+}
+
+func (h *hydrator) relationnode(n uint32) interface{} {
+	h.assertLength(3, n)
+	if h.getErr() != nil {
+		return nil
+	}
+	r := relNode{}
+	h.unp.Next()
+	r.id = h.unp.Int()
+	h.unp.Next()
+	r.name = h.unp.String()
+	h.unp.Next()
+	r.props = h.amap()
+	return &r
+}
+
+func (h *hydrator) path(n uint32) interface{} {
+	h.assertLength(3, n)
+	if h.getErr() != nil {
+		return nil
+	}
+	// Array of nodes
+	h.unp.Next()
+	num := h.unp.Int()
+	nodes := make([]dbtype.Node, num)
+	for i := range nodes {
+		h.unp.Next()
+		node, ok := h.value().(dbtype.Node)
 		if !ok {
-			return nil, errors.New("Path hydrate error")
+			h.setErr(errors.New("Path hydrate error"))
+			return nil
 		}
-		nodes[i] = n
+		nodes[i] = node
+	}
+	// Array of relnodes
+	h.unp.Next()
+	num = h.unp.Int()
+	rnodes := make([]*relNode, num)
+	for i := range rnodes {
+		h.unp.Next()
+		rnode, ok := h.value().(*relNode)
+		if !ok {
+			h.setErr(errors.New("Path hydrate error"))
+			return nil
+		}
+		rnodes[i] = rnode
+	}
+	// Array of indexes
+	h.unp.Next()
+	num = h.unp.Int()
+	indexes := make([]int, num)
+	for i := range indexes {
+		h.unp.Next()
+		indexes[i] = int(h.unp.Int())
 	}
 
-	relnodes := make([]*relNode, len(relnodesx))
-	for i, rx := range relnodesx {
-		r, ok := rx.(*relNode)
-		if !ok {
-			return nil, errors.New("Path hydrate error")
-		}
-		relnodes[i] = r
-	}
-
-	indexes := make([]int, len(indsx))
-	for i, ix := range indsx {
-		p, ok := ix.(int64)
-		if !ok {
-			return nil, errors.New("Path hydrate error")
-		}
-		indexes[i] = int(p)
-	}
-	// Must be even number
 	if (len(indexes) & 0x01) == 1 {
-		return nil, errors.New("Path hydrate error")
+		h.setErr(errors.New("Path hydrate error"))
+		return nil
 	}
 
-	return buildPath(nodes, relnodes, indexes), nil
+	return buildPath(nodes, rnodes, indexes)
 }
 
-func hydrateSuccess(fields []interface{}) (interface{}, error) {
-	if len(fields) != 1 {
-		return nil, errors.New("Success hydrate error")
-	}
-	meta, metaok := fields[0].(map[string]interface{})
-	if !metaok {
-		return nil, errors.New("Success hydrate error")
-	}
-	return &successResponse{meta: meta}, nil
+func (h *hydrator) point2d(n uint32) interface{} {
+	p := dbtype.Point2D{}
+	h.unp.Next()
+	p.SpatialRefId = uint32(h.unp.Int())
+	h.unp.Next()
+	p.X = h.unp.Float()
+	h.unp.Next()
+	p.Y = h.unp.Float()
+	return p
 }
 
-func hydrateRecord(fields []interface{}) (interface{}, error) {
-	if len(fields) == 0 {
-		return nil, errors.New("Record hydrate error")
-	}
-	v, vok := fields[0].([]interface{})
-	if !vok {
-		return nil, errors.New("Record hydrate error")
-	}
-	return &db.Record{Values: v}, nil
+func (h *hydrator) point3d(n uint32) interface{} {
+	p := dbtype.Point3D{}
+	h.unp.Next()
+	p.SpatialRefId = uint32(h.unp.Int())
+	h.unp.Next()
+	p.X = h.unp.Float()
+	h.unp.Next()
+	p.Y = h.unp.Float()
+	h.unp.Next()
+	p.Z = h.unp.Float()
+	return p
 }
 
-func hydrateIgnored(fields []interface{}) (interface{}, error) {
-	if len(fields) != 0 {
-		return nil, errors.New("Ignored hydrate error")
-	}
-	return &ignoredResponse{}, nil
-}
-
-func hydrateFailure(fields []interface{}) (interface{}, error) {
-	if len(fields) != 1 {
-		return nil, errors.New("Failure hydrate error")
-	}
-	m, mok := fields[0].(map[string]interface{})
-	if !mok {
-		return nil, errors.New("Failure hydrate error")
-	}
-	code, cok := m["code"].(string)
-	msg, mok := m["message"].(string)
-	if !cok || !mok {
-		return nil, errors.New("Failure hydrate error")
-	}
-	// Hydrate right into error defined in connection package to avoid remapping at a later
-	// state.
-	return &db.Neo4jError{Code: code, Msg: msg}, nil
-}
-
-func hydratePoint2d(fields []interface{}) (interface{}, error) {
-	if len(fields) != 3 {
-		return nil, errors.New("Point2d hydrate error")
-	}
-	srId, sok := fields[0].(int64)
-	x, xok := fields[1].(float64)
-	y, yok := fields[2].(float64)
-	if !sok || !xok || !yok {
-		return nil, errors.New("Point2d hydrate error")
-	}
-	return dbtype.Point2D{SpatialRefId: uint32(srId), X: x, Y: y}, nil
-}
-
-func hydratePoint3d(fields []interface{}) (interface{}, error) {
-	if len(fields) != 4 {
-		return nil, errors.New("Point3d hydrate error")
-	}
-	srId, sok := fields[0].(int64)
-	x, xok := fields[1].(float64)
-	y, yok := fields[2].(float64)
-	z, zok := fields[3].(float64)
-	if !sok || !xok || !yok || !zok {
-		return nil, errors.New("Point3d hydrate error")
-	}
-	return dbtype.Point3D{SpatialRefId: uint32(srId), X: x, Y: y, Z: z}, nil
-}
-
-func hydrateDateTimeOffset(fields []interface{}) (interface{}, error) {
-	if len(fields) != 3 {
-		return nil, errors.New("DateTime hydrate error")
-	}
-	secs, sok := fields[0].(int64)
-	nans, nok := fields[1].(int64)
-	offs, ook := fields[2].(int64)
-	if !sok || !nok || !ook {
-		return nil, errors.New("DateTime hydrate error")
-	}
-
+func (h *hydrator) dateTimeOffset(n uint32) interface{} {
+	h.unp.Next()
+	secs := h.unp.Int()
+	h.unp.Next()
+	nans := h.unp.Int()
+	h.unp.Next()
+	offs := h.unp.Int()
 	t := time.Unix(secs, nans).UTC()
 	l := time.FixedZone("Offset", int(offs))
-	return time.Date(t.Year(), t.Month(), t.Day(), t.Hour(), t.Minute(), t.Second(), t.Nanosecond(), l), nil
+	return time.Date(t.Year(), t.Month(), t.Day(), t.Hour(), t.Minute(), t.Second(), t.Nanosecond(), l)
 }
 
-func hydrateDateTimeNamedZone(fields []interface{}) (interface{}, error) {
-	if len(fields) != 3 {
-		return nil, errors.New("DateTime hydrate error")
-	}
-	secs, sok := fields[0].(int64)
-	nans, nok := fields[1].(int64)
-	zone, zok := fields[2].(string)
-	if !sok || !nok || !zok {
-		return nil, errors.New("DateTime hydrate error")
-	}
-
+func (h *hydrator) dateTimeNamedZone(n uint32) interface{} {
+	h.unp.Next()
+	secs := h.unp.Int()
+	h.unp.Next()
+	nans := h.unp.Int()
+	h.unp.Next()
+	zone := h.unp.String()
 	t := time.Unix(secs, nans).UTC()
 	l, err := time.LoadLocation(zone)
 	if err != nil {
-		return nil, err
+		h.setErr(err)
+		return nil
 	}
-	return time.Date(t.Year(), t.Month(), t.Day(), t.Hour(), t.Minute(), t.Second(), t.Nanosecond(), l), nil
+	return time.Date(t.Year(), t.Month(), t.Day(), t.Hour(), t.Minute(), t.Second(), t.Nanosecond(), l)
 }
 
-func hydrateLocalDateTime(fields []interface{}) (interface{}, error) {
-	if len(fields) != 2 {
-		return nil, errors.New("LocalDateTime hydrate error")
-	}
-	secs, sok := fields[0].(int64)
-	nans, nok := fields[1].(int64)
-	if !sok || !nok {
-		return nil, errors.New("LocalDateTime hydrate error")
-	}
+func (h *hydrator) localDateTime(n uint32) interface{} {
+	h.unp.Next()
+	secs := h.unp.Int()
+	h.unp.Next()
+	nans := h.unp.Int()
 	t := time.Unix(secs, nans).UTC()
 	t = time.Date(t.Year(), t.Month(), t.Day(), t.Hour(), t.Minute(), t.Second(), t.Nanosecond(), time.Local)
-	return dbtype.LocalDateTime(t), nil
+	return dbtype.LocalDateTime(t)
 }
 
-func hydrateDate(fields []interface{}) (interface{}, error) {
-	if len(fields) != 1 {
-		return nil, errors.New("Date hydrate error")
-	}
-	days, dok := fields[0].(int64)
-	if !dok {
-		return nil, errors.New("Date hydrate error")
-	}
+func (h *hydrator) date(n uint32) interface{} {
+	h.unp.Next()
+	days := h.unp.Int()
 	secs := days * 86400
-	return dbtype.Date(time.Unix(secs, 0).UTC()), nil
+	return dbtype.Date(time.Unix(secs, 0).UTC())
 }
 
-func hydrateTime(fields []interface{}) (interface{}, error) {
-	if len(fields) != 2 {
-		return nil, errors.New("Time hydrate error")
-	}
-	nans, nok := fields[0].(int64)
-	offs, ook := fields[1].(int64)
-	if !nok || !ook {
-		return nil, errors.New("Time hydrate error")
-	}
+func (h *hydrator) time(n uint32) interface{} {
+	h.unp.Next()
+	nans := h.unp.Int()
+	h.unp.Next()
+	offs := h.unp.Int()
 	secs := nans / int64(time.Second)
 	nans -= secs * int64(time.Second)
 	l := time.FixedZone("Offset", int(offs))
 	t := time.Date(0, 0, 0, 0, 0, int(secs), int(nans), l)
-	return dbtype.Time(t), nil
+	return dbtype.Time(t)
 }
 
-func hydrateLocalTime(fields []interface{}) (interface{}, error) {
-	if len(fields) != 1 {
-		return nil, errors.New("LocalTime hydrate error")
-	}
-	nans, nok := fields[0].(int64)
-	if !nok {
-		return nil, errors.New("LocalTime hydrate error")
-	}
+func (h *hydrator) localTime(n uint32) interface{} {
+	h.unp.Next()
+	nans := h.unp.Int()
 	secs := nans / int64(time.Second)
 	nans -= secs * int64(time.Second)
 	t := time.Date(0, 0, 0, 0, 0, int(secs), int(nans), time.Local)
-	return dbtype.LocalTime(t), nil
+	return dbtype.LocalTime(t)
 }
 
-func hydrateDuration(fields []interface{}) (interface{}, error) {
-	// Always hydrate to dbtype.Duration since that allows for longer durations than the
-	// standard time.Duration even though it's probably very unusual with the need to
-	// express durations for hundreds of years.
-	if len(fields) != 4 {
-		return nil, errors.New("Duration hydrate error")
+func (h *hydrator) duration(n uint32) interface{} {
+	h.unp.Next()
+	mon := h.unp.Int()
+	h.unp.Next()
+	day := h.unp.Int()
+	h.unp.Next()
+	sec := h.unp.Int()
+	h.unp.Next()
+	nan := h.unp.Int()
+	return dbtype.Duration{Months: mon, Days: day, Seconds: sec, Nanos: int(nan)}
+}
+
+func parseNotifications(notificationsx []interface{}) []db.Notification {
+	var notifications []db.Notification
+	if len(notificationsx) > 0 {
+		notifications = make([]db.Notification, 0, len(notificationsx))
+		for _, x := range notificationsx {
+			notificationx, ok := x.(map[string]interface{})
+			if ok {
+				notifications = append(notifications, parseNotification(notificationx))
+			}
+		}
 	}
-	mon, mok := fields[0].(int64)
-	day, dok := fields[1].(int64)
-	sec, sok := fields[2].(int64)
-	nan, nok := fields[3].(int64)
-	if !mok || !dok || !sok || !nok {
-		return nil, errors.New("Duration hydrate error")
+	return notifications
+}
+
+func parsePlanOpIdArgsChildren(planx map[string]interface{}) (string, []string, map[string]interface{}, []interface{}) {
+	operator, _ := planx["operatorType"].(string)
+	identifiersx, _ := planx["identifiers"].([]interface{})
+	arguments, _ := planx["args"].(map[string]interface{})
+
+	identifiers := make([]string, len(identifiersx))
+	for i, id := range identifiersx {
+		identifiers[i], _ = id.(string)
 	}
 
-	return dbtype.Duration{Months: mon, Days: day, Seconds: sec, Nanos: int(nan)}, nil
+	childrenx, _ := planx["children"].([]interface{})
+
+	return operator, identifiers, arguments, childrenx
+}
+
+func parsePlan(planx map[string]interface{}) *db.Plan {
+	op, ids, args, childrenx := parsePlanOpIdArgsChildren(planx)
+	plan := &db.Plan{
+		Operator:    op,
+		Arguments:   args,
+		Identifiers: ids,
+	}
+
+	plan.Children = make([]db.Plan, 0, len(childrenx))
+	for _, c := range childrenx {
+		childPlanx, _ := c.(map[string]interface{})
+		if len(childPlanx) > 0 {
+			childPlan := parsePlan(childPlanx)
+			if childPlan != nil {
+				plan.Children = append(plan.Children, *childPlan)
+			}
+		}
+	}
+
+	return plan
+}
+
+func parseProfile(profilex map[string]interface{}) *db.ProfiledPlan {
+	op, ids, args, childrenx := parsePlanOpIdArgsChildren(profilex)
+	plan := &db.ProfiledPlan{
+		Operator:    op,
+		Arguments:   args,
+		Identifiers: ids,
+	}
+
+	plan.DbHits, _ = profilex["dbHits"].(int64)
+	plan.Records, _ = profilex["rows"].(int64)
+
+	plan.Children = make([]db.ProfiledPlan, 0, len(childrenx))
+	for _, c := range childrenx {
+		childPlanx, _ := c.(map[string]interface{})
+		if len(childPlanx) > 0 {
+			childPlan := parseProfile(childPlanx)
+			if childPlan != nil {
+				plan.Children = append(plan.Children, *childPlan)
+			}
+		}
+	}
+
+	return plan
+}
+
+func parseNotification(m map[string]interface{}) db.Notification {
+	n := db.Notification{}
+	n.Code, _ = m["code"].(string)
+	n.Description = m["description"].(string)
+	n.Severity, _ = m["severity"].(string)
+	n.Title, _ = m["title"].(string)
+	posx, exists := m["position"].(map[string]interface{})
+	if exists {
+		pos := &db.InputPosition{}
+		i, _ := posx["column"].(int64)
+		pos.Column = int(i)
+		i, _ = posx["line"].(int64)
+		pos.Line = int(i)
+		i, _ = posx["offset"].(int64)
+		pos.Offset = int(i)
+		n.Position = pos
+	}
+
+	return n
 }

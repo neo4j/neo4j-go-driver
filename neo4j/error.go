@@ -101,8 +101,16 @@ func IsTransactionExecutionLimit(err error) bool {
 
 // Wraps errors that can happen on Bolt protocol level to external error
 func wrapBoltError(err error) error {
+	if err == nil {
+		return nil
+	}
 	if err == io.EOF {
 		return &ConnectivityError{inner: err}
+	}
+	switch err.(type) {
+	case *db.UnsupportedTypeError:
+		// Usage of a type not supported by database network protocol
+		return &UsageError{Message: err.Error()}
 	}
 	return err
 }

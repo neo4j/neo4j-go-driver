@@ -34,19 +34,18 @@ import (
 // in the test.
 type bolt4server struct {
 	conn     net.Conn
-	hyd      packstream.Hydrate
 	unpacker *packstream.Unpacker
-	chunker  *chunker
-	packer   *packstream.Packer
+	out      *outgoing
 }
 
 func newBolt4Server(conn net.Conn) *bolt4server {
 	return &bolt4server{
 		unpacker: &packstream.Unpacker{},
 		conn:     conn,
-		chunker:  newChunker(),
-		hyd:      passthroughHydrator,
-		packer:   &packstream.Packer{},
+		out: &outgoing{
+			chunker: newChunker(),
+			packer:  &packstream.Packer{},
+		},
 	}
 }
 
@@ -59,9 +58,9 @@ func (s *bolt4server) waitForHandshake() []byte {
 	return handshake
 }
 
-func (s *bolt4server) assertStructType(msg *packstream.Struct, t packstream.StructTag) {
-	if msg.Tag != t {
-		panic(fmt.Sprintf("Got wrong type of message expected %d but got %d (%+v)", t, msg.Tag, msg))
+func (s *bolt4server) assertStructType(msg *testStruct, t byte) {
+	if msg.tag != t {
+		panic(fmt.Sprintf("Got wrong type of message expected %d but got %d (%+v)", t, msg.tag, msg))
 	}
 }
 
@@ -81,7 +80,7 @@ func (s *bolt4server) sendIgnoredMsg() {
 func (s *bolt4server) waitForHello() map[string]interface{} {
 	msg := s.receiveMsg()
 	s.assertStructType(msg, msgHello)
-	m := msg.Fields[0].(map[string]interface{})
+	m := msg.fields[0].(map[string]interface{})
 	// Hello should contain some musts
 	_, exists := m["scheme"]
 	if !exists {
@@ -94,16 +93,22 @@ func (s *bolt4server) waitForHello() map[string]interface{} {
 	return m
 }
 
-func (s *bolt4server) receiveMsg() *packstream.Struct {
+func (s *bolt4server) receiveMsg() *testStruct {
 	buf, err := dechunkMessage(s.conn, []byte{})
 	if err != nil {
 		panic(err)
 	}
-	x, err := s.unpacker.UnpackStruct(buf, s.hyd)
-	if err != nil {
-		panic(err)
+	s.unpacker.Reset(buf)
+	s.unpacker.Next()
+	n := s.unpacker.Len()
+	t := s.unpacker.StructTag()
+
+	fields := make([]interface{}, n)
+	for i := uint32(0); i < n; i++ {
+		s.unpacker.Next()
+		fields[i] = serverHydrator(s.unpacker)
 	}
-	return x.(*packstream.Struct)
+	return &testStruct{tag: t, fields: fields}
 }
 
 func (s *bolt4server) waitForRun() {
@@ -134,7 +139,7 @@ func (s *bolt4server) waitForTxRollback() {
 func (s *bolt4server) waitForPullN(n int) {
 	msg := s.receiveMsg()
 	s.assertStructType(msg, msgPullN)
-	extra := msg.Fields[0].(map[string]interface{})
+	extra := msg.fields[0].(map[string]interface{})
 	sentN := int(extra["n"].(int64))
 	if sentN != n {
 		panic(fmt.Sprintf("Expected PULL n:%d but got PULL %d", n, sentN))
@@ -148,7 +153,7 @@ func (s *bolt4server) waitForPullN(n int) {
 func (s *bolt4server) waitForPullNandQid(n, qid int) {
 	msg := s.receiveMsg()
 	s.assertStructType(msg, msgPullN)
-	extra := msg.Fields[0].(map[string]interface{})
+	extra := msg.fields[0].(map[string]interface{})
 	sentN := int(extra["n"].(int64))
 	if sentN != n {
 		panic(fmt.Sprintf("Expected PULL n:%d but got PULL %d", n, sentN))
@@ -161,7 +166,7 @@ func (s *bolt4server) waitForPullNandQid(n, qid int) {
 func (s *bolt4server) waitForDiscardN(n, qid int) {
 	msg := s.receiveMsg()
 	s.assertStructType(msg, msgDiscardN)
-	extra := msg.Fields[0].(map[string]interface{})
+	extra := msg.fields[0].(map[string]interface{})
 	sentN := int(extra["n"].(int64))
 	if sentN != n {
 		panic(fmt.Sprintf("Expected DISCARD n:%d but got DISCARD %d", n, sentN))
@@ -191,15 +196,9 @@ func (s *bolt4server) closeConnection() {
 	s.conn.Close()
 }
 
-func (s *bolt4server) send(tag packstream.StructTag, field ...interface{}) {
-	s.chunker.beginMessage()
-	var err error
-	s.chunker.buf, err = s.packer.PackStruct(s.chunker.buf, dehydrate, tag, field...)
-	if err != nil {
-		panic(err)
-	}
-	s.chunker.endMessage()
-	s.chunker.send(s.conn)
+func (s *bolt4server) send(tag byte, field ...interface{}) {
+	s.out.appendX(tag, field...)
+	s.out.send(s.conn)
 }
 
 func (s *bolt4server) sendSuccess(m map[string]interface{}) {
@@ -229,21 +228,21 @@ func (s *bolt4server) accept(ver byte) {
 }
 
 // Utility to wait and serve a auto commit query
-func (s *bolt4server) serveRun(stream []packstream.Struct) {
+func (s *bolt4server) serveRun(stream []testStruct) {
 	s.waitForRun()
 	s.waitForPullN(bolt4_fetchsize)
 	for _, x := range stream {
-		s.send(x.Tag, x.Fields...)
+		s.send(x.tag, x.fields...)
 	}
 }
 
-func (s *bolt4server) serveRunTx(stream []packstream.Struct, commit bool, bookmark string) {
+func (s *bolt4server) serveRunTx(stream []testStruct, commit bool, bookmark string) {
 	s.waitForTxBegin()
 	s.send(msgSuccess, map[string]interface{}{})
 	s.waitForRun()
 	s.waitForPullN(bolt4_fetchsize)
 	for _, x := range stream {
-		s.send(x.Tag, x.Fields...)
+		s.send(x.tag, x.fields...)
 	}
 	if commit {
 		s.waitForTxCommit()

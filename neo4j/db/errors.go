@@ -21,6 +21,7 @@ package db
 
 import (
 	"fmt"
+	"reflect"
 	"strings"
 )
 
@@ -103,4 +104,12 @@ type RoutingNotSupportedError struct {
 
 func (e *RoutingNotSupportedError) Error() string {
 	return fmt.Sprintf("%s does not support routing", e.Server)
+}
+
+type UnsupportedTypeError struct {
+	Type reflect.Type
+}
+
+func (e *UnsupportedTypeError) Error() string {
+	return fmt.Sprintf("Usage of type '%s' is not supported", e.Type.String())
 }

@@ -23,7 +23,6 @@ import (
 	"testing"
 
 	"github.com/neo4j/neo4j-go-driver/v4/neo4j/db"
-	"github.com/neo4j/neo4j-go-driver/v4/neo4j/internal/packstream"
 	. "github.com/neo4j/neo4j-go-driver/v4/neo4j/internal/testutil"
 )
 
@@ -32,31 +31,31 @@ func TestBolt3(ot *testing.T) {
 	// Faked returns from a server
 	runKeys := []interface{}{"f1", "f2"}
 	runBookmark := "bm"
-	runResponse := []packstream.Struct{
-		packstream.Struct{
-			Tag: msgSuccess,
-			Fields: []interface{}{
+	runResponse := []testStruct{
+		{
+			tag: msgSuccess,
+			fields: []interface{}{
 				map[string]interface{}{
 					"fields":  runKeys,
 					"t_first": int64(1),
 				},
 			},
 		},
-		packstream.Struct{
-			Tag:    msgRecord,
-			Fields: []interface{}{[]interface{}{"1v1", "1v2"}},
+		{
+			tag:    msgRecord,
+			fields: []interface{}{[]interface{}{"1v1", "1v2"}},
 		},
-		packstream.Struct{
-			Tag:    msgRecord,
-			Fields: []interface{}{[]interface{}{"2v1", "2v2"}},
+		{
+			tag:    msgRecord,
+			fields: []interface{}{[]interface{}{"2v1", "2v2"}},
 		},
-		packstream.Struct{
-			Tag:    msgRecord,
-			Fields: []interface{}{[]interface{}{"3v1", "3v2"}},
+		{
+			tag:    msgRecord,
+			fields: []interface{}{[]interface{}{"3v1", "3v2"}},
 		},
-		packstream.Struct{
-			Tag:    msgSuccess,
-			Fields: []interface{}{map[string]interface{}{"bookmark": runBookmark, "type": "r"}},
+		{
+			tag:    msgSuccess,
+			fields: []interface{}{map[string]interface{}{"bookmark": runBookmark, "type": "r"}},
 		},
 	}
 

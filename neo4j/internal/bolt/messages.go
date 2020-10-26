@@ -19,26 +19,22 @@
 
 package bolt
 
-import (
-	"github.com/neo4j/neo4j-go-driver/v4/neo4j/internal/packstream"
-)
-
 // Message struct tags
 // Shared between bolt versions
 const (
-	msgReset      packstream.StructTag = 0x0f
-	msgRun        packstream.StructTag = 0x10
-	msgDiscardAll packstream.StructTag = 0x2f
-	msgDiscardN                        = msgDiscardAll // Different name >= 4.0
-	msgPullAll    packstream.StructTag = 0x3f
-	msgPullN                           = msgPullAll // Different name >= 4.0
-	msgRecord     packstream.StructTag = 0x71
-	msgSuccess    packstream.StructTag = 0x70
-	msgIgnored    packstream.StructTag = 0x7e
-	msgFailure    packstream.StructTag = 0x7f
-	msgHello      packstream.StructTag = 0x01
-	msgGoodbye    packstream.StructTag = 0x02
-	msgBegin      packstream.StructTag = 0x11
-	msgCommit     packstream.StructTag = 0x12
-	msgRollback   packstream.StructTag = 0x13
+	msgReset      byte = 0x0f
+	msgRun        byte = 0x10
+	msgDiscardAll byte = 0x2f
+	msgDiscardN        = msgDiscardAll // Different name >= 4.0
+	msgPullAll    byte = 0x3f
+	msgPullN           = msgPullAll // Different name >= 4.0
+	msgRecord     byte = 0x71
+	msgSuccess    byte = 0x70
+	msgIgnored    byte = 0x7e
+	msgFailure    byte = 0x7f
+	msgHello      byte = 0x01
+	msgGoodbye    byte = 0x02
+	msgBegin      byte = 0x11
+	msgCommit     byte = 0x12
+	msgRollback   byte = 0x13
 )

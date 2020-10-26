@@ -90,11 +90,11 @@ func iterMxL(driver neo4j.Driver) {
 		num++
 		node := record.Values[0].(neo4j.Node)
 		if len(node.Props) != iterMxLNUMPROPS {
-			panic("Too few props")
+			panic("Num props differ")
 		}
 	}
 	if num != iterMxLNUMRECS {
-		panic("Too few records")
+		panic(fmt.Sprintf("Num records differ: %d vs %d", num, iterMxLNUMRECS))
 	}
 }
 
@@ -205,7 +205,10 @@ func getS18(driver neo4j18.Driver, n int) {
 
 // Run with bolt://localhost:7687 user pass
 func main() {
-	driver, err := neo4j.NewDriver(os.Args[1], neo4j.BasicAuth(os.Args[2], os.Args[3], ""))
+	driver, err := neo4j.NewDriver(os.Args[1], neo4j.BasicAuth(os.Args[2], os.Args[3], ""),
+	func(c *neo4j.Config) {
+		//c.Log = neo4j.ConsoleLogger(neo4j.DEBUG)
+	})
 	if err != nil {
 		panic(err)
 	}

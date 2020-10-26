@@ -16,12 +16,25 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
+package bolt
 
-package packstream
+import (
+	"io"
+)
 
-type StructTag byte
+type incoming struct {
+	buf []byte
+	hyd hydrator
+}
 
-type Struct struct {
-	Tag    StructTag
-	Fields []interface{}
+func (i *incoming) next(rd io.Reader) (interface{}, error) {
+	// Get next message from transport layer
+	buf, err := dechunkMessage(rd, i.buf)
+	if err != nil {
+		return nil, err
+	}
+	// Reuse buffer for next dechunk
+	i.buf = buf
+
+	return i.hyd.hydrate(buf)
 }

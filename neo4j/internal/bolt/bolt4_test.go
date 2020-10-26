@@ -23,7 +23,6 @@ import (
 	"testing"
 
 	"github.com/neo4j/neo4j-go-driver/v4/neo4j/db"
-	"github.com/neo4j/neo4j-go-driver/v4/neo4j/internal/packstream"
 	. "github.com/neo4j/neo4j-go-driver/v4/neo4j/internal/testutil"
 )
 
@@ -34,10 +33,10 @@ func TestBolt4(ot *testing.T) {
 	runKeys := []interface{}{"f1", "f2"}
 	runBookmark := "bm"
 	runQid := 7
-	runResponse := []packstream.Struct{
+	runResponse := []testStruct{
 		{
-			Tag: msgSuccess,
-			Fields: []interface{}{
+			tag: msgSuccess,
+			fields: []interface{}{
 				map[string]interface{}{
 					"fields":  runKeys,
 					"t_first": int64(1),
@@ -46,20 +45,20 @@ func TestBolt4(ot *testing.T) {
 			},
 		},
 		{
-			Tag:    msgRecord,
-			Fields: []interface{}{[]interface{}{"1v1", "1v2"}},
+			tag:    msgRecord,
+			fields: []interface{}{[]interface{}{"1v1", "1v2"}},
 		},
 		{
-			Tag:    msgRecord,
-			Fields: []interface{}{[]interface{}{"2v1", "2v2"}},
+			tag:    msgRecord,
+			fields: []interface{}{[]interface{}{"2v1", "2v2"}},
 		},
 		{
-			Tag:    msgRecord,
-			Fields: []interface{}{[]interface{}{"3v1", "3v2"}},
+			tag:    msgRecord,
+			fields: []interface{}{[]interface{}{"3v1", "3v2"}},
 		},
 		{
-			Tag:    msgSuccess,
-			Fields: []interface{}{map[string]interface{}{"bookmark": runBookmark, "type": "r"}},
+			tag:    msgSuccess,
+			fields: []interface{}{map[string]interface{}{"bookmark": runBookmark, "type": "r"}},
 		},
 	}
 
@@ -206,7 +205,10 @@ func TestBolt4(ot *testing.T) {
 		bolt, err := Connect("serverName", conn, auth, "007", nil, logger)
 		AssertNil(t, bolt)
 		AssertError(t, err)
-		dbErr := err.(*db.Neo4jError)
+		dbErr, isDbErr := err.(*db.Neo4jError)
+		if !isDbErr {
+			panic(err)
+		}
 		if !dbErr.IsAuthenticationFailed() {
 			t.Errorf("Should be authentication error: %s", dbErr)
 		}
@@ -235,13 +237,13 @@ func TestBolt4(ot *testing.T) {
 			srv.accept(4)
 			srv.waitForRun()
 			srv.waitForPullN(2)
-			srv.send(runResponse[0].Tag, runResponse[0].Fields...)
-			srv.send(runResponse[1].Tag, runResponse[1].Fields...)
-			srv.send(runResponse[2].Tag, runResponse[2].Fields...)
+			srv.send(runResponse[0].tag, runResponse[0].fields...)
+			srv.send(runResponse[1].tag, runResponse[1].fields...)
+			srv.send(runResponse[2].tag, runResponse[2].fields...)
 			srv.send(msgSuccess, map[string]interface{}{"has_more": true})
 			srv.waitForPullN(2)
-			srv.send(runResponse[3].Tag, runResponse[3].Fields...)
-			srv.send(runResponse[4].Tag, runResponse[4].Fields...)
+			srv.send(runResponse[3].tag, runResponse[3].fields...)
+			srv.send(runResponse[4].tag, runResponse[4].fields...)
 		})
 		defer cleanup()
 		defer bolt.Close()
@@ -420,7 +422,7 @@ func TestBolt4(ot *testing.T) {
 			srv.waitForPullN(bolt4_fetchsize)
 			// Send RUN response and a record
 			for i := 0; i < 2; i++ {
-				srv.send(runResponse[i].Tag, runResponse[i].Fields...)
+				srv.send(runResponse[i].tag, runResponse[i].fields...)
 			}
 			srv.waitForReset()
 			// Acknowledge reset, no fields

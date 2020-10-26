@@ -65,7 +65,7 @@ func makeRawConnection(logger log.Logger) (dbserver.DbServer, db.Connection) {
 }
 
 func BenchmarkQuery(b *testing.B) {
-	_, conn := makeRawConnection(&log.Void{})
+	_, conn := makeRawConnection(&log.Console{Debugs: true, Errors: true, Infos: true, Warns: true})
 	defer conn.Close()
 	params := map[string]interface{}{
 		"one": 1,
