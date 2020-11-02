@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"runtime"
 	"strconv"
 	"time"
 
@@ -203,12 +204,40 @@ func getS18(driver neo4j18.Driver, n int) {
 	}
 }
 
+type memDiff struct {
+	Mallocs    uint64
+	TotalAlloc uint64
+}
+
+func perf(warmup, measure func()) (time.Duration, memDiff) {
+	// Run a warm up first, typically reduced
+	warmup()
+
+	// Collect all garbage before and retrieve baseline mem stats
+	runtime.GC()
+	memBefore := runtime.MemStats{}
+	runtime.ReadMemStats(&memBefore)
+	start := time.Now()
+
+	// Perform the measurement
+	// Include garbage collection in the measurement
+	measure()
+	runtime.GC()
+
+	dur := time.Since(start)
+	memAfter := runtime.MemStats{}
+	runtime.ReadMemStats(&memAfter)
+
+	mem := memDiff{
+		Mallocs:    memAfter.Mallocs - memBefore.Mallocs,
+		TotalAlloc: memAfter.TotalAlloc - memBefore.TotalAlloc,
+	}
+	return dur, mem
+}
+
 // Run with bolt://localhost:7687 user pass
 func main() {
-	driver, err := neo4j.NewDriver(os.Args[1], neo4j.BasicAuth(os.Args[2], os.Args[3], ""),
-	func(c *neo4j.Config) {
-		//c.Log = neo4j.ConsoleLogger(neo4j.DEBUG)
-	})
+	driver, err := neo4j.NewDriver(os.Args[1], neo4j.BasicAuth(os.Args[2], os.Args[3], ""))
 	if err != nil {
 		panic(err)
 	}
@@ -222,35 +251,24 @@ func main() {
 	// Build the setup if needed
 	buildSetup(driver, getSetup(driver))
 
-	iterMxL(driver) // Warm up
-	start := time.Now()
-	iterMxL(driver)
-	duration := time.Since(start)
-	iterMxL18(driver18) // Warm up
-	start18 := time.Now()
-	iterMxL18(driver18)
-	duration18 := time.Since(start18)
-	fmt.Printf("iterMxL: %.2f\n", float64(duration)/float64(duration18))
+	fmt.Printf("%-15v %-6v %-5v %-5v\n", "Benchmark", "Dur", "Mal", "Tal")
+	printRes := func(name string, dur, dur18 time.Duration, mem, mem18 memDiff) {
+		fmt.Printf("%-15v %.2f   %.2f  %.2f\n", name,
+			float64(dur)/float64(dur18),
+			float64(mem.Mallocs)/float64(mem18.Mallocs),
+			float64(mem.TotalAlloc)/float64(mem18.TotalAlloc))
+	}
 
-	getS(driver, 10) // Warm up
-	start = time.Now()
-	getS(driver, 1000)
-	duration = time.Since(start)
-	getS18(driver18, 10) // Warm up
-	start18 = time.Now()
-	getS18(driver18, 1000)
-	duration18 = time.Since(start18)
-	fmt.Printf("getS: %.2f\n", float64(duration)/float64(duration18))
+	dur, mem := perf(func() { iterMxL(driver) }, func() { iterMxL(driver) })
+	dur18, mem18 := perf(func() { iterMxL18(driver18) }, func() { iterMxL18(driver18) })
+	printRes("iterMxL", dur, dur18, mem, mem18)
+
+	dur, mem = perf(func() { getS(driver, 10) }, func() { getS(driver, 1000) })
+	dur18, mem18 = perf(func() { getS18(driver18, 10) }, func() { getS18(driver18, 1000) })
+	printRes("getS", dur, dur18, mem, mem18)
 
 	m := buildParamsLMap()
-	params(driver, m, 10) // Warm up
-	start = time.Now()
-	params(driver, m, 1000)
-	duration = time.Since(start)
-	params18(driver18, m, 10) // Warm up
-	start18 = time.Now()
-	params(driver, m, 1000)
-	duration18 = time.Since(start18)
-	fmt.Printf("paramsL: %.2f\n", float64(duration)/float64(duration18))
-
+	dur, mem = perf(func() { params(driver, m, 10) }, func() { params(driver, m, 1000) })
+	dur18, mem18 = perf(func() { params18(driver18, m, 10) }, func() { params18(driver18, m, 1000) })
+	printRes("paramsL", dur, dur18, mem, mem18)
 }

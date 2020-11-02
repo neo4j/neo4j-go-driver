@@ -274,10 +274,18 @@ func (o *outgoing) packX(x interface{}) {
 	case reflect.Struct:
 		o.packStruct(x)
 	case reflect.Slice:
-		// Check for more optimal/specific cases
+		// Optimizations
 		switch s := x.(type) {
 		case []byte:
-			o.packer.Bytes(s)
+			o.packer.Bytes(s) // Not just optimization
+		case []int:
+			o.packer.Ints(s)
+		case []int64:
+			o.packer.Int64s(s)
+		case []string:
+			o.packer.Strings(s)
+		case []float64:
+			o.packer.Float64s(s)
 		default:
 			num := v.Len()
 			o.packer.ArrayHeader(num)
