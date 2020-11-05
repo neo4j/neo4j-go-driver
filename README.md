@@ -2,6 +2,8 @@
 
 This is the official Neo4j Go Driver.
 
+There is a 4.0 beta released, see 4.0 branch on how to use that and how to migrate.
+
 ## Getting the Driver
 
 ### Module version
