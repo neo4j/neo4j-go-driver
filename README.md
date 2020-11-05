@@ -8,7 +8,11 @@ This is the official Neo4j Go Driver.
 
 Make sure your application has been setup to use go modules (there should be a go.mod file in your application root). Add the driver with:
 
-`go mod edit -require github.com/neo4j/neo4j-go-driver@<the tag>`
+`go get github.com/neo4j/neo4j-go-driver/v4@<the 4.x tag>`
+
+For versions 1.x of the driver (notice the absence of `/v4`), run instead the following:
+
+`go get github.com/neo4j/neo4j-go-driver@<the 1.x tag>`
 
 ## Documentation
 Drivers manual that describes general driver concepts in depth [here](https://neo4j.com/docs/driver-manual/4.0/).
