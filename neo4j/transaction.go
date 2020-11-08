@@ -21,6 +21,7 @@ package neo4j
 
 import (
 	"github.com/neo4j/neo4j-go-driver/v4/neo4j/db"
+	"net/url"
 )
 
 // Transaction represents a transaction in the Neo4j database
@@ -38,18 +39,29 @@ type Transaction interface {
 
 // Transaction implementation when explicit transaction started
 type transaction struct {
-	conn      db.Connection
-	fetchSize int
-	txHandle  db.TxHandle
-	done      bool
-	err       error
-	onClosed  func()
+	conn          db.Connection
+	fetchSize     int
+	txHandle      db.TxHandle
+	done          bool
+	err           error
+	onClosed      func()
+	target        url.URL
+	config        TransactionConfig
+	preQueryHook  PreQueryHook
+	postQueryHook PostQueryHook
 }
 
-func (tx *transaction) Run(cypher string, params map[string]interface{}) (Result, error) {
-	stream, err := tx.conn.RunTx(tx.txHandle, db.Command{Cypher: cypher, Params: params, FetchSize: tx.fetchSize})
-	if err != nil {
-		return nil, wrapBoltError(err)
+func (tx *transaction) Run(cypher string, params map[string]interface{}) (result Result, err error) {
+	if tx.postQueryHook != nil {
+		defer func() { tx.postQueryHook(err, tx.target, &tx.config) }()
+	}
+	if tx.preQueryHook != nil {
+		tx.preQueryHook(cypher, params, tx.target, &tx.config)
+	}
+	stream, e := tx.conn.RunTx(tx.txHandle, db.Command{Cypher: cypher, Params: params, FetchSize: tx.fetchSize})
+	if e != nil {
+		err = wrapBoltError(e)
+		return
 	}
 	return newResult(tx.conn, stream, cypher, params), nil
 }
@@ -80,15 +92,26 @@ func (tx *transaction) Close() error {
 
 // Transaction implementation used as parameter to transactional functions
 type retryableTransaction struct {
-	conn      db.Connection
-	fetchSize int
-	txHandle  db.TxHandle
+	conn          db.Connection
+	fetchSize     int
+	txHandle      db.TxHandle
+	target        url.URL
+	config        TransactionConfig
+	preQueryHook  PreQueryHook
+	postQueryHook PostQueryHook
 }
 
-func (tx *retryableTransaction) Run(cypher string, params map[string]interface{}) (Result, error) {
-	stream, err := tx.conn.RunTx(tx.txHandle, db.Command{Cypher: cypher, Params: params, FetchSize: tx.fetchSize})
-	if err != nil {
-		return nil, wrapBoltError(err)
+func (tx *retryableTransaction) Run(cypher string, params map[string]interface{}) (result Result, err error) {
+	if tx.postQueryHook != nil {
+		defer func() { tx.postQueryHook(err, tx.target, &tx.config) }()
+	}
+	if tx.preQueryHook != nil {
+		tx.preQueryHook(cypher, params, tx.target, &tx.config)
+	}
+	stream, e := tx.conn.RunTx(tx.txHandle, db.Command{Cypher: cypher, Params: params, FetchSize: tx.fetchSize})
+	if e != nil {
+		err = wrapBoltError(err)
+		return
 	}
 	return newResult(tx.conn, stream, cypher, params), nil
 }

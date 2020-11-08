@@ -21,6 +21,7 @@ package neo4j
 
 import (
 	"context"
+	"net/url"
 	"time"
 
 	"github.com/neo4j/neo4j-go-driver/v4/neo4j/db"
@@ -106,6 +107,7 @@ type session struct {
 	log          log.Logger
 	throttleTime time.Duration
 	fetchSize    int
+	target       url.URL
 }
 
 // Remove empty string bookmarks to check for "bad" callers
@@ -132,8 +134,8 @@ func cleanupBookmarks(bookmarks []string) []string {
 	return cleaned
 }
 
-func newSession(config *Config, router sessionRouter, pool sessionPool,
-	mode db.AccessMode, bookmarks []string, databaseName string, fetchSize int, logger log.Logger) *session {
+func newSession(config *Config, router sessionRouter, pool sessionPool, mode db.AccessMode,
+	bookmarks []string, databaseName string, fetchSize int, logger log.Logger, target url.URL) *session {
 
 	logId := log.NewId()
 	logger.Debugf(log.Session, logId, "Created")
@@ -151,6 +153,7 @@ func newSession(config *Config, router sessionRouter, pool sessionPool,
 		logId:        logId,
 		throttleTime: time.Second * 1,
 		fetchSize:    fetchSize,
+		target:       target,
 	}
 }
 
@@ -206,9 +209,13 @@ func (s *session) BeginTransaction(configurers ...func(*TransactionConfig)) (Tra
 
 	// Create transaction wrapper
 	s.txExplicit = &transaction{
-		conn:      conn,
-		fetchSize: s.fetchSize,
-		txHandle:  txHandle,
+		conn:          conn,
+		fetchSize:     s.fetchSize,
+		txHandle:      txHandle,
+		target:        s.target,
+		config:        config,
+		preQueryHook:  s.config.PreQueryHook,
+		postQueryHook: s.config.PostQueryHook,
 		onClosed: func() {
 			// On transaction closed (rollbacked or committed)
 			s.retrieveBookmarks(conn)
@@ -220,7 +227,7 @@ func (s *session) BeginTransaction(configurers ...func(*TransactionConfig)) (Tra
 	return s.txExplicit, nil
 }
 
-func (s *session) runRetriable(
+func (s *session) runRetryable(
 	mode db.AccessMode,
 	work TransactionWork, configurers ...func(*TransactionConfig)) (interface{}, error) {
 
@@ -275,7 +282,16 @@ func (s *session) runRetriable(
 		// Construct a transaction like thing for client to execute stuff on.
 		// Evaluate the returned error from all the work for retryable, this means
 		// that client can mess up the error handling.
-		tx := retryableTransaction{conn: conn, fetchSize: s.fetchSize, txHandle: txHandle}
+		tx := retryableTransaction{
+			conn:          conn,
+			fetchSize:     s.fetchSize,
+			txHandle:      txHandle,
+			target:        s.target,
+			config:        config,
+			preQueryHook:  s.config.PreQueryHook,
+			postQueryHook: s.config.PostQueryHook,
+		}
+
 		x, err := work(&tx)
 		if err != nil {
 			state.OnFailure(conn, err, false)
@@ -311,13 +327,13 @@ func (s *session) runRetriable(
 func (s *session) ReadTransaction(
 	work TransactionWork, configurers ...func(*TransactionConfig)) (interface{}, error) {
 
-	return s.runRetriable(db.ReadMode, work, configurers...)
+	return s.runRetryable(db.ReadMode, work, configurers...)
 }
 
 func (s *session) WriteTransaction(
 	work TransactionWork, configurers ...func(*TransactionConfig)) (interface{}, error) {
 
-	return s.runRetriable(db.WriteMode, work, configurers...)
+	return s.runRetryable(db.WriteMode, work, configurers...)
 }
 
 func (s *session) getServers(mode db.AccessMode) ([]string, error) {
@@ -395,6 +411,10 @@ func (s *session) Run(
 		return nil, err
 	}
 
+	if s.config.PreQueryHook != nil {
+		s.config.PreQueryHook(cypher, params, s.target, &config)
+	}
+
 	stream, err := conn.Run(
 		db.Command{
 			Cypher:    cypher,
@@ -409,7 +429,13 @@ func (s *session) Run(
 		})
 	if err != nil {
 		s.pool.Return(conn)
-		return nil, wrapBoltError(err)
+		err = wrapBoltError(err)
+
+		// Handle errors in post hook
+		if s.config.PostQueryHook != nil {
+			s.config.PostQueryHook(err, s.target, &config)
+		}
+		return nil, err
 	}
 
 	s.txAuto = &autoTransaction{
@@ -420,6 +446,11 @@ func (s *session) Run(
 			s.pool.Return(conn)
 			s.txAuto = nil
 		},
+	}
+
+	// Execute post hook as we have a result
+	if s.config.PostQueryHook != nil {
+		s.config.PostQueryHook(err, s.target, &config)
 	}
 
 	return s.txAuto.res, nil

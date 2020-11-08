@@ -88,6 +88,14 @@ type Config struct {
 	//
 	// default: neo4j.UserAgent
 	UserAgent string
+	// Optional hook function, executed before the actual query execution
+	//
+	// default: nil
+	PreQueryHook PreQueryHook
+	// Optional hook function, executed after the actual query execution
+	//
+	// default: nil
+	PostQueryHook PostQueryHook
 }
 
 func defaultConfig() *Config {
@@ -101,6 +109,8 @@ func defaultConfig() *Config {
 		SocketKeepalive:              true,
 		RootCAs:                      nil,
 		UserAgent:                    UserAgent,
+		PreQueryHook:                 nil,
+		PostQueryHook:                nil,
 	}
 }
 

@@ -19,7 +19,10 @@
 
 package neo4j
 
-import "time"
+import (
+	"context"
+	"time"
+)
 
 // TransactionConfig holds the settings for explicit and auto-commit transactions. Actual configuration is expected
 // to be done using configuration functions that are predefined, i.e. 'WithTxTimeout' and 'WithTxMetadata', or one
@@ -29,6 +32,8 @@ type TransactionConfig struct {
 	Timeout time.Duration
 	// Metadata is the configured transaction metadata that will be attached to the underlying transaction.
 	Metadata map[string]interface{}
+	// Context is the context to govern the execution
+	Context context.Context
 }
 
 // WithTxTimeout returns a transaction configuration function that applies a timeout to a transaction.
@@ -66,5 +71,24 @@ func WithTxTimeout(timeout time.Duration) func(*TransactionConfig) {
 func WithTxMetadata(metadata map[string]interface{}) func(*TransactionConfig) {
 	return func(config *TransactionConfig) {
 		config.Metadata = metadata
+	}
+}
+
+// WithContext returns a transaction configuration function that applies a context to a transaction.
+//
+// To apply a context to an explicit transaction:
+//	session.BeginTransaction(WithContext(context.Background()))
+//
+// To apply a context to an auto-commit transaction:
+//	session.Run("RETURN 1", nil, WithContext(context.Background()))
+//
+// To apply a context to a read transaction function:
+//	session.ReadTransaction(DoWork, WithContext(context.Background()))
+//
+// To apply a context to a write transaction function:
+//	session.WriteTransaction(DoWork, WithContext(context.Background()))
+func WithContext(context context.Context) func(*TransactionConfig) {
+	return func(config *TransactionConfig) {
+		config.Context = context
 	}
 }
