@@ -33,7 +33,23 @@ type (
 	LocalDateTime time.Time // Date and time in local timezone
 )
 
+// Time casts LocalDateTime to time.Time
 func (t LocalDateTime) Time() time.Time {
+	return time.Time(t)
+}
+
+// Time casts LocalTime to time.Time
+func (t LocalTime) Time() time.Time {
+	return time.Time(t)
+}
+
+// Time casts Date to time.Time
+func (t Date) Time() time.Time {
+	return time.Time(t)
+}
+
+// Time casts Time to time.Time
+func (t Time) Time() time.Time {
 	return time.Time(t)
 }
 
