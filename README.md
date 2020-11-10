@@ -3,6 +3,7 @@
 3
 4
 5
+6
 # neo4j-go-driver
 
 This is the official Neo4j Go Driver.
