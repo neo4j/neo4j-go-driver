@@ -17,6 +17,7 @@
  *  limitations under the License.
  */
 
+// Package bolt contains implementations of the database functionality.
 package bolt
 
 import (

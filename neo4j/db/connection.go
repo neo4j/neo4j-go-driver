@@ -17,6 +17,7 @@
  *  limitations under the License.
  */
 
+// Package db defines generic database functionality.
 package db
 
 import (
@@ -49,7 +50,7 @@ type TxConfig struct {
 	Meta      map[string]interface{}
 }
 
-// Abstract database server connection.
+// Connection defines an abstract database server connection.
 type Connection interface {
 	TxBegin(txConfig TxConfig) (TxHandle, error)
 	TxRollback(tx TxHandle) error

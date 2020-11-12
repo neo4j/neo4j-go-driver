@@ -16,6 +16,8 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
+
+// Package connector is responsible for connecting to a database server.
 package connector
 
 import (

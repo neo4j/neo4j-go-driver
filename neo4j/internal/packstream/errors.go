@@ -16,6 +16,9 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
+
+// Package packstream handles serialization of data sent to database server and
+// deserialization of data received from database server.
 package packstream
 
 type OverflowError struct {
