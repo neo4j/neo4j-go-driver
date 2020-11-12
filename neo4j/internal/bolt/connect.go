@@ -78,14 +78,16 @@ func Connect(serverName string, conn net.Conn, auth map[string]interface{}, user
 			return nil, err
 		}
 		return boltConn, nil
-	case 4:
-		// Handover rest of connection handshaking
-		boltConn := NewBolt4(serverName, conn, log)
-		err = boltConn.connect(int(minor), auth, userAgent, routingContext)
-		if err != nil {
-			return nil, err
-		}
-		return boltConn, nil
+		/*
+			case 4:
+				// Handover rest of connection handshaking
+				boltConn := NewBolt4(serverName, conn, log)
+				err = boltConn.connect(int(minor), auth, userAgent, routingContext)
+				if err != nil {
+					return nil, err
+				}
+				return boltConn, nil
+		*/
 	case 0:
 		err = errors.New(fmt.Sprintf("Server did not accept any of the requested Bolt versions (%#v)", versions))
 	default:
