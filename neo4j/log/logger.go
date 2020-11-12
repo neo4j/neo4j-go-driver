@@ -17,6 +17,8 @@
  *  limitations under the License.
  */
 
+// Package log defines the logging interface used internally by the driver and
+// provides default logging implementations.
 package log
 
 import (

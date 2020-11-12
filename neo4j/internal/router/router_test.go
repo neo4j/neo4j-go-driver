@@ -17,6 +17,7 @@
  *  limitations under the License.
  */
 
+// Package router handles routing of commands to different database servers part of a cluster.
 package router
 
 import (

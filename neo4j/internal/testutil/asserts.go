@@ -17,6 +17,7 @@
  *  limitations under the License.
  */
 
+// Package testutil contains shared test functionality
 package testutil
 
 import (

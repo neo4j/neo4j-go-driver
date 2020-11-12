@@ -26,7 +26,7 @@ import (
 )
 
 // Console is a simple logger that logs to stdout/console.
-// Turn the different log levels on/off as wished, all is off by default.
+// Turn the different log levels on/off as wished, all are off by default.
 type Console struct {
 	Errors bool
 	Infos  bool

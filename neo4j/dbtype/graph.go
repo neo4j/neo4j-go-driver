@@ -17,6 +17,7 @@
  *  limitations under the License.
  */
 
+// Package dbtype contains definitions of supported database types.
 package dbtype
 
 // Node represents a node in the neo4j graph database

@@ -17,6 +17,7 @@
  *  limitations under the License.
  */
 
+// Tool used for verifying driver under load.
 package main
 
 import (

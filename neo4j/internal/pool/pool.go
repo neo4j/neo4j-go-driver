@@ -17,6 +17,7 @@
  *  limitations under the License.
  */
 
+// Package pool handles the database connection pool.
 package pool
 
 // Thread safe
