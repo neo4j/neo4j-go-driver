@@ -22,6 +22,7 @@ package test_integration
 import (
 	"errors"
 	"fmt"
+	"testing"
 	"time"
 
 	"github.com/neo4j/neo4j-go-driver/v4/neo4j"
@@ -644,6 +645,15 @@ func addPersonNode(driver neo4j.Driver, name string) (int64, error) {
 }
 
 // end::read-write-transaction[]
+
+func TestExamplesDatabaseSelection(t *testing.T) {
+	driver := dbserver.GetDbServer().Driver()
+	defer driver.Close()
+	// tag::database-selection[]
+	session := driver.NewSession(neo4j.SessionConfig{DatabaseName: "example"})
+	// end::database-selection[]
+	defer session.Close()
+}
 
 // tag::result-consume[]
 func getPeople(driver neo4j.Driver) ([]string, error) {
