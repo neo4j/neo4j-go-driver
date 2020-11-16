@@ -212,4 +212,30 @@ rec, err := session.ReadTransaction(func(tx neo4j.Transaction) (interface{}, err
     }
     return rec, nil
 })
+
+## Result usage out of session scope
+On 1.x driver it was possible to iterate through a result after the sessions has been closed,
+this is no longer allowed.
+
+This code will no longer work:
+```go
+result, err := session.Run("RETURN 1 as n", nil)
+session.Close()
+// This will fail since result should be used within the session scope
+var rec *neo4j.Record
+if !result.NextRecord(&rec) {
+    // This will always happen on 4.x
+    return errors.New("No record")
+}
+```
+
+Should be rewritten to use the result before closing the session:
+```go
+result, err := session.Run("RETURN 1 as n", nil)
+if err != nil {
+    return err
+}
+// Buffer all records in memory
+records, err := result.Collect()
+session.Close()
 ```
