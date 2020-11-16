@@ -435,7 +435,7 @@ func (s *session) Close() error {
 	}
 
 	if s.txAuto != nil {
-		s.txAuto.done()
+		s.txAuto.discard()
 	}
 
 	s.log.Debugf(log.Session, s.logId, "Closed")

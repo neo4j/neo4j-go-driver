@@ -121,3 +121,11 @@ func (tx *autoTransaction) done() {
 		tx.onClosed()
 	}
 }
+
+func (tx *autoTransaction) discard() {
+	if !tx.closed {
+		tx.res.Consume()
+		tx.closed = true
+		tx.onClosed()
+	}
+}

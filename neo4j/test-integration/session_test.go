@@ -300,7 +300,7 @@ var _ = Describe("Session", func() {
 			Expect(result2Values).To(BeEquivalentTo([]int{11, 12, 13, 14, 15, 16, 17, 18, 19, 20}))
 		})
 
-		Specify("when session is closed, pending query should be executed", func() {
+		Specify("when session is closed, pending query result should be discarded", func() {
 			var result neo4j.Result
 			var err error
 
@@ -321,12 +321,10 @@ var _ = Describe("Session", func() {
 
 			records, _ := neo4j.Collect(result, nil)
 			Expect(records).NotTo(BeNil())
-			Expect(records).To(HaveLen(100))
-			Expect(records[0].Values[0]).To(BeEquivalentTo(1))
-			Expect(records[99].Values[0]).To(BeEquivalentTo(100))
+			Expect(records).To(HaveLen(0))
 		})
 
-		Specify("when session is closed, pending queries should be executed", func() {
+		Specify("when session is closed, last pending result shoud be discarded", func() {
 			var result1, result2 neo4j.Result
 			var err error
 
@@ -357,9 +355,7 @@ var _ = Describe("Session", func() {
 
 			records2, _ := neo4j.Collect(result2, nil)
 			Expect(records2).NotTo(BeNil())
-			Expect(records2).To(HaveLen(100))
-			Expect(records2[0].Values[0]).Should(Equal("Text 1"))
-			Expect(records2[99].Values[0]).Should(Equal("Text 100"))
+			Expect(records2).To(HaveLen(0))
 		})
 
 		Specify("when session is closed, pending explicit transaction should be rolled-back", func() {
