@@ -21,15 +21,15 @@ package neo4j
 
 // A router implementation that never routes
 type directRouter struct {
-	server string
+	address string
 }
 
 func (r *directRouter) Readers(database string) ([]string, error) {
-	return []string{r.server}, nil
+	return []string{r.address}, nil
 }
 
 func (r *directRouter) Writers(database string) ([]string, error) {
-	return []string{r.server}, nil
+	return []string{r.address}, nil
 }
 
 func (r *directRouter) Invalidate(database string) {
