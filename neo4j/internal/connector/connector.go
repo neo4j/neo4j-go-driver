@@ -43,6 +43,7 @@ type Connector struct {
 	Log             log.Logger
 	UserAgent       string
 	RoutingContext  map[string]string
+	Network         string
 }
 
 type ConnectError struct {
@@ -67,7 +68,7 @@ func (c Connector) Connect(address string) (db.Connection, error) {
 		dialer.KeepAlive = -1 * time.Second // Turns keep-alive off
 	}
 
-	conn, err := dialer.Dial("tcp", address)
+	conn, err := dialer.Dial(c.Network, address)
 	if err != nil {
 		return nil, &ConnectError{inner: err}
 	}

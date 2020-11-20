@@ -82,17 +82,27 @@ func NewDriver(target string, auth AuthToken, configurers ...func(*Config)) (Dri
 	if err != nil {
 		return nil, err
 	}
-	if parsed.Port() == "" {
-		parsed.Host = parsed.Host + ":7687"
-	}
 
 	d := driver{target: parsed}
 
 	routing := true
+	d.connector.Network = "tcp"
+	address := parsed.Host
 	switch parsed.Scheme {
 	case "bolt":
 		routing = false
 		d.connector.SkipEncryption = true
+	case "bolt+unix":
+		// bolt+unix://<path to socket>
+		routing = false
+		d.connector.SkipEncryption = true
+		d.connector.Network = "unix"
+		if parsed.Host != "" {
+			return nil, &UsageError{
+				Message: fmt.Sprintf("Host part should be empty for scheme %s", parsed.Scheme),
+			}
+		}
+		address = parsed.Path
 	case "bolt+s":
 		routing = false
 	case "bolt+ssc":
@@ -105,8 +115,13 @@ func NewDriver(target string, auth AuthToken, configurers ...func(*Config)) (Dri
 	case "neo4j+s":
 	default:
 		return nil, &UsageError{
-			Message: fmt.Sprintf("URL scheme %s is not supported", parsed.Scheme),
+			Message: fmt.Sprintf("URI scheme %s is not supported", parsed.Scheme),
 		}
+	}
+
+	if parsed.Host != "" && parsed.Port() == "" {
+		address += ":7687"
+		parsed.Host = address
 	}
 
 	if !routing && len(parsed.RawQuery) > 0 {
@@ -150,7 +165,7 @@ func NewDriver(target string, auth AuthToken, configurers ...func(*Config)) (Dri
 	d.pool = pool.New(d.config.MaxConnectionPoolSize, d.config.MaxConnectionLifetime, d.connector.Connect, d.log, d.logId)
 
 	if !routing {
-		d.router = &directRouter{server: parsed.Host}
+		d.router = &directRouter{address: address}
 	} else {
 		var routersResolver func() []string
 		addressResolverHook := d.config.AddressResolver
@@ -165,10 +180,10 @@ func NewDriver(target string, auth AuthToken, configurers ...func(*Config)) (Dri
 			}
 		}
 		// Let the router use the same logid as the driver to simplify log reading.
-		d.router = router.New(parsed.Host, routersResolver, routingContext, d.pool, d.log, d.logId)
+		d.router = router.New(address, routersResolver, routingContext, d.pool, d.log, d.logId)
 	}
 
-	d.log.Infof(log.Driver, d.logId, "Created { target: %s }", target)
+	d.log.Infof(log.Driver, d.logId, "Created { target: %s }", address)
 	return &d, nil
 }
 

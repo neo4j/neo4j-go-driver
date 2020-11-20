@@ -34,6 +34,13 @@ func assertNoRouter(t *testing.T, d Driver) {
 		t.Error("Expected no router")
 	}
 }
+func assertNoRouterAddress(t *testing.T, d Driver, address string) {
+	t.Helper()
+	direct := d.(*driver).router.(*directRouter)
+	if direct.address != address {
+		t.Errorf("Address mismatch %s vs %s", address, direct.address)
+	}
+}
 
 func assertRouter(t *testing.T, d Driver) {
 	t.Helper()
@@ -52,46 +59,80 @@ func assertRouterContext(t *testing.T, d Driver, context map[string]string) {
 	}
 }
 
-var uriSchemeTests = []struct {
-	name    string
-	scheme  string
-	testing string
-	router  bool
-}{
-	{"bolt://", "bolt", "bolt://localhost:7687", false},
-	{"bolt+s://", "bolt", "bolt://localhost:7687", false},
-	{"bolt+ssc://", "bolt", "bolt://localhost:7687", false},
-	{"neo4j://", "neo4j", "neo4j://localhost:7687", true},
-	{"neo4j+s://", "neo4j", "neo4j://localhost:7687", true},
-	{"neo4j+ssc://", "neo4j", "neo4j://localhost:7687", true},
+func assertSkipEncryption(t *testing.T, d Driver, skipEncryption bool) {
+	t.Helper()
+	c := d.(*driver).connector
+	if c.SkipEncryption != skipEncryption {
+		t.Errorf("SkipEncryption mismatch, %t vs %t", skipEncryption, c.SkipEncryption)
+	}
 }
 
-func TestDriverURISchemesX(t *testing.T) {
+func assertSkipVerify(t *testing.T, d Driver, skipVerify bool) {
+	t.Helper()
+	c := d.(*driver).connector
+	if c.SkipVerify != skipVerify {
+		t.Errorf("SkipVerify mismatch, %t vs %t", skipVerify, c.SkipVerify)
+	}
+}
+
+func assertNetwork(t *testing.T, d Driver, network string) {
+	t.Helper()
+	c := d.(*driver).connector
+	if c.Network != network {
+		t.Errorf("Network mismatch, %s vs %s", network, c.Network)
+	}
+}
+
+func TestDriverURISchemes(t *testing.T) {
+	uriSchemeTests := []struct {
+		scheme         string
+		testing        string
+		router         bool
+		skipEncryption bool
+		skipVerify     bool
+		network        string
+		address        string
+	}{
+		{"bolt", "bolt://localhost:7687", false, true, false, "tcp", "localhost:7687"},
+		{"bolt+s", "bolt+s://localhost:7687", false, false, false, "tcp", "localhost:7687"},
+		{"bolt+ssc", "bolt+ssc://localhost:7687", false, false, true, "tcp", "localhost:7687"},
+		{"bolt+unix", "bolt+unix:///tmp/a.socket", false, true, false, "unix", "/tmp/a.socket"},
+		{"neo4j", "neo4j://localhost:7687", true, true, false, "tcp", ""},
+		{"neo4j+s", "neo4j+s://localhost:7687", true, false, false, "tcp", ""},
+		{"neo4j+ssc", "neo4j+ssc://localhost:7687", true, false, true, "tcp", ""},
+	}
+
 	for _, tt := range uriSchemeTests {
-		t.Run(tt.name, func(t *testing.T) {
+		t.Run(tt.scheme, func(t *testing.T) {
 			driver, err := NewDriver(tt.testing, NoAuth())
 
 			AssertNoError(t, err)
 			AssertStringEqual(t, driver.Target().Scheme, tt.scheme)
 			if !tt.router {
 				assertNoRouter(t, driver)
+				assertNoRouterAddress(t, driver, tt.address)
 			} else {
 				assertRouter(t, driver)
 			}
+			assertSkipEncryption(t, driver, tt.skipEncryption)
+			if !tt.skipEncryption {
+				assertSkipVerify(t, driver, tt.skipVerify)
+			}
+			assertNetwork(t, driver, tt.network)
 		})
 	}
 }
 
-var invalidURISchemeTests = []struct {
-	name    string
-	scheme  string
-	testing string
-}{
-	{"bolt+routing://", "bolt+routing", "bolt+routing://localhost:7687"},
-	{"invalid://", "invalid", "invalid://localhost:7687"},
-}
+func TestDriverInvalidURISchemes(t *testing.T) {
+	invalidURISchemeTests := []struct {
+		name    string
+		scheme  string
+		testing string
+	}{
+		{"bolt+routing://", "bolt+routing", "bolt+routing://localhost:7687"},
+		{"invalid://", "invalid", "invalid://localhost:7687"},
+	}
 
-func TestDriverInvalidURISchemesX(t *testing.T) {
 	for _, tt := range invalidURISchemeTests {
 		t.Run(tt.name, func(t *testing.T) {
 			_, err := NewDriver(tt.testing, NoAuth())
@@ -127,7 +168,6 @@ func TestDriverURIRoutingContext(t *testing.T) {
 }
 
 func TestDriverDefaultPort(t *testing.T) {
-
 	t.Run("neo4j://localhost should default to port 7687", func(t1 *testing.T) {
 		driver, err := NewDriver("neo4j://localhost", NoAuth())
 		driverTarget := driver.Target()
@@ -139,7 +179,6 @@ func TestDriverDefaultPort(t *testing.T) {
 }
 
 func TestNewDriverAndClose(t *testing.T) {
-
 	driver, err := NewDriver("bolt://localhost:7687", NoAuth())
 	AssertNoError(t, err)
 
@@ -172,19 +211,19 @@ func TestNewDriverAndClose(t *testing.T) {
 	}
 }
 
-var driverSessionCreationTests = []struct {
-	name      string
-	testing   string
-	mode      AccessMode
-	bookmarks []string
-}{
-	{"case one", "bolt://localhost:7687", AccessModeWrite, []string(nil)},
-	{"case two", "bolt://localhost:7687", AccessModeRead, []string(nil)},
-	{"case three", "bolt://localhost:7687", AccessModeWrite, []string{"B1", "B2", "B3"}},
-	{"case four", "bolt://localhost:7687", AccessModeRead, []string{"B1", "B2", "B3", "B4"}},
-}
+func TestDriverSessionCreation(t *testing.T) {
+	driverSessionCreationTests := []struct {
+		name      string
+		testing   string
+		mode      AccessMode
+		bookmarks []string
+	}{
+		{"Write", "bolt://localhost:7687", AccessModeWrite, []string(nil)},
+		{"Read", "bolt://localhost:7687", AccessModeRead, []string(nil)},
+		{"Write+bookmarks", "bolt://localhost:7687", AccessModeWrite, []string{"B1", "B2", "B3"}},
+		{"Read+bookmarks", "bolt://localhost:7687", AccessModeRead, []string{"B1", "B2", "B3", "B4"}},
+	}
 
-func TestDriverSessionCreationX(t *testing.T) {
 	for _, tt := range driverSessionCreationTests {
 		t.Run(tt.name, func(t *testing.T) {
 			driver, err := NewDriver(tt.testing, NoAuth())
