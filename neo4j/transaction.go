@@ -49,7 +49,7 @@ type transaction struct {
 func (tx *transaction) Run(cypher string, params map[string]interface{}) (Result, error) {
 	stream, err := tx.conn.RunTx(tx.txHandle, db.Command{Cypher: cypher, Params: params, FetchSize: tx.fetchSize})
 	if err != nil {
-		return nil, wrapBoltError(err)
+		return nil, wrapError(err)
 	}
 	return newResult(tx.conn, stream, cypher, params), nil
 }
@@ -61,7 +61,7 @@ func (tx *transaction) Commit() error {
 	tx.err = tx.conn.TxCommit(tx.txHandle)
 	tx.done = true
 	tx.onClosed()
-	return wrapBoltError(tx.err)
+	return wrapError(tx.err)
 }
 
 func (tx *transaction) Rollback() error {
@@ -71,7 +71,7 @@ func (tx *transaction) Rollback() error {
 	tx.err = tx.conn.TxRollback(tx.txHandle)
 	tx.done = true
 	tx.onClosed()
-	return wrapBoltError(tx.err)
+	return wrapError(tx.err)
 }
 
 func (tx *transaction) Close() error {
@@ -88,7 +88,7 @@ type retryableTransaction struct {
 func (tx *retryableTransaction) Run(cypher string, params map[string]interface{}) (Result, error) {
 	stream, err := tx.conn.RunTx(tx.txHandle, db.Command{Cypher: cypher, Params: params, FetchSize: tx.fetchSize})
 	if err != nil {
-		return nil, wrapBoltError(err)
+		return nil, wrapError(err)
 	}
 	return newResult(tx.conn, stream, cypher, params), nil
 }

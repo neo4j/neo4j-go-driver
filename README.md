@@ -213,7 +213,6 @@ The `Log` field of the `neo4j.Config` struct is defined to be of interface `neo4
 ```go
 type Logger interface {
 	Error(name string, id string, err error)
-	Errorf(name string, id string, msg string, args ...interface{})
 	Warnf(name string, id string, msg string, args ...interface{})
 	Infof(name string, id string, msg string, args ...interface{})
 	Debugf(name string, id string, msg string, args ...interface{})

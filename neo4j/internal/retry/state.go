@@ -21,6 +21,7 @@
 package retry
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/neo4j/neo4j-go-driver/v4/neo4j/db"
@@ -29,6 +30,14 @@ import (
 
 type Router interface {
 	Invalidate(database string)
+}
+
+type CommitFailedDeadError struct {
+	inner error
+}
+
+func (e *CommitFailedDeadError) Error() string {
+	return fmt.Sprintf("Connection lost during commit: %s", e.inner)
 }
 
 type State struct {
@@ -55,7 +64,6 @@ type State struct {
 }
 
 func (s *State) OnFailure(conn db.Connection, err error, isCommitting bool) {
-	s.LastErrWasRetryable = false
 	s.LastErr = err
 	s.cause = ""
 	s.skipSleep = false
@@ -70,6 +78,9 @@ func (s *State) OnFailure(conn db.Connection, err error, isCommitting bool) {
 		return
 	}
 
+	// Reset after determined to evaluate this error
+	s.LastErrWasRetryable = false
+
 	// Failed to connect
 	if conn == nil {
 		s.LastErrWasRetryable = true
@@ -81,7 +92,9 @@ func (s *State) OnFailure(conn db.Connection, err error, isCommitting bool) {
 	if !conn.IsAlive() {
 		if isCommitting {
 			s.stop = true
-			s.cause = "Connection lost during commit"
+			// The error is most probably io.EOF so enrich the error
+			// to make this error more recognizable.
+			s.LastErr = &CommitFailedDeadError{inner: s.LastErr}
 			return
 		}
 
@@ -138,12 +151,5 @@ func (s *State) Continue() bool {
 		return true
 	}
 
-	// Stop retrying
-	// When last error was retryable we gave up for some reason, log this as an error
-	// since it is somewhat our fault.
-	if s.cause != "" {
-		s.Log.Errorf(s.LogName, s.LogId,
-			"Transaction failed (%s): %s after %d retries", s.cause, s.LastErr, len(s.Errs)-1)
-	}
 	return false
 }

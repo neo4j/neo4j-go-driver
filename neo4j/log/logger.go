@@ -36,10 +36,14 @@ import (
 //
 // Database connections takes to form of "bolt3" and "bolt-123@192.168.0.1:7687"
 // where "bolt3" is the name of the protocol handler in use, "bolt-123" is the
-// databatases identity of the connection on server "192.168.0.1:7687".
+// databases identity of the connection on server "192.168.0.1:7687".
 type Logger interface {
+	// Error is called whenever the driver encounters an error that might
+	// or might not cause a retry operation which means that all logged
+	// errors are not critical. Type of err might or might not be a publicly
+	// exported type. The same root cause of an error might be reported
+	// more than once by different components using same or different err types.
 	Error(name string, id string, err error)
-	Errorf(name string, id string, msg string, args ...interface{})
 	Warnf(name string, id string, msg string, args ...interface{})
 	Infof(name string, id string, msg string, args ...interface{})
 	Debugf(name string, id string, msg string, args ...interface{})

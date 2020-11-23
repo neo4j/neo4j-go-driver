@@ -301,11 +301,18 @@ func (s *session) runRetriable(
 
 	// When retries has occured wrap the error, the last error is always added but
 	// cause is only set when the retry logic could detect something strange.
-	if len(state.Causes) > 0 {
-		return nil, &TransactionExecutionLimit{Errors: state.Errs, Causes: state.Causes}
+	if state.LastErrWasRetryable {
+		err := newTransactionExecutionLimit(state.Errs, state.Causes)
+		s.log.Error(log.Session, s.logId, err)
+		return nil, err
 	}
-	// Return the non-retriable error as is
-	return nil, state.LastErr
+	// Wrap and log the error if it belongs to the driver
+	err := wrapError(state.LastErr)
+	switch err.(type) {
+	case *UsageError, *ConnectivityError:
+		s.log.Error(log.Session, s.logId, err)
+	}
+	return nil, err
 }
 
 func (s *session) ReadTransaction(
@@ -331,7 +338,7 @@ func (s *session) getServers(mode db.AccessMode) ([]string, error) {
 func (s *session) getConnection(mode db.AccessMode) (db.Connection, error) {
 	servers, err := s.getServers(mode)
 	if err != nil {
-		return nil, wrapConnectError(err)
+		return nil, wrapError(err)
 	}
 
 	var ctx context.Context
@@ -346,7 +353,7 @@ func (s *session) getConnection(mode db.AccessMode) (db.Connection, error) {
 	}
 	conn, err := s.pool.Borrow(ctx, servers, s.config.ConnectionAcquisitionTimeout != 0)
 	if err != nil {
-		return nil, wrapConnectError(err)
+		return nil, wrapError(err)
 	}
 
 	// Select database on server
@@ -409,7 +416,7 @@ func (s *session) Run(
 		})
 	if err != nil {
 		s.pool.Return(conn)
-		return nil, wrapBoltError(err)
+		return nil, wrapError(err)
 	}
 
 	s.txAuto = &autoTransaction{

@@ -173,3 +173,12 @@ func AssertIntEqual(t *testing.T, ai, ei int) {
 		t.Errorf("Differs %+v vs %+v", ai, ei)
 	}
 }
+
+func AssertSameType(t *testing.T, x, y interface{}) {
+	t.Helper()
+	t1 := reflect.TypeOf(x)
+	t2 := reflect.TypeOf(y)
+	if t1 != t2 {
+		t.Errorf("Expected types of %s and %s to be same but was %s and %s", x, y, t1, t2)
+	}
+}

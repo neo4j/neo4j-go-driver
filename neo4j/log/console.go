@@ -44,14 +44,6 @@ func (l *Console) Error(name, id string, err error) {
 	fmt.Fprintf(os.Stderr, "%s  ERROR  [%s %s] %s\n", now.Format(timeFormat), name, id, err.Error())
 }
 
-func (l *Console) Errorf(name, id string, msg string, args ...interface{}) {
-	if !l.Infos {
-		return
-	}
-	now := time.Now()
-	fmt.Fprintf(os.Stdout, "%s  ERROR  [%s %s] %s\n", now.Format(timeFormat), name, id, fmt.Sprintf(msg, args...))
-}
-
 func (l *Console) Infof(name, id string, msg string, args ...interface{}) {
 	if !l.Infos {
 		return
