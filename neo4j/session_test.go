@@ -22,12 +22,14 @@ package neo4j
 import (
 	"errors"
 	"fmt"
+	"io"
 	"reflect"
 	"sync"
 	"testing"
 	"time"
 
 	"github.com/neo4j/neo4j-go-driver/v4/neo4j/db"
+	"github.com/neo4j/neo4j-go-driver/v4/neo4j/internal/retry"
 	. "github.com/neo4j/neo4j-go-driver/v4/neo4j/internal/testutil"
 	"github.com/neo4j/neo4j-go-driver/v4/neo4j/log"
 )
@@ -112,8 +114,7 @@ func TestSession(st *testing.T) {
 		// Check that sesssion is in clean state after connection fails to commit.
 		rt.Run("Failed commit", func(t *testing.T) {
 			_, pool, sess := createSession()
-			commitErr := errors.New("Commit error")
-			pool.BorrowConn = &ConnFake{Alive: true, TxCommitErr: commitErr}
+			pool.BorrowConn = &ConnFake{Alive: false, TxCommitErr: io.EOF}
 			numRetries := 0
 			_, err := sess.WriteTransaction(func(tx Transaction) (interface{}, error) {
 				numRetries++
@@ -122,7 +123,9 @@ func TestSession(st *testing.T) {
 			if numRetries != 1 {
 				t.Error("Should not retry on commit error")
 			}
-			assertErrorEq(t, commitErr, err)
+			// Should not be a TransactionExecutionLimitError here
+			AssertTrue(t, IsConnectivityError(err))
+			AssertSameType(t, err.(*ConnectivityError).inner, &retry.CommitFailedDeadError{})
 			assertCleanSessionState(t, sess)
 		})
 	})

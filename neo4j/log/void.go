@@ -19,12 +19,10 @@
 
 package log
 
+// Logger implementation that throws away all log events.
 type Void struct{}
 
 func (l Void) Error(name, id string, err error) {
-}
-
-func (l Void) Errorf(name, id string, msg string, args ...interface{}) {
 }
 
 func (l Void) Infof(name, id string, msg string, args ...interface{}) {

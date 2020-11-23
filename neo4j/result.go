@@ -86,7 +86,7 @@ func (r *result) Record() *Record {
 }
 
 func (r *result) Err() error {
-	return wrapBoltError(r.err)
+	return wrapError(r.err)
 }
 
 func (r *result) Collect() ([]*Record, error) {
@@ -98,7 +98,7 @@ func (r *result) Collect() ([]*Record, error) {
 		}
 	}
 	if r.err != nil {
-		return nil, wrapBoltError(r.err)
+		return nil, wrapError(r.err)
 	}
 	return recs, nil
 }
@@ -111,7 +111,7 @@ func (r *result) Single() (*Record, error) {
 	// Try retrieving the single record
 	r.record, r.summary, r.err = r.conn.Next(r.streamHandle)
 	if r.err != nil {
-		return nil, wrapBoltError(r.err)
+		return nil, wrapError(r.err)
 	}
 	if r.summary != nil {
 		r.err = &UsageError{Message: "Result contains no more records"}
@@ -134,7 +134,7 @@ func (r *result) Single() (*Record, error) {
 	if r.err != nil {
 		// Might be more records or not, anyway something is bad.
 		// Both r.record and r.summary are nil at this point which is good.
-		return nil, wrapBoltError(r.err)
+		return nil, wrapError(r.err)
 	}
 	// We got the expected summary
 	// r.record contains the single record and r.summary the summary.
@@ -155,13 +155,13 @@ func (r *result) Consume() (ResultSummary, error) {
 	// set by Single to indicate some kind of usage error that "destroyed"
 	// the result.
 	if r.err != nil {
-		return nil, wrapBoltError(r.err)
+		return nil, wrapError(r.err)
 	}
 
 	r.record = nil
 	r.summary, r.err = r.conn.Consume(r.streamHandle)
 	if r.err != nil {
-		return nil, wrapBoltError(r.err)
+		return nil, wrapError(r.err)
 	}
 	return r.toResultSummary(), nil
 }

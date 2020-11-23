@@ -26,6 +26,7 @@ import (
 	"github.com/neo4j/neo4j-go-driver/v4/neo4j/db"
 	"github.com/neo4j/neo4j-go-driver/v4/neo4j/internal/connector"
 	"github.com/neo4j/neo4j-go-driver/v4/neo4j/internal/pool"
+	"github.com/neo4j/neo4j-go-driver/v4/neo4j/internal/retry"
 	"github.com/neo4j/neo4j-go-driver/v4/neo4j/internal/router"
 )
 
@@ -49,6 +50,15 @@ func (e *UsageError) Error() string {
 type TransactionExecutionLimit struct {
 	Errors []error
 	Causes []string
+}
+
+func newTransactionExecutionLimit(errors []error, causes []string) *TransactionExecutionLimit {
+	tel := &TransactionExecutionLimit{Errors: make([]error, len(errors)), Causes: causes}
+	for i, err := range errors {
+		tel.Errors[i] = wrapError(err)
+	}
+
+	return tel
 }
 
 func (e *TransactionExecutionLimit) Error() string {
@@ -99,8 +109,7 @@ func IsTransactionExecutionLimit(err error) bool {
 	return is
 }
 
-// Wraps errors that can happen on Bolt protocol level to external error
-func wrapBoltError(err error) error {
+func wrapError(err error) error {
 	if err == nil {
 		return nil
 	}
@@ -111,22 +120,14 @@ func wrapBoltError(err error) error {
 	case *db.UnsupportedTypeError:
 		// Usage of a type not supported by database network protocol
 		return &UsageError{Message: err.Error()}
-	}
-	return err
-}
-
-// Wraps errors that can happen during connect to external error
-func wrapConnectError(err error) error {
-	if err == io.EOF {
-		return &ConnectivityError{inner: err}
-	}
-
-	switch err.(type) {
 	case *connector.TlsError, *connector.ConnectError:
 		return &ConnectivityError{inner: err}
-	case *pool.PoolTimeout, *pool.PoolFull, *router.ReadRoutingTableError:
+	case *pool.PoolTimeout, *pool.PoolFull:
+		return &ConnectivityError{inner: err}
+	case *router.ReadRoutingTableError:
+		return &ConnectivityError{inner: err}
+	case *retry.CommitFailedDeadError:
 		return &ConnectivityError{inner: err}
 	}
-
 	return err
 }

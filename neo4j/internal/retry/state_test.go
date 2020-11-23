@@ -21,10 +21,12 @@ package retry
 import (
 	"errors"
 	"io"
+	"reflect"
 	"testing"
 	"time"
 
 	"github.com/neo4j/neo4j-go-driver/v4/neo4j/db"
+	"github.com/neo4j/neo4j-go-driver/v4/neo4j/internal/pool"
 	"github.com/neo4j/neo4j-go-driver/v4/neo4j/internal/testutil"
 	"github.com/neo4j/neo4j-go-driver/v4/neo4j/log"
 )
@@ -37,6 +39,8 @@ type TStateInvocation struct {
 	expectContinued           bool
 	expectRouterInvalidated   bool
 	expectRouterInvalidatedDb string
+	expectLastErrWasRetryable bool
+	expectLastErrType         error
 }
 
 func TestState(tt *testing.T) {
@@ -53,44 +57,68 @@ func TestState(tt *testing.T) {
 
 	cases := map[string][]TStateInvocation{
 		"Retry connect": []TStateInvocation{
-			{conn: nil, err: errors.New("A connect error"), expectContinued: true},
+			{conn: nil, err: &pool.PoolTimeout{}, expectContinued: true,
+				expectLastErrWasRetryable: true, expectLastErrType: &pool.PoolTimeout{}},
 		},
 		"Retry connect timeout": []TStateInvocation{
-			{conn: nil, err: errors.New("connect error 1"), expectContinued: true, now: baseTime},
-			{conn: nil, err: errors.New("connect error 2"), expectContinued: true, now: halfTime},
-			{conn: nil, err: errors.New("connect error 3"), expectContinued: false, now: overTime},
+			{conn: nil, err: errors.New("connect error 1"), expectContinued: true, now: baseTime,
+				expectLastErrWasRetryable: true},
+			{conn: nil, err: errors.New("connect error 2"), expectContinued: true, now: halfTime,
+				expectLastErrWasRetryable: true},
+			{conn: nil, err: errors.New("connect error 3"), expectContinued: false, now: overTime,
+				expectLastErrWasRetryable: true},
 		},
 		"Retry dead connection": []TStateInvocation{
-			{conn: &testutil.ConnFake{Alive: false}, err: errors.New("some error"), expectContinued: true},
+			{conn: &testutil.ConnFake{Alive: false}, err: errors.New("some error"), expectContinued: true,
+				expectLastErrWasRetryable: true},
 		},
 		"Retry dead connection timeout": []TStateInvocation{
-			{conn: &testutil.ConnFake{Alive: false}, err: errors.New("some error 1"), expectContinued: true, now: baseTime},
-			{conn: &testutil.ConnFake{Alive: false}, err: errors.New("some error 2"), expectContinued: false, now: overTime},
+			{conn: &testutil.ConnFake{Alive: false}, err: errors.New("some error 1"), expectContinued: true, now: baseTime,
+				expectLastErrWasRetryable: true},
+			{conn: &testutil.ConnFake{Alive: false}, err: errors.New("some error 2"), expectContinued: false, now: overTime,
+				expectLastErrWasRetryable: true},
 		},
 		"Retry dead connection max": []TStateInvocation{
-			{conn: &testutil.ConnFake{Alive: false}, err: errors.New("some error 1"), expectContinued: true},
-			{conn: &testutil.ConnFake{Alive: false}, err: errors.New("some error 2"), expectContinued: true},
-			{conn: &testutil.ConnFake{Alive: false}, err: errors.New("some error 3"), expectContinued: false},
+			{conn: &testutil.ConnFake{Alive: false}, err: errors.New("some error 1"), expectContinued: true,
+				expectLastErrWasRetryable: true},
+			{conn: &testutil.ConnFake{Alive: false}, err: errors.New("some error 2"), expectContinued: true,
+				expectLastErrWasRetryable: true},
+			{conn: &testutil.ConnFake{Alive: false}, err: errors.New("some error 3"), expectContinued: false,
+				expectLastErrWasRetryable: true},
 		},
 		"Cluster error": []TStateInvocation{
-			{conn: &testutil.ConnFake{Alive: true}, err: clusterErr, expectContinued: true, expectRouterInvalidated: true, expectRouterInvalidatedDb: dbName},
+			{conn: &testutil.ConnFake{Alive: true}, err: clusterErr, expectContinued: true,
+				expectRouterInvalidated: true, expectRouterInvalidatedDb: dbName, expectLastErrWasRetryable: true},
 		},
 		"Cluster error timeout": []TStateInvocation{
-			{conn: &testutil.ConnFake{Alive: true}, err: clusterErr, expectContinued: true, expectRouterInvalidated: true, expectRouterInvalidatedDb: dbName},
-			{conn: &testutil.ConnFake{Alive: true}, err: clusterErr, expectContinued: false, now: overTime},
+			{conn: &testutil.ConnFake{Alive: true}, err: clusterErr, expectContinued: true,
+				expectRouterInvalidated: true, expectRouterInvalidatedDb: dbName, expectLastErrWasRetryable: true},
+			{conn: &testutil.ConnFake{Alive: true}, err: clusterErr, expectContinued: false, now: overTime,
+				expectLastErrWasRetryable: true},
 		},
 		"Database transient error": []TStateInvocation{
-			{conn: &testutil.ConnFake{Alive: true}, err: dbTransientErr, expectContinued: true},
+			{conn: &testutil.ConnFake{Alive: true}, err: dbTransientErr, expectContinued: true,
+				expectLastErrWasRetryable: true},
 		},
 		"Database transient error timeout": []TStateInvocation{
-			{conn: &testutil.ConnFake{Alive: true}, err: dbTransientErr, expectContinued: true},
-			{conn: &testutil.ConnFake{Alive: true}, err: dbTransientErr, expectContinued: false, now: overTime},
+			{conn: &testutil.ConnFake{Alive: true}, err: dbTransientErr, expectContinued: true,
+				expectLastErrWasRetryable: true},
+			{conn: &testutil.ConnFake{Alive: true}, err: dbTransientErr, expectContinued: false, now: overTime,
+				expectLastErrWasRetryable: true},
 		},
 		"User defined error": []TStateInvocation{
-			{conn: &testutil.ConnFake{Alive: true}, err: errors.New("client error"), expectContinued: false},
+			{conn: &testutil.ConnFake{Alive: true}, err: errors.New("client error"), expectContinued: false,
+				expectLastErrWasRetryable: false},
 		},
 		"Fail during commit": []TStateInvocation{
-			{conn: &testutil.ConnFake{Alive: false}, err: io.EOF, isCommitting: true, expectContinued: false},
+			{conn: &testutil.ConnFake{Alive: false}, err: io.EOF, isCommitting: true, expectContinued: false,
+				expectLastErrWasRetryable: false, expectLastErrType: &CommitFailedDeadError{}},
+		},
+		"Fail during commit after retry": []TStateInvocation{
+			{conn: &testutil.ConnFake{Alive: true}, err: dbTransientErr, expectContinued: true,
+				expectLastErrWasRetryable: true},
+			{conn: &testutil.ConnFake{Alive: false}, err: io.EOF, isCommitting: true, expectContinued: false,
+				expectLastErrWasRetryable: false, expectLastErrType: &CommitFailedDeadError{}},
 		},
 	}
 
@@ -125,6 +153,19 @@ func TestState(tt *testing.T) {
 					t.Errorf("Expected router invalidated: (%v/%s) vs (%v/%s)",
 						i.expectRouterInvalidated, i.expectRouterInvalidatedDb,
 						router.Invalidated, router.InvalidatedDb)
+				}
+				if state.LastErr == nil {
+					t.Errorf("LastErr should be set")
+				}
+				if state.LastErrWasRetryable != i.expectLastErrWasRetryable {
+					t.Errorf("LastErrWasRetryable mismatch")
+				}
+				if i.expectLastErrType != nil {
+					t1 := reflect.TypeOf(state.LastErr)
+					t2 := reflect.TypeOf(i.expectLastErrType)
+					if t1 != t2 {
+						t.Errorf("LastErr type mismatch: %s vs %s", t1, t2)
+					}
 				}
 			}
 		})
