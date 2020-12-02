@@ -38,34 +38,6 @@ func TestAuthentication(tt *testing.T) {
 		return driver, driver.NewSession(neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead})
 	}
 
-	assertConnect := func(t *testing.T, token neo4j.AuthToken) {
-		driver, session := getDriverAndSession(token)
-		defer driver.Close()
-		defer session.Close()
-
-		_, err := session.Run("RETURN 1", nil)
-		if err != nil {
-			t.Errorf("Failed to run query when connect should succeed: %s", err)
-		}
-	}
-
-	tt.Run("when credentials are provided as a basic token with realm", func(t *testing.T) {
-		token := neo4j.BasicAuth(server.Username, server.Password, "native")
-		assertConnect(t, token)
-	})
-
-	tt.Run("when credentials are provided as a custom token", func(t *testing.T) {
-		token := neo4j.CustomAuth("basic", server.Username, server.Password, "native", nil)
-		assertConnect(t, token)
-	})
-
-	tt.Run("when credentials are provided as a custom token with parameters", func(t *testing.T) {
-		token := neo4j.CustomAuth("basic", server.Username, server.Password, "native", map[string]interface{}{
-			"otp": "12345",
-		})
-		assertConnect(t, token)
-	})
-
 	tt.Run("when wrong credentials are provided, it should fail with authentication error", func(t *testing.T) {
 		token := neo4j.BasicAuth("wrong", "wrong", "")
 		driver, session := getDriverAndSession(token)

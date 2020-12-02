@@ -399,7 +399,11 @@ func (b *backend) handleRequest(req map[string]interface{}) {
 	case "SessionLastBookmarks":
 		sessionState := b.sessionStates[data["sessionId"].(string)]
 		bookmark := sessionState.session.LastBookmark()
-		b.writeResponse("Bookmarks", map[string]interface{}{"bookmarks": []string{bookmark}})
+		bookmarks := []string{}
+		if bookmark != "" {
+			bookmarks = append(bookmarks, bookmark)
+		}
+		b.writeResponse("Bookmarks", map[string]interface{}{"bookmarks": bookmarks})
 
 	case "TransactionRun":
 		tx := b.transactions[data["txId"].(string)]
@@ -466,6 +470,15 @@ func (b *backend) handleRequest(req map[string]interface{}) {
 			}
 			b.writeResponse("NullRecord", nil)
 		}
+	case "ResultConsume":
+		result := b.results[data["resultId"].(string)]
+		_, err := result.Consume()
+		if err != nil {
+			b.writeError(err)
+			return
+		}
+		b.writeResponse("Summary", nil)
+
 	default:
 		b.writeError(errors.New("Unknown request: " + name))
 	}

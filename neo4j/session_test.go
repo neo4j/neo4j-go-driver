@@ -131,7 +131,7 @@ func TestSession(st *testing.T) {
 	})
 
 	st.Run("Bookmarking", func(bt *testing.T) {
-		bt.Run("Last initial bookmark is used for LastBookmark", func(t *testing.T) {
+		bt.Run("Initial bookmark is used for LastBookmark", func(t *testing.T) {
 			_, _, sess := createSessionWithBookmarks([]string{"b1", "b2"})
 			AssertStringEqual(t, sess.LastBookmark(), "b2")
 		})
@@ -158,6 +158,11 @@ func TestSession(st *testing.T) {
 					t.Errorf("Using unclean or no bookmarks: %+v", rtx)
 				}
 			}
+		})
+
+		bt.Run("LastBookmark is empty when no initial bookmark", func(t *testing.T) {
+			_, _, sess := createSession()
+			AssertStringEqual(t, sess.LastBookmark(), "")
 		})
 	})
 
