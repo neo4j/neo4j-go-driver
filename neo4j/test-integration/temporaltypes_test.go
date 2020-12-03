@@ -176,19 +176,6 @@ var _ = Describe("Temporal Types", func() {
 			location)
 	}
 
-	testReceive := func(query string, expected interface{}) {
-		result, err = session.Run(query, nil)
-		Expect(err).To(BeNil())
-
-		if result.Next() {
-			var received = result.Record().Values[0]
-
-			Expect(received).To(Equal(expected))
-		}
-		Expect(result.Err()).To(BeNil())
-		Expect(result.Next()).To(BeFalse())
-	}
-
 	testSendAndReceive := func(query string, data interface{}, expected []interface{}) {
 		result, err = session.Run(query, map[string]interface{}{"x": data})
 		Expect(err).To(BeNil())
@@ -227,43 +214,6 @@ var _ = Describe("Temporal Types", func() {
 		Expect(result.Err()).To(BeNil())
 		Expect(result.Next()).To(BeFalse())
 	}
-
-	Context("Receive", func() {
-		It("duration", func() {
-			testReceive("RETURN duration({ months: 16, days: 45, seconds: 120, nanoseconds: 187309812 })", neo4j.DurationOf(16, 45, 120, 187309812))
-		})
-
-		It("date", func() {
-			testReceive("RETURN date({ year: 1994, month: 11, day: 15 })", neo4j.DateOf(time.Date(1994, 11, 15, 0, 0, 0, 0, time.Local)))
-		})
-
-		It("local time", func() {
-			testReceive("RETURN localtime({ hour: 23, minute: 49, second: 59, nanosecond: 999999999 })", neo4j.LocalTimeOf(time.Date(0, 0, 0, 23, 49, 59, 999999999, time.Local)))
-		})
-
-		It("offset time", func() {
-			testReceive("RETURN time({ hour: 23, minute: 49, second: 59, nanosecond: 999999999, timezone:'+03:00' })", neo4j.OffsetTimeOf(time.Date(0, 0, 0, 23, 49, 59, 999999999, time.FixedZone("Offset", 3*60*60))))
-		})
-
-		It("local date time (test location = UTC)", func() {
-			testReceive("RETURN localdatetime({ year: 1859, month: 5, day: 31, hour: 23, minute: 49, second: 59, nanosecond: 999999999 })", neo4j.LocalDateTimeOf(time.Date(1859, 5, 31, 23, 49, 59, 999999999, time.UTC)))
-		})
-
-		It("local date time (test location = local)", func() {
-			testReceive("RETURN localdatetime({ year: 1859, month: 5, day: 31, hour: 23, minute: 49, second: 59, nanosecond: 999999999 })", neo4j.LocalDateTimeOf(time.Date(1859, 5, 31, 23, 49, 59, 999999999, time.Local)))
-		})
-
-		It("offset date time", func() {
-			testReceive("RETURN datetime({ year: 1859, month: 5, day: 31, hour: 23, minute: 49, second: 59, nanosecond: 999999999, timezone:'+02:30' })", time.Date(1859, 5, 31, 23, 49, 59, 999999999, time.FixedZone("Offset", 150*60)))
-		})
-
-		It("zoned date time", func() {
-			location, err := time.LoadLocation("Europe/London")
-			Expect(err).To(BeNil())
-
-			testReceive("RETURN datetime({ year: 1959, month: 5, day: 31, hour: 23, minute: 49, second: 59, nanosecond: 999999999, timezone:'Europe/London' })", time.Date(1959, 5, 31, 23, 49, 59, 999999999, location))
-		})
-	})
 
 	Context("Send and Receive", func() {
 		It("duration", func() {
@@ -387,55 +337,6 @@ var _ = Describe("Temporal Types", func() {
 					int64(999999999),
 					"US/Pacific",
 				})
-		})
-	})
-
-	Context("Send and receive random", func() {
-		It("duration", func() {
-			for i := 0; i < numberOfRandomValues; i++ {
-				testSendAndReceiveValue(randomDuration())
-			}
-		})
-
-		It("date", func() {
-			for i := 0; i < numberOfRandomValues; i++ {
-				testSendAndReceiveValue(randomLocalDate())
-			}
-		})
-
-		It("local time", func() {
-			for i := 0; i < numberOfRandomValues; i++ {
-				testSendAndReceiveValue(randomLocalTime())
-			}
-		})
-
-		It("offset time", func() {
-			for i := 0; i < numberOfRandomValues; i++ {
-				testSendAndReceiveValue(randomOffsetTime())
-			}
-		})
-
-		It("local date time", func() {
-			for i := 0; i < numberOfRandomValues; i++ {
-				testSendAndReceiveValueComp(randomLocalDateTime(), func(x, y interface{}) bool {
-					x1 := x.(neo4j.LocalDateTime)
-					y1 := y.(neo4j.LocalDateTime)
-
-					return x1.Time().Equal(y1.Time())
-				})
-			}
-		})
-
-		It("offset date time", func() {
-			for i := 0; i < numberOfRandomValues; i++ {
-				testSendAndReceiveValue(randomOffsetDateTime())
-			}
-		})
-
-		It("zoned date time", func() {
-			for i := 0; i < numberOfRandomValues; i++ {
-				testSendAndReceiveValue(randomZonedDateTime())
-			}
 		})
 	})
 

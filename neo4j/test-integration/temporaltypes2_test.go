@@ -20,6 +20,7 @@
 package test_integration
 
 import (
+	"math"
 	"math/rand"
 	"testing"
 	"time"
@@ -187,11 +188,164 @@ func TestTemporalTypes(tt *testing.T) {
 				0, 0, 0, 0, time.Local))
 		}
 
+		randomDuration := func() neo4j.Duration {
+			sign := int64(1)
+			if rand.Intn(2) == 0 {
+				sign = -sign
+			}
+
+			return neo4j.DurationOf(
+				sign*rand.Int63n(math.MaxInt32),
+				sign*rand.Int63n(math.MaxInt32),
+				sign*rand.Int63n(math.MaxInt32),
+				rand.Intn(1000000000))
+		}
+
+		randomLocalTime := func() neo4j.LocalTime {
+			return neo4j.LocalTimeOf(
+				time.Date(
+					0, 0, 0,
+					rand.Intn(24),
+					rand.Intn(60),
+					rand.Intn(60),
+					rand.Intn(1000000000),
+					time.Local))
+		}
+
+		randomLocalDateTime := func() neo4j.LocalDateTime {
+			sign := 1
+			if rand.Intn(2) == 0 {
+				sign = -sign
+			}
+
+			return neo4j.LocalDateTimeOf(
+				time.Date(
+					sign*rand.Intn(9999),
+					time.Month(rand.Intn(12)+1),
+					rand.Intn(28)+1,
+					rand.Intn(24),
+					rand.Intn(60),
+					rand.Intn(60),
+					rand.Intn(1000000000),
+					time.Local))
+		}
+
+		randomOffsetTime := func() neo4j.OffsetTime {
+			sign := 1
+			if rand.Intn(2) == 0 {
+				sign = -sign
+			}
+
+			return neo4j.OffsetTimeOf(
+				time.Date(
+					0, 0, 0,
+					rand.Intn(24),
+					rand.Intn(60),
+					rand.Intn(60),
+					rand.Intn(1000000000),
+					time.FixedZone("Offset", sign*rand.Intn(64800))))
+		}
+		randomOffsetDateTime := func() time.Time {
+			sign := 1
+			if rand.Intn(2) == 0 {
+				sign = -sign
+			}
+
+			return time.Date(
+				rand.Intn(300)+1900,
+				time.Month(rand.Intn(12)+1),
+				rand.Intn(28)+1,
+				rand.Intn(24),
+				rand.Intn(60),
+				rand.Intn(60),
+				rand.Intn(1000000000),
+				time.FixedZone("Offset", sign*rand.Intn(64800)))
+		}
+
+		randomZonedDateTime := func() time.Time {
+			var zones = []string{
+				"Africa/Harare", "America/Aruba", "Africa/Nairobi", "America/Dawson", "Asia/Beirut", "Asia/Tashkent",
+				"Canada/Eastern", "Europe/Malta", "Europe/Volgograd", "Indian/Kerguelen", "Etc/GMT+3",
+			}
+
+			location, err := time.LoadLocation(zones[rand.Intn(len(zones))])
+			if err != nil {
+				panic(err)
+			}
+
+			return time.Date(
+				rand.Intn(300)+1900,
+				time.Month(rand.Intn(12)+1),
+				rand.Intn(28)+1,
+				rand.Intn(17)+6, // to be safe from DST changes
+				rand.Intn(60),
+				rand.Intn(60),
+				rand.Intn(1000000000),
+				location)
+		}
+
 		rt.Run("Date", func(t *testing.T) {
 			for i := 0; i < numRand; i++ {
 				d1 := randomDate()
 				d2 := sendAndReceive(t, d1).(neo4j.Date)
 				assertDatePart(t, time.Time(d1), time.Time(d2))
+			}
+		})
+
+		rt.Run("Duration", func(t *testing.T) {
+			for i := 0; i < numRand; i++ {
+				d1 := randomDuration()
+				d2 := sendAndReceive(t, d1).(neo4j.Duration)
+				assertDurationEqual(t, d1, d2)
+			}
+		})
+
+		rt.Run("LocalTime", func(t *testing.T) {
+			for i := 0; i < numRand; i++ {
+				d1 := randomLocalTime()
+				d2 := sendAndReceive(t, d1).(neo4j.LocalTime)
+				assertTimePart(t, time.Time(d1), time.Time(d2))
+				assertLocal(t, time.Time(d2))
+			}
+		})
+
+		rt.Run("OffsetTime", func(t *testing.T) {
+			for i := 0; i < numRand; i++ {
+				d1 := randomOffsetTime()
+				d2 := sendAndReceive(t, d1).(neo4j.OffsetTime)
+				assertTimePart(t, time.Time(d1), time.Time(d2))
+				assertZone(t, time.Time(d2), "Offset")
+			}
+		})
+
+		rt.Run("LocalDateTime", func(t *testing.T) {
+			for i := 0; i < numRand; i++ {
+				d1 := randomLocalDateTime()
+				d2 := sendAndReceive(t, d1).(neo4j.LocalDateTime)
+				assertDatePart(t, time.Time(d1), time.Time(d2))
+				assertTimePart(t, time.Time(d1), time.Time(d2))
+				assertLocal(t, time.Time(d2))
+			}
+		})
+
+		rt.Run("Offset DateTime", func(t *testing.T) {
+			for i := 0; i < numRand; i++ {
+				d1 := randomOffsetDateTime()
+				d2 := sendAndReceive(t, d1).(time.Time)
+				assertDatePart(t, d1, d2)
+				assertTimePart(t, d1, d2)
+				assertZone(t, d2, "Offset")
+			}
+		})
+
+		rt.Run("Zoned DateTime", func(t *testing.T) {
+			for i := 0; i < numRand; i++ {
+				d1 := randomZonedDateTime()
+				d2 := sendAndReceive(t, d1).(time.Time)
+				assertDatePart(t, d1, d2)
+				assertTimePart(t, d1, d2)
+				zone, _ := d1.Zone()
+				assertZone(t, d2, zone)
 			}
 		})
 	})
