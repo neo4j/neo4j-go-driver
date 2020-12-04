@@ -47,6 +47,7 @@ type success struct {
 	plan          *db.Plan
 	profile       *db.ProfiledPlan
 	notifications []db.Notification
+	routingTable  *db.RoutingTable
 	num           uint32
 }
 
@@ -57,6 +58,9 @@ func (s *success) String() string {
 	}
 	if s.profile != nil {
 		str += fmt.Sprintf(" \nprofile: %#v", s.profile)
+	}
+	if s.routingTable != nil {
+		str += fmt.Sprintf(" \nrouting table: %#v", s.routingTable)
 	}
 	return str
 }
@@ -75,24 +79,6 @@ func (s *success) summary() *db.Summary {
 
 func (s *success) isResetResponse() bool {
 	return s.num == 0
-}
-
-// Since it is reused
-func (s *success) clear() {
-	s.fields = nil
-	s.bookmark = ""
-	s.hasMore = false
-	s.notifications = nil
-	s.plan = nil
-	s.profile = nil
-	s.qid = -1
-	s.server = ""
-	s.connectionId = ""
-	s.server = ""
-	s.tfirst = 0
-	s.tlast = 0
-	s.db = ""
-	s.qtype = db.StatementTypeUnknown
 }
 
 type hydrator struct {
@@ -189,8 +175,9 @@ func (h *hydrator) success(n uint32) *success {
 		return nil
 	}
 	// Use cached success but clear it first
+	h.cachedSuccess = success{}
+	h.cachedSuccess.qid = -1
 	succ := &h.cachedSuccess
-	succ.clear()
 
 	h.unp.Next() // Detect map
 	n = h.unp.Len()
@@ -242,6 +229,8 @@ func (h *hydrator) success(n uint32) *success {
 		case "notifications":
 			l := h.array()
 			succ.notifications = parseNotifications(l)
+		case "rt":
+			succ.routingTable = h.routingTable()
 		default:
 			// Unknown key, waste it
 			h.trash()
@@ -266,20 +255,62 @@ func (h *hydrator) successStats() map[string]int {
 	return counts
 }
 
-/*
-func (h *hydrator) successPlanOperator() {
-}
-
-func (h *hydrator) successPlan() *db.Plan {
-	// Should be on a map
-	n := h.unp.Len()
-	if n == 0 {
-		return nil
+// routingTable parses a routing table sent from the server. This is done
+// the 'hard' way to reduce number of allocations (would be easier to go via
+// a map) since it is called in normal flow (not that frequent...).
+func (h *hydrator) routingTable() *db.RoutingTable {
+	rt := db.RoutingTable{}
+	// Length of map
+	nkeys := h.unp.Len()
+	for ; nkeys > 0; nkeys-- {
+		h.unp.Next()
+		key := h.unp.String()
+		h.unp.Next()
+		switch key {
+		case "ttl":
+			rt.TimeToLive = int(h.unp.Int())
+		case "servers":
+			nservers := h.unp.Len()
+			for ; nservers > 0; nservers-- {
+				h.routingTableRole(&rt)
+			}
+		default:
+			// Unknown key, waste the value
+			h.trash()
+		}
 	}
-
-	plan := &db.Plan{}
+	return &rt
 }
-*/
+
+func (h *hydrator) routingTableRole(rt *db.RoutingTable) {
+	h.unp.Next()
+	nkeys := h.unp.Len()
+	var role string
+	var addresses []string
+	for ; nkeys > 0; nkeys-- {
+		h.unp.Next()
+		key := h.unp.String()
+		h.unp.Next()
+		switch key {
+		case "role":
+			role = h.unp.String()
+			fmt.Println(role)
+		case "addresses":
+			addresses = h.strings()
+		default:
+			// Unknown key, waste the value
+			h.trash()
+		}
+	}
+	switch role {
+	case "READ":
+		rt.Readers = addresses
+	case "WRITE":
+		rt.Writers = addresses
+	case "ROUTE":
+		rt.Routers = addresses
+	}
+}
 
 func (h *hydrator) strings() []string {
 	n := h.unp.Len()

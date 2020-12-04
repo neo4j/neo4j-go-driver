@@ -91,6 +91,7 @@ type bolt4 struct {
 	log           log.Logger
 	databaseName  string
 	err           error // Last fatal error
+	minor         int
 }
 
 func NewBolt4(serverName string, conn net.Conn, log log.Logger) *bolt4 {
@@ -246,6 +247,7 @@ func (b *bolt4) connect(minor int, auth map[string]interface{}, userAgent string
 
 	// Transition into ready state
 	b.state = bolt4_ready
+	b.minor = minor
 	b.streams.reset()
 	b.log.Infof(log.Bolt4, b.logId, "Connected")
 	return nil
@@ -831,8 +833,20 @@ func (b *bolt4) GetRoutingTable(database string, context map[string]string) (*db
 		return nil, err
 	}
 
-	b.log.Infof(log.Bolt4, b.logId, "Reading routing table")
+	b.log.Infof(log.Bolt4, b.logId, "Retrieving routing table")
+	if b.minor > 2 {
+		b.out.appendRoute(database, context)
+		b.out.send(b.conn)
+		succ := b.receiveSuccess()
+		if b.err != nil {
+			return nil, b.err
+		}
+		return succ.routingTable, nil
+	}
+	return b.callGetRoutingTable(database, context)
+}
 
+func (b *bolt4) callGetRoutingTable(database string, context map[string]string) (*db.RoutingTable, error) {
 	// The query should run in system database, preserve current setting and restore it when
 	// done.
 	originalDatabaseName := b.databaseName
@@ -861,7 +875,7 @@ func (b *bolt4) GetRoutingTable(database string, context map[string]string) (*db
 	if rec == nil {
 		return nil, errors.New("No routing table record")
 	}
-	// Just empty the stream, ignore the summary should leave the connecion in ready state
+	// Just empty the stream, ignore the summary should leave the connection in ready state
 	b.Next(streamHandle)
 
 	table := parseRoutingTableRecord(rec)

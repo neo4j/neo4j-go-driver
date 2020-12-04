@@ -321,6 +321,78 @@ func TestHydrator(ot *testing.T) {
 			x: &success{tlast: 7, bookmark: "b1", qtype: db.StatementTypeRead, qid: -1, num: 4},
 		},
 		{
+			name: "Success route response",
+			build: func() {
+				packer.StructHeader(byte(msgSuccess), 1)
+				packer.MapHeader(1)
+				packer.String("rt")
+				packer.MapHeader(2)
+				packer.String("ttl")
+				packer.Int(1001)
+				packer.String("servers")
+				packer.ArrayHeader(3)
+				// Routes
+				packer.MapHeader(2)
+				packer.String("role")
+				packer.String("ROUTE")
+				packer.String("addresses")
+				packer.ArrayHeader(2)
+				packer.String("router1")
+				packer.String("router2")
+				// Readers
+				packer.MapHeader(2)
+				packer.String("role")
+				packer.String("READ")
+				packer.String("addresses")
+				packer.ArrayHeader(3)
+				packer.String("reader1")
+				packer.String("reader2")
+				packer.String("reader3")
+				// Writers
+				packer.MapHeader(2)
+				packer.String("role")
+				packer.String("WRITE")
+				packer.String("addresses")
+				packer.ArrayHeader(1)
+				packer.String("writer1")
+			},
+			x: &success{qid: -1, num: 1, routingTable: &db.RoutingTable{
+				TimeToLive: 1001,
+				Routers:    []string{"router1", "router2"},
+				Readers:    []string{"reader1", "reader2", "reader3"},
+				Writers:    []string{"writer1"}}},
+		},
+		{
+			name: "Success route response extras",
+			build: func() {
+				packer.StructHeader(byte(msgSuccess), 1)
+				packer.MapHeader(2)
+				packer.String("extra1")
+				packer.ArrayHeader(2)
+				packer.Int(1)
+				packer.Int(2)
+				packer.String("rt")
+				packer.MapHeader(2)
+				packer.String("ttl")
+				packer.Int(1001)
+				packer.String("servers")
+				packer.ArrayHeader(1)
+				// Routes
+				packer.MapHeader(3)
+				packer.String("extra2")
+				packer.ArrayHeader(1)
+				packer.String("extraval2")
+				packer.String("role")
+				packer.String("ROUTE")
+				packer.String("addresses")
+				packer.ArrayHeader(1)
+				packer.String("router1")
+			},
+			x: &success{qid: -1, num: 2, routingTable: &db.RoutingTable{
+				TimeToLive: 1001,
+				Routers:    []string{"router1"}}},
+		},
+		{
 			name: "Record of ints",
 			build: func() {
 				packer.StructHeader(byte(msgRecord), 1)

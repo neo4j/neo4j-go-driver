@@ -254,6 +254,26 @@ func TestOutgoing(ot *testing.T) {
 				fields: []interface{}{"cypher", map[string]interface{}{"x": int64(1), "y": "2"}, map[string]interface{}{"mode": "r"}},
 			},
 		},
+		{
+			name: "route",
+			build: func() {
+				out.appendRoute("adb", map[string]string{"key1": "val1", "key2": "val2"})
+			},
+			expect: &testStruct{
+				tag:    byte(msgRoute),
+				fields: []interface{}{map[string]interface{}{"key1": "val1", "key2": "val2"}, "adb"},
+			},
+		},
+		{
+			name: "route, default database",
+			build: func() {
+				out.appendRoute(db.DefaultDatabase, map[string]string{"key1": "val1", "key2": "val2"})
+			},
+			expect: &testStruct{
+				tag:    byte(msgRoute),
+				fields: []interface{}{map[string]interface{}{"key1": "val1", "key2": "val2"}, nil},
+			},
+		},
 	}
 	for _, c := range cases {
 		ot.Run(c.name, func(t *testing.T) {

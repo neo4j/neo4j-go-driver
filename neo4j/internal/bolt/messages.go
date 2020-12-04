@@ -37,4 +37,5 @@ const (
 	msgBegin      byte = 0x11
 	msgCommit     byte = 0x12
 	msgRollback   byte = 0x13
+	msgRoute      byte = 0x66 // > 4.2
 )
