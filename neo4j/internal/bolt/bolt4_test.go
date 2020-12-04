@@ -20,6 +20,7 @@
 package bolt
 
 import (
+	"reflect"
 	"testing"
 
 	"github.com/neo4j/neo4j-go-driver/v4/neo4j/db"
@@ -682,5 +683,32 @@ func TestBolt4(ot *testing.T) {
 		sum, err := bolt.Consume(db.StreamHandle(1))
 		AssertNil(t, sum)
 		AssertError(t, err)
+	})
+
+	ot.Run("GetRoutingTable using ROUTE message", func(t *testing.T) {
+		bolt, cleanup := connectToServer(t, func(srv *bolt4server) {
+			srv.acceptWithMinor(4, 3)
+			srv.waitForRoute()
+			srv.sendSuccess(map[string]interface{}{
+				"rt": map[string]interface{}{
+					"ttl": 1000,
+					"servers": []interface{}{
+						map[string]interface{}{
+							"role":      "ROUTE",
+							"addresses": []interface{}{"router1"},
+						},
+					},
+				},
+			})
+		})
+		defer cleanup()
+		defer bolt.Close()
+
+		rt, err := bolt.GetRoutingTable("thedb", map[string]string{"region": "space"})
+		AssertNoError(t, err)
+		ert := &db.RoutingTable{Routers: []string{"router1"}, TimeToLive: 1000}
+		if !reflect.DeepEqual(rt, ert) {
+			t.Fatalf("Expected:\n%+v\n != Actual: \n%+v\n", rt, ert)
+		}
 	})
 }

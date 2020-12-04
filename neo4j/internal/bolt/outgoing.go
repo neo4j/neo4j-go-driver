@@ -120,6 +120,22 @@ func (o *outgoing) appendPullAll() {
 	o.end()
 }
 
+func (o *outgoing) appendRoute(database string, context map[string]string) {
+	o.begin()
+	o.packer.StructHeader(byte(msgRoute), 2)
+	o.packer.MapHeader(len(context))
+	for k, v := range context {
+		o.packer.String(k)
+		o.packer.String(v)
+	}
+	if database == db.DefaultDatabase {
+		o.packer.Nil()
+	} else {
+		o.packer.String(database)
+	}
+	o.end()
+}
+
 func (o *outgoing) appendReset() {
 	o.begin()
 	o.packer.StructHeader(byte(msgReset), 0)

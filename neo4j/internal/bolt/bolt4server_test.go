@@ -177,6 +177,11 @@ func (s *bolt4server) waitForDiscardN(n, qid int) {
 	}
 }
 
+func (s *bolt4server) waitForRoute() {
+	msg := s.receiveMsg()
+	s.assertStructType(msg, msgRoute)
+}
+
 func (s *bolt4server) acceptVersion(major, minor byte) {
 	acceptedVer := []byte{0x00, 0x00, minor, major}
 	_, err := s.conn.Write(acceptedVer)
@@ -223,6 +228,13 @@ func (s *bolt4server) rejectHelloUnauthorized() {
 func (s *bolt4server) accept(ver byte) {
 	s.waitForHandshake()
 	s.acceptVersion(ver, 0)
+	s.waitForHello()
+	s.acceptHello()
+}
+
+func (s *bolt4server) acceptWithMinor(major, minor byte) {
+	s.waitForHandshake()
+	s.acceptVersion(major, minor)
 	s.waitForHello()
 	s.acceptHello()
 }
