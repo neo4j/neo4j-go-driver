@@ -66,17 +66,17 @@ func stressTest(ctx *TestContext, successfulExecutors []func(*TestContext), fail
 
 func main() {
 	var (
-		uri      string
-		user     string
-		password string
+		uri              string
+		user             string
+		password         string
+		causalClustering bool
 	)
 
 	flag.StringVar(&uri, "uri", "bolt://localhost:7687", "Database URI")
 	flag.StringVar(&user, "user", "neo4j", "User name")
 	flag.StringVar(&password, "password", "pass", "Password")
+	flag.BoolVar(&causalClustering, "cluster", false, "Causal clustering")
 	flag.Parse()
-
-	causalClustering := false
 
 	auth := neo4j.BasicAuth(user, password, "")
 	driver, err := neo4j.NewDriver(uri, auth, func(conf *neo4j.Config) {
@@ -87,40 +87,51 @@ func main() {
 	}
 	ctx := NewTestContext(driver)
 
-	successfulQueryExecutors := []func(*TestContext){
-		ReadQueryExecutor(driver, true),
-		ReadQueryExecutor(driver, false),
-		ReadQueryInTxExecutor(driver, true),
-		ReadQueryInTxExecutor(driver, false),
-		ReadQueryWithReadTransactionExecutor(driver, true),
-		ReadQueryWithReadTransactionExecutor(driver, false),
-		WriteQueryExecutor(driver, true),
-		WriteQueryExecutor(driver, false),
-		WriteQueryInTxExecutor(driver, true),
-		WriteQueryInTxExecutor(driver, false),
-		WriteQueryWithWriteTransactionExecutor(driver, true),
-		WriteQueryWithWriteTransactionExecutor(driver, false),
-	}
-
-	failingQueryExecutors := []func(*TestContext){
-		FailingQueryExecutor(driver, true),
-		FailingQueryExecutor(driver, false),
-		FailingQueryInTxExecutor(driver, true),
-		FailingQueryInTxExecutor(driver, false),
-		FailingQueryWithReadTransactionExecutor(driver, true),
-		FailingQueryWithReadTransactionExecutor(driver, false),
-		FailingQueryWithWriteTransactionExecutor(driver, true),
-		FailingQueryWithWriteTransactionExecutor(driver, false),
-		WrongQueryExecutor(driver),
-		WrongQueryInTxExecutor(driver),
-	}
+	successfulQueryExecutors := []func(*TestContext){}
+	failingQueryExecutors := []func(*TestContext){}
 
 	if causalClustering {
+		successfulQueryExecutors = append(successfulQueryExecutors,
+			ReadQueryWithReadTransactionExecutor(driver, true),
+			ReadQueryWithReadTransactionExecutor(driver, false),
+			WriteQueryWithWriteTransactionExecutor(driver, true),
+			WriteQueryWithWriteTransactionExecutor(driver, false),
+		)
 		failingQueryExecutors = append(failingQueryExecutors,
+			FailingQueryWithReadTransactionExecutor(driver, true),
+			FailingQueryWithReadTransactionExecutor(driver, false),
+			FailingQueryWithWriteTransactionExecutor(driver, true),
+			FailingQueryWithWriteTransactionExecutor(driver, false),
+			WrongQueryExecutor(driver),
 			WriteQueryInReadSessionExecutor(driver, true),
 			WriteQueryInReadSessionExecutor(driver, false),
-			WriteQueryInTxInReadSessionExecutor(driver, true),
-			WriteQueryInTxInReadSessionExecutor(driver, false),
+		)
+	} else {
+		successfulQueryExecutors = append(successfulQueryExecutors,
+			ReadQueryWithReadTransactionExecutor(driver, true),
+			ReadQueryWithReadTransactionExecutor(driver, false),
+			WriteQueryWithWriteTransactionExecutor(driver, true),
+			WriteQueryWithWriteTransactionExecutor(driver, false),
+			WriteQueryExecutor(driver, true),
+			WriteQueryExecutor(driver, false),
+			ReadQueryExecutor(driver, true),
+			ReadQueryExecutor(driver, false),
+			WriteQueryInTxExecutor(driver, true),
+			WriteQueryInTxExecutor(driver, false),
+			ReadQueryInTxExecutor(driver, true),
+			ReadQueryInTxExecutor(driver, false),
+		)
+		failingQueryExecutors = append(failingQueryExecutors,
+			FailingQueryWithReadTransactionExecutor(driver, true),
+			FailingQueryWithReadTransactionExecutor(driver, false),
+			FailingQueryWithWriteTransactionExecutor(driver, true),
+			FailingQueryWithWriteTransactionExecutor(driver, false),
+			WrongQueryExecutor(driver),
+			WrongQueryInTxExecutor(driver),
+			FailingQueryExecutor(driver, true),
+			FailingQueryExecutor(driver, false),
+			FailingQueryInTxExecutor(driver, true),
+			FailingQueryInTxExecutor(driver, false),
 		)
 	}
 

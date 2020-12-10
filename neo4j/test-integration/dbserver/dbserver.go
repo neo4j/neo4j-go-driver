@@ -51,14 +51,14 @@ func GetDbServer() DbServer {
 
 	if server == nil {
 		vars := map[string]string{
-			"TEST_NEO4J_HOST":      "",
-			"TEST_NEO4J_USER":      "neo4j",
-			"TEST_NEO4J_PASS":      "pass",
-			"TEST_NEO4J_SCHEME":    "neo4j",
-			"TEST_NEO4J_PORT":      "7687",
-			"TEST_NEO4J_EDITION":   "community",
-			"TEST_NEO4J_ISCLUSTER": "0",
-			"TEST_NEO4J_VERSION":   "",
+			"TEST_NEO4J_HOST":       "",
+			"TEST_NEO4J_USER":       "neo4j",
+			"TEST_NEO4J_PASS":       "pass",
+			"TEST_NEO4J_SCHEME":     "neo4j",
+			"TEST_NEO4J_PORT":       "7687",
+			"TEST_NEO4J_EDITION":    "community",
+			"TEST_NEO4J_IS_CLUSTER": "0",
+			"TEST_NEO4J_VERSION":    "",
 		}
 		for k1, v1 := range vars {
 			v2, e2 := os.LookupEnv(k1)
@@ -74,7 +74,7 @@ func GetDbServer() DbServer {
 		if err != nil {
 			panic(fmt.Sprintf("Unable to parse %s:%s to int", key, vars[key]))
 		}
-		key = "TEST_NEO4J_ISCLUSTER"
+		key = "TEST_NEO4J_IS_CLUSTER"
 		isCluster, err := strconv.ParseBool(vars[key])
 		if err != nil {
 			panic(fmt.Sprintf("Unable to parse %s:%s to bool", key, vars[key]))
