@@ -17,7 +17,7 @@ For versions 1.x of the driver (notice the absence of `/v4`), run instead the fo
 ## Documentation
 Drivers manual that describes general driver concepts in depth [here](https://neo4j.com/docs/driver-manual/4.0/).
 
-Go package API documentation [here](https://pkg.go.dev/github.com/neo4j/neo4j-go-driver/neo4j).
+Go package API documentation [here](https://pkg.go.dev/github.com/neo4j/neo4j-go-driver/v4).
 
 ## Migration from 1.8
 See [migrationguide](MIGRATIONGUIDE.md) for information on how to migrate from 1.8 (and 1.7) version of the driver.
