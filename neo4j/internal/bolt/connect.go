@@ -33,11 +33,12 @@ import (
 type protocolVersion struct {
 	major byte
 	minor byte
+	back  byte // Number of minor versions back
 }
 
 // Supported versions in priority order
 var versions = [4]protocolVersion{
-	{major: 4, minor: 2},
+	{major: 4, minor: 3, back: 1},
 	{major: 4, minor: 1},
 	{major: 4, minor: 0},
 	{major: 3, minor: 0},
@@ -50,10 +51,10 @@ func Connect(serverName string, conn net.Conn, auth map[string]interface{}, user
 	// Send handshake to server
 	handshake := []byte{
 		0x60, 0x60, 0xb0, 0x17, // Magic: GoGoBolt
-		0x00, 0x00, versions[0].minor, versions[0].major,
-		0x00, 0x00, versions[1].minor, versions[1].major,
-		0x00, 0x00, versions[2].minor, versions[2].major,
-		0x00, 0x00, versions[3].minor, versions[3].major,
+		0x00, versions[0].back, versions[0].minor, versions[0].major,
+		0x00, versions[1].back, versions[1].minor, versions[1].major,
+		0x00, versions[2].back, versions[2].minor, versions[2].major,
+		0x00, versions[3].back, versions[3].minor, versions[3].major,
 	}
 	_, err := conn.Write(handshake)
 	if err != nil {
