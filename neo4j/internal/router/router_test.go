@@ -98,7 +98,7 @@ func assertNum(t *testing.T, x, y int, msg string) {
 
 func TestRespectsTimeToLiveAndInvalidate(t *testing.T) {
 	numfetch := 0
-	table := &db.RoutingTable{TimeToLive: 1}
+	table := &db.RoutingTable{TimeToLive: 1, Readers: []string{"router1"}}
 	pool := &poolFake{
 		borrow: func(names []string, cancel context.CancelFunc) (db.Connection, error) {
 			numfetch++
@@ -139,11 +139,14 @@ func TestRespectsTimeToLiveAndInvalidate(t *testing.T) {
 func TestUsesRootRouterWhenPreviousRoutersFails(t *testing.T) {
 	borrows := [][]string{}
 
-	conn := &testutil.ConnFake{Table: &db.RoutingTable{TimeToLive: 1, Routers: []string{"otherRouter"}}}
+	conn := &testutil.ConnFake{Table: &db.RoutingTable{
+		TimeToLive: 1,
+		Routers:    []string{"otherRouter"},
+		Readers:    []string{"router1"},
+	}}
 	var err error
 	pool := &poolFake{
 		borrow: func(names []string, cancel context.CancelFunc) (db.Connection, error) {
-			//numfetch++
 			borrows = append(borrows, names)
 			return conn, err
 		},
@@ -297,8 +300,46 @@ func TestWritersRetriesWhenNoWriters(t *testing.T) {
 	}
 }
 
+func TestReadersRetriesWhenNoReaders(t *testing.T) {
+	numfetch := 0
+	tableNoReaders := &db.RoutingTable{TimeToLive: 1, Routers: []string{"rt1", "rt2"}, Writers: []string{"wd1"}}
+	tableReaders := &db.RoutingTable{TimeToLive: 1, Routers: []string{"rt1", "rt2"}, Writers: []string{"wd1"}, Readers: []string{"wr1"}}
+	pool := &poolFake{
+		borrow: func(names []string, cancel context.CancelFunc) (db.Connection, error) {
+			// Return no readers first time and readers the second time
+			numfetch++
+			if numfetch == 1 {
+				return &testutil.ConnFake{Table: tableNoReaders}, nil
+			}
+			return &testutil.ConnFake{Table: tableReaders}, nil
+		},
+	}
+	numsleep := 0
+	router := New("router", func() []string { return []string{} }, nil, pool, logger, "routerid")
+	router.sleep = func(time.Duration) {
+		numsleep++
+	}
+	dbName := "dbname"
+
+	// Should trigger initial table read that contains no readers and a second table read
+	// that gets the readers
+	readers, err := router.Readers(dbName)
+	if err != nil {
+		t.Errorf("Got error: %s", err)
+	}
+	if len(readers) != 1 {
+		t.Error("Didn't get expected reader")
+	}
+	if numfetch != 2 {
+		t.Error("Should have fetched two times")
+	}
+	if numsleep != 1 {
+		t.Error("Should have slept once")
+	}
+}
+
 func TestCleanUp(t *testing.T) {
-	table := &db.RoutingTable{TimeToLive: 1}
+	table := &db.RoutingTable{TimeToLive: 1, Readers: []string{"router1"}}
 	pool := &poolFake{
 		borrow: func(names []string, cancel context.CancelFunc) (db.Connection, error) {
 			return &testutil.ConnFake{Table: table}, nil
