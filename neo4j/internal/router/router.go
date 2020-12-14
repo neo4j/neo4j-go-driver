@@ -30,6 +30,7 @@ import (
 )
 
 const missingWriterRetries = 100
+const missingReaderRetries = 100
 
 type databaseRouter struct {
 	dueUnix int64
@@ -134,9 +135,26 @@ func (r *Router) Readers(database string) ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	// During startup we can get tables without any readers
+	retries := missingReaderRetries
+	for len(table.Readers) == 0 {
+		retries--
+		if retries == 0 {
+			break
+		}
+		r.log.Infof(log.Router, r.logId, "Invalidating routing table, no readers")
+		r.Invalidate(database)
+		r.sleep(100 * time.Millisecond)
+		table, err = r.getTable(database)
+		if err != nil {
+			return nil, err
+		}
+	}
 	if len(table.Readers) == 0 {
 		return nil, wrapError(r.rootRouter, errors.New("No readers"))
 	}
+
 	return table.Readers, nil
 }
 
@@ -153,9 +171,9 @@ func (r *Router) Writers(database string) ([]string, error) {
 		if retries == 0 {
 			break
 		}
-		r.log.Debugf(log.Router, r.logId, "Invalidating routing table, no writers")
-		r.sleep(100 * time.Millisecond)
+		r.log.Infof(log.Router, r.logId, "Invalidating routing table, no writers")
 		r.Invalidate(database)
+		r.sleep(100 * time.Millisecond)
 		table, err = r.getTable(database)
 		if err != nil {
 			return nil, err
