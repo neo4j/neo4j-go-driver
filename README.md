@@ -15,7 +15,7 @@ For versions 1.x of the driver (notice the absence of `/v4`), run instead the fo
 `go get github.com/neo4j/neo4j-go-driver@<the 1.x tag>`
 
 ## Documentation
-Drivers manual that describes general driver concepts in depth [here](https://neo4j.com/docs/driver-manual/4.0/).
+Drivers manual that describes general driver concepts in depth [here](https://neo4j.com/docs/go-manual/4.2/).
 
 Go package API documentation [here](https://pkg.go.dev/github.com/neo4j/neo4j-go-driver/v4).
 
