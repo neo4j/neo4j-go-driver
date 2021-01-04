@@ -77,24 +77,6 @@ func (s *success) isResetResponse() bool {
 	return s.num == 0
 }
 
-// Since it is reused
-func (s *success) clear() {
-	s.fields = nil
-	s.bookmark = ""
-	s.hasMore = false
-	s.notifications = nil
-	s.plan = nil
-	s.profile = nil
-	s.qid = -1
-	s.server = ""
-	s.connectionId = ""
-	s.server = ""
-	s.tfirst = 0
-	s.tlast = 0
-	s.db = ""
-	s.qtype = db.StatementTypeUnknown
-}
-
 type hydrator struct {
 	unpacker      packstream.Unpacker
 	unp           *packstream.Unpacker
@@ -189,8 +171,9 @@ func (h *hydrator) success(n uint32) *success {
 		return nil
 	}
 	// Use cached success but clear it first
+	h.cachedSuccess = success{}
+	h.cachedSuccess.qid = -1
 	succ := &h.cachedSuccess
-	succ.clear()
 
 	h.unp.Next() // Detect map
 	n = h.unp.Len()
