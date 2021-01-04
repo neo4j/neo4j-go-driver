@@ -257,6 +257,26 @@ var _ = Describe("Session", func() {
 			Expect(summary.ResultConsumedAfter()).To(BeNumerically(">=", 0))
 		})
 
+		Specify("on multiple runs summary counters should be correct", func() {
+			result, _ = session.Run("CREATE (p:Person { name: 'one'})", nil)
+			summary, _ = result.Consume()
+			counters := summary.Counters()
+
+			Expect(counters.NodesCreated()).To(BeIdenticalTo(1))
+			Expect(counters.NodesDeleted()).To(BeZero())
+			Expect(counters.RelationshipsCreated()).To(BeZero())
+			Expect(counters.RelationshipsDeleted()).To(BeZero())
+
+			result, _ = session.Run("MATCH (p:Person { name: 'one'}) RETURN p", nil)
+			summary, _ = result.Consume()
+			counters = summary.Counters()
+
+			Expect(counters.NodesCreated()).To(BeZero())
+			Expect(counters.NodesDeleted()).To(BeZero())
+			Expect(counters.RelationshipsCreated()).To(BeZero())
+			Expect(counters.RelationshipsDeleted()).To(BeZero())
+		})
+
 		Specify("when one statement fails, the next one should run successfully", func() {
 			result, err = session.Run("Invalid Cypher", nil)
 			Expect(result).To(BeNil())
