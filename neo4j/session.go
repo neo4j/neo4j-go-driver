@@ -272,12 +272,17 @@ func (s *session) runRetriable(
 			continue
 		}
 
-		// Construct a transaction like thing for client to execute stuff on.
-		// Evaluate the returned error from all the work for retryable, this means
-		// that client can mess up the error handling.
+		// Construct a transaction like thing for client to execute stuff on
+		// and invoke the client work function.
 		tx := retryableTransaction{conn: conn, fetchSize: s.fetchSize, txHandle: txHandle}
 		x, err := work(&tx)
+		// Evaluate the returned error from all the work for retryable, this means
+		// that client can mess up the error handling.
 		if err != nil {
+			// If the client returns a client specific error that means that
+			// client wants to rollback. We don't do an explicit rollback here
+			// but instead realy on pool invoking reset on the connection, that
+			// will do an implicit rollback.
 			state.OnFailure(conn, err, false)
 			s.pool.Return(conn)
 			continue
