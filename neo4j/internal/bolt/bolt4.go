@@ -860,8 +860,8 @@ func (b *bolt4) callGetRoutingTable(database string, context map[string]string) 
 		FetchSize: -1,
 	}
 	if database != db.DefaultDatabase {
-		runCommand.Cypher = "CALL dbms.routing.getRoutingTable($context, $db)"
-		runCommand.Params["db"] = database
+		runCommand.Cypher = "CALL dbms.routing.getRoutingTable($context, $database)"
+		runCommand.Params["database"] = database
 	}
 	txConfig := db.TxConfig{Mode: db.ReadMode}
 	streamHandle, err := b.Run(runCommand, txConfig)
