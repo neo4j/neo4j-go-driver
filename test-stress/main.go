@@ -29,12 +29,11 @@ import (
 	"github.com/neo4j/neo4j-go-driver/v4/neo4j"
 )
 
-const (
-	TestDuration           = 15 * time.Second
-	TestNumberOfGoRoutines = 20
-)
+const TestNumberOfGoRoutines = 20
 
-func stressTest(ctx *TestContext, successfulExecutors []func(*TestContext), failingExecutors []func(*TestContext)) {
+func stressTest(ctx *TestContext, duration time.Duration,
+	successfulExecutors []func(*TestContext), failingExecutors []func(*TestContext)) {
+
 	successfulExecutorsLen := len(successfulExecutors)
 	failingExecutorsLen := len(failingExecutors)
 
@@ -59,9 +58,16 @@ func stressTest(ctx *TestContext, successfulExecutors []func(*TestContext), fail
 		}()
 	}
 
-	time.Sleep(TestDuration)
+	time.Sleep(duration)
 	ctx.Stop()
 	waiter.Wait()
+
+	if ctx.createdNodeCount == 0 {
+		panic("No nodes at all were created")
+	}
+	if ctx.readNodeCount == 0 {
+		panic("No nodes at all were read")
+	}
 }
 
 func main() {
@@ -70,12 +76,14 @@ func main() {
 		user             string
 		password         string
 		causalClustering bool
+		seconds          int
 	)
 
 	flag.StringVar(&uri, "uri", "bolt://localhost:7687", "Database URI")
 	flag.StringVar(&user, "user", "neo4j", "User name")
 	flag.StringVar(&password, "password", "pass", "Password")
 	flag.BoolVar(&causalClustering, "cluster", false, "Causal clustering")
+	flag.IntVar(&seconds, "seconds", 15, "Duration in seconds")
 	flag.Parse()
 
 	auth := neo4j.BasicAuth(user, password, "")
@@ -135,6 +143,7 @@ func main() {
 		)
 	}
 
-	stressTest(ctx, successfulQueryExecutors, failingQueryExecutors)
+	stressTest(ctx, time.Duration(seconds)*time.Second,
+		successfulQueryExecutors, failingQueryExecutors)
 	ctx.PrintStats()
 }

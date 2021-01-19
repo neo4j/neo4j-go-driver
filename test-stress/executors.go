@@ -21,112 +21,9 @@ package main
 
 import (
 	"fmt"
-	"strings"
-	"sync"
-	"sync/atomic"
 
 	"github.com/neo4j/neo4j-go-driver/v4/neo4j"
 )
-
-// TestContext provides state data shared across tests
-type TestContext struct {
-	driver   neo4j.Driver
-	stop     int32
-	bookmark atomic.Value
-
-	readNodeCountsByServer sync.Map
-
-	readNodeCount       int32
-	createdNodeCount    int32
-	failedBookmarkCount int32
-	leaderSwitchCount   int32
-}
-
-// NewTestContext returns a new TestContext
-func NewTestContext(driver neo4j.Driver) *TestContext {
-	result := &TestContext{
-		driver:                 driver,
-		stop:                   0,
-		bookmark:               atomic.Value{},
-		readNodeCountsByServer: sync.Map{},
-		readNodeCount:          0,
-		createdNodeCount:       0,
-		failedBookmarkCount:    0,
-		leaderSwitchCount:      0,
-	}
-
-	result.bookmark.Store("")
-
-	return result
-}
-
-// ShouldStop returns whether a stop is signalled
-func (ctx *TestContext) ShouldStop() bool {
-	return atomic.LoadInt32(&ctx.stop) > 0
-}
-
-// Stop signals a stop
-func (ctx *TestContext) Stop() {
-	atomic.CompareAndSwapInt32(&ctx.stop, 0, 1)
-}
-
-func (ctx *TestContext) addCreated() {
-	atomic.AddInt32(&ctx.createdNodeCount, 1)
-}
-
-func (ctx *TestContext) addRead() {
-	atomic.AddInt32(&ctx.readNodeCount, 1)
-}
-
-func (ctx *TestContext) addBookmarkFailure() {
-	atomic.AddInt32(&ctx.failedBookmarkCount, 1)
-}
-
-func (ctx *TestContext) getBookmark() string {
-	return ctx.bookmark.Load().(string)
-}
-
-func (ctx *TestContext) setBookmark(bookmark string) {
-	ctx.bookmark.Store(bookmark)
-}
-
-func (ctx *TestContext) processSummary(summary neo4j.ResultSummary) {
-	ctx.addRead()
-
-	if summary == nil {
-		return
-	}
-
-	var count int32
-	lastCountInt, _ := ctx.readNodeCountsByServer.LoadOrStore(summary.Server().Address(), &count)
-	lastCount := lastCountInt.(*int32)
-
-	atomic.AddInt32(lastCount, 1)
-}
-
-func (ctx *TestContext) handleFailure(err error) bool {
-	if err != nil && strings.Contains(err.Error(), "no longer accepts writes") {
-		atomic.AddInt32(&ctx.leaderSwitchCount, 1)
-		return true
-	}
-
-	return false
-}
-
-// PrintStats writes summary information about the completed test
-func (ctx *TestContext) PrintStats() {
-	fmt.Printf("Stats:\n")
-	fmt.Printf("\tNodes Created: %d\n", ctx.createdNodeCount)
-	fmt.Printf("\tNodes Read: %d\n", ctx.readNodeCount)
-	fmt.Printf("\tBookmarks Failed: %d\n", ctx.failedBookmarkCount)
-	fmt.Printf("\tLeader Switches: %d\n", ctx.leaderSwitchCount)
-	fmt.Printf("\tRead Counts By Server:\n")
-
-	ctx.readNodeCountsByServer.Range(func(key, value interface{}) bool {
-		fmt.Printf("\t\t%s: %d\n", key.(string), *(value.(*int32)))
-		return true
-	})
-}
 
 func ExpectNoError(err error) {
 	if err != nil {
@@ -281,14 +178,12 @@ func WriteQueryExecutor(driver neo4j.Driver, useBookmark bool) func(ctx *TestCon
 		ExpectNoError(err)
 
 		summary, err := result.Consume()
-		if !ctx.handleFailure(err) {
-			ExpectNoError(err)
-			ExpectInt(summary.Counters().NodesCreated(), 1)
+		ExpectNoError(err)
+		ExpectInt(summary.Counters().NodesCreated(), 1)
 
-			ctx.setBookmark(session.LastBookmark())
+		ctx.setBookmark(session.LastBookmark())
 
-			ctx.addCreated()
-		}
+		ctx.addCreated()
 	}
 }
 
@@ -306,17 +201,15 @@ func WriteQueryInTxExecutor(driver neo4j.Driver, useBookmark bool) func(ctx *Tes
 		ExpectNoError(err)
 
 		summary, err := result.Consume()
-		if !ctx.handleFailure(err) {
-			ExpectNoError(err)
-			ExpectInt(summary.Counters().NodesCreated(), 1)
+		ExpectNoError(err)
+		ExpectInt(summary.Counters().NodesCreated(), 1)
 
-			err = tx.Commit()
-			ExpectNoError(err)
+		err = tx.Commit()
+		ExpectNoError(err)
 
-			ctx.setBookmark(session.LastBookmark())
+		ctx.setBookmark(session.LastBookmark())
 
-			ctx.addCreated()
-		}
+		ctx.addCreated()
 	}
 }
 
@@ -334,16 +227,10 @@ func WriteQueryWithWriteTransactionExecutor(driver neo4j.Driver, useBookmark boo
 			return result.Consume()
 		})
 		ExpectNoError(err)
-
-		if !ctx.handleFailure(err) {
-			ExpectNoError(err)
-			ExpectNotNil(summary)
-			ExpectInt(summary.(neo4j.ResultSummary).Counters().NodesCreated(), 1)
-
-			ctx.setBookmark(session.LastBookmark())
-
-			ctx.addCreated()
-		}
+		ExpectNotNil(summary)
+		ExpectInt(summary.(neo4j.ResultSummary).Counters().NodesCreated(), 1)
+		ctx.setBookmark(session.LastBookmark())
+		ctx.addCreated()
 	}
 }
 
