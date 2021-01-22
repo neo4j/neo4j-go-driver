@@ -34,16 +34,16 @@ type TransactionConfig struct {
 // WithTxTimeout returns a transaction configuration function that applies a timeout to a transaction.
 //
 // To apply a transaction timeout to an explicit transaction:
-//	session.BeginTransaction(WithTxTimeout(5*time.Seconds))
+//	session.BeginTransaction(WithTxTimeout(5*time.Second))
 //
 // To apply a transaction timeout to an auto-commit transaction:
-//	session.Run("RETURN 1", nil, WithTxTimeout(5*time.Seconds))
+//	session.Run("RETURN 1", nil, WithTxTimeout(5*time.Second))
 //
 // To apply a transaction timeout to a read transaction function:
-//	session.ReadTransaction(DoWork, WithTxTimeout(5*time.Seconds))
+//	session.ReadTransaction(DoWork, WithTxTimeout(5*time.Second))
 //
 // To apply a transaction timeout to a write transaction function:
-//	session.WriteTransaction(DoWork, WithTxTimeout(5*time.Seconds))
+//	session.WriteTransaction(DoWork, WithTxTimeout(5*time.Second))
 func WithTxTimeout(timeout time.Duration) func(*TransactionConfig) {
 	return func(config *TransactionConfig) {
 		config.Timeout = timeout
