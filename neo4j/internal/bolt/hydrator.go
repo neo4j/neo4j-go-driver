@@ -294,7 +294,6 @@ func (h *hydrator) routingTableRole(rt *db.RoutingTable) {
 		switch key {
 		case "role":
 			role = h.unp.String()
-			fmt.Println(role)
 		case "addresses":
 			addresses = h.strings()
 		default:
