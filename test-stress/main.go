@@ -77,6 +77,7 @@ func main() {
 		password         string
 		causalClustering bool
 		seconds          int
+		bigDataTest      bool
 	)
 
 	flag.StringVar(&uri, "uri", "bolt://localhost:7687", "Database URI")
@@ -84,6 +85,7 @@ func main() {
 	flag.StringVar(&password, "password", "pass", "Password")
 	flag.BoolVar(&causalClustering, "cluster", false, "Causal clustering")
 	flag.IntVar(&seconds, "seconds", 15, "Duration in seconds")
+	flag.BoolVar(&bigDataTest, "big", false, "Big data test")
 	flag.Parse()
 
 	auth := neo4j.BasicAuth(user, password, "")
@@ -141,6 +143,10 @@ func main() {
 			FailingQueryInTxExecutor(driver, true),
 			FailingQueryInTxExecutor(driver, false),
 		)
+	}
+
+	if bigDataTest {
+		runBigDataThing(driver)
 	}
 
 	stressTest(ctx, time.Duration(seconds)*time.Second,
