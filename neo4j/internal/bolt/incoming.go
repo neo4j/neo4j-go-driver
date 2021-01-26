@@ -33,8 +33,9 @@ func (i *incoming) next(rd io.Reader) (interface{}, error) {
 	if err != nil {
 		return nil, err
 	}
-	// Reuse buffer for next dechunk
-	i.buf = buf
+	// Create a new buffer for the incoming stream so the hydrator can own the
+	// current byte slice.
+	i.buf = make([]byte, 4096)
 
 	return i.hyd.hydrate(buf)
 }
