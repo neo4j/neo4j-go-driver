@@ -81,7 +81,7 @@ func TestChunker(ot *testing.T) {
 
 	receiveAndAssertMessage := func(t *testing.T, rd io.Reader, expected []byte) {
 		t.Helper()
-		msg, err := dechunkMessage(rd, []byte{})
+		_, msg, err := dechunkMessage(rd, []byte{})
 		AssertNoError(t, err)
 		assertSlices(t, msg, expected)
 	}
