@@ -39,13 +39,16 @@ func TestDechunker(t *testing.T) {
 		{size: 1021, max: 0x7},
 		{size: 0xffff78, max: 0x30},
 		{size: 3, max: 0xffff},
+		{size: 1021, max: 0xff90},
+		{size: 0xffff78, max: 0xff90},
 	}
-	for _, msg := range messages {
+	for msgi, msg := range messages {
 		// Prepare message
 		str := &bytes.Buffer{}
 		total := msg.size
 		this := uint16(0)
 
+		b := byte(0)
 		for total > 0 {
 			// Write size
 			if total > uint32(msg.max) {
@@ -60,15 +63,30 @@ func TestDechunker(t *testing.T) {
 
 			// Write data
 			buf = make([]byte, int(this))
+			for i := range buf {
+				buf[i] = b
+				b++
+			}
 			str.Write(buf)
 		}
 		// Write end of mesage marker
 		str.Write([]byte{0x00, 0x00})
 
 		// Dechunk the message
-		buf, err = dechunkMessage(str, buf)
+		var msgBuf []byte
+		buf, msgBuf, err = dechunkMessage(str, buf)
 		AssertNoError(t, err)
-		AssertLen(t, buf, int(msg.size))
+		AssertLen(t, msgBuf, int(msg.size))
+		// Check content of buffer
+		b = 0
+		for i := range msgBuf {
+			if msgBuf[i] != b {
+				t.Errorf("Wrong content in buffer at %d, %d vs %d (message %d)", i, msgBuf[i], b, msgi)
+				return
+			}
+			b++
+		}
+
 		// Check that buffer increases or stays put
 		if cap(buf) < prevCap {
 			t.Errorf("Underlying buffer should be reused")

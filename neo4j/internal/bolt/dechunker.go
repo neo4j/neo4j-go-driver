@@ -24,19 +24,22 @@ import (
 	"io"
 )
 
-func dechunkMessage(rd io.Reader, msgBuf []byte) ([]byte, error) {
+// dechunkMessage takes a buffer to be reused and returns the reusable buffer
+// (might have been reallocated to handle growth), the message buffer and
+// error.
+func dechunkMessage(rd io.Reader, msgBuf []byte) ([]byte, []byte, error) {
 	sizeBuf := []byte{0x00, 0x00}
 	off := 0
 
 	for {
 		_, err := io.ReadFull(rd, sizeBuf)
 		if err != nil {
-			return msgBuf, err
+			return msgBuf, nil, err
 		}
 		chunkSize := int(binary.BigEndian.Uint16(sizeBuf))
 		if chunkSize == 0 {
 			if off > 0 {
-				return msgBuf[:off], nil
+				return msgBuf, msgBuf[:off], nil
 			}
 			// Got a nop chunk
 			continue
@@ -44,12 +47,14 @@ func dechunkMessage(rd io.Reader, msgBuf []byte) ([]byte, error) {
 
 		// Need to expand buffer
 		if (off + chunkSize) > cap(msgBuf) {
-			msgBuf = append(msgBuf, make([]byte, off+chunkSize)...)
+			newMsgBuf := make([]byte, (off+chunkSize)+4096)
+			copy(newMsgBuf, msgBuf)
+			msgBuf = newMsgBuf
 		}
 		// Read the chunk into buffer
 		_, err = io.ReadFull(rd, msgBuf[off:(off+chunkSize)])
 		if err != nil {
-			return msgBuf, err
+			return msgBuf, nil, err
 		}
 		off += chunkSize
 	}
