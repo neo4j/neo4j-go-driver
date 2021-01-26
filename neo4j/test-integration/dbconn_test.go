@@ -416,7 +416,7 @@ func TestConnectionConformance(ot *testing.T) {
 		query := "RETURN $x"
 		bigBuilder := strings.Builder{}
 		s := "0123456789"
-		n := 10000
+		n := 100000
 		size := len(s) * n // Should exceed 64k
 		bigBuilder.Grow(size)
 		for i := 0; i < n; i++ {
@@ -428,6 +428,16 @@ func TestConnectionConformance(ot *testing.T) {
 		rec, sum, err := boltConn.Next(stream)
 		AssertNextOnlyRecord(t, rec, sum, err)
 		recS := rec.Values[0].(string)
+		if recS != bigBuilder.String() {
+			t.Errorf("Strings differ")
+		}
+		// Run the same thing once again to excerise buffer reuse at connection
+		// level (there has been a bug caught by this).
+		stream, err = boltConn.Run(db.Command{Cypher: query, Params: map[string]interface{}{"x": bigBuilder.String()}}, db.TxConfig{Mode: db.ReadMode})
+		AssertNoError(t, err)
+		rec, sum, err = boltConn.Next(stream)
+		AssertNextOnlyRecord(t, rec, sum, err)
+		recS = rec.Values[0].(string)
 		if recS != bigBuilder.String() {
 			t.Errorf("Strings differ")
 		}
