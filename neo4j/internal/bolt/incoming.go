@@ -23,18 +23,17 @@ import (
 )
 
 type incoming struct {
-	buf []byte
+	buf []byte // Reused buffer
 	hyd hydrator
 }
 
 func (i *incoming) next(rd io.Reader) (interface{}, error) {
 	// Get next message from transport layer
-	buf, err := dechunkMessage(rd, i.buf)
+	var err error
+	var msg []byte
+	i.buf, msg, err = dechunkMessage(rd, i.buf)
 	if err != nil {
 		return nil, err
 	}
-	// Reuse buffer for next dechunk
-	i.buf = buf
-
-	return i.hyd.hydrate(buf)
+	return i.hyd.hydrate(msg)
 }

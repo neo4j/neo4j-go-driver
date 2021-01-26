@@ -99,7 +99,7 @@ func TestOutgoing(ot *testing.T) {
 		out.send(buf)
 
 		// Dechunk it
-		byts, err := dechunkMessage(buf, []byte{})
+		_, byts, err := dechunkMessage(buf, []byte{})
 		if err != nil {
 			t.Fatal(err)
 		}
