@@ -140,13 +140,14 @@ func runBigDataThing(driver neo4j.Driver) {
 	}
 
 	// Read nodes
+	seen := 0
 	_, err := session.ReadTransaction(func(tx neo4j.Transaction) (interface{}, error) {
+		seen = 0
 		result, err := tx.Run("MATCH (n:Node) RETURN n", nil)
 		if err != nil {
 			return nil, err
 		}
 		var rec *neo4j.Record
-		seen := 0
 		for result.NextRecord(&rec) {
 			node := rec.Values[0].(neo4j.Node)
 			// Validate the node
@@ -163,13 +164,13 @@ func runBigDataThing(driver neo4j.Driver) {
 			assertBooleansSlice(nCopiesBool(10, (index%2) == 0), node.Props["booleans"].([]interface{}))
 			seen++
 		}
-		if seen < nodeCount {
-			panic("Too few nodes")
-		}
 		return nil, result.Err()
 	})
 	if err != nil {
 		panic(err)
+	}
+	if seen < nodeCount {
+		panic("Too few nodes")
 	}
 	fmt.Println("Verified big data nodes")
 }
