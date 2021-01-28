@@ -35,7 +35,7 @@ const TestNumberOfGoRoutines = 20
 func stressTest(ctx *TestContext, duration time.Duration,
 	successfulExecutors []func(*TestContext), failingExecutors []func(*TestContext)) {
 
-	fmt.Printf("Stressing with random executors on %d Go routines\n", TestNumberOfGoRoutines)
+	fmt.Printf("Stressing with random executors on %d Go routines, will run for %s\n", TestNumberOfGoRoutines, duration)
 	successfulExecutorsLen := len(successfulExecutors)
 	failingExecutorsLen := len(failingExecutors)
 

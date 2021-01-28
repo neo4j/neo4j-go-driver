@@ -21,11 +21,12 @@ if __name__ == "__main__":
             os.environ["TEST_NEO4J_PORT"])
     user = os.environ["TEST_NEO4J_USER"]
     password = os.environ["TEST_NEO4J_PASS"]
+    duration = os.environ.get("TEST_NEO4J_STRESS_DURATION", "20")
 
     # Run the stress tests
     stressPath = os.path.join(".", "test-stress")
     cmd = ["go", "run", "--race", stressPath,
-           "--big",
+           "--seconds", duration,
            "-uri", uri, "-user", user, "-password", password]
     if os.environ.get("TEST_NEO4J_IS_CLUSTER"):
         cmd.append("-cluster")
