@@ -22,6 +22,7 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"math/rand"
 	"sync"
 	"time"
@@ -34,6 +35,7 @@ const TestNumberOfGoRoutines = 20
 func stressTest(ctx *TestContext, duration time.Duration,
 	successfulExecutors []func(*TestContext), failingExecutors []func(*TestContext)) {
 
+	fmt.Printf("Stressing with random executors on %d Go routines\n", TestNumberOfGoRoutines)
 	successfulExecutorsLen := len(successfulExecutors)
 	failingExecutorsLen := len(failingExecutors)
 
@@ -95,6 +97,10 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
+
+	fmt.Println("Cleaning up database")
+	cleanDb(driver)
+
 	ctx := NewTestContext(driver)
 
 	successfulQueryExecutors := []func(*TestContext){}
@@ -146,6 +152,7 @@ func main() {
 	}
 
 	if bigDataTest {
+		fmt.Println("Running big data test")
 		runBigDataThing(driver)
 	}
 
