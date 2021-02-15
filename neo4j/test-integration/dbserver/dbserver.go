@@ -21,6 +21,7 @@
 package dbserver
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"strconv"
@@ -100,7 +101,7 @@ func (s DbServer) deleteData() {
 	defer session.Close()
 
 	for {
-		result, err := session.Run("MATCH (n) WITH n LIMIT 10000 DETACH DELETE n RETURN count(n)", nil)
+		result, err := session.Run(context.TODO(), "MATCH (n) WITH n LIMIT 10000 DETACH DELETE n RETURN count(n)", nil)
 		if err != nil {
 			panic(err)
 		}

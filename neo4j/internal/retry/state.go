@@ -21,6 +21,7 @@
 package retry
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -29,7 +30,7 @@ import (
 )
 
 type Router interface {
-	Invalidate(database string)
+	Invalidate(ctx context.Context, database string)
 }
 
 type CommitFailedDeadError struct {
@@ -63,7 +64,7 @@ type State struct {
 	skipSleep  bool
 }
 
-func (s *State) OnFailure(conn db.Connection, err error, isCommitting bool) {
+func (s *State) OnFailure(ctx context.Context, conn db.Connection, err error, isCommitting bool) {
 	s.LastErr = err
 	s.cause = ""
 	s.skipSleep = false
@@ -109,7 +110,7 @@ func (s *State) OnFailure(conn db.Connection, err error, isCommitting bool) {
 	if dbErr, isDbErr := err.(*db.Neo4jError); isDbErr {
 		if dbErr.IsRetriableCluster() {
 			// Force routing tables to be updated before trying again
-			s.Router.Invalidate(s.DatabaseName)
+			s.Router.Invalidate(ctx, s.DatabaseName)
 			s.cause = "Cluster error"
 			s.LastErrWasRetryable = true
 			return

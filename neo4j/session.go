@@ -39,15 +39,15 @@ type Session interface {
 	// If no bookmark was received or if this transaction was rolled back, the bookmark value will not be changed.
 	LastBookmark() string
 	// BeginTransaction starts a new explicit transaction on this session
-	BeginTransaction(configurers ...func(*TransactionConfig)) (Transaction, error)
+	BeginTransaction(ctx context.Context, configurers ...func(*TransactionConfig)) (Transaction, error)
 	// ReadTransaction executes the given unit of work in a AccessModeRead transaction with
 	// retry logic in place
-	ReadTransaction(work TransactionWork, configurers ...func(*TransactionConfig)) (interface{}, error)
+	ReadTransaction(ctx context.Context, work TransactionWork, configurers ...func(*TransactionConfig)) (interface{}, error)
 	// WriteTransaction executes the given unit of work in a AccessModeWrite transaction with
 	// retry logic in place
-	WriteTransaction(work TransactionWork, configurers ...func(*TransactionConfig)) (interface{}, error)
+	WriteTransaction(ctx context.Context, work TransactionWork, configurers ...func(*TransactionConfig)) (interface{}, error)
 	// Run executes an auto-commit statement and returns a result
-	Run(cypher string, params map[string]interface{}, configurers ...func(*TransactionConfig)) (Result, error)
+	Run(ctx context.Context, cypher string, params map[string]interface{}, configurers ...func(*TransactionConfig)) (Result, error)
 	// Close closes any open resources and marks this session as unusable
 	Close() error
 }
@@ -168,7 +168,7 @@ func (s *session) LastBookmark() string {
 	return ""
 }
 
-func (s *session) BeginTransaction(configurers ...func(*TransactionConfig)) (Transaction, error) {
+func (s *session) BeginTransaction(ctx context.Context, configurers ...func(*TransactionConfig)) (Transaction, error) {
 	// Guard for more than one transaction per session
 	if s.txExplicit != nil {
 		err := &UsageError{Message: "Session already has a pending transaction"}
@@ -187,7 +187,7 @@ func (s *session) BeginTransaction(configurers ...func(*TransactionConfig)) (Tra
 	}
 
 	// Get a connection from the pool. This could fail in clustered environment.
-	conn, err := s.getConnection(s.defaultMode)
+	conn, err := s.getConnection(ctx, s.defaultMode)
 	if err != nil {
 		return nil, err
 	}
@@ -221,6 +221,7 @@ func (s *session) BeginTransaction(configurers ...func(*TransactionConfig)) (Tra
 }
 
 func (s *session) runRetriable(
+	ctx context.Context,
 	mode db.AccessMode,
 	work TransactionWork, configurers ...func(*TransactionConfig)) (interface{}, error) {
 
@@ -253,9 +254,9 @@ func (s *session) runRetriable(
 	}
 	for state.Continue() {
 		// Establish new connection
-		conn, err := s.getConnection(mode)
+		conn, err := s.getConnection(ctx, mode)
 		if err != nil {
-			state.OnFailure(conn, err, false)
+			state.OnFailure(ctx, conn, err, false)
 			continue
 		}
 
@@ -267,7 +268,7 @@ func (s *session) runRetriable(
 			Meta:      config.Metadata,
 		})
 		if err != nil {
-			state.OnFailure(conn, err, false)
+			state.OnFailure(ctx, conn, err, false)
 			s.pool.Return(conn)
 			continue
 		}
@@ -283,7 +284,7 @@ func (s *session) runRetriable(
 			// client wants to rollback. We don't do an explicit rollback here
 			// but instead realy on pool invoking reset on the connection, that
 			// will do an implicit rollback.
-			state.OnFailure(conn, err, false)
+			state.OnFailure(ctx, conn, err, false)
 			s.pool.Return(conn)
 			continue
 		}
@@ -291,7 +292,7 @@ func (s *session) runRetriable(
 		// Commit transaction
 		err = conn.TxCommit(txHandle)
 		if err != nil {
-			state.OnFailure(conn, err, true)
+			state.OnFailure(ctx, conn, err, true)
 			s.pool.Return(conn)
 			continue
 		}
@@ -321,40 +322,37 @@ func (s *session) runRetriable(
 }
 
 func (s *session) ReadTransaction(
-	work TransactionWork, configurers ...func(*TransactionConfig)) (interface{}, error) {
+	ctx context.Context, work TransactionWork, configurers ...func(*TransactionConfig)) (interface{}, error) {
 
-	return s.runRetriable(db.ReadMode, work, configurers...)
+	return s.runRetriable(ctx, db.ReadMode, work, configurers...)
 }
 
 func (s *session) WriteTransaction(
-	work TransactionWork, configurers ...func(*TransactionConfig)) (interface{}, error) {
+	ctx context.Context, work TransactionWork, configurers ...func(*TransactionConfig)) (interface{}, error) {
 
-	return s.runRetriable(db.WriteMode, work, configurers...)
+	return s.runRetriable(ctx, db.WriteMode, work, configurers...)
 }
 
-func (s *session) getServers(mode db.AccessMode) ([]string, error) {
+func (s *session) getServers(ctx context.Context, mode db.AccessMode) ([]string, error) {
 	if mode == db.ReadMode {
-		return s.router.Readers(s.databaseName)
+		return s.router.Readers(ctx, s.databaseName)
 	} else {
-		return s.router.Writers(s.databaseName)
+		return s.router.Writers(ctx, s.databaseName)
 	}
 }
 
-func (s *session) getConnection(mode db.AccessMode) (db.Connection, error) {
-	servers, err := s.getServers(mode)
+func (s *session) getConnection(ctx context.Context, mode db.AccessMode) (db.Connection, error) {
+	servers, err := s.getServers(ctx, mode)
 	if err != nil {
 		return nil, wrapError(err)
 	}
 
-	var ctx context.Context
 	if s.config.ConnectionAcquisitionTimeout > 0 {
 		var cancel context.CancelFunc
-		ctx, cancel = context.WithTimeout(context.Background(), s.config.ConnectionAcquisitionTimeout)
+		ctx, cancel = context.WithTimeout(ctx, s.config.ConnectionAcquisitionTimeout)
 		if cancel != nil {
 			defer cancel()
 		}
-	} else {
-		ctx = context.Background()
 	}
 	conn, err := s.pool.Borrow(ctx, servers, s.config.ConnectionAcquisitionTimeout != 0)
 	if err != nil {
@@ -385,7 +383,7 @@ func (s *session) retrieveBookmarks(conn db.Connection) {
 }
 
 func (s *session) Run(
-	cypher string, params map[string]interface{}, configurers ...func(*TransactionConfig)) (Result, error) {
+	ctx context.Context, cypher string, params map[string]interface{}, configurers ...func(*TransactionConfig)) (Result, error) {
 
 	if s.txExplicit != nil {
 		err := &UsageError{Message: "Trying to run auto-commit transaction while in explicit transaction"}
@@ -402,7 +400,7 @@ func (s *session) Run(
 		c(&config)
 	}
 
-	conn, err := s.getConnection(s.defaultMode)
+	conn, err := s.getConnection(ctx, s.defaultMode)
 	if err != nil {
 		return nil, err
 	}
@@ -468,16 +466,16 @@ func (s *sessionWithError) LastBookmark() string {
 	return ""
 }
 
-func (s *sessionWithError) BeginTransaction(configurers ...func(*TransactionConfig)) (Transaction, error) {
+func (s *sessionWithError) BeginTransaction(_ context.Context, configurers ...func(*TransactionConfig)) (Transaction, error) {
 	return nil, s.err
 }
-func (s *sessionWithError) ReadTransaction(work TransactionWork, configurers ...func(*TransactionConfig)) (interface{}, error) {
+func (s *sessionWithError) ReadTransaction(_ context.Context, work TransactionWork, configurers ...func(*TransactionConfig)) (interface{}, error) {
 	return nil, s.err
 }
-func (s *sessionWithError) WriteTransaction(work TransactionWork, configurers ...func(*TransactionConfig)) (interface{}, error) {
+func (s *sessionWithError) WriteTransaction(_ context.Context, work TransactionWork, configurers ...func(*TransactionConfig)) (interface{}, error) {
 	return nil, s.err
 }
-func (s *sessionWithError) Run(cypher string, params map[string]interface{}, configurers ...func(*TransactionConfig)) (Result, error) {
+func (s *sessionWithError) Run(_ context.Context, cypher string, params map[string]interface{}, configurers ...func(*TransactionConfig)) (Result, error) {
 	return nil, s.err
 }
 func (s *sessionWithError) Close() error {

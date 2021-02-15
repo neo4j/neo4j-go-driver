@@ -21,6 +21,7 @@
 package neo4j
 
 import (
+	"context"
 	"fmt"
 	"net/url"
 	"strings"
@@ -53,11 +54,11 @@ type Driver interface {
 	// Creates a new session based on the specified session configuration.
 	NewSession(config SessionConfig) Session
 	// Deprecated: Use NewSession instead
-	Session(accessMode AccessMode, bookmarks ...string) (Session, error)
+	Session(ctx context.Context, accessMode AccessMode, bookmarks ...string) (Session, error)
 	// Verifies that the driver can connect to a remote server or cluster by
 	// establishing a network connection with the remote. Returns nil if succesful
 	// or error describing the problem.
-	VerifyConnectivity() error
+	VerifyConnectivity(ctx context.Context) error
 	// Close the driver and all underlying connections
 	Close() error
 }
@@ -223,9 +224,9 @@ func routingContextFromUrl(useRouting bool, u *url.URL) (map[string]string, erro
 }
 
 type sessionRouter interface {
-	Readers(database string) ([]string, error)
-	Writers(database string) ([]string, error)
-	Invalidate(database string)
+	Readers(ctx context.Context, database string) ([]string, error)
+	Writers(ctx context.Context, database string) ([]string, error)
+	Invalidate(ctx context.Context, database string)
 	CleanUp()
 }
 
@@ -244,7 +245,7 @@ func (d *driver) Target() url.URL {
 	return *d.target
 }
 
-func (d *driver) Session(accessMode AccessMode, bookmarks ...string) (Session, error) {
+func (d *driver) Session(ctx context.Context, accessMode AccessMode, bookmarks ...string) (Session, error) {
 	d.mut.Lock()
 	defer d.mut.Unlock()
 	if d.pool == nil {
@@ -274,10 +275,10 @@ func (d *driver) NewSession(config SessionConfig) Session {
 		d.pool, db.AccessMode(config.AccessMode), config.Bookmarks, databaseName, config.FetchSize, d.log)
 }
 
-func (d *driver) VerifyConnectivity() error {
+func (d *driver) VerifyConnectivity(ctx context.Context) error {
 	session := d.NewSession(SessionConfig{AccessMode: AccessModeRead})
 	defer session.Close()
-	result, err := session.Run("RETURN 1 AS n", nil)
+	result, err := session.Run(ctx,"RETURN 1 AS n", nil)
 	if err != nil {
 		return err
 	}

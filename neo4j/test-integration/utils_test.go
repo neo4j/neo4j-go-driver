@@ -20,6 +20,7 @@
 package test_integration
 
 import (
+	"context"
 	"fmt"
 	"reflect"
 
@@ -53,21 +54,21 @@ func transactionWithIntWork(tx neo4j.Transaction, work neo4j.TransactionWork) in
 }
 
 func readTransactionWithIntWork(session neo4j.Session, work neo4j.TransactionWork, configurers ...func(*neo4j.TransactionConfig)) int64 {
-	result, err := session.ReadTransaction(work, configurers...)
+	result, err := session.ReadTransaction(context.TODO(), work, configurers...)
 	Expect(err).To(BeNil())
 
 	return result.(int64)
 }
 
 func writeTransactionWithIntWork(session neo4j.Session, work neo4j.TransactionWork, configurers ...func(*neo4j.TransactionConfig)) int64 {
-	result, err := session.WriteTransaction(work, configurers...)
+	result, err := session.WriteTransaction(context.TODO(), work, configurers...)
 	Expect(err).To(BeNil())
 
 	return result.(int64)
 }
 
 func newSession(driver neo4j.Driver, mode neo4j.AccessMode) neo4j.Session {
-	session, err := driver.Session(mode)
+	session, err := driver.Session(context.TODO(), mode)
 	Expect(err).To(BeNil())
 	return session
 }
@@ -75,7 +76,7 @@ func newSession(driver neo4j.Driver, mode neo4j.AccessMode) neo4j.Session {
 func newSessionAndTx(driver neo4j.Driver, mode neo4j.AccessMode, configurers ...func(*neo4j.TransactionConfig)) (neo4j.Session, neo4j.Transaction) {
 	session := newSession(driver, mode)
 
-	tx, err := session.BeginTransaction(configurers...)
+	tx, err := session.BeginTransaction(context.TODO(), configurers...)
 	Expect(err).To(BeNil())
 
 	return session, tx
@@ -89,9 +90,9 @@ func createNode(session neo4j.Session, label string, props map[string]interface{
 	)
 
 	if len(props) > 0 {
-		result, err = session.Run(fmt.Sprintf("CREATE (n:%s) SET n = $props", label), map[string]interface{}{"props": props})
+		result, err = session.Run(context.TODO(), fmt.Sprintf("CREATE (n:%s) SET n = $props", label), map[string]interface{}{"props": props})
 	} else {
-		result, err = session.Run(fmt.Sprintf("CREATE (n:%s)", label), nil)
+		result, err = session.Run(context.TODO(), fmt.Sprintf("CREATE (n:%s)", label), nil)
 	}
 	Expect(err).To(BeNil())
 
@@ -152,7 +153,7 @@ func updateNode(session neo4j.Session, label string, newProps map[string]interfa
 		ginkgo.Fail("newProps is empty")
 	}
 
-	result, err = session.Run(fmt.Sprintf("MATCH (n:%s) SET n = $props", label), map[string]interface{}{"props": newProps})
+	result, err = session.Run(context.TODO(), fmt.Sprintf("MATCH (n:%s) SET n = $props", label), map[string]interface{}{"props": newProps})
 	Expect(err).To(BeNil())
 
 	summary, err = result.Consume()

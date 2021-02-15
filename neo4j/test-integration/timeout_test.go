@@ -20,6 +20,7 @@
 package test_integration
 
 import (
+	"context"
 	"time"
 
 	"github.com/neo4j/neo4j-go-driver/v4/neo4j"
@@ -48,12 +49,12 @@ var _ = Describe("Timeout and Lifetime", func() {
 		session1, _ = newSessionAndTx(driver, neo4j.AccessModeRead)
 		defer session1.Close()
 
-		session2, err = driver.Session(neo4j.AccessModeRead)
+		session2, err = driver.Session(context.TODO(), neo4j.AccessModeRead)
 		Expect(err).To(BeNil())
 		Expect(session2).NotTo(BeNil())
 		defer session2.Close()
 
-		_, err = session2.Run("RETURN 1", nil)
+		_, err = session2.Run(context.TODO(), "RETURN 1", nil)
 		Expect(err).ToNot(BeNil())
 		//Expect(err).To(test.BeConnectorErrorWithCode(0x601))
 	})
@@ -100,7 +101,7 @@ var _ = Describe("Timeout and Lifetime", func() {
 		session = newSession(driver, neo4j.AccessModeRead)
 		defer session.Close()
 
-		_, err = session.BeginTransaction()
+		_, err = session.BeginTransaction(context.TODO())
 		Expect(err).ToNot(BeNil())
 		//Expect(err).To(test.BeConnectorErrorWithCode(6))
 	})

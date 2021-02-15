@@ -20,6 +20,7 @@
 package dbserver
 
 import (
+	"context"
 	"fmt"
 	"regexp"
 	"strconv"
@@ -38,7 +39,7 @@ func versionOfDriver(driver neo4j.Driver) Version {
 	session := driver.NewSession(neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead})
 	defer session.Close()
 
-	result, err := session.Run("RETURN 1", nil)
+	result, err := session.Run(context.TODO(), "RETURN 1", nil)
 	if err != nil {
 		panic(err)
 	}

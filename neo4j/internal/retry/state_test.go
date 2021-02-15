@@ -20,6 +20,7 @@
 package retry
 
 import (
+	"context"
 	"errors"
 	"io"
 	"reflect"
@@ -144,7 +145,7 @@ func TestState(tt *testing.T) {
 				router := &testutil.RouterFake{}
 				state.Router = router
 
-				state.OnFailure(i.conn, i.err, i.isCommitting)
+				state.OnFailure(context.TODO(), i.conn, i.err, i.isCommitting)
 				continued := state.Continue()
 				if continued != i.expectContinued {
 					t.Errorf("Expected continue to return %v but returned %v", i.expectContinued, continued)

@@ -20,6 +20,7 @@
 package test_integration
 
 import (
+	"context"
 	"errors"
 	"time"
 
@@ -41,7 +42,7 @@ var _ = Describe("Transaction", func() {
 	BeforeEach(func() {
 		driver = server.Driver()
 
-		session, err = driver.Session(neo4j.AccessModeWrite)
+		session, err = driver.Session(context.TODO(), neo4j.AccessModeWrite)
 		Expect(err).To(BeNil())
 	})
 
@@ -57,7 +58,7 @@ var _ = Describe("Transaction", func() {
 
 		It("should work on WriteTransaction", func() {
 			times := 0
-			_, err = session.WriteTransaction(func(transaction neo4j.Transaction) (interface{}, error) {
+			_, err = session.WriteTransaction(context.TODO(), func(transaction neo4j.Transaction) (interface{}, error) {
 				times++
 				time.Sleep(1 * time.Second)
 				return nil, transientError
@@ -70,7 +71,7 @@ var _ = Describe("Transaction", func() {
 
 		It("should work on ReadTransaction", func() {
 			times := 0
-			_, err = session.ReadTransaction(func(transaction neo4j.Transaction) (interface{}, error) {
+			_, err = session.ReadTransaction(context.TODO(), func(transaction neo4j.Transaction) (interface{}, error) {
 				times++
 				time.Sleep(1 * time.Second)
 				return nil, transientError
@@ -92,7 +93,7 @@ var _ = Describe("Transaction", func() {
 
 	It("should rollback if work function returns error", func() {
 		createWork := intReturningWork("CREATE (n:Person2) RETURN count(n)", nil)
-		createResult, err := session.WriteTransaction(func(tx neo4j.Transaction) (interface{}, error) {
+		createResult, err := session.WriteTransaction(context.TODO(), func(tx neo4j.Transaction) (interface{}, error) {
 			innerResult, err := createWork(tx)
 			Expect(err).To(BeNil())
 			Expect(innerResult).To(BeEquivalentTo(1))
@@ -107,7 +108,7 @@ var _ = Describe("Transaction", func() {
 	})
 
 	It("should have keys available after run", func() {
-		tx, err = session.BeginTransaction()
+		tx, err = session.BeginTransaction(context.TODO())
 		Expect(err).To(BeNil())
 		defer tx.Close()
 
@@ -118,7 +119,7 @@ var _ = Describe("Transaction", func() {
 	})
 
 	It("should have keys available after run and consume", func() {
-		tx, err = session.BeginTransaction()
+		tx, err = session.BeginTransaction(context.TODO())
 		Expect(err).To(BeNil())
 		defer tx.Close()
 
@@ -134,7 +135,7 @@ var _ = Describe("Transaction", func() {
 	})
 
 	It("should have keys available for consecutive runs", func() {
-		tx, err = session.BeginTransaction()
+		tx, err = session.BeginTransaction(context.TODO())
 		Expect(err).To(BeNil())
 		defer tx.Close()
 
@@ -149,7 +150,7 @@ var _ = Describe("Transaction", func() {
 	})
 
 	It("should have keys available for consecutive runs and consumes", func() {
-		tx, err = session.BeginTransaction()
+		tx, err = session.BeginTransaction(context.TODO())
 		Expect(err).To(BeNil())
 		defer tx.Close()
 
@@ -169,7 +170,7 @@ var _ = Describe("Transaction", func() {
 	})
 
 	It("should have keys available for consecutive runs independent of order", func() {
-		tx, err = session.BeginTransaction()
+		tx, err = session.BeginTransaction(context.TODO())
 		Expect(err).To(BeNil())
 		defer tx.Close()
 
@@ -184,7 +185,7 @@ var _ = Describe("Transaction", func() {
 	})
 
 	It("should have keys available for consecutive runs and consumes independent of order", func() {
-		tx, err = session.BeginTransaction()
+		tx, err = session.BeginTransaction(context.TODO())
 		Expect(err).To(BeNil())
 		defer tx.Close()
 
@@ -219,7 +220,7 @@ var _ = Describe("Transaction", func() {
 				"m4": neo4j.LocalDateTimeOf(time.Now()),
 			}
 
-			tx, err = session.BeginTransaction(neo4j.WithTxMetadata(metadata))
+			tx, err = session.BeginTransaction(context.TODO(), neo4j.WithTxMetadata(metadata))
 			Expect(err).To(BeNil())
 			defer tx.Close()
 
@@ -232,7 +233,7 @@ var _ = Describe("Transaction", func() {
 
 			session2 := newSession(driver, neo4j.AccessModeRead)
 			defer session2.Close()
-			matched, err := session2.ReadTransaction(listTransactionsAndMatchMetadataWork(metadata))
+			matched, err := session2.ReadTransaction(context.TODO(), listTransactionsAndMatchMetadataWork(metadata))
 			Expect(err).To(BeNil())
 			Expect(matched).To(BeTrue())
 		})
@@ -265,13 +266,13 @@ var _ = Describe("Transaction", func() {
 		})
 
 		It("should fail when transaction timeout is set for Session.BeginTransaction", func() {
-			_, err := session.BeginTransaction(neo4j.WithTxTimeout(1 * time.Second))
+			_, err := session.BeginTransaction(context.TODO(), neo4j.WithTxTimeout(1 * time.Second))
 			Expect(err).ToNot(BeNil())
 			//Expect(err).To(BeConnectorErrorWithCode(0x504))
 		})
 
 		It("should fail when transaction metadata is set for Session.BeginTransaction", func() {
-			_, err := session.BeginTransaction(neo4j.WithTxMetadata(map[string]interface{}{"x": 1}))
+			_, err := session.BeginTransaction(context.TODO(), neo4j.WithTxMetadata(map[string]interface{}{"x": 1}))
 			Expect(err).ToNot(BeNil())
 			//Expect(err).To(BeConnectorErrorWithCode(0x504))
 		})

@@ -20,6 +20,8 @@
 package test_integration
 
 import (
+	"context"
+
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 
@@ -52,11 +54,11 @@ var _ = Describe("Routing", func() {
 		Expect(err).To(BeNil())
 		defer driver.Close()
 
-		session, err = driver.Session(neo4j.AccessModeRead)
+		session, err = driver.Session(context.TODO(), neo4j.AccessModeRead)
 		Expect(err).To(BeNil())
 		defer session.Close()
 
-		result, err = session.Run("RETURN 1", nil)
+		result, err = session.Run(context.TODO(), "RETURN 1", nil)
 		Expect(err).To(BeNil())
 
 		summary, err = result.Consume()
@@ -73,10 +75,10 @@ var _ = Describe("Routing", func() {
 		driver := getDriver(server.URI())
 		Expect(err).To(BeNil())
 
-		session, err = driver.Session(neo4j.AccessModeWrite)
+		session, err = driver.Session(context.TODO(), neo4j.AccessModeWrite)
 		Expect(err).To(BeNil())
 
-		writeCount, err = session.WriteTransaction(func(tx neo4j.Transaction) (interface{}, error) {
+		writeCount, err = session.WriteTransaction(context.TODO(), func(tx neo4j.Transaction) (interface{}, error) {
 			writeResult, err := tx.Run("MERGE (n:Person {name: 'John'}) RETURN 1", nil)
 			if err != nil {
 				return nil, err
@@ -95,7 +97,7 @@ var _ = Describe("Routing", func() {
 		Expect(err).To(BeNil())
 		Expect(writeCount).To(BeNumerically("==", 1))
 
-		readCount, err = session.ReadTransaction(func(tx neo4j.Transaction) (interface{}, error) {
+		readCount, err = session.ReadTransaction(context.TODO(), func(tx neo4j.Transaction) (interface{}, error) {
 			readResult, err := tx.Run("MATCH (n:Person {name: 'John'}) RETURN COUNT(*) AS count", nil)
 			if err != nil {
 				return nil, err

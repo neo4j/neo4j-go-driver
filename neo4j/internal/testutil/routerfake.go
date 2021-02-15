@@ -19,6 +19,8 @@
 
 package testutil
 
+import "context"
+
 type RouterFake struct {
 	Invalidated   bool
 	InvalidatedDb string
@@ -28,16 +30,16 @@ type RouterFake struct {
 	CleanUpHook   func()
 }
 
-func (r *RouterFake) Invalidate(database string) {
+func (r *RouterFake) Invalidate(_ context.Context, database string) {
 	r.InvalidatedDb = database
 	r.Invalidated = true
 }
 
-func (r *RouterFake) Readers(database string) ([]string, error) {
+func (r *RouterFake) Readers(_ context.Context, database string) ([]string, error) {
 	return r.ReadersRet, r.Err
 }
 
-func (r *RouterFake) Writers(database string) ([]string, error) {
+func (r *RouterFake) Writers(_ context.Context, database string) ([]string, error) {
 	return r.WritersRet, r.Err
 }
 

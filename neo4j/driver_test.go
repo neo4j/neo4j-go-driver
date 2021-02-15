@@ -20,6 +20,7 @@
 package neo4j
 
 import (
+	"context"
 	"reflect"
 	"testing"
 
@@ -200,7 +201,7 @@ func TestNewDriverAndClose(t *testing.T) {
 	AssertNoError(t, err)
 
 	session := driver.NewSession(SessionConfig{})
-	_, err = session.Run("cypher", nil)
+	_, err = session.Run(context.TODO(), "cypher", nil)
 	if !IsUsageError(err) {
 		t.Errorf("should not allow new session after driver being closed")
 	}
