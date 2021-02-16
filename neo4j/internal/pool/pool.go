@@ -249,14 +249,14 @@ func (p *Pool) Borrow(ctx context.Context, serverNames []string, wait bool) (db.
 	var err error
 	var conn db.Connection
 	for _, s := range penalties {
-		// Check if we have timed out
-		if timeOut() {
-			return nil, &PoolTimeout{servers: serverNames}
-		}
-
 		conn, err = p.tryBorrow(s.name)
 		if err == nil {
 			return conn, nil
+		}
+
+		// Check if we have timed out after failed borrow
+		if timeOut() {
+			return nil, &PoolTimeout{servers: serverNames}
 		}
 	}
 

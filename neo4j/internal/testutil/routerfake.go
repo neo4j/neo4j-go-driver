@@ -19,6 +19,10 @@
 
 package testutil
 
+import (
+	"context"
+)
+
 type RouterFake struct {
 	Invalidated   bool
 	InvalidatedDb string
@@ -33,11 +37,11 @@ func (r *RouterFake) Invalidate(database string) {
 	r.Invalidated = true
 }
 
-func (r *RouterFake) Readers(database string) ([]string, error) {
+func (r *RouterFake) Readers(ctx context.Context, database string) ([]string, error) {
 	return r.ReadersRet, r.Err
 }
 
-func (r *RouterFake) Writers(database string) ([]string, error) {
+func (r *RouterFake) Writers(ctx context.Context, database string) ([]string, error) {
 	return r.WritersRet, r.Err
 }
 

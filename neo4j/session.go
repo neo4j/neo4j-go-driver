@@ -332,20 +332,15 @@ func (s *session) WriteTransaction(
 	return s.runRetriable(db.WriteMode, work, configurers...)
 }
 
-func (s *session) getServers(mode db.AccessMode) ([]string, error) {
+func (s *session) getServers(ctx context.Context, mode db.AccessMode) ([]string, error) {
 	if mode == db.ReadMode {
-		return s.router.Readers(s.databaseName)
+		return s.router.Readers(ctx, s.databaseName)
 	} else {
-		return s.router.Writers(s.databaseName)
+		return s.router.Writers(ctx, s.databaseName)
 	}
 }
 
 func (s *session) getConnection(mode db.AccessMode) (db.Connection, error) {
-	servers, err := s.getServers(mode)
-	if err != nil {
-		return nil, wrapError(err)
-	}
-
 	var ctx context.Context
 	if s.config.ConnectionAcquisitionTimeout > 0 {
 		var cancel context.CancelFunc
@@ -356,6 +351,11 @@ func (s *session) getConnection(mode db.AccessMode) (db.Connection, error) {
 	} else {
 		ctx = context.Background()
 	}
+	servers, err := s.getServers(ctx, mode)
+	if err != nil {
+		return nil, wrapError(err)
+	}
+
 	conn, err := s.pool.Borrow(ctx, servers, s.config.ConnectionAcquisitionTimeout != 0)
 	if err != nil {
 		return nil, wrapError(err)

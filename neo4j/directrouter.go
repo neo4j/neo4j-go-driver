@@ -19,16 +19,18 @@
 
 package neo4j
 
+import "context"
+
 // A router implementation that never routes
 type directRouter struct {
 	address string
 }
 
-func (r *directRouter) Readers(database string) ([]string, error) {
+func (r *directRouter) Readers(ctx context.Context, database string) ([]string, error) {
 	return []string{r.address}, nil
 }
 
-func (r *directRouter) Writers(database string) ([]string, error) {
+func (r *directRouter) Writers(ctx context.Context, database string) ([]string, error) {
 	return []string{r.address}, nil
 }
 
