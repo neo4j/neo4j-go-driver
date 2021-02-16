@@ -491,6 +491,37 @@ func TestBolt4(ot *testing.T) {
 		bolt.Reset()
 	})
 
+	ot.Run("Forces reset in ready state", func(t *testing.T) {
+		bolt, cleanup := connectToServer(t, func(srv *bolt4server) {
+			srv.accept(4)
+			srv.waitForReset()
+			srv.sendSuccess(map[string]interface{}{})
+		})
+		defer cleanup()
+		defer bolt.Close()
+
+		err := bolt.ForceReset()
+		AssertNoError(t, err)
+		assertBoltState(t, bolt4_ready, bolt)
+	})
+
+	ot.Run("Forces reset while streaming", func(t *testing.T) {
+		bolt, cleanup := connectToServer(t, func(srv *bolt4server) {
+			srv.accept(4)
+			srv.serveRun(runResponse)
+			srv.waitForReset()
+			srv.sendSuccess(map[string]interface{}{})
+		})
+		defer cleanup()
+		defer bolt.Close()
+		_, err := bolt.Run(db.Command{Cypher: "MATCH (n) RETURN n"}, db.TxConfig{Mode: db.ReadMode})
+		AssertNoError(t, err)
+
+		err = bolt.ForceReset()
+		AssertNoError(t, err)
+		assertBoltState(t, bolt4_ready, bolt)
+	})
+
 	// Reset where state is ready
 
 	ot.Run("Buffer stream", func(t *testing.T) {

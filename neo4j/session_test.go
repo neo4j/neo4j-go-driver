@@ -167,6 +167,41 @@ func TestSession(st *testing.T) {
 	})
 
 	st.Run("Run", func(bt *testing.T) {
+		bt.Run("Forces reset on acquired connection", func(t *testing.T) {
+			_, pool, sess := createSession()
+			forceResetCalls := 0
+			connection := &ConnFake{
+				ForceResetHook: func() error {
+					forceResetCalls++
+					return nil
+				},
+			}
+			pool.BorrowConn = connection
+
+			_, err := sess.Run("cypher", map[string]interface{}{})
+			AssertNoError(t, err)
+			AssertIntEqual(t, forceResetCalls, 1)
+		})
+
+		bt.Run("Picks connection from the pool until force-reset succeeds", func(t *testing.T) {
+			_, pool, sess := createSession()
+			forceResetCalls := 0
+			connection := &ConnFake{
+				ForceResetHook: func() error {
+					forceResetCalls++
+					if forceResetCalls == 1 {
+						return errors.New("force-reset failure")
+					}
+					return nil
+				},
+			}
+			pool.BorrowConn = connection
+
+			_, err := sess.Run("cypher", map[string]interface{}{})
+			AssertNoError(t, err)
+			AssertIntEqual(t, forceResetCalls, 2)
+		})
+
 		// Checks that chained Run results are buffered and that bookmarks are retrieved for
 		// those and that a Consume on the last result also gives the appropriate bookmark.
 		bt.Run("Chained and consume", func(t *testing.T) {

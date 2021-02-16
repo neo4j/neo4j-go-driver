@@ -88,6 +88,7 @@ type Connection interface {
 	// Resets connection to same state as directly after a connect.
 	// Active streams will be discarded and the bookmark will be lost.
 	Reset()
+	ForceReset() error
 	// Closes the database connection as well as any underlying connection.
 	// The instance should not be used after being closed.
 	Close()
