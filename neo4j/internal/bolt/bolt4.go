@@ -910,3 +910,17 @@ func (b *bolt4) Close() {
 func (b *bolt4) SelectDatabase(database string) {
 	b.databaseName = database
 }
+
+func (b *bolt4) ForceReset() error {
+	if b.state == bolt4_ready {
+		b.out.appendReset()
+		b.out.send(b.conn)
+		if b.err != nil {
+			return b.err
+		}
+		b.receiveMsg()
+		return b.err
+	}
+	b.Reset()
+	return b.err
+}

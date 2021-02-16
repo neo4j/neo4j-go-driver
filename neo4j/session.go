@@ -402,9 +402,19 @@ func (s *session) Run(
 		c(&config)
 	}
 
-	conn, err := s.getConnection(s.defaultMode)
-	if err != nil {
-		return nil, err
+	var (
+		conn db.Connection
+		err  error
+	)
+	for  {
+		conn, err = s.getConnection(s.defaultMode)
+		if err != nil {
+			return nil, err
+		}
+		err = conn.ForceReset()
+		if err == nil {
+			break
+		}
 	}
 
 	stream, err := conn.Run(

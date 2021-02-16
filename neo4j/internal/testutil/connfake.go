@@ -40,28 +40,29 @@ type RecordedTx struct {
 }
 
 type ConnFake struct {
-	Name          string
-	Version       string
-	Alive         bool
-	Birth         time.Time
-	Table         *db.RoutingTable
-	Err           error
-	Id            int
-	TxBeginHandle db.TxHandle
-	RunStream     db.StreamHandle
-	RunTxStream   db.StreamHandle
-	Nexts         []Next
-	Bookm         string
-	TxCommitErr   error
-	TxCommitHook  func()
-	TxRollbackErr error
-	ResetHook     func()
-	ConsumeSum    *db.Summary
-	ConsumeErr    error
-	ConsumeHook   func()
-	RecordedTxs   []RecordedTx // Appended to by Run/TxBegin
-	BufferErr     error
-	BufferHook    func()
+	Name           string
+	Version        string
+	Alive          bool
+	Birth          time.Time
+	Table          *db.RoutingTable
+	Err            error
+	Id             int
+	TxBeginHandle  db.TxHandle
+	RunStream      db.StreamHandle
+	RunTxStream    db.StreamHandle
+	Nexts          []Next
+	Bookm          string
+	TxCommitErr    error
+	TxCommitHook   func()
+	TxRollbackErr  error
+	ResetHook      func()
+	ConsumeSum     *db.Summary
+	ConsumeErr     error
+	ConsumeHook    func()
+	RecordedTxs    []RecordedTx // Appended to by Run/TxBegin
+	BufferErr      error
+	BufferHook     func()
+	ForceResetHook func() error
 }
 
 func (c *ConnFake) ServerName() string {
@@ -144,4 +145,11 @@ func (c *ConnFake) Next(streamHandle db.StreamHandle) (*db.Record, *db.Summary, 
 		c.Nexts = c.Nexts[1:]
 	}
 	return next.Record, next.Summary, next.Err
+}
+
+func (c *ConnFake) ForceReset() error {
+	if c.ForceResetHook != nil {
+		return c.ForceResetHook()
+	}
+	return nil
 }
