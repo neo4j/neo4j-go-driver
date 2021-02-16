@@ -735,3 +735,7 @@ func (b *bolt3) Close() {
 	b.conn.Close()
 	b.state = bolt3_dead
 }
+
+func (b *bolt3) ForceReset() error {
+	return nil
+}
