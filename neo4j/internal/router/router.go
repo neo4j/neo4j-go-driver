@@ -72,7 +72,7 @@ func New(rootRouter string, getRouters func() []string, routerContext map[string
 	return r
 }
 
-func (r *Router) getTable(database string) (*db.RoutingTable, error) {
+func (r *Router) getTable(ctx context.Context, database string) (*db.RoutingTable, error) {
 	now := r.now()
 
 	r.dbRoutersMut.Lock()
@@ -92,20 +92,20 @@ func (r *Router) getTable(database string) (*db.RoutingTable, error) {
 	if dbRouter != nil && len(dbRouter.table.Routers) > 0 {
 		routers := dbRouter.table.Routers
 		r.log.Infof(log.Router, r.logId, "Reading routing table for '%s' from previously known routers: %v", database, routers)
-		table, err = readTable(context.Background(), r.pool, database, routers, r.routerContext)
+		table, err = readTable(ctx, r.pool, database, routers, r.routerContext)
 	}
 
 	// Try initial router if no routers or failed
-	if table == nil || err != nil {
+	if table == nil {
 		r.log.Infof(log.Router, r.logId, "Reading routing table from initial router: %s", r.rootRouter)
-		table, err = readTable(context.Background(), r.pool, database, []string{r.rootRouter}, r.routerContext)
+		table, err = readTable(ctx, r.pool, database, []string{r.rootRouter}, r.routerContext)
 	}
 
 	// Use hook to retrieve possibly different set of routers and retry
-	if err != nil && r.getRouters != nil {
+	if table == nil && r.getRouters != nil {
 		routers := r.getRouters()
 		r.log.Infof(log.Router, r.logId, "Reading routing table for '%s' from custom routers: %v", routers)
-		table, err = readTable(context.Background(), r.pool, database, routers, r.routerContext)
+		table, err = readTable(ctx, r.pool, database, routers, r.routerContext)
 	}
 
 	if err != nil {
@@ -130,8 +130,8 @@ func (r *Router) getTable(database string) (*db.RoutingTable, error) {
 	return table, nil
 }
 
-func (r *Router) Readers(database string) ([]string, error) {
-	table, err := r.getTable(database)
+func (r *Router) Readers(ctx context.Context, database string) ([]string, error) {
+	table, err := r.getTable(ctx, database)
 	if err != nil {
 		return nil, err
 	}
@@ -146,7 +146,7 @@ func (r *Router) Readers(database string) ([]string, error) {
 		r.log.Infof(log.Router, r.logId, "Invalidating routing table, no readers")
 		r.Invalidate(database)
 		r.sleep(100 * time.Millisecond)
-		table, err = r.getTable(database)
+		table, err = r.getTable(ctx, database)
 		if err != nil {
 			return nil, err
 		}
@@ -158,8 +158,8 @@ func (r *Router) Readers(database string) ([]string, error) {
 	return table.Readers, nil
 }
 
-func (r *Router) Writers(database string) ([]string, error) {
-	table, err := r.getTable(database)
+func (r *Router) Writers(ctx context.Context, database string) ([]string, error) {
+	table, err := r.getTable(ctx, database)
 	if err != nil {
 		return nil, err
 	}
@@ -174,7 +174,7 @@ func (r *Router) Writers(database string) ([]string, error) {
 		r.log.Infof(log.Router, r.logId, "Invalidating routing table, no writers")
 		r.Invalidate(database)
 		r.sleep(100 * time.Millisecond)
-		table, err = r.getTable(database)
+		table, err = r.getTable(ctx, database)
 		if err != nil {
 			return nil, err
 		}

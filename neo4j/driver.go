@@ -21,6 +21,7 @@
 package neo4j
 
 import (
+	"context"
 	"fmt"
 	"net/url"
 	"strings"
@@ -223,8 +224,8 @@ func routingContextFromUrl(useRouting bool, u *url.URL) (map[string]string, erro
 }
 
 type sessionRouter interface {
-	Readers(database string) ([]string, error)
-	Writers(database string) ([]string, error)
+	Readers(ctx context.Context, database string) ([]string, error)
+	Writers(ctx context.Context, database string) ([]string, error)
 	Invalidate(database string)
 	CleanUp()
 }
