@@ -407,9 +407,18 @@ func (b *bolt4) discardStream() {
 		return
 	}
 
+	discarded := false
 	for {
 		_, batch, sum := b.receiveNext()
 		if batch {
+			if discarded {
+				// Response to discard, see below
+				return
+			}
+			// Discard all! After this the next receive will get another batch
+			// as a response to the discard, we need to keep track of that we
+			// already sent a discard.
+			discarded = true
 			stream.fetchSize = -1
 			b.out.appendDiscardNQid(stream.fetchSize, stream.qid)
 			b.out.send(b.conn)
