@@ -319,6 +319,7 @@ func TestBolt4(ot *testing.T) {
 
 		err = bolt.TxCommit(tx)
 		AssertNoError(t, err)
+		assertBoltState(t, bolt4_ready, bolt)
 	})
 
 	ot.Run("Begin transaction with bookmark success", func(t *testing.T) {
