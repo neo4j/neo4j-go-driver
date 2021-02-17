@@ -115,13 +115,9 @@ func (o *openstreams) detach(sum *db.Summary, err error) {
 	}
 
 	o.remove(o.curr)
-	o.curr = nil
-	if o.num <= 0 {
-		o.onEmpty()
-	}
 }
 
-// Streams can be paused when they have received a 'has_more' response from server
+// Streams can be paused when they have received a "has_more" response from server
 // Pauses the current stream
 func (o *openstreams) pause() {
 	o.curr = nil
@@ -136,10 +132,17 @@ func (o *openstreams) resume(s *stream) {
 	o.curr = s
 }
 
-// Internal, "removes" the stream by setting it's corresponding entry to nil.
+// Removes the stream by disabling its key and removing it from the count of streams.
+// If the stream is current the current is set to nil.
 func (o *openstreams) remove(s *stream) {
 	o.num--
 	s.key = 0
+	if o.curr == s {
+		o.curr = nil
+	}
+	if o.num == 0 {
+		o.onEmpty()
+	}
 }
 
 func (o *openstreams) reset() {

@@ -413,6 +413,7 @@ func (b *bolt4) discardStream() {
 		if batch {
 			if discarded {
 				// Response to discard, see below
+				b.streams.remove(stream)
 				return
 			}
 			// Discard all! After this the next receive will get another batch
@@ -423,6 +424,7 @@ func (b *bolt4) discardStream() {
 			b.out.appendDiscardNQid(stream.fetchSize, stream.qid)
 			b.out.send(b.conn)
 		} else if sum != nil || b.err != nil {
+			b.streams.remove(stream)
 			return
 		}
 	}
