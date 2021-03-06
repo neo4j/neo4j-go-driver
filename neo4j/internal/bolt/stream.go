@@ -146,11 +146,10 @@ func (o *openstreams) remove(s *stream) {
 }
 
 func (o *openstreams) reset() {
-	num := o.num
 	o.num = 0
-	if num > 0 {
-		o.onEmpty()
-	}
+	// Might cause onEmpty to be called more than once but makes it more robust
+	// for any errors on stream counting.
+	o.onEmpty()
 	o.curr = nil
 	o.key = time.Now().UnixNano()
 }
