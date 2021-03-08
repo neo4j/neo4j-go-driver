@@ -322,6 +322,52 @@ func TestBolt4(ot *testing.T) {
 		assertBoltState(t, bolt4_ready, bolt)
 	})
 
+	// Verifies that current stream is discarded correctly even if it is larger
+	// than what is served by a single pull.
+	ot.Run("Commit while streams, explicit consume", func(t *testing.T) {
+		qid := int64(2)
+		bolt, cleanup := connectToServer(t, func(srv *bolt4server) {
+			srv.accept(4)
+			srv.waitForTxBegin()
+			srv.send(msgSuccess, map[string]interface{}{})
+			// First RunTx
+			srv.waitForRun()
+			srv.waitForPullN(1)
+			// Send Pull response
+			srv.send(msgSuccess, map[string]interface{}{"fields": []interface{}{"k"}, "t_first": int64(1), "qid": qid})
+			// Driver should discard this stream which is small
+			srv.send(msgRecord, []interface{}{"v1"})
+			srv.send(msgSuccess, map[string]interface{}{"has_more": false})
+			// Second RunTx
+			srv.waitForRun()
+			srv.waitForPullN(1)
+			srv.send(msgSuccess, map[string]interface{}{"fields": []interface{}{"k"}, "t_first": int64(1), "qid": qid})
+			// Driver should discard this stream, which is small
+			srv.send(msgRecord, []interface{}{"v1"})
+			srv.send(msgSuccess, map[string]interface{}{"has_more": false})
+			// Wait for the commit
+			srv.waitForTxCommit()
+			srv.send(msgSuccess, map[string]interface{}{"bookmark": "x"})
+		})
+		defer cleanup()
+		defer bolt.Close()
+
+		tx, err := bolt.TxBegin(db.TxConfig{Mode: db.ReadMode})
+		AssertNoError(t, err)
+		s, err := bolt.RunTx(tx, db.Command{Cypher: "Whatever", FetchSize: 1})
+		AssertNoError(t, err)
+		_, err = bolt.Consume(s)
+		AssertNoError(t, err)
+		s, err = bolt.RunTx(tx, db.Command{Cypher: "Whatever", FetchSize: 1})
+		AssertNoError(t, err)
+		_, err = bolt.Consume(s)
+		AssertNoError(t, err)
+
+		err = bolt.TxCommit(tx)
+		AssertNoError(t, err)
+		assertBoltState(t, bolt4_ready, bolt)
+	})
+
 	ot.Run("Begin transaction with bookmark success", func(t *testing.T) {
 		committedBookmark := "cbm"
 		bolt, cleanup := connectToServer(t, func(srv *bolt4server) {
@@ -656,6 +702,7 @@ func TestBolt4(ot *testing.T) {
 		sum, err := bolt.Consume(stream)
 		AssertNoError(t, err)
 		AssertNotNil(t, sum)
+		assertBoltState(t, bolt4_ready, bolt)
 		// The bookmark should be set
 		AssertStringEqual(t, bolt.Bookmark(), runBookmark)
 		AssertStringEqual(t, sum.Bookmark, runBookmark)
@@ -697,6 +744,7 @@ func TestBolt4(ot *testing.T) {
 		sum, err = bolt.Consume(stream)
 		AssertNoError(t, err)
 		AssertNotNil(t, sum)
+		assertBoltState(t, bolt4_ready, bolt)
 
 		// The bookmark should be set
 		AssertStringEqual(t, bolt.Bookmark(), bookmark)
