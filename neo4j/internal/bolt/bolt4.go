@@ -79,14 +79,15 @@ type bolt4 struct {
 	streams       openstreams
 	conn          net.Conn
 	serverName    string
-	out           *outgoing
-	in            *incoming
+	out           outgoing
+	in            incoming
 	connId        string
 	logId         string
 	serverVersion string
-	tfirst        int64        // Time that server started streaming
-	pendingTx     *internalTx4 // Stashed away when tx started explcitly
-	bookmark      string       // Last bookmark
+	tfirst        int64       // Time that server started streaming
+	pendingTx     internalTx4 // Stashed away when tx started explcitly
+	hasPendingTx  bool
+	bookmark      string // Last bookmark
 	birthDate     time.Time
 	log           log.Logger
 	databaseName  string
@@ -102,11 +103,11 @@ func NewBolt4(serverName string, conn net.Conn, log log.Logger) *bolt4 {
 		birthDate:  time.Now(),
 		log:        log,
 		streams:    openstreams{},
-		in:         &incoming{buf: make([]byte, 4096)},
+		in:         incoming{buf: make([]byte, 4096)},
 	}
-	b.out = &outgoing{
+	b.out = outgoing{
 		chunker: newChunker(),
-		packer:  &packstream.Packer{},
+		packer:  packstream.Packer{},
 		onErr:   func(err error) { b.setError(err, true) },
 	}
 
@@ -261,7 +262,7 @@ func (b *bolt4) TxBegin(txConfig db.TxConfig) (db.TxHandle, error) {
 		return 0, err
 	}
 
-	tx := &internalTx4{
+	tx := internalTx4{
 		mode:         txConfig.Mode,
 		bookmarks:    txConfig.Bookmarks,
 		timeout:      txConfig.Timeout,
@@ -279,9 +280,11 @@ func (b *bolt4) TxBegin(txConfig db.TxConfig) (db.TxHandle, error) {
 			return 0, b.err
 		}
 		b.state = bolt4_tx
+		b.hasPendingTx = false
 	} else {
 		// Stash this into pending internal tx
 		b.pendingTx = tx
+		b.hasPendingTx = true
 		b.state = bolt4_pendingtx
 	}
 	b.txId = db.TxHandle(time.Now().Unix())
@@ -600,8 +603,12 @@ func (b *bolt4) RunTx(txh db.TxHandle, cmd db.Command) (db.StreamHandle, error) 
 		return nil, err
 	}
 
-	stream, err := b.run(cmd.Cypher, cmd.Params, cmd.FetchSize, b.pendingTx)
-	b.pendingTx = nil
+	tx := &b.pendingTx
+	if !b.hasPendingTx {
+		tx = nil
+	}
+	stream, err := b.run(cmd.Cypher, cmd.Params, cmd.FetchSize, tx)
+	b.hasPendingTx = false
 	if err != nil {
 		return nil, err
 	}
@@ -797,7 +804,7 @@ func (b *bolt4) Reset() {
 		// Reset internal state
 		b.txId = 0
 		b.bookmark = ""
-		b.pendingTx = nil
+		b.hasPendingTx = false
 		b.databaseName = db.DefaultDatabase
 		b.err = nil
 		b.streams.reset()

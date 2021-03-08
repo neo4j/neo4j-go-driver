@@ -85,7 +85,7 @@ func TestOutgoing(ot *testing.T) {
 	var err error
 	out := &outgoing{
 		chunker: newChunker(),
-		packer:  &packstream.Packer{},
+		packer:  packstream.Packer{},
 		onErr:   func(e error) { err = e },
 	}
 	// Utility to unpack through dechunking and a custom build func
@@ -444,7 +444,7 @@ func TestOutgoing(ot *testing.T) {
 		var err error
 		out := &outgoing{
 			chunker: newChunker(),
-			packer:  &packstream.Packer{},
+			packer:  packstream.Packer{},
 			onErr:   func(e error) { err = e },
 		}
 		ot.Run(c.name, func(t *testing.T) {

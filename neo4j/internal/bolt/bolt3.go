@@ -96,7 +96,7 @@ func NewBolt3(serverName string, conn net.Conn, log log.Logger) *bolt3 {
 	}
 	b.out = &outgoing{
 		chunker: newChunker(),
-		packer:  &packstream.Packer{},
+		packer:  packstream.Packer{},
 		onErr: func(err error) {
 			if b.err == nil {
 				b.err = err
