@@ -44,7 +44,7 @@ func newBolt3Server(conn net.Conn) *bolt3server {
 		conn:     conn,
 		out: &outgoing{
 			chunker: newChunker(),
-			packer:  &packstream.Packer{},
+			packer:  packstream.Packer{},
 		},
 	}
 }

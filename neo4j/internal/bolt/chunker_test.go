@@ -91,7 +91,7 @@ func TestChunker(ot *testing.T) {
 		cbuf := &bytes.Buffer{}
 		chunker := newChunker()
 		chunked := []byte{}
-		chunked = writeSmall(chunker, chunked)
+		chunked = writeSmall(&chunker, chunked)
 		err := chunker.send(cbuf)
 		AssertNoError(t, err)
 		assertBuf(t, cbuf, chunked)
@@ -106,8 +106,8 @@ func TestChunker(ot *testing.T) {
 		cbuf := &bytes.Buffer{}
 		chunker := newChunker()
 		chunked := []byte{}
-		chunked = writeSmall(chunker, chunked)
-		chunked = writeSmall(chunker, chunked)
+		chunked = writeSmall(&chunker, chunked)
+		chunked = writeSmall(&chunker, chunked)
 		err := chunker.send(cbuf)
 		AssertNoError(t, err)
 		assertBuf(t, cbuf, chunked)
@@ -123,7 +123,7 @@ func TestChunker(ot *testing.T) {
 		cbuf := &bytes.Buffer{}
 		chunker := newChunker()
 		chunked := []byte{}
-		chunked = writeLarge(chunker, chunked)
+		chunked = writeLarge(&chunker, chunked)
 		err := chunker.send(cbuf)
 		AssertNoError(t, err)
 		assertBuf(t, cbuf, chunked)
@@ -138,8 +138,8 @@ func TestChunker(ot *testing.T) {
 		cbuf := &bytes.Buffer{}
 		chunker := newChunker()
 		chunked := []byte{}
-		chunked = writeSmall(chunker, chunked)
-		chunked = writeLarge(chunker, chunked)
+		chunked = writeSmall(&chunker, chunked)
+		chunked = writeLarge(&chunker, chunked)
 		err := chunker.send(cbuf)
 		AssertNoError(t, err)
 		assertBuf(t, cbuf, chunked)

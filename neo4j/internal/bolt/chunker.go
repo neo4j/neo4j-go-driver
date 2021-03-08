@@ -30,8 +30,8 @@ type chunker struct {
 	offset int
 }
 
-func newChunker() *chunker {
-	return &chunker{
+func newChunker() chunker {
+	return chunker{
 		buf:    make([]byte, 0, 1024),
 		sizes:  make([]int, 0, 3),
 		offset: 0,
