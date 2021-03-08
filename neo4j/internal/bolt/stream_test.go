@@ -92,86 +92,52 @@ func TestStream(ot *testing.T) {
 }
 
 func TestOpenStreams(ot *testing.T) {
-	closed := false
-	emptied := false
-	failed := false
-	onClose := func(*stream) {
-		closed = true
-	}
-	onEmpty := func() {
-		emptied = true
-	}
-	onAssertFail := func(err error) {
-		failed = true
-	}
-	reset := func() {
-		closed = false
-		emptied = false
-		failed = false
-	}
 	ot.Run("Attach/Detach", func(t *testing.T) {
-		streams := &openstreams{onClose: onClose, onEmpty: onEmpty, onAssertFail: onAssertFail}
+		streams := &openstreams{}
 
-		// Detaching empty should fail
+		// Detaching empty should not crash
 		streams.detach(nil, nil)
-		AssertFalse(t, emptied)
-		AssertFalse(t, closed)
-		AssertTrue(t, failed)
-		reset()
 
 		// Attach uncompleted stream, should set current
 		s := &stream{}
 		streams.attach(s)
 		AssertNotNil(t, streams.curr)
-
-		// Detaching uncompleted stream should fail
-		streams.detach(nil, nil)
-		AssertFalse(t, emptied)
-		AssertFalse(t, closed)
-		AssertTrue(t, failed)
-		AssertNotNil(t, streams.curr)
-		reset()
+		AssertIntEqual(t, streams.num, 1)
 
 		// Finishing the stream with a summary should detach it and
 		// since it is the one and only stream detach should indicate everything closed.
 		streams.detach(&db.Summary{}, nil)
-		AssertTrue(t, closed)
-		AssertTrue(t, emptied)
 		AssertNil(t, streams.curr)
-		reset()
+		AssertIntEqual(t, streams.num, 0)
 
-		// Attach another uncompleted stream
+		// Attach and detach a stream with an error, should set error on stream
 		s = &stream{}
 		streams.attach(s)
-		AssertNotNil(t, streams.curr)
-
-		// Finish the stream with an error
 		streams.detach(nil, invalidStream)
-		AssertFalse(t, closed)
-		AssertTrue(t, emptied)
 		AssertNil(t, streams.curr)
-		reset()
+		AssertIntEqual(t, streams.num, 0)
+		AssertNotNil(t, s.err)
 
-		// Going into pause/resume territory a bit
+		// Going into pause/resume territory
 		// Add two uncompleted streams
 		s = &stream{}
 		s2 := &stream{}
 		streams.attach(s)
 		streams.pause()
 		streams.attach(s2)
+		AssertIntEqual(t, streams.num, 2)
 		// Detaching the second stream should just close that stream
-		// and should not call report empty.
 		streams.detach(&db.Summary{}, nil)
-		AssertTrue(t, closed)
-		AssertFalse(t, emptied)
+		AssertIntEqual(t, streams.num, 1)
 		AssertNil(t, streams.curr)
-		// Resume and detach the last stream
-		streams.resume(s2)
+
+		// Resume and detach the first stream
+		streams.resume(s)
 		AssertNotNil(t, streams.curr)
+		AssertIntEqual(t, streams.num, 1)
 		streams.detach(&db.Summary{}, nil)
-		AssertTrue(t, closed)
-		AssertTrue(t, emptied)
 		AssertNil(t, streams.curr)
+		AssertIntEqual(t, streams.num, 0)
 	})
 
 	ot.Run("Pause/Resume", func(t *testing.T) {
@@ -188,24 +154,21 @@ func TestOpenStreams(ot *testing.T) {
 	})
 
 	ot.Run("Reset", func(t *testing.T) {
-		reset()
-		streams := &openstreams{onClose: onClose, onEmpty: onEmpty, onAssertFail: onAssertFail}
+		streams := &openstreams{}
 		s := &stream{}
 		streams.attach(s)
 		AssertNoError(t, streams.isSafe(s))
 
 		// Should not call callbacks
 		streams.reset()
-		AssertFalse(t, closed)
-		// Should call empty callback
-		AssertTrue(t, emptied)
 		AssertNil(t, streams.curr)
+		AssertIntEqual(t, streams.num, 0)
 		// Stream should not be safe after reset
 		AssertError(t, streams.isSafe(s))
 	})
 
 	ot.Run("getUnsafe/isSafe", func(t *testing.T) {
-		streams := &openstreams{onClose: onClose, onEmpty: onEmpty, onAssertFail: onAssertFail}
+		streams := &openstreams{}
 		streams.reset()
 
 		// Should fail to retrieve even a unsafe stream from these

@@ -109,17 +109,12 @@ func NewBolt4(serverName string, conn net.Conn, log log.Logger) *bolt4 {
 		packer:  &packstream.Packer{},
 		onErr:   func(err error) { b.setError(err, true) },
 	}
-	// Setup open streams. Errors reported to callback are assertion like errors, let them
-	// bubble up to kill them off when they happen, alternatively they could be logged.
-	b.streams.onAssertFail = func(err error) {
-		b.setError(err, false)
-	}
-	b.streams.onClose = func(s *stream) { // Current stream succesfully closed (no error)
-		if len(s.sum.Bookmark) > 0 {
-			b.bookmark = s.sum.Bookmark
-		}
-	}
-	b.streams.onEmpty = func() { // All streams closed (succesfully or with error)
+
+	return b
+}
+
+func (b *bolt4) checkStreams() {
+	if b.streams.num <= 0 {
 		// Perform state transition from streaming, if in that state otherwise keep the current
 		// state as we are in some kind of bad shape
 		switch b.state {
@@ -129,8 +124,6 @@ func NewBolt4(serverName string, conn net.Conn, log log.Logger) *bolt4 {
 			b.state = bolt4_ready
 		}
 	}
-
-	return b
 }
 
 func (b *bolt4) ServerName() string {
@@ -162,6 +155,7 @@ func (b *bolt4) setError(err error, fatal bool) {
 	// Forward error to current stream if there is one
 	if b.streams.curr != nil {
 		b.streams.detach(nil, err)
+		b.checkStreams()
 	}
 
 	// Do not log big cypher statements as errors
@@ -416,6 +410,7 @@ func (b *bolt4) discardStream() {
 			if discarded {
 				// Response to discard, see below
 				b.streams.remove(stream)
+				b.checkStreams()
 				return
 			}
 			// Discard all! After this the next receive will get another batch
@@ -440,6 +435,7 @@ func (b *bolt4) discardAllStreams() {
 	// Discard current
 	b.discardStream()
 	b.streams.reset()
+	b.checkStreams()
 }
 
 // Sends a PULL n request to server. State should be streaming and there should be a current stream.
@@ -574,7 +570,8 @@ func (b *bolt4) run(cypher string, params map[string]interface{}, fetchSize int,
 
 	// Create a stream representation, set it to current and track it
 	stream := &stream{keys: succ.fields, qid: succ.qid, fetchSize: fetchSize}
-	(&b.streams).attach(stream)
+	b.streams.attach(stream)
+	// No need to check streams state, we know we are streaming
 
 	return stream, nil
 }
@@ -766,8 +763,12 @@ func (b *bolt4) receiveNext() (*db.Record, bool, *db.Summary) {
 		sum.ServerVersion = b.serverVersion
 		sum.ServerName = b.serverName
 		sum.TFirst = b.tfirst
+		if len(sum.Bookmark) > 0 {
+			b.bookmark = sum.Bookmark
+		}
 		// Done with this stream
 		b.streams.detach(sum, nil)
+		b.checkStreams()
 		return nil, false, sum
 	case *db.Neo4jError:
 		b.setError(x, false) // Will detach the stream
