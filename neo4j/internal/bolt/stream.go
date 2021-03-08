@@ -66,27 +66,23 @@ func (s *stream) push(rec *db.Record) {
 	s.fifo.PushBack(rec)
 }
 
+// Only need to keep track of current stream. Client keeps track of other
+// open streams and a key in each stream is used to validate if it belongs to
+// current bolt connection or not.
 type openstreams struct {
-	curr         *stream
-	num          int
-	key          int64
-	onAssertFail func(e error)
-	onClose      func(s *stream) // Stream succesfully closed
-	onEmpty      func()          // All streams closed succesfully or with an error
+	curr *stream
+	num  int
+	key  int64
 }
 
 var (
-	invalidStream          = errors.New("Invalid stream handle")
-	assertDetachUncomplete = errors.New("Assert fail: Detaching incomplete stream")
-	assertShoudBeNoCurrent = errors.New("Assert fail: Should be no curr stream")
-	assertShoudBeCurrent   = errors.New("Assert fail: Should be curr stream")
+	invalidStream = errors.New("Invalid stream handle")
 )
 
 // Adds a new open stream and sets it as current.
 // There should NOT be a current stream .
 func (o *openstreams) attach(s *stream) {
 	if o.curr != nil {
-		o.onAssertFail(assertShoudBeNoCurrent)
 		return
 	}
 	// Track number of open streams and set the stream as current
@@ -100,20 +96,11 @@ func (o *openstreams) attach(s *stream) {
 // The stream should be either in failed state or completed.
 func (o *openstreams) detach(sum *db.Summary, err error) {
 	if o.curr == nil {
-		o.onAssertFail(assertShoudBeCurrent)
 		return
 	}
 
-	if sum != nil {
-		o.curr.sum = sum
-		o.onClose(o.curr)
-	} else if err != nil {
-		o.curr.err = err
-	} else {
-		o.onAssertFail(assertDetachUncomplete)
-		return
-	}
-
+	o.curr.sum = sum
+	o.curr.err = err
 	o.remove(o.curr)
 }
 
@@ -126,7 +113,6 @@ func (o *openstreams) pause() {
 // When resuming a stream a new PULL message needs to be sent.
 func (o *openstreams) resume(s *stream) {
 	if o.curr != nil {
-		o.onAssertFail(assertShoudBeNoCurrent)
 		return
 	}
 	o.curr = s
@@ -140,23 +126,17 @@ func (o *openstreams) remove(s *stream) {
 	if o.curr == s {
 		o.curr = nil
 	}
-	if o.num == 0 {
-		o.onEmpty()
-	}
 }
 
 func (o *openstreams) reset() {
 	o.num = 0
-	// Might cause onEmpty to be called more than once but makes it more robust
-	// for any errors on stream counting.
-	o.onEmpty()
 	o.curr = nil
 	o.key = time.Now().UnixNano()
 }
 
 // Checks that the handle represents a stream but not necessarily a stream belonging
 // to this set of open streams.
-func (o *openstreams) getUnsafe(h db.StreamHandle) (*stream, error) {
+func (o openstreams) getUnsafe(h db.StreamHandle) (*stream, error) {
 	stream, ok := h.(*stream)
 	if !ok || stream == nil {
 		return nil, invalidStream
@@ -164,7 +144,7 @@ func (o *openstreams) getUnsafe(h db.StreamHandle) (*stream, error) {
 	return stream, nil
 }
 
-func (o *openstreams) isSafe(s *stream) error {
+func (o openstreams) isSafe(s *stream) error {
 	if s.key == o.key {
 		return nil
 	}
