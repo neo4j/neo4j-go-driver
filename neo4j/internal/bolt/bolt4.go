@@ -85,7 +85,7 @@ type bolt4 struct {
 	logId         string
 	serverVersion string
 	tfirst        int64       // Time that server started streaming
-	pendingTx     internalTx4 // Stashed away when tx started explcitly
+	pendingTx     internalTx4 // Stashed away when tx started explicitly
 	hasPendingTx  bool
 	bookmark      string // Last bookmark
 	birthDate     time.Time
@@ -170,7 +170,7 @@ func (b *bolt4) setError(err error, fatal bool) {
 }
 
 func (b *bolt4) receiveMsg() interface{} {
-	// Potentially dangerous to receive when an error has occured, could hang.
+	// Potentially dangerous to receive when an error has occurred, could hang.
 	// Important, a lot of code has been simplified relying on this check.
 	if b.err != nil {
 		return nil
@@ -634,7 +634,7 @@ func (b *bolt4) Next(streamHandle db.StreamHandle) (*db.Record, *db.Summary, err
 		return nil, nil, err
 	}
 
-	// Buffered stream or someone elses stream, doesn't matter...
+	// Buffered stream or someone else's stream, doesn't matter...
 	// Summary and error are considered buffered as well.
 	buf, rec, sum, err := stream.bufferedNext()
 	if buf {

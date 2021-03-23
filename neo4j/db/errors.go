@@ -25,7 +25,7 @@ import (
 	"strings"
 )
 
-// Database server failed to fullfill request.
+// Database server failed to fulfill request.
 type Neo4jError struct {
 	Code           string
 	Msg            string
