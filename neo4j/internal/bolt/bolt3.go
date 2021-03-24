@@ -90,7 +90,13 @@ func NewBolt3(serverName string, conn net.Conn, log log.Logger) *bolt3 {
 		state:      bolt3_unauthorized,
 		conn:       conn,
 		serverName: serverName,
-		in:         &incoming{buf: make([]byte, 4096)},
+		in:         &incoming{
+			buf: make([]byte, 4096),
+			hyd: hydrator{
+				logger: log,
+				logId: "S",
+			},
+		},
 		birthDate:  time.Now(),
 		log:        log,
 	}
@@ -103,6 +109,8 @@ func NewBolt3(serverName string, conn net.Conn, log log.Logger) *bolt3 {
 			}
 			b.state = bolt3_dead
 		},
+		logger: log,
+		logId: "C",
 	}
 	return b
 }
@@ -186,7 +194,10 @@ func (b *bolt3) connect(auth map[string]interface{}, userAgent string) error {
 	}
 
 	b.connId = succ.connectionId
-	b.logId = fmt.Sprintf("%s@%s", b.connId, b.serverName)
+	connectionLogId := fmt.Sprintf("%s@%s", b.connId, b.serverName)
+	b.logId = connectionLogId
+	b.in.hyd.logId = fmt.Sprintf("%s %s", b.in.hyd.logId, connectionLogId)
+	b.out.logId = fmt.Sprintf("%s %s", b.out.logId, connectionLogId)
 	b.serverVersion = succ.server
 
 	// Transition into ready state

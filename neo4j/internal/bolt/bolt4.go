@@ -103,12 +103,20 @@ func NewBolt4(serverName string, conn net.Conn, log log.Logger) *bolt4 {
 		birthDate:  time.Now(),
 		log:        log,
 		streams:    openstreams{},
-		in:         incoming{buf: make([]byte, 4096)},
+		in:         incoming{
+			buf: make([]byte, 4096),
+			hyd: hydrator{
+				logger: log,
+				logId: "S",
+			},
+		},
 	}
 	b.out = outgoing{
 		chunker: newChunker(),
 		packer:  packstream.Packer{},
 		onErr:   func(err error) { b.setError(err, true) },
+		logger: log,
+		logId: "C",
 	}
 
 	return b
@@ -238,7 +246,10 @@ func (b *bolt4) connect(minor int, auth map[string]interface{}, userAgent string
 	b.serverVersion = succ.server
 
 	// Construct log identity
-	b.logId = fmt.Sprintf("%s@%s", b.connId, b.serverName)
+	connectionLogId := fmt.Sprintf("%s@%s", b.connId, b.serverName)
+	b.logId = connectionLogId
+	b.in.hyd.logId = fmt.Sprintf("%s %s", b.in.hyd.logId, connectionLogId)
+	b.out.logId = fmt.Sprintf("%s %s", b.out.logId, connectionLogId)
 
 	// Transition into ready state
 	b.state = bolt4_ready
