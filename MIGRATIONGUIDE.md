@@ -212,6 +212,7 @@ rec, err := session.ReadTransaction(func(tx neo4j.Transaction) (interface{}, err
     }
     return rec, nil
 })
+```
 
 ## Result usage out of session scope
 On 1.x driver it was possible to iterate through a result after the sessions has been closed,
