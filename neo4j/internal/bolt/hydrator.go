@@ -22,6 +22,7 @@ package bolt
 import (
 	"errors"
 	"fmt"
+	"github.com/neo4j/neo4j-go-driver/v4/neo4j/log"
 	"time"
 
 	"github.com/neo4j/neo4j-go-driver/v4/neo4j/db"
@@ -87,6 +88,8 @@ type hydrator struct {
 	err           error
 	cachedIgnored ignored
 	cachedSuccess success
+	logger        log.Logger
+	logId         string
 }
 
 func (h *hydrator) setErr(err error) {
@@ -142,6 +145,7 @@ func (h *hydrator) ignored(n uint32) *ignored {
 	if h.getErr() != nil {
 		return nil
 	}
+	h.logger.Debugf(log.BoltTrace, h.logId, "IGNORED")
 	return &h.cachedIgnored
 }
 
@@ -166,6 +170,7 @@ func (h *hydrator) failure(n uint32) *db.Neo4jError {
 			h.trash()
 		}
 	}
+	h.logger.Debugf(log.BoltTrace, h.logId, "FAILURE %s", loggableFailure(dberr))
 	return &dberr
 }
 
@@ -236,6 +241,7 @@ func (h *hydrator) success(n uint32) *success {
 			h.trash()
 		}
 	}
+	h.logger.Debugf(log.BoltTrace, h.logId, "SUCCESS %s", loggableSuccess(*succ))
 	return succ
 }
 
@@ -356,6 +362,7 @@ func (h *hydrator) record(n uint32) *db.Record {
 		h.unp.Next()
 		rec.Values[i] = h.value()
 	}
+	h.logger.Debugf(log.BoltTrace, h.logId, "RECORD %s", loggableList(rec.Values))
 	return &rec
 }
 
