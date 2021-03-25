@@ -480,6 +480,9 @@ func (b *backend) handleRequest(req map[string]interface{}) {
 		}
 		b.writeResponse("Summary", nil)
 
+	case "StartTest":
+		b.writeResponse("RunTest", nil)
+
 	default:
 		b.writeError(errors.New("Unknown request: " + name))
 	}
