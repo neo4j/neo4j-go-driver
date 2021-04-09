@@ -847,14 +847,14 @@ func (b *bolt4) Reset() {
 	}
 }
 
-func (b *bolt4) GetRoutingTable(database string, context map[string]string) (*db.RoutingTable, error) {
+func (b *bolt4) GetRoutingTable(context map[string]string, bookmarks []string, database string) (*db.RoutingTable, error) {
 	if err := b.assertState(bolt4_ready); err != nil {
 		return nil, err
 	}
 
 	b.log.Infof(log.Bolt4, b.logId, "Retrieving routing table")
 	if b.minor > 2 {
-		b.out.appendRoute(context, nil, database)
+		b.out.appendRoute(context, bookmarks, database)
 		b.out.send(b.conn)
 		succ := b.receiveSuccess()
 		if b.err != nil {

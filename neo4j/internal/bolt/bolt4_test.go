@@ -820,7 +820,7 @@ func TestBolt4(ot *testing.T) {
 		defer cleanup()
 		defer bolt.Close()
 
-		rt, err := bolt.GetRoutingTable("thedb", map[string]string{"region": "space"})
+		rt, err := bolt.GetRoutingTable(map[string]string{"region": "space"}, nil, "thedb")
 		AssertNoError(t, err)
 		ert := &db.RoutingTable{Routers: []string{"router1"}, TimeToLive: 1000}
 		if !reflect.DeepEqual(rt, ert) {

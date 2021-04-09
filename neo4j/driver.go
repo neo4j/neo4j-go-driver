@@ -224,8 +224,8 @@ func routingContextFromUrl(useRouting bool, u *url.URL) (map[string]string, erro
 }
 
 type sessionRouter interface {
-	Readers(ctx context.Context, database string) ([]string, error)
-	Writers(ctx context.Context, database string) ([]string, error)
+	Readers(ctx context.Context, bookmarks []string, database string) ([]string, error)
+	Writers(ctx context.Context, bookmarks []string, database string) ([]string, error)
 	Invalidate(database string)
 	CleanUp()
 }

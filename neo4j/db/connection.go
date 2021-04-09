@@ -95,7 +95,7 @@ type Connection interface {
 	// Gets routing table for specified database name or the default database if
 	// database equals DefaultDatabase. If the underlying connection does not support
 	// multiple databases, DefaultDatabase should be used as database.
-	GetRoutingTable(database string, context map[string]string) (*RoutingTable, error)
+	GetRoutingTable(context map[string]string, bookmarks []string, database string) (*RoutingTable, error)
 }
 
 type RoutingTable struct {
