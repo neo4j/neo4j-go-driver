@@ -854,7 +854,7 @@ func (b *bolt4) GetRoutingTable(database string, context map[string]string) (*db
 
 	b.log.Infof(log.Bolt4, b.logId, "Retrieving routing table")
 	if b.minor > 2 {
-		b.out.appendRoute(database, context)
+		b.out.appendRoute(context, nil, database)
 		b.out.send(b.conn)
 		succ := b.receiveSuccess()
 		if b.err != nil {
