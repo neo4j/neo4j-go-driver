@@ -862,10 +862,10 @@ func (b *bolt4) GetRoutingTable(context map[string]string, bookmarks []string, d
 		}
 		return succ.routingTable, nil
 	}
-	return b.callGetRoutingTable(database, context)
+	return b.callGetRoutingTable(context, bookmarks, database)
 }
 
-func (b *bolt4) callGetRoutingTable(database string, context map[string]string) (*db.RoutingTable, error) {
+func (b *bolt4) callGetRoutingTable(context map[string]string, bookmarks []string, database string) (*db.RoutingTable, error) {
 	// The query should run in system database, preserve current setting and restore it when
 	// done.
 	originalDatabaseName := b.databaseName
@@ -882,7 +882,7 @@ func (b *bolt4) callGetRoutingTable(database string, context map[string]string) 
 		runCommand.Cypher = "CALL dbms.routing.getRoutingTable($context, $database)"
 		runCommand.Params["database"] = database
 	}
-	txConfig := db.TxConfig{Mode: db.ReadMode}
+	txConfig := db.TxConfig{Mode: db.ReadMode, Bookmarks: bookmarks}
 	streamHandle, err := b.Run(runCommand, txConfig)
 	if err != nil {
 		return nil, err
