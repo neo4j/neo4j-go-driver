@@ -257,21 +257,41 @@ func TestOutgoing(ot *testing.T) {
 		{
 			name: "route",
 			build: func() {
-				out.appendRoute("adb", map[string]string{"key1": "val1", "key2": "val2"})
+				out.appendRoute(map[string]string{"key1": "val1", "key2": "val2"}, []string{"deutsch-mark", "mark-twain"}, "adb")
 			},
 			expect: &testStruct{
 				tag:    byte(msgRoute),
-				fields: []interface{}{map[string]interface{}{"key1": "val1", "key2": "val2"}, "adb"},
+				fields: []interface{}{map[string]interface{}{"key1": "val1", "key2": "val2"}, []interface{}{"deutsch-mark", "mark-twain"}, "adb"},
 			},
 		},
 		{
 			name: "route, default database",
 			build: func() {
-				out.appendRoute(db.DefaultDatabase, map[string]string{"key1": "val1", "key2": "val2"})
+				out.appendRoute(map[string]string{"key1": "val1", "key2": "val2"}, []string{"deutsch-mark", "mark-twain"}, db.DefaultDatabase)
 			},
 			expect: &testStruct{
 				tag:    byte(msgRoute),
-				fields: []interface{}{map[string]interface{}{"key1": "val1", "key2": "val2"}, nil},
+				fields: []interface{}{map[string]interface{}{"key1": "val1", "key2": "val2"}, []interface{}{"deutsch-mark", "mark-twain"}, nil},
+			},
+		},
+		{
+			name: "route, default bookmarks",
+			build: func() {
+				out.appendRoute(map[string]string{"key1": "val1", "key2": "val2"}, nil, "adb")
+			},
+			expect: &testStruct{
+				tag:    byte(msgRoute),
+				fields: []interface{}{map[string]interface{}{"key1": "val1", "key2": "val2"}, []interface{}{}, "adb"},
+			},
+		},
+		{
+			name: "route, default bookmarks and database",
+			build: func() {
+				out.appendRoute(map[string]string{"key1": "val1", "key2": "val2"}, nil, db.DefaultDatabase)
+			},
+			expect: &testStruct{
+				tag:    byte(msgRoute),
+				fields: []interface{}{map[string]interface{}{"key1": "val1", "key2": "val2"}, []interface{}{}, nil},
 			},
 		},
 	}

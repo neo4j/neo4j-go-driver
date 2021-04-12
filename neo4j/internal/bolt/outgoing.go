@@ -120,13 +120,17 @@ func (o *outgoing) appendPullAll() {
 	o.end()
 }
 
-func (o *outgoing) appendRoute(database string, context map[string]string) {
+func (o *outgoing) appendRoute(context map[string]string, bookmarks []string, database string) {
 	o.begin()
-	o.packer.StructHeader(byte(msgRoute), 2)
+	o.packer.StructHeader(byte(msgRoute), 3)
 	o.packer.MapHeader(len(context))
 	for k, v := range context {
 		o.packer.String(k)
 		o.packer.String(v)
+	}
+	o.packer.ArrayHeader(len(bookmarks))
+	for _, bookmark := range bookmarks {
+		o.packer.String(bookmark)
 	}
 	if database == db.DefaultDatabase {
 		o.packer.Nil()

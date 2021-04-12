@@ -27,7 +27,7 @@ import (
 
 // Tries to read routing table from any of the specified routers using new or existing connection
 // from the supplied pool.
-func readTable(ctx context.Context, pool Pool, database string, routers []string, routerContext map[string]string) (*db.RoutingTable, error) {
+func readTable(ctx context.Context, pool Pool, routers []string, routerContext map[string]string, bookmarks []string, database string) (*db.RoutingTable, error) {
 	// Preserve last error to be returned, set a default for case of no routers
 	var err error = &ReadRoutingTableError{}
 
@@ -47,7 +47,7 @@ func readTable(ctx context.Context, pool Pool, database string, routers []string
 
 		// We have a connection to the "router"
 		var table *db.RoutingTable
-		table, err = conn.GetRoutingTable(database, routerContext)
+		table, err = conn.GetRoutingTable(routerContext, bookmarks, database)
 		pool.Return(conn)
 		if err == nil {
 			return table, nil

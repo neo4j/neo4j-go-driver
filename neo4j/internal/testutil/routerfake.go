@@ -37,11 +37,11 @@ func (r *RouterFake) Invalidate(database string) {
 	r.Invalidated = true
 }
 
-func (r *RouterFake) Readers(ctx context.Context, database string) ([]string, error) {
+func (r *RouterFake) Readers(ctx context.Context, bookmarks []string, database string) ([]string, error) {
 	return r.ReadersRet, r.Err
 }
 
-func (r *RouterFake) Writers(ctx context.Context, database string) ([]string, error) {
+func (r *RouterFake) Writers(ctx context.Context, bookmarks []string, database string) ([]string, error) {
 	return r.WritersRet, r.Err
 }
 

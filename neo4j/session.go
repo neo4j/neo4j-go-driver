@@ -334,9 +334,9 @@ func (s *session) WriteTransaction(
 
 func (s *session) getServers(ctx context.Context, mode db.AccessMode) ([]string, error) {
 	if mode == db.ReadMode {
-		return s.router.Readers(ctx, s.databaseName)
+		return s.router.Readers(ctx, s.bookmarks, s.databaseName)
 	} else {
-		return s.router.Writers(ctx, s.databaseName)
+		return s.router.Writers(ctx, s.bookmarks, s.databaseName)
 	}
 }
 

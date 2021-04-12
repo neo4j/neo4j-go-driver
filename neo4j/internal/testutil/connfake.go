@@ -105,7 +105,7 @@ func (c *ConnFake) Consume(streamHandle db.StreamHandle) (*db.Summary, error) {
 	return c.ConsumeSum, c.ConsumeErr
 }
 
-func (c *ConnFake) GetRoutingTable(database string, context map[string]string) (*db.RoutingTable, error) {
+func (c *ConnFake) GetRoutingTable(context map[string]string, bookmarks []string, database string) (*db.RoutingTable, error) {
 	return c.Table, c.Err
 }
 

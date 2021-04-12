@@ -481,11 +481,6 @@ func (b *backend) handleRequest(req map[string]interface{}) {
 		b.writeResponse("Summary", nil)
 
 	case "StartTest":
-		testName := data["testName"].(string)
-		if testName == "stub.routing.RoutingV4.test_should_pass_system_bookmark_when_getting_rt_for_multi_db" {
-			b.writeResponse("SkipTest", map[string]interface{}{"reason": "It should send bookmark to the routing procedure"})
-			return
-		}
 		b.writeResponse("RunTest", nil)
 
 	default:

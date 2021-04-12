@@ -26,11 +26,11 @@ type directRouter struct {
 	address string
 }
 
-func (r *directRouter) Readers(ctx context.Context, database string) ([]string, error) {
+func (r *directRouter) Readers(ctx context.Context, bookmarks []string, database string) ([]string, error) {
 	return []string{r.address}, nil
 }
 
-func (r *directRouter) Writers(ctx context.Context, database string) ([]string, error) {
+func (r *directRouter) Writers(ctx context.Context, bookmarks []string, database string) ([]string, error) {
 	return []string{r.address}, nil
 }
 

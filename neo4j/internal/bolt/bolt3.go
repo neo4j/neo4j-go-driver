@@ -682,7 +682,7 @@ func (b *bolt3) Reset() {
 	}
 }
 
-func (b *bolt3) GetRoutingTable(database string, context map[string]string) (*db.RoutingTable, error) {
+func (b *bolt3) GetRoutingTable(context map[string]string, bookmarks []string, database string) (*db.RoutingTable, error) {
 	if err := b.assertState(bolt3_ready); err != nil {
 		return nil, err
 	}
