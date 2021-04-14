@@ -827,4 +827,16 @@ func TestBolt4(ot *testing.T) {
 			t.Fatalf("Expected:\n%+v\n != Actual: \n%+v\n", rt, ert)
 		}
 	})
+
+	ot.Run("Expired authentication error should close connection", func(t *testing.T) {
+		bolt, cleanup := connectToServer(t, func(srv *bolt4server) {
+			srv.accept(4)
+			srv.sendFailureMsg("Status.Security.AuthorizationExpired", "auth token is... expired")
+		})
+		defer cleanup()
+
+		_, err := bolt.Run(db.Command{Cypher: "MATCH (n) RETURN n"}, db.TxConfig{Mode: db.ReadMode})
+		assertBoltState(t, bolt4_dead, bolt)
+		AssertError(t, err)
+	})
 }
