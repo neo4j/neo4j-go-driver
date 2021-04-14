@@ -148,8 +148,10 @@ func (b *bolt4) setError(err error, fatal bool) {
 		b.state = bolt4_failed
 	}
 
+	neo4jErr, _ := err.(*db.Neo4jError)
 	// Increase severity even if it was a previous error
-	if fatal {
+	// Treat expired auth as fatal so that pool is cleaned up of old connections
+	if fatal || (neo4jErr != nil && neo4jErr.Code == "Status.Security.AuthorizationExpired") {
 		b.state = bolt4_dead
 	}
 
@@ -160,7 +162,6 @@ func (b *bolt4) setError(err error, fatal bool) {
 	}
 
 	// Do not log big cypher statements as errors
-	neo4jErr, _ := err.(*db.Neo4jError)
 	if neo4jErr != nil && neo4jErr.Classification() == "ClientError" {
 		b.log.Debugf(log.Bolt4, b.logId, "%s", err)
 	} else {
