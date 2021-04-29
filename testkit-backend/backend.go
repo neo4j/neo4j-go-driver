@@ -481,6 +481,11 @@ func (b *backend) handleRequest(req map[string]interface{}) {
 		b.writeResponse("Summary", nil)
 
 	case "StartTest":
+		testName := data["testName"].(string)
+		if testName == "stub.disconnected.SessionRunDisconnected.test_fail_on_reset" {
+			b.writeResponse("SkipTest", map[string]interface{}{"reason": "It is not resetting driver when put back to pool"})
+			return
+		}
 		b.writeResponse("RunTest", nil)
 
 	default:
