@@ -77,7 +77,7 @@ func formatOmittingZero(i int64) string {
 
 type loggableFailure db.Neo4jError
 
-func (f *loggableFailure) String() string {
+func (f loggableFailure) String() string {
 	return serializeTrace(map[string]interface{}{
 		"code":    f.Code,
 		"message": f.Msg,
