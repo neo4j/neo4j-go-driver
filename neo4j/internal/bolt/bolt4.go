@@ -779,7 +779,9 @@ func (b *bolt4) receiveNext() (*db.Record, bool, *db.Summary) {
 		// End of stream, parse summary. Current implementation never fails.
 		sum := x.summary()
 		// Add some extras to the summary
-		sum.ServerVersion = b.serverVersion
+		sum.Agent = b.serverVersion
+		sum.Major = 4
+		sum.Minor = b.minor
 		sum.ServerName = b.serverName
 		sum.TFirst = b.tfirst
 		if len(sum.Bookmark) > 0 {

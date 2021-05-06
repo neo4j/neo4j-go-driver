@@ -473,12 +473,19 @@ func (b *backend) handleRequest(req map[string]interface{}) {
 		}
 	case "ResultConsume":
 		result := b.results[data["resultId"].(string)]
-		_, err := result.Consume()
+		summary, err := result.Consume()
 		if err != nil {
 			b.writeError(err)
 			return
 		}
-		b.writeResponse("Summary", nil)
+		serverInfo := summary.Server()
+		protocolVersion := serverInfo.ProtocolVersion()
+		b.writeResponse("Summary", map[string]interface{}{
+			"serverInfo": map[string]interface{}{
+				"protocolVersion": fmt.Sprintf("%d.%d", protocolVersion.Major, protocolVersion.Minor),
+				"agent":           serverInfo.Agent(),
+			},
+		})
 
 	case "StartTest":
 		testName := data["testName"].(string)

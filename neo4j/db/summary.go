@@ -114,11 +114,18 @@ type InputPosition struct {
 	Column int
 }
 
+type ProtocolVersion struct {
+	Major int
+	Minor int
+}
+
 type Summary struct {
 	Bookmark      string
 	StmntType     StatementType
 	ServerName    string
-	ServerVersion string
+	Agent         string
+	Major         int
+	Minor         int
 	Counters      map[string]int
 	TFirst        int64
 	TLast         int64

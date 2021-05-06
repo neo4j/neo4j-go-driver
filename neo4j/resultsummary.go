@@ -102,7 +102,10 @@ type ServerInfo interface {
 	// Address returns the address of the server.
 	Address() string
 	// Version returns the version of Neo4j running at the server.
+	// Deprecated: since 4.3, this function is deprecated. It will be removed in 5.0. please use Agent, ProtocolVersion, or call the dbms.components procedure instead
 	Version() string
+	Agent() string
+	ProtocolVersion() db.ProtocolVersion
 }
 
 // Plan describes the actual plan that the database planner produced and used (or will use) to execute your statement.
@@ -179,6 +182,17 @@ type resultSummary struct {
 	params map[string]interface{}
 }
 
+func (s *resultSummary) Agent() string {
+	return s.sum.Agent
+}
+
+func (s *resultSummary) ProtocolVersion() db.ProtocolVersion {
+	return db.ProtocolVersion{
+		Major: s.sum.Major,
+		Minor: s.sum.Minor,
+	}
+}
+
 func (s *resultSummary) Server() ServerInfo {
 	return s
 }
@@ -188,7 +202,7 @@ func (s *resultSummary) Address() string {
 }
 
 func (s *resultSummary) Version() string {
-	return s.sum.ServerVersion
+	return s.sum.Agent
 }
 
 func (s *resultSummary) Statement() Statement {
