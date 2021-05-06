@@ -604,7 +604,7 @@ func (b *bolt3) receiveNext() (*db.Record, *db.Summary, error) {
 		b.currStream.sum = sum
 		b.currStream = nil
 		// Add some extras to the summary
-		sum.ServerVersion = b.serverVersion
+		sum.Agent = b.serverVersion
 		sum.ServerName = b.serverName
 		sum.TFirst = b.tfirst
 		return nil, sum, nil
