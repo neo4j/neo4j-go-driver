@@ -39,7 +39,7 @@ func TestDehydrateHydrate(ot *testing.T) {
 		},
 	}
 	hydrator := hydrator{
-		logger: log.Void{},
+		boltLogger: log.Void{},
 	}
 
 	// A bit of white box testing, uses "internal" APIs to shortcut

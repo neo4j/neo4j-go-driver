@@ -53,7 +53,6 @@ type Logger interface {
 const (
 	Bolt3     = "bolt3"
 	Bolt4     = "bolt4"
-	BoltTrace = "bolt-trace"
 	Driver    = "driver"
 	Pool      = "pool"
 	Router    = "router"

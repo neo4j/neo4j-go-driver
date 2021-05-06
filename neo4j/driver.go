@@ -146,6 +146,10 @@ func NewDriver(target string, auth AuthToken, configurers ...func(*Config)) (Dri
 		// Default to void logger
 		d.log = &log.Void{}
 	}
+	d.boltLog = d.config.BoltLog
+	if d.boltLog == nil {
+		d.boltLog = &log.Void{}
+	}
 	d.logId = log.NewId()
 
 	routingContext, err := routingContextFromUrl(routing, parsed)
@@ -159,6 +163,7 @@ func NewDriver(target string, auth AuthToken, configurers ...func(*Config)) (Dri
 	d.connector.UserAgent = d.config.UserAgent
 	d.connector.RootCAs = d.config.RootCAs
 	d.connector.Log = d.log
+	d.connector.BoltLog = d.boltLog
 	d.connector.Auth = auth.tokens
 	d.connector.RoutingContext = routingContext
 
@@ -239,6 +244,7 @@ type driver struct {
 	router    sessionRouter
 	logId     string
 	log       log.Logger
+	boltLog   log.BoltLogger
 }
 
 func (d *driver) Target() url.URL {

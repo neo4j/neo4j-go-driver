@@ -94,7 +94,7 @@ func TestBolt3(ot *testing.T) {
 		tcpConn, srv, cleanup := setupBolt3Pipe(t)
 		go serverJob(srv)
 
-		c, err := Connect("serverName", tcpConn, auth, "007", nil, logger)
+		c, err := Connect("serverName", tcpConn, auth, "007", nil, logger, boltLogger)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -143,7 +143,7 @@ func TestBolt3(ot *testing.T) {
 			srv.waitForHello()
 			srv.rejectHelloUnauthorized()
 		}()
-		bolt, err := Connect("serverName", conn, auth, "007", nil, logger)
+		bolt, err := Connect("serverName", conn, auth, "007", nil, logger, boltLogger)
 		AssertNil(t, bolt)
 		AssertError(t, err)
 		dbErr := err.(*db.Neo4jError)

@@ -38,7 +38,7 @@ import (
 	"github.com/neo4j/neo4j-go-driver/v4/neo4j/test-integration/dbserver"
 )
 
-func makeRawConnection(logger log.Logger) (dbserver.DbServer, db.Connection) {
+func makeRawConnection(logger log.Logger, boltLogger log.BoltLogger) (dbserver.DbServer, db.Connection) {
 	server := dbserver.GetDbServer()
 	uri := server.BoltURI()
 	parsedUri, err := url.Parse(uri)
@@ -57,7 +57,7 @@ func makeRawConnection(logger log.Logger) (dbserver.DbServer, db.Connection) {
 		"credentials": server.Password,
 	}
 
-	boltConn, err := bolt.Connect(parsedUri.Host, tcpConn, authMap, "007", nil, logger)
+	boltConn, err := bolt.Connect(parsedUri.Host, tcpConn, authMap, "007", nil, logger, boltLogger)
 	if err != nil {
 		panic(err)
 	}
@@ -65,7 +65,7 @@ func makeRawConnection(logger log.Logger) (dbserver.DbServer, db.Connection) {
 }
 
 func BenchmarkQuery(b *testing.B) {
-	_, conn := makeRawConnection(&log.Console{Debugs: false, Errors: true, Infos: true, Warns: true})
+	_, conn := makeRawConnection(&log.Console{Debugs: true, Errors: true, Infos: true, Warns: true}, &log.ConsoleBoltLogger{})
 	defer conn.Close()
 	params := map[string]interface{}{
 		"one": 1,
@@ -85,8 +85,8 @@ func BenchmarkQuery(b *testing.B) {
 
 // Tests the specification of the internal db connection API
 func TestConnectionConformance(ot *testing.T) {
-	logger := &log.Console{Errors: true, Infos: true, Warns: true, Debugs: false}
-	server, boltConn := makeRawConnection(logger)
+	logger := &log.Console{Errors: true, Infos: true, Warns: true, Debugs: true}
+	server, boltConn := makeRawConnection(logger, &log.ConsoleBoltLogger{})
 	defer boltConn.Close()
 
 	randInt := func() int64 {

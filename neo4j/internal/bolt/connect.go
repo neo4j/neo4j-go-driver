@@ -46,7 +46,7 @@ var versions = [4]protocolVersion{
 
 // Negotiate version of bolt protocol.
 // Returns instance of bolt protocol implmenting low-level abstract connection Connection interface.
-func Connect(serverName string, conn net.Conn, auth map[string]interface{}, userAgent string, routingContext map[string]string, log log.Logger) (db.Connection, error) {
+func Connect(serverName string, conn net.Conn, auth map[string]interface{}, userAgent string, routingContext map[string]string, logger log.Logger, boltLog log.BoltLogger) (db.Connection, error) {
 	// Perform Bolt handshake to negotiate version
 	// Send handshake to server
 	handshake := []byte{
@@ -56,6 +56,8 @@ func Connect(serverName string, conn net.Conn, auth map[string]interface{}, user
 		0x00, versions[2].back, versions[2].minor, versions[2].major,
 		0x00, versions[3].back, versions[3].minor, versions[3].major,
 	}
+	boltLog.LogMessage(log.BoltClient, "", "<MAGIC> %#010X", handshake[0:4])
+	boltLog.LogMessage(log.BoltClient, "", "<HANDSHAKE> %#010X %#010X %#010X %#010X", handshake[4:8], handshake[8:12], handshake[12:16], handshake[16:20])
 	_, err := conn.Write(handshake)
 	if err != nil {
 		return nil, err
@@ -68,13 +70,14 @@ func Connect(serverName string, conn net.Conn, auth map[string]interface{}, user
 		return nil, err
 	}
 
+	boltLog.LogMessage(log.BoltServer, "", "<HANDSHAKE> %#010X", buf)
 	// Parse received version and construct the correct instance
 	major := buf[3]
 	minor := buf[2]
 	switch major {
 	case 3:
 		// Handover rest of connection handshaking
-		boltConn := NewBolt3(serverName, conn, log)
+		boltConn := NewBolt3(serverName, conn, logger, boltLog)
 		err = boltConn.connect(auth, userAgent)
 		if err != nil {
 			return nil, err
@@ -82,7 +85,7 @@ func Connect(serverName string, conn net.Conn, auth map[string]interface{}, user
 		return boltConn, nil
 	case 4:
 		// Handover rest of connection handshaking
-		boltConn := NewBolt4(serverName, conn, log)
+		boltConn := NewBolt4(serverName, conn, logger, boltLog)
 		err = boltConn.connect(int(minor), auth, userAgent, routingContext)
 		if err != nil {
 			return nil, err
