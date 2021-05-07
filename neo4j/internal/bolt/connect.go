@@ -56,8 +56,10 @@ func Connect(serverName string, conn net.Conn, auth map[string]interface{}, user
 		0x00, versions[2].back, versions[2].minor, versions[2].major,
 		0x00, versions[3].back, versions[3].minor, versions[3].major,
 	}
-	boltLog.LogClientMessage("", "<MAGIC> %#010X", handshake[0:4])
-	boltLog.LogClientMessage("", "<HANDSHAKE> %#010X %#010X %#010X %#010X", handshake[4:8], handshake[8:12], handshake[12:16], handshake[16:20])
+	if boltLog != nil {
+		boltLog.LogClientMessage("", "<MAGIC> %#010X", handshake[0:4])
+		boltLog.LogClientMessage("", "<HANDSHAKE> %#010X %#010X %#010X %#010X", handshake[4:8], handshake[8:12], handshake[12:16], handshake[16:20])
+	}
 	_, err := conn.Write(handshake)
 	if err != nil {
 		return nil, err
@@ -70,7 +72,9 @@ func Connect(serverName string, conn net.Conn, auth map[string]interface{}, user
 		return nil, err
 	}
 
-	boltLog.LogServerMessage("", "<HANDSHAKE> %#010X", buf)
+	if boltLog != nil {
+		boltLog.LogServerMessage("", "<HANDSHAKE> %#010X", buf)
+	}
 	// Parse received version and construct the correct instance
 	major := buf[3]
 	minor := buf[2]

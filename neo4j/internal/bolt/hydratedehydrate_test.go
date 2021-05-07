@@ -21,7 +21,6 @@ package bolt
 
 import (
 	"bytes"
-	"github.com/neo4j/neo4j-go-driver/v4/neo4j/log"
 	"testing"
 	"time"
 
@@ -38,9 +37,7 @@ func TestDehydrateHydrate(ot *testing.T) {
 			ot.Fatalf("Should be no dehydration errors in this test: %s", err)
 		},
 	}
-	hydrator := hydrator{
-		boltLogger: log.VoidBoltLogger{},
-	}
+	hydrator := hydrator{}
 
 	// A bit of white box testing, uses "internal" APIs to shortcut
 	// hydration/dehydration circuit.

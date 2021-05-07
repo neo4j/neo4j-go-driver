@@ -11,16 +11,6 @@ type BoltLogger interface {
 	LogServerMessage(context string, msg string, args ...interface{})
 }
 
-type VoidBoltLogger struct {
-
-}
-
-func (v VoidBoltLogger) LogClientMessage(context string, msg string, args ...interface{}) {
-}
-
-func (v VoidBoltLogger) LogServerMessage(context string, msg string, args ...interface{}) {
-}
-
 type ConsoleBoltLogger struct {
 }
 
