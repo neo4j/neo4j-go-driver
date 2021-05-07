@@ -65,7 +65,7 @@ func makeRawConnection(logger log.Logger, boltLogger log.BoltLogger) (dbserver.D
 }
 
 func BenchmarkQuery(b *testing.B) {
-	_, conn := makeRawConnection(&log.Console{Debugs: true, Errors: true, Infos: true, Warns: true}, &log.ConsoleBoltLogger{})
+	_, conn := makeRawConnection(&log.Console{Debugs: true, Errors: true, Infos: true, Warns: true}, &log.VoidBoltLogger{})
 	defer conn.Close()
 	params := map[string]interface{}{
 		"one": 1,
@@ -86,7 +86,7 @@ func BenchmarkQuery(b *testing.B) {
 // Tests the specification of the internal db connection API
 func TestConnectionConformance(ot *testing.T) {
 	logger := &log.Console{Errors: true, Infos: true, Warns: true, Debugs: true}
-	server, boltConn := makeRawConnection(logger, &log.ConsoleBoltLogger{})
+	server, boltConn := makeRawConnection(logger, &log.VoidBoltLogger{})
 	defer boltConn.Close()
 
 	randInt := func() int64 {
