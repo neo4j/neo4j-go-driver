@@ -487,6 +487,9 @@ func (b *backend) handleRequest(req map[string]interface{}) {
 			},
 		})
 
+	case "GetFeatures":
+		b.writeResponse("FeatureList", nil)
+
 	case "StartTest":
 		testName := data["testName"].(string)
 		if testName == "stub.disconnected.SessionRunDisconnected.test_fail_on_reset" {
