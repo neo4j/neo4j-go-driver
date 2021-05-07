@@ -88,7 +88,7 @@ func TestOutgoing(ot *testing.T) {
 		chunker:    newChunker(),
 		packer:     packstream.Packer{},
 		onErr:      func(e error) { err = e },
-		boltLogger: log.Void{},
+		boltLogger: log.VoidBoltLogger{},
 	}
 	// Utility to unpack through dechunking and a custom build func
 	dechunkAndUnpack := func(t *testing.T, build func()) interface{} {

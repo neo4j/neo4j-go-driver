@@ -33,6 +33,3 @@ func (l Void) Warnf(name, id string, msg string, args ...interface{}) {
 
 func (l Void) Debugf(name, id string, msg string, args ...interface{}) {
 }
-
-func (l Void) LogMessage(src MessageSource, id, msg string, args ...interface{}) {
-}

@@ -602,7 +602,7 @@ func TestHydrator(ot *testing.T) {
 
 	// Shared among calls in real usage so we do the same while testing it.
 	hydrator := hydrator{
-		boltLogger: log.Void{},
+		boltLogger: log.VoidBoltLogger{},
 	}
 	for _, c := range cases {
 		ot.Run(c.name, func(t *testing.T) {

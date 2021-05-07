@@ -148,7 +148,7 @@ func NewDriver(target string, auth AuthToken, configurers ...func(*Config)) (Dri
 	}
 	d.boltLog = d.config.BoltLog
 	if d.boltLog == nil {
-		d.boltLog = &log.Void{}
+		d.boltLog = &log.VoidBoltLogger{}
 	}
 	d.logId = log.NewId()
 

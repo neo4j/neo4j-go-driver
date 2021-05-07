@@ -145,7 +145,7 @@ func (h *hydrator) ignored(n uint32) *ignored {
 	if h.getErr() != nil {
 		return nil
 	}
-	h.boltLogger.LogMessage(log.BoltServer, h.logId, "IGNORED")
+	h.boltLogger.LogServerMessage(h.logId, "IGNORED")
 	return &h.cachedIgnored
 }
 
@@ -170,7 +170,7 @@ func (h *hydrator) failure(n uint32) *db.Neo4jError {
 			h.trash()
 		}
 	}
-	h.boltLogger.LogMessage(log.BoltServer, h.logId, "FAILURE %s", loggableFailure(dberr))
+	h.boltLogger.LogServerMessage(h.logId, "FAILURE %s", loggableFailure(dberr))
 	return &dberr
 }
 
@@ -241,7 +241,7 @@ func (h *hydrator) success(n uint32) *success {
 			h.trash()
 		}
 	}
-	h.boltLogger.LogMessage(log.BoltServer, h.logId, "SUCCESS %s", loggableSuccess(*succ))
+	h.boltLogger.LogServerMessage(h.logId, "SUCCESS %s", loggableSuccess(*succ))
 	return succ
 }
 
@@ -362,7 +362,7 @@ func (h *hydrator) record(n uint32) *db.Record {
 		h.unp.Next()
 		rec.Values[i] = h.value()
 	}
-	h.boltLogger.LogMessage(log.BoltServer, h.logId, "RECORD %s", loggableList(rec.Values))
+	h.boltLogger.LogServerMessage(h.logId, "RECORD %s", loggableList(rec.Values))
 	return &rec
 }
 

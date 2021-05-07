@@ -6,32 +6,33 @@ import (
 	"time"
 )
 
-type MessageSource int
-
-const (
-	BoltClient MessageSource = iota
-	BoltServer
-)
-
-func (src MessageSource) String() string {
-	switch src {
-	case BoltClient:
-		return "C"
-	case BoltServer:
-		return "S"
-	default:
-		return ""
-	}
+type BoltLogger interface {
+	LogClientMessage(context string, msg string, args ...interface{})
+	LogServerMessage(context string, msg string, args ...interface{})
 }
 
-type BoltLogger interface {
-	LogMessage(src MessageSource, context string, msg string, args ...interface{})
+type VoidBoltLogger struct {
+
+}
+
+func (v VoidBoltLogger) LogClientMessage(context string, msg string, args ...interface{}) {
+}
+
+func (v VoidBoltLogger) LogServerMessage(context string, msg string, args ...interface{}) {
 }
 
 type ConsoleBoltLogger struct {
 }
 
-func (cbl *ConsoleBoltLogger) LogMessage(src MessageSource, id, msg string, args ...interface{}) {
+func (cbl *ConsoleBoltLogger) LogClientMessage(id, msg string, args ...interface{}) {
+	cbl.logBoltMessage("C", id, msg, args)
+}
+
+func (cbl *ConsoleBoltLogger) LogServerMessage(id, msg string, args ...interface{}) {
+	cbl.logBoltMessage("S", id, msg, args)
+}
+
+func (cbl *ConsoleBoltLogger) logBoltMessage(src, id string, msg string, args []interface{}) {
 	_, _ = fmt.Fprintf(os.Stdout, "%s   BOLT  %s%s: %s\n", time.Now().Format(timeFormat), formatId(id), src, fmt.Sprintf(msg, args...))
 }
 

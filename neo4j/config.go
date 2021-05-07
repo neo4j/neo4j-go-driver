@@ -51,7 +51,7 @@ type Config struct {
 	// Possible to use custom logger (implement log.BoltLogger interface) or
 	// use neo4j.ConsoleBoltLogger.
 	//
-	// default: No Op Logger (log.Void)
+	// default: No Op Logger (log.VoidBoltLogger)
 	BoltLog log.BoltLogger
 	// Resolver that would be used to resolve initial router address. This may
 	// be useful if you want to provide more than one URL for initial router.
