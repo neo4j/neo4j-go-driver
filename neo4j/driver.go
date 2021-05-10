@@ -146,7 +146,6 @@ func NewDriver(target string, auth AuthToken, configurers ...func(*Config)) (Dri
 		// Default to void logger
 		d.log = &log.Void{}
 	}
-	d.boltLog = d.config.BoltLog
 	d.logId = log.NewId()
 
 	routingContext, err := routingContextFromUrl(routing, parsed)
@@ -160,7 +159,6 @@ func NewDriver(target string, auth AuthToken, configurers ...func(*Config)) (Dri
 	d.connector.UserAgent = d.config.UserAgent
 	d.connector.RootCAs = d.config.RootCAs
 	d.connector.Log = d.log
-	d.connector.BoltLog = d.boltLog
 	d.connector.Auth = auth.tokens
 	d.connector.RoutingContext = routingContext
 
@@ -226,8 +224,8 @@ func routingContextFromUrl(useRouting bool, u *url.URL) (map[string]string, erro
 }
 
 type sessionRouter interface {
-	Readers(ctx context.Context, bookmarks []string, database string) ([]string, error)
-	Writers(ctx context.Context, bookmarks []string, database string) ([]string, error)
+	Readers(ctx context.Context, bookmarks []string, database string, boltLogger log.BoltLogger) ([]string, error)
+	Writers(ctx context.Context, bookmarks []string, database string, boltLogger log.BoltLogger) ([]string, error)
 	Invalidate(database string)
 	CleanUp()
 }
@@ -241,7 +239,6 @@ type driver struct {
 	router    sessionRouter
 	logId     string
 	log       log.Logger
-	boltLog   log.BoltLogger
 }
 
 func (d *driver) Target() url.URL {
@@ -258,7 +255,7 @@ func (d *driver) Session(accessMode AccessMode, bookmarks ...string) (Session, e
 	}
 	return newSession(
 		d.config, d.router,
-		d.pool, db.AccessMode(accessMode), bookmarks, db.DefaultDatabase, 0, d.log), nil
+		d.pool, db.AccessMode(accessMode), bookmarks, db.DefaultDatabase, 0, d.log, nil), nil
 }
 
 func (d *driver) NewSession(config SessionConfig) Session {
@@ -275,7 +272,8 @@ func (d *driver) NewSession(config SessionConfig) Session {
 	}
 	return newSession(
 		d.config, d.router,
-		d.pool, db.AccessMode(config.AccessMode), config.Bookmarks, databaseName, config.FetchSize, d.log)
+		d.pool, db.AccessMode(config.AccessMode), config.Bookmarks, databaseName, config.FetchSize,
+		d.log, config.BoltLogger)
 }
 
 func (d *driver) VerifyConnectivity() error {

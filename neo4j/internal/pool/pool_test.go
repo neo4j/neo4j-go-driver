@@ -39,12 +39,12 @@ func TestPoolBorrowReturn(ot *testing.T) {
 	maxAge := 1 * time.Second
 	birthdate := time.Now()
 
-	succeedingConnect := func(s string) (db.Connection, error) {
+	succeedingConnect := func(s string, _ log.BoltLogger) (db.Connection, error) {
 		return &testutil.ConnFake{Name: s, Alive: true, Birth: birthdate}, nil
 	}
 
 	failingError := errors.New("whatever")
-	failingConnect := func(s string) (db.Connection, error) {
+	failingConnect := func(s string, _ log.BoltLogger) (db.Connection, error) {
 		return nil, failingError
 	}
 
@@ -53,7 +53,7 @@ func TestPoolBorrowReturn(ot *testing.T) {
 		p.now = func() time.Time { return birthdate }
 		defer p.Close()
 		serverNames := []string{"srv1"}
-		conn, err := p.Borrow(context.Background(), serverNames, true)
+		conn, err := p.Borrow(context.Background(), serverNames, true, nil)
 		assertConnection(t, conn, err)
 		p.Return(conn)
 
@@ -74,7 +74,7 @@ func TestPoolBorrowReturn(ot *testing.T) {
 
 		// First thread borrows
 		ctx1 := context.Background()
-		c1, err1 := p.Borrow(ctx1, serverNames, true)
+		c1, err1 := p.Borrow(ctx1, serverNames, true, nil)
 		assertConnection(t, c1, err1)
 
 		// Second thread tries to borrow the only allowed connection on the same server
@@ -82,7 +82,7 @@ func TestPoolBorrowReturn(ot *testing.T) {
 			ctx2 := context.Background()
 			// Will block here until first thread detects me in the queue and returns the
 			// connection which will unblock here.
-			c2, err2 := p.Borrow(ctx2, serverNames, true)
+			c2, err2 := p.Borrow(ctx2, serverNames, true, nil)
 			assertConnection(t, c2, err2)
 			wg.Done()
 		}()
@@ -107,12 +107,12 @@ func TestPoolBorrowReturn(ot *testing.T) {
 
 		// First thread borrows
 		ctx1 := context.Background()
-		c1, err1 := p.Borrow(ctx1, serverNames, true)
+		c1, err1 := p.Borrow(ctx1, serverNames, true, nil)
 		assertConnection(t, c1, err1)
 
 		// Actually don't need a thread here since we shouldn't block
 		ctx2 := context.Background()
-		c2, err2 := p.Borrow(ctx2, serverNames, false)
+		c2, err2 := p.Borrow(ctx2, serverNames, false, nil)
 		assertNoConnection(t, c2, err2)
 		// Error should be pool full
 		_ = err2.(*PoolFull)
@@ -129,7 +129,7 @@ func TestPoolBorrowReturn(ot *testing.T) {
 
 		worker := func() {
 			for i := 0; i < 5; i++ {
-				c, err := p.Borrow(context.Background(), serverNames, true)
+				c, err := p.Borrow(context.Background(), serverNames, true, nil)
 				assertConnection(t, c, err)
 				time.Sleep(time.Duration((rand.Int() % 7)) * time.Millisecond)
 				p.Return(c)
@@ -155,7 +155,7 @@ func TestPoolBorrowReturn(ot *testing.T) {
 		p := New(2, maxAge, failingConnect, logger, "poolid")
 		p.now = func() time.Time { return birthdate }
 		serverNames := []string{"srv1"}
-		c, err := p.Borrow(context.Background(), serverNames, true)
+		c, err := p.Borrow(context.Background(), serverNames, true, nil)
 		assertNoConnection(t, c, err)
 		// Should get the connect error back
 		if err != failingError {
@@ -166,13 +166,13 @@ func TestPoolBorrowReturn(ot *testing.T) {
 	ot.Run("Cancel Borrow", func(t *testing.T) {
 		p := New(1, maxAge, succeedingConnect, logger, "poolid")
 		p.now = func() time.Time { return birthdate }
-		c1, _ := p.Borrow(context.Background(), []string{"A"}, true)
+		c1, _ := p.Borrow(context.Background(), []string{"A"}, true, nil)
 		ctx, cancel := context.WithCancel(context.Background())
 		wg := sync.WaitGroup{}
 		var err error
 		wg.Add(1)
 		go func() {
-			_, err = p.Borrow(ctx, []string{"A"}, true)
+			_, err = p.Borrow(ctx, []string{"A"}, true, nil)
 			wg.Done()
 		}()
 
@@ -198,7 +198,7 @@ func TestPoolResourceUsage(ot *testing.T) {
 	maxAge := 1 * time.Second
 	birthdate := time.Now()
 
-	succeedingConnect := func(s string) (db.Connection, error) {
+	succeedingConnect := func(s string, _ log.BoltLogger) (db.Connection, error) {
 		return &testutil.ConnFake{Name: s, Alive: true, Birth: birthdate}, nil
 	}
 
@@ -207,7 +207,7 @@ func TestPoolResourceUsage(ot *testing.T) {
 		p.now = func() time.Time { return birthdate }
 		defer p.Close()
 		serverNames := []string{"srvA", "srvB", "srvC", "srvD"}
-		c, _ := p.Borrow(context.Background(), serverNames, true)
+		c, _ := p.Borrow(context.Background(), serverNames, true, nil)
 		if c.ServerName() != serverNames[0] {
 			t.Errorf("Should have created server for first server but created for %s", c.ServerName())
 		}
@@ -218,7 +218,7 @@ func TestPoolResourceUsage(ot *testing.T) {
 		p.now = func() time.Time { return birthdate }
 		defer p.Close()
 		serverNames := []string{"srvA"}
-		c, _ := p.Borrow(context.Background(), serverNames, true)
+		c, _ := p.Borrow(context.Background(), serverNames, true, nil)
 		c.(*testutil.ConnFake).Alive = false
 		p.Return(c)
 		servers := p.getServers()
@@ -232,7 +232,7 @@ func TestPoolResourceUsage(ot *testing.T) {
 		p.now = func() time.Time { return birthdate.Add(maxAge * 2) }
 		defer p.Close()
 		serverNames := []string{"srvA"}
-		c, _ := p.Borrow(context.Background(), serverNames, true)
+		c, _ := p.Borrow(context.Background(), serverNames, true, nil)
 		p.Return(c)
 		servers := p.getServers()
 		if len(servers) > 0 && servers[serverNames[0]].size() > 0 {
@@ -243,9 +243,9 @@ func TestPoolResourceUsage(ot *testing.T) {
 	ot.Run("Returning dead connection to server should remove older idle connections", func(t *testing.T) {
 		p := New(3, 0, succeedingConnect, logger, "poolid")
 		// Trigger creation of three connections on the same server
-		c1, _ := p.Borrow(context.Background(), []string{"A"}, true)
-		c2, _ := p.Borrow(context.Background(), []string{"A"}, true)
-		c3, _ := p.Borrow(context.Background(), []string{"A"}, true)
+		c1, _ := p.Borrow(context.Background(), []string{"A"}, true, nil)
+		c2, _ := p.Borrow(context.Background(), []string{"A"}, true, nil)
+		c3, _ := p.Borrow(context.Background(), []string{"A"}, true, nil)
 		// Manipulate birthdate on the connections
 		now := time.Now()
 		c1.(*testutil.ConnFake).Birth = now.Add(-1 * time.Second)
@@ -276,7 +276,7 @@ func TestPoolResourceUsage(ot *testing.T) {
 		}
 		defer p.Close()
 		serverNames := []string{"srvA"}
-		c1, _ := p.Borrow(context.Background(), serverNames, true)
+		c1, _ := p.Borrow(context.Background(), serverNames, true, nil)
 		c1.(*testutil.ConnFake).Id = 123
 		// It's alive when returning it
 		p.Return(c1)
@@ -284,7 +284,7 @@ func TestPoolResourceUsage(ot *testing.T) {
 		now = now.Add(2 * maxAge)
 		nowMut.Unlock()
 		// Shouldn't get the same one back!
-		c2, _ := p.Borrow(context.Background(), serverNames, true)
+		c2, _ := p.Borrow(context.Background(), serverNames, true, nil)
 		if c2.(*testutil.ConnFake).Id == 123 {
 			t.Errorf("Got the old connection back!")
 		}
@@ -294,9 +294,9 @@ func TestPoolResourceUsage(ot *testing.T) {
 		p := New(1, maxAge, succeedingConnect, logger, "poolid")
 		p.now = func() time.Time { return birthdate }
 		defer p.Close()
-		c1, err := p.Borrow(context.Background(), []string{"A"}, true)
+		c1, err := p.Borrow(context.Background(), []string{"A"}, true, nil)
 		assertConnection(t, c1, err)
-		c2, err := p.Borrow(context.Background(), []string{"B"}, true)
+		c2, err := p.Borrow(context.Background(), []string{"B"}, true, nil)
 		assertConnection(t, c2, err)
 		assertNumberOfServers(t, p, 2)
 	})
@@ -305,15 +305,15 @@ func TestPoolResourceUsage(ot *testing.T) {
 func TestPoolCleanup(ot *testing.T) {
 	birthdate := time.Now()
 	maxLife := 1 * time.Second
-	succeedingConnect := func(s string) (db.Connection, error) {
+	succeedingConnect := func(s string, _ log.BoltLogger) (db.Connection, error) {
 		return &testutil.ConnFake{Name: s, Alive: true, Birth: birthdate}, nil
 	}
 
 	// Borrows a connection in server A and another in server B
 	borrowConnections := func(t *testing.T, p *Pool) (db.Connection, db.Connection) {
-		c1, err := p.Borrow(context.Background(), []string{"A"}, true)
+		c1, err := p.Borrow(context.Background(), []string{"A"}, true, nil)
 		assertConnection(t, c1, err)
-		c2, err := p.Borrow(context.Background(), []string{"B"}, true)
+		c2, err := p.Borrow(context.Background(), []string{"B"}, true, nil)
 		assertConnection(t, c2, err)
 		return c1, c2
 	}
@@ -352,12 +352,12 @@ func TestPoolCleanup(ot *testing.T) {
 	})
 
 	ot.Run("Should not remove servers with only idle connections but with recent connect failures ", func(t *testing.T) {
-		failingConnect := func(s string) (db.Connection, error) {
+		failingConnect := func(s string, _ log.BoltLogger) (db.Connection, error) {
 			return nil, errors.New("an error")
 		}
 		p := New(0, maxLife, failingConnect, logger, "poolid")
 		defer p.Close()
-		c1, err := p.Borrow(context.Background(), []string{"A"}, true)
+		c1, err := p.Borrow(context.Background(), []string{"A"}, true, nil)
 		assertNoConnection(t, c1, err)
 		assertNumberOfServers(t, p, 1)
 		assertNumberOfIdle(t, p, "A", 0)

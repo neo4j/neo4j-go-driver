@@ -21,18 +21,19 @@ package router
 
 import (
 	"context"
+	"github.com/neo4j/neo4j-go-driver/v4/neo4j/log"
 
 	"github.com/neo4j/neo4j-go-driver/v4/neo4j/db"
 )
 
 type poolFake struct {
-	borrow   func(names []string, cancel context.CancelFunc) (db.Connection, error)
+	borrow   func(names []string, cancel context.CancelFunc, logger log.BoltLogger) (db.Connection, error)
 	returned []db.Connection
 	cancel   context.CancelFunc
 }
 
-func (p *poolFake) Borrow(ctx context.Context, servers []string, wait bool) (db.Connection, error) {
-	return p.borrow(servers, p.cancel)
+func (p *poolFake) Borrow(ctx context.Context, servers []string, wait bool, logger log.BoltLogger) (db.Connection, error) {
+	return p.borrow(servers, p.cancel, logger)
 }
 
 func (p *poolFake) Return(c db.Connection) {

@@ -35,7 +35,7 @@ import (
 	"github.com/neo4j/neo4j-go-driver/v4/neo4j/log"
 )
 
-type Connect func(string) (db.Connection, error)
+type Connect func(string, log.BoltLogger) (db.Connection, error)
 
 type qitem struct {
 	servers []string
@@ -145,7 +145,7 @@ func (p *Pool) CleanUp() {
 	}
 }
 
-func (p *Pool) tryBorrow(serverName string) (db.Connection, error) {
+func (p *Pool) tryBorrow(serverName string, boltLogger log.BoltLogger) (db.Connection, error) {
 	// For now, lock complete servers map to avoid over connecting but with the downside
 	// that long connect times will block connects to other servers as well. To fix this
 	// we would need to add a pending connect to the server and lock per server.
@@ -156,6 +156,7 @@ func (p *Pool) tryBorrow(serverName string) (db.Connection, error) {
 	if srv != nil {
 		// Try to get an existing idle connection
 		if c := srv.getIdle(); c != nil {
+			c.SetBoltLogger(boltLogger)
 			return c, nil
 		}
 		if srv.size() >= p.maxSize {
@@ -169,7 +170,7 @@ func (p *Pool) tryBorrow(serverName string) (db.Connection, error) {
 
 	// No idle connection, try to connect
 	p.log.Infof(log.Pool, p.logId, "Connecting to %s", serverName)
-	c, err := p.connect(serverName)
+	c, err := p.connect(serverName, boltLogger)
 	if err != nil {
 		// Failed to connect, keep track that it was bad for a while
 		srv.notifyFailedConnect(p.now())
@@ -223,7 +224,7 @@ func (p *Pool) tryAnyIdle(serverNames []string) db.Connection {
 // Borrow tries to borrow an existing database connection or tries to create a new one
 // if none exists. The wait flag indicates if the caller wants to wait for a connection
 // to be returned if there aren't any idle connection available.
-func (p *Pool) Borrow(ctx context.Context, serverNames []string, wait bool) (db.Connection, error) {
+func (p *Pool) Borrow(ctx context.Context, serverNames []string, wait bool, boltLogger log.BoltLogger) (db.Connection, error) {
 	timeOut := func() bool {
 		select {
 		case <-ctx.Done():
@@ -249,7 +250,7 @@ func (p *Pool) Borrow(ctx context.Context, serverNames []string, wait bool) (db.
 	var err error
 	var conn db.Connection
 	for _, s := range penalties {
-		conn, err = p.tryBorrow(s.name)
+		conn, err = p.tryBorrow(s.name, boltLogger)
 		if err == nil {
 			return conn, nil
 		}

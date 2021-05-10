@@ -52,7 +52,7 @@ type Router struct {
 }
 
 type Pool interface {
-	Borrow(ctx context.Context, servers []string, wait bool) (db.Connection, error)
+	Borrow(ctx context.Context, servers []string, wait bool, boltLogger log.BoltLogger) (db.Connection, error)
 	Return(c db.Connection)
 }
 
@@ -72,7 +72,7 @@ func New(rootRouter string, getRouters func() []string, routerContext map[string
 	return r
 }
 
-func (r *Router) getTable(ctx context.Context, bookmarks []string, database string) (*db.RoutingTable, error) {
+func (r *Router) getTable(ctx context.Context, bookmarks []string, database string, boltLogger log.BoltLogger) (*db.RoutingTable, error) {
 	now := r.now()
 
 	r.dbRoutersMut.Lock()
@@ -92,20 +92,20 @@ func (r *Router) getTable(ctx context.Context, bookmarks []string, database stri
 	if dbRouter != nil && len(dbRouter.table.Routers) > 0 {
 		routers := dbRouter.table.Routers
 		r.log.Infof(log.Router, r.logId, "Reading routing table for '%s' from previously known routers: %v", database, routers)
-		table, err = readTable(ctx, r.pool, routers, r.routerContext, bookmarks, database)
+		table, err = readTable(ctx, r.pool, routers, r.routerContext, bookmarks, database, boltLogger)
 	}
 
 	// Try initial router if no routers or failed
 	if table == nil {
 		r.log.Infof(log.Router, r.logId, "Reading routing table from initial router: %s", r.rootRouter)
-		table, err = readTable(ctx, r.pool, []string{r.rootRouter}, r.routerContext, bookmarks, database)
+		table, err = readTable(ctx, r.pool, []string{r.rootRouter}, r.routerContext, bookmarks, database, boltLogger)
 	}
 
 	// Use hook to retrieve possibly different set of routers and retry
 	if table == nil && r.getRouters != nil {
 		routers := r.getRouters()
 		r.log.Infof(log.Router, r.logId, "Reading routing table for '%s' from custom routers: %v", routers)
-		table, err = readTable(ctx, r.pool, routers, r.routerContext, bookmarks, database)
+		table, err = readTable(ctx, r.pool, routers, r.routerContext, bookmarks, database, boltLogger)
 	}
 
 	if err != nil {
@@ -130,8 +130,8 @@ func (r *Router) getTable(ctx context.Context, bookmarks []string, database stri
 	return table, nil
 }
 
-func (r *Router) Readers(ctx context.Context, bookmarks []string, database string) ([]string, error) {
-	table, err := r.getTable(ctx, bookmarks, database)
+func (r *Router) Readers(ctx context.Context, bookmarks []string, database string, boltLogger log.BoltLogger) ([]string, error) {
+	table, err := r.getTable(ctx, bookmarks, database, boltLogger)
 	if err != nil {
 		return nil, err
 	}
@@ -146,7 +146,7 @@ func (r *Router) Readers(ctx context.Context, bookmarks []string, database strin
 		r.log.Infof(log.Router, r.logId, "Invalidating routing table, no readers")
 		r.Invalidate(database)
 		r.sleep(100 * time.Millisecond)
-		table, err = r.getTable(ctx, bookmarks, database)
+		table, err = r.getTable(ctx, bookmarks, database, boltLogger)
 		if err != nil {
 			return nil, err
 		}
@@ -158,8 +158,8 @@ func (r *Router) Readers(ctx context.Context, bookmarks []string, database strin
 	return table.Readers, nil
 }
 
-func (r *Router) Writers(ctx context.Context, bookmarks []string, database string) ([]string, error) {
-	table, err := r.getTable(ctx, bookmarks, database)
+func (r *Router) Writers(ctx context.Context, bookmarks []string, database string, boltLogger log.BoltLogger) ([]string, error) {
+	table, err := r.getTable(ctx, bookmarks, database, boltLogger)
 	if err != nil {
 		return nil, err
 	}
@@ -174,7 +174,7 @@ func (r *Router) Writers(ctx context.Context, bookmarks []string, database strin
 		r.log.Infof(log.Router, r.logId, "Invalidating routing table, no writers")
 		r.Invalidate(database)
 		r.sleep(100 * time.Millisecond)
-		table, err = r.getTable(ctx, bookmarks, database)
+		table, err = r.getTable(ctx, bookmarks, database, boltLogger)
 		if err != nil {
 			return nil, err
 		}

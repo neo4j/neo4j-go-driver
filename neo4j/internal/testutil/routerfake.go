@@ -21,6 +21,7 @@ package testutil
 
 import (
 	"context"
+	"github.com/neo4j/neo4j-go-driver/v4/neo4j/log"
 )
 
 type RouterFake struct {
@@ -37,11 +38,11 @@ func (r *RouterFake) Invalidate(database string) {
 	r.Invalidated = true
 }
 
-func (r *RouterFake) Readers(ctx context.Context, bookmarks []string, database string) ([]string, error) {
+func (r *RouterFake) Readers(ctx context.Context, bookmarks []string, database string, _ log.BoltLogger) ([]string, error) {
 	return r.ReadersRet, r.Err
 }
 
-func (r *RouterFake) Writers(ctx context.Context, bookmarks []string, database string) ([]string, error) {
+func (r *RouterFake) Writers(ctx context.Context, bookmarks []string, database string, _ log.BoltLogger) ([]string, error) {
 	return r.WritersRet, r.Err
 }
 

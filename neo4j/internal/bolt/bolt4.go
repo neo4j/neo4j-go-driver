@@ -944,3 +944,8 @@ func (b *bolt4) ForceReset() error {
 	b.Reset()
 	return b.err
 }
+
+func (b *bolt4) SetBoltLogger(boltLogger log.BoltLogger) {
+	b.in.hyd.boltLogger = boltLogger
+	b.out.boltLogger = boltLogger
+}

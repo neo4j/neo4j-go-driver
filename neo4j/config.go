@@ -45,12 +45,6 @@ type Config struct {
 	//
 	// default: No Op Logger (log.Void)
 	Log log.Logger
-
-	// Logging target the driver will send its Bolt message traces
-	//
-	// Possible to use custom logger (implement log.BoltLogger interface) or
-	// use neo4j.ConsoleBoltLogger.
-	BoltLog log.BoltLogger
 	// Resolver that would be used to resolve initial router address. This may
 	// be useful if you want to provide more than one URL for initial router.
 	// If not specified, the URL provided to NewDriver is used as the initial

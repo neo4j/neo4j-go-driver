@@ -41,7 +41,6 @@ type Connector struct {
 	SocketKeepAlive bool
 	Auth            map[string]interface{}
 	Log             log.Logger
-	BoltLog         log.BoltLogger
 	UserAgent       string
 	RoutingContext  map[string]string
 	Network         string
@@ -63,7 +62,7 @@ func (e *TlsError) Error() string {
 	return e.inner.Error()
 }
 
-func (c Connector) Connect(address string) (db.Connection, error) {
+func (c Connector) Connect(address string, boltLogger log.BoltLogger) (db.Connection, error) {
 	dialer := net.Dialer{Timeout: c.DialTimeout}
 	if !c.SocketKeepAlive {
 		dialer.KeepAlive = -1 * time.Second // Turns keep-alive off
@@ -76,7 +75,7 @@ func (c Connector) Connect(address string) (db.Connection, error) {
 
 	// TLS not requested, perform Bolt handshake
 	if c.SkipEncryption {
-		return bolt.Connect(address, conn, c.Auth, c.UserAgent, c.RoutingContext, c.Log, c.BoltLog)
+		return bolt.Connect(address, conn, c.Auth, c.UserAgent, c.RoutingContext, c.Log, boltLogger)
 	}
 
 	// TLS requested, continue with handshake
@@ -97,5 +96,5 @@ func (c Connector) Connect(address string) (db.Connection, error) {
 		return nil, &TlsError{inner: err}
 	}
 	// Perform Bolt handshake
-	return bolt.Connect(address, tlsconn, c.Auth, c.UserAgent, c.RoutingContext, c.Log, c.BoltLog)
+	return bolt.Connect(address, tlsconn, c.Auth, c.UserAgent, c.RoutingContext, c.Log, boltLogger)
 }

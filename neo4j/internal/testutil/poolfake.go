@@ -21,6 +21,7 @@ package testutil
 
 import (
 	"context"
+	"github.com/neo4j/neo4j-go-driver/v4/neo4j/log"
 
 	"github.com/neo4j/neo4j-go-driver/v4/neo4j/db"
 )
@@ -32,7 +33,7 @@ type PoolFake struct {
 	CleanUpHook func()
 }
 
-func (p *PoolFake) Borrow(ctx context.Context, serverNames []string, wait bool) (db.Connection, error) {
+func (p *PoolFake) Borrow(ctx context.Context, serverNames []string, wait bool, _ log.BoltLogger) (db.Connection, error) {
 	return p.BorrowConn, p.BorrowErr
 }
 

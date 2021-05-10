@@ -748,3 +748,8 @@ func (b *bolt3) Close() {
 func (b *bolt3) ForceReset() error {
 	return nil
 }
+
+func (b *bolt3) SetBoltLogger(boltLogger log.BoltLogger) {
+	b.in.hyd.boltLogger = boltLogger
+	b.out.boltLogger = boltLogger
+}
