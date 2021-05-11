@@ -83,6 +83,7 @@ type bolt3 struct {
 	birthDate     time.Time
 	log           log.Logger
 	err           error // Last fatal error
+	minor         int
 }
 
 func NewBolt3(serverName string, conn net.Conn, log log.Logger, boltLog log.BoltLogger) *bolt3 {
@@ -163,7 +164,7 @@ func (b *bolt3) receiveSuccess() *success {
 	}
 }
 
-func (b *bolt3) connect(auth map[string]interface{}, userAgent string) error {
+func (b *bolt3) connect(minor int, auth map[string]interface{}, userAgent string) error {
 	if err := b.assertState(bolt3_unauthorized); err != nil {
 		return err
 	}
@@ -200,6 +201,7 @@ func (b *bolt3) connect(auth map[string]interface{}, userAgent string) error {
 
 	// Transition into ready state
 	b.state = bolt3_ready
+	b.minor = minor
 	b.log.Infof(log.Bolt3, b.logId, "Connected")
 	return nil
 }
@@ -603,6 +605,8 @@ func (b *bolt3) receiveNext() (*db.Record, *db.Summary, error) {
 		b.currStream = nil
 		// Add some extras to the summary
 		sum.Agent = b.serverVersion
+		sum.Major = 3
+		sum.Minor = b.minor
 		sum.ServerName = b.serverName
 		sum.TFirst = b.tfirst
 		return nil, sum, nil
