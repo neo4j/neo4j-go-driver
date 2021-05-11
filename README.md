@@ -245,7 +245,7 @@ defer driver.Close()
 
 ### Custom Logger
 
-The `Log` field of the `neo4j.Config` struct is defined to be of interface `neo4j/log.Logger` which has the following definition.
+The `Log` field of the `neo4j.Config` struct is defined to be of interface `neo4j/log.Logger` which has the following definition:
 
 ```go
 type Logger interface {
@@ -257,3 +257,34 @@ type Logger interface {
 ```
 
 For a customised logging target, you can implement the above interface and pass an instance of that implementation to the `Log` field.
+
+## Bolt tracing
+
+Logging Bolt messages is done at the session level and is configured independently of the logging configuration described above.
+This is **disabled** by default.
+
+### Console Bolt logger
+
+For simplicity, we provide a predefined console logger which can be constructed by `neo4j.ConsoleBoltLogger`.
+
+```go
+session := driver.NewSession(neo4j.SessionConfig{
+	BoltLogger: &neo4j.ConsoleBoltLogger{},
+})
+defer session.Close()
+// [...]
+```
+
+### Custom Bolt Logger
+
+The `BoltLogger` field of the `neo4j.SessionConfig` struct is defined to be of interface `neo4j/log.BoltLogger` which has the following definition:
+
+```go
+type BoltLogger interface {
+	LogClientMessage(context string, msg string, args ...interface{})
+	LogServerMessage(context string, msg string, args ...interface{})
+}
+```
+
+For a customised logging target, you can implement the above interface and pass an instance of that implementation to the `BoltLogger` field.
+
