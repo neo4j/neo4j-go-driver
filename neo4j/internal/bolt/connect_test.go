@@ -27,6 +27,7 @@ import (
 )
 
 var logger = &log.Console{Errors: true, Infos: true, Warns: true}
+var boltLogger = &log.ConsoleBoltLogger{}
 
 func TestConnect(ot *testing.T) {
 	// TODO: Test connect timeout
@@ -49,7 +50,7 @@ func TestConnect(ot *testing.T) {
 			srv.closeConnection()
 		}()
 
-		_, err := Connect("servername", conn, auth, "007", nil, logger)
+		_, err := Connect("servername", conn, auth, "007", nil, logger, boltLogger)
 		AssertError(t, err)
 	})
 
@@ -64,7 +65,7 @@ func TestConnect(ot *testing.T) {
 			srv.acceptVersion(1, 0)
 		}()
 
-		boltconn, err := Connect("servername", conn, auth, "007", nil, logger)
+		boltconn, err := Connect("servername", conn, auth, "007", nil, logger, boltLogger)
 		AssertError(t, err)
 		if boltconn != nil {
 			t.Error("Shouldn't returned conn")

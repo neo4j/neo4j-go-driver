@@ -21,7 +21,6 @@ package bolt
 
 import (
 	"fmt"
-	"github.com/neo4j/neo4j-go-driver/v4/neo4j/log"
 	"reflect"
 	"testing"
 	"time"
@@ -601,9 +600,7 @@ func TestHydrator(ot *testing.T) {
 	}
 
 	// Shared among calls in real usage so we do the same while testing it.
-	hydrator := hydrator{
-		logger: log.Void{},
-	}
+	hydrator := hydrator{}
 	for _, c := range cases {
 		ot.Run(c.name, func(t *testing.T) {
 			packer.Begin([]byte{})

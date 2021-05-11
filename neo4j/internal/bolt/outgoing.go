@@ -30,11 +30,11 @@ import (
 )
 
 type outgoing struct {
-	chunker chunker
-	packer  packstream.Packer
-	onErr   func(err error)
-	logger  log.Logger
-	logId   string
+	chunker    chunker
+	packer     packstream.Packer
+	onErr      func(err error)
+	boltLogger log.BoltLogger
+	logId      string
 }
 
 func (o *outgoing) begin() {
@@ -52,7 +52,9 @@ func (o *outgoing) end() {
 }
 
 func (o *outgoing) appendHello(hello map[string]interface{}) {
-	o.logger.Debugf(log.BoltTrace, o.logId, "HELLO %s", loggableDictionary(hello))
+	if o.boltLogger != nil {
+		o.boltLogger.LogClientMessage(o.logId, "HELLO %s", loggableDictionary(hello))
+	}
 	o.begin()
 	o.packer.StructHeader(byte(msgHello), 1)
 	o.packMap(hello)
@@ -60,7 +62,9 @@ func (o *outgoing) appendHello(hello map[string]interface{}) {
 }
 
 func (o *outgoing) appendBegin(meta map[string]interface{}) {
-	o.logger.Debugf(log.BoltTrace, o.logId, "BEGIN %s", loggableDictionary(meta))
+	if o.boltLogger != nil {
+		o.boltLogger.LogClientMessage(o.logId, "BEGIN %s", loggableDictionary(meta))
+	}
 	o.begin()
 	o.packer.StructHeader(byte(msgBegin), 1)
 	o.packMap(meta)
@@ -68,21 +72,27 @@ func (o *outgoing) appendBegin(meta map[string]interface{}) {
 }
 
 func (o *outgoing) appendCommit() {
-	o.logger.Debugf(log.BoltTrace, o.logId, "COMMIT")
+	if o.boltLogger != nil {
+		o.boltLogger.LogClientMessage(o.logId, "COMMIT")
+	}
 	o.begin()
 	o.packer.StructHeader(byte(msgCommit), 0)
 	o.end()
 }
 
 func (o *outgoing) appendRollback() {
-	o.logger.Debugf(log.BoltTrace, o.logId, "ROLLBACK")
+	if o.boltLogger != nil {
+		o.boltLogger.LogClientMessage(o.logId, "ROLLBACK")
+	}
 	o.begin()
 	o.packer.StructHeader(byte(msgRollback), 0)
 	o.end()
 }
 
 func (o *outgoing) appendRun(cypher string, params, meta map[string]interface{}) {
-	o.logger.Debugf(log.BoltTrace, o.logId, "RUN %q %s %s", cypher, loggableDictionary(params), loggableDictionary(meta))
+	if o.boltLogger != nil {
+		o.boltLogger.LogClientMessage(o.logId, "RUN %q %s %s", cypher, loggableDictionary(params), loggableDictionary(meta))
+	}
 	o.begin()
 	o.packer.StructHeader(byte(msgRun), 3)
 	o.packer.String(cypher)
@@ -92,7 +102,9 @@ func (o *outgoing) appendRun(cypher string, params, meta map[string]interface{})
 }
 
 func (o *outgoing) appendPullN(n int) {
-	o.logger.Debugf(log.BoltTrace, o.logId, "PULL %s", loggableDictionary{"n": n})
+	if o.boltLogger != nil {
+		o.boltLogger.LogClientMessage(o.logId, "PULL %s", loggableDictionary{"n": n})
+	}
 	o.begin()
 	o.packer.StructHeader(byte(msgPullN), 1)
 	o.packer.MapHeader(1)
@@ -102,7 +114,9 @@ func (o *outgoing) appendPullN(n int) {
 }
 
 func (o *outgoing) appendPullNQid(n int, qid int64) {
-	o.logger.Debugf(log.BoltTrace, o.logId, "PULL %s", loggableDictionary{"n": n, "qid": qid})
+	if o.boltLogger != nil {
+		o.boltLogger.LogClientMessage(o.logId, "PULL %s", loggableDictionary{"n": n, "qid": qid})
+	}
 	o.begin()
 	o.packer.StructHeader(byte(msgPullN), 1)
 	o.packer.MapHeader(2)
@@ -114,7 +128,9 @@ func (o *outgoing) appendPullNQid(n int, qid int64) {
 }
 
 func (o *outgoing) appendDiscardNQid(n int, qid int64) {
-	o.logger.Debugf(log.BoltTrace, o.logId, "DISCARD %s", loggableDictionary{"n": n, "qid": qid})
+	if o.boltLogger != nil {
+		o.boltLogger.LogClientMessage(o.logId, "DISCARD %s", loggableDictionary{"n": n, "qid": qid})
+	}
 	o.begin()
 	o.packer.StructHeader(byte(msgDiscardN), 1)
 	o.packer.MapHeader(2)
@@ -126,14 +142,18 @@ func (o *outgoing) appendDiscardNQid(n int, qid int64) {
 }
 
 func (o *outgoing) appendPullAll() {
-	o.logger.Debugf(log.BoltTrace, o.logId, "PULL ALL")
+	if o.boltLogger != nil {
+		o.boltLogger.LogClientMessage(o.logId, "PULL ALL")
+	}
 	o.begin()
 	o.packer.StructHeader(byte(msgPullAll), 0)
 	o.end()
 }
 
 func (o *outgoing) appendRoute(context map[string]string, bookmarks []string, database string) {
-	o.logger.Debugf(log.BoltTrace, o.logId, "ROUTE %s %s %q", loggableStringDictionary(context), loggableStringList(bookmarks), database)
+	if o.boltLogger != nil {
+		o.boltLogger.LogClientMessage(o.logId, "ROUTE %s %s %q", loggableStringDictionary(context), loggableStringList(bookmarks), database)
+	}
 	o.begin()
 	o.packer.StructHeader(byte(msgRoute), 3)
 	o.packer.MapHeader(len(context))
@@ -154,14 +174,18 @@ func (o *outgoing) appendRoute(context map[string]string, bookmarks []string, da
 }
 
 func (o *outgoing) appendReset() {
-	o.logger.Debugf(log.BoltTrace, o.logId, "RESET")
+	if o.boltLogger != nil {
+		o.boltLogger.LogClientMessage(o.logId, "RESET")
+	}
 	o.begin()
 	o.packer.StructHeader(byte(msgReset), 0)
 	o.end()
 }
 
 func (o *outgoing) appendGoodbye() {
-	o.logger.Debugf(log.BoltTrace, o.logId, "GOODBYE")
+	if o.boltLogger != nil {
+		o.boltLogger.LogClientMessage(o.logId, "GOODBYE")
+	}
 	o.begin()
 	o.packer.StructHeader(byte(msgGoodbye), 0)
 	o.end()

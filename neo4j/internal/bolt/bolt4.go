@@ -95,7 +95,7 @@ type bolt4 struct {
 	minor         int
 }
 
-func NewBolt4(serverName string, conn net.Conn, log log.Logger) *bolt4 {
+func NewBolt4(serverName string, conn net.Conn, log log.Logger, boltLog log.BoltLogger) *bolt4 {
 	b := &bolt4{
 		state:      bolt4_unauthorized,
 		conn:       conn,
@@ -106,17 +106,15 @@ func NewBolt4(serverName string, conn net.Conn, log log.Logger) *bolt4 {
 		in:         incoming{
 			buf: make([]byte, 4096),
 			hyd: hydrator{
-				logger: log,
-				logId: "S",
+				boltLogger: boltLog,
 			},
 		},
 	}
 	b.out = outgoing{
-		chunker: newChunker(),
-		packer:  packstream.Packer{},
-		onErr:   func(err error) { b.setError(err, true) },
-		logger: log,
-		logId: "C",
+		chunker:    newChunker(),
+		packer:     packstream.Packer{},
+		onErr:      func(err error) { b.setError(err, true) },
+		boltLogger: boltLog,
 	}
 
 	return b
@@ -249,8 +247,8 @@ func (b *bolt4) connect(minor int, auth map[string]interface{}, userAgent string
 	// Construct log identity
 	connectionLogId := fmt.Sprintf("%s@%s", b.connId, b.serverName)
 	b.logId = connectionLogId
-	b.in.hyd.logId = fmt.Sprintf("%s %s", b.in.hyd.logId, connectionLogId)
-	b.out.logId = fmt.Sprintf("%s %s", b.out.logId, connectionLogId)
+	b.in.hyd.logId = connectionLogId
+	b.out.logId = connectionLogId
 
 	// Transition into ready state
 	b.state = bolt4_ready
@@ -945,4 +943,9 @@ func (b *bolt4) ForceReset() error {
 	}
 	b.Reset()
 	return b.err
+}
+
+func (b *bolt4) SetBoltLogger(boltLogger log.BoltLogger) {
+	b.in.hyd.boltLogger = boltLogger
+	b.out.boltLogger = boltLogger
 }

@@ -21,6 +21,7 @@
 package db
 
 import (
+	"github.com/neo4j/neo4j-go-driver/v4/neo4j/log"
 	"time"
 )
 
@@ -96,6 +97,8 @@ type Connection interface {
 	// database equals DefaultDatabase. If the underlying connection does not support
 	// multiple databases, DefaultDatabase should be used as database.
 	GetRoutingTable(context map[string]string, bookmarks []string, database string) (*RoutingTable, error)
+	// Sets Bolt message logger on already initialized connections
+	SetBoltLogger(boltLogger log.BoltLogger)
 }
 
 type RoutingTable struct {

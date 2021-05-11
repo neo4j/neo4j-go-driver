@@ -46,3 +46,7 @@ func ConsoleLogger(level LogLevel) *log.Console {
 		Debugs: level >= DEBUG,
 	}
 }
+
+func ConsoleBoltLogger() *log.ConsoleBoltLogger {
+	return &log.ConsoleBoltLogger{}
+}

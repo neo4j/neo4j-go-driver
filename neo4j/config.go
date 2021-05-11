@@ -40,10 +40,10 @@ type Config struct {
 
 	// Logging target the driver will send its log outputs
 	//
-	// Possible to use custom logger (implement neo4j.log.Logger interface) or
-	// use neo4j.ConsoleLog.
+	// Possible to use custom logger (implement log.Logger interface) or
+	// use neo4j.ConsoleLogger.
 	//
-	// default: No Op Logger (neo4j.VoidLog)
+	// default: No Op Logger (log.Void)
 	Log log.Logger
 	// Resolver that would be used to resolve initial router address. This may
 	// be useful if you want to provide more than one URL for initial router.

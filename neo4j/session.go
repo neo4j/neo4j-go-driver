@@ -76,6 +76,11 @@ type SessionConfig struct {
 	// To turn off fetching in batches and always fetch everything, set FetchSize to FetchAll.
 	// If a single large result is to be retrieved this is the most performant setting.
 	FetchSize int
+	// Logging target the session will send its Bolt message traces
+	//
+	// Possible to use custom logger (implement log.BoltLogger interface) or
+	// use neo4j.ConsoleBoltLogger.
+	BoltLogger log.BoltLogger
 }
 
 // Turns off fetching records in batches.
@@ -86,7 +91,7 @@ const FetchDefault = 0
 
 // Connection pool as seen by the session.
 type sessionPool interface {
-	Borrow(ctx context.Context, serverNames []string, wait bool) (db.Connection, error)
+	Borrow(ctx context.Context, serverNames []string, wait bool, boltLogger log.BoltLogger) (db.Connection, error)
 	Return(c db.Connection)
 	CleanUp()
 }
@@ -106,6 +111,7 @@ type session struct {
 	log          log.Logger
 	throttleTime time.Duration
 	fetchSize    int
+	boltLogger   log.BoltLogger
 }
 
 // Remove empty string bookmarks to check for "bad" callers
@@ -133,7 +139,7 @@ func cleanupBookmarks(bookmarks []string) []string {
 }
 
 func newSession(config *Config, router sessionRouter, pool sessionPool,
-	mode db.AccessMode, bookmarks []string, databaseName string, fetchSize int, logger log.Logger) *session {
+	mode db.AccessMode, bookmarks []string, databaseName string, fetchSize int, logger log.Logger, boltLogger log.BoltLogger) *session {
 
 	logId := log.NewId()
 	logger.Debugf(log.Session, logId, "Created")
@@ -151,6 +157,7 @@ func newSession(config *Config, router sessionRouter, pool sessionPool,
 		logId:        logId,
 		throttleTime: time.Second * 1,
 		fetchSize:    fetchSize,
+		boltLogger:   boltLogger,
 	}
 }
 
@@ -334,9 +341,9 @@ func (s *session) WriteTransaction(
 
 func (s *session) getServers(ctx context.Context, mode db.AccessMode) ([]string, error) {
 	if mode == db.ReadMode {
-		return s.router.Readers(ctx, s.bookmarks, s.databaseName)
+		return s.router.Readers(ctx, s.bookmarks, s.databaseName, s.boltLogger)
 	} else {
-		return s.router.Writers(ctx, s.bookmarks, s.databaseName)
+		return s.router.Writers(ctx, s.bookmarks, s.databaseName, s.boltLogger)
 	}
 }
 
@@ -356,7 +363,7 @@ func (s *session) getConnection(mode db.AccessMode) (db.Connection, error) {
 		return nil, wrapError(err)
 	}
 
-	conn, err := s.pool.Borrow(ctx, servers, s.config.ConnectionAcquisitionTimeout != 0)
+	conn, err := s.pool.Borrow(ctx, servers, s.config.ConnectionAcquisitionTimeout != 0, s.boltLogger)
 	if err != nil {
 		return nil, wrapError(err)
 	}

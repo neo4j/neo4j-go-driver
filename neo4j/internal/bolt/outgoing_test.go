@@ -21,7 +21,6 @@ package bolt
 
 import (
 	"bytes"
-	"github.com/neo4j/neo4j-go-driver/v4/neo4j/log"
 	"reflect"
 	"testing"
 	"time"
@@ -85,10 +84,9 @@ func unpack(u *packstream.Unpacker) interface{} {
 func TestOutgoing(ot *testing.T) {
 	var err error
 	out := &outgoing{
-		chunker: newChunker(),
-		packer:  packstream.Packer{},
-		onErr:   func(e error) { err = e },
-		logger: log.Void{},
+		chunker:    newChunker(),
+		packer:     packstream.Packer{},
+		onErr:      func(e error) { err = e },
 	}
 	// Utility to unpack through dechunking and a custom build func
 	dechunkAndUnpack := func(t *testing.T, build func()) interface{} {

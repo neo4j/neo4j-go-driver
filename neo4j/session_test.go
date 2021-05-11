@@ -36,6 +36,7 @@ import (
 
 func TestSession(st *testing.T) {
 	logger := log.Console{Errors: true, Infos: true, Warns: true, Debugs: true}
+	boltLogger := log.ConsoleBoltLogger{}
 
 	assertCleanSessionState := func(t *testing.T, sess *session) {
 		if sess.txExplicit != nil {
@@ -47,7 +48,7 @@ func TestSession(st *testing.T) {
 		conf := Config{MaxTransactionRetryTime: 3 * time.Millisecond}
 		router := RouterFake{}
 		pool := PoolFake{}
-		sess := newSession(&conf, &router, &pool, db.ReadMode, []string{}, "", 0, &logger)
+		sess := newSession(&conf, &router, &pool, db.ReadMode, []string{}, "", 0, &logger, &boltLogger)
 		sess.throttleTime = time.Millisecond * 1
 		return &router, &pool, sess
 	}
@@ -56,7 +57,7 @@ func TestSession(st *testing.T) {
 		conf := Config{MaxTransactionRetryTime: 3 * time.Millisecond}
 		router := RouterFake{}
 		pool := PoolFake{}
-		sess := newSession(&conf, &router, &pool, db.ReadMode, bookmarks, "", 0, &logger)
+		sess := newSession(&conf, &router, &pool, db.ReadMode, bookmarks, "", 0, &logger, &boltLogger)
 		sess.throttleTime = time.Millisecond * 1
 		return &router, &pool, sess
 	}

@@ -85,7 +85,7 @@ type bolt3 struct {
 	err           error // Last fatal error
 }
 
-func NewBolt3(serverName string, conn net.Conn, log log.Logger) *bolt3 {
+func NewBolt3(serverName string, conn net.Conn, log log.Logger, boltLog log.BoltLogger) *bolt3 {
 	b := &bolt3{
 		state:      bolt3_unauthorized,
 		conn:       conn,
@@ -93,8 +93,7 @@ func NewBolt3(serverName string, conn net.Conn, log log.Logger) *bolt3 {
 		in:         &incoming{
 			buf: make([]byte, 4096),
 			hyd: hydrator{
-				logger: log,
-				logId: "S",
+				boltLogger: boltLog,
 			},
 		},
 		birthDate:  time.Now(),
@@ -109,8 +108,7 @@ func NewBolt3(serverName string, conn net.Conn, log log.Logger) *bolt3 {
 			}
 			b.state = bolt3_dead
 		},
-		logger: log,
-		logId: "C",
+		boltLogger: boltLog,
 	}
 	return b
 }
@@ -196,8 +194,8 @@ func (b *bolt3) connect(auth map[string]interface{}, userAgent string) error {
 	b.connId = succ.connectionId
 	connectionLogId := fmt.Sprintf("%s@%s", b.connId, b.serverName)
 	b.logId = connectionLogId
-	b.in.hyd.logId = fmt.Sprintf("%s %s", b.in.hyd.logId, connectionLogId)
-	b.out.logId = fmt.Sprintf("%s %s", b.out.logId, connectionLogId)
+	b.in.hyd.logId = connectionLogId
+	b.out.logId = connectionLogId
 	b.serverVersion = succ.server
 
 	// Transition into ready state
@@ -749,4 +747,9 @@ func (b *bolt3) Close() {
 
 func (b *bolt3) ForceReset() error {
 	return nil
+}
+
+func (b *bolt3) SetBoltLogger(boltLogger log.BoltLogger) {
+	b.in.hyd.boltLogger = boltLogger
+	b.out.boltLogger = boltLogger
 }
