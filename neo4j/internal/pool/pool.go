@@ -351,6 +351,8 @@ func (p *Pool) Return(c db.Connection) {
 		return
 	}
 
+	c.SetBoltLogger(nil)
+
 	// Get the name of the server that the connection belongs to.
 	serverName := c.ServerName()
 	isAlive := c.IsAlive()
