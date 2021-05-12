@@ -269,7 +269,7 @@ For simplicity, we provide a predefined console logger which can be constructed 
 
 ```go
 session := driver.NewSession(neo4j.SessionConfig{
-	BoltLogger: &neo4j.ConsoleBoltLogger{},
+	BoltLogger: neo4j.ConsoleBoltLogger(),
 })
 defer session.Close()
 // [...]
