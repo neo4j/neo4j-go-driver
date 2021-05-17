@@ -112,7 +112,8 @@ func (b *backend) writeError(err error) {
 	isDriverError := neo4j.IsNeo4jError(err) ||
 		neo4j.IsUsageError(err) ||
 		neo4j.IsConnectivityError(err) ||
-		neo4j.IsTransactionExecutionLimit(err)
+		neo4j.IsTransactionExecutionLimit(err) ||
+		err.Error() == "Invalid transaction handle"
 
 	if isDriverError {
 		id := b.setError(err)
