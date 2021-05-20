@@ -34,7 +34,13 @@ type relNode struct {
 func buildPath(nodes []dbtype.Node, relNodes []*relNode, indexes []int) dbtype.Path {
 	num := len(indexes) / 2
 	if num == 0 {
-		return dbtype.Path{}
+		var path dbtype.Path
+		// add nodes to the path if no relationships but there is a node
+		// if num is 0 there probably isn't rel nodes
+		if nodes != nil && len(nodes) != 0 {
+			path.Nodes = nodes
+		}
+		return path
 	}
 	rels := make([]dbtype.Relationship, 0, num)
 

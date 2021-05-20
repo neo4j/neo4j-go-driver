@@ -57,6 +57,24 @@ func TestBuildPath(ot *testing.T) {
 			relNodes: []*relNode{&relNode{id: 3, name: "x"}},
 			indexes:  []int{-1, 1},
 		},
+		{
+			name: "One node",
+			path: dbtype.Path{
+				Nodes: []dbtype.Node{dbtype.Node{Id: 1}},
+			},
+			nodes: []dbtype.Node{dbtype.Node{Id: 1}},
+			relNodes: []*relNode{},
+			indexes: []int{},
+		},
+		{
+			name: "Many nodes, no relationships",
+			path: dbtype.Path{
+				Nodes: []dbtype.Node{dbtype.Node{Id: 1}, dbtype.Node{Id: 2}},
+			},
+			nodes: []dbtype.Node{dbtype.Node{Id: 1}, dbtype.Node{Id: 2}},
+			relNodes: []*relNode{},
+			indexes: []int{},
+		},
 	}
 	for _, c := range cases {
 		ot.Run(c.name, func(t *testing.T) {
