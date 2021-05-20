@@ -62,18 +62,18 @@ func TestBuildPath(ot *testing.T) {
 			path: dbtype.Path{
 				Nodes: []dbtype.Node{dbtype.Node{Id: 1}},
 			},
-			nodes: []dbtype.Node{dbtype.Node{Id: 1}},
+			nodes:    []dbtype.Node{dbtype.Node{Id: 1}},
 			relNodes: []*relNode{},
-			indexes: []int{},
+			indexes:  []int{},
 		},
 		{
 			name: "Many nodes, no relationships",
 			path: dbtype.Path{
 				Nodes: []dbtype.Node{dbtype.Node{Id: 1}, dbtype.Node{Id: 2}},
 			},
-			nodes: []dbtype.Node{dbtype.Node{Id: 1}, dbtype.Node{Id: 2}},
+			nodes:    []dbtype.Node{dbtype.Node{Id: 1}, dbtype.Node{Id: 2}},
 			relNodes: []*relNode{},
-			indexes: []int{},
+			indexes:  []int{},
 		},
 	}
 	for _, c := range cases {
