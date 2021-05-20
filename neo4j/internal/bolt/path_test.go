@@ -57,12 +57,24 @@ func TestBuildPath(ot *testing.T) {
 			relNodes: []*relNode{&relNode{id: 3, name: "x"}},
 			indexes:  []int{-1, 1},
 		},
+		{
+			name: "One node",
+			path: dbtype.Path{
+				Nodes: []dbtype.Node{dbtype.Node{Id: 1}},
+			},
+			nodes:    []dbtype.Node{dbtype.Node{Id: 1}},
+			relNodes: []*relNode{},
+			indexes:  []int{},
+		},
 	}
 	for _, c := range cases {
 		ot.Run(c.name, func(t *testing.T) {
 			path := buildPath(c.nodes, c.relNodes, c.indexes)
 			if len(path.Relationships) != len(c.path.Relationships) {
 				t.Fatal("Wrong number of relationships")
+			}
+			if len(path.Nodes) != len(c.path.Nodes) {
+				t.Fatal("Wrong number of nodes")
 			}
 			for i, rel := range path.Relationships {
 				// Compare expected relationship

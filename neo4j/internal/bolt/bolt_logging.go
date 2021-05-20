@@ -91,4 +91,3 @@ func serializeTrace(v interface{}) string {
 	_ = encoder.Encode(v)
 	return strings.TrimSpace(builder.String())
 }
-

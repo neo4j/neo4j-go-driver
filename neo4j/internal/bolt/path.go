@@ -34,7 +34,12 @@ type relNode struct {
 func buildPath(nodes []dbtype.Node, relNodes []*relNode, indexes []int) dbtype.Path {
 	num := len(indexes) / 2
 	if num == 0 {
-		return dbtype.Path{}
+		var path dbtype.Path
+		if len(nodes) > 0 {
+			// there could be a single disconnected node
+			path.Nodes = nodes
+		}
+		return path
 	}
 	rels := make([]dbtype.Relationship, 0, num)
 
