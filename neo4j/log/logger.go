@@ -51,12 +51,12 @@ type Logger interface {
 
 // List of component names used as parameter to logger functions.
 const (
-	Bolt3     = "bolt3"
-	Bolt4     = "bolt4"
-	Driver    = "driver"
-	Pool      = "pool"
-	Router    = "router"
-	Session   = "session"
+	Bolt3   = "bolt3"
+	Bolt4   = "bolt4"
+	Driver  = "driver"
+	Pool    = "pool"
+	Router  = "router"
+	Session = "session"
 )
 
 // Last used component id

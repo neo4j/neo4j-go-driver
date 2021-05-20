@@ -103,7 +103,7 @@ func NewBolt4(serverName string, conn net.Conn, log log.Logger, boltLog log.Bolt
 		birthDate:  time.Now(),
 		log:        log,
 		streams:    openstreams{},
-		in:         incoming{
+		in: incoming{
 			buf: make([]byte, 4096),
 			hyd: hydrator{
 				boltLogger: boltLog,

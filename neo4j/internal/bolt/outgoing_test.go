@@ -84,9 +84,9 @@ func unpack(u *packstream.Unpacker) interface{} {
 func TestOutgoing(ot *testing.T) {
 	var err error
 	out := &outgoing{
-		chunker:    newChunker(),
-		packer:     packstream.Packer{},
-		onErr:      func(e error) { err = e },
+		chunker: newChunker(),
+		packer:  packstream.Packer{},
+		onErr:   func(e error) { err = e },
 	}
 	// Utility to unpack through dechunking and a custom build func
 	dechunkAndUnpack := func(t *testing.T, build func()) interface{} {

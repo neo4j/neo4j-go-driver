@@ -91,14 +91,14 @@ func NewBolt3(serverName string, conn net.Conn, log log.Logger, boltLog log.Bolt
 		state:      bolt3_unauthorized,
 		conn:       conn,
 		serverName: serverName,
-		in:         &incoming{
+		in: &incoming{
 			buf: make([]byte, 4096),
 			hyd: hydrator{
 				boltLogger: boltLog,
 			},
 		},
-		birthDate:  time.Now(),
-		log:        log,
+		birthDate: time.Now(),
+		log:       log,
 	}
 	b.out = &outgoing{
 		chunker: newChunker(),

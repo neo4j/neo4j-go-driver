@@ -413,7 +413,7 @@ func (s *session) Run(
 		conn db.Connection
 		err  error
 	)
-	for  {
+	for {
 		conn, err = s.getConnection(s.defaultMode)
 		if err != nil {
 			return nil, err
