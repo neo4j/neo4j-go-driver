@@ -6,9 +6,6 @@
 
 # GoLang
 .idea/
-# remove this if you want to use go modules at some point
-neo4j/go.mod
-neo4j/go.sum
 
 testkit/CAs/
 testkit-backend/testkit-backend
