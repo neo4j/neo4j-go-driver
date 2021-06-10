@@ -500,7 +500,7 @@ func addPersonInTxFunc(driver neo4j.Driver, name string) error {
 
 // tag::transaction-timeout-config[]
 func configTxTimeout(driver neo4j.Driver, name string) error {
-	session := driver.NewSession(neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
+	session := driver.NewSession(neo4j.SessionConfig{})
 	defer session.Close()
 
 	_, err := session.WriteTransaction(func(tx neo4j.Transaction) (interface{}, error) {
@@ -519,7 +519,7 @@ func configTxTimeout(driver neo4j.Driver, name string) error {
 
 // tag::transaction-metadata-config[]
 func configTxMetadata(driver neo4j.Driver, name string) error {
-	session := driver.NewSession(neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
+	session := driver.NewSession(neo4j.SessionConfig{})
 	defer session.Close()
 
 	_, err := session.WriteTransaction(func(tx neo4j.Transaction) (interface{}, error) {
