@@ -498,6 +498,44 @@ func addPersonInTxFunc(driver neo4j.Driver, name string) error {
 
 // end::transaction-function[]
 
+// tag::transaction-timeout-config[]
+func configTxTimeout(driver neo4j.Driver, name string) error {
+	session := driver.NewSession(neo4j.SessionConfig{})
+	defer session.Close()
+
+	_, err := session.WriteTransaction(func(tx neo4j.Transaction) (interface{}, error) {
+		result, err := tx.Run("CREATE (a:Person {name: $name})", map[string]interface{}{"name": name})
+		if err != nil {
+			return nil, err
+		}
+
+		return result.Consume()
+	}, neo4j.WithTxTimeout(5*time.Second))
+
+	return err
+}
+
+// end::transaction-timeout-config[]
+
+// tag::transaction-metadata-config[]
+func configTxMetadata(driver neo4j.Driver, name string) error {
+	session := driver.NewSession(neo4j.SessionConfig{})
+	defer session.Close()
+
+	_, err := session.WriteTransaction(func(tx neo4j.Transaction) (interface{}, error) {
+		result, err := tx.Run("CREATE (a:Person {name: $name})", map[string]interface{}{"name": name})
+		if err != nil {
+			return nil, err
+		}
+
+		return result.Consume()
+	}, neo4j.WithTxMetadata(map[string]interface{}{"applicationId": 123}))
+
+	return err
+}
+
+// end::transaction-metadata-config[]
+
 // tag::pass-bookmarks[]
 func addCompanyTxFunc(name string) neo4j.TransactionWork {
 	return func(tx neo4j.Transaction) (interface{}, error) {
