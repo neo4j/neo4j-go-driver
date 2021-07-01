@@ -288,3 +288,39 @@ type BoltLogger interface {
 
 For a customised logging target, you can implement the above interface and pass an instance of that implementation to the `BoltLogger` field.
 
+## Development
+
+This section describes instructions to use during the development phase of the driver. 
+
+### Testing
+
+Tests **require** the latest [Testkit 4.3](https://github.com/neo4j-drivers/testkit/tree/4.3), Python3 and Docker.
+
+Testkit needs to be cloned and configured to run against the Go Driver. Use the following steps to configure it.
+
+1. Clone the Testkit repository
+
+```shell
+git clone https://github.com/neo4j-drivers/testkit.git
+```
+
+2. Under the Testkit folder, install the requirements.
+
+```shell
+pip3 install -r requirements.txt
+```
+
+3. Define the following required environment variables
+
+```shell
+export TEST_DRIVER_NAME=go
+export TEST_DRIVER_REPO=<path for the root folder of driver repository>
+```
+
+To run test against against some Neo4j version:
+
+```shell
+python3 main.py
+```
+
+More details about how to use Teskit can be found on [its repository](https://github.com/neo4j-drivers/testkit/tree/4.3)
