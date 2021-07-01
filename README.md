@@ -323,4 +323,4 @@ To run test against against some Neo4j version:
 python3 main.py
 ```
 
-More details about how to use Teskit could be found on [its repository](https://github.com/neo4j-drivers/testkit/tree/4.3)
+More details about how to use Teskit can be found on [its repository](https://github.com/neo4j-drivers/testkit/tree/4.3)
