@@ -288,7 +288,7 @@ type BoltLogger interface {
 
 For a customised logging target, you can implement the above interface and pass an instance of that implementation to the `BoltLogger` field.
 
-## Developing
+## Development
 
 This section describe instructions to be used during the development phase of the driver. 
 
