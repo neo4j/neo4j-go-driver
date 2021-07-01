@@ -319,7 +319,7 @@ export TEST_DRIVER_REPO=<path for the root folder of driver repository>
 
 To run test against against some Neo4j version:
 
-```
+```shell
 python3 main.py
 ```
 
