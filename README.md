@@ -290,7 +290,7 @@ For a customised logging target, you can implement the above interface and pass 
 
 ## Development
 
-This section describe instructions to be used during the development phase of the driver. 
+This section describes instructions to use during the development phase of the driver. 
 
 ### Testing
 
