@@ -310,7 +310,7 @@ git clone https://github.com/neo4j-drivers/testkit.git
 pip3 install -r requirements.txt
 ```
 
-3. Define some enviroment variables to configure Testkit
+3. Define the following required environment variables
 
 ```
 export TEST_DRIVER_NAME=go
