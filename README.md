@@ -312,7 +312,7 @@ pip3 install -r requirements.txt
 
 3. Define the following required environment variables
 
-```
+```shell
 export TEST_DRIVER_NAME=go
 export TEST_DRIVER_REPO=<path for the root folder of driver repository>
 ```
