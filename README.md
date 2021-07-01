@@ -306,7 +306,7 @@ git clone https://github.com/neo4j-drivers/testkit.git
 
 2. Under the Testkit folder, install the requirements.
 
-```
+```shell
 pip3 install -r requirements.txt
 ```
 
