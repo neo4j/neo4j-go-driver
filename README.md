@@ -300,7 +300,7 @@ Testkit needs to be cloned and configured to run against the Go Driver. Use the 
 
 1. Clone the Testkit repository
 
-```
+```shell
 git clone https://github.com/neo4j-drivers/testkit.git
 ```
 
