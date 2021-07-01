@@ -296,7 +296,7 @@ This section describes instructions to use during the development phase of the d
 
 Tests **require** the latest [Testkit 4.3](https://github.com/neo4j-drivers/testkit/tree/4.3), Python3 and Docker.
 
-Testkit is needed to be cloned and configured to run against the Go Driver. Use the following steps to configure Testkit.
+Testkit needs to be cloned and configured to run against the Go Driver. Use the following steps to configure it.
 
 1. Clone the Testkit repository
 
