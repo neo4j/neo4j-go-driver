@@ -60,6 +60,8 @@ type ResultSummary interface {
 	ResultAvailableAfter() time.Duration
 	// ResultConsumedAfter returns the time it took the server to consume the result.
 	ResultConsumedAfter() time.Duration
+	// Database returns information about the database where the result is obtained from
+	Database() DatabaseInfo
 }
 
 // Counters contains statistics about the changes made to the database made as part
@@ -106,6 +108,11 @@ type ServerInfo interface {
 	Version() string
 	Agent() string
 	ProtocolVersion() db.ProtocolVersion
+}
+
+// DatabaseInfo contains basic information of the database the query result has been obtained from.
+type DatabaseInfo interface {
+	Name() string
 }
 
 // Plan describes the actual plan that the database planner produced and used (or will use) to execute your statement.
@@ -293,6 +300,22 @@ func (s *resultSummary) Plan() Plan {
 		return nil
 	}
 	return &plan{plan: s.sum.Plan}
+}
+
+func (s *resultSummary) Database() DatabaseInfo {
+	database := s.sum.Database
+	if database == "" {
+		return nil
+	}
+	return &databaseInfo{name: database}
+}
+
+type databaseInfo struct {
+	name string
+}
+
+func (d *databaseInfo) Name() string {
+	return d.name
 }
 
 type plan struct {
