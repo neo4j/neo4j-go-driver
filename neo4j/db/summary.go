@@ -132,4 +132,5 @@ type Summary struct {
 	Plan          *Plan
 	ProfiledPlan  *ProfiledPlan
 	Notifications []Notification
+	Database      string
 }

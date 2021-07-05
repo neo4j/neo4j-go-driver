@@ -75,6 +75,7 @@ func (s *success) summary() *db.Summary {
 		Plan:          s.plan,
 		ProfiledPlan:  s.profile,
 		Notifications: s.notifications,
+		Database:      s.db,
 	}
 }
 

@@ -23,33 +23,7 @@ import (
 	"fmt"
 	"regexp"
 	"strconv"
-
-	"github.com/neo4j/neo4j-go-driver/v4/neo4j"
 )
-
-var (
-	// V340 identifies server version 3.4.0
-	V340 = VersionOf("3.4.0")
-	// V350 identifies server version 3.5.0
-	V350 = VersionOf("3.5.0")
-)
-
-func versionOfDriver(driver neo4j.Driver) Version {
-	session := driver.NewSession(neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead})
-	defer session.Close()
-
-	result, err := session.Run("RETURN 1", nil)
-	if err != nil {
-		panic(err)
-	}
-
-	summary, err := result.Consume()
-	if err != nil {
-		panic(err)
-	}
-
-	return VersionOf(summary.Server().Version())
-}
 
 const (
 	versionPattern = "(Neo4j/)?(\\d+)\\.(\\d+)(?:\\.)?(\\d*)(\\.|-|\\+)?([0-9A-Za-z-.]*)?"
@@ -67,10 +41,32 @@ type Version struct {
 }
 
 var (
-	noVersion      Version = Version{-1, -1, -1}
-	inDevVersion   Version = Version{0, 0, 0}
-	defaultVersion Version = Version{3, 0, 0}
+	noVersion      = Version{-1, -1, -1}
+	inDevVersion   = Version{0, 0, 0}
+	defaultVersion = Version{3, 0, 0}
 )
+
+func VersionOf(server string) Version {
+	if server == "" {
+		return defaultVersion
+	} else {
+		if versionMatcher == nil {
+			versionMatcher = regexp.MustCompile(versionPattern)
+		}
+		matches := versionMatcher.FindStringSubmatch(server)
+		if matches != nil {
+			major, _ := strconv.Atoi(matches[2])
+			minor, _ := strconv.Atoi(matches[3])
+			patch, _ := strconv.Atoi(matches[4])
+
+			return Version{major, minor, patch}
+		} else if server == versionInDev {
+			return inDevVersion
+		}
+	}
+
+	return noVersion
+}
 
 func compareInt(num1 int, num2 int) int {
 	if num1 == num2 {
@@ -94,28 +90,6 @@ func compareVersions(version1 Version, version2 Version) int {
 	}
 
 	return comp
-}
-
-func VersionOf(server string) Version {
-	if server == "" {
-		return defaultVersion
-	} else {
-		if versionMatcher == nil {
-			versionMatcher = regexp.MustCompile(versionPattern)
-		}
-		matches := versionMatcher.FindStringSubmatch(server)
-		if matches != nil {
-			major, _ := strconv.Atoi(matches[2])
-			minor, _ := strconv.Atoi(matches[3])
-			patch, _ := strconv.Atoi(matches[4])
-
-			return Version{major, minor, patch}
-		} else if server == versionInDev {
-			return inDevVersion
-		}
-	}
-
-	return noVersion
 }
 
 func (version Version) String() string {
