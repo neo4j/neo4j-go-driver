@@ -61,6 +61,8 @@ type ResultSummary interface {
 	// ResultConsumedAfter returns the time it took the server to consume the result.
 	ResultConsumedAfter() time.Duration
 	// Database returns information about the database where the result is obtained from
+	// Returns nil for Neo4j versions prior to v4.
+	// Returns the default "neo4j" database for Community Edition servers.
 	Database() DatabaseInfo
 }
 
