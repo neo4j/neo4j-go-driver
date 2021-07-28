@@ -24,6 +24,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/neo4j/neo4j-go-driver/v4/neo4j/db"
 	"io"
 	"sync"
 	"time"
@@ -109,6 +110,10 @@ func (b *backend) writeError(err error) {
 	// This is very simple right now, no extra information is sent at all just keep
 	// track of this error so that we can reuse the real thing within a retryable tx
 	fmt.Printf("Error: %s (%T)\n", err.Error(), err)
+	code := ""
+	if neo4j.IsNeo4jError(err) {
+		code = err.(*db.Neo4jError).Code
+	}
 	isDriverError := neo4j.IsNeo4jError(err) ||
 		neo4j.IsUsageError(err) ||
 		neo4j.IsConnectivityError(err) ||
@@ -117,7 +122,7 @@ func (b *backend) writeError(err error) {
 
 	if isDriverError {
 		id := b.setError(err)
-		b.writeResponse("DriverError", map[string]interface{}{"id": id})
+		b.writeResponse("DriverError", map[string]interface{}{"id": id, "msg": err.Error(), "code": code})
 		return
 	}
 
