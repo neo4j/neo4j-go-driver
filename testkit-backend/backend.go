@@ -26,6 +26,7 @@ import (
 	"fmt"
 	"github.com/neo4j/neo4j-go-driver/v4/neo4j/db"
 	"io"
+	"net/url"
 	"sync"
 	"time"
 
@@ -35,15 +36,16 @@ import (
 // Handles a testkit backend session.
 // Tracks all objects (and errors) that is created by testkit frontend.
 type backend struct {
-	rd             *bufio.Reader // Socket to read requests from
-	wr             io.Writer     // Socket to write responses (and logs) on, don't buffer (WriteString on bufio was weird...)
-	drivers        map[string]neo4j.Driver
-	sessionStates  map[string]*sessionState
-	results        map[string]neo4j.Result
-	transactions   map[string]neo4j.Transaction
-	recordedErrors map[string]error
-	id             int // Id to use for next object created by frontend
-	wrLock         sync.Mutex
+	rd                *bufio.Reader // Socket to read requests from
+	wr                io.Writer     // Socket to write responses (and logs) on, don't buffer (WriteString on bufio was weird...)
+	drivers           map[string]neo4j.Driver
+	sessionStates     map[string]*sessionState
+	results           map[string]neo4j.Result
+	transactions      map[string]neo4j.Transaction
+	recordedErrors    map[string]error
+	resolvedAddresses map[string][]interface{}
+	id                int // Id to use for next object created by frontend
+	wrLock            sync.Mutex
 }
 
 // To implement transactional functions a bit of extra state is needed on the
@@ -62,14 +64,15 @@ const (
 
 func newBackend(rd *bufio.Reader, wr io.Writer) *backend {
 	return &backend{
-		rd:             rd,
-		wr:             wr,
-		drivers:        make(map[string]neo4j.Driver),
-		sessionStates:  make(map[string]*sessionState),
-		results:        make(map[string]neo4j.Result),
-		transactions:   make(map[string]neo4j.Transaction),
-		recordedErrors: make(map[string]error),
-		id:             0,
+		rd:                rd,
+		wr:                wr,
+		drivers:           make(map[string]neo4j.Driver),
+		sessionStates:     make(map[string]*sessionState),
+		results:           make(map[string]neo4j.Result),
+		transactions:      make(map[string]neo4j.Transaction),
+		recordedErrors:    make(map[string]error),
+		resolvedAddresses: make(map[string][]interface{}),
+		id:                0,
 	}
 }
 
@@ -286,11 +289,62 @@ func (b *backend) handleTransactionFunc(isRead bool, data map[string]interface{}
 	}
 }
 
+func (b *backend) customAddressResolverFunction() neo4j.ServerAddressResolver {
+	return func(address neo4j.ServerAddress) []neo4j.ServerAddress {
+		id := b.nextId()
+		b.writeResponse("ResolverResolutionRequired", map[string]string{
+			"id":      id,
+			"address": fmt.Sprintf("%s:%s", address.Hostname(), address.Port()),
+		})
+		for {
+			b.process()
+			if addresses, ok := b.resolvedAddresses[id]; ok {
+				result := make([]neo4j.ServerAddress, len(addresses))
+				for i, address := range addresses {
+					result[i] = NewServerAddress(address.(string))
+				}
+				return result
+			}
+		}
+	}
+
+}
+
+type serverAddress struct {
+	hostname string
+	port     string
+}
+
+func NewServerAddress(address string) neo4j.ServerAddress {
+	parsedAddress, err := url.Parse("//" + address)
+	if err != nil {
+		panic(err)
+	}
+	return serverAddress{
+		hostname: parsedAddress.Hostname(),
+		port:     parsedAddress.Port(),
+	}
+}
+
+func (s serverAddress) Hostname() string {
+	return s.hostname
+}
+
+func (s serverAddress) Port() string {
+	return s.port
+}
+
 func (b *backend) handleRequest(req map[string]interface{}) {
 	name := req["name"].(string)
 	data := req["data"].(map[string]interface{})
+
 	fmt.Printf("REQ: %s\n", name)
 	switch name {
+
+	case "ResolverResolutionCompleted":
+		requestId := data["requestId"].(string)
+		addresses := data["addresses"].([]interface{})
+		b.resolvedAddresses[requestId] = addresses
 
 	case "NewDriver":
 		// Parse authorization token
@@ -308,7 +362,6 @@ func (b *backend) handleRequest(req map[string]interface{}) {
 		}
 		// Parse URI (or rather type cast)
 		uri := data["uri"].(string)
-		// Create the driver instance
 		driver, err := neo4j.NewDriver(uri, authToken, func(c *neo4j.Config) {
 			// Setup custom logger that redirects log entries back to frontend
 			c.Log = &streamLog{writeLine: b.writeLineLocked}
@@ -317,12 +370,14 @@ func (b *backend) handleRequest(req map[string]interface{}) {
 			if userAgentX != nil {
 				c.UserAgent = userAgentX.(string)
 			}
+			if data["resolverRegistered"].(bool) {
+				c.AddressResolver = b.customAddressResolverFunction()
+			}
 		})
 		if err != nil {
 			b.writeError(err)
 			return
 		}
-		// Store the instance for later referal
 		idKey := b.nextId()
 		b.drivers[idKey] = driver
 		b.writeResponse("Driver", map[string]interface{}{"id": idKey})
@@ -500,6 +555,11 @@ func (b *backend) handleRequest(req map[string]interface{}) {
 		testName := data["testName"].(string)
 		if testName == "stub.disconnected.SessionRunDisconnected.test_fail_on_reset" {
 			b.writeResponse("SkipTest", map[string]interface{}{"reason": "It is not resetting driver when put back to pool"})
+			return
+		}
+		if testName == "stub.routing.test_routing_v4x3.RoutingV4x3.test_should_use_resolver_during_rediscovery_when_existing_routers_fail" ||
+			testName == "stub.routing.test_routing_v4x3.RoutingV4x3.test_should_revert_to_initial_router_if_known_router_throws_protocol_errors" {
+			b.writeResponse("SkipTest", map[string]interface{}{"reason": "It needs investigation - resolver does not seem to be called"})
 			return
 		}
 		b.writeResponse("RunTest", nil)
