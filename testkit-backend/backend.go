@@ -553,18 +553,22 @@ func (b *backend) handleRequest(req map[string]interface{}) {
 
 	case "StartTest":
 		testName := data["testName"].(string)
-		if testName == "stub.disconnected.SessionRunDisconnected.test_fail_on_reset" {
-			b.writeResponse("SkipTest", map[string]interface{}{"reason": "It is not resetting driver when put back to pool"})
-			return
-		}
-		if testName == "stub.routing.test_routing_v4x3.RoutingV4x3.test_should_use_resolver_during_rediscovery_when_existing_routers_fail" ||
-			testName == "stub.routing.test_routing_v4x3.RoutingV4x3.test_should_revert_to_initial_router_if_known_router_throws_protocol_errors" {
-			b.writeResponse("SkipTest", map[string]interface{}{"reason": "It needs investigation - resolver does not seem to be called"})
+		skippedTests := testSkips()
+		if reason, ok := skippedTests[testName]; ok {
+			b.writeResponse("SkipTest", map[string]interface{}{"reason": reason})
 			return
 		}
 		b.writeResponse("RunTest", nil)
 
 	default:
 		b.writeError(errors.New("Unknown request: " + name))
+	}
+}
+
+func testSkips() map[string]string {
+	return map[string]string{
+		"test_disconnects.TestDisconnects.test_fail_on_reset": "It is not resetting driver when put back to pool",
+		"stub.routing.test_routing_v4x3.RoutingV4x3.test_should_use_resolver_during_rediscovery_when_existing_routers_fail": "It needs investigation - custom resolver does not seem to be called",
+		"stub.routing.test_routing_v4x3.RoutingV4x3.test_should_revert_to_initial_router_if_known_router_throws_protocol_errors": "It needs investigation - custom resolver does not seem to be called",
 	}
 }
