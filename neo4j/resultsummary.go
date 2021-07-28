@@ -20,6 +20,7 @@
 package neo4j
 
 import (
+	"fmt"
 	"github.com/neo4j/neo4j-go-driver/v4/neo4j/db"
 	"time"
 )
@@ -355,6 +356,10 @@ type profile struct {
 	profile *db.ProfiledPlan
 }
 
+func (p *profile) String() string {
+	return fmt.Sprintf("%v", *p.profile)
+}
+
 func (p *profile) Operator() string {
 	return p.profile.Operator
 }
@@ -378,7 +383,8 @@ func (p *profile) Records() int64 {
 func (p *profile) Children() []ProfiledPlan {
 	children := make([]ProfiledPlan, len(p.profile.Children))
 	for i, c := range p.profile.Children {
-		children[i] = &profile{profile: &c}
+		child := c
+		children[i] = &profile{profile: &child}
 	}
 	return children
 }
