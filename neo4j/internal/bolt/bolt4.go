@@ -429,7 +429,11 @@ func (b *bolt4) discardStream() {
 			// already sent a discard.
 			discarded = true
 			stream.fetchSize = -1
-			b.out.appendDiscardNQid(stream.fetchSize, stream.qid)
+			if b.state == bolt4_streamingtx {
+				b.out.appendDiscardNQid(stream.fetchSize, stream.qid)
+			} else {
+				b.out.appendDiscardN(stream.fetchSize)
+			}
 			b.out.send(b.conn)
 		} else if sum != nil || b.err != nil {
 			// Stream is detached in receiveNext
