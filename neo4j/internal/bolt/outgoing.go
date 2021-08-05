@@ -127,6 +127,18 @@ func (o *outgoing) appendPullNQid(n int, qid int64) {
 	o.end()
 }
 
+func (o *outgoing) appendDiscardN(n int) {
+	if o.boltLogger != nil {
+		o.boltLogger.LogClientMessage(o.logId, "DISCARD %s", loggableDictionary{"n": n})
+	}
+	o.begin()
+	o.packer.StructHeader(byte(msgDiscardN), 1)
+	o.packer.MapHeader(1)
+	o.packer.String("n")
+	o.packer.Int(n)
+	o.end()
+}
+
 func (o *outgoing) appendDiscardNQid(n int, qid int64) {
 	if o.boltLogger != nil {
 		o.boltLogger.LogClientMessage(o.logId, "DISCARD %s", loggableDictionary{"n": n, "qid": qid})
