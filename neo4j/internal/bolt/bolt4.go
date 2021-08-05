@@ -221,8 +221,6 @@ func (b *bolt4) connect(minor int, auth map[string]interface{}, userAgent string
 	if minor >= 1 {
 		if routingContext != nil {
 			hello["routing"] = routingContext
-		} else {
-			hello["routing"] = nil
 		}
 	}
 	// Merge authentication keys into hello, avoid overwriting existing keys
