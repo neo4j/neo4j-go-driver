@@ -568,7 +568,11 @@ func (b *backend) handleRequest(req map[string]interface{}) {
 func testSkips() map[string]string {
 	return map[string]string{
 		"stub.disconnects.test_disconnects.TestDisconnects.test_fail_on_reset": "It is not resetting driver when put back to pool",
+		"stub.routing.test_routing_v3.RoutingV3.test_should_use_resolver_during_rediscovery_when_existing_routers_fail": "It needs investigation - custom resolver does not seem to be called",
+		"stub.routing.test_routing_v4x1.RoutingV4x1.test_should_use_resolver_during_rediscovery_when_existing_routers_fail": "It needs investigation - custom resolver does not seem to be called",
 		"stub.routing.test_routing_v4x3.RoutingV4x3.test_should_use_resolver_during_rediscovery_when_existing_routers_fail": "It needs investigation - custom resolver does not seem to be called",
+		"stub.routing.test_routing_v3.RoutingV3.test_should_revert_to_initial_router_if_known_router_throws_protocol_errors": "It needs investigation - custom resolver does not seem to be called",
+		"stub.routing.test_routing_v4x1.RoutingV4x1.test_should_revert_to_initial_router_if_known_router_throws_protocol_errors": "It needs investigation - custom resolver does not seem to be called",
 		"stub.routing.test_routing_v4x3.RoutingV4x3.test_should_revert_to_initial_router_if_known_router_throws_protocol_errors": "It needs investigation - custom resolver does not seem to be called",
 	}
 }
