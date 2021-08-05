@@ -163,7 +163,8 @@ func (s *bolt4server) waitForPullNandQid(n, qid int) {
 		panic(fmt.Sprintf("Expected PULL qid:%d but got PULL %d", qid, sentQid))
 	}
 }
-func (s *bolt4server) waitForDiscardN(n, qid int) {
+
+func (s *bolt4server) waitForDiscardNAndQid(n, qid int) {
 	msg := s.receiveMsg()
 	s.assertStructType(msg, msgDiscardN)
 	extra := msg.fields[0].(map[string]interface{})
@@ -174,6 +175,20 @@ func (s *bolt4server) waitForDiscardN(n, qid int) {
 	sentQid := int(extra["qid"].(int64))
 	if sentQid != qid {
 		panic(fmt.Sprintf("Expected DISCARD qid:%d but got DISCARD %d", qid, sentQid))
+	}
+}
+
+func (s *bolt4server) waitForDiscardN(n int) {
+	msg := s.receiveMsg()
+	s.assertStructType(msg, msgDiscardN)
+	extra := msg.fields[0].(map[string]interface{})
+	sentN := int(extra["n"].(int64))
+	if sentN != n {
+		panic(fmt.Sprintf("Expected DISCARD n:%d but got DISCARD %d", n, sentN))
+	}
+	_, hasQid := extra["qid"]
+	if hasQid {
+		panic("Expected DISCARD without qid")
 	}
 }
 

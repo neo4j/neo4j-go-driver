@@ -302,7 +302,7 @@ func TestBolt4(ot *testing.T) {
 			// ... and the batch summary
 			srv.send(msgSuccess, map[string]interface{}{"has_more": true})
 			// Wait for the discard message
-			srv.waitForDiscardN(-1, int(qid))
+			srv.waitForDiscardNAndQid(-1, int(qid))
 			// Respond to discard with has more to indicate that there are more records
 			srv.send(msgSuccess, map[string]interface{}{"has_more": true})
 			// Wait for the commit
@@ -730,7 +730,7 @@ func TestBolt4(ot *testing.T) {
 			srv.send(msgRecord, []interface{}{"2"})
 			srv.send(msgRecord, []interface{}{"3"})
 			srv.send(msgSuccess, map[string]interface{}{"has_more": true, "qid": int64(qid)})
-			srv.waitForDiscardN(-1, qid)
+			srv.waitForDiscardN(-1)
 			srv.send(msgSuccess, map[string]interface{}{"bookmark": bookmark, "type": "r"})
 		})
 		defer cleanup()
