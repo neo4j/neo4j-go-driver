@@ -19,4 +19,4 @@
 
 package neo4j
 
-const UserAgent = "Go Driver/4.3"
+const UserAgent = "Go Driver/4.4"
