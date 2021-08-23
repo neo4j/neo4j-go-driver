@@ -1,5 +1,7 @@
 FROM ubuntu:20.04
 
+ARG go_version=1.16.7
+
 # Install all needed to build and run tests
 # This will install the default distribution Go version, for 18.04 this means 1.10
 # Install tzdata to make sure Go timezone info works correctly (need noninteractive to avoid
@@ -10,8 +12,15 @@ RUN apt-get update && \
         git \
         tzdata \
         python3 \
-        golang \
-    && rm -rf /var/lib/apt/lists/*
+        wget \
+    && rm -rf /var/lib/apt/lists/* \
+    # the packaged Golang version of Ubuntu is too old
+    && wget https://golang.org/dl/go${go_version}.linux-amd64.tar.gz \
+    && tar -xvf go${go_version}.linux-amd64.tar.gz \
+    && mv go /usr/local
+
+ENV GOROOT=/usr/local/go
+ENV PATH=$GOROOT/bin:$PATH
 
 # Install python stuff
 ENV PYTHON=python3
