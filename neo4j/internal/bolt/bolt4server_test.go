@@ -29,7 +29,7 @@ import (
 )
 
 // Fake of bolt4 server.
-// Utility to test bolt4 protocol implemntation.
+// Utility to test bolt4 protocol implementation.
 // Use panic upon errors, simplifies output when server is running within a go thread
 // in the test.
 type bolt4server struct {

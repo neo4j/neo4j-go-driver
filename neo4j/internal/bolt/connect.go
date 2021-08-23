@@ -38,14 +38,14 @@ type protocolVersion struct {
 
 // Supported versions in priority order
 var versions = [4]protocolVersion{
-	{major: 4, minor: 3, back: 1},
+	{major: 4, minor: 4, back: 2},
 	{major: 4, minor: 1},
 	{major: 4, minor: 0},
 	{major: 3, minor: 0},
 }
 
-// Negotiate version of bolt protocol.
-// Returns instance of bolt protocol implmenting low-level abstract connection Connection interface.
+// Connect initiates the negotiation of the Bolt protocol version.
+// Returns the instance of bolt protocol implementing the low-level Connection interface.
 func Connect(serverName string, conn net.Conn, auth map[string]interface{}, userAgent string, routingContext map[string]string, logger log.Logger, boltLog log.BoltLogger) (db.Connection, error) {
 	// Perform Bolt handshake to negotiate version
 	// Send handshake to server
