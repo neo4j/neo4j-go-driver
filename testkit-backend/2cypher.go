@@ -59,11 +59,38 @@ func nativeToCypher(v interface{}) map[string]interface{} {
 		return valueResponse("CypherMap", values)
 	case neo4j.Node:
 		return map[string]interface{}{
-			"name": "Node", "data": map[string]interface{}{
+			"name": "Node",
+			"data": map[string]interface{}{
 				"id":     nativeToCypher(x.Id),
 				"labels": nativeToCypher(x.Labels),
 				"props":  nativeToCypher(x.Props),
 			}}
+	case neo4j.Relationship:
+		return map[string]interface{}{
+			"name": "Relationship",
+			"data": map[string]interface{}{
+				"id":          nativeToCypher(x.Id),
+				"startNodeId": nativeToCypher(x.StartId),
+				"endNodeId":   nativeToCypher(x.EndId),
+				"type":        nativeToCypher(x.Type),
+				"props":       nativeToCypher(x.Props),
+			}}
+	case neo4j.Path:
+		nodes := make([]interface{}, len(x.Nodes))
+		for i := range x.Nodes {
+			nodes[i] = x.Nodes[i]
+		}
+		rels := make([]interface{}, len(x.Relationships))
+		for i := range x.Relationships {
+			rels[i] = x.Relationships[i]
+		}
+		return map[string]interface{}{
+			"name": "Path",
+			"data": map[string]interface{}{
+				"nodes": nativeToCypher(nodes),
+				"relationships": nativeToCypher(rels),
+			},
+		}
 	}
 	panic(fmt.Sprintf("Don't know how to patch %T", v))
 }
