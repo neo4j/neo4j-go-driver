@@ -3,7 +3,6 @@ FROM ubuntu:20.04
 ARG go_version=1.16.7
 
 # Install all needed to build and run tests
-# This will install the default distribution Go version, for 18.04 this means 1.10
 # Install tzdata to make sure Go timezone info works correctly (need noninteractive to avoid
 # timezone prompt when installing)
 ARG DEBIAN_FRONTEND=noninteractive
