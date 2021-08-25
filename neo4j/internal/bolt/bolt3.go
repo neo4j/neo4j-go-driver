@@ -124,7 +124,7 @@ func (b *bolt3) ServerVersion() string {
 
 // Sets b.err and b.state on failure
 func (b *bolt3) receiveMsg() interface{} {
-	msg, err := b.in.next(b.conn)
+	msg, err := b.in.next(b.conn, nil)
 	if err != nil {
 		b.err = err
 		b.log.Error(log.Bolt3, b.logId, b.err)

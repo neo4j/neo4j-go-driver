@@ -27,7 +27,7 @@ import (
 // dechunkMessage takes a buffer to be reused and returns the reusable buffer
 // (might have been reallocated to handle growth), the message buffer and
 // error.
-func dechunkMessage(rd io.Reader, msgBuf []byte) ([]byte, []byte, error) {
+func dechunkMessage(rd io.Reader, msgBuf []byte, resetDeadline func()) ([]byte, []byte, error) {
 	sizeBuf := []byte{0x00, 0x00}
 	off := 0
 
@@ -42,6 +42,9 @@ func dechunkMessage(rd io.Reader, msgBuf []byte) ([]byte, []byte, error) {
 				return msgBuf, msgBuf[:off], nil
 			}
 			// Got a nop chunk
+			if resetDeadline != nil {
+				resetDeadline()
+			}
 			continue
 		}
 

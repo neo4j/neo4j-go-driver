@@ -27,11 +27,11 @@ type incoming struct {
 	hyd hydrator
 }
 
-func (i *incoming) next(rd io.Reader) (interface{}, error) {
+func (i *incoming) next(rd io.Reader, deadlineReset func()) (interface{}, error) {
 	// Get next message from transport layer
 	var err error
 	var msg []byte
-	i.buf, msg, err = dechunkMessage(rd, i.buf)
+	i.buf, msg, err = dechunkMessage(rd, i.buf, deadlineReset)
 	if err != nil {
 		return nil, err
 	}

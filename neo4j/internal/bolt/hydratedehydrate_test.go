@@ -47,7 +47,7 @@ func TestDehydrateHydrate(ot *testing.T) {
 		buf := &bytes.Buffer{}
 		out.send(buf)
 
-		_, byts, err := dechunkMessage(buf, []byte{})
+		_, byts, err := dechunkMessage(buf, []byte{}, nil)
 		if err != nil {
 			t.Fatal(err)
 		}

@@ -74,25 +74,26 @@ func (i *internalTx4) toMeta() map[string]interface{} {
 }
 
 type bolt4 struct {
-	state         int
-	txId          db.TxHandle
-	streams       openstreams
-	conn          net.Conn
-	serverName    string
-	out           outgoing
-	in            incoming
-	connId        string
-	logId         string
-	serverVersion string
-	tfirst        int64       // Time that server started streaming
-	pendingTx     internalTx4 // Stashed away when tx started explicitly
-	hasPendingTx  bool
-	bookmark      string // Last bookmark
-	birthDate     time.Time
-	log           log.Logger
-	databaseName  string
-	err           error // Last fatal error
-	minor         int
+	state                 int
+	txId                  db.TxHandle
+	streams               openstreams
+	conn                  net.Conn
+	serverName            string
+	out                   outgoing
+	in                    incoming
+	connId                string
+	logId                 string
+	serverVersion         string
+	tfirst                int64       // Time that server started streaming
+	pendingTx             internalTx4 // Stashed away when tx started explicitly
+	hasPendingTx          bool
+	bookmark              string // Last bookmark
+	birthDate             time.Time
+	log                   log.Logger
+	databaseName          string
+	err                   error // Last fatal error
+	minor                 int
+	connectionReadTimeout time.Duration
 }
 
 func NewBolt4(serverName string, conn net.Conn, log log.Logger, boltLog log.BoltLogger) *bolt4 {
@@ -109,6 +110,7 @@ func NewBolt4(serverName string, conn net.Conn, log log.Logger, boltLog log.Bolt
 				boltLogger: boltLog,
 			},
 		},
+		connectionReadTimeout: -1,
 	}
 	b.out = outgoing{
 		chunker:    newChunker(),
@@ -182,8 +184,9 @@ func (b *bolt4) receiveMsg() interface{} {
 		return nil
 	}
 
-	msg, err := b.in.next(b.conn)
+	msg, err := b.in.next(b.conn, b.resetConnectionReadDeadline)
 	b.setError(err, true)
+	b.resetConnectionReadDeadline()
 	return msg
 }
 
@@ -248,6 +251,8 @@ func (b *bolt4) connect(minor int, auth map[string]interface{}, userAgent string
 	b.in.hyd.logId = connectionLogId
 	b.out.logId = connectionLogId
 
+	b.initializeReadTimeoutHint(succ.configurationHints)
+	b.resetConnectionReadDeadline()
 	// Transition into ready state
 	b.state = bolt4_ready
 	b.minor = minor
@@ -950,4 +955,33 @@ func (b *bolt4) ForceReset() error {
 func (b *bolt4) SetBoltLogger(boltLogger log.BoltLogger) {
 	b.in.hyd.boltLogger = boltLogger
 	b.out.boltLogger = boltLogger
+}
+
+const readTimeoutHintName = "connection.recv_timeout_seconds"
+
+func (b *bolt4) initializeReadTimeoutHint(hints map[string]interface{}) {
+	readTimeoutHint, ok := hints[readTimeoutHintName]
+	if !ok {
+		return
+	}
+	readTimeout, ok := readTimeoutHint.(int64)
+	if !ok {
+		b.log.Infof(log.Bolt4, b.logId, `invalid %q value: %s, ignoring hint`, readTimeoutHintName, readTimeout)
+		return
+	}
+	if readTimeout <= 0 {
+		b.log.Infof(log.Bolt4, b.logId, `invalid %q numeric value: %s.Only strictly positive integer values are accepted"`, readTimeoutHintName, readTimeout)
+		return
+	}
+	b.connectionReadTimeout = time.Duration(readTimeout) * time.Second
+}
+
+func (b *bolt4) resetConnectionReadDeadline() {
+	timeout := b.connectionReadTimeout
+	if timeout < 0 {
+		return
+	}
+	if err := b.conn.SetReadDeadline(time.Now().Add(timeout)); err != nil {
+		b.log.Error(log.Bolt4, b.logId, err)
+	}
 }

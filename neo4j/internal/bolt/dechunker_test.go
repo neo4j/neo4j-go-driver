@@ -74,7 +74,7 @@ func TestDechunker(t *testing.T) {
 
 		// Dechunk the message
 		var msgBuf []byte
-		buf, msgBuf, err = dechunkMessage(str, buf)
+		buf, msgBuf, err = dechunkMessage(str, buf, nil)
 		AssertNoError(t, err)
 		AssertLen(t, msgBuf, int(msg.size))
 		// Check content of buffer
