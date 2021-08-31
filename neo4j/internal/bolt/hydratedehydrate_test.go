@@ -20,7 +20,7 @@
 package bolt
 
 import (
-	"bytes"
+	"net"
 	"testing"
 	"time"
 
@@ -30,24 +30,33 @@ import (
 )
 
 func TestDehydrateHydrate(ot *testing.T) {
-	out := &outgoing{
-		chunker: newChunker(),
-		packer:  packstream.Packer{},
-		onErr: func(err error) {
-			ot.Fatalf("Should be no dehydration errors in this test: %s", err)
-		},
-	}
 	hydrator := hydrator{}
 
 	// A bit of white box testing, uses "internal" APIs to shortcut
 	// hydration/dehydration circuit.
 	dehydrateAndHydrate := func(t *testing.T, xi interface{}) interface{} {
-		// Put the stuff in a record to avoid getting too violent with the hydrator
-		out.appendX(byte(msgRecord), []interface{}{xi})
-		buf := &bytes.Buffer{}
-		out.send(buf)
-
-		_, byts, err := dechunkMessage(buf, []byte{}, nil)
+		out := &outgoing{
+			chunker: newChunker(),
+			packer:  packstream.Packer{},
+			onErr: func(err error) {
+				ot.Fatalf("Should be no dehydration errors in this test: %s", err)
+			},
+		}
+		serv, cli := net.Pipe()
+		defer func() {
+			if err := cli.Close(); err != nil {
+				ot.Errorf("failed to close client connection %v", err)
+			}
+			if err := serv.Close(); err != nil {
+				ot.Errorf("failed to close server connection %v", err)
+			}
+		}()
+		// format data in a record to avoid confusing the hydrator
+		out.appendX(msgRecord, []interface{}{xi})
+		go func() {
+			out.send(cli)
+		}()
+		_, byts, err := dechunkMessage(serv, []byte{}, -1, nil, "")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -56,7 +65,6 @@ func TestDehydrateHydrate(ot *testing.T) {
 		if err != nil {
 			ot.Fatalf("Should be no hydration errors in this test: %s", err)
 		}
-
 		rec := recx.(*db.Record)
 		return rec.Values[0]
 	}

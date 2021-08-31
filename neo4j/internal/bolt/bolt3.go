@@ -96,6 +96,8 @@ func NewBolt3(serverName string, conn net.Conn, log log.Logger, boltLog log.Bolt
 			hyd: hydrator{
 				boltLogger: boltLog,
 			},
+			connReadTimeout: -1,
+			logger: log,
 		},
 		birthDate: time.Now(),
 		log:       log,
@@ -124,7 +126,7 @@ func (b *bolt3) ServerVersion() string {
 
 // Sets b.err and b.state on failure
 func (b *bolt3) receiveMsg() interface{} {
-	msg, err := b.in.next(b.conn, nil)
+	msg, err := b.in.next(b.conn)
 	if err != nil {
 		b.err = err
 		b.log.Error(log.Bolt3, b.logId, b.err)
@@ -195,6 +197,7 @@ func (b *bolt3) connect(minor int, auth map[string]interface{}, userAgent string
 	b.connId = succ.connectionId
 	connectionLogId := fmt.Sprintf("%s@%s", b.connId, b.serverName)
 	b.logId = connectionLogId
+	b.in.logId = connectionLogId
 	b.in.hyd.logId = connectionLogId
 	b.out.logId = connectionLogId
 	b.serverVersion = succ.server

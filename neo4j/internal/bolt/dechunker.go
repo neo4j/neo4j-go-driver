@@ -21,18 +21,23 @@ package bolt
 
 import (
 	"encoding/binary"
+	"github.com/neo4j/neo4j-go-driver/v4/neo4j/log"
 	"io"
+	"net"
+	"time"
 )
 
 // dechunkMessage takes a buffer to be reused and returns the reusable buffer
 // (might have been reallocated to handle growth), the message buffer and
 // error.
-func dechunkMessage(rd io.Reader, msgBuf []byte, resetDeadline func()) ([]byte, []byte, error) {
+// If a non-default connection read timeout configuration hint is passed, the dechunker resets the connection read
+// deadline as well.
+func dechunkMessage(conn net.Conn, msgBuf []byte, readTimeout time.Duration, logger log.Logger, logId string) ([]byte, []byte, error) {
 	sizeBuf := []byte{0x00, 0x00}
 	off := 0
 
 	for {
-		_, err := io.ReadFull(rd, sizeBuf)
+		_, err := io.ReadFull(conn, sizeBuf)
 		if err != nil {
 			return msgBuf, nil, err
 		}
@@ -42,9 +47,7 @@ func dechunkMessage(rd io.Reader, msgBuf []byte, resetDeadline func()) ([]byte, 
 				return msgBuf, msgBuf[:off], nil
 			}
 			// Got a nop chunk
-			if resetDeadline != nil {
-				resetDeadline()
-			}
+			resetConnectionReadDeadline(conn, readTimeout, logger, logId)
 			continue
 		}
 
@@ -55,10 +58,20 @@ func dechunkMessage(rd io.Reader, msgBuf []byte, resetDeadline func()) ([]byte, 
 			msgBuf = newMsgBuf
 		}
 		// Read the chunk into buffer
-		_, err = io.ReadFull(rd, msgBuf[off:(off+chunkSize)])
+		_, err = io.ReadFull(conn, msgBuf[off:(off+chunkSize)])
 		if err != nil {
 			return msgBuf, nil, err
 		}
 		off += chunkSize
+		resetConnectionReadDeadline(conn, readTimeout, logger, logId)
+	}
+}
+
+func resetConnectionReadDeadline(conn net.Conn, readTimeout time.Duration, logger log.Logger, logId string) {
+	if readTimeout < 0 {
+		return
+	}
+	if err := conn.SetReadDeadline(time.Now().Add(readTimeout)); err != nil {
+		logger.Error(log.Bolt4, logId, err)
 	}
 }

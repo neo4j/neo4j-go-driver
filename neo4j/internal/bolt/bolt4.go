@@ -93,7 +93,6 @@ type bolt4 struct {
 	databaseName          string
 	err                   error // Last fatal error
 	minor                 int
-	connectionReadTimeout time.Duration
 }
 
 func NewBolt4(serverName string, conn net.Conn, log log.Logger, boltLog log.BoltLogger) *bolt4 {
@@ -109,8 +108,9 @@ func NewBolt4(serverName string, conn net.Conn, log log.Logger, boltLog log.Bolt
 			hyd: hydrator{
 				boltLogger: boltLog,
 			},
+			connReadTimeout: -1,
+			logger: log,
 		},
-		connectionReadTimeout: -1,
 	}
 	b.out = outgoing{
 		chunker:    newChunker(),
@@ -184,9 +184,8 @@ func (b *bolt4) receiveMsg() interface{} {
 		return nil
 	}
 
-	msg, err := b.in.next(b.conn, b.resetConnectionReadDeadline)
+	msg, err := b.in.next(b.conn)
 	b.setError(err, true)
-	b.resetConnectionReadDeadline()
 	return msg
 }
 
@@ -249,10 +248,10 @@ func (b *bolt4) connect(minor int, auth map[string]interface{}, userAgent string
 	connectionLogId := fmt.Sprintf("%s@%s", b.connId, b.serverName)
 	b.logId = connectionLogId
 	b.in.hyd.logId = connectionLogId
+	b.in.logId = connectionLogId
 	b.out.logId = connectionLogId
 
 	b.initializeReadTimeoutHint(succ.configurationHints)
-	b.resetConnectionReadDeadline()
 	// Transition into ready state
 	b.state = bolt4_ready
 	b.minor = minor
@@ -973,15 +972,5 @@ func (b *bolt4) initializeReadTimeoutHint(hints map[string]interface{}) {
 		b.log.Infof(log.Bolt4, b.logId, `invalid %q numeric value: %s.Only strictly positive integer values are accepted"`, readTimeoutHintName, readTimeout)
 		return
 	}
-	b.connectionReadTimeout = time.Duration(readTimeout) * time.Second
-}
-
-func (b *bolt4) resetConnectionReadDeadline() {
-	timeout := b.connectionReadTimeout
-	if timeout < 0 {
-		return
-	}
-	if err := b.conn.SetReadDeadline(time.Now().Add(timeout)); err != nil {
-		b.log.Error(log.Bolt4, b.logId, err)
-	}
+	b.in.connReadTimeout = time.Duration(readTimeout) * time.Second
 }

@@ -22,6 +22,7 @@ package bolt
 import (
 	"bytes"
 	"encoding/binary"
+	"net"
 	"testing"
 
 	. "github.com/neo4j/neo4j-go-driver/v4/neo4j/internal/testutil"
@@ -30,7 +31,7 @@ import (
 func TestDechunker(t *testing.T) {
 	var err error
 	prevCap := 0
-	buf := []byte{}
+	var buf []byte
 	messages := []struct {
 		size uint32
 		max  uint16
@@ -69,12 +70,17 @@ func TestDechunker(t *testing.T) {
 			}
 			str.Write(buf)
 		}
-		// Write end of mesage marker
+		// Write end of message marker
 		str.Write([]byte{0x00, 0x00})
 
 		// Dechunk the message
 		var msgBuf []byte
-		buf, msgBuf, err = dechunkMessage(str, buf, nil)
+		serv, cli := net.Pipe()
+		go func() {
+			_, err := cli.Write(str.Bytes())
+			AssertNoError(t, err)
+		}()
+		buf, msgBuf, err = dechunkMessage(serv, buf, -1, nil, "")
 		AssertNoError(t, err)
 		AssertLen(t, msgBuf, int(msg.size))
 		// Check content of buffer
@@ -82,6 +88,8 @@ func TestDechunker(t *testing.T) {
 		for i := range msgBuf {
 			if msgBuf[i] != b {
 				t.Errorf("Wrong content in buffer at %d, %d vs %d (message %d)", i, msgBuf[i], b, msgi)
+				AssertNoError(t, serv.Close())
+				AssertNoError(t, cli.Close())
 				return
 			}
 			b++
@@ -92,5 +100,7 @@ func TestDechunker(t *testing.T) {
 			t.Errorf("Underlying buffer should be reused")
 		}
 		prevCap = cap(buf)
+		AssertNoError(t, serv.Close())
+		AssertNoError(t, cli.Close())
 	}
 }
