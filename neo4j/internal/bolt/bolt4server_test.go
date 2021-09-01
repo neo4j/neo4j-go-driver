@@ -232,6 +232,14 @@ func (s *bolt4server) acceptHello() {
 	})
 }
 
+func (s *bolt4server) acceptHelloWithHints(hints map[string]interface{}) {
+	s.send(msgSuccess, map[string]interface{}{
+		"connection_id": "cid",
+		"server":        "fake/4.5",
+		"hints":         hints,
+	})
+}
+
 func (s *bolt4server) rejectHelloUnauthorized() {
 	s.send(msgFailure, map[string]interface{}{
 		"code":    "Neo.ClientError.Security.Unauthorized",
