@@ -31,7 +31,7 @@ import (
 // (might have been reallocated to handle growth), the message buffer and
 // error.
 // If a non-default connection read timeout configuration hint is passed, the dechunker resets the connection read
-// deadline as well.
+// deadline as well after successfully reading a chunk (NOOP messages included)
 func dechunkMessage(conn net.Conn, msgBuf []byte, readTimeout time.Duration, logger log.Logger, logId string) ([]byte, []byte, error) {
 	sizeBuf := []byte{0x00, 0x00}
 	off := 0

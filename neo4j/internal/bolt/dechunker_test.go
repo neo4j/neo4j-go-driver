@@ -23,7 +23,9 @@ import (
 	"bytes"
 	"encoding/binary"
 	"net"
+	"reflect"
 	"testing"
+	"time"
 
 	. "github.com/neo4j/neo4j-go-driver/v4/neo4j/internal/testutil"
 )
@@ -77,8 +79,7 @@ func TestDechunker(t *testing.T) {
 		var msgBuf []byte
 		serv, cli := net.Pipe()
 		go func() {
-			_, err := cli.Write(str.Bytes())
-			AssertNoError(t, err)
+			AssertWriteSucceeds(t, cli, str.Bytes())
 		}()
 		buf, msgBuf, err = dechunkMessage(serv, buf, -1, nil, "")
 		AssertNoError(t, err)
@@ -103,4 +104,53 @@ func TestDechunker(t *testing.T) {
 		AssertNoError(t, serv.Close())
 		AssertNoError(t, cli.Close())
 	}
+}
+
+func TestDechunkerWithTimeout(ot *testing.T) {
+	timeout := time.Millisecond * 600
+	serv, cli := net.Pipe()
+	defer func() {
+		AssertNoError(ot, serv.Close())
+		AssertNoError(ot, cli.Close())
+	}()
+	AssertNoError(ot, serv.SetReadDeadline(time.Now().Add(timeout)))
+	logger := &noopLogger{}
+	logId := "dechunker-test"
+
+	ot.Run("Resets connection deadline upon successful reads", func(t *testing.T) {
+		go func() {
+			time.Sleep(timeout / 2)
+			AssertWriteSucceeds(t, cli, []byte{0x00, 0x00})
+			time.Sleep(2 * timeout / 3)
+			AssertWriteSucceeds(t, cli, []byte{0x00, 0x02, 0xCA, 0xFE})
+			time.Sleep(timeout / 2)
+			AssertWriteSucceeds(t, cli, []byte{0x00, 0x00})
+		}()
+		buffer := make([]byte, 2)
+		_, _, err := dechunkMessage(serv, buffer, timeout, logger, logId)
+		AssertNoError(t, err)
+		AssertTrue(t, reflect.DeepEqual(buffer, []byte{0xCA, 0xFE}))
+	})
+
+	ot.Run("Fails when connection deadline is reached", func(t *testing.T) {
+		_, _, err := dechunkMessage(serv, nil, timeout, logger, logId)
+		AssertError(t, err)
+		AssertStringContain(t, err.Error(), "read pipe")
+	})
+
+}
+
+type noopLogger struct {
+}
+
+func (*noopLogger) Error(string, string, error) {
+}
+
+func (*noopLogger) Warnf(string, string, string, ...interface{}) {
+}
+
+func (*noopLogger) Infof(string, string, string, ...interface{}) {
+}
+
+func (*noopLogger) Debugf(string, string, string, ...interface{}) {
 }
