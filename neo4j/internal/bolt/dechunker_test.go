@@ -22,7 +22,10 @@ package bolt
 import (
 	"bytes"
 	"encoding/binary"
+	"net"
+	"reflect"
 	"testing"
+	"time"
 
 	. "github.com/neo4j/neo4j-go-driver/v4/neo4j/internal/testutil"
 )
@@ -30,7 +33,7 @@ import (
 func TestDechunker(t *testing.T) {
 	var err error
 	prevCap := 0
-	buf := []byte{}
+	var buf []byte
 	messages := []struct {
 		size uint32
 		max  uint16
@@ -69,12 +72,16 @@ func TestDechunker(t *testing.T) {
 			}
 			str.Write(buf)
 		}
-		// Write end of mesage marker
+		// Write end of message marker
 		str.Write([]byte{0x00, 0x00})
 
 		// Dechunk the message
 		var msgBuf []byte
-		buf, msgBuf, err = dechunkMessage(str, buf)
+		serv, cli := net.Pipe()
+		go func() {
+			AssertWriteSucceeds(t, cli, str.Bytes())
+		}()
+		buf, msgBuf, err = dechunkMessage(serv, buf, -1, nil, "")
 		AssertNoError(t, err)
 		AssertLen(t, msgBuf, int(msg.size))
 		// Check content of buffer
@@ -82,6 +89,8 @@ func TestDechunker(t *testing.T) {
 		for i := range msgBuf {
 			if msgBuf[i] != b {
 				t.Errorf("Wrong content in buffer at %d, %d vs %d (message %d)", i, msgBuf[i], b, msgi)
+				AssertNoError(t, serv.Close())
+				AssertNoError(t, cli.Close())
 				return
 			}
 			b++
@@ -92,5 +101,56 @@ func TestDechunker(t *testing.T) {
 			t.Errorf("Underlying buffer should be reused")
 		}
 		prevCap = cap(buf)
+		AssertNoError(t, serv.Close())
+		AssertNoError(t, cli.Close())
 	}
+}
+
+func TestDechunkerWithTimeout(ot *testing.T) {
+	timeout := time.Millisecond * 600
+	serv, cli := net.Pipe()
+	defer func() {
+		AssertNoError(ot, serv.Close())
+		AssertNoError(ot, cli.Close())
+	}()
+	AssertNoError(ot, serv.SetReadDeadline(time.Now().Add(timeout)))
+	logger := &noopLogger{}
+	logId := "dechunker-test"
+
+	ot.Run("Resets connection deadline upon successful reads", func(t *testing.T) {
+		go func() {
+			time.Sleep(timeout / 2)
+			AssertWriteSucceeds(t, cli, []byte{0x00, 0x00})
+			time.Sleep(2 * timeout / 3)
+			AssertWriteSucceeds(t, cli, []byte{0x00, 0x02, 0xCA, 0xFE})
+			time.Sleep(timeout / 2)
+			AssertWriteSucceeds(t, cli, []byte{0x00, 0x00})
+		}()
+		buffer := make([]byte, 2)
+		_, _, err := dechunkMessage(serv, buffer, timeout, logger, logId)
+		AssertNoError(t, err)
+		AssertTrue(t, reflect.DeepEqual(buffer, []byte{0xCA, 0xFE}))
+	})
+
+	ot.Run("Fails when connection deadline is reached", func(t *testing.T) {
+		_, _, err := dechunkMessage(serv, nil, timeout, logger, logId)
+		AssertError(t, err)
+		AssertStringContain(t, err.Error(), "read pipe")
+	})
+
+}
+
+type noopLogger struct {
+}
+
+func (*noopLogger) Error(string, string, error) {
+}
+
+func (*noopLogger) Warnf(string, string, string, ...interface{}) {
+}
+
+func (*noopLogger) Infof(string, string, string, ...interface{}) {
+}
+
+func (*noopLogger) Debugf(string, string, string, ...interface{}) {
 }

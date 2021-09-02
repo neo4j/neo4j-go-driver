@@ -20,7 +20,7 @@
 package bolt
 
 import (
-	"bytes"
+	"net"
 	"reflect"
 	"testing"
 	"time"
@@ -83,23 +83,33 @@ func unpack(u *packstream.Unpacker) interface{} {
 
 func TestOutgoing(ot *testing.T) {
 	var err error
-	out := &outgoing{
-		chunker: newChunker(),
-		packer:  packstream.Packer{},
-		onErr:   func(e error) { err = e },
-	}
 	// Utility to unpack through dechunking and a custom build func
-	dechunkAndUnpack := func(t *testing.T, build func()) interface{} {
-		buf := &bytes.Buffer{}
+	dechunkAndUnpack := func(t *testing.T, build func(outgoing *outgoing)) interface{} {
+		out := &outgoing{
+			chunker: newChunker(),
+			packer:  packstream.Packer{},
+			onErr:   func(e error) { err = e },
+		}
+		serv, cli := net.Pipe()
+		defer func() {
+			if err := cli.Close(); err != nil {
+				ot.Errorf("failed to close client connection %v", err)
+			}
+			if err := serv.Close(); err != nil {
+				ot.Errorf("failed to close server connection %v", err)
+			}
+		}()
 		err = nil
-		build()
+		build(out)
 		if err != nil {
 			t.Fatal(err)
 		}
-		out.send(buf)
+		go func() {
+			out.send(cli)
+		}()
 
 		// Dechunk it
-		_, byts, err := dechunkMessage(buf, []byte{})
+		_, byts, err := dechunkMessage(serv, []byte{}, -1, nil, "")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -116,12 +126,12 @@ func TestOutgoing(ot *testing.T) {
 	// tests for top level appending and sending outgoing messages
 	cases := []struct {
 		name   string
-		build  func()
+		build  func(outgoing *outgoing)
 		expect interface{}
 	}{
 		{
 			name: "hello",
-			build: func() {
+			build: func(out *outgoing) {
 				out.appendHello(nil)
 			},
 			expect: &testStruct{
@@ -131,7 +141,7 @@ func TestOutgoing(ot *testing.T) {
 		},
 		{
 			name: "begin",
-			build: func() {
+			build: func(out *outgoing) {
 				out.appendBegin(map[string]interface{}{"mode": "r"})
 			},
 			expect: &testStruct{
@@ -141,7 +151,7 @@ func TestOutgoing(ot *testing.T) {
 		},
 		{
 			name: "commit",
-			build: func() {
+			build: func(out *outgoing) {
 				out.appendCommit()
 			},
 			expect: &testStruct{
@@ -150,7 +160,7 @@ func TestOutgoing(ot *testing.T) {
 		},
 		{
 			name: "rollback",
-			build: func() {
+			build: func(out *outgoing) {
 				out.appendRollback()
 			},
 			expect: &testStruct{
@@ -159,7 +169,7 @@ func TestOutgoing(ot *testing.T) {
 		},
 		{
 			name: "goodbye",
-			build: func() {
+			build: func(out *outgoing) {
 				out.appendGoodbye()
 			},
 			expect: &testStruct{
@@ -168,7 +178,7 @@ func TestOutgoing(ot *testing.T) {
 		},
 		{
 			name: "reset",
-			build: func() {
+			build: func(out *outgoing) {
 				out.appendReset()
 			},
 			expect: &testStruct{
@@ -177,7 +187,7 @@ func TestOutgoing(ot *testing.T) {
 		},
 		{
 			name: "pull all",
-			build: func() {
+			build: func(out *outgoing) {
 				out.appendPullAll()
 			},
 			expect: &testStruct{
@@ -186,7 +196,7 @@ func TestOutgoing(ot *testing.T) {
 		},
 		{
 			name: "pull n",
-			build: func() {
+			build: func(out *outgoing) {
 				out.appendPullN(7)
 			},
 			expect: &testStruct{
@@ -196,7 +206,7 @@ func TestOutgoing(ot *testing.T) {
 		},
 		{
 			name: "pull n+qid",
-			build: func() {
+			build: func(out *outgoing) {
 				out.appendPullNQid(7, 10000)
 			},
 			expect: &testStruct{
@@ -206,7 +216,7 @@ func TestOutgoing(ot *testing.T) {
 		},
 		{
 			name: "discard n+qid",
-			build: func() {
+			build: func(out *outgoing) {
 				out.appendDiscardNQid(7, 10000)
 			},
 			expect: &testStruct{
@@ -216,7 +226,7 @@ func TestOutgoing(ot *testing.T) {
 		},
 		{
 			name: "run, no params, no meta",
-			build: func() {
+			build: func(out *outgoing) {
 				out.appendRun("cypher", nil, nil)
 			},
 			expect: &testStruct{
@@ -226,7 +236,7 @@ func TestOutgoing(ot *testing.T) {
 		},
 		{
 			name: "run, no params, meta",
-			build: func() {
+			build: func(out *outgoing) {
 				out.appendRun("cypher", nil, map[string]interface{}{"mode": "r"})
 			},
 			expect: &testStruct{
@@ -236,7 +246,7 @@ func TestOutgoing(ot *testing.T) {
 		},
 		{
 			name: "run, params, meta",
-			build: func() {
+			build: func(out *outgoing) {
 				out.appendRun("cypher", map[string]interface{}{"x": 1, "y": "2"}, map[string]interface{}{"mode": "r"})
 			},
 			expect: &testStruct{
@@ -246,7 +256,7 @@ func TestOutgoing(ot *testing.T) {
 		},
 		{
 			name: "run, params, meta",
-			build: func() {
+			build: func(out *outgoing) {
 				out.appendRun("cypher", map[string]interface{}{"x": 1, "y": "2"}, map[string]interface{}{"mode": "r"})
 			},
 			expect: &testStruct{
@@ -256,7 +266,7 @@ func TestOutgoing(ot *testing.T) {
 		},
 		{
 			name: "route",
-			build: func() {
+			build: func(out *outgoing) {
 				out.appendRoute(map[string]string{"key1": "val1", "key2": "val2"}, []string{"deutsch-mark", "mark-twain"}, "adb")
 			},
 			expect: &testStruct{
@@ -266,7 +276,7 @@ func TestOutgoing(ot *testing.T) {
 		},
 		{
 			name: "route, default database",
-			build: func() {
+			build: func(out *outgoing) {
 				out.appendRoute(map[string]string{"key1": "val1", "key2": "val2"}, []string{"deutsch-mark", "mark-twain"}, db.DefaultDatabase)
 			},
 			expect: &testStruct{
@@ -276,7 +286,7 @@ func TestOutgoing(ot *testing.T) {
 		},
 		{
 			name: "route, default bookmarks",
-			build: func() {
+			build: func(out *outgoing) {
 				out.appendRoute(map[string]string{"key1": "val1", "key2": "val2"}, nil, "adb")
 			},
 			expect: &testStruct{
@@ -286,7 +296,7 @@ func TestOutgoing(ot *testing.T) {
 		},
 		{
 			name: "route, default bookmarks and database",
-			build: func() {
+			build: func(out *outgoing) {
 				out.appendRoute(map[string]string{"key1": "val1", "key2": "val2"}, nil, db.DefaultDatabase)
 			},
 			expect: &testStruct{
@@ -419,7 +429,7 @@ func TestOutgoing(ot *testing.T) {
 
 	for _, c := range paramCases {
 		ot.Run(c.name, func(t *testing.T) {
-			x := dechunkAndUnpack(t, func() {
+			x := dechunkAndUnpack(t, func(out *outgoing) {
 				out.begin()
 				out.packMap(c.inp)
 				out.end()
