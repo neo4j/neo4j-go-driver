@@ -22,6 +22,7 @@ package neo4j
 import (
 	"fmt"
 	"io"
+	"net"
 
 	"github.com/neo4j/neo4j-go-driver/v4/neo4j/db"
 	"github.com/neo4j/neo4j-go-driver/v4/neo4j/internal/connector"
@@ -116,7 +117,7 @@ func wrapError(err error) error {
 	if err == io.EOF {
 		return &ConnectivityError{inner: err}
 	}
-	switch err.(type) {
+	switch e := err.(type) {
 	case *db.UnsupportedTypeError:
 		// Usage of a type not supported by database network protocol
 		return &UsageError{Message: err.Error()}
@@ -128,6 +129,11 @@ func wrapError(err error) error {
 		return &ConnectivityError{inner: err}
 	case *retry.CommitFailedDeadError:
 		return &ConnectivityError{inner: err}
+	case *net.OpError:
+		if e.Timeout() && e.Op == "read" {
+			// most likely due to read timeout configuration hint being applied
+			return &ConnectivityError{inner: err}
+		}
 	}
 	return err
 }

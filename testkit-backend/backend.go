@@ -24,13 +24,14 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/neo4j/neo4j-go-driver/v4/neo4j"
 	"github.com/neo4j/neo4j-go-driver/v4/neo4j/db"
 	"io"
 	"net/url"
+	"regexp"
+	"strings"
 	"sync"
 	"time"
-
-	"github.com/neo4j/neo4j-go-driver/v4/neo4j"
 )
 
 // Handles a testkit backend session.
@@ -396,6 +397,7 @@ func (b *backend) handleRequest(req map[string]interface{}) {
 	case "NewSession":
 		driver := b.drivers[data["driverId"].(string)]
 		sessionConfig := neo4j.SessionConfig{}
+		sessionConfig.BoltLogger = neo4j.ConsoleBoltLogger()
 		switch data["accessMode"].(string) {
 		case "r":
 			sessionConfig.AccessMode = neo4j.AccessModeRead
@@ -499,6 +501,17 @@ func (b *backend) handleRequest(req map[string]interface{}) {
 		}
 		b.writeResponse("Transaction", map[string]interface{}{"id": txId})
 
+	case "TransactionClose":
+		txId := data["txId"].(string)
+		tx := b.transactions[txId]
+		delete(b.transactions, txId)
+		err := tx.Close()
+		if err != nil {
+			b.writeError(err)
+			return
+		}
+		b.writeResponse("TransactionClose", map[string]interface{}{"id": txId})
+
 	case "SessionReadTransaction":
 		b.handleTransactionFunc(true, data)
 
@@ -549,12 +562,15 @@ func (b *backend) handleRequest(req map[string]interface{}) {
 		})
 
 	case "GetFeatures":
-		b.writeResponse("FeatureList", nil)
+		b.writeResponse("FeatureList", map[string]interface{}{
+			"features": []string{
+				"ConfHint:connection.recv_timeout_seconds",
+			},
+		})
 
 	case "StartTest":
 		testName := data["testName"].(string)
-		skippedTests := testSkips()
-		if reason, ok := skippedTests[testName]; ok {
+		if reason, ok := mustSkip(testName); ok {
 			b.writeResponse("SkipTest", map[string]interface{}{"reason": reason})
 			return
 		}
@@ -565,14 +581,43 @@ func (b *backend) handleRequest(req map[string]interface{}) {
 	}
 }
 
+func mustSkip(testName string) (string, bool) {
+	skippedTests := testSkips()
+	for testPattern, exclusionReason := range skippedTests {
+		if matches(testPattern, testName) {
+			return exclusionReason, true
+		}
+	}
+	return "", false
+}
+
+func matches(pattern, testName string) bool {
+	if pattern == testName {
+		return true
+	}
+	if !strings.Contains(pattern, "*") {
+		return false
+	}
+	regex := asRegex(pattern)
+	return regex.MatchString(testName)
+}
+
+func asRegex(rawPattern string) *regexp.Regexp {
+	pattern := regexp.QuoteMeta(rawPattern)
+	pattern = strings.ReplaceAll(pattern, `\*`, ".*")
+	return regexp.MustCompile(pattern)
+}
+
+// you can use '*' as wildcards anywhere in the qualified test name (useful to exclude a whole class e.g.)
 func testSkips() map[string]string {
 	return map[string]string{
-		"stub.disconnects.test_disconnects.TestDisconnects.test_fail_on_reset": "It is not resetting driver when put back to pool",
-		"stub.routing.test_routing_v3.RoutingV3.test_should_use_resolver_during_rediscovery_when_existing_routers_fail": "It needs investigation - custom resolver does not seem to be called",
-		"stub.routing.test_routing_v4x1.RoutingV4x1.test_should_use_resolver_during_rediscovery_when_existing_routers_fail": "It needs investigation - custom resolver does not seem to be called",
-		"stub.routing.test_routing_v4x3.RoutingV4x3.test_should_use_resolver_during_rediscovery_when_existing_routers_fail": "It needs investigation - custom resolver does not seem to be called",
-		"stub.routing.test_routing_v3.RoutingV3.test_should_revert_to_initial_router_if_known_router_throws_protocol_errors": "It needs investigation - custom resolver does not seem to be called",
+		"stub.disconnects.test_disconnects.TestDisconnects.test_fail_on_reset":                                                   "It is not resetting driver when put back to pool",
+		"stub.routing.test_routing_v3.RoutingV3.test_should_use_resolver_during_rediscovery_when_existing_routers_fail":          "It needs investigation - custom resolver does not seem to be called",
+		"stub.routing.test_routing_v4x1.RoutingV4x1.test_should_use_resolver_during_rediscovery_when_existing_routers_fail":      "It needs investigation - custom resolver does not seem to be called",
+		"stub.routing.test_routing_v4x3.RoutingV4x3.test_should_use_resolver_during_rediscovery_when_existing_routers_fail":      "It needs investigation - custom resolver does not seem to be called",
+		"stub.routing.test_routing_v3.RoutingV3.test_should_revert_to_initial_router_if_known_router_throws_protocol_errors":     "It needs investigation - custom resolver does not seem to be called",
 		"stub.routing.test_routing_v4x1.RoutingV4x1.test_should_revert_to_initial_router_if_known_router_throws_protocol_errors": "It needs investigation - custom resolver does not seem to be called",
 		"stub.routing.test_routing_v4x3.RoutingV4x3.test_should_revert_to_initial_router_if_known_router_throws_protocol_errors": "It needs investigation - custom resolver does not seem to be called",
+		"stub.configuration_hints.test_connection_recv_timeout_seconds.TestRoutingConnectionRecvTimeout.*":                       "No GetRoutingTable support - too tricky to implement in Go",
 	}
 }

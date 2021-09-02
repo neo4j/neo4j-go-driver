@@ -49,7 +49,8 @@ type success struct {
 	profile       *db.ProfiledPlan
 	notifications []db.Notification
 	routingTable  *db.RoutingTable
-	num           uint32
+	num                uint32
+	configurationHints map[string]interface{}
 }
 
 func (s *success) String() string {
@@ -241,6 +242,9 @@ func (h *hydrator) success(n uint32) *success {
 			succ.notifications = parseNotifications(l)
 		case "rt":
 			succ.routingTable = h.routingTable()
+		case "hints":
+			hints := h.amap()
+			succ.configurationHints = hints
 		default:
 			// Unknown key, waste it
 			h.trash()
