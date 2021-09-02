@@ -20,8 +20,10 @@
 package bolt
 
 import (
+	"fmt"
 	"reflect"
 	"testing"
+	"time"
 
 	"github.com/neo4j/neo4j-go-driver/v4/neo4j/db"
 	. "github.com/neo4j/neo4j-go-driver/v4/neo4j/internal/testutil"
@@ -108,7 +110,7 @@ func TestBolt4(ot *testing.T) {
 		return bolt, cleanup
 	}
 
-	// Simple succesful connect
+	// Simple successful connect
 	ot.Run("Connect success", func(t *testing.T) {
 		bolt, cleanup := connectToServer(t, func(srv *bolt4server) {
 			handshake := srv.waitForHandshake()
@@ -135,7 +137,37 @@ func TestBolt4(ot *testing.T) {
 		// Check Bolt properties
 		AssertStringEqual(t, bolt.ServerName(), "serverName")
 		AssertTrue(t, bolt.IsAlive())
+		AssertTrue(t, reflect.DeepEqual(bolt.in.connReadTimeout, time.Duration(-1)))
 	})
+
+	ot.Run("Connect success with timeout hint", func(t *testing.T) {
+		bolt, cleanup := connectToServer(t, func(srv *bolt4server) {
+			srv.waitForHandshake()
+			srv.acceptVersion(4, 0)
+			srv.waitForHello()
+			srv.acceptHelloWithHints(map[string]interface{}{"connection.recv_timeout_seconds": 42})
+		})
+		defer cleanup()
+		defer bolt.Close()
+
+		AssertTrue(t, reflect.DeepEqual(bolt.in.connReadTimeout, 42*time.Second))
+	})
+
+	invalidValues := []interface{}{4.2, "42", -42}
+	for _, value := range invalidValues {
+		ot.Run(fmt.Sprintf("Connect success with ignored invalid timeout hint %v", value), func(t *testing.T) {
+			bolt, cleanup := connectToServer(t, func(srv *bolt4server) {
+				srv.waitForHandshake()
+				srv.acceptVersion(4, 0)
+				srv.waitForHello()
+				srv.acceptHelloWithHints(map[string]interface{}{"connection.recv_timeout_seconds": value})
+			})
+			defer cleanup()
+			defer bolt.Close()
+
+			AssertTrue(t, reflect.DeepEqual(bolt.in.connReadTimeout, time.Duration(-1)))
+		})
+	}
 
 	ot.Run("Routing in hello", func(t *testing.T) {
 		routingContext := map[string]string{"some": "thing"}
