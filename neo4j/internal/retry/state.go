@@ -109,6 +109,7 @@ func (s *State) OnFailure(conn db.Connection, err error, isCommitting bool) {
 	if dbErr, isDbErr := err.(*db.Neo4jError); isDbErr {
 		if dbErr.IsRetriableCluster() {
 			// Force routing tables to be updated before trying again
+			conn.Close()
 			s.Router.Invalidate(s.DatabaseName)
 			s.cause = "Cluster error"
 			s.LastErrWasRetryable = true
