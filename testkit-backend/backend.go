@@ -356,6 +356,8 @@ func (b *backend) handleRequest(req map[string]interface{}) {
 				authTokenMap["principal"].(string),
 				authTokenMap["credentials"].(string),
 				authTokenMap["realm"].(string))
+		case "kerberos":
+			authToken = neo4j.KerberosAuth(authTokenMap["credentials"].(string))
 		default:
 			b.writeError(errors.New("Unsupported scheme"))
 			return
