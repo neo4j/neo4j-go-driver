@@ -21,7 +21,7 @@ package bolt
 
 import (
 	"bytes"
-	"io"
+	"net"
 	"testing"
 
 	. "github.com/neo4j/neo4j-go-driver/v4/neo4j/internal/testutil"
@@ -79,9 +79,9 @@ func TestChunker(ot *testing.T) {
 		}
 	}
 
-	receiveAndAssertMessage := func(t *testing.T, rd io.Reader, expected []byte) {
+	receiveAndAssertMessage := func(t *testing.T, conn net.Conn, expected []byte) {
 		t.Helper()
-		_, msg, err := dechunkMessage(rd, []byte{})
+		_, msg, err := dechunkMessage(conn, []byte{}, -1, nil, "")
 		AssertNoError(t, err)
 		assertSlices(t, msg, expected)
 	}
@@ -90,22 +90,28 @@ func TestChunker(ot *testing.T) {
 		// Chunk
 		cbuf := &bytes.Buffer{}
 		chunker := newChunker()
-		chunked := []byte{}
+		var chunked []byte
 		chunked = writeSmall(&chunker, chunked)
 		err := chunker.send(cbuf)
 		AssertNoError(t, err)
 		assertBuf(t, cbuf, chunked)
 
 		// Dechunk
-		dbuf := bytes.NewBuffer(chunked)
-		receiveAndAssertMessage(t, dbuf, msgS)
+		serv, cli := net.Pipe()
+		go func() {
+			_, err = cli.Write(chunked)
+			AssertNoError(t, err)
+		}()
+		receiveAndAssertMessage(t, serv, msgS)
+		AssertNoError(t, serv.Close())
+		AssertNoError(t, cli.Close())
 	})
 
 	ot.Run("Two small messages", func(t *testing.T) {
 		// Chunk
 		cbuf := &bytes.Buffer{}
 		chunker := newChunker()
-		chunked := []byte{}
+		var chunked []byte
 		chunked = writeSmall(&chunker, chunked)
 		chunked = writeSmall(&chunker, chunked)
 		err := chunker.send(cbuf)
@@ -113,9 +119,15 @@ func TestChunker(ot *testing.T) {
 		assertBuf(t, cbuf, chunked)
 
 		// Dechunk
-		dbuf := bytes.NewBuffer(chunked)
-		receiveAndAssertMessage(t, dbuf, msgS)
-		receiveAndAssertMessage(t, dbuf, msgS)
+		serv, cli := net.Pipe()
+		go func() {
+			_, err = cli.Write(chunked)
+			AssertNoError(t, err)
+		}()
+		receiveAndAssertMessage(t, serv, msgS)
+		receiveAndAssertMessage(t, serv, msgS)
+		AssertNoError(t, serv.Close())
+		AssertNoError(t, cli.Close())
 	})
 
 	ot.Run("One large message", func(t *testing.T) {
@@ -129,8 +141,14 @@ func TestChunker(ot *testing.T) {
 		assertBuf(t, cbuf, chunked)
 
 		// Dechunk
-		dbuf := bytes.NewBuffer(chunked)
-		receiveAndAssertMessage(t, dbuf, msgL)
+		serv, cli := net.Pipe()
+		go func() {
+			_, err = cli.Write(chunked)
+			AssertNoError(t, err)
+		}()
+		receiveAndAssertMessage(t, serv, msgL)
+		AssertNoError(t, serv.Close())
+		AssertNoError(t, cli.Close())
 	})
 
 	ot.Run("Small and large message", func(t *testing.T) {
@@ -145,8 +163,14 @@ func TestChunker(ot *testing.T) {
 		assertBuf(t, cbuf, chunked)
 
 		// Dechunk
-		dbuf := bytes.NewBuffer(chunked)
-		receiveAndAssertMessage(t, dbuf, msgS)
-		receiveAndAssertMessage(t, dbuf, msgL)
+		serv, cli := net.Pipe()
+		go func() {
+			_, err = cli.Write(chunked)
+			AssertNoError(t, err)
+		}()
+		receiveAndAssertMessage(t, serv, msgS)
+		receiveAndAssertMessage(t, serv, msgL)
+		AssertNoError(t, serv.Close())
+		AssertNoError(t, cli.Close())
 	})
 }

@@ -74,25 +74,25 @@ func (i *internalTx4) toMeta() map[string]interface{} {
 }
 
 type bolt4 struct {
-	state         int
-	txId          db.TxHandle
-	streams       openstreams
-	conn          net.Conn
-	serverName    string
-	out           outgoing
-	in            incoming
-	connId        string
-	logId         string
-	serverVersion string
-	tfirst        int64       // Time that server started streaming
-	pendingTx     internalTx4 // Stashed away when tx started explicitly
-	hasPendingTx  bool
-	bookmark      string // Last bookmark
-	birthDate     time.Time
-	log           log.Logger
-	databaseName  string
-	err           error // Last fatal error
-	minor         int
+	state                 int
+	txId                  db.TxHandle
+	streams               openstreams
+	conn                  net.Conn
+	serverName            string
+	out                   outgoing
+	in                    incoming
+	connId                string
+	logId                 string
+	serverVersion         string
+	tfirst                int64       // Time that server started streaming
+	pendingTx             internalTx4 // Stashed away when tx started explicitly
+	hasPendingTx          bool
+	bookmark              string // Last bookmark
+	birthDate             time.Time
+	log                   log.Logger
+	databaseName          string
+	err                   error // Last fatal error
+	minor                 int
 }
 
 func NewBolt4(serverName string, conn net.Conn, log log.Logger, boltLog log.BoltLogger) *bolt4 {
@@ -108,6 +108,8 @@ func NewBolt4(serverName string, conn net.Conn, log log.Logger, boltLog log.Bolt
 			hyd: hydrator{
 				boltLogger: boltLog,
 			},
+			connReadTimeout: -1,
+			logger: log,
 		},
 	}
 	b.out = outgoing{
@@ -246,8 +248,10 @@ func (b *bolt4) connect(minor int, auth map[string]interface{}, userAgent string
 	connectionLogId := fmt.Sprintf("%s@%s", b.connId, b.serverName)
 	b.logId = connectionLogId
 	b.in.hyd.logId = connectionLogId
+	b.in.logId = connectionLogId
 	b.out.logId = connectionLogId
 
+	b.initializeReadTimeoutHint(succ.configurationHints)
 	// Transition into ready state
 	b.state = bolt4_ready
 	b.minor = minor
@@ -950,4 +954,23 @@ func (b *bolt4) ForceReset() error {
 func (b *bolt4) SetBoltLogger(boltLogger log.BoltLogger) {
 	b.in.hyd.boltLogger = boltLogger
 	b.out.boltLogger = boltLogger
+}
+
+const readTimeoutHintName = "connection.recv_timeout_seconds"
+
+func (b *bolt4) initializeReadTimeoutHint(hints map[string]interface{}) {
+	readTimeoutHint, ok := hints[readTimeoutHintName]
+	if !ok {
+		return
+	}
+	readTimeout, ok := readTimeoutHint.(int64)
+	if !ok {
+		b.log.Infof(log.Bolt4, b.logId, `invalid %q value: %v, ignoring hint. Only strictly positive integer values are accepted`, readTimeoutHintName, readTimeoutHint)
+		return
+	}
+	if readTimeout <= 0 {
+		b.log.Infof(log.Bolt4, b.logId, `invalid %q integer value: %d. Only strictly positive values are accepted"`, readTimeoutHintName, readTimeout)
+		return
+	}
+	b.in.connReadTimeout = time.Duration(readTimeout) * time.Second
 }

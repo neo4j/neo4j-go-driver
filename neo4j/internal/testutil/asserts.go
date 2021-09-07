@@ -21,6 +21,7 @@
 package testutil
 
 import (
+	"io"
 	"reflect"
 	"strings"
 	"testing"
@@ -65,6 +66,12 @@ func AssertNextOnlyError(t *testing.T, rec *db.Record, sum *db.Summary, err erro
 	if err == nil {
 		t.Errorf("Expected error")
 	}
+}
+
+func AssertWriteSucceeds(t *testing.T, w io.Writer, b []byte) {
+	t.Helper()
+	_, err := w.Write(b)
+	AssertNoError(t, err)
 }
 
 func AssertNoError(t *testing.T, err error) {
