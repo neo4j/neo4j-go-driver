@@ -60,6 +60,8 @@ func KerberosAuth(ticket string) AuthToken {
 	token := AuthToken{
 		tokens: map[string]interface{}{
 			keyScheme: schemeKerberos,
+			// Backwards compatibility: Neo4j servers pre 4.4 require the presence of the principal.
+			keyPrincipal: "",
 			keyTicket: ticket,
 		},
 	}

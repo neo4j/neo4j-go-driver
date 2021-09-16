@@ -353,7 +353,7 @@ func (b *backend) handleRequest(req map[string]interface{}) {
 		authTokenMap := data["authorizationToken"].(map[string]interface{})["data"].(map[string]interface{})
 		switch authTokenMap["scheme"] {
 		case "basic":
-			var realmString = ""
+			realmString := ""
 			if realm, ok := authTokenMap["realm"]; ok {
 				realmString = realm.(string)
 			}
@@ -364,8 +364,12 @@ func (b *backend) handleRequest(req map[string]interface{}) {
 		case "kerberos":
 			authToken = neo4j.KerberosAuth(authTokenMap["ticket"].(string))
 		default:
-			b.writeError(errors.New("Unsupported scheme"))
-			return
+			authToken = neo4j.CustomAuth(
+				authTokenMap["scheme"].(string),
+				authTokenMap["principal"].(string),
+				authTokenMap["credentials"].(string),
+				authTokenMap["realm"].(string),
+				authTokenMap["parameters"].(map[string]interface{}))
 		}
 		// Parse URI (or rather type cast)
 		uri := data["uri"].(string)
@@ -570,6 +574,8 @@ func (b *backend) handleRequest(req map[string]interface{}) {
 	case "GetFeatures":
 		b.writeResponse("FeatureList", map[string]interface{}{
 			"features": []string{
+				"Feature:Auth:Custom",
+				"Feature:Auth:Kerberos",
 				"ConfHint:connection.recv_timeout_seconds",
 			},
 		})
