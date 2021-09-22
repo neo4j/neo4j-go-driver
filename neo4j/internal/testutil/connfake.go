@@ -48,8 +48,11 @@ type ConnFake struct {
 	Table          *db.RoutingTable
 	Err            error
 	Id             int
+	TxBeginErr     error
 	TxBeginHandle  db.TxHandle
+	RunErr         error
 	RunStream      db.StreamHandle
+	RunTxErr       error
 	RunTxStream    db.StreamHandle
 	Nexts          []Next
 	Bookm          string
@@ -112,7 +115,7 @@ func (c *ConnFake) GetRoutingTable(context map[string]string, bookmarks []string
 
 func (c *ConnFake) TxBegin(txConfig db.TxConfig) (db.TxHandle, error) {
 	c.RecordedTxs = append(c.RecordedTxs, RecordedTx{Origin: "TxBegin", Mode: txConfig.Mode, Bookmarks: txConfig.Bookmarks, Timeout: txConfig.Timeout, Meta: txConfig.Meta})
-	return c.TxBeginHandle, c.Err
+	return c.TxBeginHandle, c.TxBeginErr
 }
 
 func (c *ConnFake) TxRollback(tx db.TxHandle) error {
@@ -129,11 +132,11 @@ func (c *ConnFake) TxCommit(tx db.TxHandle) error {
 func (c *ConnFake) Run(runCommand db.Command, txConfig db.TxConfig) (db.StreamHandle, error) {
 
 	c.RecordedTxs = append(c.RecordedTxs, RecordedTx{Origin: "Run", Mode: txConfig.Mode, Bookmarks: txConfig.Bookmarks, Timeout: txConfig.Timeout, Meta: txConfig.Meta})
-	return c.RunStream, c.Err
+	return c.RunStream, c.RunErr
 }
 
 func (c *ConnFake) RunTx(tx db.TxHandle, runCommand db.Command) (db.StreamHandle, error) {
-	return c.RunTxStream, c.Err
+	return c.RunTxStream, c.RunTxErr
 }
 
 func (c *ConnFake) Keys(streamHandle db.StreamHandle) ([]string, error) {
