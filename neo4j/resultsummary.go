@@ -44,7 +44,7 @@ const (
 type ResultSummary interface {
 	// Server returns basic information about the server where the statement is carried out.
 	Server() ServerInfo
-	// Deprecated: Use Query instead
+	// Deprecated: since 4.4, will be removed in 5.0. Use Query instead
 	Statement() Statement
 	// Query returns the query that has been executed.
 	Query() Query
@@ -104,7 +104,7 @@ type Statement interface {
 type Query interface {
 	// Text returns the statement's text.
 	Text() string
-	// Deprecated: Use Parameters instead
+	// Deprecated: since 4.4, will be removed in 5.0. Use Parameters instead
 	Params() map[string]interface{}
 	// Parameters returns the statement's parameters.
 	Parameters() map[string]interface{}
