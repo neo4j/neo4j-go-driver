@@ -78,8 +78,8 @@ var _ = Describe("Session", func() {
 			Expect(result.Next()).To(BeFalse())
 			Expect(result.Err()).To(BeNil())
 
-			Expect(summary.Statement().Text()).To(BeIdenticalTo(stmt))
-			Expect(summary.Statement().Params()).To(BeNil())
+			Expect(summary.Query().Text()).To(BeIdenticalTo(stmt))
+			Expect(summary.Query().Parameters()).To(BeNil())
 		})
 
 		Specify("when a query is executed, it should run and return summary with correct statement and params", func() {
@@ -96,8 +96,8 @@ var _ = Describe("Session", func() {
 			Expect(result.Next()).To(BeFalse())
 			Expect(result.Err()).To(BeNil())
 
-			Expect(summary.Statement().Text()).To(Equal(stmt))
-			Expect(summary.Statement().Params()).To(Equal(params))
+			Expect(summary.Query().Text()).To(Equal(stmt))
+			Expect(summary.Query().Parameters()).To(Equal(params))
 		})
 
 		Specify("when a query is executed, it should run and return summary when consumed", func() {
