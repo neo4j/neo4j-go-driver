@@ -458,9 +458,7 @@ func (s *session) Close() error {
 	var err error
 
 	if s.txExplicit != nil {
-		s.txExplicit.Close()
-		err = &UsageError{Message: "Closing session with a pending transaction"}
-		s.log.Warnf(log.Session, s.logId, err.Error())
+		err = s.txExplicit.Close()
 	}
 
 	if s.txAuto != nil {
