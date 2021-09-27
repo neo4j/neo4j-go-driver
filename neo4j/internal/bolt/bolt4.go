@@ -74,25 +74,26 @@ func (i *internalTx4) toMeta() map[string]interface{} {
 }
 
 type bolt4 struct {
-	state                 int
-	txId                  db.TxHandle
-	streams               openstreams
-	conn                  net.Conn
-	serverName            string
-	out                   outgoing
-	in                    incoming
-	connId                string
-	logId                 string
-	serverVersion         string
-	tfirst                int64       // Time that server started streaming
-	pendingTx             internalTx4 // Stashed away when tx started explicitly
-	hasPendingTx          bool
-	bookmark              string // Last bookmark
-	birthDate             time.Time
-	log                   log.Logger
-	databaseName          string
-	err                   error // Last fatal error
-	minor                 int
+	state         int
+	txId          db.TxHandle
+	streams       openstreams
+	conn          net.Conn
+	serverName    string
+	out           outgoing
+	in            incoming
+	connId        string
+	logId         string
+	serverVersion string
+	tfirst        int64       // Time that server started streaming
+	pendingTx     internalTx4 // Stashed away when tx started explicitly
+	hasPendingTx  bool
+	bookmark      string // Last bookmark
+	birthDate     time.Time
+	log           log.Logger
+	databaseName  string
+	err           error // Last fatal error
+	minor         int
+	lastQid       int64 // Last seen qid
 }
 
 func NewBolt4(serverName string, conn net.Conn, log log.Logger, boltLog log.BoltLogger) *bolt4 {
@@ -199,6 +200,9 @@ func (b *bolt4) receiveSuccess() *success {
 
 	switch v := msg.(type) {
 	case *success:
+		if v.qid > -1 {
+			b.lastQid = v.qid
+		}
 		return v
 	case *db.Neo4jError:
 		b.setError(v, false)
@@ -433,7 +437,7 @@ func (b *bolt4) discardStream() {
 			// already sent a discard.
 			discarded = true
 			stream.fetchSize = -1
-			if b.state == bolt4_streamingtx {
+			if b.state == bolt4_streamingtx && stream.qid != b.lastQid {
 				b.out.appendDiscardNQid(stream.fetchSize, stream.qid)
 			} else {
 				b.out.appendDiscardN(stream.fetchSize)
@@ -464,7 +468,12 @@ func (b *bolt4) sendPullN() {
 		b.out.appendPullN(b.streams.curr.fetchSize)
 		b.out.send(b.conn)
 	} else if b.state == bolt4_streamingtx {
-		b.out.appendPullNQid(b.streams.curr.fetchSize, b.streams.curr.qid)
+		fetchSize := b.streams.curr.fetchSize
+		if b.streams.curr.qid == b.lastQid {
+			b.out.appendPullN(fetchSize)
+		} else {
+			b.out.appendPullNQid(fetchSize, b.streams.curr.qid)
+		}
 		b.out.send(b.conn)
 	}
 }
