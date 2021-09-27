@@ -567,6 +567,7 @@ func (b *backend) handleRequest(req map[string]interface{}) {
 		b.writeResponse("FeatureList", map[string]interface{}{
 			"features": []string{
 				"ConfHint:connection.recv_timeout_seconds",
+				"Optimization:ImplicitDefaultArguments",
 			},
 		})
 
