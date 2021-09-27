@@ -53,10 +53,11 @@ type loggedSuccess struct {
 	TLast        string   `json:"t_last,omitempty"`
 	HasMore      bool     `json:"has_more,omitempy"`
 	Db           string   `json:"db,omitempty"`
+	Qid          int64    `json:"qid,omitempty"`
 }
 
 func (s loggableSuccess) String() string {
-	return serializeTrace(loggedSuccess{
+	success := loggedSuccess{
 		Server:       s.server,
 		ConnectionId: s.connectionId,
 		Fields:       s.fields,
@@ -65,7 +66,12 @@ func (s loggableSuccess) String() string {
 		TLast:        formatOmittingZero(s.tlast),
 		HasMore:      s.hasMore,
 		Db:           s.db,
-	})
+	}
+	if s.qid > -1 {
+		success.Qid = s.qid
+	}
+	return serializeTrace(success)
+
 }
 
 func formatOmittingZero(i int64) string {
