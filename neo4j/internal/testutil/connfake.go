@@ -33,11 +33,12 @@ type Next struct {
 }
 
 type RecordedTx struct {
-	Origin    string
-	Mode      db.AccessMode
-	Bookmarks []string
-	Timeout   time.Duration
-	Meta      map[string]interface{}
+	Origin           string
+	Mode             db.AccessMode
+	Bookmarks        []string
+	Timeout          time.Duration
+	Meta             map[string]interface{}
+	ImpersonatedUser string
 }
 
 type ConnFake struct {
@@ -106,12 +107,12 @@ func (c *ConnFake) Consume(streamHandle db.StreamHandle) (*db.Summary, error) {
 	return c.ConsumeSum, c.ConsumeErr
 }
 
-func (c *ConnFake) GetRoutingTable(context map[string]string, bookmarks []string, database string) (*db.RoutingTable, error) {
+func (c *ConnFake) GetRoutingTable(context map[string]string, bookmarks []string, database, impersonatedUser string) (*db.RoutingTable, error) {
 	return c.Table, c.Err
 }
 
 func (c *ConnFake) TxBegin(txConfig db.TxConfig) (db.TxHandle, error) {
-	c.RecordedTxs = append(c.RecordedTxs, RecordedTx{Origin: "TxBegin", Mode: txConfig.Mode, Bookmarks: txConfig.Bookmarks, Timeout: txConfig.Timeout, Meta: txConfig.Meta})
+	c.RecordedTxs = append(c.RecordedTxs, RecordedTx{Origin: "TxBegin", Mode: txConfig.Mode, Bookmarks: txConfig.Bookmarks, Timeout: txConfig.Timeout, Meta: txConfig.Meta, ImpersonatedUser: txConfig.ImpersonatedUser})
 	return c.TxBeginHandle, c.Err
 }
 
@@ -127,8 +128,7 @@ func (c *ConnFake) TxCommit(tx db.TxHandle) error {
 }
 
 func (c *ConnFake) Run(runCommand db.Command, txConfig db.TxConfig) (db.StreamHandle, error) {
-
-	c.RecordedTxs = append(c.RecordedTxs, RecordedTx{Origin: "Run", Mode: txConfig.Mode, Bookmarks: txConfig.Bookmarks, Timeout: txConfig.Timeout, Meta: txConfig.Meta})
+	c.RecordedTxs = append(c.RecordedTxs, RecordedTx{Origin: "Run", Mode: txConfig.Mode, Bookmarks: txConfig.Bookmarks, Timeout: txConfig.Timeout, Meta: txConfig.Meta, ImpersonatedUser: txConfig.ImpersonatedUser})
 	return c.RunStream, c.Err
 }
 

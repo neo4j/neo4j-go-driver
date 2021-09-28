@@ -181,12 +181,8 @@ func (p *Packer) ArrayHeader(l int) {
 	p.listHeader(l, 0x90, 0xd4)
 }
 
-func (p *Packer) MapHeader(l int) {
-	p.listHeader(l, 0xa0, 0xd8)
-}
-
 func (p *Packer) IntMap(m map[string]int) {
-	p.listHeader(len(m), 0xa0, 0xd8)
+	p.MapHeader(len(m))
 	for k, v := range m {
 		p.String(k)
 		p.Int(v)
@@ -194,11 +190,15 @@ func (p *Packer) IntMap(m map[string]int) {
 }
 
 func (p *Packer) StringMap(m map[string]string) {
-	p.listHeader(len(m), 0xa0, 0xd8)
+	p.MapHeader(len(m))
 	for k, v := range m {
 		p.String(k)
 		p.String(v)
 	}
+}
+
+func (p *Packer) MapHeader(l int) {
+	p.listHeader(l, 0xa0, 0xd8)
 }
 
 func (p *Packer) Bytes(b []byte) {

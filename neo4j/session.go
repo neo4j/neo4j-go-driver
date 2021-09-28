@@ -81,6 +81,12 @@ type SessionConfig struct {
 	// Possible to use custom logger (implement log.BoltLogger interface) or
 	// use neo4j.ConsoleBoltLogger.
 	BoltLogger log.BoltLogger
+	// Username to impersonate
+	//
+	// Unless DatabaseName is provided, the assumed database will be the impersonated user's home database.
+	//
+	// Note: this setting is ignored when connecting to Neo4j servers whose version is not 4.4 or later
+	ImpersonatedUser string
 }
 
 // Turns off fetching records in batches.
@@ -97,21 +103,22 @@ type sessionPool interface {
 }
 
 type session struct {
-	config       *Config
-	defaultMode  db.AccessMode
-	bookmarks    []string
-	databaseName string
-	pool         sessionPool
-	router       sessionRouter
-	txExplicit   *transaction
-	txAuto       *autoTransaction
-	sleep        func(d time.Duration)
-	now          func() time.Time
-	logId        string
-	log          log.Logger
-	throttleTime time.Duration
-	fetchSize    int
-	boltLogger   log.BoltLogger
+	config           *Config
+	defaultMode      db.AccessMode
+	bookmarks        []string
+	databaseName     string
+	pool             sessionPool
+	router           sessionRouter
+	txExplicit       *transaction
+	txAuto           *autoTransaction
+	sleep            func(d time.Duration)
+	now              func() time.Time
+	logId            string
+	log              log.Logger
+	throttleTime     time.Duration
+	fetchSize        int
+	boltLogger       log.BoltLogger
+	impersonatedUser string
 }
 
 // Remove empty string bookmarks to check for "bad" callers
@@ -138,26 +145,26 @@ func cleanupBookmarks(bookmarks []string) []string {
 	return cleaned
 }
 
-func newSession(config *Config, router sessionRouter, pool sessionPool,
-	mode db.AccessMode, bookmarks []string, databaseName string, fetchSize int, logger log.Logger, boltLogger log.BoltLogger) *session {
+func newSession(config *Config, router sessionRouter, pool sessionPool, mode db.AccessMode, bookmarks []string, databaseName string, fetchSize int, logger log.Logger, boltLogger log.BoltLogger, impersonatedUser string) *session {
 
 	logId := log.NewId()
 	logger.Debugf(log.Session, logId, "Created")
 
 	return &session{
-		config:       config,
-		router:       router,
-		pool:         pool,
-		defaultMode:  mode,
-		bookmarks:    cleanupBookmarks(bookmarks),
-		databaseName: databaseName,
-		sleep:        time.Sleep,
-		now:          time.Now,
-		log:          logger,
-		logId:        logId,
-		throttleTime: time.Second * 1,
-		fetchSize:    fetchSize,
-		boltLogger:   boltLogger,
+		config:           config,
+		router:           router,
+		pool:             pool,
+		defaultMode:      mode,
+		bookmarks:        cleanupBookmarks(bookmarks),
+		databaseName:     databaseName,
+		sleep:            time.Sleep,
+		now:              time.Now,
+		log:              logger,
+		logId:            logId,
+		throttleTime:     time.Second * 1,
+		fetchSize:        fetchSize,
+		boltLogger:       boltLogger,
+		impersonatedUser: impersonatedUser,
 	}
 }
 
@@ -201,10 +208,11 @@ func (s *session) BeginTransaction(configurers ...func(*TransactionConfig)) (Tra
 
 	// Begin transaction
 	txHandle, err := conn.TxBegin(db.TxConfig{
-		Mode:      s.defaultMode,
-		Bookmarks: s.bookmarks,
-		Timeout:   config.Timeout,
-		Meta:      config.Metadata,
+		Mode:             s.defaultMode,
+		Bookmarks:        s.bookmarks,
+		Timeout:          config.Timeout,
+		Meta:             config.Metadata,
+		ImpersonatedUser: s.impersonatedUser,
 	})
 	if err != nil {
 		s.pool.Return(conn)
@@ -341,9 +349,9 @@ func (s *session) WriteTransaction(
 
 func (s *session) getServers(ctx context.Context, mode db.AccessMode) ([]string, error) {
 	if mode == db.ReadMode {
-		return s.router.Readers(ctx, s.bookmarks, s.databaseName, s.boltLogger)
+		return s.router.Readers(ctx, s.bookmarks, s.databaseName, s.boltLogger, s.impersonatedUser)
 	} else {
-		return s.router.Writers(ctx, s.bookmarks, s.databaseName, s.boltLogger)
+		return s.router.Writers(ctx, s.bookmarks, s.databaseName, s.boltLogger, s.impersonatedUser)
 	}
 }
 
@@ -431,10 +439,11 @@ func (s *session) Run(
 			FetchSize: s.fetchSize,
 		},
 		db.TxConfig{
-			Mode:      s.defaultMode,
-			Bookmarks: s.bookmarks,
-			Timeout:   config.Timeout,
-			Meta:      config.Metadata,
+			Mode:             s.defaultMode,
+			Bookmarks:        s.bookmarks,
+			Timeout:          config.Timeout,
+			Meta:             config.Metadata,
+			ImpersonatedUser: s.impersonatedUser,
 		})
 	if err != nil {
 		s.pool.Return(conn)

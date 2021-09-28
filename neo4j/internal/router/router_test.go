@@ -65,14 +65,14 @@ func TestMultithreading(t *testing.T) {
 	wg.Add(2)
 	consumer := func() {
 		for i := 0; i < 30; i++ {
-			readers, err := router.Readers(context.Background(), nil, dbName, nil)
+			readers, err := router.Readers(context.Background(), nil, dbName, nil, "")
 			if len(readers) != 2 {
 				t.Error("Wrong number of readers")
 			}
 			if err != nil {
 				t.Error(err)
 			}
-			writers, err := router.Writers(context.Background(), nil, dbName, nil)
+			writers, err := router.Writers(context.Background(), nil, dbName, nil, "")
 			if len(writers) != 1 {
 				t.Error("Wrong number of writers")
 			}
@@ -114,25 +114,25 @@ func TestRespectsTimeToLiveAndInvalidate(t *testing.T) {
 	dbName := "dbname"
 
 	// First access should trigger initial table read
-	router.Readers(context.Background(), nil, dbName, nil)
+	router.Readers(context.Background(), nil, dbName, nil, "")
 	assertNum(t, numfetch, 1, "Should have fetched initial")
 
 	// Second access with time set to same should not trigger a read
-	router.Readers(context.Background(), nil, dbName, nil)
+	router.Readers(context.Background(), nil, dbName, nil, "")
 	assertNum(t, numfetch, 1, "Should not have have fetched")
 
 	// Third access with time passed table due should trigger fetch
 	n = n.Add(2 * time.Second)
-	router.Readers(context.Background(), nil, dbName, nil)
+	router.Readers(context.Background(), nil, dbName, nil, "")
 	assertNum(t, numfetch, 2, "Should have have fetched")
 
 	// Just another one to make sure we're cached
-	router.Readers(context.Background(), nil, dbName, nil)
+	router.Readers(context.Background(), nil, dbName, nil, "")
 	assertNum(t, numfetch, 2, "Should not have have fetched")
 
 	// Invalidate should force fetching
 	router.Invalidate(dbName)
-	router.Readers(context.Background(), nil, dbName, nil)
+	router.Readers(context.Background(), nil, dbName, nil, "")
 	assertNum(t, numfetch, 3, "Should have have fetched")
 }
 
@@ -160,13 +160,13 @@ func TestUsesRootRouterWhenPreviousRoutersFails(t *testing.T) {
 	dbName := "dbname"
 
 	// First access should trigger initial table read from root router
-	router.Readers(context.Background(), nil, dbName, nil)
+	router.Readers(context.Background(), nil, dbName, nil, "")
 	if borrows[0][0] != "rootRouter" {
 		t.Errorf("Should have connected to root upon first router request")
 	}
 	// Next access should go to otherRouter
 	n = n.Add(2 * time.Second)
-	router.Readers(context.Background(), nil, dbName, nil)
+	router.Readers(context.Background(), nil, dbName, nil, "")
 	if borrows[1][0] != "otherRouter" {
 		t.Errorf("Should have queried other router")
 	}
@@ -191,7 +191,7 @@ func TestUsesRootRouterWhenPreviousRoutersFails(t *testing.T) {
 		return &testutil.ConnFake{Table: &db.RoutingTable{TimeToLive: 1, Readers: []string{"aReader"}}}, nil
 	}
 	n = n.Add(2 * time.Second)
-	readers, err := router.Readers(context.Background(), nil, dbName, nil)
+	readers, err := router.Readers(context.Background(), nil, dbName, nil, "")
 	if err != nil {
 		t.Error(err)
 	}
@@ -219,7 +219,7 @@ func TestUseGetRoutersHookWhenInitialRouterFails(t *testing.T) {
 	dbName := "dbname"
 
 	// Trigger read of routing table
-	router.Readers(context.Background(), nil, dbName, nil)
+	router.Readers(context.Background(), nil, dbName, nil, "")
 
 	expected := []string{rootRouter}
 	expected = append(expected, backupRouters...)
@@ -247,7 +247,7 @@ func TestWritersFailAfterNRetries(t *testing.T) {
 	dbName := "dbname"
 
 	// Should trigger a lot of retries to get a writer until it finally fails
-	writers, err := router.Writers(context.Background(), nil, dbName, nil)
+	writers, err := router.Writers(context.Background(), nil, dbName, nil, "")
 	if err == nil {
 		t.Error("Should have failed")
 	}
@@ -285,7 +285,7 @@ func TestWritersRetriesWhenNoWriters(t *testing.T) {
 
 	// Should trigger initial table read that contains no writers and a second table read
 	// that gets the writers
-	writers, err := router.Writers(context.Background(), nil, dbName, nil)
+	writers, err := router.Writers(context.Background(), nil, dbName, nil, "")
 	if err != nil {
 		t.Errorf("Got error: %s", err)
 	}
@@ -323,7 +323,7 @@ func TestReadersRetriesWhenNoReaders(t *testing.T) {
 
 	// Should trigger initial table read that contains no readers and a second table read
 	// that gets the readers
-	readers, err := router.Readers(context.Background(), nil, dbName, nil)
+	readers, err := router.Readers(context.Background(), nil, dbName, nil, "")
 	if err != nil {
 		t.Errorf("Got error: %s", err)
 	}
@@ -349,8 +349,8 @@ func TestCleanUp(t *testing.T) {
 	router := New("router", func() []string { return []string{} }, nil, pool, logger, "routerid")
 	router.now = func() time.Time { return now }
 
-	router.Readers(context.Background(), nil, "db1", nil)
-	router.Readers(context.Background(), nil, "db2", nil)
+	router.Readers(context.Background(), nil, "db1", nil, "")
+	router.Readers(context.Background(), nil, "db2", nil, "")
 
 	// Should be a router for each requested database
 	if len(router.dbRouters) != 2 {

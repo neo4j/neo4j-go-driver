@@ -29,11 +29,11 @@ type directRouter struct {
 	address string
 }
 
-func (r *directRouter) Readers(ctx context.Context, bookmarks []string, database string, boltLogger log.BoltLogger) ([]string, error) {
+func (r *directRouter) Readers(ctx context.Context, bookmarks []string, database string, boltLogger log.BoltLogger, impersonatedUser string) ([]string, error) {
 	return []string{r.address}, nil
 }
 
-func (r *directRouter) Writers(ctx context.Context, bookmarks []string, database string, boltLogger log.BoltLogger) ([]string, error) {
+func (r *directRouter) Writers(ctx context.Context, bookmarks []string, database string, boltLogger log.BoltLogger, impersonatedUser string) ([]string, error) {
 	return []string{r.address}, nil
 }
 

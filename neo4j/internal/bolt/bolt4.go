@@ -45,11 +45,12 @@ const (
 const bolt4_fetchsize = 1000
 
 type internalTx4 struct {
-	mode         db.AccessMode
-	bookmarks    []string
-	timeout      time.Duration
-	txMeta       map[string]interface{}
-	databaseName string
+	mode             db.AccessMode
+	bookmarks        []string
+	timeout          time.Duration
+	txMeta           map[string]interface{}
+	databaseName     string
+	impersonatedUser string
 }
 
 func (i *internalTx4) toMeta() map[string]interface{} {
@@ -70,30 +71,34 @@ func (i *internalTx4) toMeta() map[string]interface{} {
 	if i.databaseName != db.DefaultDatabase {
 		meta["db"] = i.databaseName
 	}
+	if i.impersonatedUser != "" {
+		meta["imp_user"] = i.impersonatedUser
+	}
 	return meta
 }
 
 type bolt4 struct {
-	state         int
-	txId          db.TxHandle
-	streams       openstreams
-	conn          net.Conn
-	serverName    string
-	out           outgoing
-	in            incoming
-	connId        string
-	logId         string
-	serverVersion string
-	tfirst        int64       // Time that server started streaming
-	pendingTx     internalTx4 // Stashed away when tx started explicitly
-	hasPendingTx  bool
-	bookmark      string // Last bookmark
-	birthDate     time.Time
-	log           log.Logger
-	databaseName  string
-	err           error // Last fatal error
-	minor         int
-	lastQid       int64 // Last seen qid
+	state                  int
+	txId                   db.TxHandle
+	streams                openstreams
+	conn                   net.Conn
+	serverName             string
+	out                    outgoing
+	in                     incoming
+	connId                 string
+	logId                  string
+	serverVersion          string
+	tfirst                 int64       // Time that server started streaming
+	pendingTx              internalTx4 // Stashed away when tx started explicitly
+	hasPendingTx           bool
+	bookmark               string // Last bookmark
+	birthDate              time.Time
+	log                    log.Logger
+	databaseName           string
+	impersonatedUserHomeDb string
+	err                    error // Last fatal error
+	minor                  int
+	lastQid                int64 // Last seen qid
 }
 
 func NewBolt4(serverName string, conn net.Conn, log log.Logger, boltLog log.BoltLogger) *bolt4 {
@@ -110,7 +115,7 @@ func NewBolt4(serverName string, conn net.Conn, log log.Logger, boltLog log.Bolt
 				boltLogger: boltLog,
 			},
 			connReadTimeout: -1,
-			logger: log,
+			logger:          log,
 		},
 	}
 	b.out = outgoing{
@@ -279,11 +284,14 @@ func (b *bolt4) TxBegin(txConfig db.TxConfig) (db.TxHandle, error) {
 	}
 
 	tx := internalTx4{
-		mode:         txConfig.Mode,
-		bookmarks:    txConfig.Bookmarks,
-		timeout:      txConfig.Timeout,
-		txMeta:       txConfig.Meta,
-		databaseName: b.databaseName,
+		mode:             txConfig.Mode,
+		bookmarks:        txConfig.Bookmarks,
+		timeout:          txConfig.Timeout,
+		txMeta:           txConfig.Meta,
+		databaseName:     b.databaseName,
+	}
+	if b.minor >= 4 {
+		b.setImpersonationConfig(txConfig, &tx)
 	}
 
 	// If there are bookmarks, begin the transaction immediately for backwards compatible
@@ -546,7 +554,7 @@ func (b *bolt4) run(cypher string, params map[string]interface{}, fetchSize int,
 		return nil, err
 	}
 
-	// Transaction meta data, used either in lazily started transaction or to run message.
+	// Transaction metadata, used either in lazily started transaction or to run message.
 	var meta map[string]interface{}
 	if tx != nil {
 		meta = tx.toMeta()
@@ -554,6 +562,7 @@ func (b *bolt4) run(cypher string, params map[string]interface{}, fetchSize int,
 	if b.state == bolt4_pendingtx {
 		// Append lazy begin transaction message
 		b.out.appendBegin(meta)
+		// TODO: set impersonated user again?
 		meta = nil // Don't add this to run message again
 	}
 
@@ -615,6 +624,9 @@ func (b *bolt4) Run(cmd db.Command, txConfig db.TxConfig) (db.StreamHandle, erro
 		timeout:      txConfig.Timeout,
 		txMeta:       txConfig.Meta,
 		databaseName: b.databaseName,
+	}
+	if b.minor >= 4 {
+		b.setImpersonationConfig(txConfig, &tx)
 	}
 	stream, err := b.run(cmd.Cypher, cmd.Params, cmd.FetchSize, &tx)
 	if err != nil {
@@ -874,13 +886,25 @@ func (b *bolt4) Reset() {
 	}
 }
 
-func (b *bolt4) GetRoutingTable(context map[string]string, bookmarks []string, database string) (*db.RoutingTable, error) {
+func (b *bolt4) GetRoutingTable(context map[string]string, bookmarks []string, database, impersonatedUser string) (*db.RoutingTable, error) {
 	if err := b.assertState(bolt4_ready); err != nil {
 		return nil, err
 	}
 
 	b.log.Infof(log.Bolt4, b.logId, "Retrieving routing table")
-	if b.minor > 2 {
+	if b.minor >= 4 {
+		b.out.appendRouteWithDbContext(context, bookmarks, routeDatabaseContext(database, impersonatedUser))
+		b.out.send(b.conn)
+		succ := b.receiveSuccess()
+		if b.err != nil {
+			return nil, b.err
+		}
+		routingTable := succ.routingTable
+		b.databaseName = routingTable.Database
+		b.impersonatedUserHomeDb = routingTable.Database
+		return routingTable, nil
+	}
+	if b.minor >= 3 {
 		b.out.appendRoute(context, bookmarks, database)
 		b.out.send(b.conn)
 		succ := b.receiveSuccess()
@@ -982,4 +1006,27 @@ func (b *bolt4) initializeReadTimeoutHint(hints map[string]interface{}) {
 		return
 	}
 	b.in.connReadTimeout = time.Duration(readTimeout) * time.Second
+}
+
+func routeDatabaseContext(database string, impersonatedUser string) map[string]string {
+	dbContext := make(map[string]string)
+	if database != db.DefaultDatabase {
+		dbContext["db"] = database
+	}
+	if impersonatedUser != "" {
+		dbContext["imp_user"] = impersonatedUser
+	}
+	return dbContext
+}
+
+func (b *bolt4) setImpersonationConfig(config db.TxConfig, tx *internalTx4) {
+	tx.impersonatedUser = config.ImpersonatedUser
+	// b.databaseName may have been overwritten by the session
+	// else it's the same as the impersonated user's home DB
+	// in the latter case, do not include the database since it might be outdated
+	// indeed, the home DB might have switched between the routing table retrieval
+	// and the execution of BEGIN, so let the server resolve the home DB again instead
+	if tx.databaseName == b.impersonatedUserHomeDb {
+		tx.databaseName = ""
+	}
 }

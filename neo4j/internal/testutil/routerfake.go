@@ -24,12 +24,13 @@ import (
 	"github.com/neo4j/neo4j-go-driver/v4/neo4j/log"
 )
 
+type ServerLookupFn = func(context.Context, []string, string, log.BoltLogger, string) ([]string, error)
+
 type RouterFake struct {
 	Invalidated   bool
 	InvalidatedDb string
-	ReadersRet    []string
-	WritersRet    []string
-	Err           error
+	ReadersHook   ServerLookupFn
+	WritersHook   ServerLookupFn
 	CleanUpHook   func()
 }
 
@@ -38,12 +39,18 @@ func (r *RouterFake) Invalidate(database string) {
 	r.Invalidated = true
 }
 
-func (r *RouterFake) Readers(ctx context.Context, bookmarks []string, database string, _ log.BoltLogger) ([]string, error) {
-	return r.ReadersRet, r.Err
+func (r *RouterFake) Readers(ctx context.Context, bookmarks []string, database string, boltLogger log.BoltLogger, impersonatedUser string) ([]string, error) {
+	if r.ReadersHook != nil {
+		return r.ReadersHook(ctx, bookmarks, database, boltLogger, impersonatedUser)
+	}
+	return nil, nil
 }
 
-func (r *RouterFake) Writers(ctx context.Context, bookmarks []string, database string, _ log.BoltLogger) ([]string, error) {
-	return r.WritersRet, r.Err
+func (r *RouterFake) Writers(ctx context.Context, bookmarks []string, database string, boltLogger log.BoltLogger, impersonatedUser string) ([]string, error) {
+	if r.WritersHook != nil {
+		return r.WritersHook(ctx, bookmarks, database, boltLogger, impersonatedUser)
+	}
+	return nil, nil
 }
 
 func (r *RouterFake) CleanUp() {

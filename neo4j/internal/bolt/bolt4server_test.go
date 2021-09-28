@@ -23,6 +23,7 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"reflect"
 	"testing"
 
 	"github.com/neo4j/neo4j-go-driver/v4/neo4j/internal/packstream"
@@ -61,6 +62,19 @@ func (s *bolt4server) waitForHandshake() []byte {
 func (s *bolt4server) assertStructType(msg *testStruct, t byte) {
 	if msg.tag != t {
 		panic(fmt.Sprintf("Got wrong type of message expected %d but got %d (%+v)", t, msg.tag, msg))
+	}
+}
+
+func (s *bolt4server) assertContainsField(msg *testStruct, t byte, expectedField interface{}) {
+	found := false
+	for _, field := range msg.fields {
+		if reflect.DeepEqual(field, expectedField) {
+			found = true
+			break
+		}
+	}
+	if !found {
+		panic(fmt.Sprintf("Could not find field for message %d, expected to find %+v in %+v but found nothing", t, expectedField, msg.fields))
 	}
 }
 
@@ -111,9 +125,21 @@ func (s *bolt4server) receiveMsg() *testStruct {
 	return &testStruct{tag: t, fields: fields}
 }
 
-func (s *bolt4server) waitForRun() {
+func (s *bolt4server) waitForRunWithMeta(meta map[string]interface{}) {
+	msg := s.waitForRun()
+	if len(msg.fields) != 3 {
+		panic(fmt.Errorf("expected 3 fields, but got %d", len(msg.fields)))
+	}
+	field := msg.fields[2].(map[string]interface{})
+	if !reflect.DeepEqual(field, meta) {
+		panic(fmt.Errorf("expected metadata %+v, but got %+v", field, meta))
+	}
+}
+
+func (s *bolt4server) waitForRun() *testStruct {
 	msg := s.receiveMsg()
 	s.assertStructType(msg, msgRun)
+	return msg
 }
 
 func (s *bolt4server) waitForReset() {
@@ -121,9 +147,21 @@ func (s *bolt4server) waitForReset() {
 	s.assertStructType(msg, msgReset)
 }
 
-func (s *bolt4server) waitForTxBegin() {
+func (s *bolt4server) waitForTxBeginWithMeta(meta map[string]interface{}) {
+	msg := s.waitForTxBegin()
+	if len(msg.fields) != 1 {
+		panic(fmt.Errorf("expected 1 field, but got %d", len(msg.fields)))
+	}
+	field := msg.fields[0].(map[string]interface{})
+	if !reflect.DeepEqual(field, meta) {
+		panic(fmt.Errorf("expected metadata %+v, but got %+v", field, meta))
+	}
+}
+
+func (s *bolt4server) waitForTxBegin() *testStruct {
 	msg := s.receiveMsg()
 	s.assertStructType(msg, msgBegin)
+	return msg
 }
 
 func (s *bolt4server) waitForTxCommit() {
@@ -192,9 +230,15 @@ func (s *bolt4server) waitForDiscardN(n int) {
 	}
 }
 
-func (s *bolt4server) waitForRoute() {
+func (s *bolt4server) waitForRouteWithImpersonation(user string) {
+	msg := s.waitForRoute()
+	s.assertContainsField(msg, msgRoute, map[string]interface{}{"imp_user": user})
+}
+
+func (s *bolt4server) waitForRoute() *testStruct {
 	msg := s.receiveMsg()
 	s.assertStructType(msg, msgRoute)
+	return msg
 }
 
 func (s *bolt4server) acceptVersion(major, minor byte) {

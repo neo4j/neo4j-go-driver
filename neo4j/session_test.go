@@ -20,6 +20,7 @@
 package neo4j
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -48,7 +49,7 @@ func TestSession(st *testing.T) {
 		conf := Config{MaxTransactionRetryTime: 3 * time.Millisecond}
 		router := RouterFake{}
 		pool := PoolFake{}
-		sess := newSession(&conf, &router, &pool, db.ReadMode, []string{}, "", 0, &logger, &boltLogger)
+		sess := newSession(&conf, &router, &pool, db.ReadMode, nil, "", 0, &logger, &boltLogger, "")
 		sess.throttleTime = time.Millisecond * 1
 		return &router, &pool, sess
 	}
@@ -57,7 +58,17 @@ func TestSession(st *testing.T) {
 		conf := Config{MaxTransactionRetryTime: 3 * time.Millisecond}
 		router := RouterFake{}
 		pool := PoolFake{}
-		sess := newSession(&conf, &router, &pool, db.ReadMode, bookmarks, "", 0, &logger, &boltLogger)
+		sess := newSession(&conf, &router, &pool, db.ReadMode, bookmarks, "", 0, &logger, &boltLogger, "")
+		sess.throttleTime = time.Millisecond * 1
+		return &router, &pool, sess
+	}
+
+	createSessionWithImpersonation := func(impersonatedUser string) (*RouterFake, *PoolFake, *session) {
+		conf := Config{MaxTransactionRetryTime: 3 * time.Millisecond}
+		router := RouterFake{
+		}
+		pool := PoolFake{}
+		sess := newSession(&conf, &router, &pool, db.ReadMode, nil, "", 0, &logger, &boltLogger, impersonatedUser)
 		sess.throttleTime = time.Millisecond * 1
 		return &router, &pool, sess
 	}
@@ -297,6 +308,22 @@ func TestSession(st *testing.T) {
 			_, err = sess.Run("cypher", nil)
 			assertUsageError(t, err)
 		})
+
+		bt.Run("With user impersonation", func(t *testing.T) {
+			user := "johndoe"
+			router, pool, sess := createSessionWithImpersonation(user)
+			router.ReadersHook = requiresImpersonationLookupFn(user)
+			conn := &ConnFake{Alive: true}
+			pool.BorrowConn = conn
+
+			_, err := sess.Run("cypher", nil)
+
+			AssertNoError(t, err)
+			AssertIntEqual(t, len(conn.RecordedTxs), 1)
+			recordedTx := conn.RecordedTxs[0]
+			AssertStringEqual(t, recordedTx.Origin, "Run")
+			AssertStringEqual(t, recordedTx.ImpersonatedUser, user)
+		})
 	})
 
 	st.Run("Explicit transaction", func(bt *testing.T) {
@@ -366,4 +393,29 @@ func TestSession(st *testing.T) {
 			wg.Wait()
 		})
 	})
+
+	st.Run("With user impersonation", func(t *testing.T) {
+		user := "johndoe"
+		router, pool, sess := createSessionWithImpersonation(user)
+		router.ReadersHook = requiresImpersonationLookupFn(user)
+		conn := &ConnFake{Alive: true}
+		pool.BorrowConn = conn
+
+		_, err := sess.BeginTransaction()
+
+		AssertNoError(t, err)
+		AssertIntEqual(t, len(conn.RecordedTxs), 1)
+		recordedTx := conn.RecordedTxs[0]
+		AssertStringEqual(t, recordedTx.Origin, "TxBegin")
+		AssertStringEqual(t, recordedTx.ImpersonatedUser, user)
+	})
+}
+
+func requiresImpersonationLookupFn(user string) ServerLookupFn {
+	return func(_ context.Context, _ []string, _ string, _ log.BoltLogger, impersonatedUser string) ([]string, error) {
+		if impersonatedUser != user {
+			return nil, fmt.Errorf("expected impersonated user %s", user)
+		}
+		return nil, nil
+	}
 }

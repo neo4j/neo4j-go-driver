@@ -284,6 +284,8 @@ func (h *hydrator) routingTable() *db.RoutingTable {
 		key := h.unp.String()
 		h.unp.Next()
 		switch key {
+		case "db":
+			rt.Database = h.unp.String()
 		case "ttl":
 			rt.TimeToLive = int(h.unp.Int())
 		case "servers":

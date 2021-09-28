@@ -324,7 +324,7 @@ func TestBolt4(ot *testing.T) {
 		bolt, cleanup := connectToServer(t, func(srv *bolt4server) {
 			srv.accept(4)
 			srv.waitForTxBegin()
-			srv.send(msgSuccess, map[string]interface{}{})
+			srv.sendSuccess(map[string]interface{}{})
 			srv.waitForRun()
 			srv.waitForPullN(1)
 			// Send Pull response
@@ -361,7 +361,7 @@ func TestBolt4(ot *testing.T) {
 		bolt, cleanup := connectToServer(t, func(srv *bolt4server) {
 			srv.accept(4)
 			srv.waitForTxBegin()
-			srv.send(msgSuccess, map[string]interface{}{})
+			srv.sendSuccess(map[string]interface{}{})
 			// First RunTx
 			srv.waitForRun()
 			srv.waitForPullN(1)
@@ -852,7 +852,7 @@ func TestBolt4(ot *testing.T) {
 		defer cleanup()
 		defer bolt.Close()
 
-		rt, err := bolt.GetRoutingTable(map[string]string{"region": "space"}, nil, "thedb")
+		rt, err := bolt.GetRoutingTable(map[string]string{"region": "space"}, nil, "thedb", "")
 		AssertNoError(t, err)
 		ert := &db.RoutingTable{Routers: []string{"router1"}, TimeToLive: 1000}
 		if !reflect.DeepEqual(rt, ert) {
@@ -870,5 +870,195 @@ func TestBolt4(ot *testing.T) {
 		_, err := bolt.Run(db.Command{Cypher: "MATCH (n) RETURN n"}, db.TxConfig{Mode: db.ReadMode})
 		assertBoltState(t, bolt4_dead, bolt)
 		AssertError(t, err)
+	})
+
+	ot.Run("Fetches routing table with impersonated user", func(t *testing.T) {
+		bolt, cleanup := connectToServer(t, func(srv *bolt4server) {
+			srv.acceptWithMinor(4, 4)
+			srv.waitForRouteWithImpersonation("jane_doe")
+			srv.sendSuccess(map[string]interface{}{
+				"rt": map[string]interface{}{
+					"db": "impersonated_home_sweet_home",
+					"ttl": 1000,
+					"servers": []interface{}{
+						map[string]interface{}{
+							"role":      "ROUTE",
+							"addresses": []interface{}{"router1"},
+						},
+					},
+				},
+			})
+		})
+		defer cleanup()
+		defer bolt.Close()
+
+		_, err := bolt.GetRoutingTable(map[string]string{"region": "space"}, nil, "", "jane_doe")
+		AssertNoError(t, err)
+		AssertStringEqual(t, bolt.databaseName, "impersonated_home_sweet_home")
+		AssertStringEqual(t, bolt.impersonatedUserHomeDb, "impersonated_home_sweet_home")
+	})
+
+	ot.Run("Begins transaction with impersonated user", func(t *testing.T) {
+		bolt, cleanup := connectToServer(t, func(srv *bolt4server) {
+			srv.acceptWithMinor(4, 4)
+			srv.waitForRouteWithImpersonation("jane_doe")
+			srv.sendSuccess(map[string]interface{}{
+				"rt": map[string]interface{}{
+					"db": "home_db",
+					"ttl": 1000,
+					"servers": []interface{}{
+						map[string]interface{}{
+							"role":      "ROUTE",
+							"addresses": []interface{}{"router1"},
+						},
+					},
+				},
+			})
+			srv.waitForTxBeginWithMeta(map[string]interface{}{
+				"bookmarks": []interface{}{"kitap"},
+				"imp_user": "jane_doe",
+			})
+			srv.sendSuccess(map[string]interface{}{})
+		})
+		defer cleanup()
+		defer bolt.Close()
+
+		_, err := bolt.GetRoutingTable(map[string]string{}, nil, "", "jane_doe")
+		AssertNil(t, err)
+		_, err = bolt.TxBegin(db.TxConfig{
+			Bookmarks: []string{"kitap"}, // forces eager BEGIN
+			ImpersonatedUser: "jane_doe",
+		})
+
+		AssertNil(t, err)
+	})
+
+	ot.Run("Begins transaction with impersonated user and custom database", func(t *testing.T) {
+		bolt, cleanup := connectToServer(t, func(srv *bolt4server) {
+			srv.acceptWithMinor(4, 4)
+			srv.waitForRouteWithImpersonation("jane_doe")
+			srv.sendSuccess(map[string]interface{}{
+				"rt": map[string]interface{}{
+					"db": "home_db",
+					"ttl": 1000,
+					"servers": []interface{}{
+						map[string]interface{}{
+							"role":      "ROUTE",
+							"addresses": []interface{}{"router1"},
+						},
+					},
+				},
+			})
+			srv.waitForTxBeginWithMeta(map[string]interface{}{
+				"bookmarks": []interface{}{"kitap"},
+				"imp_user": "jane_doe",
+				"db": "custom_db",
+			})
+			srv.sendSuccess(map[string]interface{}{})
+		})
+		defer cleanup()
+		defer bolt.Close()
+
+		_, err := bolt.GetRoutingTable(map[string]string{}, nil, "", "jane_doe")
+		AssertNil(t, err)
+		bolt.databaseName = "custom_db" // simulates session configuration of custom database
+		_, err = bolt.TxBegin(db.TxConfig{
+			Bookmarks: []string{"kitap"}, // forces eager BEGIN
+			ImpersonatedUser: "jane_doe",
+		})
+
+		AssertNil(t, err)
+	})
+
+	ot.Run("Runs explicit transaction with impersonated user", func(t *testing.T) {
+		bolt, cleanup := connectToServer(t, func(srv *bolt4server) {
+			srv.acceptWithMinor(4, 4)
+			srv.waitForRouteWithImpersonation("jane_doe")
+			srv.sendSuccess(map[string]interface{}{
+				"rt": map[string]interface{}{
+					"db": "home_db",
+					"ttl": 1000,
+					"servers": []interface{}{
+						map[string]interface{}{
+							"role":      "ROUTE",
+							"addresses": []interface{}{"router1"},
+						},
+					},
+				},
+			})
+			srv.waitForTxBeginWithMeta(map[string]interface{}{"imp_user": "jane_doe"})
+			srv.sendSuccess(map[string]interface{}{})
+			srv.waitForRun() // TODO: assert imp_user? (if so, another TODO: add test with custom aka non-home database like the previous test)
+			srv.sendSuccess(map[string]interface{}{})
+		})
+		defer cleanup()
+		defer bolt.Close()
+
+		_, err := bolt.GetRoutingTable(map[string]string{}, nil, "", "jane_doe")
+		AssertNil(t, err)
+		handle, err := bolt.TxBegin(db.TxConfig{ImpersonatedUser: "jane_doe"})
+		AssertNil(t, err)
+		_, err = bolt.RunTx(handle, db.Command{Cypher: "RETURN 42"})
+
+		AssertNil(t, err)
+	})
+
+	ot.Run("Runs auto-commit transaction with impersonated user", func(t *testing.T) {
+		bolt, cleanup := connectToServer(t, func(srv *bolt4server) {
+			srv.acceptWithMinor(4, 4)
+			srv.waitForRouteWithImpersonation("jane_doe")
+			srv.sendSuccess(map[string]interface{}{
+				"rt": map[string]interface{}{
+					"db": "home_db",
+					"ttl": 1000,
+					"servers": []interface{}{
+						map[string]interface{}{
+							"role":      "ROUTE",
+							"addresses": []interface{}{"router1"},
+						},
+					},
+				},
+			})
+			srv.waitForRunWithMeta(map[string]interface{}{"imp_user": "jane_doe"})
+			srv.sendSuccess(map[string]interface{}{})
+		})
+		defer cleanup()
+		defer bolt.Close()
+
+		_, err := bolt.GetRoutingTable(map[string]string{}, nil, "", "jane_doe")
+		AssertNil(t, err)
+		_, err = bolt.Run(db.Command{Cypher: "RETURN 42"}, db.TxConfig{ImpersonatedUser: "jane_doe"})
+
+		AssertNil(t, err)
+	})
+
+	ot.Run("Runs auto-commit transaction with impersonated user and custom database", func(t *testing.T) {
+		bolt, cleanup := connectToServer(t, func(srv *bolt4server) {
+			srv.acceptWithMinor(4, 4)
+			srv.waitForRouteWithImpersonation("jane_doe")
+			srv.sendSuccess(map[string]interface{}{
+				"rt": map[string]interface{}{
+					"db": "home_db",
+					"ttl": 1000,
+					"servers": []interface{}{
+						map[string]interface{}{
+							"role":      "ROUTE",
+							"addresses": []interface{}{"router1"},
+						},
+					},
+				},
+			})
+			srv.waitForRunWithMeta(map[string]interface{}{"imp_user": "jane_doe", "db": "custom_db"})
+			srv.sendSuccess(map[string]interface{}{})
+		})
+		defer cleanup()
+		defer bolt.Close()
+
+		_, err := bolt.GetRoutingTable(map[string]string{}, nil, "", "jane_doe")
+		AssertNil(t, err)
+		bolt.databaseName = "custom_db" // simulates session configuration of custom database
+		_, err = bolt.Run(db.Command{Cypher: "RETURN 42"}, db.TxConfig{ImpersonatedUser: "jane_doe"})
+
+		AssertNil(t, err)
 	})
 }
