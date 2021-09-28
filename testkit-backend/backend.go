@@ -362,7 +362,7 @@ func (b *backend) handleRequest(req map[string]interface{}) {
 				authTokenMap["credentials"].(string),
 				realmString)
 		case "kerberos":
-			authToken = neo4j.KerberosAuth(authTokenMap["ticket"].(string))
+			authToken = neo4j.KerberosAuth(authTokenMap["credentials"].(string))
 		default:
 			authToken = neo4j.CustomAuth(
 				authTokenMap["scheme"].(string),

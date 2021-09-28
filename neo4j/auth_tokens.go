@@ -31,7 +31,8 @@ const schemeKerberos = "kerberos"
 const keyPrincipal = "principal"
 const keyCredentials = "credentials"
 const keyRealm = "realm"
-const keyTicket = "ticket"
+// Deprecated: will be removed in 5.0. Use keyCredentials instead.
+const keyTicket = keyCredentials
 
 // NoAuth generates an empty authentication token
 func NoAuth() AuthToken {
@@ -62,7 +63,7 @@ func KerberosAuth(ticket string) AuthToken {
 			keyScheme: schemeKerberos,
 			// Backwards compatibility: Neo4j servers pre 4.4 require the presence of the principal.
 			keyPrincipal: "",
-			keyTicket: ticket,
+			keyCredentials: ticket,
 		},
 	}
 

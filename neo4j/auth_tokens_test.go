@@ -92,7 +92,7 @@ func TestKerberosAuth(t *testing.T) {
 
 	token := KerberosAuth(ticket)
 
-	if len(token.tokens) != 2 {
+	if len(token.tokens) != 3 {
 		t.Errorf("should contain 2 keys")
 	}
 
@@ -100,8 +100,12 @@ func TestKerberosAuth(t *testing.T) {
 		t.Errorf("the key scheme should be 'kerberos' %v", token.tokens[keyScheme])
 	}
 
-	if token.tokens[keyTicket] != ticket {
-		t.Errorf("the key ticket was not properly set %v", token.tokens[keyTicket])
+	if token.tokens[keyPrincipal] != "" {
+		t.Errorf("the key principal was not properly set %v", token.tokens[keyPrincipal])
+	}
+
+	if token.tokens[keyCredentials] != ticket {
+		t.Errorf("the key ticket was not properly set %v", token.tokens[keyCredentials])
 	}
 }
 
