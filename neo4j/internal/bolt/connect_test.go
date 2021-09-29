@@ -26,8 +26,7 @@ import (
 	"github.com/neo4j/neo4j-go-driver/v4/neo4j/log"
 )
 
-var logger = &log.Console{Errors: true, Infos: true, Warns: true}
-var boltLogger = &log.ConsoleBoltLogger{}
+var logger = log.Void{}
 
 func TestConnect(ot *testing.T) {
 	// TODO: Test connect timeout
@@ -50,7 +49,7 @@ func TestConnect(ot *testing.T) {
 			srv.closeConnection()
 		}()
 
-		_, err := Connect("servername", conn, auth, "007", nil, logger, boltLogger)
+		_, err := Connect("servername", conn, auth, "007", nil, logger, nil)
 		AssertError(t, err)
 	})
 
@@ -65,7 +64,7 @@ func TestConnect(ot *testing.T) {
 			srv.acceptVersion(1, 0)
 		}()
 
-		boltconn, err := Connect("servername", conn, auth, "007", nil, logger, boltLogger)
+		boltconn, err := Connect("servername", conn, auth, "007", nil, logger, nil)
 		AssertError(t, err)
 		if boltconn != nil {
 			t.Error("Shouldn't returned conn")
