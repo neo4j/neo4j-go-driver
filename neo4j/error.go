@@ -110,6 +110,17 @@ func IsTransactionExecutionLimit(err error) bool {
 	return is
 }
 
+// TokenExpiredError represent errors caused by the driver not being able to connect to Neo4j services,
+// or lost connections.
+type TokenExpiredError struct {
+	Code string
+	Message string
+}
+
+func (e *TokenExpiredError) Error() string {
+	return fmt.Sprintf("TokenExpiredError: %s (%s)", e.Code, e.Message)
+}
+
 func wrapError(err error) error {
 	if err == nil {
 		return nil
@@ -133,6 +144,10 @@ func wrapError(err error) error {
 		if e.Timeout() && e.Op == "read" {
 			// most likely due to read timeout configuration hint being applied
 			return &ConnectivityError{inner: err}
+		}
+	case *db.Neo4jError:
+		if e.Code == "Neo.ClientError.Security.TokenExpired" {
+			return &TokenExpiredError{Code: e.Code, Message: e.Msg}
 		}
 	}
 	return err

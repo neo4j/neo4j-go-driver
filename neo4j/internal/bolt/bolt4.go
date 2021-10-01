@@ -157,10 +157,8 @@ func (b *bolt4) setError(err error, fatal bool) {
 		b.state = bolt4_failed
 	}
 
-	neo4jErr, _ := err.(*db.Neo4jError)
 	// Increase severity even if it was a previous error
-	// Treat expired auth as fatal so that pool is cleaned up of old connections
-	if fatal || (neo4jErr != nil && neo4jErr.Code == "Status.Security.AuthorizationExpired") {
+	if fatal {
 		b.state = bolt4_dead
 	}
 
@@ -171,7 +169,8 @@ func (b *bolt4) setError(err error, fatal bool) {
 	}
 
 	// Do not log big cypher statements as errors
-	if neo4jErr != nil && neo4jErr.Classification() == "ClientError" {
+	neo4jErr, casted := err.(*db.Neo4jError)
+	if casted && neo4jErr.Classification() == "ClientError" {
 		b.log.Debugf(log.Bolt4, b.logId, "%s", err)
 	} else {
 		b.log.Error(log.Bolt4, b.logId, err)
@@ -205,7 +204,7 @@ func (b *bolt4) receiveSuccess() *success {
 		}
 		return v
 	case *db.Neo4jError:
-		b.setError(v, false)
+		b.setError(v, isFatalError(v))
 		return nil
 	default:
 		// Unexpected message received
@@ -805,7 +804,7 @@ func (b *bolt4) receiveNext() (*db.Record, bool, *db.Summary) {
 		b.checkStreams()
 		return nil, false, sum
 	case *db.Neo4jError:
-		b.setError(x, false) // Will detach the stream
+		b.setError(x, isFatalError(x)) // Will detach the stream
 		return nil, false, nil
 	default:
 		// Unknown territory
@@ -982,4 +981,9 @@ func (b *bolt4) initializeReadTimeoutHint(hints map[string]interface{}) {
 		return
 	}
 	b.in.connReadTimeout = time.Duration(readTimeout) * time.Second
+}
+
+func isFatalError(err *db.Neo4jError) bool {
+	// Treat expired auth as fatal so that pool is cleaned up of old connections
+	return err != nil && err.Code == "Status.Security.AuthorizationExpired"
 }

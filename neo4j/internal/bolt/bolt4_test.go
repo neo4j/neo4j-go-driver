@@ -871,4 +871,29 @@ func TestBolt4(ot *testing.T) {
 		assertBoltState(t, bolt4_dead, bolt)
 		AssertError(t, err)
 	})
+
+	ot.Run("Immediately expired authentication token error triggers a connection failure", func(t *testing.T) {
+		bolt, cleanup := connectToServer(t, func(srv *bolt4server) {
+			srv.accept(4)
+			srv.sendFailureMsg("Neo.ClientError.Security.TokenExpired", "SSO token is... expired")
+		})
+		defer cleanup()
+
+		_, err := bolt.Run(db.Command{Cypher: "MATCH (n) RETURN n"}, db.TxConfig{Mode: db.ReadMode})
+		assertBoltState(t, bolt4_failed, bolt)
+		AssertError(t, err)
+	})
+
+	ot.Run("Expired authentication token error after run triggers a connection failure", func(t *testing.T) {
+		bolt, cleanup := connectToServer(t, func(srv *bolt4server) {
+			srv.accept(4)
+			srv.waitForRun()
+			srv.sendFailureMsg("Neo.ClientError.Security.TokenExpired", "SSO token is... expired")
+		})
+		defer cleanup()
+
+		_, err := bolt.Run(db.Command{Cypher: "MATCH (n) RETURN n"}, db.TxConfig{Mode: db.ReadMode})
+		assertBoltState(t, bolt4_failed, bolt)
+		AssertError(t, err)
+	})
 }

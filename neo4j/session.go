@@ -208,7 +208,7 @@ func (s *session) BeginTransaction(configurers ...func(*TransactionConfig)) (Tra
 	})
 	if err != nil {
 		s.pool.Return(conn)
-		return nil, err
+		return nil, wrapError(err)
 	}
 
 	// Create transaction wrapper
