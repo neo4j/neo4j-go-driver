@@ -367,12 +367,16 @@ func (b *backend) handleRequest(req map[string]interface{}) {
 				authTokenMap["credentials"].(string),
 				realm)
 		case "kerberos":
-			authToken = neo4j.KerberosAuth(authTokenMap["ticket"].(string))
+			authToken = neo4j.KerberosAuth(authTokenMap["credentials"].(string))
 		case "bearer":
 			authToken = neo4j.BearerAuth(authTokenMap["credentials"].(string))
 		default:
-			b.writeError(errors.New("Unsupported scheme"))
-			return
+			authToken = neo4j.CustomAuth(
+				authTokenMap["scheme"].(string),
+				authTokenMap["principal"].(string),
+				authTokenMap["credentials"].(string),
+				authTokenMap["realm"].(string),
+				authTokenMap["parameters"].(map[string]interface{}))
 		}
 		// Parse URI (or rather type cast)
 		uri := data["uri"].(string)
@@ -578,10 +582,12 @@ func (b *backend) handleRequest(req map[string]interface{}) {
 		b.writeResponse("FeatureList", map[string]interface{}{
 			"features": []string{
 				"ConfHint:connection.recv_timeout_seconds",
+				"Feature:Auth:Custom",
+				"Feature:Auth:Bearer",
+				"Feature:Auth:Kerberos",
 				"Optimization:ConnectionReuse",
 				"Optimization:ImplicitDefaultArguments",
 				"Optimization:PullPipelining",
-				"Feature:Auth:Bearer",
 			},
 		})
 

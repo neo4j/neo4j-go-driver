@@ -92,16 +92,20 @@ func TestKerberosAuth(t *testing.T) {
 
 	token := KerberosAuth(ticket)
 
-	if len(token.tokens) != 2 {
-		t.Errorf("should contain 2 keys")
+	if len(token.tokens) != 3 {
+		t.Errorf("should contain 3 keys")
 	}
 
 	if token.tokens[keyScheme] != schemeKerberos {
 		t.Errorf("the key scheme should be 'kerberos' %v", token.tokens[keyScheme])
 	}
 
-	if token.tokens[keyTicket] != ticket {
-		t.Errorf("the key ticket was not properly set %v", token.tokens[keyTicket])
+	if token.tokens[keyPrincipal] != "" {
+		t.Errorf("the key principal was not properly set %v", token.tokens[keyPrincipal])
+	}
+
+	if token.tokens[keyCredentials] != ticket {
+		t.Errorf("the key ticket was not properly set %v", token.tokens[keyCredentials])
 	}
 }
 
@@ -144,8 +148,8 @@ func TestCustomAuthWithEmptyParameters(t *testing.T) {
 
 	token := CustomAuth(scheme, userName, password, realm, parameters)
 
-	if len(token.tokens) != 5 {
-		t.Errorf("should contain 5 keys when parameters data was passed %v", len(token.tokens))
+	if len(token.tokens) != 4 {
+		t.Errorf("should contain 4 keys when parameters data was passed %v", len(token.tokens))
 	}
 
 	if token.tokens[keyScheme] != scheme {
