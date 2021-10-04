@@ -31,7 +31,6 @@ const schemeKerberos = "kerberos"
 const keyPrincipal = "principal"
 const keyCredentials = "credentials"
 const keyRealm = "realm"
-const keyTicket = "ticket"
 
 // NoAuth generates an empty authentication token
 func NoAuth() AuthToken {
@@ -60,7 +59,9 @@ func KerberosAuth(ticket string) AuthToken {
 	token := AuthToken{
 		tokens: map[string]interface{}{
 			keyScheme: schemeKerberos,
-			keyTicket: ticket,
+			// Backwards compatibility: Neo4j servers pre 4.4 require the presence of the principal.
+			keyPrincipal:   "",
+			keyCredentials: ticket,
 		},
 	}
 
@@ -70,16 +71,19 @@ func KerberosAuth(ticket string) AuthToken {
 // CustomAuth generates a custom authentication token with provided parameters
 func CustomAuth(scheme string, username string, password string, realm string, parameters map[string]interface{}) AuthToken {
 	tokens := map[string]interface{}{
-		keyScheme:      scheme,
-		keyPrincipal:   username,
-		keyCredentials: password,
+		keyScheme:    scheme,
+		keyPrincipal: username,
+	}
+
+	if password != "" {
+		tokens[keyCredentials] = password
 	}
 
 	if realm != "" {
 		tokens[keyRealm] = realm
 	}
 
-	if parameters != nil {
+	if len(parameters) > 0 {
 		tokens["parameters"] = parameters
 	}
 
