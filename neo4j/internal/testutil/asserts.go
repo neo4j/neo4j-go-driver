@@ -21,6 +21,7 @@
 package testutil
 
 import (
+	"fmt"
 	"io"
 	"reflect"
 	"strings"
@@ -81,10 +82,15 @@ func AssertNoError(t *testing.T, err error) {
 	}
 }
 
+func AssertErrorMessageContains(t *testing.T, err error, msg string, args ...interface{}) {
+	AssertError(t, err)
+	AssertStringContain(t, err.Error(), fmt.Sprintf(msg, args...))
+}
+
 func AssertError(t *testing.T, err error) {
 	t.Helper()
 	if err == nil {
-		t.Fatal("Expected an error but it wasn't")
+		t.Fatal("Expected an error but none occurred")
 	}
 }
 

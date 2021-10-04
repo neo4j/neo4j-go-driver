@@ -44,8 +44,10 @@ const (
 type ResultSummary interface {
 	// Server returns basic information about the server where the statement is carried out.
 	Server() ServerInfo
-	// Statement returns statement that has been executed.
+	// Deprecated: since 4.4, will be removed in 5.0. Use Query instead
 	Statement() Statement
+	// Query returns the query that has been executed.
+	Query() Query
 	// StatementType returns type of statement that has been executed.
 	StatementType() StatementType
 	// Counters returns statistics counts for the statement.
@@ -96,10 +98,16 @@ type Counters interface {
 }
 
 type Statement interface {
+	Query
+}
+
+type Query interface {
 	// Text returns the statement's text.
 	Text() string
-	// Params returns the statement's parameters.
+	// Deprecated: since 4.4, will be removed in 5.0. Use Parameters instead
 	Params() map[string]interface{}
+	// Parameters returns the statement's parameters.
+	Parameters() map[string]interface{}
 }
 
 // ServerInfo contains basic information of the server.
@@ -219,6 +227,10 @@ func (s *resultSummary) Statement() Statement {
 	return s
 }
 
+func (s *resultSummary) Query() Query {
+	return s
+}
+
 func (s *resultSummary) StatementType() StatementType {
 	return StatementType(s.sum.StmntType)
 }
@@ -228,6 +240,10 @@ func (s *resultSummary) Text() string {
 }
 
 func (s *resultSummary) Params() map[string]interface{} {
+	return s.Parameters()
+}
+
+func (s *resultSummary) Parameters() map[string]interface{} {
 	return s.params
 }
 

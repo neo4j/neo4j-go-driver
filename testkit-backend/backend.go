@@ -115,10 +115,15 @@ func (b *backend) writeError(err error) {
 	// track of this error so that we can reuse the real thing within a retryable tx
 	fmt.Printf("Error: %s (%T)\n", err.Error(), err)
 	code := ""
+	tokenErr, isTokenExpiredErr := err.(*neo4j.TokenExpiredError)
+	if isTokenExpiredErr {
+		code = tokenErr.Code
+	}
 	if neo4j.IsNeo4jError(err) {
 		code = err.(*db.Neo4jError).Code
 	}
-	isDriverError := neo4j.IsNeo4jError(err) ||
+	isDriverError := isTokenExpiredErr ||
+		neo4j.IsNeo4jError(err) ||
 		neo4j.IsUsageError(err) ||
 		neo4j.IsConnectivityError(err) ||
 		neo4j.IsTransactionExecutionLimit(err) ||
@@ -353,16 +358,18 @@ func (b *backend) handleRequest(req map[string]interface{}) {
 		authTokenMap := data["authorizationToken"].(map[string]interface{})["data"].(map[string]interface{})
 		switch authTokenMap["scheme"] {
 		case "basic":
-			realmString := ""
-			if realm, ok := authTokenMap["realm"]; ok {
-				realmString = realm.(string)
+			realm, ok := authTokenMap["realm"].(string)
+			if !ok {
+				realm = ""
 			}
 			authToken = neo4j.BasicAuth(
 				authTokenMap["principal"].(string),
 				authTokenMap["credentials"].(string),
-				realmString)
+				realm)
 		case "kerberos":
 			authToken = neo4j.KerberosAuth(authTokenMap["credentials"].(string))
+		case "bearer":
+			authToken = neo4j.BearerAuth(authTokenMap["credentials"].(string))
 		default:
 			authToken = neo4j.CustomAuth(
 				authTokenMap["scheme"].(string),
@@ -574,9 +581,13 @@ func (b *backend) handleRequest(req map[string]interface{}) {
 	case "GetFeatures":
 		b.writeResponse("FeatureList", map[string]interface{}{
 			"features": []string{
-				"Feature:Auth:Custom",
-				"Feature:Auth:Kerberos",
 				"ConfHint:connection.recv_timeout_seconds",
+				"Feature:Auth:Custom",
+				"Feature:Auth:Bearer",
+				"Feature:Auth:Kerberos",
+				"Optimization:ConnectionReuse",
+				"Optimization:ImplicitDefaultArguments",
+				"Optimization:PullPipelining",
 			},
 		})
 

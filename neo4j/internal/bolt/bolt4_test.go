@@ -333,8 +333,8 @@ func TestBolt4(ot *testing.T) {
 			srv.send(msgRecord, []interface{}{"v1"})
 			// ... and the batch summary
 			srv.send(msgSuccess, map[string]interface{}{"has_more": true})
-			// Wait for the discard message
-			srv.waitForDiscardNAndQid(-1, int(qid))
+			// Wait for the discard message (no need for qid since the last executed query is discarded)
+			srv.waitForDiscardN(-1)
 			// Respond to discard with has more to indicate that there are more records
 			srv.send(msgSuccess, map[string]interface{}{"has_more": true})
 			// Wait for the commit
@@ -869,6 +869,31 @@ func TestBolt4(ot *testing.T) {
 
 		_, err := bolt.Run(db.Command{Cypher: "MATCH (n) RETURN n"}, db.TxConfig{Mode: db.ReadMode})
 		assertBoltState(t, bolt4_dead, bolt)
+		AssertError(t, err)
+	})
+
+	ot.Run("Immediately expired authentication token error triggers a connection failure", func(t *testing.T) {
+		bolt, cleanup := connectToServer(t, func(srv *bolt4server) {
+			srv.accept(4)
+			srv.sendFailureMsg("Neo.ClientError.Security.TokenExpired", "SSO token is... expired")
+		})
+		defer cleanup()
+
+		_, err := bolt.Run(db.Command{Cypher: "MATCH (n) RETURN n"}, db.TxConfig{Mode: db.ReadMode})
+		assertBoltState(t, bolt4_failed, bolt)
+		AssertError(t, err)
+	})
+
+	ot.Run("Expired authentication token error after run triggers a connection failure", func(t *testing.T) {
+		bolt, cleanup := connectToServer(t, func(srv *bolt4server) {
+			srv.accept(4)
+			srv.waitForRun()
+			srv.sendFailureMsg("Neo.ClientError.Security.TokenExpired", "SSO token is... expired")
+		})
+		defer cleanup()
+
+		_, err := bolt.Run(db.Command{Cypher: "MATCH (n) RETURN n"}, db.TxConfig{Mode: db.ReadMode})
+		assertBoltState(t, bolt4_failed, bolt)
 		AssertError(t, err)
 	})
 }

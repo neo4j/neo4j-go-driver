@@ -62,6 +62,8 @@ func TestSession(st *testing.T) {
 		return &router, &pool, sess
 	}
 
+	tokenExpiredErr := &db.Neo4jError{Code: "Neo.ClientError.Security.TokenExpired", Msg: "oopsie whoopsie"}
+
 	st.Run("Retry mechanism", func(rt *testing.T) {
 		// Checks that retries occur on database error and that it stops retrying after a certain
 		// amount of time and that connections are returned to pool upon failure.
@@ -141,17 +143,17 @@ func TestSession(st *testing.T) {
 			dirtyBookmarks := []string{"", "b1", "", "b2", ""}
 			cleanBookmarks := []string{"b1", "b2"}
 			_, pool, sess := createSessionWithBookmarks(dirtyBookmarks)
-			conn := &ConnFake{Alive: true, Err: errors.New("Make all fail")}
+			err := errors.New("make all fail")
+			conn := &ConnFake{Alive: true, RunErr: err, TxBeginErr: err}
 			pool.BorrowConn = conn
 
-			// All of these assume that Err on ConnFake fails the operations
 			sess.Run("cypher", nil)
 			sess.BeginTransaction()
 			sess.ReadTransaction(func(tx Transaction) (interface{}, error) {
-				return nil, errors.New("somehting")
+				return nil, errors.New("something")
 			})
 			sess.WriteTransaction(func(tx Transaction) (interface{}, error) {
-				return nil, errors.New("somehting")
+				return nil, errors.New("something")
 			})
 			AssertLen(t, conn.RecordedTxs, 4)
 			for _, rtx := range conn.RecordedTxs {
@@ -297,6 +299,98 @@ func TestSession(st *testing.T) {
 			_, err = sess.Run("cypher", nil)
 			assertUsageError(t, err)
 		})
+
+		bt.Run("Token expiration in session run after errored connection acquisition", func(t *testing.T) {
+			_, pool, sess := createSession()
+			pool.BorrowErr = tokenExpiredErr
+
+			_, err := sess.Run("cypher", map[string]interface{}{})
+
+			assertTokenExpiredError(t, err)
+		})
+
+		bt.Run("Token expiration after run", func(t *testing.T) {
+			_, pool, sess := createSession()
+			conn := &ConnFake{Alive: true, RunErr: tokenExpiredErr}
+			pool.BorrowConn = conn
+
+			_, err := sess.Run("cypher", map[string]interface{}{})
+
+			assertTokenExpiredError(t, err)
+		})
+
+		bt.Run("Token expiration after result collect call", func(t *testing.T) {
+			_, pool, sess := createSession()
+			conn := &ConnFake{Alive: true, Nexts: []Next{{Err: tokenExpiredErr}}}
+			pool.BorrowConn = conn
+
+			result, err := sess.Run("cypher", map[string]interface{}{})
+			AssertNil(t, err)
+			_, err = result.Collect()
+
+			assertTokenExpiredError(t, err)
+		})
+
+		bt.Run("Token expiration after result consume call", func(t *testing.T) {
+			_, pool, sess := createSession()
+			conn := &ConnFake{Alive: true, ConsumeErr: tokenExpiredErr}
+			pool.BorrowConn = conn
+
+			result, err := sess.Run("cypher", map[string]interface{}{})
+			AssertNil(t, err)
+			_, err = result.Consume()
+
+			assertTokenExpiredError(t, err)
+		})
+
+		bt.Run("Token expiration after result consume next and err call", func(t *testing.T) {
+			_, pool, sess := createSession()
+			conn := &ConnFake{Alive: true, Nexts: []Next{{Err: tokenExpiredErr}}}
+			pool.BorrowConn = conn
+
+			result, err := sess.Run("cypher", map[string]interface{}{})
+			AssertNil(t, err)
+			_ = result.Next()
+			err = result.Err()
+
+			assertTokenExpiredError(t, err)
+		})
+
+		bt.Run("Token expiration after result single record extraction", func(t *testing.T) {
+			_, pool, sess := createSession()
+			conn := &ConnFake{Alive: true, Nexts: []Next{{Err: tokenExpiredErr}}}
+			pool.BorrowConn = conn
+
+			result, err := sess.Run("cypher", map[string]interface{}{})
+			AssertNil(t, err)
+			_, err = result.Single()
+
+			assertTokenExpiredError(t, err)
+		})
+
+		bt.Run("Token expiration after write transaction function", func(t *testing.T) {
+			_, pool, sess := createSession()
+			conn := &ConnFake{Alive: true}
+			pool.BorrowConn = conn
+
+			_, err := sess.WriteTransaction(func(tx Transaction) (interface{}, error) {
+				return nil, tokenExpiredErr
+			})
+
+			assertTokenExpiredError(t, err)
+		})
+
+		bt.Run("Token expiration after read transaction function", func(t *testing.T) {
+			_, pool, sess := createSession()
+			conn := &ConnFake{Alive: true}
+			pool.BorrowConn = conn
+
+			_, err := sess.ReadTransaction(func(tx Transaction) (interface{}, error) {
+				return nil, tokenExpiredErr
+			})
+
+			assertTokenExpiredError(t, err)
+		})
 	})
 
 	st.Run("Explicit transaction", func(bt *testing.T) {
@@ -342,6 +436,57 @@ func TestSession(st *testing.T) {
 			_, err := sess.BeginTransaction()
 			AssertNoError(t, err)
 		})
+
+		bt.Run("Token expiration after transaction begin", func(t *testing.T) {
+			_, pool, sess := createSession()
+			conn := &ConnFake{Alive: true, TxBeginErr: tokenExpiredErr}
+			pool.BorrowConn = conn
+
+			tx, err := sess.BeginTransaction()
+
+			AssertNil(t, tx)
+			assertTokenExpiredError(t, err)
+		})
+
+		bt.Run("Token expiration after transaction run", func(t *testing.T) {
+			_, pool, sess := createSession()
+			conn := &ConnFake{Alive: true, RunTxErr: tokenExpiredErr}
+			pool.BorrowConn = conn
+
+			tx, err := sess.BeginTransaction()
+			AssertNil(t, err)
+			_, err = tx.Run("cypher", map[string]interface{}{})
+
+			assertTokenExpiredError(t, err)
+		})
+
+		bt.Run("Token expiration after transaction commit", func(t *testing.T) {
+			_, pool, sess := createSession()
+			conn := &ConnFake{Alive: true, TxCommitErr: tokenExpiredErr}
+			pool.BorrowConn = conn
+
+			tx, err := sess.BeginTransaction()
+			AssertNil(t, err)
+			_, err = tx.Run("cypher", map[string]interface{}{})
+			AssertNil(t, err)
+			err = tx.Commit()
+
+			assertTokenExpiredError(t, err)
+		})
+
+		bt.Run("Token expiration after transaction rollback", func(t *testing.T) {
+			_, pool, sess := createSession()
+			conn := &ConnFake{Alive: true, TxRollbackErr: tokenExpiredErr}
+			pool.BorrowConn = conn
+
+			tx, err := sess.BeginTransaction()
+			AssertNil(t, err)
+			_, err = tx.Run("cypher", map[string]interface{}{})
+			AssertNil(t, err)
+			err = tx.Rollback()
+
+			assertTokenExpiredError(t, err)
+		})
 	})
 
 	st.Run("Close", func(ct *testing.T) {
@@ -366,4 +511,10 @@ func TestSession(st *testing.T) {
 			wg.Wait()
 		})
 	})
+}
+
+func assertTokenExpiredError(t *testing.T, err error) {
+	AssertSameType(t, err, &TokenExpiredError{})
+	AssertErrorMessageContains(t, err, "Neo.ClientError.Security.TokenExpired")
+	AssertErrorMessageContains(t, err, "oopsie whoopsie")
 }

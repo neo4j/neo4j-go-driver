@@ -74,25 +74,26 @@ func (i *internalTx4) toMeta() map[string]interface{} {
 }
 
 type bolt4 struct {
-	state                 int
-	txId                  db.TxHandle
-	streams               openstreams
-	conn                  net.Conn
-	serverName            string
-	out                   outgoing
-	in                    incoming
-	connId                string
-	logId                 string
-	serverVersion         string
-	tfirst                int64       // Time that server started streaming
-	pendingTx             internalTx4 // Stashed away when tx started explicitly
-	hasPendingTx          bool
-	bookmark              string // Last bookmark
-	birthDate             time.Time
-	log                   log.Logger
-	databaseName          string
-	err                   error // Last fatal error
-	minor                 int
+	state         int
+	txId          db.TxHandle
+	streams       openstreams
+	conn          net.Conn
+	serverName    string
+	out           outgoing
+	in            incoming
+	connId        string
+	logId         string
+	serverVersion string
+	tfirst        int64       // Time that server started streaming
+	pendingTx     internalTx4 // Stashed away when tx started explicitly
+	hasPendingTx  bool
+	bookmark      string // Last bookmark
+	birthDate     time.Time
+	log           log.Logger
+	databaseName  string
+	err           error // Last fatal error
+	minor         int
+	lastQid       int64 // Last seen qid
 }
 
 func NewBolt4(serverName string, conn net.Conn, log log.Logger, boltLog log.BoltLogger) *bolt4 {
@@ -156,10 +157,8 @@ func (b *bolt4) setError(err error, fatal bool) {
 		b.state = bolt4_failed
 	}
 
-	neo4jErr, _ := err.(*db.Neo4jError)
 	// Increase severity even if it was a previous error
-	// Treat expired auth as fatal so that pool is cleaned up of old connections
-	if fatal || (neo4jErr != nil && neo4jErr.Code == "Status.Security.AuthorizationExpired") {
+	if fatal {
 		b.state = bolt4_dead
 	}
 
@@ -170,7 +169,8 @@ func (b *bolt4) setError(err error, fatal bool) {
 	}
 
 	// Do not log big cypher statements as errors
-	if neo4jErr != nil && neo4jErr.Classification() == "ClientError" {
+	neo4jErr, casted := err.(*db.Neo4jError)
+	if casted && neo4jErr.Classification() == "ClientError" {
 		b.log.Debugf(log.Bolt4, b.logId, "%s", err)
 	} else {
 		b.log.Error(log.Bolt4, b.logId, err)
@@ -199,9 +199,12 @@ func (b *bolt4) receiveSuccess() *success {
 
 	switch v := msg.(type) {
 	case *success:
+		if v.qid > -1 {
+			b.lastQid = v.qid
+		}
 		return v
 	case *db.Neo4jError:
-		b.setError(v, false)
+		b.setError(v, isFatalError(v))
 		return nil
 	default:
 		// Unexpected message received
@@ -433,7 +436,7 @@ func (b *bolt4) discardStream() {
 			// already sent a discard.
 			discarded = true
 			stream.fetchSize = -1
-			if b.state == bolt4_streamingtx {
+			if b.state == bolt4_streamingtx && stream.qid != b.lastQid {
 				b.out.appendDiscardNQid(stream.fetchSize, stream.qid)
 			} else {
 				b.out.appendDiscardN(stream.fetchSize)
@@ -464,7 +467,12 @@ func (b *bolt4) sendPullN() {
 		b.out.appendPullN(b.streams.curr.fetchSize)
 		b.out.send(b.conn)
 	} else if b.state == bolt4_streamingtx {
-		b.out.appendPullNQid(b.streams.curr.fetchSize, b.streams.curr.qid)
+		fetchSize := b.streams.curr.fetchSize
+		if b.streams.curr.qid == b.lastQid {
+			b.out.appendPullN(fetchSize)
+		} else {
+			b.out.appendPullNQid(fetchSize, b.streams.curr.qid)
+		}
 		b.out.send(b.conn)
 	}
 }
@@ -796,7 +804,7 @@ func (b *bolt4) receiveNext() (*db.Record, bool, *db.Summary) {
 		b.checkStreams()
 		return nil, false, sum
 	case *db.Neo4jError:
-		b.setError(x, false) // Will detach the stream
+		b.setError(x, isFatalError(x)) // Will detach the stream
 		return nil, false, nil
 	default:
 		// Unknown territory
@@ -973,4 +981,9 @@ func (b *bolt4) initializeReadTimeoutHint(hints map[string]interface{}) {
 		return
 	}
 	b.in.connReadTimeout = time.Duration(readTimeout) * time.Second
+}
+
+func isFatalError(err *db.Neo4jError) bool {
+	// Treat expired auth as fatal so that pool is cleaned up of old connections
+	return err != nil && err.Code == "Status.Security.AuthorizationExpired"
 }
