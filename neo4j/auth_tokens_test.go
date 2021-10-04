@@ -93,7 +93,7 @@ func TestKerberosAuth(t *testing.T) {
 	token := KerberosAuth(ticket)
 
 	if len(token.tokens) != 3 {
-		t.Errorf("should contain 2 keys")
+		t.Errorf("should contain 3 keys")
 	}
 
 	if token.tokens[keyScheme] != schemeKerberos {
