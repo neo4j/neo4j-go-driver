@@ -148,8 +148,8 @@ func TestCustomAuthWithEmptyParameters(t *testing.T) {
 
 	token := CustomAuth(scheme, userName, password, realm, parameters)
 
-	if len(token.tokens) != 5 {
-		t.Errorf("should contain 5 keys when parameters data was passed %v", len(token.tokens))
+	if len(token.tokens) != 4 {
+		t.Errorf("should contain 4 keys when parameters data was passed %v", len(token.tokens))
 	}
 
 	if token.tokens[keyScheme] != scheme {
