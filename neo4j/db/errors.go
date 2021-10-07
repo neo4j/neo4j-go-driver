@@ -98,12 +98,14 @@ func (e *Neo4jError) IsRetriableCluster() bool {
 	return false
 }
 
-type RoutingNotSupportedError struct {
-	Server string
+type FeatureNotSupportedError struct {
+	Server  string
+	Feature string
+	Reason  string
 }
 
-func (e *RoutingNotSupportedError) Error() string {
-	return fmt.Sprintf("%s does not support routing", e.Server)
+func (e *FeatureNotSupportedError) Error() string {
+	return fmt.Sprintf("Server %s does not support: %s (%s)", e.Server, e.Feature, e.Reason)
 }
 
 type UnsupportedTypeError struct {

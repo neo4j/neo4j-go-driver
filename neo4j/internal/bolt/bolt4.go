@@ -45,11 +45,12 @@ const (
 const bolt4_fetchsize = 1000
 
 type internalTx4 struct {
-	mode         db.AccessMode
-	bookmarks    []string
-	timeout      time.Duration
-	txMeta       map[string]interface{}
-	databaseName string
+	mode          db.AccessMode
+	bookmarks     []string
+	timeout       time.Duration
+	txMeta        map[string]interface{}
+	databaseName  string
+	impersonateAs string
 }
 
 func (i *internalTx4) toMeta() map[string]interface{} {
@@ -69,6 +70,9 @@ func (i *internalTx4) toMeta() map[string]interface{} {
 	}
 	if i.databaseName != db.DefaultDatabase {
 		meta["db"] = i.databaseName
+	}
+	if i.impersonateAs != "" {
+		meta["imp_user"] = i.impersonateAs
 	}
 	return meta
 }
@@ -110,7 +114,7 @@ func NewBolt4(serverName string, conn net.Conn, log log.Logger, boltLog log.Bolt
 				boltLogger: boltLog,
 			},
 			connReadTimeout: -1,
-			logger: log,
+			logger:          log,
 		},
 	}
 	b.out = outgoing{
@@ -263,6 +267,13 @@ func (b *bolt4) connect(minor int, auth map[string]interface{}, userAgent string
 	return nil
 }
 
+func (b *bolt4) checkImpersonationAndVersion(impersonateAs string) error {
+	if impersonateAs != "" && b.minor < 4 {
+		return &db.FeatureNotSupportedError{Server: b.serverName, Feature: "user impersonation", Reason: "requires at least server v4.4"}
+	}
+	return nil
+}
+
 func (b *bolt4) TxBegin(txConfig db.TxConfig) (db.TxHandle, error) {
 	// Ok, to begin transaction while streaming auto-commit, just empty the stream and continue.
 	if b.state == bolt4_streaming {
@@ -277,12 +288,17 @@ func (b *bolt4) TxBegin(txConfig db.TxConfig) (db.TxHandle, error) {
 		return 0, err
 	}
 
+	if err := b.checkImpersonationAndVersion(txConfig.ImpersonateAs); err != nil {
+		return 0, err
+	}
+
 	tx := internalTx4{
-		mode:         txConfig.Mode,
-		bookmarks:    txConfig.Bookmarks,
-		timeout:      txConfig.Timeout,
-		txMeta:       txConfig.Meta,
-		databaseName: b.databaseName,
+		mode:          txConfig.Mode,
+		bookmarks:     txConfig.Bookmarks,
+		timeout:       txConfig.Timeout,
+		txMeta:        txConfig.Meta,
+		databaseName:  b.databaseName,
+		impersonateAs: txConfig.ImpersonateAs,
 	}
 
 	// If there are bookmarks, begin the transaction immediately for backwards compatible
@@ -608,12 +624,17 @@ func (b *bolt4) Run(cmd db.Command, txConfig db.TxConfig) (db.StreamHandle, erro
 		return nil, err
 	}
 
+	if err := b.checkImpersonationAndVersion(txConfig.ImpersonateAs); err != nil {
+		return 0, err
+	}
+
 	tx := internalTx4{
-		mode:         txConfig.Mode,
-		bookmarks:    txConfig.Bookmarks,
-		timeout:      txConfig.Timeout,
-		txMeta:       txConfig.Meta,
-		databaseName: b.databaseName,
+		mode:          txConfig.Mode,
+		bookmarks:     txConfig.Bookmarks,
+		timeout:       txConfig.Timeout,
+		txMeta:        txConfig.Meta,
+		databaseName:  b.databaseName,
+		impersonateAs: txConfig.ImpersonateAs,
 	}
 	stream, err := b.run(cmd.Cypher, cmd.Params, cmd.FetchSize, &tx)
 	if err != nil {
@@ -873,19 +894,42 @@ func (b *bolt4) Reset() {
 	}
 }
 
-func (b *bolt4) GetRoutingTable(context map[string]string, bookmarks []string, database string) (*db.RoutingTable, error) {
+func (b *bolt4) GetRoutingTable(context map[string]string, bookmarks []string, database, impersonateAs string) (*db.RoutingTable, error) {
 	if err := b.assertState(bolt4_ready); err != nil {
 		return nil, err
 	}
 
 	b.log.Infof(log.Bolt4, b.logId, "Retrieving routing table")
-	if b.minor > 2 {
-		b.out.appendRoute(context, bookmarks, database)
+	if b.minor > 3 {
+		extras := map[string]interface{}{}
+		if database != db.DefaultDatabase {
+			extras["db"] = database
+		}
+		if impersonateAs != "" {
+			extras["imp_user"] = impersonateAs
+		}
+		b.out.appendRouteToV43(context, bookmarks, database)
 		b.out.send(b.conn)
 		succ := b.receiveSuccess()
 		if b.err != nil {
 			return nil, b.err
 		}
+		return succ.routingTable, nil
+	}
+
+	if err := b.checkImpersonationAndVersion(impersonateAs); err != nil {
+		return nil, err
+	}
+
+	if b.minor > 2 {
+		b.out.appendRouteToV43(context, bookmarks, database)
+		b.out.send(b.conn)
+		succ := b.receiveSuccess()
+		if b.err != nil {
+			return nil, b.err
+		}
+		// On this version we will not receive the database name
+		succ.routingTable.DatabaseName = database
 		return succ.routingTable, nil
 	}
 	return b.callGetRoutingTable(context, bookmarks, database)
@@ -927,6 +971,8 @@ func (b *bolt4) callGetRoutingTable(context map[string]string, bookmarks []strin
 	if table == nil {
 		return nil, errors.New("Unable to parse routing table")
 	}
+	// On this version we will not recive the database name
+	table.DatabaseName = database
 	return table, nil
 }
 

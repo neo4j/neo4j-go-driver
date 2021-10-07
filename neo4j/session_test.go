@@ -48,18 +48,24 @@ func TestSession(st *testing.T) {
 		conf := Config{MaxTransactionRetryTime: 3 * time.Millisecond}
 		router := RouterFake{}
 		pool := PoolFake{}
-		sess := newSession(&conf, &router, &pool, db.ReadMode, []string{}, "", 0, &logger, &boltLogger)
+		sessConfig := SessionConfig{AccessMode: AccessModeRead, BoltLogger: &boltLogger}
+		sess := newSession(&conf, sessConfig, &router, &pool, &logger)
+		sess.throttleTime = time.Millisecond * 1
+		return &router, &pool, sess
+	}
+
+	createSessionFromConfig := func(sessConfig SessionConfig) (*RouterFake, *PoolFake, *session) {
+		conf := Config{MaxTransactionRetryTime: 3 * time.Millisecond}
+		router := RouterFake{}
+		pool := PoolFake{}
+		sess := newSession(&conf, sessConfig, &router, &pool, &logger)
 		sess.throttleTime = time.Millisecond * 1
 		return &router, &pool, sess
 	}
 
 	createSessionWithBookmarks := func(bookmarks []string) (*RouterFake, *PoolFake, *session) {
-		conf := Config{MaxTransactionRetryTime: 3 * time.Millisecond}
-		router := RouterFake{}
-		pool := PoolFake{}
-		sess := newSession(&conf, &router, &pool, db.ReadMode, bookmarks, "", 0, &logger, &boltLogger)
-		sess.throttleTime = time.Millisecond * 1
-		return &router, &pool, sess
+		sessConfig := SessionConfig{AccessMode: AccessModeRead, Bookmarks: bookmarks, BoltLogger: &boltLogger}
+		return createSessionFromConfig(sessConfig)
 	}
 
 	tokenExpiredErr := &db.Neo4jError{Code: "Neo.ClientError.Security.TokenExpired", Msg: "oopsie whoopsie"}
@@ -130,6 +136,31 @@ func TestSession(st *testing.T) {
 			AssertTrue(t, IsConnectivityError(err))
 			AssertSameType(t, err.(*ConnectivityError).inner, &retry.CommitFailedDeadError{})
 			assertCleanSessionState(t, sess)
+		})
+
+		rt.Run("Retrieves default database name for impersonated user", func(t *testing.T) {
+			sessConfig := SessionConfig{ImpersonateAs: "me"}
+			router, pool, sess := createSessionFromConfig(sessConfig)
+			conn := &ConnFake{}
+			pool.BorrowConn = conn
+			numDefaultDbLookups := 0
+			const mydb = "mydb"
+			router.GetNameOfDefaultDbHook = func(user string) (string, error) {
+				numDefaultDbLookups++
+				return mydb, nil
+			}
+			router.WritersHook = func(bookmarks []string, database string) ([]string, error) {
+				AssertStringEqual(t, mydb, database)
+				return []string{"aserver"}, nil
+			}
+
+			sess.WriteTransaction(func(tx Transaction) (interface{}, error) {
+				return nil, nil
+			})
+			_, err := sess.BeginTransaction()
+			AssertNoError(t, err)
+			AssertStringEqual(t, mydb, conn.DatabaseName)
+			AssertIntEqual(t, numDefaultDbLookups, 1)
 		})
 	})
 
@@ -300,6 +331,37 @@ func TestSession(st *testing.T) {
 			assertUsageError(t, err)
 		})
 
+		bt.Run("Retrieves default database name for impersonated user", func(t *testing.T) {
+			sessConfig := SessionConfig{ImpersonateAs: "me"}
+			router, pool, sess := createSessionFromConfig(sessConfig)
+			conn := &ConnFake{}
+			pool.BorrowConn = conn
+			numDefaultDbLookups := 0
+			const mydb = "mydb"
+			router.GetNameOfDefaultDbHook = func(user string) (string, error) {
+				numDefaultDbLookups++
+				return mydb, nil
+			}
+			router.ReadersHook = func(bookmarks []string, database string) ([]string, error) {
+				AssertStringEqual(t, mydb, database)
+				return []string{"aserver"}, nil
+			}
+
+			res, err := sess.Run("cypher", nil)
+			AssertNoError(t, err)
+			AssertStringEqual(t, mydb, conn.DatabaseName)
+			AssertIntEqual(t, numDefaultDbLookups, 1)
+			res.Consume()
+
+			// Triggering another operation on the same session should NOT look up again
+			conn = &ConnFake{}
+			pool.BorrowConn = conn
+			_, err = sess.Run("cypher", nil)
+			AssertNoError(t, err)
+			AssertStringEqual(t, mydb, conn.DatabaseName)
+			AssertIntEqual(t, numDefaultDbLookups, 1)
+		})
+
 		bt.Run("Token expiration in session run after errored connection acquisition", func(t *testing.T) {
 			_, pool, sess := createSession()
 			pool.BorrowErr = tokenExpiredErr
@@ -435,6 +497,28 @@ func TestSession(st *testing.T) {
 			// Trying begin a new transaction should succeed after rollback
 			_, err := sess.BeginTransaction()
 			AssertNoError(t, err)
+		})
+
+		bt.Run("Retrieves default database name for impersonated user", func(t *testing.T) {
+			sessConfig := SessionConfig{ImpersonateAs: "me"}
+			router, pool, sess := createSessionFromConfig(sessConfig)
+			conn := &ConnFake{}
+			pool.BorrowConn = conn
+			numDefaultDbLookups := 0
+			const mydb = "mydb"
+			router.GetNameOfDefaultDbHook = func(user string) (string, error) {
+				numDefaultDbLookups++
+				return mydb, nil
+			}
+			router.ReadersHook = func(bookmarks []string, database string) ([]string, error) {
+				AssertStringEqual(t, mydb, database)
+				return []string{"aserver"}, nil
+			}
+
+			_, err := sess.BeginTransaction()
+			AssertNoError(t, err)
+			AssertStringEqual(t, mydb, conn.DatabaseName)
+			AssertIntEqual(t, numDefaultDbLookups, 1)
 		})
 
 		bt.Run("Token expiration after transaction begin", func(t *testing.T) {

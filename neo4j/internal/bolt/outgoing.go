@@ -162,7 +162,8 @@ func (o *outgoing) appendPullAll() {
 	o.end()
 }
 
-func (o *outgoing) appendRoute(context map[string]string, bookmarks []string, database string) {
+// Only valid for V4.3
+func (o *outgoing) appendRouteToV43(context map[string]string, bookmarks []string, database string) {
 	if o.boltLogger != nil {
 		o.boltLogger.LogClientMessage(o.logId, "ROUTE %s %s %q", loggableStringDictionary(context), loggableStringList(bookmarks), database)
 	}
@@ -182,6 +183,25 @@ func (o *outgoing) appendRoute(context map[string]string, bookmarks []string, da
 	} else {
 		o.packer.String(database)
 	}
+	o.end()
+}
+
+func (o *outgoing) appendRoute(context map[string]string, bookmarks []string, what map[string]interface{}) {
+	if o.boltLogger != nil {
+		o.boltLogger.LogClientMessage(o.logId, "ROUTE %s %s %s", loggableStringDictionary(context), loggableStringList(bookmarks), loggableDictionary(what))
+	}
+	o.begin()
+	o.packer.StructHeader(byte(msgRoute), 3)
+	o.packer.MapHeader(len(context))
+	for k, v := range context {
+		o.packer.String(k)
+		o.packer.String(v)
+	}
+	o.packer.ArrayHeader(len(bookmarks))
+	for _, bookmark := range bookmarks {
+		o.packer.String(bookmark)
+	}
+	o.packMap(what)
 	o.end()
 }
 
