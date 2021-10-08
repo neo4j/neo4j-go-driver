@@ -908,7 +908,7 @@ func (b *bolt4) GetRoutingTable(context map[string]string, bookmarks []string, d
 		if impersonateAs != "" {
 			extras["imp_user"] = impersonateAs
 		}
-		b.out.appendRouteToV43(context, bookmarks, database)
+		b.out.appendRoute(context, bookmarks, extras)
 		b.out.send(b.conn)
 		succ := b.receiveSuccess()
 		if b.err != nil {

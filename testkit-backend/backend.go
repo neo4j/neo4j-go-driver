@@ -585,6 +585,8 @@ func (b *backend) handleRequest(req map[string]interface{}) {
 				"Feature:Auth:Custom",
 				"Feature:Auth:Bearer",
 				"Feature:Auth:Kerberos",
+				"Feature:Bolt:4.4",
+				"Feature:Impersonation",
 				"Optimization:ConnectionReuse",
 				"Optimization:ImplicitDefaultArguments",
 				"Optimization:PullPipelining",
