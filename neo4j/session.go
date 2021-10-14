@@ -373,7 +373,7 @@ func (s *session) getConnection(mode db.AccessMode) (db.Connection, error) {
 	if s.getDefaultDbName {
 		defaultDb, err := s.router.GetNameOfDefaultDatabase(ctx, s.bookmarks, s.impersonatedUser, s.boltLogger)
 		if err != nil {
-			return nil, err
+			return nil, wrapError(err)
 		}
 		s.log.Debugf(log.Session, s.logId, "Retrieved default database for impersonated user, uses db '%s'", defaultDb)
 		s.databaseName = defaultDb
