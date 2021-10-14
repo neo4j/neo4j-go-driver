@@ -38,7 +38,7 @@ func (r *directRouter) Writers(ctx context.Context, bookmarks []string, database
 	return []string{r.address}, nil
 }
 
-func (r *directRouter) GetNameOfDefaultDatabase(ctx context.Context, user string, boltLogger log.BoltLogger) (string, error) {
+func (r *directRouter) GetNameOfDefaultDatabase(ctx context.Context, bookmarks []string, user string, boltLogger log.BoltLogger) (string, error) {
 	return db.DefaultDatabase, nil
 }
 

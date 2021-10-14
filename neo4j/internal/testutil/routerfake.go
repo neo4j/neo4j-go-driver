@@ -55,7 +55,7 @@ func (r *RouterFake) Writers(ctx context.Context, bookmarks []string, database s
 	return r.WritersRet, r.Err
 }
 
-func (r *RouterFake) GetNameOfDefaultDatabase(ctx context.Context, user string, boltLogger log.BoltLogger) (string, error) {
+func (r *RouterFake) GetNameOfDefaultDatabase(ctx context.Context, bookmarks []string, user string, boltLogger log.BoltLogger) (string, error) {
 	if r.GetNameOfDefaultDbHook != nil {
 		return r.GetNameOfDefaultDbHook(user)
 	}

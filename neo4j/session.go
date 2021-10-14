@@ -371,7 +371,7 @@ func (s *session) getConnection(mode db.AccessMode) (db.Connection, error) {
 	// If client requested user impersonation but provided no database we need to retrieve
 	// the name of the configured default database for that user before asking for a connection
 	if s.getDefaultDbName {
-		defaultDb, err := s.router.GetNameOfDefaultDatabase(ctx, s.impersonateAs, s.boltLogger)
+		defaultDb, err := s.router.GetNameOfDefaultDatabase(ctx, s.bookmarks, s.impersonateAs, s.boltLogger)
 		if err != nil {
 			return nil, err
 		}

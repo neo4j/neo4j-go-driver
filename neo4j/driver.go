@@ -230,7 +230,7 @@ type sessionRouter interface {
 	Writers(ctx context.Context, bookmarks []string, database string, boltLogger log.BoltLogger) ([]string, error)
 	// Returns name of default database for specified user. The correct database name is needed when
 	// requesting readers or writers.
-	GetNameOfDefaultDatabase(ctx context.Context, user string, boltLogger log.BoltLogger) (string, error)
+	GetNameOfDefaultDatabase(ctx context.Context, bookmarks []string, user string, boltLogger log.BoltLogger) (string, error)
 	Invalidate(database string)
 	CleanUp()
 }

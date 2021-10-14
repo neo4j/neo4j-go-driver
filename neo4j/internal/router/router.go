@@ -194,8 +194,8 @@ func (r *Router) Writers(ctx context.Context, bookmarks []string, database strin
 	return table.Writers, nil
 }
 
-func (r *Router) GetNameOfDefaultDatabase(ctx context.Context, user string, boltLogger log.BoltLogger) (string, error) {
-	table, err := r.readTable(ctx, nil, nil, db.DefaultDatabase, user, boltLogger)
+func (r *Router) GetNameOfDefaultDatabase(ctx context.Context, bookmarks []string, user string, boltLogger log.BoltLogger) (string, error) {
+	table, err := r.readTable(ctx, nil, bookmarks, db.DefaultDatabase, user, boltLogger)
 	if err != nil {
 		return "", err
 	}
