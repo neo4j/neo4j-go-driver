@@ -275,7 +275,7 @@ func TestBolt4(ot *testing.T) {
 
 	ot.Run("Run auto-commit with impersonation", func(t *testing.T) {
 		cypherText := "MATCH (n)"
-		impersonateAs := "a user"
+		impersonatedUser := "a user"
 		theDb := "thedb"
 		bolt, cleanup := connectToServer(t, func(srv *bolt4server) {
 			srv.acceptWithMinor(4, 4)
@@ -285,14 +285,14 @@ func TestBolt4(ot *testing.T) {
 				AssertStringEqual(t, fields[0].(string), cypherText)
 				meta := fields[2].(map[string]interface{})
 				AssertStringEqual(t, meta["db"].(string), theDb)
-				AssertStringEqual(t, meta["imp_user"].(string), impersonateAs)
+				AssertStringEqual(t, meta["imp_user"].(string), impersonatedUser)
 			})
 		})
 		defer cleanup()
 		defer bolt.Close()
 
 		bolt.SelectDatabase(theDb)
-		str, _ := bolt.Run(db.Command{Cypher: cypherText}, db.TxConfig{Mode: db.ReadMode, ImpersonateAs: impersonateAs})
+		str, _ := bolt.Run(db.Command{Cypher: cypherText}, db.TxConfig{Mode: db.ReadMode, ImpersonatedUser: impersonatedUser})
 		skeys, _ := bolt.Keys(str)
 		assertKeys(t, runKeys, skeys)
 		assertBoltState(t, bolt4_streaming, bolt)

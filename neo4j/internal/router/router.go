@@ -72,7 +72,7 @@ func New(rootRouter string, getRouters func() []string, routerContext map[string
 	return r
 }
 
-func (r *Router) readTable(ctx context.Context, dbRouter *databaseRouter, bookmarks []string, database, impersonateAs string, boltLogger log.BoltLogger) (*db.RoutingTable, error) {
+func (r *Router) readTable(ctx context.Context, dbRouter *databaseRouter, bookmarks []string, database, impersonatedUser string, boltLogger log.BoltLogger) (*db.RoutingTable, error) {
 	var (
 		table *db.RoutingTable
 		err   error
@@ -82,20 +82,20 @@ func (r *Router) readTable(ctx context.Context, dbRouter *databaseRouter, bookma
 	if dbRouter != nil && len(dbRouter.table.Routers) > 0 {
 		routers := dbRouter.table.Routers
 		r.log.Infof(log.Router, r.logId, "Reading routing table for '%s' from previously known routers: %v", database, routers)
-		table, err = readTable(ctx, r.pool, routers, r.routerContext, bookmarks, database, impersonateAs, boltLogger)
+		table, err = readTable(ctx, r.pool, routers, r.routerContext, bookmarks, database, impersonatedUser, boltLogger)
 	}
 
 	// Try initial router if no routers or failed
 	if table == nil {
 		r.log.Infof(log.Router, r.logId, "Reading routing table from initial router: %s", r.rootRouter)
-		table, err = readTable(ctx, r.pool, []string{r.rootRouter}, r.routerContext, bookmarks, database, impersonateAs, boltLogger)
+		table, err = readTable(ctx, r.pool, []string{r.rootRouter}, r.routerContext, bookmarks, database, impersonatedUser, boltLogger)
 	}
 
 	// Use hook to retrieve possibly different set of routers and retry
 	if table == nil && r.getRouters != nil {
 		routers := r.getRouters()
 		r.log.Infof(log.Router, r.logId, "Reading routing table for '%s' from custom routers: %v", routers)
-		table, err = readTable(ctx, r.pool, routers, r.routerContext, bookmarks, database, impersonateAs, boltLogger)
+		table, err = readTable(ctx, r.pool, routers, r.routerContext, bookmarks, database, impersonatedUser, boltLogger)
 	}
 
 	if err != nil {

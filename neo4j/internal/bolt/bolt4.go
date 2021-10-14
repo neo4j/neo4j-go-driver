@@ -45,12 +45,12 @@ const (
 const bolt4_fetchsize = 1000
 
 type internalTx4 struct {
-	mode          db.AccessMode
-	bookmarks     []string
-	timeout       time.Duration
-	txMeta        map[string]interface{}
-	databaseName  string
-	impersonateAs string
+	mode             db.AccessMode
+	bookmarks        []string
+	timeout          time.Duration
+	txMeta           map[string]interface{}
+	databaseName     string
+	impersonatedUser string
 }
 
 func (i *internalTx4) toMeta() map[string]interface{} {
@@ -71,8 +71,8 @@ func (i *internalTx4) toMeta() map[string]interface{} {
 	if i.databaseName != db.DefaultDatabase {
 		meta["db"] = i.databaseName
 	}
-	if i.impersonateAs != "" {
-		meta["imp_user"] = i.impersonateAs
+	if i.impersonatedUser != "" {
+		meta["imp_user"] = i.impersonatedUser
 	}
 	return meta
 }
@@ -267,8 +267,8 @@ func (b *bolt4) connect(minor int, auth map[string]interface{}, userAgent string
 	return nil
 }
 
-func (b *bolt4) checkImpersonationAndVersion(impersonateAs string) error {
-	if impersonateAs != "" && b.minor < 4 {
+func (b *bolt4) checkImpersonationAndVersion(impersonatedUser string) error {
+	if impersonatedUser != "" && b.minor < 4 {
 		return &db.FeatureNotSupportedError{Server: b.serverName, Feature: "user impersonation", Reason: "requires at least server v4.4"}
 	}
 	return nil
@@ -288,17 +288,17 @@ func (b *bolt4) TxBegin(txConfig db.TxConfig) (db.TxHandle, error) {
 		return 0, err
 	}
 
-	if err := b.checkImpersonationAndVersion(txConfig.ImpersonateAs); err != nil {
+	if err := b.checkImpersonationAndVersion(txConfig.ImpersonatedUser); err != nil {
 		return 0, err
 	}
 
 	tx := internalTx4{
-		mode:          txConfig.Mode,
-		bookmarks:     txConfig.Bookmarks,
-		timeout:       txConfig.Timeout,
-		txMeta:        txConfig.Meta,
-		databaseName:  b.databaseName,
-		impersonateAs: txConfig.ImpersonateAs,
+		mode:             txConfig.Mode,
+		bookmarks:        txConfig.Bookmarks,
+		timeout:          txConfig.Timeout,
+		txMeta:           txConfig.Meta,
+		databaseName:     b.databaseName,
+		impersonatedUser: txConfig.ImpersonatedUser,
 	}
 
 	// If there are bookmarks, begin the transaction immediately for backwards compatible
@@ -624,17 +624,17 @@ func (b *bolt4) Run(cmd db.Command, txConfig db.TxConfig) (db.StreamHandle, erro
 		return nil, err
 	}
 
-	if err := b.checkImpersonationAndVersion(txConfig.ImpersonateAs); err != nil {
+	if err := b.checkImpersonationAndVersion(txConfig.ImpersonatedUser); err != nil {
 		return 0, err
 	}
 
 	tx := internalTx4{
-		mode:          txConfig.Mode,
-		bookmarks:     txConfig.Bookmarks,
-		timeout:       txConfig.Timeout,
-		txMeta:        txConfig.Meta,
-		databaseName:  b.databaseName,
-		impersonateAs: txConfig.ImpersonateAs,
+		mode:             txConfig.Mode,
+		bookmarks:        txConfig.Bookmarks,
+		timeout:          txConfig.Timeout,
+		txMeta:           txConfig.Meta,
+		databaseName:     b.databaseName,
+		impersonatedUser: txConfig.ImpersonatedUser,
 	}
 	stream, err := b.run(cmd.Cypher, cmd.Params, cmd.FetchSize, &tx)
 	if err != nil {
@@ -894,7 +894,7 @@ func (b *bolt4) Reset() {
 	}
 }
 
-func (b *bolt4) GetRoutingTable(context map[string]string, bookmarks []string, database, impersonateAs string) (*db.RoutingTable, error) {
+func (b *bolt4) GetRoutingTable(context map[string]string, bookmarks []string, database, impersonatedUser string) (*db.RoutingTable, error) {
 	if err := b.assertState(bolt4_ready); err != nil {
 		return nil, err
 	}
@@ -905,8 +905,8 @@ func (b *bolt4) GetRoutingTable(context map[string]string, bookmarks []string, d
 		if database != db.DefaultDatabase {
 			extras["db"] = database
 		}
-		if impersonateAs != "" {
-			extras["imp_user"] = impersonateAs
+		if impersonatedUser != "" {
+			extras["imp_user"] = impersonatedUser
 		}
 		b.out.appendRoute(context, bookmarks, extras)
 		b.out.send(b.conn)
@@ -917,7 +917,7 @@ func (b *bolt4) GetRoutingTable(context map[string]string, bookmarks []string, d
 		return succ.routingTable, nil
 	}
 
-	if err := b.checkImpersonationAndVersion(impersonateAs); err != nil {
+	if err := b.checkImpersonationAndVersion(impersonatedUser); err != nil {
 		return nil, err
 	}
 

@@ -45,11 +45,11 @@ type Command struct {
 }
 
 type TxConfig struct {
-	Mode          AccessMode
-	Bookmarks     []string
-	Timeout       time.Duration
-	ImpersonateAs string
-	Meta          map[string]interface{}
+	Mode             AccessMode
+	Bookmarks        []string
+	Timeout          time.Duration
+	ImpersonatedUser string
+	Meta             map[string]interface{}
 }
 
 // Connection defines an abstract database server connection.
@@ -97,11 +97,11 @@ type Connection interface {
 	// Gets routing table for specified database name or the default database if
 	// database equals DefaultDatabase. If the underlying connection does not support
 	// multiple databases, DefaultDatabase should be used as database.
-	// If user impersonation is used (impersonateAs != "") and default database is used
+	// If user impersonation is used (impersonatedUser != "") and default database is used
 	// the database name in the returned routing table will contain the actual name of the
 	// configured default database for the impersonated user. If no impersonation is used
 	// database name in routing table will be set to the name of the requested database.
-	GetRoutingTable(context map[string]string, bookmarks []string, database, impersonateAs string) (*RoutingTable, error)
+	GetRoutingTable(context map[string]string, bookmarks []string, database, impersonatedUser string) (*RoutingTable, error)
 	// Sets Bolt message logger on already initialized connections
 	SetBoltLogger(boltLogger log.BoltLogger)
 }

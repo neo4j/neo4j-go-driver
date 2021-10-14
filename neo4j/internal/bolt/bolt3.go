@@ -220,7 +220,7 @@ func (b *bolt3) TxBegin(txConfig db.TxConfig) (db.TxHandle, error) {
 	if err := b.assertState(bolt3_ready); err != nil {
 		return 0, err
 	}
-	if err := b.checkImpersonation(txConfig.ImpersonateAs); err != nil {
+	if err := b.checkImpersonation(txConfig.ImpersonatedUser); err != nil {
 		return 0, err
 	}
 
@@ -472,7 +472,7 @@ func (b *bolt3) Run(runCommand db.Command, txConfig db.TxConfig) (db.StreamHandl
 	if err := b.assertState(bolt3_streaming, bolt3_ready); err != nil {
 		return nil, err
 	}
-	if err := b.checkImpersonation(txConfig.ImpersonateAs); err != nil {
+	if err := b.checkImpersonation(txConfig.ImpersonatedUser); err != nil {
 		return nil, err
 	}
 
@@ -704,21 +704,21 @@ func (b *bolt3) Reset() {
 	}
 }
 
-func (b *bolt3) checkImpersonation(impersonateAs string) error {
-	if impersonateAs != "" {
+func (b *bolt3) checkImpersonation(impersonatedUser string) error {
+	if impersonatedUser != "" {
 		return &db.FeatureNotSupportedError{Server: b.serverName, Feature: "user impersonation", Reason: "requires least server v4.4"}
 	}
 	return nil
 }
 
-func (b *bolt3) GetRoutingTable(context map[string]string, bookmarks []string, database, impersonateAs string) (*db.RoutingTable, error) {
+func (b *bolt3) GetRoutingTable(context map[string]string, bookmarks []string, database, impersonatedUser string) (*db.RoutingTable, error) {
 	if err := b.assertState(bolt3_ready); err != nil {
 		return nil, err
 	}
 	if database != db.DefaultDatabase {
 		return nil, &db.FeatureNotSupportedError{Server: b.serverName, Feature: "route to database", Reason: "requires at least server v4"}
 	}
-	if err := b.checkImpersonation(impersonateAs); err != nil {
+	if err := b.checkImpersonation(impersonatedUser); err != nil {
 		return nil, err
 	}
 

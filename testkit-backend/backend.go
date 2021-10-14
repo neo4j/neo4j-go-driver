@@ -439,7 +439,7 @@ func (b *backend) handleRequest(req map[string]interface{}) {
 			sessionConfig.FetchSize = int(data["fetchSize"].(float64))
 		}
 		if data["impersonatedUser"] != nil {
-			sessionConfig.ImpersonateAs = data["impersonatedUser"].(string)
+			sessionConfig.ImpersonatedUser = data["impersonatedUser"].(string)
 		}
 		session := driver.NewSession(sessionConfig)
 		idKey := b.nextId()

@@ -139,7 +139,7 @@ func TestSession(st *testing.T) {
 		})
 
 		rt.Run("Retrieves default database name for impersonated user", func(t *testing.T) {
-			sessConfig := SessionConfig{ImpersonateAs: "me"}
+			sessConfig := SessionConfig{ImpersonatedUser: "me"}
 			router, pool, sess := createSessionFromConfig(sessConfig)
 			conn := &ConnFake{}
 			pool.BorrowConn = conn
@@ -332,7 +332,7 @@ func TestSession(st *testing.T) {
 		})
 
 		bt.Run("Retrieves default database name for impersonated user", func(t *testing.T) {
-			sessConfig := SessionConfig{ImpersonateAs: "me"}
+			sessConfig := SessionConfig{ImpersonatedUser: "me"}
 			router, pool, sess := createSessionFromConfig(sessConfig)
 			conn := &ConnFake{}
 			pool.BorrowConn = conn
@@ -500,7 +500,7 @@ func TestSession(st *testing.T) {
 		})
 
 		bt.Run("Retrieves default database name for impersonated user", func(t *testing.T) {
-			sessConfig := SessionConfig{ImpersonateAs: "me"}
+			sessConfig := SessionConfig{ImpersonatedUser: "me"}
 			router, pool, sess := createSessionFromConfig(sessConfig)
 			conn := &ConnFake{}
 			pool.BorrowConn = conn
