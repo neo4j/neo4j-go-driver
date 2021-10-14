@@ -21,6 +21,7 @@ package neo4j
 
 import (
 	"context"
+	"github.com/neo4j/neo4j-go-driver/v4/neo4j/db"
 	"github.com/neo4j/neo4j-go-driver/v4/neo4j/log"
 )
 
@@ -35,6 +36,10 @@ func (r *directRouter) Readers(ctx context.Context, bookmarks []string, database
 
 func (r *directRouter) Writers(ctx context.Context, bookmarks []string, database string, boltLogger log.BoltLogger) ([]string, error) {
 	return []string{r.address}, nil
+}
+
+func (r *directRouter) GetNameOfDefaultDatabase(ctx context.Context, bookmarks []string, user string, boltLogger log.BoltLogger) (string, error) {
+	return db.DefaultDatabase, nil
 }
 
 func (r *directRouter) Invalidate(database string) {

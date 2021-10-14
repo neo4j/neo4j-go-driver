@@ -81,6 +81,12 @@ type SessionConfig struct {
 	// Possible to use custom logger (implement log.BoltLogger interface) or
 	// use neo4j.ConsoleBoltLogger.
 	BoltLogger log.BoltLogger
+	// ImpersonatedUser sets the Neo4j user that the session should be acting as. If not set the user used to create
+	// the driver will be used. If user impersonation is used the the default database for the impersonated user
+	// will be used. Beware that using impersonation and not explicitly setting the database name and routing enabled
+	// will cause the driver to query the cluster for the name of the default database for the impersonated user to
+	// be able to route to the correct instance.
+	ImpersonatedUser string
 }
 
 // Turns off fetching records in batches.
@@ -97,21 +103,23 @@ type sessionPool interface {
 }
 
 type session struct {
-	config       *Config
-	defaultMode  db.AccessMode
-	bookmarks    []string
-	databaseName string
-	pool         sessionPool
-	router       sessionRouter
-	txExplicit   *transaction
-	txAuto       *autoTransaction
-	sleep        func(d time.Duration)
-	now          func() time.Time
-	logId        string
-	log          log.Logger
-	throttleTime time.Duration
-	fetchSize    int
-	boltLogger   log.BoltLogger
+	config           *Config
+	defaultMode      db.AccessMode
+	bookmarks        []string
+	databaseName     string
+	impersonatedUser string
+	getDefaultDbName bool
+	pool             sessionPool
+	router           sessionRouter
+	txExplicit       *transaction
+	txAuto           *autoTransaction
+	sleep            func(d time.Duration)
+	now              func() time.Time
+	logId            string
+	log              log.Logger
+	throttleTime     time.Duration
+	fetchSize        int
+	boltLogger       log.BoltLogger
 }
 
 // Remove empty string bookmarks to check for "bad" callers
@@ -138,26 +146,26 @@ func cleanupBookmarks(bookmarks []string) []string {
 	return cleaned
 }
 
-func newSession(config *Config, router sessionRouter, pool sessionPool,
-	mode db.AccessMode, bookmarks []string, databaseName string, fetchSize int, logger log.Logger, boltLogger log.BoltLogger) *session {
-
+func newSession(config *Config, sessConfig SessionConfig, router sessionRouter, pool sessionPool, logger log.Logger) *session {
 	logId := log.NewId()
 	logger.Debugf(log.Session, logId, "Created")
 
 	return &session{
-		config:       config,
-		router:       router,
-		pool:         pool,
-		defaultMode:  mode,
-		bookmarks:    cleanupBookmarks(bookmarks),
-		databaseName: databaseName,
-		sleep:        time.Sleep,
-		now:          time.Now,
-		log:          logger,
-		logId:        logId,
-		throttleTime: time.Second * 1,
-		fetchSize:    fetchSize,
-		boltLogger:   boltLogger,
+		config:           config,
+		router:           router,
+		pool:             pool,
+		defaultMode:      db.AccessMode(sessConfig.AccessMode),
+		bookmarks:        cleanupBookmarks(sessConfig.Bookmarks),
+		databaseName:     sessConfig.DatabaseName,
+		impersonatedUser: sessConfig.ImpersonatedUser,
+		getDefaultDbName: sessConfig.DatabaseName == "",
+		sleep:            time.Sleep,
+		now:              time.Now,
+		log:              logger,
+		logId:            logId,
+		throttleTime:     time.Second * 1,
+		fetchSize:        sessConfig.FetchSize,
+		boltLogger:       sessConfig.BoltLogger,
 	}
 }
 
@@ -201,10 +209,11 @@ func (s *session) BeginTransaction(configurers ...func(*TransactionConfig)) (Tra
 
 	// Begin transaction
 	txHandle, err := conn.TxBegin(db.TxConfig{
-		Mode:      s.defaultMode,
-		Bookmarks: s.bookmarks,
-		Timeout:   config.Timeout,
-		Meta:      config.Metadata,
+		Mode:             s.defaultMode,
+		Bookmarks:        s.bookmarks,
+		Timeout:          config.Timeout,
+		Meta:             config.Metadata,
+		ImpersonatedUser: s.impersonatedUser,
 	})
 	if err != nil {
 		s.pool.Return(conn)
@@ -268,10 +277,11 @@ func (s *session) runRetriable(
 
 		// Begin transaction
 		txHandle, err := conn.TxBegin(db.TxConfig{
-			Mode:      mode,
-			Bookmarks: s.bookmarks,
-			Timeout:   config.Timeout,
-			Meta:      config.Metadata,
+			Mode:             mode,
+			Bookmarks:        s.bookmarks,
+			Timeout:          config.Timeout,
+			Meta:             config.Metadata,
+			ImpersonatedUser: s.impersonatedUser,
 		})
 		if err != nil {
 			state.OnFailure(conn, err, false)
@@ -358,6 +368,17 @@ func (s *session) getConnection(mode db.AccessMode) (db.Connection, error) {
 	} else {
 		ctx = context.Background()
 	}
+	// If client requested user impersonation but provided no database we need to retrieve
+	// the name of the configured default database for that user before asking for a connection
+	if s.getDefaultDbName {
+		defaultDb, err := s.router.GetNameOfDefaultDatabase(ctx, s.bookmarks, s.impersonatedUser, s.boltLogger)
+		if err != nil {
+			return nil, wrapError(err)
+		}
+		s.log.Debugf(log.Session, s.logId, "Retrieved default database for impersonated user, uses db '%s'", defaultDb)
+		s.databaseName = defaultDb
+		s.getDefaultDbName = false
+	}
 	servers, err := s.getServers(ctx, mode)
 	if err != nil {
 		return nil, wrapError(err)
@@ -431,10 +452,11 @@ func (s *session) Run(
 			FetchSize: s.fetchSize,
 		},
 		db.TxConfig{
-			Mode:      s.defaultMode,
-			Bookmarks: s.bookmarks,
-			Timeout:   config.Timeout,
-			Meta:      config.Metadata,
+			Mode:             s.defaultMode,
+			Bookmarks:        s.bookmarks,
+			Timeout:          config.Timeout,
+			Meta:             config.Metadata,
+			ImpersonatedUser: s.impersonatedUser,
 		})
 	if err != nil {
 		s.pool.Return(conn)

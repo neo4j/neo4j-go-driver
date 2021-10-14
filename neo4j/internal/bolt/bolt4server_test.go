@@ -111,9 +111,12 @@ func (s *bolt4server) receiveMsg() *testStruct {
 	return &testStruct{tag: t, fields: fields}
 }
 
-func (s *bolt4server) waitForRun() {
+func (s *bolt4server) waitForRun(assertFields func(fields []interface{})) {
 	msg := s.receiveMsg()
 	s.assertStructType(msg, msgRun)
+	if assertFields != nil {
+		assertFields(msg.fields)
+	}
 }
 
 func (s *bolt4server) waitForReset() {
@@ -192,9 +195,12 @@ func (s *bolt4server) waitForDiscardN(n int) {
 	}
 }
 
-func (s *bolt4server) waitForRoute() {
+func (s *bolt4server) waitForRoute(assertRoute func(fields []interface{})) {
 	msg := s.receiveMsg()
 	s.assertStructType(msg, msgRoute)
+	if assertRoute != nil {
+		assertRoute(msg.fields)
+	}
 }
 
 func (s *bolt4server) acceptVersion(major, minor byte) {
@@ -263,8 +269,8 @@ func (s *bolt4server) acceptWithMinor(major, minor byte) {
 }
 
 // Utility to wait and serve a auto commit query
-func (s *bolt4server) serveRun(stream []testStruct) {
-	s.waitForRun()
+func (s *bolt4server) serveRun(stream []testStruct, assertRun func([]interface{})) {
+	s.waitForRun(assertRun)
 	s.waitForPullN(bolt4_fetchsize)
 	for _, x := range stream {
 		s.send(x.tag, x.fields...)
@@ -274,7 +280,7 @@ func (s *bolt4server) serveRun(stream []testStruct) {
 func (s *bolt4server) serveRunTx(stream []testStruct, commit bool, bookmark string) {
 	s.waitForTxBegin()
 	s.send(msgSuccess, map[string]interface{}{})
-	s.waitForRun()
+	s.waitForRun(nil)
 	s.waitForPullN(bolt4_fetchsize)
 	for _, x := range stream {
 		s.send(x.tag, x.fields...)

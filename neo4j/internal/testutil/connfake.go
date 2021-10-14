@@ -67,6 +67,7 @@ type ConnFake struct {
 	BufferErr      error
 	BufferHook     func()
 	ForceResetHook func() error
+	DatabaseName   string
 }
 
 func (c *ConnFake) ServerName() string {
@@ -109,7 +110,10 @@ func (c *ConnFake) Consume(streamHandle db.StreamHandle) (*db.Summary, error) {
 	return c.ConsumeSum, c.ConsumeErr
 }
 
-func (c *ConnFake) GetRoutingTable(context map[string]string, bookmarks []string, database string) (*db.RoutingTable, error) {
+func (c *ConnFake) GetRoutingTable(context map[string]string, bookmarks []string, database, impersonatedUser string) (*db.RoutingTable, error) {
+	if c.Table != nil {
+		c.Table.DatabaseName = database
+	}
 	return c.Table, c.Err
 }
 
@@ -156,6 +160,10 @@ func (c *ConnFake) ForceReset() error {
 		return c.ForceResetHook()
 	}
 	return nil
+}
+
+func (c *ConnFake) SelectDatabase(database string) {
+	c.DatabaseName = database
 }
 
 func (c *ConnFake) SetBoltLogger(_ log.BoltLogger) {

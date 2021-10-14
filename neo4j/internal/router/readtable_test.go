@@ -167,7 +167,7 @@ func TestReadTableTable(ot *testing.T) {
 		ot.Run(c.name, func(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			c.pool.cancel = cancel
-			table, err := readTable(ctx, c.pool, c.routers, nil, nil, "dbname", nil)
+			table, err := readTable(ctx, c.pool, c.routers, nil, nil, "dbname", "", nil)
 			c.assert(t, table, err)
 			if err != nil && c.assertErr != nil {
 				c.assertErr(t, err)

@@ -438,6 +438,9 @@ func (b *backend) handleRequest(req map[string]interface{}) {
 		if data["fetchSize"] != nil {
 			sessionConfig.FetchSize = int(data["fetchSize"].(float64))
 		}
+		if data["impersonatedUser"] != nil {
+			sessionConfig.ImpersonatedUser = data["impersonatedUser"].(string)
+		}
 		session := driver.NewSession(sessionConfig)
 		idKey := b.nextId()
 		b.sessionStates[idKey] = &sessionState{session: session}
@@ -585,6 +588,8 @@ func (b *backend) handleRequest(req map[string]interface{}) {
 				"Feature:Auth:Custom",
 				"Feature:Auth:Bearer",
 				"Feature:Auth:Kerberos",
+				"Feature:Bolt:4.4",
+				"Feature:Impersonation",
 				"Optimization:ConnectionReuse",
 				"Optimization:ImplicitDefaultArguments",
 				"Optimization:PullPipelining",
@@ -638,9 +643,12 @@ func testSkips() map[string]string {
 		"stub.routing.test_routing_v3.RoutingV3.test_should_use_resolver_during_rediscovery_when_existing_routers_fail":          "It needs investigation - custom resolver does not seem to be called",
 		"stub.routing.test_routing_v4x1.RoutingV4x1.test_should_use_resolver_during_rediscovery_when_existing_routers_fail":      "It needs investigation - custom resolver does not seem to be called",
 		"stub.routing.test_routing_v4x3.RoutingV4x3.test_should_use_resolver_during_rediscovery_when_existing_routers_fail":      "It needs investigation - custom resolver does not seem to be called",
+		"stub.routing.test_routing_v4x4.RoutingV4x4.test_should_use_resolver_during_rediscovery_when_existing_routers_fail":      "It needs investigation - custom resolver does not seem to be called",
 		"stub.routing.test_routing_v3.RoutingV3.test_should_revert_to_initial_router_if_known_router_throws_protocol_errors":     "It needs investigation - custom resolver does not seem to be called",
 		"stub.routing.test_routing_v4x1.RoutingV4x1.test_should_revert_to_initial_router_if_known_router_throws_protocol_errors": "It needs investigation - custom resolver does not seem to be called",
 		"stub.routing.test_routing_v4x3.RoutingV4x3.test_should_revert_to_initial_router_if_known_router_throws_protocol_errors": "It needs investigation - custom resolver does not seem to be called",
+		"stub.routing.test_routing_v4x4.RoutingV4x4.test_should_revert_to_initial_router_if_known_router_throws_protocol_errors": "It needs investigation - custom resolver does not seem to be called",
 		"stub.configuration_hints.test_connection_recv_timeout_seconds.TestRoutingConnectionRecvTimeout.*":                       "No GetRoutingTable support - too tricky to implement in Go",
+		"stub.homedb.test_homedb.TestHomeDb.test_session_should_cache_home_db_despite_new_rt":                                    "Driver does not remove servers from RT when connection breaks.",
 	}
 }

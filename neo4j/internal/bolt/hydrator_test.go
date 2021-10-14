@@ -326,6 +326,51 @@ func TestHydrator(ot *testing.T) {
 				packer.StructHeader(byte(msgSuccess), 1)
 				packer.MapHeader(1)
 				packer.String("rt")
+				packer.MapHeader(3)
+				packer.String("ttl")
+				packer.Int(1001)
+				packer.String("db")
+				packer.String("dbname")
+				packer.String("servers")
+				packer.ArrayHeader(3)
+				// Routes
+				packer.MapHeader(2)
+				packer.String("role")
+				packer.String("ROUTE")
+				packer.String("addresses")
+				packer.ArrayHeader(2)
+				packer.String("router1")
+				packer.String("router2")
+				// Readers
+				packer.MapHeader(2)
+				packer.String("role")
+				packer.String("READ")
+				packer.String("addresses")
+				packer.ArrayHeader(3)
+				packer.String("reader1")
+				packer.String("reader2")
+				packer.String("reader3")
+				// Writers
+				packer.MapHeader(2)
+				packer.String("role")
+				packer.String("WRITE")
+				packer.String("addresses")
+				packer.ArrayHeader(1)
+				packer.String("writer1")
+			},
+			x: &success{qid: -1, num: 1, routingTable: &db.RoutingTable{
+				TimeToLive:   1001,
+				DatabaseName: "dbname",
+				Routers:      []string{"router1", "router2"},
+				Readers:      []string{"reader1", "reader2", "reader3"},
+				Writers:      []string{"writer1"}}},
+		},
+		{
+			name: "Success route response no database name(<4.4)",
+			build: func() {
+				packer.StructHeader(byte(msgSuccess), 1)
+				packer.MapHeader(1)
+				packer.String("rt")
 				packer.MapHeader(2)
 				packer.String("ttl")
 				packer.Int(1001)

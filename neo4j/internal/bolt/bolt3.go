@@ -97,7 +97,7 @@ func NewBolt3(serverName string, conn net.Conn, log log.Logger, boltLog log.Bolt
 				boltLogger: boltLog,
 			},
 			connReadTimeout: -1,
-			logger: log,
+			logger:          log,
 		},
 		birthDate: time.Now(),
 		log:       log,
@@ -218,6 +218,9 @@ func (b *bolt3) TxBegin(txConfig db.TxConfig) (db.TxHandle, error) {
 	}
 
 	if err := b.assertState(bolt3_ready); err != nil {
+		return 0, err
+	}
+	if err := b.checkImpersonation(txConfig.ImpersonatedUser); err != nil {
 		return 0, err
 	}
 
@@ -469,6 +472,9 @@ func (b *bolt3) Run(runCommand db.Command, txConfig db.TxConfig) (db.StreamHandl
 	if err := b.assertState(bolt3_streaming, bolt3_ready); err != nil {
 		return nil, err
 	}
+	if err := b.checkImpersonation(txConfig.ImpersonatedUser); err != nil {
+		return nil, err
+	}
 
 	tx := internalTx3{
 		mode:      txConfig.Mode,
@@ -698,13 +704,22 @@ func (b *bolt3) Reset() {
 	}
 }
 
-func (b *bolt3) GetRoutingTable(context map[string]string, bookmarks []string, database string) (*db.RoutingTable, error) {
+func (b *bolt3) checkImpersonation(impersonatedUser string) error {
+	if impersonatedUser != "" {
+		return &db.FeatureNotSupportedError{Server: b.serverName, Feature: "user impersonation", Reason: "requires least server v4.4"}
+	}
+	return nil
+}
+
+func (b *bolt3) GetRoutingTable(context map[string]string, bookmarks []string, database, impersonatedUser string) (*db.RoutingTable, error) {
 	if err := b.assertState(bolt3_ready); err != nil {
 		return nil, err
 	}
-
 	if database != db.DefaultDatabase {
-		return nil, errors.New("Bolt 3 does not support routing to a specifiec database name")
+		return nil, &db.FeatureNotSupportedError{Server: b.serverName, Feature: "route to database", Reason: "requires at least server v4"}
+	}
+	if err := b.checkImpersonation(impersonatedUser); err != nil {
+		return nil, err
 	}
 
 	// Only available when Neo4j is setup with clustering
@@ -718,7 +733,7 @@ func (b *bolt3) GetRoutingTable(context map[string]string, bookmarks []string, d
 		// Give a better error
 		dbError, isDbError := err.(*db.Neo4jError)
 		if isDbError && dbError.Code == "Neo.ClientError.Procedure.ProcedureNotFound" {
-			return nil, &db.RoutingNotSupportedError{Server: b.serverName}
+			return nil, &db.FeatureNotSupportedError{Server: b.serverName, Feature: "routing", Reason: "requires cluster setup"}
 		}
 		return nil, err
 	}
@@ -737,6 +752,8 @@ func (b *bolt3) GetRoutingTable(context map[string]string, bookmarks []string, d
 	if table == nil {
 		return nil, errors.New("Unable to parse routing table")
 	}
+	// Just because
+	table.DatabaseName = db.DefaultDatabase
 
 	return table, nil
 }

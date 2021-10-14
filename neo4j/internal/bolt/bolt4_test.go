@@ -248,14 +248,51 @@ func TestBolt4(ot *testing.T) {
 	})
 
 	ot.Run("Run auto-commit", func(t *testing.T) {
+		cypherText := "MATCH (n)"
+		theDb := "thedb"
 		bolt, cleanup := connectToServer(t, func(srv *bolt4server) {
 			srv.accept(4)
-			srv.serveRun(runResponse)
+			srv.serveRun(runResponse, func(fields []interface{}) {
+				// fields consists of cypher text, cypher params, meta
+				AssertStringEqual(t, fields[0].(string), cypherText)
+				meta := fields[2].(map[string]interface{})
+				AssertStringEqual(t, meta["db"].(string), theDb)
+			})
 		})
 		defer cleanup()
 		defer bolt.Close()
 
-		str, _ := bolt.Run(db.Command{Cypher: "MATCH (n) RETURN n"}, db.TxConfig{Mode: db.ReadMode})
+		bolt.SelectDatabase(theDb)
+		str, _ := bolt.Run(db.Command{Cypher: cypherText}, db.TxConfig{Mode: db.ReadMode})
+		skeys, _ := bolt.Keys(str)
+		assertKeys(t, runKeys, skeys)
+		assertBoltState(t, bolt4_streaming, bolt)
+
+		// Retrieve the records
+		assertRunResponseOk(t, bolt, str)
+		assertBoltState(t, bolt4_ready, bolt)
+	})
+
+	ot.Run("Run auto-commit with impersonation", func(t *testing.T) {
+		cypherText := "MATCH (n)"
+		impersonatedUser := "a user"
+		theDb := "thedb"
+		bolt, cleanup := connectToServer(t, func(srv *bolt4server) {
+			srv.acceptWithMinor(4, 4)
+			// Make sure that impersonation id is sent
+			srv.serveRun(runResponse, func(fields []interface{}) {
+				// fields consists of cypher text, cypher params, meta
+				AssertStringEqual(t, fields[0].(string), cypherText)
+				meta := fields[2].(map[string]interface{})
+				AssertStringEqual(t, meta["db"].(string), theDb)
+				AssertStringEqual(t, meta["imp_user"].(string), impersonatedUser)
+			})
+		})
+		defer cleanup()
+		defer bolt.Close()
+
+		bolt.SelectDatabase(theDb)
+		str, _ := bolt.Run(db.Command{Cypher: cypherText}, db.TxConfig{Mode: db.ReadMode, ImpersonatedUser: impersonatedUser})
 		skeys, _ := bolt.Keys(str)
 		assertKeys(t, runKeys, skeys)
 		assertBoltState(t, bolt4_streaming, bolt)
@@ -268,7 +305,7 @@ func TestBolt4(ot *testing.T) {
 	ot.Run("Run auto-commit with fetch size 2 of 3", func(t *testing.T) {
 		bolt, cleanup := connectToServer(t, func(srv *bolt4server) {
 			srv.accept(4)
-			srv.waitForRun()
+			srv.waitForRun(nil)
 			srv.waitForPullN(2)
 			srv.send(runResponse[0].tag, runResponse[0].fields...)
 			srv.send(runResponse[1].tag, runResponse[1].fields...)
@@ -325,7 +362,7 @@ func TestBolt4(ot *testing.T) {
 			srv.accept(4)
 			srv.waitForTxBegin()
 			srv.send(msgSuccess, map[string]interface{}{})
-			srv.waitForRun()
+			srv.waitForRun(nil)
 			srv.waitForPullN(1)
 			// Send Pull response
 			srv.send(msgSuccess, map[string]interface{}{"fields": []interface{}{"k"}, "t_first": int64(1), "qid": qid})
@@ -363,7 +400,7 @@ func TestBolt4(ot *testing.T) {
 			srv.waitForTxBegin()
 			srv.send(msgSuccess, map[string]interface{}{})
 			// First RunTx
-			srv.waitForRun()
+			srv.waitForRun(nil)
 			srv.waitForPullN(1)
 			// Send Pull response
 			srv.send(msgSuccess, map[string]interface{}{"fields": []interface{}{"k"}, "t_first": int64(1), "qid": qid})
@@ -371,7 +408,7 @@ func TestBolt4(ot *testing.T) {
 			srv.send(msgRecord, []interface{}{"v1"})
 			srv.send(msgSuccess, map[string]interface{}{"has_more": false})
 			// Second RunTx
-			srv.waitForRun()
+			srv.waitForRun(nil)
 			srv.waitForPullN(1)
 			srv.send(msgSuccess, map[string]interface{}{"fields": []interface{}{"k"}, "t_first": int64(1), "qid": qid})
 			// Driver should discard this stream, which is small
@@ -462,7 +499,7 @@ func TestBolt4(ot *testing.T) {
 	ot.Run("Server close while streaming", func(t *testing.T) {
 		bolt, cleanup := connectToServer(t, func(srv *bolt4server) {
 			srv.accept(4)
-			srv.waitForRun()
+			srv.waitForRun(nil)
 			srv.waitForPullN(bolt4_fetchsize)
 			// Send response to run and first record as response to pull
 			srv.send(msgSuccess, map[string]interface{}{
@@ -493,7 +530,7 @@ func TestBolt4(ot *testing.T) {
 	ot.Run("Server fail on run with reset", func(t *testing.T) {
 		bolt, cleanup := connectToServer(t, func(srv *bolt4server) {
 			srv.accept(4)
-			srv.waitForRun()
+			srv.waitForRun(nil)
 			srv.waitForPullN(bolt4_fetchsize)
 			srv.sendFailureMsg("code", "msg") // RUN failed
 			srv.waitForReset()
@@ -516,7 +553,7 @@ func TestBolt4(ot *testing.T) {
 		bolt, cleanup := connectToServer(t, func(srv *bolt4server) {
 			srv.accept(4)
 			srv.waitForTxBegin()
-			srv.waitForRun()
+			srv.waitForRun(nil)
 			srv.waitForPullN(bolt4_fetchsize)
 			srv.sendFailureMsg("code", "msg")
 		})
@@ -534,7 +571,7 @@ func TestBolt4(ot *testing.T) {
 	ot.Run("Reset while streaming", func(t *testing.T) {
 		bolt, cleanup := connectToServer(t, func(srv *bolt4server) {
 			srv.accept(4)
-			srv.waitForRun()
+			srv.waitForRun(nil)
 			srv.waitForPullN(bolt4_fetchsize)
 			// Send RUN response and a record
 			for i := 0; i < 2; i++ {
@@ -558,7 +595,7 @@ func TestBolt4(ot *testing.T) {
 	ot.Run("Reset in ready state", func(t *testing.T) {
 		bolt, cleanup := connectToServer(t, func(srv *bolt4server) {
 			srv.accept(4)
-			srv.serveRun(runResponse)
+			srv.serveRun(runResponse, nil)
 		})
 		defer cleanup()
 		defer bolt.Close()
@@ -587,7 +624,7 @@ func TestBolt4(ot *testing.T) {
 	ot.Run("Forces reset while streaming", func(t *testing.T) {
 		bolt, cleanup := connectToServer(t, func(srv *bolt4server) {
 			srv.accept(4)
-			srv.serveRun(runResponse)
+			srv.serveRun(runResponse, nil)
 			srv.waitForReset()
 			srv.sendSuccess(map[string]interface{}{})
 		})
@@ -606,7 +643,7 @@ func TestBolt4(ot *testing.T) {
 	ot.Run("Buffer stream", func(t *testing.T) {
 		bolt, cleanup := connectToServer(t, func(srv *bolt4server) {
 			srv.accept(4)
-			srv.serveRun(runResponse)
+			srv.serveRun(runResponse, nil)
 			srv.closeConnection()
 		})
 		defer cleanup()
@@ -639,7 +676,7 @@ func TestBolt4(ot *testing.T) {
 		bookmark := "x"
 		bolt, cleanup := connectToServer(t, func(srv *bolt4server) {
 			srv.accept(4)
-			srv.waitForRun()
+			srv.waitForRun(nil)
 			srv.waitForPullN(3)
 			srv.send(msgSuccess, map[string]interface{}{"fields": keys})
 			srv.send(msgRecord, []interface{}{"1"})
@@ -680,7 +717,7 @@ func TestBolt4(ot *testing.T) {
 	ot.Run("Buffer stream with error", func(t *testing.T) {
 		bolt, cleanup := connectToServer(t, func(srv *bolt4server) {
 			srv.accept(4)
-			srv.waitForRun()
+			srv.waitForRun(nil)
 			srv.waitForPullN(bolt4_fetchsize)
 			// Send response to run and first record as response to pull
 			srv.send(msgSuccess, map[string]interface{}{
@@ -723,7 +760,7 @@ func TestBolt4(ot *testing.T) {
 	ot.Run("Consume stream", func(t *testing.T) {
 		bolt, cleanup := connectToServer(t, func(srv *bolt4server) {
 			srv.accept(4)
-			srv.serveRun(runResponse)
+			srv.serveRun(runResponse, nil)
 			srv.closeConnection()
 		})
 		defer cleanup()
@@ -755,7 +792,7 @@ func TestBolt4(ot *testing.T) {
 		bookmark := "x"
 		bolt, cleanup := connectToServer(t, func(srv *bolt4server) {
 			srv.accept(4)
-			srv.waitForRun()
+			srv.waitForRun(nil)
 			srv.waitForPullN(3)
 			srv.send(msgSuccess, map[string]interface{}{"fields": keys, "qid": int64(qid)})
 			srv.send(msgRecord, []interface{}{"1"})
@@ -795,7 +832,7 @@ func TestBolt4(ot *testing.T) {
 	ot.Run("Consume stream with error", func(t *testing.T) {
 		bolt, cleanup := connectToServer(t, func(srv *bolt4server) {
 			srv.accept(4)
-			srv.waitForRun()
+			srv.waitForRun(nil)
 			srv.waitForPullN(bolt4_fetchsize)
 			// Send response to run and first record as response to pull
 			srv.send(msgSuccess, map[string]interface{}{
@@ -833,10 +870,16 @@ func TestBolt4(ot *testing.T) {
 		AssertError(t, err)
 	})
 
-	ot.Run("GetRoutingTable using ROUTE message", func(t *testing.T) {
+	ot.Run("GetRoutingTable using ROUTE message on 4.3", func(t *testing.T) {
+		theDb := "theDb"
 		bolt, cleanup := connectToServer(t, func(srv *bolt4server) {
 			srv.acceptWithMinor(4, 3)
-			srv.waitForRoute()
+			srv.waitForRoute(func(fields []interface{}) {
+				// Fields contains context(map), bookmarks ([]string), database name(string or nil)
+
+				// No database selected, should be nil
+				AssertStringEqual(t, fields[2].(string), theDb)
+			})
 			srv.sendSuccess(map[string]interface{}{
 				"rt": map[string]interface{}{
 					"ttl": 1000,
@@ -852,9 +895,39 @@ func TestBolt4(ot *testing.T) {
 		defer cleanup()
 		defer bolt.Close()
 
-		rt, err := bolt.GetRoutingTable(map[string]string{"region": "space"}, nil, "thedb")
+		rt, err := bolt.GetRoutingTable(map[string]string{"region": "space"}, nil, theDb, "")
 		AssertNoError(t, err)
-		ert := &db.RoutingTable{Routers: []string{"router1"}, TimeToLive: 1000}
+		ert := &db.RoutingTable{Routers: []string{"router1"}, TimeToLive: 1000, DatabaseName: theDb}
+		if !reflect.DeepEqual(rt, ert) {
+			t.Fatalf("Expected:\n%+v\n != Actual: \n%+v\n", rt, ert)
+		}
+	})
+
+	ot.Run("GetRoutingTable using ROUTE message", func(t *testing.T) {
+		bolt, cleanup := connectToServer(t, func(srv *bolt4server) {
+			srv.acceptWithMinor(4, 4)
+			srv.waitForRoute(func(fields []interface{}) {
+				// Fields contains context(map), bookmarks([]string), extras(map)
+			})
+			srv.sendSuccess(map[string]interface{}{
+				"rt": map[string]interface{}{
+					"ttl": 1000,
+					"db":  "thedb",
+					"servers": []interface{}{
+						map[string]interface{}{
+							"role":      "ROUTE",
+							"addresses": []interface{}{"router1"},
+						},
+					},
+				},
+			})
+		})
+		defer cleanup()
+		defer bolt.Close()
+
+		rt, err := bolt.GetRoutingTable(map[string]string{"region": "space"}, nil, "thedb", "")
+		AssertNoError(t, err)
+		ert := &db.RoutingTable{Routers: []string{"router1"}, TimeToLive: 1000, DatabaseName: "thedb"}
 		if !reflect.DeepEqual(rt, ert) {
 			t.Fatalf("Expected:\n%+v\n != Actual: \n%+v\n", rt, ert)
 		}
@@ -887,7 +960,7 @@ func TestBolt4(ot *testing.T) {
 	ot.Run("Expired authentication token error after run triggers a connection failure", func(t *testing.T) {
 		bolt, cleanup := connectToServer(t, func(srv *bolt4server) {
 			srv.accept(4)
-			srv.waitForRun()
+			srv.waitForRun(nil)
 			srv.sendFailureMsg("Neo.ClientError.Security.TokenExpired", "SSO token is... expired")
 		})
 		defer cleanup()

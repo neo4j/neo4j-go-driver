@@ -224,8 +224,13 @@ func routingContextFromUrl(useRouting bool, u *url.URL) (map[string]string, erro
 }
 
 type sessionRouter interface {
+	// Returns list of servers that can serve reads on the requested database.
 	Readers(ctx context.Context, bookmarks []string, database string, boltLogger log.BoltLogger) ([]string, error)
+	// Returns list of servers that can serve writes on the requested database.
 	Writers(ctx context.Context, bookmarks []string, database string, boltLogger log.BoltLogger) ([]string, error)
+	// Returns name of default database for specified user. The correct database name is needed when
+	// requesting readers or writers.
+	GetNameOfDefaultDatabase(ctx context.Context, bookmarks []string, user string, boltLogger log.BoltLogger) (string, error)
 	Invalidate(database string)
 	CleanUp()
 }
@@ -253,15 +258,18 @@ func (d *driver) Session(accessMode AccessMode, bookmarks ...string) (Session, e
 			Message: "Trying to create session on closed driver",
 		}
 	}
+	sessConfig := SessionConfig{
+		AccessMode:   accessMode,
+		Bookmarks:    bookmarks,
+		DatabaseName: db.DefaultDatabase,
+	}
 	return newSession(
-		d.config, d.router,
-		d.pool, db.AccessMode(accessMode), bookmarks, db.DefaultDatabase, 0, d.log, nil), nil
+		d.config, sessConfig, d.router, d.pool, d.log), nil
 }
 
 func (d *driver) NewSession(config SessionConfig) Session {
-	databaseName := db.DefaultDatabase
-	if config.DatabaseName != "" {
-		databaseName = config.DatabaseName
+	if config.DatabaseName == "" {
+		config.DatabaseName = db.DefaultDatabase
 	}
 
 	d.mut.Lock()
@@ -270,10 +278,7 @@ func (d *driver) NewSession(config SessionConfig) Session {
 		return &sessionWithError{
 			err: &UsageError{Message: "Trying to create session on closed driver"}}
 	}
-	return newSession(
-		d.config, d.router,
-		d.pool, db.AccessMode(config.AccessMode), config.Bookmarks, databaseName, config.FetchSize,
-		d.log, config.BoltLogger)
+	return newSession(d.config, config, d.router, d.pool, d.log)
 }
 
 func (d *driver) VerifyConnectivity() error {

@@ -113,7 +113,7 @@ func IsTransactionExecutionLimit(err error) bool {
 // TokenExpiredError represent errors caused by the driver not being able to connect to Neo4j services,
 // or lost connections.
 type TokenExpiredError struct {
-	Code string
+	Code    string
 	Message string
 }
 
@@ -129,8 +129,9 @@ func wrapError(err error) error {
 		return &ConnectivityError{inner: err}
 	}
 	switch e := err.(type) {
-	case *db.UnsupportedTypeError:
-		// Usage of a type not supported by database network protocol
+	case *db.UnsupportedTypeError, *db.FeatureNotSupportedError:
+		// Usage of a type not supported by database network protocol or feature
+		// not supported by current version or edition.
 		return &UsageError{Message: err.Error()}
 	case *connector.TlsError, *connector.ConnectError:
 		return &ConnectivityError{inner: err}
