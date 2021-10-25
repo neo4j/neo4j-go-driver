@@ -539,31 +539,55 @@ func configTxMetadata(driver neo4j.Driver, name string) error {
 // tag::pass-bookmarks[]
 func addCompanyTxFunc(name string) neo4j.TransactionWork {
 	return func(tx neo4j.Transaction) (interface{}, error) {
-		return tx.Run("CREATE (a:Company {name: $name})", map[string]interface{}{"name": name})
+		var result, err = tx.Run("CREATE (a:Company {name: $name})", map[string]interface{}{"name": name})
+
+		if err != nil {
+			return nil, err
+		}
+
+		return result.Consume()
 	}
 }
 
 func addPersonTxFunc(name string) neo4j.TransactionWork {
 	return func(tx neo4j.Transaction) (interface{}, error) {
-		return tx.Run("CREATE (a:Person {name: $name})", map[string]interface{}{"name": name})
+		var result, err = tx.Run("CREATE (a:Person {name: $name})", map[string]interface{}{"name": name})
+
+		if err != nil {
+			return nil, err
+		}
+
+		return result.Consume()
 	}
 }
 
 func employTxFunc(person string, company string) neo4j.TransactionWork {
 	return func(tx neo4j.Transaction) (interface{}, error) {
-		return tx.Run(
+		var result, err = tx.Run(
 			"MATCH (person:Person {name: $personName}) "+
 				"MATCH (company:Company {name: $companyName}) "+
 				"CREATE (person)-[:WORKS_FOR]->(company)", map[string]interface{}{"personName": person, "companyName": company})
+
+		if err != nil {
+			return nil, err
+		}
+
+		return result.Consume()
 	}
 }
 
 func makeFriendTxFunc(person1 string, person2 string) neo4j.TransactionWork {
 	return func(tx neo4j.Transaction) (interface{}, error) {
-		return tx.Run(
+		var result, err = tx.Run(
 			"MATCH (a:Person {name: $name1}) "+
 				"MATCH (b:Person {name: $name2}) "+
 				"MERGE (a)-[:KNOWS]->(b)", map[string]interface{}{"name1": person1, "name2": person2})
+
+		if err != nil {
+			return nil, err
+		}
+
+		return result.Consume()
 	}
 }
 
@@ -738,9 +762,14 @@ func addPersonsAsEmployees(driver neo4j.Driver, companyName string) (int, error)
 	employees := 0
 	for _, person := range persons {
 		_, err = session.WriteTransaction(func(tx neo4j.Transaction) (interface{}, error) {
-			return tx.Run("MATCH (emp:Person {name: $person_name}) "+
+			var result, err = tx.Run("MATCH (emp:Person {name: $person_name}) "+
 				"MERGE (com:Company {name: $company_name}) "+
 				"MERGE (emp)-[:WORKS_FOR]->(com)", map[string]interface{}{"person_name": person.Values[0], "company_name": companyName})
+			if err != nil {
+				return nil, err
+			}
+
+			return result.Consume()
 		})
 		if err != nil {
 			return 0, err
