@@ -93,6 +93,8 @@ type Counters interface {
 	ConstraintsAdded() int
 	// The number of constraints removed from the schema.
 	ConstraintsRemoved() int
+	// The number of system updates
+	SystemUpdates() int
 }
 
 type Statement interface {
@@ -244,6 +246,10 @@ func (s *resultSummary) getCounter(n string) int {
 		return 0
 	}
 	return s.sum.Counters[n]
+}
+
+func (s *resultSummary) SystemUpdates() int {
+	return s.getCounter(db.SystemUpdates)
 }
 
 func (s *resultSummary) NodesCreated() int {
