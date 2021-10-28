@@ -43,3 +43,29 @@ func TestProfiledPlan(st *testing.T) {
 		}
 	})
 }
+
+func TestCounters(st *testing.T) {
+
+	emptySummary := resultSummary{sum: &db.Summary{}}
+	summary := resultSummary{
+		sum: &db.Summary{
+			Counters: map[string]int{
+				"system-updates": 42,
+			},
+		},
+	}
+
+	st.Run("Returns empty system update count by default", func(t *testing.T) {
+		actual := emptySummary.Counters().SystemUpdates()
+		if actual != 0 {
+			t.Errorf("Expected 0 system update, got %d", actual)
+		}
+	})
+
+	st.Run("Returns populated system update count", func(t *testing.T) {
+		actual := summary.Counters().SystemUpdates()
+		if actual != 42 {
+			t.Errorf("Expected 42 system updates, got %d", actual)
+		}
+	})
+}
