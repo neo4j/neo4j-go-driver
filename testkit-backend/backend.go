@@ -24,14 +24,15 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/neo4j/neo4j-go-driver/v4/neo4j"
-	"github.com/neo4j/neo4j-go-driver/v4/neo4j/db"
 	"io"
 	"net/url"
 	"regexp"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/neo4j/neo4j-go-driver/v4/neo4j"
+	"github.com/neo4j/neo4j-go-driver/v4/neo4j/db"
 )
 
 // Handles a testkit backend session.
@@ -588,6 +589,11 @@ func (b *backend) handleRequest(req map[string]interface{}) {
 				"Feature:Auth:Custom",
 				"Feature:Auth:Bearer",
 				"Feature:Auth:Kerberos",
+				"Feature:Bolt:3.0",
+				"Feature:Bolt:4.0",
+				"Feature:Bolt:4.1",
+				"Feature:Bolt:4.2",
+				"Feature:Bolt:4.3",
 				"Feature:Bolt:4.4",
 				"Feature:Impersonation",
 				"Optimization:ConnectionReuse",
