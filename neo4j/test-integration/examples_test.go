@@ -307,6 +307,13 @@ func createDriverWithKerberosAuth(uri, ticket string) (neo4j.Driver, error) {
 
 // end::kerberos-auth[]
 
+// tag::bearer-auth[]
+func createDriverWithBearerAuth(uri, token string) (neo4j.Driver, error) {
+	return neo4j.NewDriver(uri, neo4j.BearerAuth(token))
+}
+
+// end::bearer-auth[]
+
 // tag::custom-auth[]
 func createDriverWithCustomAuth(uri, principal, credentials, realm, scheme string, parameters map[string]interface{}) (neo4j.Driver, error) {
 	return neo4j.NewDriver(uri, neo4j.CustomAuth(scheme, principal, credentials, realm, parameters))
