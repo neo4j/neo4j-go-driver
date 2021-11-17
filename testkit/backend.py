@@ -5,9 +5,9 @@ Responsible for starting the test backend.
 """
 import os
 import subprocess
+import sys
 
 if __name__ == "__main__":
-    backendPath = os.path.join(".", "testkit-backend")
-    err = open("/artifacts/backenderr.log", "w")
-    out = open("/artifacts/backendout.log", "w")
-    subprocess.check_call(["go", "run", backendPath], stdout=out, stderr=err)
+    backend_path = os.path.join(".", "testkit-backend")
+    subprocess.check_call(["go", "run", backend_path],
+                          stdout=sys.stdout, stderr=sys.stderr)
