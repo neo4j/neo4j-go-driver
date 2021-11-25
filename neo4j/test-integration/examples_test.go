@@ -259,11 +259,11 @@ var _ = Describe("Examples", func() {
 			fieldCartesian, _ := field.(dbtype.Point2D)
 
 			// Serializing
-			fieldCartesian.String() // Point{srId=7203, x=2.5, y=-2.0}
+			fieldCartesian.String() // Point{srId=7203, x=2.500000, y=-2.000000}
 
 			// Acessing members
-			print(fieldCartesian.X)            // 2.5
-			print(fieldCartesian.Y)            // -2
+			print(fieldCartesian.X)            // 2.500000
+			print(fieldCartesian.Y)            // -2.000000
 			print(fieldCartesian.SpatialRefId) // 7203
 
 			// Reading a WGS84 point from a record
@@ -271,20 +271,20 @@ var _ = Describe("Examples", func() {
 			fieldWgs84, _ := field.(dbtype.Point2D)
 
 			// Serializing
-			fieldWgs84.String() // Point{srId=4326, x=-1.5, y=1}
+			fieldWgs84.String() // Point{srId=4326, x=-1.500000, y=1.00000}
 
 			// Acessing members
-			print(fieldWgs84.X)            // -1.5
-			print(fieldWgs84.Y)            // 1
+			print(fieldWgs84.X)            // -1.500000
+			print(fieldWgs84.Y)            // 1.000000
 			print(fieldWgs84.SpatialRefId) // 4326
 			// end::geospatial-types-point2d[]
 
-			Expect(fieldCartesian.String()).To(Equal("Point{srId=7203, x=2.5, y=-2.0}"))
+			Expect(fieldCartesian.String()).To(Equal("Point{srId=7203, x=2.500000, y=-2.000000}"))
 			Expect(fieldCartesian.X).To(Equal(cartesian.X))
 			Expect(fieldCartesian.Y).To(Equal(cartesian.Y))
 			Expect(fieldCartesian.SpatialRefId).To(Equal(cartesian.SpatialRefId))
 
-			Expect(fieldWgs84.String()).To(Equal("Point{srId=7203, x=2.5, y=-2.0}"))
+			Expect(fieldWgs84.String()).To(Equal("Point{srId=7203, x=2.500000, y=-2.000000}"))
 			Expect(fieldWgs84.X).To(Equal(wgs84.X))
 			Expect(fieldWgs84.Y).To(Equal(wgs84.Y))
 			Expect(fieldWgs84.SpatialRefId).To(Equal(wgs84.SpatialRefId))
@@ -333,12 +333,12 @@ var _ = Describe("Examples", func() {
 			fieldCartesian := field.(dbtype.Point3D)
 
 			// Serializing
-			fieldCartesian.String() // Point{srId=9157, x=2.5, y=-2.0, z=2.0}
+			fieldCartesian.String() // Point{srId=9157, x=2.500000, y=-2.000000, z=2.000000}
 
 			// Acessing members
-			print(fieldCartesian.X)            // 2.5
-			print(fieldCartesian.Y)            // -2
-			print(fieldCartesian.Z)            // 2
+			print(fieldCartesian.X)            // 2.500000
+			print(fieldCartesian.Y)            // -2.000000
+			print(fieldCartesian.Z)            // 2.000000
 			print(fieldCartesian.SpatialRefId) // 7203
 
 			// Reading a WGS84 point from a record
@@ -346,22 +346,22 @@ var _ = Describe("Examples", func() {
 			fieldWgs84, _ := field.(dbtype.Point3D)
 
 			// Serializing
-			fieldWgs84.String() // Point{srId=4326, x=-1.5, y=1, z=3.0}
+			fieldWgs84.String() // Point{srId=4326, x=-1.500000, y=1.00000, z=3.000000}
 
 			// Acessing members
-			print(fieldWgs84.X)            // -1.5
-			print(fieldWgs84.Y)            // 1
-			print(fieldWgs84.Z)            // 3
+			print(fieldWgs84.X)            // -1.500000
+			print(fieldWgs84.Y)            // 1.000000
+			print(fieldWgs84.Z)            // 3.000000
 			print(fieldWgs84.SpatialRefId) // 4979
 			// end::geospatial-types-point3d[]
 
-			Expect(fieldCartesian.String()).To(Equal("Point{srId=9157, x=2.5, y=-2.0, z=2.0}"))
+			Expect(fieldCartesian.String()).To(Equal("Point{srId=9157, x=2.500000, y=-2.000000, z=2.000000}"))
 			Expect(fieldCartesian.X).To(Equal(cartesian.X))
 			Expect(fieldCartesian.Y).To(Equal(cartesian.Y))
 			Expect(fieldCartesian.Z).To(Equal(cartesian.Z))
 			Expect(fieldCartesian.SpatialRefId).To(Equal(cartesian.SpatialRefId))
 
-			Expect(fieldWgs84.String()).To(Equal("Point{srId=4326, x=-1.5, y=1, z=3.0}"))
+			Expect(fieldWgs84.String()).To(Equal("Point{srId=4326, x=-1.500000, y=1.000000, z=3.000000}"))
 			Expect(fieldWgs84.X).To(Equal(wgs84.X))
 			Expect(fieldWgs84.Y).To(Equal(wgs84.Y))
 			Expect(fieldWgs84.Z).To(Equal(wgs84.Z))
