@@ -26,6 +26,7 @@ import (
 	"time"
 
 	"github.com/neo4j/neo4j-go-driver/v4/neo4j"
+	"github.com/neo4j/neo4j-go-driver/v4/neo4j/dbtype"
 	"github.com/neo4j/neo4j-go-driver/v4/neo4j/test-integration/dbserver"
 
 	. "github.com/onsi/ginkgo"
@@ -216,6 +217,148 @@ var _ = Describe("Examples", func() {
 			Expect(err).To(BeNil())
 			Expect(count).To(BeNumerically(">=", 2))
 		})
+
+		Specify("Point2D", func() {
+			driver, err := createDriverWithMaxRetryTime(uri, username, password)
+			Expect(err).To(BeNil())
+			Expect(driver).NotTo(BeNil())
+			defer driver.Close()
+
+			// tag::geospatial-types-point2d[]
+			// Creating a 2D point in Cartesian space
+			cartesian := dbtype.Point2D{
+				X:            2.5,
+				Y:            -2,
+				SpatialRefId: 7203,
+			}
+
+			// Creating a 2D point in WGS84 space
+			wgs84 := dbtype.Point2D{
+				X:            -1.5,
+				Y:            1,
+				SpatialRefId: 4326,
+			}
+			// end::geospatial-types-point2d[]
+
+			session := driver.NewSession(neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
+			Expect(session).ToNot(BeNil())
+			defer session.Close()
+
+			recordWithCartesian, err := echo(session, cartesian)
+			Expect(err).To(BeNil())
+			Expect(recordWithCartesian).ToNot(BeNil())
+
+			recordWithWgs84, err := echo(session, wgs84)
+			Expect(err).To(BeNil())
+			Expect(recordWithWgs84).ToNot(BeNil())
+
+			// tag::geospatial-types-point2d[]
+
+			// Reading a Cartesian point from a record
+			fieldCartesian, _ := recordWithCartesian.Get("fieldName")
+
+			// Serializing
+			fieldCartesian.String() // Point{srId=7203, x=2.5, y=-2.0}
+
+			// Acessing members
+			fieldCartesian.X            // 2.5
+			fieldCartesian.Y            // -2
+			fieldCartesian.SpatialRefId // 7203
+
+			// Reading a WGS84 point from a record
+			fieldWgs84, _ := recordWithWgs84.Get("fieldName")
+
+			// Serializing
+			fieldWgs84.String() // Point{srId=4326, x=-1.5, y=1}
+
+			// Acessing members
+			fieldWgs84.X            // -1.5
+			fieldWgs84.Y            // 1
+			fieldWgs84.SpatialRefId // 4326
+			// end::geospatial-types-point2d[]
+
+			Expect(fieldCartesian.String()).To(Equal("Point{srId=7203, x=2.5, y=-2.0}"))
+			Expect(fieldCartesian.X).To(Equal(cartesian.X))
+			Expect(fieldCartesian.Y).To(Equal(cartesian.X))
+			Expect(fieldCartesian.SpatialRefId).To(Equal(cartesian.SpatialRefId))
+
+			Expect(fieldWgs84.String()).To(Equal("Point{srId=7203, x=2.5, y=-2.0}"))
+			Expect(fieldWgs84.X).To(Equal(wgs84.X))
+			Expect(fieldWgs84.Y).To(Equal(wgs84.X))
+			Expect(fieldWgs84.SpatialRefId).To(Equal(wgs84.SpatialRefId))
+		})
+
+		Specify("Point3D", func() {
+			driver, err := createDriverWithMaxRetryTime(uri, username, password)
+			Expect(err).To(BeNil())
+			Expect(driver).NotTo(BeNil())
+			defer driver.Close()
+
+			// tag::geospatial-types-point3d[]
+			// Creating a 3D point in Cartesian space
+			cartesian := dbtype.Point3D{
+				X:            2.5,
+				Y:            -2,
+				Z:            2,
+				SpatialRefId: 9157,
+			}
+
+			// Creating a 3D point in WGS84 space
+			wgs84 := dbtype.Point3D{
+				X:            -1.5,
+				Y:            1,
+				Z:            3,
+				SpatialRefId: 4979,
+			}
+			// end::geospatial-types-point3d[]
+
+			session := driver.NewSession(neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
+			Expect(session).ToNot(BeNil())
+			defer session.Close()
+
+			recordWithCartesian, err := echo(session, cartesian)
+			Expect(err).To(BeNil())
+			Expect(recordWithCartesian).ToNot(BeNil())
+
+			recordWithWgs84, err := echo(session, wgs84)
+			Expect(err).To(BeNil())
+			Expect(recordWithWgs84).ToNot(BeNil())
+
+			// tag::geospatial-types-point3d[]
+
+			// Reading a Cartesian point from a record
+			fieldCartesian, _ := recordWithCartesian.Get("fieldName")
+
+			// Serializing
+			fieldCartesian.String() // Point{srId=9157, x=2.5, y=-2.0, z=2.0}
+
+			// Acessing members
+			fieldCartesian.X            // 2.5
+			fieldCartesian.Y            // -2
+			fieldCartesian.SpatialRefId // 7203
+
+			// Reading a WGS84 point from a record
+			fieldWgs84, _ := recordWithWgs84.Get("fieldName")
+
+			// Serializing
+			fieldWgs84.String() // Point{srId=4326, x=-1.5, y=1, z=3.0}
+
+			// Acessing members
+			fieldWgs84.X            // -1.5
+			fieldWgs84.Y            // 1
+			fieldWgs84.SpatialRefId // 4979
+			// end::geospatial-types-point3d[]
+
+			Expect(fieldCartesian.String()).To(Equal("Point{srId=9157, x=2.5, y=-2.0, z=2.0}"))
+			Expect(fieldCartesian.X).To(Equal(cartesian.X))
+			Expect(fieldCartesian.Y).To(Equal(cartesian.X))
+			Expect(fieldCartesian.SpatialRefId).To(Equal(cartesian.SpatialRefId))
+
+			Expect(fieldWgs84.String()).To(Equal("Point{srId=4326, x=-1.5, y=1, z=3.0}"))
+			Expect(fieldWgs84.X).To(Equal(wgs84.X))
+			Expect(fieldWgs84.Y).To(Equal(wgs84.X))
+			Expect(fieldWgs84.SpatialRefId).To(Equal(wgs84.SpatialRefId))
+		})
 	})
 
 	/*
@@ -245,6 +388,7 @@ var _ = Describe("Examples", func() {
 			})
 		})
 	*/
+
 })
 
 // tag::hello-world[]
@@ -789,3 +933,22 @@ func addPersonsAsEmployees(driver neo4j.Driver, companyName string) (int, error)
 }
 
 // end::result-retain[]
+
+func echo(session neo4j.Session, value interface{}) (dbtype.Record, error) {
+	record, err := session.ReadTransaction(func(tx neo4j.Transaction) (interface{}, error) {
+		result, err := tx.Run("RETURN $value as fieldName", map[string]interface{}{"value": value})
+
+		if err != nil {
+			return neo4j.Record{}, err
+		}
+
+		if result.Next() {
+			return *result.Record(), nil
+		}
+
+		return dbtype.Record{}, result.Err()
+
+	})
+
+	return dbtype.(neo4j.Record), err
+}
