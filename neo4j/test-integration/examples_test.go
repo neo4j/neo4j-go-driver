@@ -279,12 +279,12 @@ var _ = Describe("Examples", func() {
 
 			Expect(fieldCartesian.String()).To(Equal("Point{srId=7203, x=2.5, y=-2.0}"))
 			Expect(fieldCartesian.X).To(Equal(cartesian.X))
-			Expect(fieldCartesian.Y).To(Equal(cartesian.X))
+			Expect(fieldCartesian.Y).To(Equal(cartesian.Y))
 			Expect(fieldCartesian.SpatialRefId).To(Equal(cartesian.SpatialRefId))
 
 			Expect(fieldWgs84.String()).To(Equal("Point{srId=7203, x=2.5, y=-2.0}"))
 			Expect(fieldWgs84.X).To(Equal(wgs84.X))
-			Expect(fieldWgs84.Y).To(Equal(wgs84.X))
+			Expect(fieldWgs84.Y).To(Equal(wgs84.Y))
 			Expect(fieldWgs84.SpatialRefId).To(Equal(wgs84.SpatialRefId))
 		})
 
@@ -351,12 +351,14 @@ var _ = Describe("Examples", func() {
 
 			Expect(fieldCartesian.String()).To(Equal("Point{srId=9157, x=2.5, y=-2.0, z=2.0}"))
 			Expect(fieldCartesian.X).To(Equal(cartesian.X))
-			Expect(fieldCartesian.Y).To(Equal(cartesian.X))
+			Expect(fieldCartesian.Y).To(Equal(cartesian.Y))
+			Expect(fieldCartesian.Z).To(Equal(cartesian.Z))
 			Expect(fieldCartesian.SpatialRefId).To(Equal(cartesian.SpatialRefId))
 
 			Expect(fieldWgs84.String()).To(Equal("Point{srId=4326, x=-1.5, y=1, z=3.0}"))
 			Expect(fieldWgs84.X).To(Equal(wgs84.X))
-			Expect(fieldWgs84.Y).To(Equal(wgs84.X))
+			Expect(fieldWgs84.Y).To(Equal(wgs84.Y))
+			Expect(fieldWgs84.Z).To(Equal(wgs84.Z))
 			Expect(fieldWgs84.SpatialRefId).To(Equal(wgs84.SpatialRefId))
 		})
 	})
