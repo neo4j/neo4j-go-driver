@@ -268,7 +268,7 @@ var _ = Describe("Examples", func() {
 
 			// Reading a WGS84 point from a record
 			field, _ = recordWithWgs84.Get("fieldName")
-			fieldWgs84, _ := field.(dbtype.Point2D)
+			fieldWgs84 := field.(dbtype.Point2D)
 
 			// Serializing
 			fieldWgs84.String() // Point{srId=4326, x=-1.500000, y=1.00000}
@@ -284,7 +284,7 @@ var _ = Describe("Examples", func() {
 			Expect(fieldCartesian.Y).To(Equal(cartesian.Y))
 			Expect(fieldCartesian.SpatialRefId).To(Equal(cartesian.SpatialRefId))
 
-			Expect(fieldWgs84.String()).To(Equal("Point{srId=4326, x=2.500000, y=-2.000000}"))
+			Expect(fieldWgs84.String()).To(Equal("Point{srId=4326, x=-1.500000, y=-2.000000}"))
 			Expect(fieldWgs84.X).To(Equal(wgs84.X))
 			Expect(fieldWgs84.Y).To(Equal(wgs84.Y))
 			Expect(fieldWgs84.SpatialRefId).To(Equal(wgs84.SpatialRefId))
@@ -343,7 +343,7 @@ var _ = Describe("Examples", func() {
 
 			// Reading a WGS84 point from a record
 			field, _ = recordWithWgs84.Get("fieldName")
-			fieldWgs84, _ := field.(dbtype.Point3D)
+			fieldWgs84 := field.(dbtype.Point3D)
 
 			// Serializing
 			fieldWgs84.String() // Point{srId=4979, x=-1.500000, y=1.00000, z=3.000000}
