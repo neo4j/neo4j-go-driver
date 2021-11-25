@@ -255,26 +255,28 @@ var _ = Describe("Examples", func() {
 			// tag::geospatial-types-point2d[]
 
 			// Reading a Cartesian point from a record
-			fieldCartesian, _ := recordWithCartesian.Get("fieldName")
+			field, _ := recordWithCartesian.Get("fieldName")
+			fieldCartesian, _ := field.(dbtype.Point2D)
 
 			// Serializing
 			fieldCartesian.String() // Point{srId=7203, x=2.5, y=-2.0}
 
 			// Acessing members
-			fieldCartesian.X            // 2.5
-			fieldCartesian.Y            // -2
-			fieldCartesian.SpatialRefId // 7203
+			print(fieldCartesian.X)            // 2.5
+			print(fieldCartesian.Y)            // -2
+			print(fieldCartesian.SpatialRefId) // 7203
 
 			// Reading a WGS84 point from a record
-			fieldWgs84, _ := recordWithWgs84.Get("fieldName")
+			field, _ = recordWithWgs84.Get("fieldName")
+			fieldWgs84, _ := field.(dbtype.Point2D)
 
 			// Serializing
 			fieldWgs84.String() // Point{srId=4326, x=-1.5, y=1}
 
 			// Acessing members
-			fieldWgs84.X            // -1.5
-			fieldWgs84.Y            // 1
-			fieldWgs84.SpatialRefId // 4326
+			print(fieldWgs84.X)            // -1.5
+			print(fieldWgs84.Y)            // 1
+			print(fieldWgs84.SpatialRefId) // 4326
 			// end::geospatial-types-point2d[]
 
 			Expect(fieldCartesian.String()).To(Equal("Point{srId=7203, x=2.5, y=-2.0}"))
@@ -327,26 +329,30 @@ var _ = Describe("Examples", func() {
 			// tag::geospatial-types-point3d[]
 
 			// Reading a Cartesian point from a record
-			fieldCartesian, _ := recordWithCartesian.Get("fieldName")
+			field, _ := recordWithCartesian.Get("fieldName")
+			fieldCartesian := field.(dbtype.Point3D)
 
 			// Serializing
 			fieldCartesian.String() // Point{srId=9157, x=2.5, y=-2.0, z=2.0}
 
 			// Acessing members
-			fieldCartesian.X            // 2.5
-			fieldCartesian.Y            // -2
-			fieldCartesian.SpatialRefId // 7203
+			print(fieldCartesian.X)            // 2.5
+			print(fieldCartesian.Y)            // -2
+			print(fieldCartesian.Z)            // 2
+			print(fieldCartesian.SpatialRefId) // 7203
 
 			// Reading a WGS84 point from a record
-			fieldWgs84, _ := recordWithWgs84.Get("fieldName")
+			field, _ = recordWithWgs84.Get("fieldName")
+			fieldWgs84, _ := field.(dbtype.Point3D)
 
 			// Serializing
 			fieldWgs84.String() // Point{srId=4326, x=-1.5, y=1, z=3.0}
 
 			// Acessing members
-			fieldWgs84.X            // -1.5
-			fieldWgs84.Y            // 1
-			fieldWgs84.SpatialRefId // 4979
+			print(fieldWgs84.X)            // -1.5
+			print(fieldWgs84.Y)            // 1
+			print(fieldWgs84.Z)            // 3
+			print(fieldWgs84.SpatialRefId) // 4979
 			// end::geospatial-types-point3d[]
 
 			Expect(fieldCartesian.String()).To(Equal("Point{srId=9157, x=2.5, y=-2.0, z=2.0}"))
@@ -936,7 +942,7 @@ func addPersonsAsEmployees(driver neo4j.Driver, companyName string) (int, error)
 
 // end::result-retain[]
 
-func echo(session neo4j.Session, value interface{}) (dbtype.Record, error) {
+func echo(session neo4j.Session, value interface{}) (neo4j.Record, error) {
 	record, err := session.ReadTransaction(func(tx neo4j.Transaction) (interface{}, error) {
 		result, err := tx.Run("RETURN $value as fieldName", map[string]interface{}{"value": value})
 
@@ -948,9 +954,9 @@ func echo(session neo4j.Session, value interface{}) (dbtype.Record, error) {
 			return *result.Record(), nil
 		}
 
-		return dbtype.Record{}, result.Err()
+		return neo4j.Record{}, result.Err()
 
 	})
 
-	return dbtype.(neo4j.Record), err
+	return record.(neo4j.Record), err
 }
