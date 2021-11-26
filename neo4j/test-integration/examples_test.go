@@ -284,7 +284,7 @@ var _ = Describe("Examples", func() {
 			Expect(fieldCartesian.Y).To(Equal(cartesian.Y))
 			Expect(fieldCartesian.SpatialRefId).To(Equal(cartesian.SpatialRefId))
 
-			Expect(fieldWgs84.String()).To(Equal("Point{srId=4326, x=-1.500000, y=-2.000000}"))
+			Expect(fieldWgs84.String()).To(Equal("Point{srId=4326, x=-1.500000, y=1.000000}"))
 			Expect(fieldWgs84.X).To(Equal(wgs84.X))
 			Expect(fieldWgs84.Y).To(Equal(wgs84.Y))
 			Expect(fieldWgs84.SpatialRefId).To(Equal(wgs84.SpatialRefId))
