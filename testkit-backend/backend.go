@@ -398,6 +398,11 @@ func (b *backend) handleRequest(req map[string]interface{}) {
 			if data["maxConnectionPoolSize"] != nil {
 				c.MaxConnectionPoolSize = int(data["maxConnectionPoolSize"].(float64))
 			}
+			rawMaxTxRetryTime, found := data["maxTxRetryTimeMs"]
+			if found {
+				maxTxRetryTime := int(rawMaxTxRetryTime.(float64))
+				c.MaxTransactionRetryTime = time.Millisecond * time.Duration(maxTxRetryTime)
+			}
 		})
 		if err != nil {
 			b.writeError(err)
@@ -474,7 +479,15 @@ func (b *backend) handleRequest(req map[string]interface{}) {
 		}
 		idKey := b.nextId()
 		b.results[idKey] = result
-		b.writeResponse("Result", map[string]interface{}{"id": idKey})
+		keys, err := result.Keys()
+		if err != nil {
+			b.writeError(err)
+			return
+		}
+		b.writeResponse("Result", map[string]interface{}{
+			"id":   idKey,
+			"keys": keys,
+		})
 
 	case "SessionBeginTransaction":
 		sessionState := b.sessionStates[data["sessionId"].(string)]
@@ -506,7 +519,15 @@ func (b *backend) handleRequest(req map[string]interface{}) {
 		}
 		idKey := b.nextId()
 		b.results[idKey] = result
-		b.writeResponse("Result", map[string]interface{}{"id": idKey})
+		keys, err := result.Keys()
+		if err != nil {
+			b.writeError(err)
+			return
+		}
+		b.writeResponse("Result", map[string]interface{}{
+			"id":   idKey,
+			"keys": keys,
+		})
 
 	case "TransactionCommit":
 		txId := data["txId"].(string)
@@ -581,12 +602,42 @@ func (b *backend) handleRequest(req map[string]interface{}) {
 		}
 		serverInfo := summary.Server()
 		protocolVersion := serverInfo.ProtocolVersion()
-		b.writeResponse("Summary", map[string]interface{}{
+		//counters := summary.Counters()
+		query := summary.Query()
+		database := summary.Database()
+		summaryResponse := map[string]interface{}{
 			"serverInfo": map[string]interface{}{
 				"protocolVersion": fmt.Sprintf("%d.%d", protocolVersion.Major, protocolVersion.Minor),
 				"agent":           serverInfo.Agent(),
 			},
-		})
+			"notifications":        summary.Notifications(),
+			"plan":                 summary.Plan(),
+			"profile":              summary.Profile(),
+			"resultAvailableAfter": summary.ResultAvailableAfter(),
+			"resultConsumedAfter":  summary.ResultConsumedAfter(),
+			//"counters": map[string]interface{}{
+			//	"containsUpdates":      counters.ContainsUpdates(),
+			//	"nodesCreated":         counters.NodesCreated(),
+			//	"nodesDeleted":         counters.NodesDeleted(),
+			//	"relationshipsCreated": counters.RelationshipsCreated(),
+			//	"relationshipsDeleted": counters.RelationshipsDeleted(),
+			//	"propertiesSet":        counters.PropertiesSet(),
+			//	"labelsAdded":          counters.LabelsAdded(),
+			//	"labelsRemoved":        counters.LabelsRemoved(),
+			//	"indexesAdded":         counters.IndexesAdded(),
+			//	"indexesRemoved":       counters.IndexesRemoved(),
+			//	"constraintsAdded":     counters.ConstraintsAdded(),
+			//	"constraintsRemoved":   counters.ConstraintsRemoved(),
+			//},
+			"query": map[string]interface{}{
+				"text":       query.Text(),
+				"parameters": query.Parameters(),
+			},
+		}
+		if database != nil {
+			summaryResponse["database"] = database.Name()
+		}
+		b.writeResponse("Summary", summaryResponse)
 
 	case "GetFeatures":
 		b.writeResponse("FeatureList", map[string]interface{}{
@@ -609,6 +660,13 @@ func (b *backend) handleRequest(req map[string]interface{}) {
 				"Optimization:ImplicitDefaultArguments",
 				"Optimization:PullPipelining",
 				"Temporary:ConnectionAcquisitionTimeout",
+				"Temporary:CypherPathAndRelationship",
+				"Temporary:DriverFetchSize",
+				"Temporary:DriverMaxTxRetryTime",
+				"Temporary:FastFailingDiscovery",
+				"Temporary:FullSummary",
+				"Temporary:ResultKeys",
+				"Temporary:TransactionClose",
 			},
 		})
 
@@ -655,17 +713,24 @@ func asRegex(rawPattern string) *regexp.Regexp {
 // you can use '*' as wildcards anywhere in the qualified test name (useful to exclude a whole class e.g.)
 func testSkips() map[string]string {
 	return map[string]string{
-		"stub.disconnects.test_disconnects.TestDisconnects.test_fail_on_reset":                                                   "It is not resetting driver when put back to pool",
-		"stub.routing.test_routing_v3.RoutingV3.test_should_use_resolver_during_rediscovery_when_existing_routers_fail":          "It needs investigation - custom resolver does not seem to be called",
-		"stub.routing.test_routing_v4x1.RoutingV4x1.test_should_use_resolver_during_rediscovery_when_existing_routers_fail":      "It needs investigation - custom resolver does not seem to be called",
-		"stub.routing.test_routing_v4x3.RoutingV4x3.test_should_use_resolver_during_rediscovery_when_existing_routers_fail":      "It needs investigation - custom resolver does not seem to be called",
-		"stub.routing.test_routing_v4x4.RoutingV4x4.test_should_use_resolver_during_rediscovery_when_existing_routers_fail":      "It needs investigation - custom resolver does not seem to be called",
-		"stub.routing.test_routing_v3.RoutingV3.test_should_revert_to_initial_router_if_known_router_throws_protocol_errors":     "It needs investigation - custom resolver does not seem to be called",
-		"stub.routing.test_routing_v4x1.RoutingV4x1.test_should_revert_to_initial_router_if_known_router_throws_protocol_errors": "It needs investigation - custom resolver does not seem to be called",
-		"stub.routing.test_routing_v4x3.RoutingV4x3.test_should_revert_to_initial_router_if_known_router_throws_protocol_errors": "It needs investigation - custom resolver does not seem to be called",
-		"stub.routing.test_routing_v4x4.RoutingV4x4.test_should_revert_to_initial_router_if_known_router_throws_protocol_errors": "It needs investigation - custom resolver does not seem to be called",
-		"stub.configuration_hints.test_connection_recv_timeout_seconds.TestRoutingConnectionRecvTimeout.*":                       "No GetRoutingTable support - too tricky to implement in Go",
-		"stub.homedb.test_homedb.TestHomeDb.test_session_should_cache_home_db_despite_new_rt":                                    "Driver does not remove servers from RT when connection breaks.",
-		"neo4j.test_authentication.TestAuthenticationBasic.test_error_on_incorrect_credentials_tx":                               "Driver retries tx on failed authentication.",
+		"stub.disconnects.test_disconnects.TestDisconnects.test_fail_on_reset":                                                    "It is not resetting driver when put back to pool",
+		"stub.routing.test_routing_v3.RoutingV3.test_should_use_resolver_during_rediscovery_when_existing_routers_fail":           "It needs investigation - custom resolver does not seem to be called",
+		"stub.routing.test_routing_v4x1.RoutingV4x1.test_should_use_resolver_during_rediscovery_when_existing_routers_fail":       "It needs investigation - custom resolver does not seem to be called",
+		"stub.routing.test_routing_v4x3.RoutingV4x3.test_should_use_resolver_during_rediscovery_when_existing_routers_fail":       "It needs investigation - custom resolver does not seem to be called",
+		"stub.routing.test_routing_v4x4.RoutingV4x4.test_should_use_resolver_during_rediscovery_when_existing_routers_fail":       "It needs investigation - custom resolver does not seem to be called",
+		"stub.routing.test_routing_v3.RoutingV3.test_should_revert_to_initial_router_if_known_router_throws_protocol_errors":      "It needs investigation - custom resolver does not seem to be called",
+		"stub.routing.test_routing_v4x1.RoutingV4x1.test_should_revert_to_initial_router_if_known_router_throws_protocol_errors":  "It needs investigation - custom resolver does not seem to be called",
+		"stub.routing.test_routing_v4x3.RoutingV4x3.test_should_revert_to_initial_router_if_known_router_throws_protocol_errors":  "It needs investigation - custom resolver does not seem to be called",
+		"stub.routing.test_routing_v4x4.RoutingV4x4.test_should_revert_to_initial_router_if_known_router_throws_protocol_errors":  "It needs investigation - custom resolver does not seem to be called",
+		"stub.configuration_hints.test_connection_recv_timeout_seconds.TestRoutingConnectionRecvTimeout.*":                        "No GetRoutingTable support - too tricky to implement in Go",
+		"stub.homedb.test_homedb.TestHomeDb.test_session_should_cache_home_db_despite_new_rt":                                     "Driver does not remove servers from RT when connection breaks.",
+		"neo4j.test_authentication.TestAuthenticationBasic.test_error_on_incorrect_credentials_tx":                                "Driver retries tx on failed authentication.",
+		"stub.routing.test_no_routing_v4x1.NoRoutingV4x1.test_should_accept_custom_fetch_size_using_driver_configuration":         "Does not support custom fetch size at driver level",
+		"stub.routing.test_no_routing_v4x1.NoRoutingV4x1.test_should_pull_all_when_fetch_is_minus_one_using_driver_configuration": "Does not support custom fetch size at driver level",
+		"stub.routing.RoutingV4x4.test_should_request_rt_from_all_initial_routers_until_successful_on_authorization_expired":      "Add resolvers and connection timeout support",
+		"stub.routing.RoutingV4x4.test_should_request_rt_from_all_initial_routers_until_successful_on_unknown_failure":            "Add resolvers and connection timeout support",
+		"neo4j.test_summary.TestSummary.*":                                 "Needs system update counter in summary counter to unblock the tests",
+		"stub.summary.test_summary.TestSummary.*":                          "Needs system update counter in summary counter to unblock the tests",
+		"neo4j.test_direct_driver.TestDirectDriver.test_supports_multi_db": "Needs support for CheckMultiDBSupport in backend",
 	}
 }
