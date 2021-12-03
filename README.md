@@ -120,9 +120,22 @@ There are a few points that need to be highlighted:
 * The driver is thread-safe, while the session or the transaction is not thread-safe.
 
 ## Parsing Result Values
+
 ### Record Stream
 A cypher execution result is comprised of a stream of records followed by a result summary.
-The records inside the result can be accessed via `Next()`/`Record()` functions defined on `Result`. It is important to check `Err()` after `Next()` returning `false` to find out whether it is end of result stream or an error that caused the end of result consumption.
+The records inside the result can be accessed via `Next()`/`Record()` functions defined on `Result`. It is important to check `Err()` after `Next()` returning `false` to find out whether it is the end of the result stream or an error that caused the end of result consumption.
+
+```go
+	// Next returns false upon error
+	for result.Next() {
+		record := result.Record()
+		handleRecord(record)
+	}
+	// Err returns the error that caused Next to return false
+	if err = result.Err(); err != nil {
+		handleError(err)
+	}
+```
 
 ### Accessing Values in a Record
 Values in a `Record` can be accessed either by index or by alias. The return value is an `interface{}` which means you need to convert the interface to the type expected
