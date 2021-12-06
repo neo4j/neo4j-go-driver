@@ -1,6 +1,6 @@
 module github.com/neo4j/neo4j-go-driver/v4
 
-go 1.16
+go 1.17
 
 require (
 	github.com/fsnotify/fsnotify v1.5.1 // indirect
