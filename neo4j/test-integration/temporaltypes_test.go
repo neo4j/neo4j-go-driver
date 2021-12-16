@@ -24,8 +24,8 @@ import (
 	"math/rand"
 	"time"
 
-	"github.com/neo4j/neo4j-go-driver/v4/neo4j"
-	"github.com/neo4j/neo4j-go-driver/v4/neo4j/test-integration/dbserver"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/test-integration/dbserver"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/ginkgo/extensions/table"

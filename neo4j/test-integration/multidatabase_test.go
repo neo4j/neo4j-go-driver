@@ -22,8 +22,8 @@ package test_integration
 import (
 	"testing"
 
-	"github.com/neo4j/neo4j-go-driver/v4/neo4j"
-	"github.com/neo4j/neo4j-go-driver/v4/neo4j/test-integration/dbserver"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/test-integration/dbserver"
 )
 
 func TestMultidatabase(ot *testing.T) {

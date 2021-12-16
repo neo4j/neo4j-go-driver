@@ -27,12 +27,12 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/neo4j/neo4j-go-driver/v4/neo4j/db"
-	"github.com/neo4j/neo4j-go-driver/v4/neo4j/log"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/db"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/log"
 
-	"github.com/neo4j/neo4j-go-driver/v4/neo4j/internal/connector"
-	"github.com/neo4j/neo4j-go-driver/v4/neo4j/internal/pool"
-	"github.com/neo4j/neo4j-go-driver/v4/neo4j/internal/router"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/connector"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/pool"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/router"
 )
 
 // AccessMode defines modes that routing driver decides to which cluster member

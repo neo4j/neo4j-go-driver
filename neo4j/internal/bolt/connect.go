@@ -26,8 +26,8 @@ import (
 	"io"
 	"net"
 
-	"github.com/neo4j/neo4j-go-driver/v4/neo4j/db"
-	"github.com/neo4j/neo4j-go-driver/v4/neo4j/log"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/db"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/log"
 )
 
 type protocolVersion struct {

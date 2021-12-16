@@ -9,10 +9,13 @@ import "github.com/neo4j/neo4j-go-driver/neo4j"
 
 // 4.x, note the new v4 within the package name!
 import "github.com/neo4j/neo4j-go-driver/v4/neo4j"
+
+// 5.x, note the new v4 within the package name!
+import "github.com/neo4j/neo4j-go-driver/v5/neo4j"
 ```
 
 Note that it is possible to migrate a piece at the time by using both drivers and gradually 
-rewriting application code to use the 4.x driver.
+rewriting application code to use the 4.x or 5.x driver.
 
 ## Interfaces to structs
 A lot of interfaces on 1.x API has changed to being vanilla structs instead of interfaces,
@@ -103,7 +106,7 @@ time.Duration.
 On 1.x no error types were exposed in the API, there were functions to check if an error was a
 specific class of error (neo4j.IsSecurityError, neo4j.IsAuthenticationError, ...).
 
-On 4.x four different error types are exposed with more details on the error and similair helper
+On 4.x four different error types are exposed with more details on the error and similar helper
 functions as on 1.x to check if an error is of that type, to get access to the details in the
 struct, casting is needed.
 
