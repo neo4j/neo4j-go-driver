@@ -345,7 +345,7 @@ func (b *backend) handleRequest(req map[string]interface{}) {
 	name := req["name"].(string)
 	data := req["data"].(map[string]interface{})
 
-	fmt.Printf("REQ: %s\n", name)
+	fmt.Printf("REQ: %s (data: %+v)\n", name, data)
 	switch name {
 
 	case "ResolverResolutionCompleted":
