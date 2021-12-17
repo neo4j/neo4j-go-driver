@@ -45,16 +45,17 @@ func (s loggableStringList) String() string {
 
 type loggableSuccess success
 type loggedSuccess struct {
-	Server       string             `json:"server,omitempty"`
-	ConnectionId string             `json:"connection_id,omitempty"`
-	Fields       []string           `json:"fields,omitempty"`
-	TFirst       string             `json:"t_first,omitempty"`
-	Bookmark     string             `json:"bookmark,omitempty"`
-	TLast        string             `json:"t_last,omitempty"`
-	HasMore      bool               `json:"has_more,omitempy"`
-	Db           string             `json:"db,omitempty"`
-	Qid          int64              `json:"qid,omitempty"`
-	ConfigHints  loggableDictionary `json:"hints,omitempty"`
+	Server       string              `json:"server,omitempty"`
+	ConnectionId string              `json:"connection_id,omitempty"`
+	Fields       []string            `json:"fields,omitempty"`
+	TFirst       string              `json:"t_first,omitempty"`
+	Bookmark     string              `json:"bookmark,omitempty"`
+	TLast        string              `json:"t_last,omitempty"`
+	HasMore      bool                `json:"has_more,omitempy"`
+	Db           string              `json:"db,omitempty"`
+	Qid          int64               `json:"qid,omitempty"`
+	ConfigHints  loggableDictionary  `json:"hints,omitempty"`
+	RoutingTable *loggedRoutingTable `json:"routing_table,omitempty"`
 }
 
 func (s loggableSuccess) String() string {
@@ -72,8 +73,25 @@ func (s loggableSuccess) String() string {
 	if s.qid > -1 {
 		success.Qid = s.qid
 	}
+	routingTable := s.routingTable
+	if routingTable != nil {
+		success.RoutingTable = &loggedRoutingTable{
+			TimeToLive:   routingTable.TimeToLive,
+			DatabaseName: routingTable.DatabaseName,
+			Routers:      routingTable.Routers,
+			Readers:      routingTable.Readers,
+			Writers:      routingTable.Writers,
+		}
+	}
 	return serializeTrace(success)
+}
 
+type loggedRoutingTable struct {
+	TimeToLive   int      `json:"ttl,omitempty"`
+	DatabaseName string   `json:"db,omitempty"`
+	Routers      []string `json:"routers,omitempty"`
+	Readers      []string `json:"readers,omitempty"`
+	Writers      []string `json:"writers,omitempty"`
 }
 
 func formatOmittingZero(i int64) string {
