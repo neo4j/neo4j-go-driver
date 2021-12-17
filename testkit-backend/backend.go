@@ -258,7 +258,7 @@ func (b *backend) handleTransactionFunc(isRead bool, data map[string]interface{}
 	sessionState := b.sessionStates[sid]
 	blockingRetry := func(tx neo4j.Transaction) (interface{}, error) {
 		sessionState.retryableState = retryable_nothing
-		// Instruct client to start doing it's work
+		// Instruct client to start doing its work
 		txid := b.nextId()
 		b.transactions[txid] = tx
 		b.writeResponse("RetryableTry", map[string]interface{}{"id": txid})
