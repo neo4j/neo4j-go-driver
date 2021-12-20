@@ -20,6 +20,7 @@
 package test_integration
 
 import (
+	"context"
 	"crypto/rand"
 	"math"
 	"math/big"
@@ -72,7 +73,7 @@ func randomInt() int64 {
 }
 
 func createRandomNode(t *testing.T, sess neo4j.Session) int64 {
-	nodex, err := sess.WriteTransaction(func(tx neo4j.Transaction) (interface{}, error) {
+	nodex, err := sess.WriteTransaction(context.TODO(), func(tx neo4j.Transaction) (interface{}, error) {
 		res, err := tx.Run("CREATE (n:RandomNode{val: $r}) RETURN n", map[string]interface{}{"r": randomInt()})
 		if err != nil {
 			return nil, err
@@ -88,7 +89,7 @@ func createRandomNode(t *testing.T, sess neo4j.Session) int64 {
 }
 
 func findRandomNode(t *testing.T, sess neo4j.Session, randomId int64) *neo4j.Node {
-	nodex, err := sess.ReadTransaction(func(tx neo4j.Transaction) (interface{}, error) {
+	nodex, err := sess.ReadTransaction(context.TODO(), func(tx neo4j.Transaction) (interface{}, error) {
 		res, err := tx.Run("MATCH (n:RandomNode{val: $r}) RETURN n", map[string]interface{}{"r": randomId})
 		if err != nil {
 			return nil, err
@@ -127,7 +128,7 @@ func single(t *testing.T, driver neo4j.Driver, cypher string, params map[string]
 	t.Helper()
 	session := driver.NewSession(neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
 	defer session.Close()
-	result, err := session.Run(cypher, params)
+	result, err := session.Run(context.TODO(), cypher, params)
 	if err != nil {
 		t.Fatal(err)
 	}

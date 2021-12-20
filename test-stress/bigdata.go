@@ -20,6 +20,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
@@ -108,7 +109,7 @@ func runBigDataThing(driver neo4j.Driver) {
 	// Write nodes
 	session := driver.NewSession(neo4j.SessionConfig{})
 	for index := 0; index < nodeCount; {
-		_, err := session.WriteTransaction(func(tx neo4j.Transaction) (interface{}, error) {
+		_, err := session.WriteTransaction(context.TODO(), func(tx neo4j.Transaction) (interface{}, error) {
 			batch := 0
 			for index < nodeCount && batch < batchSize {
 				result, err := tx.Run("CREATE (n:Test:Node) SET n = $props", map[string]interface{}{
@@ -141,7 +142,7 @@ func runBigDataThing(driver neo4j.Driver) {
 
 	// Read nodes
 	seen := 0
-	_, err := session.ReadTransaction(func(tx neo4j.Transaction) (interface{}, error) {
+	_, err := session.ReadTransaction(context.TODO(), func(tx neo4j.Transaction) (interface{}, error) {
 		seen = 0
 		result, err := tx.Run("MATCH (n:Node) RETURN n", nil)
 		if err != nil {

@@ -20,6 +20,7 @@
 package neo4j
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -83,7 +84,7 @@ func TestSession(st *testing.T) {
 			pool.BorrowConn = conn
 			transientErr := &db.Neo4jError{Code: "Neo.TransientError.General.MemoryPoolOutOfMemoryError"}
 			numRetries := 0
-			_, err := sess.WriteTransaction(func(tx Transaction) (interface{}, error) {
+			_, err := sess.WriteTransaction(context.TODO(), func(tx Transaction) (interface{}, error) {
 				// Previous connection should be returned to pool since it failed
 				if numRetries > 0 && numReturns != numRetries {
 					t.Errorf("Should have returned previous connection to pool")
@@ -109,7 +110,7 @@ func TestSession(st *testing.T) {
 			causeOfRollbackErr := errors.New("UserErrorFake")
 			pool.BorrowConn = &ConnFake{Alive: true, TxRollbackErr: rollbackErr}
 			numRetries := 0
-			_, err := sess.WriteTransaction(func(tx Transaction) (interface{}, error) {
+			_, err := sess.WriteTransaction(context.TODO(), func(tx Transaction) (interface{}, error) {
 				numRetries++
 				return nil, causeOfRollbackErr
 			})
@@ -125,7 +126,7 @@ func TestSession(st *testing.T) {
 			_, pool, sess := createSession()
 			pool.BorrowConn = &ConnFake{Alive: false, TxCommitErr: io.EOF}
 			numRetries := 0
-			_, err := sess.WriteTransaction(func(tx Transaction) (interface{}, error) {
+			_, err := sess.WriteTransaction(context.TODO(), func(tx Transaction) (interface{}, error) {
 				numRetries++
 				return nil, nil
 			})
@@ -154,10 +155,10 @@ func TestSession(st *testing.T) {
 				return []string{"aserver"}, nil
 			}
 
-			sess.WriteTransaction(func(tx Transaction) (interface{}, error) {
+			sess.WriteTransaction(context.TODO(), func(tx Transaction) (interface{}, error) {
 				return nil, nil
 			})
-			_, err := sess.BeginTransaction()
+			_, err := sess.BeginTransaction(context.TODO())
 			AssertNoError(t, err)
 			AssertStringEqual(t, mydb, conn.DatabaseName)
 			AssertIntEqual(t, numDefaultDbLookups, 1)
@@ -178,12 +179,12 @@ func TestSession(st *testing.T) {
 			conn := &ConnFake{Alive: true, RunErr: err, TxBeginErr: err}
 			pool.BorrowConn = conn
 
-			sess.Run("cypher", nil)
-			sess.BeginTransaction()
-			sess.ReadTransaction(func(tx Transaction) (interface{}, error) {
+			sess.Run(context.TODO(), "cypher", nil)
+			sess.BeginTransaction(context.TODO())
+			sess.ReadTransaction(context.TODO(), func(tx Transaction) (interface{}, error) {
 				return nil, errors.New("something")
 			})
-			sess.WriteTransaction(func(tx Transaction) (interface{}, error) {
+			sess.WriteTransaction(context.TODO(), func(tx Transaction) (interface{}, error) {
 				return nil, errors.New("something")
 			})
 			AssertLen(t, conn.RecordedTxs, 4)
@@ -212,7 +213,7 @@ func TestSession(st *testing.T) {
 			}
 			pool.BorrowConn = connection
 
-			_, err := sess.Run("cypher", map[string]interface{}{})
+			_, err := sess.Run(context.TODO(), "cypher", map[string]interface{}{})
 			AssertNoError(t, err)
 			AssertIntEqual(t, forceResetCalls, 1)
 		})
@@ -231,7 +232,7 @@ func TestSession(st *testing.T) {
 			}
 			pool.BorrowConn = connection
 
-			_, err := sess.Run("cypher", map[string]interface{}{})
+			_, err := sess.Run(context.TODO(), "cypher", map[string]interface{}{})
 			AssertNoError(t, err)
 			AssertIntEqual(t, forceResetCalls, 2)
 		})
@@ -254,14 +255,14 @@ func TestSession(st *testing.T) {
 			}
 			pool.BorrowConn = conn
 
-			sess.Run("cypher", nil)
+			sess.Run(context.TODO(), "cypher", nil)
 			AssertIntEqual(t, bufferCalls, 0)
 			AssertStringEqual(t, sess.LastBookmark(), "")
 			// Should call Buffer on connection to ensure that first Run is buffered and
 			// it's bookmark retrieved
-			sess.Run("cypher", nil)
+			sess.Run(context.TODO(), "cypher", nil)
 			AssertStringEqual(t, sess.LastBookmark(), "1")
-			result, _ := sess.Run("cypher", nil)
+			result, _ := sess.Run(context.TODO(), "cypher", nil)
 			AssertStringEqual(t, sess.LastBookmark(), "2")
 			// And finally consuming the last result should give a new bookmark
 			AssertIntEqual(t, consumeCalls, 0)
@@ -280,10 +281,10 @@ func TestSession(st *testing.T) {
 				conn.Bookm = fmt.Sprintf("%d", bufferCalls)
 			}
 			pool.BorrowConn = conn
-			sess.Run("cypher", nil)
+			sess.Run(context.TODO(), "cypher", nil)
 			AssertIntEqual(t, bufferCalls, 0)
 			// Run transaction function. assumes code is shared between ReadTransaction/WriteTransaction
-			sess.ReadTransaction(func(tx Transaction) (interface{}, error) {
+			sess.ReadTransaction(context.TODO(), func(tx Transaction) (interface{}, error) {
 				return nil, errors.New("somehting")
 			})
 			AssertLen(t, conn.RecordedTxs, 2)
@@ -306,10 +307,10 @@ func TestSession(st *testing.T) {
 				conn.Bookm = fmt.Sprintf("%d", bufferCalls)
 			}
 			pool.BorrowConn = conn
-			sess.Run("cypher", nil)
+			sess.Run(context.TODO(), "cypher", nil)
 			AssertIntEqual(t, bufferCalls, 0)
 			// Begin a transaction
-			sess.BeginTransaction()
+			sess.BeginTransaction(context.TODO())
 			AssertLen(t, conn.RecordedTxs, 2)
 			rtx := conn.RecordedTxs[1]
 			if !reflect.DeepEqual([]string{"1"}, rtx.Bookmarks) {
@@ -324,10 +325,10 @@ func TestSession(st *testing.T) {
 			conn := &ConnFake{Alive: true}
 			pool.BorrowConn = conn
 			// Begin a transaction on the session
-			_, err := sess.BeginTransaction()
+			_, err := sess.BeginTransaction(context.TODO())
 			AssertNoError(t, err)
 			// Trying to use Run should cause a usage error
-			_, err = sess.Run("cypher", nil)
+			_, err = sess.Run(context.TODO(), "cypher", nil)
 			assertUsageError(t, err)
 		})
 
@@ -347,7 +348,7 @@ func TestSession(st *testing.T) {
 				return []string{"aserver"}, nil
 			}
 
-			res, err := sess.Run("cypher", nil)
+			res, err := sess.Run(context.TODO(), "cypher", nil)
 			AssertNoError(t, err)
 			AssertStringEqual(t, mydb, conn.DatabaseName)
 			AssertIntEqual(t, numDefaultDbLookups, 1)
@@ -356,7 +357,7 @@ func TestSession(st *testing.T) {
 			// Triggering another operation on the same session should NOT look up again
 			conn = &ConnFake{}
 			pool.BorrowConn = conn
-			_, err = sess.Run("cypher", nil)
+			_, err = sess.Run(context.TODO(), "cypher", nil)
 			AssertNoError(t, err)
 			AssertStringEqual(t, mydb, conn.DatabaseName)
 			AssertIntEqual(t, numDefaultDbLookups, 1)
@@ -366,7 +367,7 @@ func TestSession(st *testing.T) {
 			_, pool, sess := createSession()
 			pool.BorrowErr = tokenExpiredErr
 
-			_, err := sess.Run("cypher", map[string]interface{}{})
+			_, err := sess.Run(context.TODO(), "cypher", map[string]interface{}{})
 
 			assertTokenExpiredError(t, err)
 		})
@@ -376,7 +377,7 @@ func TestSession(st *testing.T) {
 			conn := &ConnFake{Alive: true, RunErr: tokenExpiredErr}
 			pool.BorrowConn = conn
 
-			_, err := sess.Run("cypher", map[string]interface{}{})
+			_, err := sess.Run(context.TODO(), "cypher", map[string]interface{}{})
 
 			assertTokenExpiredError(t, err)
 		})
@@ -386,7 +387,7 @@ func TestSession(st *testing.T) {
 			conn := &ConnFake{Alive: true, Nexts: []Next{{Err: tokenExpiredErr}}}
 			pool.BorrowConn = conn
 
-			result, err := sess.Run("cypher", map[string]interface{}{})
+			result, err := sess.Run(context.TODO(), "cypher", map[string]interface{}{})
 			AssertNil(t, err)
 			_, err = result.Collect()
 
@@ -398,7 +399,7 @@ func TestSession(st *testing.T) {
 			conn := &ConnFake{Alive: true, ConsumeErr: tokenExpiredErr}
 			pool.BorrowConn = conn
 
-			result, err := sess.Run("cypher", map[string]interface{}{})
+			result, err := sess.Run(context.TODO(), "cypher", map[string]interface{}{})
 			AssertNil(t, err)
 			_, err = result.Consume()
 
@@ -410,7 +411,7 @@ func TestSession(st *testing.T) {
 			conn := &ConnFake{Alive: true, Nexts: []Next{{Err: tokenExpiredErr}}}
 			pool.BorrowConn = conn
 
-			result, err := sess.Run("cypher", map[string]interface{}{})
+			result, err := sess.Run(context.TODO(), "cypher", map[string]interface{}{})
 			AssertNil(t, err)
 			_ = result.Next()
 			err = result.Err()
@@ -423,7 +424,7 @@ func TestSession(st *testing.T) {
 			conn := &ConnFake{Alive: true, Nexts: []Next{{Err: tokenExpiredErr}}}
 			pool.BorrowConn = conn
 
-			result, err := sess.Run("cypher", map[string]interface{}{})
+			result, err := sess.Run(context.TODO(), "cypher", map[string]interface{}{})
 			AssertNil(t, err)
 			_, err = result.Single()
 
@@ -435,7 +436,7 @@ func TestSession(st *testing.T) {
 			conn := &ConnFake{Alive: true}
 			pool.BorrowConn = conn
 
-			_, err := sess.WriteTransaction(func(tx Transaction) (interface{}, error) {
+			_, err := sess.WriteTransaction(context.TODO(), func(tx Transaction) (interface{}, error) {
 				return nil, tokenExpiredErr
 			})
 
@@ -447,7 +448,7 @@ func TestSession(st *testing.T) {
 			conn := &ConnFake{Alive: true}
 			pool.BorrowConn = conn
 
-			_, err := sess.ReadTransaction(func(tx Transaction) (interface{}, error) {
+			_, err := sess.ReadTransaction(context.TODO(), func(tx Transaction) (interface{}, error) {
 				return nil, tokenExpiredErr
 			})
 
@@ -461,10 +462,10 @@ func TestSession(st *testing.T) {
 			conn := &ConnFake{Alive: true}
 			pool.BorrowConn = conn
 			// Begin a transaction on the session
-			_, err := sess.BeginTransaction()
+			_, err := sess.BeginTransaction(context.TODO())
 			AssertNoError(t, err)
 			// Trying to begin a new transaction should cause a usage error
-			_, err = sess.BeginTransaction()
+			_, err = sess.BeginTransaction(context.TODO())
 			assertUsageError(t, err)
 		})
 
@@ -475,11 +476,11 @@ func TestSession(st *testing.T) {
 			conn.TxCommitHook = func() { conn.Bookm = bookmark }
 			pool.BorrowConn = conn
 			// Begin and commit a transaction on the session
-			tx, _ := sess.BeginTransaction()
+			tx, _ := sess.BeginTransaction(context.TODO())
 			tx.Commit()
 			AssertStringEqual(t, sess.LastBookmark(), bookmark)
 			// The bookmark should be used in next transaction
-			tx, _ = sess.BeginTransaction()
+			tx, _ = sess.BeginTransaction(context.TODO())
 			AssertLen(t, conn.RecordedTxs, 2)
 			rtx := conn.RecordedTxs[1]
 			if !reflect.DeepEqual([]string{bookmark}, rtx.Bookmarks) {
@@ -492,10 +493,10 @@ func TestSession(st *testing.T) {
 			conn := &ConnFake{Alive: true}
 			pool.BorrowConn = conn
 			// Begin a transaction on the session
-			tx, _ := sess.BeginTransaction()
+			tx, _ := sess.BeginTransaction(context.TODO())
 			tx.Rollback()
 			// Trying begin a new transaction should succeed after rollback
-			_, err := sess.BeginTransaction()
+			_, err := sess.BeginTransaction(context.TODO())
 			AssertNoError(t, err)
 		})
 
@@ -515,7 +516,7 @@ func TestSession(st *testing.T) {
 				return []string{"aserver"}, nil
 			}
 
-			_, err := sess.BeginTransaction()
+			_, err := sess.BeginTransaction(context.TODO())
 			AssertNoError(t, err)
 			AssertStringEqual(t, mydb, conn.DatabaseName)
 			AssertIntEqual(t, numDefaultDbLookups, 1)
@@ -526,7 +527,7 @@ func TestSession(st *testing.T) {
 			conn := &ConnFake{Alive: true, TxBeginErr: tokenExpiredErr}
 			pool.BorrowConn = conn
 
-			tx, err := sess.BeginTransaction()
+			tx, err := sess.BeginTransaction(context.TODO())
 
 			AssertNil(t, tx)
 			assertTokenExpiredError(t, err)
@@ -537,7 +538,7 @@ func TestSession(st *testing.T) {
 			conn := &ConnFake{Alive: true, RunTxErr: tokenExpiredErr}
 			pool.BorrowConn = conn
 
-			tx, err := sess.BeginTransaction()
+			tx, err := sess.BeginTransaction(context.TODO())
 			AssertNil(t, err)
 			_, err = tx.Run("cypher", map[string]interface{}{})
 
@@ -549,7 +550,7 @@ func TestSession(st *testing.T) {
 			conn := &ConnFake{Alive: true, TxCommitErr: tokenExpiredErr}
 			pool.BorrowConn = conn
 
-			tx, err := sess.BeginTransaction()
+			tx, err := sess.BeginTransaction(context.TODO())
 			AssertNil(t, err)
 			_, err = tx.Run("cypher", map[string]interface{}{})
 			AssertNil(t, err)
@@ -563,7 +564,7 @@ func TestSession(st *testing.T) {
 			conn := &ConnFake{Alive: true, TxRollbackErr: tokenExpiredErr}
 			pool.BorrowConn = conn
 
-			tx, err := sess.BeginTransaction()
+			tx, err := sess.BeginTransaction(context.TODO())
 			AssertNil(t, err)
 			_, err = tx.Run("cypher", map[string]interface{}{})
 			AssertNil(t, err)

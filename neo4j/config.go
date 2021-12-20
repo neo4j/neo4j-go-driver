@@ -68,18 +68,6 @@ type Config struct {
 	//
 	// default: 1 * time.Hour
 	MaxConnectionLifetime time.Duration
-	// Maximum amount of time to either acquire an idle connection from the pool
-	// or create a new connection (when the pool is not full). Negative values
-	// result in an infinite wait time where 0 value results in no timeout which
-	// results in immediate failure when there are no available connections.
-	//
-	// default: 1 * time.Minute
-	ConnectionAcquisitionTimeout time.Duration
-	// Connect timeout that will be set on underlying sockets. Values less than
-	// or equal to 0 results in no timeout being applied.
-	//
-	// default: 5 * time.Second
-	SocketConnectTimeout time.Duration
 	// Whether to enable TCP keep alive on underlying sockets.
 	//
 	// default: true
@@ -88,19 +76,20 @@ type Config struct {
 	//
 	// default: neo4j.UserAgent
 	UserAgent string
+	// Whether to wait or not for a connection to be available when the pool is full
+	FullPoolWaitForConnection bool
 }
 
 func defaultConfig() *Config {
 	return &Config{
-		AddressResolver:              nil,
-		MaxTransactionRetryTime:      30 * time.Second,
-		MaxConnectionPoolSize:        100,
-		MaxConnectionLifetime:        1 * time.Hour,
-		ConnectionAcquisitionTimeout: 1 * time.Minute,
-		SocketConnectTimeout:         5 * time.Second,
-		SocketKeepalive:              true,
-		RootCAs:                      nil,
-		UserAgent:                    UserAgent,
+		AddressResolver:           nil,
+		MaxTransactionRetryTime:   30 * time.Second,
+		MaxConnectionPoolSize:     100,
+		MaxConnectionLifetime:     1 * time.Hour,
+		SocketKeepalive:           true,
+		RootCAs:                   nil,
+		UserAgent:                 UserAgent,
+		FullPoolWaitForConnection: true,
 	}
 }
 
@@ -122,16 +111,6 @@ func validateAndNormaliseConfig(config *Config) error {
 	// Max Connection Lifetime
 	if config.MaxConnectionLifetime < 0 {
 		config.MaxConnectionLifetime = 0
-	}
-
-	// Connection Acquisition Timeout
-	if config.ConnectionAcquisitionTimeout < 0 {
-		config.ConnectionAcquisitionTimeout = -1
-	}
-
-	// Socket Connect Timeout
-	if config.SocketConnectTimeout < 0 {
-		config.SocketConnectTimeout = 0
 	}
 
 	return nil

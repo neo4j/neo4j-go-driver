@@ -20,6 +20,7 @@
 package test_integration
 
 import (
+	"context"
 	"fmt"
 	"reflect"
 	"time"
@@ -67,7 +68,7 @@ var _ = Describe("Session", func() {
 
 		Specify("when a query is executed, it should run and return summary with correct statement", func() {
 			stmt := "UNWIND [1, 2, 3, 4, 5] AS x RETURN x"
-			result, err = session.Run(stmt, nil)
+			result, err = session.Run(context.TODO(), stmt, nil)
 			Expect(err).To(BeNil())
 			Expect(result).NotTo(BeNil())
 
@@ -85,7 +86,7 @@ var _ = Describe("Session", func() {
 		Specify("when a query is executed, it should run and return summary with correct statement and params", func() {
 			stmt := "UNWIND RANGE(0, $x) AS n RETURN n"
 			params := map[string]interface{}{"x": 1000}
-			result, err = session.Run(stmt, params)
+			result, err = session.Run(context.TODO(), stmt, params)
 			Expect(err).To(BeNil())
 			Expect(result).NotTo(BeNil())
 
@@ -102,7 +103,7 @@ var _ = Describe("Session", func() {
 
 		Specify("when a query is executed, it should run and return summary when consumed", func() {
 			stmt := "UNWIND [1, 2, 3, 4, 5] AS x RETURN x"
-			result, err = session.Run(stmt, nil)
+			result, err = session.Run(context.TODO(), stmt, nil)
 			Expect(err).To(BeNil())
 			Expect(result).NotTo(BeNil())
 
@@ -119,7 +120,7 @@ var _ = Describe("Session", func() {
 		Specify("when an invalid query is executed, it should return error", func() {
 			stmt := "UNWIND RANGE(0,100) RETURN N"
 
-			result, err = session.Run(stmt, nil)
+			result, err = session.Run(context.TODO(), stmt, nil)
 			Expect(result).To(BeNil())
 			neo4jErr, isNeo4jErr := err.(*neo4j.Neo4jError)
 			Expect(isNeo4jErr).To(BeTrue())
@@ -129,7 +130,7 @@ var _ = Describe("Session", func() {
 		Specify("when a fail-on-streaming query is executed, it should run and return error when consuming", func() {
 			stmt := "UNWIND [1, 2, 3, 4, 0] AS x RETURN 10 / 0"
 
-			result, err = session.Run(stmt, nil)
+			result, err = session.Run(context.TODO(), stmt, nil)
 			// Up to the db when the error occures
 			if err != nil {
 				Expect(result).To(BeNil())
@@ -157,7 +158,7 @@ var _ = Describe("Session", func() {
 		Specify("when a query is executed, the returned summary should contain correct timer values", func() {
 			stmt := "UNWIND RANGE(0, 10000) AS N RETURN N"
 
-			result, err = session.Run(stmt, nil)
+			result, err = session.Run(context.TODO(), stmt, nil)
 			Expect(err).To(BeNil())
 
 			summary, err = result.Consume()
@@ -194,25 +195,25 @@ var _ = Describe("Session", func() {
 		})
 
 		Specify("when nested queries are executed, all queries should run and return results from all queries", func() {
-			result, err = session.Run("UNWIND range(1, 100) AS x CREATE (:Property {id: x})", nil)
+			result, err = session.Run(context.TODO(), "UNWIND range(1, 100) AS x CREATE (:Property {id: x})", nil)
 			Expect(err).To(BeNil())
 			_, err = result.Consume()
 			Expect(err).To(BeNil())
 
-			result, err = session.Run("UNWIND range(1, 10) AS x CREATE (:Resource {id: x})", nil)
+			result, err = session.Run(context.TODO(), "UNWIND range(1, 10) AS x CREATE (:Resource {id: x})", nil)
 			Expect(err).To(BeNil())
 			_, err = result.Consume()
 			Expect(err).To(BeNil())
 
 			seenProps := 0
 			seenResources := 0
-			properties, err := session.Run("MATCH (p:Property) RETURN p", nil)
+			properties, err := session.Run(context.TODO(), "MATCH (p:Property) RETURN p", nil)
 			Expect(err).To(BeNil())
 			for properties.Next() {
 				Expect(properties.Record()).ToNot(BeNil())
 				seenProps++
 
-				resources, err := session.Run("MATCH (r:Resource) RETURN r", nil)
+				resources, err := session.Run(context.TODO(), "MATCH (r:Resource) RETURN r", nil)
 				Expect(err).To(BeNil())
 				for resources.Next() {
 					Expect(resources.Record()).ToNot(BeNil())
@@ -227,7 +228,7 @@ var _ = Describe("Session", func() {
 		})
 
 		Specify("when a node is created, summary should contain correct counter values", func() {
-			result, err = session.Run("CREATE (p:Person { name: 'Test'})", nil)
+			result, err = session.Run(context.TODO(), "CREATE (p:Person { name: 'Test'})", nil)
 			Expect(err).To(BeNil())
 
 			summary, err = result.Consume()
@@ -248,7 +249,7 @@ var _ = Describe("Session", func() {
 		})
 
 		Specify("when a node is created, summary should contain correct timer values", func() {
-			result, err = session.Run("CREATE (p:Person { name: 'Test'})", nil)
+			result, err = session.Run(context.TODO(), "CREATE (p:Person { name: 'Test'})", nil)
 			Expect(err).To(BeNil())
 
 			summary, err = result.Consume()
@@ -258,7 +259,7 @@ var _ = Describe("Session", func() {
 		})
 
 		Specify("on multiple runs summary counters should be correct", func() {
-			result, _ = session.Run("CREATE (p:Person { name: 'one'})", nil)
+			result, _ = session.Run(context.TODO(), "CREATE (p:Person { name: 'one'})", nil)
 			summary, _ = result.Consume()
 			counters := summary.Counters()
 
@@ -267,7 +268,7 @@ var _ = Describe("Session", func() {
 			Expect(counters.RelationshipsCreated()).To(BeZero())
 			Expect(counters.RelationshipsDeleted()).To(BeZero())
 
-			result, _ = session.Run("MATCH (p:Person { name: 'one'}) RETURN p", nil)
+			result, _ = session.Run(context.TODO(), "MATCH (p:Person { name: 'one'}) RETURN p", nil)
 			summary, _ = result.Consume()
 			counters = summary.Counters()
 
@@ -278,13 +279,13 @@ var _ = Describe("Session", func() {
 		})
 
 		Specify("when one statement fails, the next one should run successfully", func() {
-			result, err = session.Run("Invalid Cypher", nil)
+			result, err = session.Run(context.TODO(), "Invalid Cypher", nil)
 			Expect(result).To(BeNil())
 			neo4jErr, isNeo4jErr := err.(*neo4j.Neo4jError)
 			Expect(isNeo4jErr).To(BeTrue())
 			Expect(neo4jErr.Classification()).To(Equal("ClientError"))
 
-			result, err = session.Run("RETURN 1", nil)
+			result, err = session.Run(context.TODO(), "RETURN 1", nil)
 			Expect(err).To(BeNil())
 
 			if result.Next() {
@@ -295,9 +296,9 @@ var _ = Describe("Session", func() {
 		})
 
 		Specify("when two statements are queued, the second one should cause first one's results to be cached", func() {
-			result1, err := session.Run("UNWIND RANGE(1,10) AS N RETURN N", nil)
+			result1, err := session.Run(context.TODO(), "UNWIND RANGE(1,10) AS N RETURN N", nil)
 			Expect(err).To(BeNil())
-			result2, err := session.Run("UNWIND RANGE(11,20) AS N RETURN N", nil)
+			result2, err := session.Run(context.TODO(), "UNWIND RANGE(11,20) AS N RETURN N", nil)
 			Expect(err).To(BeNil())
 
 			result2Values := []int(nil)
@@ -330,7 +331,7 @@ var _ = Describe("Session", func() {
 				}
 				defer session.Close()
 
-				if result, err = session.Run("UNWIND RANGE(1,100) AS N RETURN N", nil); err != nil {
+				if result, err = session.Run(context.TODO(), "UNWIND RANGE(1,100) AS N RETURN N", nil); err != nil {
 					return err
 				}
 
@@ -354,11 +355,11 @@ var _ = Describe("Session", func() {
 				}
 				defer session.Close()
 
-				if result1, err = session.Run("UNWIND RANGE(1,100) AS N RETURN N", nil); err != nil {
+				if result1, err = session.Run(context.TODO(), "UNWIND RANGE(1,100) AS N RETURN N", nil); err != nil {
 					return err
 				}
 
-				if result2, err = session.Run("UNWIND RANGE(1,100) AS N RETURN 'Text ' + N", nil); err != nil {
+				if result2, err = session.Run(context.TODO(), "UNWIND RANGE(1,100) AS N RETURN 'Text ' + N", nil); err != nil {
 					return err
 				}
 
@@ -393,7 +394,7 @@ var _ = Describe("Session", func() {
 				}
 				defer session.Close()
 
-				if tx, err = session.BeginTransaction(); err != nil {
+				if tx, err = session.BeginTransaction(context.TODO()); err != nil {
 					return err
 				}
 
@@ -430,7 +431,7 @@ var _ = Describe("Session", func() {
 			Expect(newSession).NotTo(BeNil())
 			defer newSession.Close()
 
-			records3, _ := neo4j.Collect(newSession.Run("MATCH (n:TxRollbackOnClose) RETURN n.id, n.text", nil))
+			records3, _ := neo4j.Collect(newSession.Run(context.TODO(), "MATCH (n:TxRollbackOnClose) RETURN n.id, n.text", nil))
 			Expect(records3).To(HaveLen(0))
 		})
 	})
@@ -478,7 +479,7 @@ var _ = Describe("Session", func() {
 				Skip("Can not use dbms.listTransactions on non-enterprise version")
 			}
 
-			result, err = session.Run("CALL dbms.listTransactions()", nil, neo4j.WithTxMetadata(metadata))
+			result, err = session.Run(context.TODO(), "CALL dbms.listTransactions()", nil, neo4j.WithTxMetadata(metadata))
 			Expect(err).To(BeNil())
 
 			var matched bool = false
@@ -509,7 +510,7 @@ var _ = Describe("Session", func() {
 				Skip("Can not use dbms.listTransactions on non-enterprise version")
 			}
 
-			matched, err := session.ReadTransaction(listTransactionsAndMatchMetadataWork(metadata), neo4j.WithTxMetadata(metadata))
+			matched, err := session.ReadTransaction(context.TODO(), listTransactionsAndMatchMetadataWork(metadata), neo4j.WithTxMetadata(metadata))
 			Expect(err).To(BeNil())
 			Expect(matched).To(BeTrue(), fmt.Sprintf("dbms.listTransactions did not include a metadata of %v", metadata))
 		})
@@ -526,7 +527,7 @@ var _ = Describe("Session", func() {
 				Skip("Can not use dbms.listTransactions on non-enterprise version")
 			}
 
-			matched, err := session.WriteTransaction(listTransactionsAndMatchMetadataWork(metadata), neo4j.WithTxMetadata(metadata))
+			matched, err := session.WriteTransaction(context.TODO(), listTransactionsAndMatchMetadataWork(metadata), neo4j.WithTxMetadata(metadata))
 			Expect(err).To(BeNil())
 			Expect(matched).To(BeTrue(), fmt.Sprintf("dbms.listTransactions did not include a metadata of %v", metadata))
 		})
@@ -534,15 +535,15 @@ var _ = Describe("Session", func() {
 		It("should set transaction timeout", func() {
 			createNode(session, "RunTxTimeOut", nil)
 
-			session2, tx2 := newSessionAndTx(driver, neo4j.AccessModeWrite)
+			session2, tx2 := newSessionAndTx(context.TODO(), driver, neo4j.AccessModeWrite)
 			defer session2.Close()
 			defer tx2.Close()
 			updateNodeInTx(tx2, "RunTxTimeOut", map[string]interface{}{"id": 1})
 
-			session3 := newSession(driver, neo4j.AccessModeWrite)
+			session3 := driver.NewSession(neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
 
-			result3, err := session3.Run("MATCH (n:RunTxTimeOut) SET n.id = 2", nil, neo4j.WithTxTimeout(1*time.Second))
-			// Up to db to determine when error occures
+			result3, err := session3.Run(context.TODO(), "MATCH (n:RunTxTimeOut) SET n.id = 2", nil, neo4j.WithTxTimeout(1*time.Second))
+			// Up to db to determine when error occurs
 			if err != nil {
 				dbErr := err.(*db.Neo4jError)
 				Expect(dbErr.Msg).To(ContainSubstring("terminated"))
@@ -561,14 +562,14 @@ var _ = Describe("Session", func() {
 		It("should set transaction timeout on WriteTransaction", func() {
 			createNode(session, "WriteTransactionTxTimeOut", nil)
 
-			session2, tx2 := newSessionAndTx(driver, neo4j.AccessModeWrite)
+			session2, tx2 := newSessionAndTx(context.TODO(), driver, neo4j.AccessModeWrite)
 			defer session2.Close()
 			defer tx2.Close()
 			updateNodeInTx(tx2, "WriteTransactionTxTimeOut", map[string]interface{}{"id": 1})
 
-			session3 := newSession(driver, neo4j.AccessModeWrite)
+			session3 := driver.NewSession(neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
 
-			_, err := session3.WriteTransaction(updateNodeWork("WriteTransactionTxTimeOut", map[string]interface{}{"id": 2}), neo4j.WithTxTimeout(1*time.Second))
+			_, err := session3.WriteTransaction(context.TODO(), updateNodeWork("WriteTransactionTxTimeOut", map[string]interface{}{"id": 2}), neo4j.WithTxTimeout(1*time.Second))
 			Expect(err).ToNot(BeNil())
 			dbErr := err.(*db.Neo4jError)
 			Expect(dbErr.Msg).To(ContainSubstring("terminated"))

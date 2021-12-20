@@ -39,12 +39,12 @@ func TestPoolBorrowReturn(ot *testing.T) {
 	maxAge := 1 * time.Second
 	birthdate := time.Now()
 
-	succeedingConnect := func(s string, _ log.BoltLogger) (db.Connection, error) {
+	succeedingConnect := func(ctx context.Context, s string, _ log.BoltLogger) (db.Connection, error) {
 		return &testutil.ConnFake{Name: s, Alive: true, Birth: birthdate}, nil
 	}
 
 	failingError := errors.New("whatever")
-	failingConnect := func(s string, _ log.BoltLogger) (db.Connection, error) {
+	failingConnect := func(ctx context.Context, s string, _ log.BoltLogger) (db.Connection, error) {
 		return nil, failingError
 	}
 
@@ -198,7 +198,7 @@ func TestPoolResourceUsage(ot *testing.T) {
 	maxAge := 1 * time.Second
 	birthdate := time.Now()
 
-	succeedingConnect := func(s string, _ log.BoltLogger) (db.Connection, error) {
+	succeedingConnect := func(ctx context.Context, s string, _ log.BoltLogger) (db.Connection, error) {
 		return &testutil.ConnFake{Name: s, Alive: true, Birth: birthdate}, nil
 	}
 
@@ -305,7 +305,7 @@ func TestPoolResourceUsage(ot *testing.T) {
 func TestPoolCleanup(ot *testing.T) {
 	birthdate := time.Now()
 	maxLife := 1 * time.Second
-	succeedingConnect := func(s string, _ log.BoltLogger) (db.Connection, error) {
+	succeedingConnect := func(ctx context.Context, s string, _ log.BoltLogger) (db.Connection, error) {
 		return &testutil.ConnFake{Name: s, Alive: true, Birth: birthdate}, nil
 	}
 
@@ -352,7 +352,7 @@ func TestPoolCleanup(ot *testing.T) {
 	})
 
 	ot.Run("Should not remove servers with only idle connections but with recent connect failures ", func(t *testing.T) {
-		failingConnect := func(s string, _ log.BoltLogger) (db.Connection, error) {
+		failingConnect := func(ctx context.Context, s string, _ log.BoltLogger) (db.Connection, error) {
 			return nil, errors.New("an error")
 		}
 		p := New(0, maxLife, failingConnect, logger, "poolid")

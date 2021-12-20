@@ -39,15 +39,15 @@ type Session interface {
 	// If no bookmark was received or if this transaction was rolled back, the bookmark value will not be changed.
 	LastBookmark() string
 	// BeginTransaction starts a new explicit transaction on this session
-	BeginTransaction(configurers ...func(*TransactionConfig)) (Transaction, error)
+	BeginTransaction(ctx context.Context, configurers ...func(*TransactionConfig)) (Transaction, error)
 	// ReadTransaction executes the given unit of work in a AccessModeRead transaction with
 	// retry logic in place
-	ReadTransaction(work TransactionWork, configurers ...func(*TransactionConfig)) (interface{}, error)
+	ReadTransaction(ctx context.Context, work TransactionWork, configurers ...func(*TransactionConfig)) (interface{}, error)
 	// WriteTransaction executes the given unit of work in a AccessModeWrite transaction with
 	// retry logic in place
-	WriteTransaction(work TransactionWork, configurers ...func(*TransactionConfig)) (interface{}, error)
+	WriteTransaction(ctx context.Context, work TransactionWork, configurers ...func(*TransactionConfig)) (interface{}, error)
 	// Run executes an auto-commit statement and returns a result
-	Run(cypher string, params map[string]interface{}, configurers ...func(*TransactionConfig)) (Result, error)
+	Run(ctx context.Context, cypher string, params map[string]interface{}, configurers ...func(*TransactionConfig)) (Result, error)
 	// Close closes any open resources and marks this session as unusable
 	Close() error
 }
@@ -183,7 +183,7 @@ func (s *session) LastBookmark() string {
 	return ""
 }
 
-func (s *session) BeginTransaction(configurers ...func(*TransactionConfig)) (Transaction, error) {
+func (s *session) BeginTransaction(ctx context.Context, configurers ...func(*TransactionConfig)) (Transaction, error) {
 	// Guard for more than one transaction per session
 	if s.txExplicit != nil {
 		err := &UsageError{Message: "Session already has a pending transaction"}
@@ -202,7 +202,7 @@ func (s *session) BeginTransaction(configurers ...func(*TransactionConfig)) (Tra
 	}
 
 	// Get a connection from the pool. This could fail in clustered environment.
-	conn, err := s.getConnection(s.defaultMode)
+	conn, err := s.getConnection(ctx, s.defaultMode)
 	if err != nil {
 		return nil, err
 	}
@@ -236,10 +236,7 @@ func (s *session) BeginTransaction(configurers ...func(*TransactionConfig)) (Tra
 	return s.txExplicit, nil
 }
 
-func (s *session) runRetriable(
-	mode db.AccessMode,
-	work TransactionWork, configurers ...func(*TransactionConfig)) (interface{}, error) {
-
+func (s *session) runRetriable(ctx context.Context, mode db.AccessMode, work TransactionWork, configurers ...func(*TransactionConfig)) (interface{}, error) {
 	// Guard for more than one transaction per session
 	if s.txExplicit != nil {
 		err := &UsageError{Message: "Session already has a pending transaction"}
@@ -269,7 +266,7 @@ func (s *session) runRetriable(
 	}
 	for state.Continue() {
 		// Establish new connection
-		conn, err := s.getConnection(mode)
+		conn, err := s.getConnection(ctx, mode)
 		if err != nil {
 			state.OnFailure(conn, err, false)
 			continue
@@ -337,37 +334,22 @@ func (s *session) runRetriable(
 	return nil, err
 }
 
-func (s *session) ReadTransaction(
-	work TransactionWork, configurers ...func(*TransactionConfig)) (interface{}, error) {
-
-	return s.runRetriable(db.ReadMode, work, configurers...)
+func (s *session) ReadTransaction(ctx context.Context, work TransactionWork, configurers ...func(*TransactionConfig)) (interface{}, error) {
+	return s.runRetriable(ctx, db.ReadMode, work, configurers...)
 }
 
-func (s *session) WriteTransaction(
-	work TransactionWork, configurers ...func(*TransactionConfig)) (interface{}, error) {
-
-	return s.runRetriable(db.WriteMode, work, configurers...)
+func (s *session) WriteTransaction(ctx context.Context, work TransactionWork, configurers ...func(*TransactionConfig)) (interface{}, error) {
+	return s.runRetriable(ctx, db.WriteMode, work, configurers...)
 }
 
 func (s *session) getServers(ctx context.Context, mode db.AccessMode) ([]string, error) {
 	if mode == db.ReadMode {
 		return s.router.Readers(ctx, s.bookmarks, s.databaseName, s.boltLogger)
-	} else {
-		return s.router.Writers(ctx, s.bookmarks, s.databaseName, s.boltLogger)
 	}
+	return s.router.Writers(ctx, s.bookmarks, s.databaseName, s.boltLogger)
 }
 
-func (s *session) getConnection(mode db.AccessMode) (db.Connection, error) {
-	var ctx context.Context
-	if s.config.ConnectionAcquisitionTimeout > 0 {
-		var cancel context.CancelFunc
-		ctx, cancel = context.WithTimeout(context.Background(), s.config.ConnectionAcquisitionTimeout)
-		if cancel != nil {
-			defer cancel()
-		}
-	} else {
-		ctx = context.Background()
-	}
+func (s *session) getConnection(ctx context.Context, mode db.AccessMode) (db.Connection, error) {
 	// If client requested user impersonation but provided no database we need to retrieve
 	// the name of the configured default database for that user before asking for a connection
 	if s.getDefaultDbName {
@@ -384,7 +366,7 @@ func (s *session) getConnection(mode db.AccessMode) (db.Connection, error) {
 		return nil, wrapError(err)
 	}
 
-	conn, err := s.pool.Borrow(ctx, servers, s.config.ConnectionAcquisitionTimeout != 0, s.boltLogger)
+	conn, err := s.pool.Borrow(ctx, servers, s.config.FullPoolWaitForConnection, s.boltLogger)
 	if err != nil {
 		return nil, wrapError(err)
 	}
@@ -412,8 +394,7 @@ func (s *session) retrieveBookmarks(conn db.Connection) {
 	}
 }
 
-func (s *session) Run(
-	cypher string, params map[string]interface{}, configurers ...func(*TransactionConfig)) (Result, error) {
+func (s *session) Run(ctx context.Context, cypher string, params map[string]interface{}, configurers ...func(*TransactionConfig)) (Result, error) {
 
 	if s.txExplicit != nil {
 		err := &UsageError{Message: "Trying to run auto-commit transaction while in explicit transaction"}
@@ -435,7 +416,7 @@ func (s *session) Run(
 		err  error
 	)
 	for {
-		conn, err = s.getConnection(s.defaultMode)
+		conn, err = s.getConnection(ctx, s.defaultMode)
 		if err != nil {
 			return nil, err
 		}
@@ -505,16 +486,16 @@ func (s *sessionWithError) LastBookmark() string {
 	return ""
 }
 
-func (s *sessionWithError) BeginTransaction(configurers ...func(*TransactionConfig)) (Transaction, error) {
+func (s *sessionWithError) BeginTransaction(ctx context.Context, configurers ...func(*TransactionConfig)) (Transaction, error) {
 	return nil, s.err
 }
-func (s *sessionWithError) ReadTransaction(work TransactionWork, configurers ...func(*TransactionConfig)) (interface{}, error) {
+func (s *sessionWithError) ReadTransaction(ctx context.Context, work TransactionWork, configurers ...func(*TransactionConfig)) (interface{}, error) {
 	return nil, s.err
 }
-func (s *sessionWithError) WriteTransaction(work TransactionWork, configurers ...func(*TransactionConfig)) (interface{}, error) {
+func (s *sessionWithError) WriteTransaction(ctx context.Context, work TransactionWork, configurers ...func(*TransactionConfig)) (interface{}, error) {
 	return nil, s.err
 }
-func (s *sessionWithError) Run(cypher string, params map[string]interface{}, configurers ...func(*TransactionConfig)) (Result, error) {
+func (s *sessionWithError) Run(ctx context.Context, cypher string, params map[string]interface{}, configurers ...func(*TransactionConfig)) (Result, error) {
 	return nil, s.err
 }
 func (s *sessionWithError) Close() error {

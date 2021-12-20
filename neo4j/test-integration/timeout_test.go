@@ -20,6 +20,7 @@
 package test_integration
 
 import (
+	"context"
 	"time"
 
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
@@ -32,77 +33,31 @@ import (
 var _ = Describe("Timeout and Lifetime", func() {
 	server := dbserver.GetDbServer()
 
-	It("should error when ConnectionAcquisitionTimeout is hit", func() {
+	It("should error when timeout is hit", func() {
 		var err error
 		var driver neo4j.Driver
 		var session1, session2 neo4j.Session
 
 		driver, err = neo4j.NewDriver(server.BoltURI(), server.AuthToken(), server.ConfigFunc(), func(config *neo4j.Config) {
-			config.ConnectionAcquisitionTimeout = 1 * time.Second
 			config.MaxConnectionPoolSize = 1
 		})
 		Expect(err).To(BeNil())
 		Expect(driver).NotTo(BeNil())
 		defer driver.Close()
 
-		session1, _ = newSessionAndTx(driver, neo4j.AccessModeRead)
+		ctx, cancelFunc := context.WithTimeout(context.Background(), 1*time.Second)
+		defer cancelFunc()
+		session1, _ = newSessionAndTx(ctx, driver, neo4j.AccessModeRead)
 		defer session1.Close()
 
-		session2, err = driver.Session(neo4j.AccessModeRead)
+		session2 = driver.NewSession(neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead})
 		Expect(err).To(BeNil())
 		Expect(session2).NotTo(BeNil())
 		defer session2.Close()
 
-		_, err = session2.Run("RETURN 1", nil)
+		_, err = session2.Run(context.TODO(), "RETURN 1", nil)
 		Expect(err).ToNot(BeNil())
 		//Expect(err).To(test.BeConnectorErrorWithCode(0x601))
-	})
-
-	/*
-		It("should close connection when MaxConnectionLifetime is hit", func() {
-			var err error
-			var driver neo4j.Driver
-			var session1, session2 neo4j.Session
-
-			driver, err = neo4j.NewDriver(server.BoltURI(), server.AuthToken(), server.Config(), func(config *neo4j.Config) {
-				config.Log = log
-				config.MaxConnectionLifetime = 5 * time.Second
-				config.MaxConnectionPoolSize = 1
-			})
-			Expect(err).To(BeNil())
-			Expect(driver).NotTo(BeNil())
-			defer driver.Close()
-
-			session1, _ = newSessionAndTx(driver, neo4j.AccessModeRead)
-			time.Sleep(5 * time.Second)
-			session1.Close()
-
-			session2, _ = newSessionAndTx(driver, neo4j.AccessModeRead)
-			defer session2.Close()
-
-			Skip("Log not impl")
-			Expect(log.Infos).Should(ContainElement(ContainSubstring("reached its maximum lifetime")))
-		})
-	*/
-
-	It("should timeout connection when SocketConnectTimeout is hit", func() {
-		var err error
-		var driver neo4j.Driver
-		var session neo4j.Session
-
-		driver, err = neo4j.NewDriver("bolt://10.255.255.1:8080", server.AuthToken(), server.ConfigFunc(), func(config *neo4j.Config) {
-			config.SocketConnectTimeout = 1 * time.Second
-		})
-		Expect(err).To(BeNil())
-		Expect(driver).NotTo(BeNil())
-		defer driver.Close()
-
-		session = newSession(driver, neo4j.AccessModeRead)
-		defer session.Close()
-
-		_, err = session.BeginTransaction()
-		Expect(err).ToNot(BeNil())
-		//Expect(err).To(test.BeConnectorErrorWithCode(6))
 	})
 
 })

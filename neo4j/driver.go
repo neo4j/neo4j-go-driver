@@ -154,7 +154,6 @@ func NewDriver(target string, auth AuthToken, configurers ...func(*Config)) (Dri
 	}
 
 	// Continue to setup connector
-	d.connector.DialTimeout = d.config.SocketConnectTimeout
 	d.connector.SocketKeepAlive = d.config.SocketKeepalive
 	d.connector.UserAgent = d.config.UserAgent
 	d.connector.RootCAs = d.config.RootCAs
@@ -284,7 +283,7 @@ func (d *driver) NewSession(config SessionConfig) Session {
 func (d *driver) VerifyConnectivity() error {
 	session := d.NewSession(SessionConfig{AccessMode: AccessModeRead})
 	defer session.Close()
-	result, err := session.Run("RETURN 1 AS n", nil)
+	result, err := session.Run(context.TODO(), "RETURN 1 AS n", nil)
 	if err != nil {
 		return err
 	}

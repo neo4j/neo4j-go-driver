@@ -35,7 +35,7 @@ import (
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/log"
 )
 
-type Connect func(string, log.BoltLogger) (db.Connection, error)
+type Connect func(context.Context, string, log.BoltLogger) (db.Connection, error)
 
 type qitem struct {
 	servers []string
@@ -145,7 +145,7 @@ func (p *Pool) CleanUp() {
 	}
 }
 
-func (p *Pool) tryBorrow(serverName string, boltLogger log.BoltLogger) (db.Connection, error) {
+func (p *Pool) tryBorrow(ctx context.Context, serverName string, boltLogger log.BoltLogger) (db.Connection, error) {
 	// For now, lock complete servers map to avoid over connecting but with the downside
 	// that long connect times will block connects to other servers as well. To fix this
 	// we would need to add a pending connect to the server and lock per server.
@@ -170,7 +170,7 @@ func (p *Pool) tryBorrow(serverName string, boltLogger log.BoltLogger) (db.Conne
 
 	// No idle connection, try to connect
 	p.log.Infof(log.Pool, p.logId, "Connecting to %s", serverName)
-	c, err := p.connect(serverName, boltLogger)
+	c, err := p.connect(ctx, serverName, boltLogger)
 	if err != nil {
 		// Failed to connect, keep track that it was bad for a while
 		srv.notifyFailedConnect(p.now())
@@ -250,7 +250,7 @@ func (p *Pool) Borrow(ctx context.Context, serverNames []string, wait bool, bolt
 	var err error
 	var conn db.Connection
 	for _, s := range penalties {
-		conn, err = p.tryBorrow(s.name, boltLogger)
+		conn, err = p.tryBorrow(ctx, s.name, boltLogger)
 		if err == nil {
 			return conn, nil
 		}

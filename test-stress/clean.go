@@ -20,6 +20,7 @@
 package main
 
 import (
+	"context"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
 )
 
@@ -27,7 +28,7 @@ func cleanDb(driver neo4j.Driver) {
 	session := driver.NewSession(neo4j.SessionConfig{})
 	batch := 1000
 	for {
-		x, err := session.WriteTransaction(func(tx neo4j.Transaction) (interface{}, error) {
+		x, err := session.WriteTransaction(context.TODO(), func(tx neo4j.Transaction) (interface{}, error) {
 			result, err := tx.Run("MATCH (n) WITH n LIMIT $batch DETACH DELETE n RETURN count(n)",
 				map[string]interface{}{"batch": batch})
 			if err != nil {

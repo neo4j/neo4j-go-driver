@@ -20,6 +20,7 @@
 package test_integration
 
 import (
+	"context"
 	"testing"
 
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
@@ -45,9 +46,9 @@ func TestMultidatabase(ot *testing.T) {
 	func() {
 		sysSess := driver.NewSession(neo4j.SessionConfig{DatabaseName: "system"})
 		defer sysSess.Close()
-		_, err := sysSess.Run("DROP DATABASE testdb IF EXISTS", nil)
+		_, err := sysSess.Run(context.TODO(), "DROP DATABASE testdb IF EXISTS", nil)
 		assertNoError(ot, err)
-		_, err = sysSess.Run("CREATE DATABASE testdb", nil)
+		_, err = sysSess.Run(context.TODO(), "CREATE DATABASE testdb", nil)
 		assertNoError(ot, err)
 	}()
 

@@ -20,6 +20,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
@@ -83,7 +84,7 @@ func ReadQueryExecutor(driver neo4j.Driver, useBookmark bool) func(ctx *TestCont
 		session := newStressSession(driver, useBookmark, neo4j.AccessModeRead, ctx)
 		defer session.Close()
 
-		result, err := session.Run("MATCH (n) RETURN n LIMIT 1", nil)
+		result, err := session.Run(context.TODO(), "MATCH (n) RETURN n LIMIT 1", nil)
 		ExpectNoError(err)
 
 		if result.Next() {
@@ -110,7 +111,7 @@ func ReadQueryInTxExecutor(driver neo4j.Driver, useBookmark bool) func(ctx *Test
 		session := newStressSession(driver, useBookmark, neo4j.AccessModeRead, ctx)
 		defer session.Close()
 
-		tx, err := session.BeginTransaction()
+		tx, err := session.BeginTransaction(context.TODO())
 		ExpectNoError(err)
 		defer tx.Close()
 
@@ -144,7 +145,7 @@ func ReadQueryWithReadTransactionExecutor(driver neo4j.Driver, useBookmark bool)
 		session := newStressSession(driver, useBookmark, neo4j.AccessModeRead, ctx)
 		defer session.Close()
 
-		summary, err := session.ReadTransaction(func(tx neo4j.Transaction) (interface{}, error) {
+		summary, err := session.ReadTransaction(context.TODO(), func(tx neo4j.Transaction) (interface{}, error) {
 			result, err := tx.Run("MATCH (n) RETURN n LIMIT 1", nil)
 			if err != nil {
 				return nil, err
@@ -174,7 +175,7 @@ func WriteQueryExecutor(driver neo4j.Driver, useBookmark bool) func(ctx *TestCon
 		session := newStressSession(driver, useBookmark, neo4j.AccessModeWrite, ctx)
 		defer session.Close()
 
-		result, err := session.Run("CREATE ()", nil)
+		result, err := session.Run(context.TODO(), "CREATE ()", nil)
 		ExpectNoError(err)
 
 		summary, err := result.Consume()
@@ -193,7 +194,7 @@ func WriteQueryInTxExecutor(driver neo4j.Driver, useBookmark bool) func(ctx *Tes
 		session := newStressSession(driver, useBookmark, neo4j.AccessModeWrite, ctx)
 		defer session.Close()
 
-		tx, err := session.BeginTransaction()
+		tx, err := session.BeginTransaction(context.TODO())
 		ExpectNoError(err)
 		defer tx.Close()
 
@@ -219,7 +220,7 @@ func WriteQueryWithWriteTransactionExecutor(driver neo4j.Driver, useBookmark boo
 		session := newStressSession(driver, useBookmark, neo4j.AccessModeWrite, ctx)
 		defer session.Close()
 
-		summary, err := session.WriteTransaction(func(tx neo4j.Transaction) (interface{}, error) {
+		summary, err := session.WriteTransaction(context.TODO(), func(tx neo4j.Transaction) (interface{}, error) {
 			result, err := tx.Run("CREATE ()", nil)
 			if err != nil {
 				return nil, err
@@ -240,7 +241,7 @@ func WriteQueryInReadSessionExecutor(driver neo4j.Driver, useBookmark bool) func
 		session := newStressSession(driver, useBookmark, neo4j.AccessModeRead, ctx)
 		defer session.Close()
 
-		_, err := session.Run("CREATE ()", nil)
+		_, err := session.Run(context.TODO(), "CREATE ()", nil)
 		ExpectNotNil(err)
 	}
 }
@@ -251,7 +252,7 @@ func WriteQueryInTxInReadSessionExecutor(driver neo4j.Driver, useBookmark bool) 
 		session := newStressSession(driver, useBookmark, neo4j.AccessModeRead, ctx)
 		defer session.Close()
 
-		tx, err := session.BeginTransaction()
+		tx, err := session.BeginTransaction(context.TODO())
 		ExpectNoError(err)
 		defer tx.Close()
 
@@ -266,7 +267,7 @@ func FailingQueryExecutor(driver neo4j.Driver, useBookmark bool) func(ctx *TestC
 		session := newStressSession(driver, useBookmark, neo4j.AccessModeRead, ctx)
 		defer session.Close()
 
-		result, err := session.Run("UNWIND [10, 5, 0] AS x RETURN 10 / x", nil)
+		result, err := session.Run(context.TODO(), "UNWIND [10, 5, 0] AS x RETURN 10 / x", nil)
 		ExpectNoError(err)
 
 		summary, err := result.Consume()
@@ -282,7 +283,7 @@ func FailingQueryInTxExecutor(driver neo4j.Driver, useBookmark bool) func(ctx *T
 		session := newStressSession(driver, useBookmark, neo4j.AccessModeRead, ctx)
 		defer session.Close()
 
-		tx, err := session.BeginTransaction()
+		tx, err := session.BeginTransaction(context.TODO())
 		ExpectNoError(err)
 		defer tx.Close()
 
@@ -302,7 +303,7 @@ func FailingQueryWithReadTransactionExecutor(driver neo4j.Driver, useBookmark bo
 		session := newStressSession(driver, useBookmark, neo4j.AccessModeRead, ctx)
 		defer session.Close()
 
-		summary, err := session.ReadTransaction(func(tx neo4j.Transaction) (interface{}, error) {
+		summary, err := session.ReadTransaction(context.TODO(), func(tx neo4j.Transaction) (interface{}, error) {
 			result, err := tx.Run("UNWIND [10, 5, 0] AS x RETURN 10 / x", nil)
 			if err != nil {
 				return nil, err
@@ -324,7 +325,7 @@ func FailingQueryWithWriteTransactionExecutor(driver neo4j.Driver, useBookmark b
 		session := newStressSession(driver, useBookmark, neo4j.AccessModeRead, ctx)
 		defer session.Close()
 
-		summary, err := session.WriteTransaction(func(tx neo4j.Transaction) (interface{}, error) {
+		summary, err := session.WriteTransaction(context.TODO(), func(tx neo4j.Transaction) (interface{}, error) {
 			result, err := tx.Run("UNWIND [10, 5, 0] AS x RETURN 10 / x", nil)
 			if err != nil {
 				return nil, err
@@ -347,7 +348,7 @@ func WrongQueryExecutor(driver neo4j.Driver) func(ctx *TestContext) {
 		session := newStressSession(driver, false, neo4j.AccessModeRead, ctx)
 		defer session.Close()
 
-		_, err := session.Run("RETURN wrongThing", nil)
+		_, err := session.Run(context.TODO(), "RETURN wrongThing", nil)
 		ExpectNotNil(err)
 	}
 }
@@ -358,7 +359,7 @@ func WrongQueryInTxExecutor(driver neo4j.Driver) func(ctx *TestContext) {
 		session := newStressSession(driver, false, neo4j.AccessModeWrite, ctx)
 		defer session.Close()
 
-		tx, err := session.BeginTransaction()
+		tx, err := session.BeginTransaction(context.TODO())
 		ExpectNoError(err)
 		defer tx.Close()
 

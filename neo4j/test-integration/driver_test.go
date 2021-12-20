@@ -20,6 +20,7 @@
 package test_integration
 
 import (
+	"context"
 	"math"
 	"time"
 
@@ -77,7 +78,7 @@ var _ = Describe("Driver", func() {
 		})
 
 		It("it should not allow work on existing sessions, after driver is closed", func() {
-			result, err = session.Run("RETURN 1", nil)
+			result, err = session.Run(context.TODO(), "RETURN 1", nil)
 			Expect(err).To(BeNil())
 
 			if result.Next() {
@@ -89,12 +90,12 @@ var _ = Describe("Driver", func() {
 			err := driver.Close()
 			Expect(err).To(BeNil())
 
-			_, err = session.Run("RETURN 1", nil)
+			_, err = session.Run(context.TODO(), "RETURN 1", nil)
 			Expect(err).NotTo(BeNil())
 		})
 
 		It("it should not allow new sessions, after driver is closed", func() {
-			result, err = session.Run("RETURN 1", nil)
+			result, err = session.Run(context.TODO(), "RETURN 1", nil)
 			Expect(err).To(BeNil())
 
 			if result.Next() {
@@ -121,7 +122,6 @@ var _ = Describe("Driver", func() {
 		BeforeEach(func() {
 			driver, err = neo4j.NewDriver(server.BoltURI(), server.AuthToken(), server.ConfigFunc(), func(config *neo4j.Config) {
 				config.MaxConnectionPoolSize = 2
-				config.ConnectionAcquisitionTimeout = 0
 			})
 			Expect(err).To(BeNil())
 		})
@@ -137,21 +137,21 @@ var _ = Describe("Driver", func() {
 			session1, err := driver.Session(neo4j.AccessModeWrite)
 			Expect(err).To(BeNil())
 
-			_, err = session1.Run("UNWIND RANGE(1, 100) AS N RETURN N", nil)
+			_, err = session1.Run(context.TODO(), "UNWIND RANGE(1, 100) AS N RETURN N", nil)
 			Expect(err).To(BeNil())
 
 			// Open connection 2
 			session2, err := driver.Session(neo4j.AccessModeWrite)
 			Expect(err).To(BeNil())
 
-			_, err = session2.Run("UNWIND RANGE(1, 100) AS N RETURN N", nil)
+			_, err = session2.Run(context.TODO(), "UNWIND RANGE(1, 100) AS N RETURN N", nil)
 			Expect(err).To(BeNil())
 
 			// Try opening connection 3
 			session3, err := driver.Session(neo4j.AccessModeWrite)
 			Expect(err).To(BeNil())
 
-			_, err = session3.Run("UNWIND RANGE(1, 100) AS N RETURN N", nil)
+			_, err = session3.Run(context.TODO(), "UNWIND RANGE(1, 100) AS N RETURN N", nil)
 			Expect(neo4j.IsConnectivityError(err)).To(BeTrue())
 			//Expect(err).To(BeConnectorErrorWithCode(0x600))
 		})
@@ -161,17 +161,20 @@ var _ = Describe("Driver", func() {
 		var (
 			err    error
 			driver neo4j.Driver
+			ctx    context.Context
+			cancel context.CancelFunc
 		)
 
 		BeforeEach(func() {
 			driver, err = neo4j.NewDriver(server.BoltURI(), server.AuthToken(), server.ConfigFunc(), func(config *neo4j.Config) {
 				config.MaxConnectionPoolSize = 2
-				config.ConnectionAcquisitionTimeout = 10 * time.Second
 			})
 			Expect(err).To(BeNil())
+			ctx, cancel = context.WithTimeout(context.Background(), 10*time.Second)
 		})
 
 		AfterEach(func() {
+			cancel()
 			if driver != nil {
 				driver.Close()
 			}
@@ -179,25 +182,25 @@ var _ = Describe("Driver", func() {
 
 		It("should return error when pool is full", func() {
 			// Open connection 1
-			session1, err := driver.Session(neo4j.AccessModeWrite)
+			session1 := driver.NewSession(neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
 			Expect(err).To(BeNil())
 
-			_, err = session1.Run("UNWIND RANGE(1, 100) AS N RETURN N", nil)
+			_, err = session1.Run(ctx, "UNWIND RANGE(1, 100) AS N RETURN N", nil)
 			Expect(err).To(BeNil())
 
 			// Open connection 2
-			session2, err := driver.Session(neo4j.AccessModeWrite)
+			session2 := driver.NewSession(neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
 			Expect(err).To(BeNil())
 
-			_, err = session2.Run("UNWIND RANGE(1, 100) AS N RETURN N", nil)
+			_, err = session2.Run(ctx, "UNWIND RANGE(1, 100) AS N RETURN N", nil)
 			Expect(err).To(BeNil())
 
 			// Try opening connection 3
-			session3, err := driver.Session(neo4j.AccessModeWrite)
+			session3 := driver.NewSession(neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
 			Expect(err).To(BeNil())
 
 			start := time.Now()
-			_, err = session3.Run("UNWIND RANGE(1, 100) AS N RETURN N", nil)
+			_, err = session3.Run(ctx, "UNWIND RANGE(1, 100) AS N RETURN N", nil)
 			elapsed := time.Since(start)
 			Expect(neo4j.IsConnectivityError(err)).To(BeTrue())
 			//Expect(err).To(BeConnectorErrorWithCode(0x601))

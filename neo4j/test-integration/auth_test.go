@@ -20,6 +20,7 @@
 package test_integration
 
 import (
+	"context"
 	"testing"
 
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
@@ -44,7 +45,7 @@ func TestAuthentication(tt *testing.T) {
 		defer driver.Close()
 		defer session.Close()
 
-		_, err := session.Run("RETURN 1", nil)
+		_, err := session.Run(context.TODO(), "RETURN 1", nil)
 		if err == nil {
 			t.Fatal("Should NOT be able to connect")
 		}

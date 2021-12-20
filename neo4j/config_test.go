@@ -40,14 +40,6 @@ func TestDefaultConfig(t *testing.T) {
 		t.Errorf("should have max connection lifetime set to 1 hour by default")
 	}
 
-	if config.ConnectionAcquisitionTimeout != 1*time.Minute {
-		t.Errorf("should have connection acquisition timeout set to 1 minute by default")
-	}
-
-	if config.SocketConnectTimeout != 5*time.Second {
-		t.Errorf("should have socket connect timeout set to 5 seconds by default")
-	}
-
 	if config.SocketKeepalive != true {
 		t.Errorf("should have socket keep alive enabled by default")
 	}
@@ -85,32 +77,6 @@ func TestValidateAndNormaliseConfig(rt *testing.T) {
 		}
 		if config.MaxConnectionPoolSize != math.MaxInt32 {
 			t.Errorf("MaxConnectionPoolSize should be set to math.MaxInt32 when negative")
-		}
-	})
-
-	rt.Run("ConnectionAcquisitionTimeout less than zero", func(t *testing.T) {
-		config := defaultConfig()
-
-		config.ConnectionAcquisitionTimeout = -1 * time.Second
-		err := validateAndNormaliseConfig(config)
-		if err != nil {
-			t.Errorf("ConnectionAcquisitionTimeout is negative but returned an error")
-		}
-		if config.ConnectionAcquisitionTimeout != -1*time.Nanosecond {
-			t.Errorf("MaxConnectionPoolSize should be set to (-1 * time.Nanosecond) when negative")
-		}
-	})
-
-	rt.Run("SocketConnectTimeout less than zero", func(t *testing.T) {
-		config := defaultConfig()
-
-		config.SocketConnectTimeout = -1 * time.Second
-		err := validateAndNormaliseConfig(config)
-		if err != nil {
-			t.Errorf("SocketConnectTimeout is negative but returned an error")
-		}
-		if config.SocketConnectTimeout != 0*time.Nanosecond {
-			t.Errorf("SocketConnectTimeout should be set to (0 * time.Nanosecond) when negative")
 		}
 	})
 }

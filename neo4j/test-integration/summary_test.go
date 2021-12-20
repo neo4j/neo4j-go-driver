@@ -1,6 +1,7 @@
 package test_integration
 
 import (
+	"context"
 	"fmt"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/test-integration/dbserver"
@@ -35,7 +36,7 @@ var _ = Describe("Result Summary", func() {
 		It("does not include any database information", func() {
 			session := driver.NewSession(neo4j.SessionConfig{Bookmarks: []string{bookmark}})
 			defer assertCloses(session)
-			result, err := session.Run("RETURN 42", noParams)
+			result, err := session.Run(context.TODO(), "RETURN 42", noParams)
 			Expect(err).NotTo(HaveOccurred())
 
 			summary, err := result.Consume()
@@ -58,7 +59,7 @@ var _ = Describe("Result Summary", func() {
 		BeforeEach(func() {
 			session := driver.NewSession(neo4j.SessionConfig{DatabaseName: "system"})
 			defer assertCloses(session)
-			_, err := session.Run(fmt.Sprintf("CREATE DATABASE %s", extraDatabase), map[string]interface{}{})
+			_, err := session.Run(context.TODO(), fmt.Sprintf("CREATE DATABASE %s", extraDatabase), map[string]interface{}{})
 			Expect(err).NotTo(HaveOccurred())
 			bookmark = session.LastBookmark()
 		})
@@ -66,7 +67,7 @@ var _ = Describe("Result Summary", func() {
 		AfterEach(func() {
 			session := driver.NewSession(neo4j.SessionConfig{DatabaseName: "system", Bookmarks: []string{bookmark}})
 			defer assertCloses(session)
-			_, err := session.Run(fmt.Sprintf("DROP DATABASE %s", extraDatabase), map[string]interface{}{})
+			_, err := session.Run(context.TODO(), fmt.Sprintf("DROP DATABASE %s", extraDatabase), map[string]interface{}{})
 			Expect(err).NotTo(HaveOccurred())
 			bookmark = ""
 		})
@@ -74,7 +75,7 @@ var _ = Describe("Result Summary", func() {
 		It("includes the default database information", func() {
 			session := driver.NewSession(neo4j.SessionConfig{Bookmarks: []string{bookmark}})
 			defer assertCloses(session)
-			result, err := session.Run("RETURN 42", noParams)
+			result, err := session.Run(context.TODO(), "RETURN 42", noParams)
 			Expect(err).NotTo(HaveOccurred())
 
 			summary, err := result.Consume()
@@ -85,7 +86,7 @@ var _ = Describe("Result Summary", func() {
 		It("includes the database information, based on session configuration", func() {
 			session := driver.NewSession(neo4j.SessionConfig{DatabaseName: extraDatabase, Bookmarks: []string{bookmark}})
 			defer assertCloses(session)
-			result, err := session.Run("RETURN 42", noParams)
+			result, err := session.Run(context.TODO(), "RETURN 42", noParams)
 			Expect(err).NotTo(HaveOccurred())
 
 			summary, err := result.Consume()

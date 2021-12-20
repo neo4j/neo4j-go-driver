@@ -20,6 +20,7 @@
 package test_integration
 
 import (
+	"context"
 	"math/rand"
 	"reflect"
 
@@ -57,7 +58,7 @@ var _ = Describe("Types", func() {
 
 	It("should be able to send and receive boolean property", func() {
 		value := true
-		result, err = session.Run("CREATE (n {value: $value}) RETURN n.value", map[string]interface{}{"value": value})
+		result, err = session.Run(context.TODO(), "CREATE (n {value: $value}) RETURN n.value", map[string]interface{}{"value": value})
 		Expect(err).To(BeNil())
 
 		Expect(result.Next()).To(BeTrue())
@@ -68,7 +69,7 @@ var _ = Describe("Types", func() {
 
 	It("should be able to send and receive byte property", func() {
 		value := byte(1)
-		result, err = session.Run("CREATE (n {value: $value}) RETURN n.value", map[string]interface{}{"value": value})
+		result, err = session.Run(context.TODO(), "CREATE (n {value: $value}) RETURN n.value", map[string]interface{}{"value": value})
 		Expect(err).To(BeNil())
 
 		Expect(result.Next()).To(BeTrue())
@@ -80,7 +81,7 @@ var _ = Describe("Types", func() {
 
 	It("should be able to send and receive int8 property", func() {
 		value := int8(2)
-		result, err = session.Run("CREATE (n {value: $value}) RETURN n.value", map[string]interface{}{"value": value})
+		result, err = session.Run(context.TODO(), "CREATE (n {value: $value}) RETURN n.value", map[string]interface{}{"value": value})
 		Expect(err).To(BeNil())
 
 		Expect(result.Next()).To(BeTrue())
@@ -92,7 +93,7 @@ var _ = Describe("Types", func() {
 
 	It("should be able to send and receive int16 property", func() {
 		value := int16(3)
-		result, err = session.Run("CREATE (n {value: $value}) RETURN n.value", map[string]interface{}{"value": value})
+		result, err = session.Run(context.TODO(), "CREATE (n {value: $value}) RETURN n.value", map[string]interface{}{"value": value})
 		Expect(err).To(BeNil())
 
 		Expect(result.Next()).To(BeTrue())
@@ -104,7 +105,7 @@ var _ = Describe("Types", func() {
 
 	It("should be able to send and receive int property", func() {
 		value := int(4)
-		result, err = session.Run("CREATE (n {value: $value}) RETURN n.value", map[string]interface{}{"value": value})
+		result, err = session.Run(context.TODO(), "CREATE (n {value: $value}) RETURN n.value", map[string]interface{}{"value": value})
 		Expect(err).To(BeNil())
 
 		Expect(result.Next()).To(BeTrue())
@@ -116,7 +117,7 @@ var _ = Describe("Types", func() {
 
 	It("should be able to send and receive int32 property", func() {
 		value := int32(5)
-		result, err = session.Run("CREATE (n {value: $value}) RETURN n.value", map[string]interface{}{"value": value})
+		result, err = session.Run(context.TODO(), "CREATE (n {value: $value}) RETURN n.value", map[string]interface{}{"value": value})
 		Expect(err).To(BeNil())
 
 		Expect(result.Next()).To(BeTrue())
@@ -128,7 +129,7 @@ var _ = Describe("Types", func() {
 
 	It("should be able to send and receive int64 property", func() {
 		value := int64(6)
-		result, err = session.Run("CREATE (n {value: $value}) RETURN n.value", map[string]interface{}{"value": value})
+		result, err = session.Run(context.TODO(), "CREATE (n {value: $value}) RETURN n.value", map[string]interface{}{"value": value})
 		Expect(err).To(BeNil())
 
 		Expect(result.Next()).To(BeTrue())
@@ -140,7 +141,7 @@ var _ = Describe("Types", func() {
 
 	It("should be able to send and receive float32 property", func() {
 		value := float32(7.1)
-		result, err = session.Run("CREATE (n {value: $value}) RETURN n.value", map[string]interface{}{"value": value})
+		result, err = session.Run(context.TODO(), "CREATE (n {value: $value}) RETURN n.value", map[string]interface{}{"value": value})
 		Expect(err).To(BeNil())
 
 		Expect(result.Next()).To(BeTrue())
@@ -152,7 +153,7 @@ var _ = Describe("Types", func() {
 
 	It("should be able to send and receive float64 property", func() {
 		value := float64(81.9224)
-		result, err = session.Run("CREATE (n {value: $value}) RETURN n.value", map[string]interface{}{"value": value})
+		result, err = session.Run(context.TODO(), "CREATE (n {value: $value}) RETURN n.value", map[string]interface{}{"value": value})
 		Expect(err).To(BeNil())
 
 		Expect(result.Next()).To(BeTrue())
@@ -164,7 +165,7 @@ var _ = Describe("Types", func() {
 
 	It("should be able to send and receive string property", func() {
 		value := "a string"
-		result, err = session.Run("CREATE (n {value: $value}) RETURN n.value", map[string]interface{}{"value": value})
+		result, err = session.Run(context.TODO(), "CREATE (n {value: $value}) RETURN n.value", map[string]interface{}{"value": value})
 		Expect(err).To(BeNil())
 
 		Expect(result.Next()).To(BeTrue())
@@ -176,7 +177,7 @@ var _ = Describe("Types", func() {
 
 	It("should be able to send and receive byte array property", func() {
 		value := []byte{1, 2, 3, 4, 5}
-		result, err = session.Run("CREATE (n {value: $value}) RETURN n.value", map[string]interface{}{"value": value})
+		result, err = session.Run(context.TODO(), "CREATE (n {value: $value}) RETURN n.value", map[string]interface{}{"value": value})
 		Expect(err).To(BeNil())
 
 		Expect(result.Next()).To(BeTrue())
@@ -188,7 +189,7 @@ var _ = Describe("Types", func() {
 
 	It("should be able to send and receive boolean array property", func() {
 		value := []bool{true, false, false, true}
-		result, err = session.Run("CREATE (n {value: $value}) RETURN n.value", map[string]interface{}{"value": value})
+		result, err = session.Run(context.TODO(), "CREATE (n {value: $value}) RETURN n.value", map[string]interface{}{"value": value})
 		Expect(err).To(BeNil())
 
 		Expect(result.Next()).To(BeTrue())
@@ -200,7 +201,7 @@ var _ = Describe("Types", func() {
 
 	It("should be able to send and receive int array property", func() {
 		value := []int{1, 2, 3, 4, 5}
-		result, err = session.Run("CREATE (n {value: $value}) RETURN n.value", map[string]interface{}{"value": value})
+		result, err = session.Run(context.TODO(), "CREATE (n {value: $value}) RETURN n.value", map[string]interface{}{"value": value})
 		Expect(err).To(BeNil())
 
 		Expect(result.Next()).To(BeTrue())
@@ -212,7 +213,7 @@ var _ = Describe("Types", func() {
 
 	It("should be able to send and receive float64 array property", func() {
 		value := []float64{1.11, 2.22, 3.33, 4.44, 5.55}
-		result, err = session.Run("CREATE (n {value: $value}) RETURN n.value", map[string]interface{}{"value": value})
+		result, err = session.Run(context.TODO(), "CREATE (n {value: $value}) RETURN n.value", map[string]interface{}{"value": value})
 		Expect(err).To(BeNil())
 
 		Expect(result.Next()).To(BeTrue())
@@ -224,7 +225,7 @@ var _ = Describe("Types", func() {
 
 	It("should be able to send and receive string array property", func() {
 		value := []string{"a", "b", "c", "d", "e"}
-		result, err = session.Run("CREATE (n {value: $value}) RETURN n.value", map[string]interface{}{"value": value})
+		result, err = session.Run(context.TODO(), "CREATE (n {value: $value}) RETURN n.value", map[string]interface{}{"value": value})
 		Expect(err).To(BeNil())
 
 		Expect(result.Next()).To(BeTrue())
@@ -247,7 +248,7 @@ var _ = Describe("Types", func() {
 
 		value := randSeq(20 * 1024)
 
-		result, err = session.Run("CREATE (n {value: $value}) RETURN n.value", map[string]interface{}{"value": value})
+		result, err = session.Run(context.TODO(), "CREATE (n {value: $value}) RETURN n.value", map[string]interface{}{"value": value})
 		Expect(err).To(BeNil())
 
 		Expect(result.Next()).To(BeTrue())
@@ -258,7 +259,7 @@ var _ = Describe("Types", func() {
 	})
 
 	It("should be able to receive a node with properties", func() {
-		result, err = session.Run("CREATE (n:Person:Manager {id: 1, name: 'a name'}) RETURN n", nil)
+		result, err = session.Run(context.TODO(), "CREATE (n:Person:Manager {id: 1, name: 'a name'}) RETURN n", nil)
 		Expect(err).To(BeNil())
 
 		Expect(result.Next()).To(BeTrue())
@@ -277,7 +278,7 @@ var _ = Describe("Types", func() {
 	})
 
 	It("should be able to receive a relationship with properties", func() {
-		result, err = session.Run("CREATE (e:Person:Employee {id: 1, name: 'employee 1'})-[w:WORKS_FOR { from: '2017-01-01' }]->(m:Person:Manager {id: 2, name: 'manager 1'}) RETURN e, w, m", nil)
+		result, err = session.Run(context.TODO(), "CREATE (e:Person:Employee {id: 1, name: 'employee 1'})-[w:WORKS_FOR { from: '2017-01-01' }]->(m:Person:Manager {id: 2, name: 'manager 1'}) RETURN e, w, m", nil)
 		Expect(err).To(BeNil())
 
 		Expect(result.Next()).To(BeTrue())
@@ -315,7 +316,7 @@ var _ = Describe("Types", func() {
 	})
 
 	It("should be able to receive a path with two nodes and one relationship", func() {
-		result, err = session.Run("CREATE p=(e:Person:Employee {id: 1, name: 'employee 1'})-[w:WORKS_FOR { from: '2017-01-01' }]->(m:Person:Manager {id: 2, name: 'manager 1'}) RETURN p, e, w, m", nil)
+		result, err = session.Run(context.TODO(), "CREATE p=(e:Person:Employee {id: 1, name: 'employee 1'})-[w:WORKS_FOR { from: '2017-01-01' }]->(m:Person:Manager {id: 2, name: 'manager 1'}) RETURN p, e, w, m", nil)
 		Expect(err).To(BeNil())
 		Expect(result.Next()).To(BeTrue())
 		path := result.Record().Values[0].(neo4j.Path)
@@ -334,7 +335,7 @@ var _ = Describe("Types", func() {
 	})
 
 	It("should be able to receive a path with three nodes and two relationship", func() {
-		result, err = session.Run(`CREATE (e1:Person:Employee $employee) 
+		result, err = session.Run(context.TODO(), `CREATE (e1:Person:Employee $employee) 
 				CREATE (l1:Person:Lead $lead) 
 				CREATE (m1:Person:Manager $manager) 
 				CREATE p = (e1)-[r1:LED_BY { from: '2017-01-01' }]->(l1)-[r2:REPORTS_TO { from: '2017-01-01' }]->(m1)
@@ -376,7 +377,7 @@ var _ = Describe("Types", func() {
 
 	DescribeTable("should be able to send and receive nil pointer property",
 		func(value interface{}) {
-			result, err = session.Run("CREATE (n {value: $value}) RETURN n.value", map[string]interface{}{"value": value})
+			result, err = session.Run(context.TODO(), "CREATE (n {value: $value}) RETURN n.value", map[string]interface{}{"value": value})
 			Expect(err).To(BeNil())
 
 			Expect(result.Next()).To(BeTrue())
@@ -422,14 +423,14 @@ var _ = Describe("Types", func() {
 
 		Context("Session.Run", func() {
 			It("should fail when sending as parameter", func() {
-				result, err = session.Run("CREATE (n {value: $value}) RETURN n.value", map[string]interface{}{"value": unsupportedType{}})
+				result, err = session.Run(context.TODO(), "CREATE (n {value: $value}) RETURN n.value", map[string]interface{}{"value": unsupportedType{}})
 				Expect(err).ToNot(BeNil())
 				//Expect(err).To(BeGenericError(ContainSubstring("unable to convert parameter \"value\" to connector value for run message")))
 				Expect(result).To(BeNil())
 			})
 
 			It("should fail when sending as tx metadata", func() {
-				result, err = session.Run("CREATE (n)", nil, neo4j.WithTxMetadata(map[string]interface{}{"m1": unsupportedType{}}))
+				result, err = session.Run(context.TODO(), "CREATE (n)", nil, neo4j.WithTxMetadata(map[string]interface{}{"m1": unsupportedType{}}))
 				Expect(err).ToNot(BeNil())
 				//Expect(err).To(BeGenericError(ContainSubstring("unable to convert tx metadata to connector value for run message")))
 				Expect(result).To(BeNil())
@@ -486,7 +487,7 @@ var _ = Describe("Types", func() {
 			var tx neo4j.Transaction
 
 			It("should fail when sending as tx metadata", func() {
-				tx, err = session.BeginTransaction()
+				tx, err = session.BeginTransaction(context.TODO())
 				Expect(err).To(BeNil())
 				Expect(tx).NotTo(BeNil())
 
@@ -552,7 +553,7 @@ var _ = Describe("Types", func() {
 
 		DescribeTable("should be able to send and receive nil pointers",
 			func(value interface{}) {
-				result, err = session.Run("CREATE (n {value: $value}) RETURN n.value", map[string]interface{}{"value": value})
+				result, err = session.Run(context.TODO(), "CREATE (n {value: $value}) RETURN n.value", map[string]interface{}{"value": value})
 				Expect(err).To(BeNil())
 
 				Expect(result.Next()).To(BeTrue())
@@ -625,7 +626,7 @@ var _ = Describe("Types", func() {
 					}
 				}
 
-				result, err = session.Run("CREATE (n {value1: $value1, value2: $value2}) RETURN n.value1, n.value2", map[string]interface{}{"value1": value, "value2": &value})
+				result, err = session.Run(context.TODO(), "CREATE (n {value1: $value1, value2: $value2}) RETURN n.value1, n.value2", map[string]interface{}{"value1": value, "value2": &value})
 				Expect(err).To(BeNil())
 
 				Expect(result.Next()).To(BeTrue())

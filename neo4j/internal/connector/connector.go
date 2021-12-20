@@ -21,6 +21,7 @@
 package connector
 
 import (
+	"context"
 	"crypto/tls"
 	"crypto/x509"
 	"errors"
@@ -37,7 +38,6 @@ type Connector struct {
 	SkipEncryption  bool
 	SkipVerify      bool
 	RootCAs         *x509.CertPool
-	DialTimeout     time.Duration
 	SocketKeepAlive bool
 	Auth            map[string]interface{}
 	Log             log.Logger
@@ -62,13 +62,13 @@ func (e *TlsError) Error() string {
 	return e.inner.Error()
 }
 
-func (c Connector) Connect(address string, boltLogger log.BoltLogger) (db.Connection, error) {
-	dialer := net.Dialer{Timeout: c.DialTimeout}
+func (c Connector) Connect(ctx context.Context, address string, boltLogger log.BoltLogger) (db.Connection, error) {
+	var dialer net.Dialer
 	if !c.SocketKeepAlive {
 		dialer.KeepAlive = -1 * time.Second // Turns keep-alive off
 	}
 
-	conn, err := dialer.Dial(c.Network, address)
+	conn, err := dialer.DialContext(ctx, c.Network, address)
 	if err != nil {
 		return nil, &ConnectError{inner: err}
 	}
@@ -86,7 +86,7 @@ func (c Connector) Connect(address string, boltLogger log.BoltLogger) (db.Connec
 	}
 	config := tls.Config{InsecureSkipVerify: c.SkipVerify, RootCAs: c.RootCAs, ServerName: serverName}
 	tlsconn := tls.Client(conn, &config)
-	err = tlsconn.Handshake()
+	err = tlsconn.HandshakeContext(ctx)
 	if err != nil {
 		if err == io.EOF {
 			// Give a bit nicer error message
