@@ -2,8 +2,8 @@ package test_integration
 
 import (
 	"fmt"
-	"github.com/neo4j/neo4j-go-driver/v4/neo4j"
-	"github.com/neo4j/neo4j-go-driver/v4/neo4j/test-integration/dbserver"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/test-integration/dbserver"
 	"io"
 
 	. "github.com/onsi/ginkgo"
@@ -93,7 +93,6 @@ var _ = Describe("Result Summary", func() {
 			Expect(summary.Database().Name()).To(Equal(extraDatabase))
 		})
 	})
-
 
 })
 

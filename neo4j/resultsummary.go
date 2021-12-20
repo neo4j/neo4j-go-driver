@@ -21,7 +21,7 @@ package neo4j
 
 import (
 	"fmt"
-	"github.com/neo4j/neo4j-go-driver/v4/neo4j/db"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/db"
 	"time"
 )
 

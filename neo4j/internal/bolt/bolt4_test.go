@@ -25,8 +25,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/neo4j/neo4j-go-driver/v4/neo4j/db"
-	. "github.com/neo4j/neo4j-go-driver/v4/neo4j/internal/testutil"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/db"
+	. "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/testutil"
 )
 
 // bolt4.connect is tested through Connect, no need to test it here

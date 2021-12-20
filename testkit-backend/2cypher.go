@@ -22,7 +22,7 @@ package main
 import (
 	"fmt"
 
-	"github.com/neo4j/neo4j-go-driver/v4/neo4j"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
 )
 
 // Converts native type to proxied "cypher" to be sent to frontend.
@@ -87,7 +87,7 @@ func nativeToCypher(v interface{}) map[string]interface{} {
 		return map[string]interface{}{
 			"name": "Path",
 			"data": map[string]interface{}{
-				"nodes": nativeToCypher(nodes),
+				"nodes":         nativeToCypher(nodes),
 				"relationships": nativeToCypher(rels),
 			},
 		}

@@ -20,10 +20,10 @@
 package testutil
 
 import (
-	"github.com/neo4j/neo4j-go-driver/v4/neo4j/log"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/log"
 	"time"
 
-	"github.com/neo4j/neo4j-go-driver/v4/neo4j/db"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/db"
 )
 
 type Next struct {

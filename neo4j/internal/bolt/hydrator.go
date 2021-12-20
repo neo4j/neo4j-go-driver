@@ -22,12 +22,12 @@ package bolt
 import (
 	"errors"
 	"fmt"
-	"github.com/neo4j/neo4j-go-driver/v4/neo4j/log"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/log"
 	"time"
 
-	"github.com/neo4j/neo4j-go-driver/v4/neo4j/db"
-	"github.com/neo4j/neo4j-go-driver/v4/neo4j/dbtype"
-	"github.com/neo4j/neo4j-go-driver/v4/neo4j/internal/packstream"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/db"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/dbtype"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/packstream"
 )
 
 var hydrationInvalidState = errors.New("Hydration state error")

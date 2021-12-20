@@ -22,8 +22,8 @@ package bolt
 import (
 	"testing"
 
-	"github.com/neo4j/neo4j-go-driver/v4/neo4j/db"
-	. "github.com/neo4j/neo4j-go-driver/v4/neo4j/internal/testutil"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/db"
+	. "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/testutil"
 )
 
 func TestBolt3(ot *testing.T) {
