@@ -392,6 +392,13 @@ func (b *backend) handleRequest(req map[string]interface{}) {
 			if data["resolverRegistered"].(bool) {
 				c.AddressResolver = b.customAddressResolverFunction()
 			}
+			if data["connectionAcquisitionTimeoutMs"] != nil {
+				timeout := time.Millisecond * time.Duration(data["connectionAcquisitionTimeoutMs"].(float64))
+				c.ConnectionAcquisitionTimeout = timeout
+			}
+			if data["maxConnectionPoolSize"] != nil {
+				c.MaxConnectionPoolSize = int(data["maxConnectionPoolSize"].(float64))
+			}
 		})
 		if err != nil {
 			b.writeError(err)
@@ -602,6 +609,7 @@ func (b *backend) handleRequest(req map[string]interface{}) {
 				"Optimization:ConnectionReuse",
 				"Optimization:ImplicitDefaultArguments",
 				"Optimization:PullPipelining",
+				"Temporary:ConnectionAcquisitionTimeout",
 			},
 		})
 
