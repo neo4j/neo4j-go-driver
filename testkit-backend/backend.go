@@ -393,8 +393,7 @@ func (b *backend) handleRequest(req map[string]interface{}) {
 				c.AddressResolver = b.customAddressResolverFunction()
 			}
 			if data["connectionAcquisitionTimeoutMs"] != nil {
-				timeout := time.Millisecond * time.Duration(data["connectionAcquisitionTimeoutMs"].(float64))
-				c.ConnectionAcquisitionTimeout = timeout
+				c.ConnectionAcquisitionTimeout = time.Millisecond * time.Duration(data["connectionAcquisitionTimeoutMs"].(float64))
 			}
 			if data["maxConnectionPoolSize"] != nil {
 				c.MaxConnectionPoolSize = int(data["maxConnectionPoolSize"].(float64))
