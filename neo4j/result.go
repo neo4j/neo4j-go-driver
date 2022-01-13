@@ -31,6 +31,9 @@ type Result interface {
 	// NextRecord returns true if there is a record to be processed, record parameter is set
 	// to point to current record.
 	NextRecord(record **Record) bool
+	// PeekRecord returns true if there is a record after the current one to be processed without advancing the record
+	// stream, record parameter is set to point to that record if present.
+	PeekRecord(record **Record) bool
 	// Err returns the latest error that caused this Next to return false.
 	Err() error
 	// Record returns the current record.
@@ -46,13 +49,16 @@ type Result interface {
 }
 
 type result struct {
-	conn         db.Connection
-	streamHandle db.StreamHandle
-	cypher       string
-	params       map[string]interface{}
-	record       *Record
-	summary      *db.Summary
-	err          error
+	conn          db.Connection
+	streamHandle  db.StreamHandle
+	cypher        string
+	params        map[string]interface{}
+	record        *Record
+	summary       *db.Summary
+	err           error
+	peekedRecord  *Record
+	peekedSummary *db.Summary
+	peeked        bool
 }
 
 func newResult(conn db.Connection, str db.StreamHandle, cypher string, params map[string]interface{}) *result {
@@ -64,21 +70,46 @@ func newResult(conn db.Connection, str db.StreamHandle, cypher string, params ma
 	}
 }
 
+func (r *result) advance() {
+	if r.peeked {
+		r.record = r.peekedRecord
+		r.summary = r.peekedSummary
+		r.peeked = false
+	} else {
+		r.record, r.summary, r.err = r.conn.Next(r.streamHandle)
+	}
+}
+
+func (r *result) peek() {
+	if !r.peeked {
+		r.peekedRecord, r.peekedSummary, r.err = r.conn.Next(r.streamHandle)
+		r.peeked = true
+	}
+}
+
 func (r *result) Keys() ([]string, error) {
 	return r.conn.Keys(r.streamHandle)
 }
 
 func (r *result) Next() bool {
-	r.record, r.summary, r.err = r.conn.Next(r.streamHandle)
+	r.advance()
 	return r.record != nil
 }
 
 func (r *result) NextRecord(out **Record) bool {
-	r.record, r.summary, r.err = r.conn.Next(r.streamHandle)
+	r.advance()
 	if out != nil {
 		*out = r.record
 	}
 	return r.record != nil
+}
+
+func (r *result) PeekRecord(out **Record) bool {
+	r.peek()
+	if out != nil {
+		*out = r.peekedRecord
+	}
+	return r.peekedRecord != nil
 }
 
 func (r *result) Record() *Record {
@@ -92,7 +123,7 @@ func (r *result) Err() error {
 func (r *result) Collect() ([]*Record, error) {
 	recs := make([]*Record, 0, 1024)
 	for r.summary == nil && r.err == nil {
-		r.record, r.summary, r.err = r.conn.Next(r.streamHandle)
+		r.advance()
 		if r.record != nil {
 			recs = append(recs, r.record)
 		}
@@ -109,7 +140,7 @@ func (r *result) buffer() {
 
 func (r *result) Single() (*Record, error) {
 	// Try retrieving the single record
-	r.record, r.summary, r.err = r.conn.Next(r.streamHandle)
+	r.advance()
 	if r.err != nil {
 		return nil, wrapError(r.err)
 	}
@@ -122,7 +153,7 @@ func (r *result) Single() (*Record, error) {
 	single := r.record
 
 	// Probe connection for more records
-	r.record, r.summary, r.err = r.conn.Next(r.streamHandle)
+	r.advance()
 	if r.record != nil {
 		// There were more records, consume the stream since the user didn't
 		// expect more records and should therefore not use them.

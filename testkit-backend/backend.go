@@ -132,7 +132,11 @@ func (b *backend) writeError(err error) {
 
 	if isDriverError {
 		id := b.setError(err)
-		b.writeResponse("DriverError", map[string]interface{}{"id": id, "msg": err.Error(), "code": code})
+		b.writeResponse("DriverError", map[string]interface{}{
+			"id": id,
+			"errorType": strings.Split(err.Error(), ":")[0],
+			"msg": err.Error(),
+			"code": code})
 		return
 	}
 
@@ -339,6 +343,35 @@ func (s serverAddress) Hostname() string {
 
 func (s serverAddress) Port() string {
 	return s.port
+}
+
+func (b *backend) writeRecord(result neo4j.Result, record *neo4j.Record, expectRecord *bool) {
+	if expectRecord != nil {
+		if *expectRecord && record == nil {
+			b.writeResponse("BackendError", map[string]interface{}{
+				"msg": "Found no record where one was expected.",
+			})
+		} else if !*expectRecord && record != nil {
+			b.writeResponse("BackendError", map[string]interface{}{
+				"msg": "Found a record where none was expected.",
+			})
+		}
+	}
+	if record != nil {
+		values := record.Values
+		cypherValues := make([]interface{}, len(values))
+		for i, v := range values {
+			cypherValues[i] = nativeToCypher(v)
+		}
+		b.writeResponse("Record", map[string]interface{}{"values": cypherValues})
+	} else {
+		err := result.Err()
+		if err != nil {
+			b.writeError(err)
+			return
+		}
+		b.writeResponse("NullRecord", nil)
+	}
 }
 
 func (b *backend) handleRequest(req map[string]interface{}) {
@@ -557,21 +590,12 @@ func (b *backend) handleRequest(req map[string]interface{}) {
 	case "ResultNext":
 		result := b.results[data["resultId"].(string)]
 		more := result.Next()
-		if more {
-			values := result.Record().Values
-			cypherValues := make([]interface{}, len(values))
-			for i, v := range values {
-				cypherValues[i] = nativeToCypher(v)
-			}
-			b.writeResponse("Record", map[string]interface{}{"values": cypherValues})
-		} else {
-			err := result.Err()
-			if err != nil {
-				b.writeError(err)
-				return
-			}
-			b.writeResponse("NullRecord", nil)
-		}
+		b.writeRecord(result, result.Record(), &more)
+	case "ResultPeek":
+		result := b.results[data["resultId"].(string)]
+		var record *db.Record = nil
+		more := result.PeekRecord(&record)
+		b.writeRecord(result, record, &more)
 	case "ResultConsume":
 		result := b.results[data["resultId"].(string)]
 		summary, err := result.Consume()
@@ -592,6 +616,7 @@ func (b *backend) handleRequest(req map[string]interface{}) {
 		b.writeResponse("FeatureList", map[string]interface{}{
 			"features": []string{
 				"ConfHint:connection.recv_timeout_seconds",
+				"Feature:API:Result.Peek",
 				"Feature:Auth:Custom",
 				"Feature:Auth:Bearer",
 				"Feature:Auth:Kerberos",
@@ -667,5 +692,6 @@ func testSkips() map[string]string {
 		"stub.configuration_hints.test_connection_recv_timeout_seconds.TestRoutingConnectionRecvTimeout.*":                       "No GetRoutingTable support - too tricky to implement in Go",
 		"stub.homedb.test_homedb.TestHomeDb.test_session_should_cache_home_db_despite_new_rt":                                    "Driver does not remove servers from RT when connection breaks.",
 		"neo4j.test_authentication.TestAuthenticationBasic.test_error_on_incorrect_credentials_tx":                               "Driver retries tx on failed authentication.",
+		"stub.iteration.test_result_peek.TestResultPeek.test_result_peek_with_failure_tx_run":                                    "Driver does not reset failed connection but raises error on Session.Close()",
 	}
 }
