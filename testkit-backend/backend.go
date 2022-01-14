@@ -345,35 +345,6 @@ func (s serverAddress) Port() string {
 	return s.port
 }
 
-func (b *backend) writeRecord(result neo4j.Result, record *neo4j.Record, expectRecord *bool) {
-	if expectRecord != nil {
-		if *expectRecord && record == nil {
-			b.writeResponse("BackendError", map[string]interface{}{
-				"msg": "Found no record where one was expected.",
-			})
-		} else if !*expectRecord && record != nil {
-			b.writeResponse("BackendError", map[string]interface{}{
-				"msg": "Found a record where none was expected.",
-			})
-		}
-	}
-	if record != nil {
-		values := record.Values
-		cypherValues := make([]interface{}, len(values))
-		for i, v := range values {
-			cypherValues[i] = nativeToCypher(v)
-		}
-		b.writeResponse("Record", map[string]interface{}{"values": cypherValues})
-	} else {
-		err := result.Err()
-		if err != nil {
-			b.writeError(err)
-			return
-		}
-		b.writeResponse("NullRecord", nil)
-	}
-}
-
 func (b *backend) handleRequest(req map[string]interface{}) {
 	name := req["name"].(string)
 	data := req["data"].(map[string]interface{})
@@ -590,12 +561,12 @@ func (b *backend) handleRequest(req map[string]interface{}) {
 	case "ResultNext":
 		result := b.results[data["resultId"].(string)]
 		more := result.Next()
-		b.writeRecord(result, result.Record(), &more)
+		b.writeRecord(result, result.Record(), more)
 	case "ResultPeek":
 		result := b.results[data["resultId"].(string)]
 		var record *db.Record = nil
 		more := result.PeekRecord(&record)
-		b.writeRecord(result, record, &more)
+		b.writeRecord(result, record, more)
 	case "ResultConsume":
 		result := b.results[data["resultId"].(string)]
 		summary, err := result.Consume()
@@ -647,6 +618,34 @@ func (b *backend) handleRequest(req map[string]interface{}) {
 
 	default:
 		b.writeError(errors.New("Unknown request: " + name))
+	}
+}
+
+func (b *backend) writeRecord(result neo4j.Result, record *neo4j.Record, expectRecord bool) {
+	if expectRecord && record == nil {
+		b.writeResponse("BackendError", map[string]interface{}{
+			"msg": "Found no record where one was expected.",
+		})
+	} else if !expectRecord && record != nil {
+		b.writeResponse("BackendError", map[string]interface{}{
+			"msg": "Found a record where none was expected.",
+		})
+	}
+
+	if record != nil {
+		values := record.Values
+		cypherValues := make([]interface{}, len(values))
+		for i, v := range values {
+			cypherValues[i] = nativeToCypher(v)
+		}
+		b.writeResponse("Record", map[string]interface{}{"values": cypherValues})
+	} else {
+		err := result.Err()
+		if err != nil {
+			b.writeError(err)
+			return
+		}
+		b.writeResponse("NullRecord", nil)
 	}
 }
 

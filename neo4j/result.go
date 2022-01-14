@@ -70,23 +70,6 @@ func newResult(conn db.Connection, str db.StreamHandle, cypher string, params ma
 	}
 }
 
-func (r *result) advance() {
-	if r.peeked {
-		r.record = r.peekedRecord
-		r.summary = r.peekedSummary
-		r.peeked = false
-	} else {
-		r.record, r.summary, r.err = r.conn.Next(r.streamHandle)
-	}
-}
-
-func (r *result) peek() {
-	if !r.peeked {
-		r.peekedRecord, r.peekedSummary, r.err = r.conn.Next(r.streamHandle)
-		r.peeked = true
-	}
-}
-
 func (r *result) Keys() ([]string, error) {
 	return r.conn.Keys(r.streamHandle)
 }
@@ -195,4 +178,21 @@ func (r *result) Consume() (ResultSummary, error) {
 		return nil, wrapError(r.err)
 	}
 	return r.toResultSummary(), nil
+}
+
+func (r *result) advance() {
+	if r.peeked {
+		r.record, r.peekedRecord = r.peekedRecord, nil
+		r.summary, r.peekedSummary = r.peekedSummary, nil
+		r.peeked = false
+	} else {
+		r.record, r.summary, r.err = r.conn.Next(r.streamHandle)
+	}
+}
+
+func (r *result) peek() {
+	if !r.peeked {
+		r.peekedRecord, r.peekedSummary, r.err = r.conn.Next(r.streamHandle)
+		r.peeked = true
+	}
 }
