@@ -541,7 +541,7 @@ func (b *backend) handleRequest(req map[string]interface{}) {
 			b.writeError(err)
 			return
 		}
-		b.writeResponse("TransactionClose", map[string]interface{}{"id": txId})
+		b.writeResponse("Transaction", map[string]interface{}{"id": txId})
 
 	case "SessionReadTransaction":
 		b.handleTransactionFunc(true, data)
