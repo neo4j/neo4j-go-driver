@@ -351,7 +351,7 @@ func (p *Pool) Return(c db.Connection) {
 		return
 	}
 
-	c.SetBoltLogger(nil)
+	defer c.SetBoltLogger(nil)
 
 	// Get the name of the server that the connection belongs to.
 	serverName := c.ServerName()

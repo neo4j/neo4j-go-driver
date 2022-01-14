@@ -85,6 +85,8 @@ type Connection interface {
 	// Implementation of this should be passive, no pinging or similair since it might be
 	// called rather frequently.
 	IsAlive() bool
+	// HasFailed returns true if the connection has received a recoverable error (``FAILURE``).
+	HasFailed() bool
 	// Returns the point in time when this connection was established.
 	Birthdate() time.Time
 	// Resets connection to same state as directly after a connect.

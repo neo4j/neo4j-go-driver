@@ -78,6 +78,10 @@ func (c *ConnFake) IsAlive() bool {
 	return c.Alive
 }
 
+func (c *ConnFake) HasFailed() bool {
+	return false
+}
+
 func (c *ConnFake) Reset() {
 }
 
