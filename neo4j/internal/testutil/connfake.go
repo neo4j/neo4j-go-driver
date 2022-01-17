@@ -152,11 +152,16 @@ func (c *ConnFake) Keys(streamHandle db.StreamHandle) ([]string, error) {
 }
 
 func (c *ConnFake) Next(streamHandle db.StreamHandle) (*db.Record, *db.Summary, error) {
-	next := c.Nexts[0]
-	if len(c.Nexts) > 1 {
-		c.Nexts = c.Nexts[1:]
+	if len(c.Nexts) >= 1 {
+		next := c.Nexts[0]
+		// moves to next record only if the current record is not an error or summary
+		// this emulates the stream buffering of a real connection
+		if next.Err == nil && next.Summary == nil {
+			c.Nexts = c.Nexts[1:]
+		}
+		return next.Record, next.Summary, next.Err
 	}
-	return next.Record, next.Summary, next.Err
+	return nil, nil, nil
 }
 
 func (c *ConnFake) ForceReset() error {

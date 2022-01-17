@@ -141,6 +141,27 @@ func TestResult(ot *testing.T) {
 		})
 	}
 
+	// PeekRecord
+	ot.Run("Peeks records", func(t *testing.T) {
+		var peedkedFirst *Record
+		var peekedSecond *Record
+		var nextFirst *Record
+		var peekedAfterNextFirst *Record
+		var nextSecond *Record
+		conn := &ConnFake{Nexts: []Next{{Record: recs[0]}}}
+
+		result := newResult(conn, streamHandle, cypher, params)
+
+		AssertTrue(t, result.PeekRecord(&peedkedFirst))
+		AssertTrue(t, result.PeekRecord(&peekedSecond))
+		AssertTrue(t, result.NextRecord(&nextFirst))
+		AssertDeepEquals(t, recs[0], peedkedFirst, peekedSecond, nextFirst)
+		AssertFalse(t, result.PeekRecord(&peekedAfterNextFirst))
+		AssertNil(t, peekedAfterNextFirst)
+		AssertFalse(t, result.NextRecord(&nextSecond))
+		AssertNil(t, nextSecond)
+	})
+
 	// Consume
 	ot.Run("Consume with summary", func(t *testing.T) {
 		conn := &ConnFake{
