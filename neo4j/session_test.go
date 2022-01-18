@@ -165,12 +165,12 @@ func TestSession(st *testing.T) {
 	})
 
 	st.Run("Bookmarking", func(bt *testing.T) {
-		bt.Run("Initial bookmark is used for LastBookmark", func(t *testing.T) {
+		bt.Run("Initial bookmark is not used for LastBookmark", func(t *testing.T) {
 			_, _, sess := createSessionWithBookmarks([]string{"b1", "b2"})
-			AssertStringEqual(t, sess.LastBookmark(), "b2")
+			AssertStringEqual(t, sess.LastBookmark(), "")
 		})
 
-		bt.Run("Initial bookmarks are used and cleaned up before usage", func(t *testing.T) {
+		bt.Run("Initial currentBookmarks are used and cleaned up before usage", func(t *testing.T) {
 			dirtyBookmarks := []string{"", "b1", "", "b2", ""}
 			cleanBookmarks := []string{"b1", "b2"}
 			_, pool, sess := createSessionWithBookmarks(dirtyBookmarks)
@@ -189,7 +189,7 @@ func TestSession(st *testing.T) {
 			AssertLen(t, conn.RecordedTxs, 4)
 			for _, rtx := range conn.RecordedTxs {
 				if !reflect.DeepEqual(cleanBookmarks, rtx.Bookmarks) {
-					t.Errorf("Using unclean or no bookmarks: %+v", rtx)
+					t.Errorf("Using unclean or no currentBookmarks: %+v", rtx)
 				}
 			}
 		})
@@ -289,7 +289,7 @@ func TestSession(st *testing.T) {
 			AssertLen(t, conn.RecordedTxs, 2)
 			rtx := conn.RecordedTxs[1]
 			if !reflect.DeepEqual([]string{"1"}, rtx.Bookmarks) {
-				t.Errorf("Using unclean or no bookmarks: %+v", rtx)
+				t.Errorf("Using unclean or no currentBookmarks: %+v", rtx)
 			}
 			AssertStringEqual(t, sess.LastBookmark(), "1")
 			AssertIntEqual(t, bufferCalls, 1)
@@ -313,7 +313,7 @@ func TestSession(st *testing.T) {
 			AssertLen(t, conn.RecordedTxs, 2)
 			rtx := conn.RecordedTxs[1]
 			if !reflect.DeepEqual([]string{"1"}, rtx.Bookmarks) {
-				t.Errorf("Using unclean or no bookmarks: %+v", rtx)
+				t.Errorf("Using unclean or no currentBookmarks: %+v", rtx)
 			}
 			AssertStringEqual(t, sess.LastBookmark(), "1")
 			AssertIntEqual(t, bufferCalls, 1)

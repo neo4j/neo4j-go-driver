@@ -103,23 +103,24 @@ type sessionPool interface {
 }
 
 type session struct {
-	config           *Config
-	defaultMode      db.AccessMode
-	bookmarks        []string
-	databaseName     string
-	impersonatedUser string
-	getDefaultDbName bool
-	pool             sessionPool
-	router           sessionRouter
-	txExplicit       *transaction
-	txAuto           *autoTransaction
-	sleep            func(d time.Duration)
-	now              func() time.Time
-	logId            string
-	log              log.Logger
-	throttleTime     time.Duration
-	fetchSize        int
-	boltLogger       log.BoltLogger
+	config               *Config
+	defaultMode          db.AccessMode
+	currentBookmarks     []string
+	lastReceivedBookmark string
+	databaseName         string
+	impersonatedUser     string
+	getDefaultDbName     bool
+	pool                 sessionPool
+	router               sessionRouter
+	txExplicit           *transaction
+	txAuto               *autoTransaction
+	sleep                func(d time.Duration)
+	now                  func() time.Time
+	logId                string
+	log                  log.Logger
+	throttleTime         time.Duration
+	fetchSize            int
+	boltLogger           log.BoltLogger
 }
 
 // Remove empty string bookmarks to check for "bad" callers
@@ -151,21 +152,22 @@ func newSession(config *Config, sessConfig SessionConfig, router sessionRouter, 
 	logger.Debugf(log.Session, logId, "Created")
 
 	return &session{
-		config:           config,
-		router:           router,
-		pool:             pool,
-		defaultMode:      db.AccessMode(sessConfig.AccessMode),
-		bookmarks:        cleanupBookmarks(sessConfig.Bookmarks),
-		databaseName:     sessConfig.DatabaseName,
-		impersonatedUser: sessConfig.ImpersonatedUser,
-		getDefaultDbName: sessConfig.DatabaseName == "",
-		sleep:            time.Sleep,
-		now:              time.Now,
-		log:              logger,
-		logId:            logId,
-		throttleTime:     time.Second * 1,
-		fetchSize:        sessConfig.FetchSize,
-		boltLogger:       sessConfig.BoltLogger,
+		config:               config,
+		router:               router,
+		pool:                 pool,
+		defaultMode:          db.AccessMode(sessConfig.AccessMode),
+		currentBookmarks:     cleanupBookmarks(sessConfig.Bookmarks),
+		lastReceivedBookmark: "",
+		databaseName:         sessConfig.DatabaseName,
+		impersonatedUser:     sessConfig.ImpersonatedUser,
+		getDefaultDbName:     sessConfig.DatabaseName == "",
+		sleep:                time.Sleep,
+		now:                  time.Now,
+		log:                  logger,
+		logId:                logId,
+		throttleTime:         time.Second * 1,
+		fetchSize:            sessConfig.FetchSize,
+		boltLogger:           sessConfig.BoltLogger,
 	}
 }
 
@@ -175,12 +177,8 @@ func (s *session) LastBookmark() string {
 		s.retrieveBookmarks(s.txAuto.conn)
 	}
 
-	// Report bookmark from previously closed connection or from initial set
-	if len(s.bookmarks) > 0 {
-		return s.bookmarks[len(s.bookmarks)-1]
-	}
-
-	return ""
+	// Report bookmark from previously closed connection.
+	return s.lastReceivedBookmark
 }
 
 func (s *session) BeginTransaction(configurers ...func(*TransactionConfig)) (Transaction, error) {
@@ -210,7 +208,7 @@ func (s *session) BeginTransaction(configurers ...func(*TransactionConfig)) (Tra
 	// Begin transaction
 	txHandle, err := conn.TxBegin(db.TxConfig{
 		Mode:             s.defaultMode,
-		Bookmarks:        s.bookmarks,
+		Bookmarks:        s.currentBookmarks,
 		Timeout:          config.Timeout,
 		Meta:             config.Metadata,
 		ImpersonatedUser: s.impersonatedUser,
@@ -278,7 +276,7 @@ func (s *session) runRetriable(
 		// Begin transaction
 		txHandle, err := conn.TxBegin(db.TxConfig{
 			Mode:             mode,
-			Bookmarks:        s.bookmarks,
+			Bookmarks:        s.currentBookmarks,
 			Timeout:          config.Timeout,
 			Meta:             config.Metadata,
 			ImpersonatedUser: s.impersonatedUser,
@@ -351,9 +349,9 @@ func (s *session) WriteTransaction(
 
 func (s *session) getServers(ctx context.Context, mode db.AccessMode) ([]string, error) {
 	if mode == db.ReadMode {
-		return s.router.Readers(ctx, s.bookmarks, s.databaseName, s.boltLogger)
+		return s.router.Readers(ctx, s.currentBookmarks, s.databaseName, s.boltLogger)
 	} else {
-		return s.router.Writers(ctx, s.bookmarks, s.databaseName, s.boltLogger)
+		return s.router.Writers(ctx, s.currentBookmarks, s.databaseName, s.boltLogger)
 	}
 }
 
@@ -371,7 +369,7 @@ func (s *session) getConnection(mode db.AccessMode) (db.Connection, error) {
 	// If client requested user impersonation but provided no database we need to retrieve
 	// the name of the configured default database for that user before asking for a connection
 	if s.getDefaultDbName {
-		defaultDb, err := s.router.GetNameOfDefaultDatabase(ctx, s.bookmarks, s.impersonatedUser, s.boltLogger)
+		defaultDb, err := s.router.GetNameOfDefaultDatabase(ctx, s.currentBookmarks, s.impersonatedUser, s.boltLogger)
 		if err != nil {
 			return nil, wrapError(err)
 		}
@@ -408,7 +406,8 @@ func (s *session) retrieveBookmarks(conn db.Connection) {
 	}
 	bookmark := conn.Bookmark()
 	if len(bookmark) > 0 {
-		s.bookmarks = []string{bookmark}
+		s.currentBookmarks = []string{bookmark}
+		s.lastReceivedBookmark = bookmark
 	}
 }
 
@@ -453,7 +452,7 @@ func (s *session) Run(
 		},
 		db.TxConfig{
 			Mode:             s.defaultMode,
-			Bookmarks:        s.bookmarks,
+			Bookmarks:        s.currentBookmarks,
 			Timeout:          config.Timeout,
 			Meta:             config.Metadata,
 			ImpersonatedUser: s.impersonatedUser,

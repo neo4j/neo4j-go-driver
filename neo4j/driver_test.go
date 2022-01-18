@@ -236,8 +236,8 @@ func TestDriverSessionCreation(t *testing.T) {
 				t.Errorf("the defaultMode was not correctly set %v", AccessMode(sess.defaultMode))
 			}
 
-			if len(sess.bookmarks) != len(tt.bookmarks) {
-				t.Errorf("the bookmarks was not correctly set %v", sess.bookmarks)
+			if len(sess.currentBookmarks) != len(tt.bookmarks) {
+				t.Errorf("the bookmarks was not correctly set %v", sess.currentBookmarks)
 			}
 		})
 	}
