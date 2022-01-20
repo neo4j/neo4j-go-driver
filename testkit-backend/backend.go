@@ -691,5 +691,7 @@ func testSkips() map[string]string {
 		"stub.configuration_hints.test_connection_recv_timeout_seconds.TestRoutingConnectionRecvTimeout.*":                       "No GetRoutingTable support - too tricky to implement in Go",
 		"stub.homedb.test_homedb.TestHomeDb.test_session_should_cache_home_db_despite_new_rt":                                    "Driver does not remove servers from RT when connection breaks.",
 		"neo4j.test_authentication.TestAuthenticationBasic.test_error_on_incorrect_credentials_tx":                               "Driver retries tx on failed authentication.",
+		"stub.*.test_0_timeout":                                                                                                  "Driver omits 0 as tx timeout value",
+		"stub.*.test_negative_timeout":                                                                                           "Driver omits negative tx timeout values",
 	}
 }
