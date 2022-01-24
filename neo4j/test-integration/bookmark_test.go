@@ -251,7 +251,7 @@ var _ = Describe("Bookmark", func() {
 			Expect(err).To(Not(BeNil()))
 
 			err = tx.Close()
-			Expect(err).To(Not(BeNil()))
+			Expect(err).To(BeNil())
 			Expect(session.LastBookmark()).To(Equal(bookmark))
 		})
 
