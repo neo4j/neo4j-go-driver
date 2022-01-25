@@ -21,7 +21,9 @@ var _ = Describe("Result Summary", func() {
 
 	BeforeEach(func() {
 		server = dbserver.GetDbServer()
-		driver = server.Driver()
+		driver = server.Driver(func(config *neo4j.Config) {
+			config.Log = neo4j.ConsoleLogger(neo4j.DEBUG)
+		})
 		Expect(driver).NotTo(BeNil())
 	})
 
@@ -56,11 +58,15 @@ var _ = Describe("Result Summary", func() {
 		})
 
 		BeforeEach(func() {
-			session := driver.NewSession(neo4j.SessionConfig{DatabaseName: "system"})
+			session := driver.NewSession(neo4j.SessionConfig{DatabaseName: "system", BoltLogger: neo4j.ConsoleBoltLogger()})
 			defer assertCloses(session)
-			_, err := session.Run(fmt.Sprintf("CREATE DATABASE %s", extraDatabase), map[string]interface{}{})
+			res, err := session.Run(fmt.Sprintf("CREATE DATABASE %s", extraDatabase), map[string]interface{}{})
 			Expect(err).NotTo(HaveOccurred())
-			bookmark = session.LastBookmark()
+			_, err = res.Consume()  // consume result to obtain bookmark
+			Expect(err).NotTo(HaveOccurred())
+			bookmarks := session.LastBookmarks()
+			Expect(len(bookmarks)).To(Equal(1))
+			bookmark = bookmarks[0]
 		})
 
 		AfterEach(func() {

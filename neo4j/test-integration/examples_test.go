@@ -765,51 +765,54 @@ func printFriendsTxFunc() neo4j.TransactionWork {
 	}
 }
 
-func addAndEmploy(driver neo4j.Driver, person string, company string) (string, error) {
+func addAndEmploy(driver neo4j.Driver, person string, company string) ([]string, error) {
 	session := driver.NewSession(neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
 	defer session.Close()
 
 	if _, err := session.WriteTransaction(addCompanyTxFunc(company)); err != nil {
-		return "", err
+		return nil, err
 	}
 	if _, err := session.WriteTransaction(addPersonTxFunc(person)); err != nil {
-		return "", err
+		return nil, err
 	}
 	if _, err := session.WriteTransaction(employTxFunc(person, company)); err != nil {
-		return "", err
+		return nil, err
 	}
 
-	return session.LastBookmark(), nil
+	return session.LastBookmarks(), nil
 }
 
-func makeFriend(driver neo4j.Driver, person1 string, person2 string, bookmarks ...string) (string, error) {
+func makeFriend(driver neo4j.Driver, person1 string, person2 string, bookmarks ...string) ([]string, error) {
 	session := driver.NewSession(neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite, Bookmarks: bookmarks})
 	defer session.Close()
 
 	if _, err := session.WriteTransaction(makeFriendTxFunc(person1, person2)); err != nil {
-		return "", err
+		return nil, err
 	}
 
-	return session.LastBookmark(), nil
+	return session.LastBookmarks(), nil
 }
 
 func addEmployAndMakeFriends(driver neo4j.Driver) error {
-	var bookmark1, bookmark2, bookmark3 string
+	var bookmarks1, bookmarks2, bookmarks3 []string
 	var err error
 
-	if bookmark1, err = addAndEmploy(driver, "Alice", "Wayne Enterprises"); err != nil {
+	if bookmarks1, err = addAndEmploy(driver, "Alice", "Wayne Enterprises"); err != nil {
 		return err
 	}
 
-	if bookmark2, err = addAndEmploy(driver, "Bob", "LexCorp"); err != nil {
+	if bookmarks2, err = addAndEmploy(driver, "Bob", "LexCorp"); err != nil {
 		return err
 	}
 
-	if bookmark3, err = makeFriend(driver, "Bob", "Alice", bookmark1, bookmark2); err != nil {
+	if bookmarks3, err = makeFriend(driver, "Bob", "Alice", append(bookmarks1, bookmarks2...)...); err != nil {
 		return err
 	}
 
-	session := driver.NewSession(neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead, Bookmarks: []string{bookmark1, bookmark2, bookmark3}})
+	session := driver.NewSession(neo4j.SessionConfig{
+		AccessMode: neo4j.AccessModeRead,
+		Bookmarks: neo4j.ConcatenateStringSlices(bookmarks1, bookmarks2, bookmarks3),
+	})
 	defer session.Close()
 
 	if _, err = session.ReadTransaction(printFriendsTxFunc()); err != nil {

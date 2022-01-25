@@ -31,7 +31,7 @@ import (
 type TestContext struct {
 	driver   neo4j.Driver
 	stop     int32
-	bookmark atomic.Value
+	bookmarks atomic.Value
 
 	readNodeCountsByServer sync.Map
 
@@ -45,13 +45,13 @@ func NewTestContext(driver neo4j.Driver) *TestContext {
 	result := &TestContext{
 		driver:                 driver,
 		stop:                   0,
-		bookmark:               atomic.Value{},
+		bookmarks:              atomic.Value{},
 		readNodeCountsByServer: sync.Map{},
 		readNodeCount:          0,
 		createdNodeCount:       0,
 	}
 
-	result.bookmark.Store("")
+	result.bookmarks.Store([]string{""})
 
 	return result
 }
@@ -74,12 +74,12 @@ func (ctx *TestContext) addRead() {
 	atomic.AddInt32(&ctx.readNodeCount, 1)
 }
 
-func (ctx *TestContext) getBookmark() string {
-	return ctx.bookmark.Load().(string)
+func (ctx *TestContext) getBookmarks() []string {
+	return ctx.bookmarks.Load().([]string)
 }
 
-func (ctx *TestContext) setBookmark(bookmark string) {
-	ctx.bookmark.Store(bookmark)
+func (ctx *TestContext) setBookmarks(bookmarks []string) {
+	ctx.bookmarks.Store(bookmarks)
 }
 
 func (ctx *TestContext) processSummary(summary neo4j.ResultSummary) {

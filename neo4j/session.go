@@ -35,9 +35,10 @@ type TransactionWork func(tx Transaction) (interface{}, error)
 // Session represents a logical connection (which is not tied to a physical connection)
 // to the server
 type Session interface {
-	// LastBookmark returns the bookmark received following the last successfully completed transaction.
-	// If no bookmark was received or if this transaction was rolled back, the bookmark value will not be changed.
-	LastBookmark() string
+	// LastBookmarks returns the bookmark received following the last successfully completed transaction.
+	// If no bookmark was received or if this transaction was rolled back, the initial set of bookmarks will be
+	// returned.
+	LastBookmarks() []string
 	// BeginTransaction starts a new explicit transaction on this session
 	BeginTransaction(configurers ...func(*TransactionConfig)) (Transaction, error)
 	// ReadTransaction executes the given unit of work in a AccessModeRead transaction with
@@ -169,18 +170,14 @@ func newSession(config *Config, sessConfig SessionConfig, router sessionRouter, 
 	}
 }
 
-func (s *session) LastBookmark() string {
+func (s *session) LastBookmarks() []string {
 	// Pick up bookmark from pending auto-commit if there is a bookmark on it
 	if s.txAuto != nil {
 		s.retrieveBookmarks(s.txAuto.conn)
 	}
 
-	// Report bookmark from previously closed connection or from initial set
-	if len(s.bookmarks) > 0 {
-		return s.bookmarks[len(s.bookmarks)-1]
-	}
-
-	return ""
+	// Report bookmarks from previously closed connection or from initial set
+	return s.bookmarks
 }
 
 func (s *session) BeginTransaction(configurers ...func(*TransactionConfig)) (Transaction, error) {
@@ -501,8 +498,8 @@ type sessionWithError struct {
 	err error
 }
 
-func (s *sessionWithError) LastBookmark() string {
-	return ""
+func (s *sessionWithError) LastBookmarks() []string {
+	return []string{}
 }
 
 func (s *sessionWithError) BeginTransaction(configurers ...func(*TransactionConfig)) (Transaction, error) {

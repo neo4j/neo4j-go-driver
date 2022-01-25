@@ -493,10 +493,9 @@ func (b *backend) handleRequest(req map[string]interface{}) {
 
 	case "SessionLastBookmarks":
 		sessionState := b.sessionStates[data["sessionId"].(string)]
-		bookmark := sessionState.session.LastBookmark()
-		bookmarks := []string{}
-		if bookmark != "" {
-			bookmarks = append(bookmarks, bookmark)
+		bookmarks := sessionState.session.LastBookmarks()
+		if (bookmarks == nil) {
+			bookmarks = []string{}
 		}
 		b.writeResponse("Bookmarks", map[string]interface{}{"bookmarks": bookmarks})
 

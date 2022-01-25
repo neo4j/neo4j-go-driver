@@ -165,9 +165,9 @@ func TestSession(st *testing.T) {
 	})
 
 	st.Run("Bookmarking", func(bt *testing.T) {
-		bt.Run("Initial bookmark is used for LastBookmark", func(t *testing.T) {
+		bt.Run("Initial bookmarks are returned from LastBookmarks", func(t *testing.T) {
 			_, _, sess := createSessionWithBookmarks([]string{"b1", "b2"})
-			AssertStringEqual(t, sess.LastBookmark(), "b2")
+			AssertDeepEquals(t, sess.LastBookmarks(), []string{"b1", "b2"})
 		})
 
 		bt.Run("Initial bookmarks are used and cleaned up before usage", func(t *testing.T) {
@@ -194,9 +194,9 @@ func TestSession(st *testing.T) {
 			}
 		})
 
-		bt.Run("LastBookmark is empty when no initial bookmark", func(t *testing.T) {
+		bt.Run("LastBookmarks is empty when no initial bookmark", func(t *testing.T) {
 			_, _, sess := createSession()
-			AssertStringEqual(t, sess.LastBookmark(), "")
+			AssertLen(t, sess.LastBookmarks(), 0)
 		})
 	})
 
@@ -256,17 +256,17 @@ func TestSession(st *testing.T) {
 
 			sess.Run("cypher", nil)
 			AssertIntEqual(t, bufferCalls, 0)
-			AssertStringEqual(t, sess.LastBookmark(), "")
+			AssertLen(t, sess.LastBookmarks(), 0)
 			// Should call Buffer on connection to ensure that first Run is buffered and
 			// it's bookmark retrieved
 			sess.Run("cypher", nil)
-			AssertStringEqual(t, sess.LastBookmark(), "1")
+			AssertDeepEquals(t, sess.LastBookmarks(), []string{"1"})
 			result, _ := sess.Run("cypher", nil)
-			AssertStringEqual(t, sess.LastBookmark(), "2")
+			AssertDeepEquals(t, sess.LastBookmarks(), []string{"2"})
 			// And finally consuming the last result should give a new bookmark
 			AssertIntEqual(t, consumeCalls, 0)
 			result.Consume()
-			AssertStringEqual(t, sess.LastBookmark(), "1")
+			AssertDeepEquals(t, sess.LastBookmarks(), []string{"1"})
 		})
 
 		bt.Run("Pending and invoke tx function", func(t *testing.T) {
@@ -291,7 +291,7 @@ func TestSession(st *testing.T) {
 			if !reflect.DeepEqual([]string{"1"}, rtx.Bookmarks) {
 				t.Errorf("Using unclean or no bookmarks: %+v", rtx)
 			}
-			AssertStringEqual(t, sess.LastBookmark(), "1")
+			AssertDeepEquals(t, sess.LastBookmarks(), []string{"1"})
 			AssertIntEqual(t, bufferCalls, 1)
 		})
 
@@ -315,7 +315,7 @@ func TestSession(st *testing.T) {
 			if !reflect.DeepEqual([]string{"1"}, rtx.Bookmarks) {
 				t.Errorf("Using unclean or no bookmarks: %+v", rtx)
 			}
-			AssertStringEqual(t, sess.LastBookmark(), "1")
+			AssertDeepEquals(t, sess.LastBookmarks(), []string{"1"})
 			AssertIntEqual(t, bufferCalls, 1)
 		})
 
@@ -477,7 +477,7 @@ func TestSession(st *testing.T) {
 			// Begin and commit a transaction on the session
 			tx, _ := sess.BeginTransaction()
 			tx.Commit()
-			AssertStringEqual(t, sess.LastBookmark(), bookmark)
+			AssertDeepEquals(t, sess.LastBookmarks(), []string{bookmark})
 			// The bookmark should be used in next transaction
 			tx, _ = sess.BeginTransaction()
 			AssertLen(t, conn.RecordedTxs, 2)
