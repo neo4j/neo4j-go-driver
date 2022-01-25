@@ -351,8 +351,6 @@ func (p *Pool) Return(c db.Connection) {
 		return
 	}
 
-	c.SetBoltLogger(nil)
-
 	// Get the name of the server that the connection belongs to.
 	serverName := c.ServerName()
 	isAlive := c.IsAlive()
@@ -379,6 +377,8 @@ func (p *Pool) Return(c db.Connection) {
 		c.Reset()
 		isAlive = c.IsAlive()
 	}
+
+	c.SetBoltLogger(nil)
 
 	// Shouldn't return a too old or dead connection back to the pool
 	if !isAlive || age >= p.maxAge {

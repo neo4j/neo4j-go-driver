@@ -41,13 +41,11 @@ func TestResult(ot *testing.T) {
 	cypher := ""
 	params := map[string]interface{}{}
 	recs := []*db.Record{
-		&db.Record{},
-		&db.Record{},
-		&db.Record{},
+		{Keys: []string{"n"}, Values: []interface{}{42}},
+		{Keys: []string{"n"}, Values: []interface{}{43}},
+		{Keys: []string{"n"}, Values: []interface{}{44}},
 	}
-	sums := []*db.Summary{
-		&db.Summary{},
-	}
+	sums := []*db.Summary{{}}
 	errs := []error{
 		errors.New("Whatever"),
 	}
@@ -80,37 +78,37 @@ func TestResult(ot *testing.T) {
 		{
 			name: "happy",
 			stream: []Next{
-				Next{Record: recs[0]},
-				Next{Record: recs[1]},
-				Next{Summary: sums[0]},
+				{Record: recs[0]},
+				{Record: recs[1]},
+				{Summary: sums[0]},
 			},
 			iters: []iter{
-				iter{expectNext: true, expectRec: recs[0]},
-				iter{expectNext: true, expectRec: recs[1]},
-				iter{expectNext: false, expectSum: sums[0]},
+				{expectNext: true, expectRec: recs[0]},
+				{expectNext: true, expectRec: recs[1]},
+				{expectNext: false, expectSum: sums[0]},
 			},
 		},
 		{
 			name: "error after one record",
 			stream: []Next{
-				Next{Record: recs[0]},
-				Next{Err: errs[0]},
+				{Record: recs[0]},
+				{Err: errs[0]},
 			},
 			iters: []iter{
-				iter{expectNext: true, expectRec: recs[0]},
-				iter{expectNext: false, expectErr: errs[0]},
+				{expectNext: true, expectRec: recs[0]},
+				{expectNext: false, expectErr: errs[0]},
 			},
 		},
 		{
 			name: "proceed after error",
 			stream: []Next{
-				Next{Record: recs[0]},
-				Next{Err: errs[0]},
+				{Record: recs[0]},
+				{Err: errs[0]},
 			},
 			iters: []iter{
-				iter{expectNext: true, expectRec: recs[0]},
-				iter{expectNext: false, expectErr: errs[0]},
-				iter{expectNext: false, expectErr: errs[0]},
+				{expectNext: true, expectRec: recs[0]},
+				{expectNext: false, expectErr: errs[0]},
+				{expectNext: false, expectErr: errs[0]},
 			},
 		},
 	}
@@ -143,12 +141,33 @@ func TestResult(ot *testing.T) {
 		})
 	}
 
+	// PeekRecord
+	ot.Run("Peeks records", func(t *testing.T) {
+		var peedkedFirst *Record
+		var peekedSecond *Record
+		var nextFirst *Record
+		var peekedAfterNextFirst *Record
+		var nextSecond *Record
+		conn := &ConnFake{Nexts: []Next{{Record: recs[0]}}}
+
+		result := newResult(conn, streamHandle, cypher, params)
+
+		AssertTrue(t, result.PeekRecord(&peedkedFirst))
+		AssertTrue(t, result.PeekRecord(&peekedSecond))
+		AssertTrue(t, result.NextRecord(&nextFirst))
+		AssertDeepEquals(t, recs[0], peedkedFirst, peekedSecond, nextFirst)
+		AssertFalse(t, result.PeekRecord(&peekedAfterNextFirst))
+		AssertNil(t, peekedAfterNextFirst)
+		AssertFalse(t, result.NextRecord(&nextSecond))
+		AssertNil(t, nextSecond)
+	})
+
 	// Consume
 	ot.Run("Consume with summary", func(t *testing.T) {
 		conn := &ConnFake{
 			ConsumeSum: sums[0],
 			ConsumeErr: nil,
-			Nexts:      []Next{Next{Record: recs[0]}},
+			Nexts:      []Next{{Record: recs[0]}},
 		}
 		res := newResult(conn, streamHandle, cypher, params)
 		// Get one record to make sure that Record() is cleared
@@ -165,7 +184,7 @@ func TestResult(ot *testing.T) {
 		conn := &ConnFake{
 			ConsumeSum: nil,
 			ConsumeErr: errs[0],
-			Nexts:      []Next{Next{Record: recs[0]}},
+			Nexts:      []Next{{Record: recs[0]}},
 		}
 		res := newResult(conn, streamHandle, cypher, params)
 		// Get one record to make sure that Record() is cleared
@@ -182,7 +201,7 @@ func TestResult(ot *testing.T) {
 	// Single
 	ot.Run("Single with one record", func(t *testing.T) {
 		conn := &ConnFake{
-			Nexts: []Next{Next{Record: recs[0]}, Next{Summary: sums[0]}},
+			Nexts: []Next{{Record: recs[0]}, {Summary: sums[0]}},
 		}
 		res := newResult(conn, streamHandle, cypher, params)
 		rec, err := res.Single()
@@ -194,7 +213,7 @@ func TestResult(ot *testing.T) {
 	})
 	ot.Run("Single with no record", func(t *testing.T) {
 		conn := &ConnFake{
-			Nexts: []Next{Next{Summary: sums[0]}},
+			Nexts: []Next{{Summary: sums[0]}},
 		}
 		res := newResult(conn, streamHandle, cypher, params)
 		rec, err := res.Single()
@@ -208,7 +227,7 @@ func TestResult(ot *testing.T) {
 	ot.Run("Single with two records", func(t *testing.T) {
 		calledConsume := false
 		conn := &ConnFake{
-			Nexts: []Next{Next{Record: recs[0]}, Next{Record: recs[1]}, Next{Summary: sums[0]}},
+			Nexts: []Next{{Record: recs[0]}, {Record: recs[1]}, {Summary: sums[0]}},
 			ConsumeHook: func() {
 				calledConsume = true
 			},
@@ -232,7 +251,7 @@ func TestResult(ot *testing.T) {
 	})
 	ot.Run("Single with error", func(t *testing.T) {
 		conn := &ConnFake{
-			Nexts: []Next{Next{Err: errs[0]}},
+			Nexts: []Next{{Err: errs[0]}},
 		}
 		res := newResult(conn, streamHandle, cypher, params)
 		rec, err := res.Single()
@@ -246,7 +265,7 @@ func TestResult(ot *testing.T) {
 	// Collect
 	ot.Run("Collect n records", func(t *testing.T) {
 		conn := &ConnFake{
-			Nexts: []Next{Next{Record: recs[0]}, Next{Record: recs[1]}, Next{Summary: sums[0]}},
+			Nexts: []Next{{Record: recs[0]}, {Record: recs[1]}, {Summary: sums[0]}},
 		}
 		res := newResult(conn, streamHandle, cypher, params)
 		coll, err := res.Collect()
@@ -260,7 +279,7 @@ func TestResult(ot *testing.T) {
 	})
 	ot.Run("Collect n records after Next", func(t *testing.T) {
 		conn := &ConnFake{
-			Nexts: []Next{Next{Record: recs[0]}, Next{Record: recs[1]}, Next{Record: recs[2]}, Next{Summary: sums[0]}},
+			Nexts: []Next{{Record: recs[0]}, {Record: recs[1]}, {Record: recs[2]}, {Summary: sums[0]}},
 		}
 		res := newResult(conn, streamHandle, cypher, params)
 		res.Next()
@@ -276,7 +295,7 @@ func TestResult(ot *testing.T) {
 	})
 	ot.Run("Collect empty", func(t *testing.T) {
 		conn := &ConnFake{
-			Nexts: []Next{Next{Summary: sums[0]}},
+			Nexts: []Next{{Summary: sums[0]}},
 		}
 		res := newResult(conn, streamHandle, cypher, params)
 		coll, err := res.Collect()
@@ -287,7 +306,7 @@ func TestResult(ot *testing.T) {
 	})
 	ot.Run("Collect emptied", func(t *testing.T) {
 		conn := &ConnFake{
-			Nexts: []Next{Next{Summary: sums[0]}},
+			Nexts: []Next{{Summary: sums[0]}},
 		}
 		res := newResult(conn, streamHandle, cypher, params)
 		res.Next()
@@ -300,7 +319,7 @@ func TestResult(ot *testing.T) {
 	})
 	ot.Run("Collect error", func(t *testing.T) {
 		conn := &ConnFake{
-			Nexts: []Next{Next{Err: errs[0]}},
+			Nexts: []Next{{Err: errs[0]}},
 		}
 		res := newResult(conn, streamHandle, cypher, params)
 		coll, err := res.Collect()
@@ -311,7 +330,7 @@ func TestResult(ot *testing.T) {
 	})
 	ot.Run("Collect stream error", func(t *testing.T) {
 		conn := &ConnFake{
-			Nexts: []Next{Next{Record: recs[0]}, Next{Err: errs[0]}},
+			Nexts: []Next{{Record: recs[0]}, {Err: errs[0]}},
 		}
 		res := newResult(conn, streamHandle, cypher, params)
 		coll, err := res.Collect()

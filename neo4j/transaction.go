@@ -68,7 +68,12 @@ func (tx *transaction) Rollback() error {
 	if tx.done {
 		return tx.err
 	}
-	tx.err = tx.conn.TxRollback(tx.txHandle)
+	if !tx.conn.IsAlive() || tx.conn.HasFailed() {
+		// tx implicitly rolled back by having failed
+		tx.err = nil
+	} else {
+		tx.err = tx.conn.TxRollback(tx.txHandle)
+	}
 	tx.done = true
 	tx.onClosed()
 	return wrapError(tx.err)

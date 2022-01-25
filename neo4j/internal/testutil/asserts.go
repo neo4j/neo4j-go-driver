@@ -195,3 +195,20 @@ func AssertSameType(t *testing.T, x, y interface{}) {
 		t.Errorf("Expected types of %s and %s to be same but was %s and %s", x, y, t1, t2)
 	}
 }
+
+func AssertDeepEquals(t *testing.T, values ...interface{}) {
+	t.Helper()
+	count := len(values)
+	if count == 0 {
+		return
+	}
+	prev := values[0]
+	for i := 1; i < count; i++ {
+		current := values[i]
+		if !reflect.DeepEqual(prev, current) {
+			t.Errorf("Expected value %v (parameter %d) to equal value %v (parameter %d)", prev, i-1, current, i)
+			return
+		}
+		prev = current
+	}
+}

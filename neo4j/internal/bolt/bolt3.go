@@ -649,6 +649,10 @@ func (b *bolt3) IsAlive() bool {
 	return b.state != bolt3_dead
 }
 
+func (b *bolt3) HasFailed() bool {
+	return b.state == bolt3_failed
+}
+
 func (b *bolt3) Birthdate() time.Time {
 	return b.birthDate
 }
