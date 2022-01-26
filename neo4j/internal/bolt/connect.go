@@ -38,9 +38,9 @@ type protocolVersion struct {
 
 // Supported versions in priority order
 var versions = [4]protocolVersion{
+	{major: 5, minor: 0},
 	{major: 4, minor: 4, back: 2},
 	{major: 4, minor: 1},
-	{major: 4, minor: 0},
 	{major: 3, minor: 0},
 }
 
@@ -80,7 +80,6 @@ func Connect(serverName string, conn net.Conn, auth map[string]interface{}, user
 	minor := buf[2]
 	switch major {
 	case 3:
-		// Handover rest of connection handshaking
 		boltConn := NewBolt3(serverName, conn, logger, boltLog)
 		err = boltConn.connect(int(minor), auth, userAgent)
 		if err != nil {
@@ -88,8 +87,14 @@ func Connect(serverName string, conn net.Conn, auth map[string]interface{}, user
 		}
 		return boltConn, nil
 	case 4:
-		// Handover rest of connection handshaking
 		boltConn := NewBolt4(serverName, conn, logger, boltLog)
+		err = boltConn.connect(int(minor), auth, userAgent, routingContext)
+		if err != nil {
+			return nil, err
+		}
+		return boltConn, nil
+	case 5:
+		boltConn := NewBolt5(serverName, conn, logger, boltLog)
 		err = boltConn.connect(int(minor), auth, userAgent, routingContext)
 		if err != nil {
 			return nil, err
