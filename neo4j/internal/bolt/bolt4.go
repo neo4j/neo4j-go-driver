@@ -278,7 +278,7 @@ func (b *bolt4) checkImpersonationAndVersion(impersonatedUser string) error {
 }
 
 func (b *bolt4) TxBegin(ctx context.Context, txConfig idb.TxConfig) (idb.
-TxHandle, error) {
+	TxHandle, error) {
 	// Ok, to begin transaction while streaming auto-commit, just empty the stream and continue.
 	if b.state == bolt4_streaming {
 		if b.bufferStream(ctx); b.err != nil {
@@ -482,7 +482,7 @@ func (b *bolt4) discardAllStreams(ctx context.Context) {
 
 // Sends a PULL n request to server. State should be streaming and there should be a current stream.
 func (b *bolt4) sendPullN(ctx context.Context) {
-	b.assertState(bolt4_streaming, bolt3_streamingtx)
+	b.assertState(bolt4_streaming, bolt4_streamingtx)
 	if b.state == bolt4_streaming {
 		b.out.appendPullN(b.streams.curr.fetchSize)
 		b.out.send(ctx, b.conn)
