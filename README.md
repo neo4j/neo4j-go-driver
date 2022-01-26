@@ -324,7 +324,7 @@ This section describes instructions to use during the development phase of the d
 
 ### Testing
 
-Tests **require** the latest [Testkit 4.3](https://github.com/neo4j-drivers/testkit/tree/4.3), Python3 and Docker.
+Tests **require** the latest [Testkit](https://github.com/neo4j-drivers/testkit/), Python3 and Docker.
 
 Testkit needs to be cloned and configured to run against the Go Driver. Use the following steps to configure it.
 
@@ -347,7 +347,7 @@ export TEST_DRIVER_NAME=go
 export TEST_DRIVER_REPO=<path for the root folder of driver repository>
 ```
 
-To run test against against some Neo4j version:
+To run test against some Neo4j version:
 
 ```shell
 python3 main.py
