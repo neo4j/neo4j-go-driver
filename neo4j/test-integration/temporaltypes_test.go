@@ -52,8 +52,7 @@ var _ = Describe("Temporal Types", func() {
 			Skip("temporal types are only available after neo4j 3.4.0 release")
 		}
 
-		session, err = driver.Session(neo4j.AccessModeWrite)
-		Expect(err).To(BeNil())
+		session = driver.NewSession(neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
 		Expect(session).NotTo(BeNil())
 	})
 

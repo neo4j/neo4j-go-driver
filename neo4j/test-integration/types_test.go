@@ -39,9 +39,7 @@ var _ = Describe("Types", func() {
 
 	BeforeEach(func() {
 		driver = server.Driver()
-
-		session, err = driver.Session(neo4j.AccessModeWrite)
-		Expect(err).To(BeNil())
+		session = driver.NewSession(neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
 		Expect(session).NotTo(BeNil())
 	})
 

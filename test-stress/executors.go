@@ -63,17 +63,15 @@ func ExpectInt(a, b int) {
 
 func newStressSession(driver neo4j.Driver, useBookmark bool, accessMode neo4j.AccessMode, ctx *TestContext) neo4j.Session {
 	var session neo4j.Session
-	var err error
-
 	if useBookmark {
-		session, err = driver.Session(accessMode, ctx.getBookmark())
+		session = driver.NewSession(neo4j.SessionConfig{
+			AccessMode: accessMode,
+			Bookmarks:  []string{ctx.getBookmark()},
+		})
 	} else {
-		session, err = driver.Session(accessMode)
+		session = driver.NewSession(neo4j.SessionConfig{AccessMode: accessMode})
 	}
-
-	ExpectNoError(err)
 	ExpectNotNil(session)
-
 	return session
 }
 

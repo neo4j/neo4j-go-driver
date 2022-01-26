@@ -33,11 +33,10 @@ var _ = Describe("Bookmark", func() {
 	server := dbserver.GetDbServer()
 
 	createNodeInTx := func(driver neo4j.Driver) string {
-		session, err := driver.Session(neo4j.AccessModeWrite)
-		Expect(err).To(BeNil())
+		session := driver.NewSession(neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
 		defer session.Close()
 
-		_, err = session.WriteTransaction(func(tx neo4j.Transaction) (interface{}, error) {
+		_, err := session.WriteTransaction(func(tx neo4j.Transaction) (interface{}, error) {
 			result, err := tx.Run("CREATE ()", nil)
 			Expect(err).To(BeNil())
 
@@ -64,8 +63,7 @@ var _ = Describe("Bookmark", func() {
 
 		BeforeEach(func() {
 			driver = server.Driver()
-			session, err = driver.Session(neo4j.AccessModeWrite)
-			Expect(err).To(BeNil())
+			session = driver.NewSession(neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
 		})
 
 		AfterEach(func() {
@@ -195,7 +193,6 @@ var _ = Describe("Bookmark", func() {
 
 	Context("session constructed with one bookmark", func() {
 		var (
-			err      error
 			driver   neo4j.Driver
 			session  neo4j.Session
 			bookmark string
@@ -206,8 +203,7 @@ var _ = Describe("Bookmark", func() {
 
 			bookmark = createNodeInTx(driver)
 
-			session, err = driver.Session(neo4j.AccessModeWrite, bookmark)
-			Expect(err).To(BeNil())
+			session = driver.NewSession(neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite, Bookmarks: []string{bookmark}})
 		})
 
 		AfterEach(func() {
@@ -276,7 +272,6 @@ var _ = Describe("Bookmark", func() {
 
 	Context("session constructed with two bookmarks", func() {
 		var (
-			err       error
 			driver    neo4j.Driver
 			session   neo4j.Session
 			bookmark1 string
@@ -290,8 +285,10 @@ var _ = Describe("Bookmark", func() {
 			bookmark2 = createNodeInTx(driver)
 			Expect(bookmark1).NotTo(Equal(bookmark2))
 
-			session, err = driver.Session(neo4j.AccessModeWrite, bookmark1, bookmark2)
-			Expect(err).To(BeNil())
+			session = driver.NewSession(neo4j.SessionConfig{
+				AccessMode: neo4j.AccessModeWrite,
+				Bookmarks:  []string{bookmark1, bookmark2},
+			})
 		})
 
 		AfterEach(func() {
@@ -335,7 +332,6 @@ var _ = Describe("Bookmark", func() {
 
 	Context("session constructed with unreachable bookmark", func() {
 		var (
-			err      error
 			driver   neo4j.Driver
 			session  neo4j.Session
 			bookmark string
@@ -346,8 +342,10 @@ var _ = Describe("Bookmark", func() {
 
 			bookmark = createNodeInTx(driver)
 
-			session, err = driver.Session(neo4j.AccessModeWrite, bookmark+"0")
-			Expect(err).To(BeNil())
+			session = driver.NewSession(neo4j.SessionConfig{
+				AccessMode: neo4j.AccessModeWrite,
+				Bookmarks:  []string{bookmark + "0"},
+			})
 		})
 
 		AfterEach(func() {

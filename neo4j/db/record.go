@@ -42,10 +42,3 @@ func (r Record) Get(key string) (interface{}, bool) {
 	}
 	return nil, false
 }
-
-// GetByIndex returns the value in the record at the specified index.
-//
-// Deprecated: Prefer to access Values directly instead.
-func (r Record) GetByIndex(i int) interface{} {
-	return r.Values[i]
-}

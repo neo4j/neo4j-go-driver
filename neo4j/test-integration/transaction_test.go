@@ -40,9 +40,7 @@ var _ = Describe("Transaction", func() {
 
 	BeforeEach(func() {
 		driver = server.Driver()
-
-		session, err = driver.Session(neo4j.AccessModeWrite)
-		Expect(err).To(BeNil())
+		session = driver.NewSession(neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
 	})
 
 	AfterEach(func() {
@@ -230,7 +228,7 @@ var _ = Describe("Transaction", func() {
 				Skip("Can not use dbms.listTransactions on non-enterprise version")
 			}
 
-			session2 := newSession(driver, neo4j.AccessModeRead)
+			session2 := driver.NewSession(neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead})
 			defer session2.Close()
 			matched, err := session2.ReadTransaction(listTransactionsAndMatchMetadataWork(metadata))
 			Expect(err).To(BeNil())

@@ -44,8 +44,6 @@ const (
 type ResultSummary interface {
 	// Server returns basic information about the server where the statement is carried out.
 	Server() ServerInfo
-	// Deprecated: since 4.4, will be removed in 5.0. Use Query instead
-	Statement() Statement
 	// Query returns the query that has been executed.
 	Query() Query
 	// StatementType returns type of statement that has been executed.
@@ -106,8 +104,6 @@ type Statement interface {
 type Query interface {
 	// Text returns the statement's text.
 	Text() string
-	// Deprecated: since 4.4, will be removed in 5.0. Use Parameters instead
-	Params() map[string]interface{}
 	// Parameters returns the statement's parameters.
 	Parameters() map[string]interface{}
 }
@@ -116,9 +112,6 @@ type Query interface {
 type ServerInfo interface {
 	// Address returns the address of the server.
 	Address() string
-	// Version returns the version of Neo4j running at the server.
-	// Deprecated: since 4.3, this function is deprecated. It will be removed in 5.0. please use Agent, ProtocolVersion, or call the dbms.components procedure instead
-	Version() string
 	Agent() string
 	ProtocolVersion() db.ProtocolVersion
 }
@@ -221,14 +214,6 @@ func (s *resultSummary) Address() string {
 	return s.sum.ServerName
 }
 
-func (s *resultSummary) Version() string {
-	return s.sum.Agent
-}
-
-func (s *resultSummary) Statement() Statement {
-	return s
-}
-
 func (s *resultSummary) Query() Query {
 	return s
 }
@@ -239,10 +224,6 @@ func (s *resultSummary) StatementType() StatementType {
 
 func (s *resultSummary) Text() string {
 	return s.cypher
-}
-
-func (s *resultSummary) Params() map[string]interface{} {
-	return s.Parameters()
 }
 
 func (s *resultSummary) Parameters() map[string]interface{} {
