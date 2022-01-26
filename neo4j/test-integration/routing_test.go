@@ -52,8 +52,7 @@ var _ = Describe("Routing", func() {
 		Expect(err).To(BeNil())
 		defer driver.Close()
 
-		session, err = driver.Session(neo4j.AccessModeRead)
-		Expect(err).To(BeNil())
+		session = driver.NewSession(neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead})
 		defer session.Close()
 
 		result, err = session.Run("RETURN 1", nil)
@@ -73,8 +72,7 @@ var _ = Describe("Routing", func() {
 		driver := getDriver(server.URI())
 		Expect(err).To(BeNil())
 
-		session, err = driver.Session(neo4j.AccessModeWrite)
-		Expect(err).To(BeNil())
+		session = driver.NewSession(neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
 
 		writeCount, err = session.WriteTransaction(func(tx neo4j.Transaction) (interface{}, error) {
 			writeResult, err := tx.Run("MERGE (n:Person {name: 'John'}) RETURN 1", nil)

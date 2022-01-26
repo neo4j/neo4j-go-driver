@@ -62,8 +62,7 @@ var _ = Describe("Driver", func() {
 		BeforeEach(func() {
 			driver = server.Driver()
 
-			session, err = driver.Session(neo4j.AccessModeWrite)
-			Expect(err).To(BeNil())
+			session = driver.NewSession(neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
 		})
 
 		AfterEach(func() {
@@ -106,8 +105,7 @@ var _ = Describe("Driver", func() {
 			err := driver.Close()
 			Expect(err).To(BeNil())
 
-			_, err = driver.Session(neo4j.AccessModeWrite)
-			Expect(err).NotTo(BeNil())
+			_ = driver.NewSession(neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
 		})
 
 	})
@@ -134,22 +132,19 @@ var _ = Describe("Driver", func() {
 
 		It("should return error when pool is full", func() {
 			// Open connection 1
-			session1, err := driver.Session(neo4j.AccessModeWrite)
-			Expect(err).To(BeNil())
+			session1 := driver.NewSession(neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
 
 			_, err = session1.Run("UNWIND RANGE(1, 100) AS N RETURN N", nil)
 			Expect(err).To(BeNil())
 
 			// Open connection 2
-			session2, err := driver.Session(neo4j.AccessModeWrite)
-			Expect(err).To(BeNil())
+			session2 := driver.NewSession(neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
 
 			_, err = session2.Run("UNWIND RANGE(1, 100) AS N RETURN N", nil)
 			Expect(err).To(BeNil())
 
 			// Try opening connection 3
-			session3, err := driver.Session(neo4j.AccessModeWrite)
-			Expect(err).To(BeNil())
+			session3 := driver.NewSession(neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
 
 			_, err = session3.Run("UNWIND RANGE(1, 100) AS N RETURN N", nil)
 			Expect(neo4j.IsConnectivityError(err)).To(BeTrue())
@@ -179,22 +174,19 @@ var _ = Describe("Driver", func() {
 
 		It("should return error when pool is full", func() {
 			// Open connection 1
-			session1, err := driver.Session(neo4j.AccessModeWrite)
-			Expect(err).To(BeNil())
+			session1 := driver.NewSession(neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
 
 			_, err = session1.Run("UNWIND RANGE(1, 100) AS N RETURN N", nil)
 			Expect(err).To(BeNil())
 
 			// Open connection 2
-			session2, err := driver.Session(neo4j.AccessModeWrite)
-			Expect(err).To(BeNil())
+			session2 := driver.NewSession(neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
 
 			_, err = session2.Run("UNWIND RANGE(1, 100) AS N RETURN N", nil)
 			Expect(err).To(BeNil())
 
 			// Try opening connection 3
-			session3, err := driver.Session(neo4j.AccessModeWrite)
-			Expect(err).To(BeNil())
+			session3 := driver.NewSession(neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
 
 			start := time.Now()
 			_, err = session3.Run("UNWIND RANGE(1, 100) AS N RETURN N", nil)

@@ -50,8 +50,7 @@ var _ = Describe("Session", func() {
 			})
 			Expect(driver).NotTo(BeNil())
 
-			session, err = driver.Session(neo4j.AccessModeRead)
-			Expect(err).To(BeNil())
+			session = driver.NewSession(neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead})
 			Expect(session).NotTo(BeNil())
 		})
 
@@ -179,8 +178,7 @@ var _ = Describe("Session", func() {
 		BeforeEach(func() {
 			driver = server.Driver()
 
-			session, err = driver.Session(neo4j.AccessModeWrite)
-			Expect(err).To(BeNil())
+			session = driver.NewSession(neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
 		})
 
 		AfterEach(func() {
@@ -325,9 +323,7 @@ var _ = Describe("Session", func() {
 			var err error
 
 			innerExecutor := func() error {
-				if session, err = driver.Session(neo4j.AccessModeRead); err != nil {
-					return err
-				}
+				session = driver.NewSession(neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead})
 				defer session.Close()
 
 				if result, err = session.Run("UNWIND RANGE(1,100) AS N RETURN N", nil); err != nil {
@@ -349,9 +345,7 @@ var _ = Describe("Session", func() {
 			var err error
 
 			innerExecutor := func() error {
-				if session, err = driver.Session(neo4j.AccessModeRead); err != nil {
-					return err
-				}
+				session = driver.NewSession(neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead})
 				defer session.Close()
 
 				if result1, err = session.Run("UNWIND RANGE(1,100) AS N RETURN N", nil); err != nil {
@@ -388,9 +382,7 @@ var _ = Describe("Session", func() {
 			innerExecutor := func() error {
 				var tx neo4j.Transaction
 
-				if session, err = driver.Session(neo4j.AccessModeWrite); err != nil {
-					return err
-				}
+				session = driver.NewSession(neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
 				defer session.Close()
 
 				if tx, err = session.BeginTransaction(); err != nil {
@@ -425,8 +417,7 @@ var _ = Describe("Session", func() {
 			Expect(records2[99].Values[0]).To(BeEquivalentTo(100))
 			Expect(records2[99].Values[1]).Should(Equal("Text 100"))
 
-			newSession, err := driver.Session(neo4j.AccessModeRead)
-			Expect(err).To(BeNil())
+			newSession := driver.NewSession(neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead})
 			Expect(newSession).NotTo(BeNil())
 			defer newSession.Close()
 
@@ -451,8 +442,7 @@ var _ = Describe("Session", func() {
 				Skip("this test is targeted for server version after neo4j 3.5.0")
 			}
 
-			session, err = driver.Session(neo4j.AccessModeWrite)
-			Expect(err).To(BeNil())
+			session = driver.NewSession(neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
 			Expect(session).NotTo(BeNil())
 		})
 
@@ -539,7 +529,7 @@ var _ = Describe("Session", func() {
 			defer tx2.Close()
 			updateNodeInTx(tx2, "RunTxTimeOut", map[string]interface{}{"id": 1})
 
-			session3 := newSession(driver, neo4j.AccessModeWrite)
+			session3 := driver.NewSession(neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
 
 			result3, err := session3.Run("MATCH (n:RunTxTimeOut) SET n.id = 2", nil, neo4j.WithTxTimeout(1*time.Second))
 			// Up to db to determine when error occures
@@ -566,7 +556,7 @@ var _ = Describe("Session", func() {
 			defer tx2.Close()
 			updateNodeInTx(tx2, "WriteTransactionTxTimeOut", map[string]interface{}{"id": 1})
 
-			session3 := newSession(driver, neo4j.AccessModeWrite)
+			session3 := driver.NewSession(neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
 
 			_, err := session3.WriteTransaction(updateNodeWork("WriteTransactionTxTimeOut", map[string]interface{}{"id": 2}), neo4j.WithTxTimeout(1*time.Second))
 			Expect(err).ToNot(BeNil())
@@ -575,71 +565,5 @@ var _ = Describe("Session", func() {
 			//Expect(err).To(BeTransientError(nil, ContainSubstring("terminated")))
 		})
 	})
-
-	/*
-		Context("V3 API on V1 & V2", func() {
-			var (
-				err     error
-				driver  neo4j.Driver
-				session neo4j.Session
-			)
-
-			metadata := map[string]interface{}{"id": 4, "name": "x"}
-
-			BeforeEach(func() {
-				driver, err = server.Driver()
-				Expect(err).To(BeNil())
-				Expect(driver).NotTo(BeNil())
-
-				if versionOfDriver(driver).GreaterThanOrEqual(V350) {
-					Skip("this test is targeted for server versions less than neo4j 3.5.0")
-				}
-
-				session, err = driver.Session(neo4j.AccessModeRead)
-				Expect(err).To(BeNil())
-				Expect(session).NotTo(BeNil())
-			})
-
-			AfterEach(func() {
-				if session != nil {
-					session.Close()
-				}
-
-				if driver != nil {
-					driver.Close()
-				}
-			})
-
-				It("should fail when transaction timeout is set for Session.Run", func() {
-					_, err := session.Run("RETURN 1", nil, neo4j.WithTxTimeout(1*time.Second))
-					Expect(err).To(BeConnectorErrorWithCode(0x504))
-				})
-
-				It("should fail when transaction timeout is set for Session.ReadTransaction", func() {
-					_, err := session.ReadTransaction(createNodeWork("Test", nil), neo4j.WithTxTimeout(1*time.Second))
-					Expect(err).To(BeConnectorErrorWithCode(0x504))
-				})
-
-				It("should fail when transaction timeout is set for Session.WriteTransaction", func() {
-					_, err := session.WriteTransaction(createNodeWork("Test", nil), neo4j.WithTxTimeout(1*time.Second))
-					Expect(err).To(BeConnectorErrorWithCode(0x504))
-				})
-
-				It("should fail when transaction metadata is set for Session.Run", func() {
-					_, err := session.Run("RETURN 1", nil, neo4j.WithTxMetadata(metadata))
-					Expect(err).To(BeConnectorErrorWithCode(0x504))
-				})
-
-				It("should fail when transaction metadata is set for Session.ReadTransaction", func() {
-					_, err := session.ReadTransaction(createNodeWork("Test", nil), neo4j.WithTxMetadata(metadata))
-					Expect(err).To(BeConnectorErrorWithCode(0x504))
-				})
-
-				It("should fail when transaction metadata is set for Session.WriteTransaction", func() {
-					_, err := session.WriteTransaction(createNodeWork("Test", nil), neo4j.WithTxMetadata(metadata))
-					Expect(err).To(BeConnectorErrorWithCode(0x504))
-				})
-		})
-	*/
 
 })

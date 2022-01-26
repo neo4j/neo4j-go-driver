@@ -53,8 +53,6 @@ type Driver interface {
 	Target() url.URL
 	// Creates a new session based on the specified session configuration.
 	NewSession(config SessionConfig) Session
-	// Deprecated: Use NewSession instead
-	Session(accessMode AccessMode, bookmarks ...string) (Session, error)
 	// Verifies that the driver can connect to a remote server or cluster by
 	// establishing a network connection with the remote. Returns nil if succesful
 	// or error describing the problem.
@@ -248,23 +246,6 @@ type driver struct {
 
 func (d *driver) Target() url.URL {
 	return *d.target
-}
-
-func (d *driver) Session(accessMode AccessMode, bookmarks ...string) (Session, error) {
-	d.mut.Lock()
-	defer d.mut.Unlock()
-	if d.pool == nil {
-		return nil, &UsageError{
-			Message: "Trying to create session on closed driver",
-		}
-	}
-	sessConfig := SessionConfig{
-		AccessMode:   accessMode,
-		Bookmarks:    bookmarks,
-		DatabaseName: db.DefaultDatabase,
-	}
-	return newSession(
-		d.config, sessConfig, d.router, d.pool, d.log), nil
 }
 
 func (d *driver) NewSession(config SessionConfig) Session {
