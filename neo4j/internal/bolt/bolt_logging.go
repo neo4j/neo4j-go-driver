@@ -55,6 +55,7 @@ type loggedSuccess struct {
 	Db           string              `json:"db,omitempty"`
 	Qid          int64               `json:"qid,omitempty"`
 	RoutingTable *loggedRoutingTable `json:"routing_table,omitempty"`
+	ConfigHints  loggableDictionary  `json:"hints,omitempty"`
 }
 
 func (s loggableSuccess) String() string {
@@ -67,6 +68,7 @@ func (s loggableSuccess) String() string {
 		TLast:        formatOmittingZero(s.tlast),
 		HasMore:      s.hasMore,
 		Db:           s.db,
+		ConfigHints:  s.configurationHints,
 	}
 	if s.qid > -1 {
 		success.Qid = s.qid
