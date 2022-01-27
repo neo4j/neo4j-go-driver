@@ -45,15 +45,16 @@ func (s loggableStringList) String() string {
 
 type loggableSuccess success
 type loggedSuccess struct {
-	Server       string   `json:"server,omitempty"`
-	ConnectionId string   `json:"connection_id,omitempty"`
-	Fields       []string `json:"fields,omitempty"`
-	TFirst       string   `json:"t_first,omitempty"`
-	Bookmark     string   `json:"bookmark,omitempty"`
-	TLast        string   `json:"t_last,omitempty"`
-	HasMore      bool     `json:"has_more,omitempy"`
-	Db           string   `json:"db,omitempty"`
-	Qid          int64    `json:"qid,omitempty"`
+	Server       string             `json:"server,omitempty"`
+	ConnectionId string             `json:"connection_id,omitempty"`
+	Fields       []string           `json:"fields,omitempty"`
+	TFirst       string             `json:"t_first,omitempty"`
+	Bookmark     string             `json:"bookmark,omitempty"`
+	TLast        string             `json:"t_last,omitempty"`
+	HasMore      bool               `json:"has_more,omitempy"`
+	Db           string             `json:"db,omitempty"`
+	Qid          int64              `json:"qid,omitempty"`
+	ConfigHints  loggableDictionary `json:"hints,omitempty"`
 }
 
 func (s loggableSuccess) String() string {
@@ -66,6 +67,7 @@ func (s loggableSuccess) String() string {
 		TLast:        formatOmittingZero(s.tlast),
 		HasMore:      s.hasMore,
 		Db:           s.db,
+		ConfigHints:  s.configurationHints,
 	}
 	if s.qid > -1 {
 		success.Qid = s.qid
