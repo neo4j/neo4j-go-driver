@@ -5,7 +5,7 @@ import (
 	"testing/quick"
 )
 
-func TestConcatenateStringSlices(t *testing.T) {
+func TestCombineBookmarks(t *testing.T) {
 	f := func(slices [][]string) bool {
 		concatenation := CombineBookmarks(slices...)
 		totalLen := 0
