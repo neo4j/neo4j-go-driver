@@ -272,7 +272,7 @@ var _ = Describe("Bookmark", func() {
 
 	})
 
-	Context("session constructed with two sets bookmarks", func() {
+	Context("session constructed with two sets of bookmarks", func() {
 		var (
 			driver    neo4j.Driver
 			session   neo4j.Session
