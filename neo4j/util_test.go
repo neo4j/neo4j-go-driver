@@ -7,7 +7,7 @@ import (
 
 func TestConcatenateStringSlices(t *testing.T) {
 	f := func(slices [][]string) bool {
-		concatenation := ConcatenateStringSlices(slices...)
+		concatenation := CombineBookmarks(slices...)
 		totalLen := 0
 		for _, s := range slices {
 			totalLen += len(s)

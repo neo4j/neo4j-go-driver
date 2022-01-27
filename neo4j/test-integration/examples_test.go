@@ -811,7 +811,7 @@ func addEmployAndMakeFriends(driver neo4j.Driver) error {
 
 	session := driver.NewSession(neo4j.SessionConfig{
 		AccessMode: neo4j.AccessModeRead,
-		Bookmarks: neo4j.ConcatenateStringSlices(bookmarks1, bookmarks2, bookmarks3),
+		Bookmarks: neo4j.CombineBookmarks(bookmarks1, bookmarks2, bookmarks3),
 	})
 	defer session.Close()
 
