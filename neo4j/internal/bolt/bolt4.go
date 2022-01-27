@@ -74,25 +74,25 @@ func (i *internalTx4) toMeta() map[string]interface{} {
 }
 
 type bolt4 struct {
-	state                 int
-	txId                  db.TxHandle
-	streams               openstreams
-	conn                  net.Conn
-	serverName            string
-	out                   outgoing
-	in                    incoming
-	connId                string
-	logId                 string
-	serverVersion         string
-	tfirst                int64       // Time that server started streaming
-	pendingTx             internalTx4 // Stashed away when tx started explicitly
-	hasPendingTx          bool
-	bookmark              string // Last bookmark
-	birthDate             time.Time
-	log                   log.Logger
-	databaseName          string
-	err                   error // Last fatal error
-	minor                 int
+	state         int
+	txId          db.TxHandle
+	streams       openstreams
+	conn          net.Conn
+	serverName    string
+	out           outgoing
+	in            incoming
+	connId        string
+	logId         string
+	serverVersion string
+	tfirst        int64       // Time that server started streaming
+	pendingTx     internalTx4 // Stashed away when tx started explicitly
+	hasPendingTx  bool
+	bookmark      string // Last bookmark
+	birthDate     time.Time
+	log           log.Logger
+	databaseName  string
+	err           error // Last fatal error
+	minor         int
 }
 
 func NewBolt4(serverName string, conn net.Conn, log log.Logger, boltLog log.BoltLogger) *bolt4 {
@@ -109,7 +109,7 @@ func NewBolt4(serverName string, conn net.Conn, log log.Logger, boltLog log.Bolt
 				boltLogger: boltLog,
 			},
 			connReadTimeout: -1,
-			logger: log,
+			logger:          log,
 		},
 	}
 	b.out = outgoing{

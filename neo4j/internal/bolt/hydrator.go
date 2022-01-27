@@ -34,21 +34,21 @@ var hydrationInvalidState = errors.New("Hydration state error")
 
 type ignored struct{}
 type success struct {
-	fields        []string
-	tfirst        int64
-	qid           int64
-	bookmark      string
-	connectionId  string
-	server        string
-	db            string
-	hasMore       bool
-	tlast         int64
-	qtype         db.StatementType
-	counters      map[string]int
-	plan          *db.Plan
-	profile       *db.ProfiledPlan
-	notifications []db.Notification
-	routingTable  *db.RoutingTable
+	fields             []string
+	tfirst             int64
+	qid                int64
+	bookmark           string
+	connectionId       string
+	server             string
+	db                 string
+	hasMore            bool
+	tlast              int64
+	qtype              db.StatementType
+	counters           map[string]int
+	plan               *db.Plan
+	profile            *db.ProfiledPlan
+	notifications      []db.Notification
+	routingTable       *db.RoutingTable
 	num                uint32
 	configurationHints map[string]interface{}
 }
