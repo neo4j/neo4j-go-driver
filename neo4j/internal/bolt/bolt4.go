@@ -1035,13 +1035,14 @@ func (b *bolt4) initializeReadTimeoutHint(hints map[string]interface{}) {
 	}
 	readTimeout, ok := readTimeoutHint.(int64)
 	if !ok {
-		b.log.Infof(log.Bolt4, b.logId, `invalid %q value: %v, ignoring hint. Only strictly positive integer values are accepted`, readTimeoutHintName, readTimeoutHint)
+		b.log.Warnf(log.Bolt4, b.logId, `invalid %q value: %v, ignoring hint. Only strictly positive integer values are accepted`, readTimeoutHintName, readTimeoutHint)
 		return
 	}
 	if readTimeout <= 0 {
-		b.log.Infof(log.Bolt4, b.logId, `invalid %q integer value: %d. Only strictly positive values are accepted"`, readTimeoutHintName, readTimeout)
+		b.log.Warnf(log.Bolt4, b.logId, `invalid %q integer value: %d. Only strictly positive values are accepted"`, readTimeoutHintName, readTimeout)
 		return
 	}
+	b.log.Infof(log.Bolt4, b.logId, `received "connection.recv_timeout_seconds" hint value of %d second(s)`, readTimeout)
 	b.in.connReadTimeout = time.Duration(readTimeout) * time.Second
 }
 
