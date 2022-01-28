@@ -20,7 +20,8 @@
 package neo4j
 
 import (
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/db"
+	"context"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
 )
 
 type Result interface {
@@ -49,150 +50,45 @@ type Result interface {
 }
 
 type result struct {
-	conn          db.Connection
-	streamHandle  db.StreamHandle
-	cypher        string
-	params        map[string]interface{}
-	record        *Record
-	summary       *db.Summary
-	err           error
-	peekedRecord  *Record
-	peekedSummary *db.Summary
-	peeked        bool
+	delegate ResultWithContext
 }
 
 func newResult(conn db.Connection, str db.StreamHandle, cypher string, params map[string]interface{}) *result {
-	return &result{
-		conn:         conn,
-		streamHandle: str,
-		cypher:       cypher,
-		params:       params,
-	}
+	return newResultWithContext(conn, str, cypher, params).legacy()
 }
 
 func (r *result) Keys() ([]string, error) {
-	return r.conn.Keys(r.streamHandle)
+	return r.delegate.Keys()
 }
 
 func (r *result) Next() bool {
-	r.advance()
-	return r.record != nil
+	return r.delegate.Next(context.Background())
 }
 
 func (r *result) NextRecord(out **Record) bool {
-	r.advance()
-	if out != nil {
-		*out = r.record
-	}
-	return r.record != nil
+	return r.delegate.NextRecord(context.Background(), out)
 }
 
 func (r *result) PeekRecord(out **Record) bool {
-	r.peek()
-	if out != nil {
-		*out = r.peekedRecord
-	}
-	return r.peekedRecord != nil
+	return r.delegate.PeekRecord(context.Background(), out)
 }
 
 func (r *result) Record() *Record {
-	return r.record
+	return r.delegate.Record()
 }
 
 func (r *result) Err() error {
-	return wrapError(r.err)
+	return r.delegate.Err()
 }
 
 func (r *result) Collect() ([]*Record, error) {
-	recs := make([]*Record, 0, 1024)
-	for r.summary == nil && r.err == nil {
-		r.advance()
-		if r.record != nil {
-			recs = append(recs, r.record)
-		}
-	}
-	if r.err != nil {
-		return nil, wrapError(r.err)
-	}
-	return recs, nil
-}
-
-func (r *result) buffer() {
-	r.err = r.conn.Buffer(r.streamHandle)
+	return r.delegate.Collect(context.Background())
 }
 
 func (r *result) Single() (*Record, error) {
-	// Try retrieving the single record
-	r.advance()
-	if r.err != nil {
-		return nil, wrapError(r.err)
-	}
-	if r.summary != nil {
-		r.err = &UsageError{Message: "Result contains no more records"}
-		return nil, r.err
-	}
-
-	// This is the potential single record
-	single := r.record
-
-	// Probe connection for more records
-	r.advance()
-	if r.record != nil {
-		// There were more records, consume the stream since the user didn't
-		// expect more records and should therefore not use them.
-		r.summary, _ = r.conn.Consume(r.streamHandle)
-		r.err = &UsageError{Message: "Result contains more than one record"}
-		r.record = nil
-		return nil, r.err
-	}
-	if r.err != nil {
-		// Might be more records or not, anyway something is bad.
-		// Both r.record and r.summary are nil at this point which is good.
-		return nil, wrapError(r.err)
-	}
-	// We got the expected summary
-	// r.record contains the single record and r.summary the summary.
-	r.record = single
-	return single, nil
-}
-
-func (r *result) toResultSummary() ResultSummary {
-	return &resultSummary{
-		sum:    r.summary,
-		cypher: r.cypher,
-		params: r.params,
-	}
+	return r.delegate.Single(context.Background())
 }
 
 func (r *result) Consume() (ResultSummary, error) {
-	// Already failed, reuse the internal error, might have been
-	// set by Single to indicate some kind of usage error that "destroyed"
-	// the result.
-	if r.err != nil {
-		return nil, wrapError(r.err)
-	}
-
-	r.record = nil
-	r.summary, r.err = r.conn.Consume(r.streamHandle)
-	if r.err != nil {
-		return nil, wrapError(r.err)
-	}
-	return r.toResultSummary(), nil
-}
-
-func (r *result) advance() {
-	if r.peeked {
-		r.record, r.peekedRecord = r.peekedRecord, nil
-		r.summary, r.peekedSummary = r.peekedSummary, nil
-		r.peeked = false
-	} else {
-		r.record, r.summary, r.err = r.conn.Next(r.streamHandle)
-	}
-}
-
-func (r *result) peek() {
-	if !r.peeked {
-		r.peekedRecord, r.peekedSummary, r.err = r.conn.Next(r.streamHandle)
-		r.peeked = true
-	}
+	return r.delegate.Consume(context.Background())
 }

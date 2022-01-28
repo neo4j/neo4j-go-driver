@@ -20,10 +20,11 @@
 package pool
 
 import (
+	"context"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
 	"testing"
 	"time"
 
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/db"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/testutil"
 )
 
@@ -113,7 +114,7 @@ func TestServer(ot *testing.T) {
 
 		// Let the conn in the middle be too old
 		conns[1].Birth = now.Add(-20 * time.Second)
-		s.removeIdleOlderThan(now, 10*time.Second)
+		s.removeIdleOlderThan(context.Background(), now, 10*time.Second)
 		assertSize(t, s, 2)
 
 		// Should be able to borrow twice
@@ -129,7 +130,7 @@ func TestServer(ot *testing.T) {
 		s.returnBusy(b2)
 		conns[0].Birth = now.Add(-20 * time.Second)
 		conns[2].Birth = now.Add(-20 * time.Second)
-		s.removeIdleOlderThan(now, 10*time.Second)
+		s.removeIdleOlderThan(context.Background(), now, 10*time.Second)
 
 		// Shouldn't be able to borrow anything and size should be zero
 		b1 = s.getIdle()

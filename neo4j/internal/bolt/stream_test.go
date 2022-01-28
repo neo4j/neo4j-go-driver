@@ -16,10 +16,12 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
+
 package bolt
 
 import (
 	"errors"
+	idb "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
 	"testing"
 
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/db"
@@ -172,7 +174,7 @@ func TestOpenStreams(ot *testing.T) {
 		streams.reset()
 
 		// Should fail to retrieve even a unsafe stream from these
-		fails := []db.StreamHandle{nil, 1, 0, ""}
+		fails := []idb.StreamHandle{nil, 1, 0, ""}
 		for _, x := range fails {
 			_, err := streams.getUnsafe(x)
 			AssertError(t, err)

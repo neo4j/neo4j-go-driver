@@ -29,14 +29,14 @@ import (
 
 func assertNoRouter(t *testing.T, d Driver) {
 	t.Helper()
-	_, isDirectRouter := d.(*driver).router.(*directRouter)
+	_, isDirectRouter := d.(*driver).delegate.(*driverWithContext).router.(*directRouter)
 	if !isDirectRouter {
 		t.Error("Expected no router")
 	}
 }
 func assertNoRouterAddress(t *testing.T, d Driver, address string) {
 	t.Helper()
-	direct := d.(*driver).router.(*directRouter)
+	direct := d.(*driver).delegate.(*driverWithContext).router.(*directRouter)
 	if direct.address != address {
 		t.Errorf("Address mismatch %s vs %s", address, direct.address)
 	}
@@ -44,7 +44,7 @@ func assertNoRouterAddress(t *testing.T, d Driver, address string) {
 
 func assertRouter(t *testing.T, d Driver) {
 	t.Helper()
-	_, isRouter := d.(*driver).router.(*router.Router)
+	_, isRouter := d.(*driver).delegate.(*driverWithContext).router.(*router.Router)
 	if !isRouter {
 		t.Error("Expected router")
 	}
@@ -52,7 +52,7 @@ func assertRouter(t *testing.T, d Driver) {
 
 func assertRouterContext(t *testing.T, d Driver, context map[string]string) {
 	t.Helper()
-	r := d.(*driver).router.(*router.Router)
+	r := d.(*driver).delegate.(*driverWithContext).router.(*router.Router)
 	c := r.Context()
 	if !reflect.DeepEqual(c, context) {
 		t.Errorf("Router contexts differ: %#v vs %#v", c, context)
@@ -61,7 +61,7 @@ func assertRouterContext(t *testing.T, d Driver, context map[string]string) {
 
 func assertSkipEncryption(t *testing.T, d Driver, skipEncryption bool) {
 	t.Helper()
-	c := d.(*driver).connector
+	c := d.(*driver).delegate.(*driverWithContext).connector
 	if c.SkipEncryption != skipEncryption {
 		t.Errorf("SkipEncryption mismatch, %t vs %t", skipEncryption, c.SkipEncryption)
 	}
@@ -69,7 +69,7 @@ func assertSkipEncryption(t *testing.T, d Driver, skipEncryption bool) {
 
 func assertSkipVerify(t *testing.T, d Driver, skipVerify bool) {
 	t.Helper()
-	c := d.(*driver).connector
+	c := d.(*driver).delegate.(*driverWithContext).connector
 	if c.SkipVerify != skipVerify {
 		t.Errorf("SkipVerify mismatch, %t vs %t", skipVerify, c.SkipVerify)
 	}
@@ -77,7 +77,7 @@ func assertSkipVerify(t *testing.T, d Driver, skipVerify bool) {
 
 func assertNetwork(t *testing.T, d Driver, network string) {
 	t.Helper()
-	c := d.(*driver).connector
+	c := d.(*driver).delegate.(*driverWithContext).connector
 	if c.Network != network {
 		t.Errorf("Network mismatch, %s vs %s", network, c.Network)
 	}
@@ -232,12 +232,12 @@ func TestDriverSessionCreation(t *testing.T) {
 			sessi := driver.NewSession(SessionConfig{AccessMode: tt.mode, Bookmarks: tt.bookmarks})
 			sess := sessi.(*session)
 
-			if AccessMode(sess.defaultMode) != tt.mode {
-				t.Errorf("the defaultMode was not correctly set %v", AccessMode(sess.defaultMode))
+			if AccessMode(sess.delegate.defaultMode) != tt.mode {
+				t.Errorf("the defaultMode was not correctly set %v", AccessMode(sess.delegate.defaultMode))
 			}
 
-			if len(sess.bookmarks) != len(tt.bookmarks) {
-				t.Errorf("the bookmarks was not correctly set %v", sess.bookmarks)
+			if len(sess.delegate.bookmarks) != len(tt.bookmarks) {
+				t.Errorf("the bookmarks was not correctly set %v", sess.delegate.bookmarks)
 			}
 		})
 	}

@@ -22,6 +22,7 @@ package retry
 
 import (
 	"fmt"
+	idb "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
 	"time"
 
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/db"
@@ -63,7 +64,7 @@ type State struct {
 	skipSleep  bool
 }
 
-func (s *State) OnFailure(conn db.Connection, err error, isCommitting bool) {
+func (s *State) OnFailure(conn idb.Connection, err error, isCommitting bool) {
 	s.LastErr = err
 	s.cause = ""
 	s.skipSleep = false

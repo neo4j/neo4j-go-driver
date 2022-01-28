@@ -21,12 +21,13 @@
 package bolt
 
 import (
+	"context"
 	"errors"
 	"fmt"
-	"io"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/racingio"
 	"net"
 
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/db"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/log"
 )
 
@@ -46,7 +47,7 @@ var versions = [4]protocolVersion{
 
 // Connect initiates the negotiation of the Bolt protocol version.
 // Returns the instance of bolt protocol implementing the low-level Connection interface.
-func Connect(serverName string, conn net.Conn, auth map[string]interface{}, userAgent string, routingContext map[string]string, logger log.Logger, boltLog log.BoltLogger) (db.Connection, error) {
+func Connect(ctx context.Context, serverName string, conn net.Conn, auth map[string]interface{}, userAgent string, routingContext map[string]string, logger log.Logger, boltLog log.BoltLogger) (db.Connection, error) {
 	// Perform Bolt handshake to negotiate version
 	// Send handshake to server
 	handshake := []byte{
@@ -60,14 +61,14 @@ func Connect(serverName string, conn net.Conn, auth map[string]interface{}, user
 		boltLog.LogClientMessage("", "<MAGIC> %#010X", handshake[0:4])
 		boltLog.LogClientMessage("", "<HANDSHAKE> %#010X %#010X %#010X %#010X", handshake[4:8], handshake[8:12], handshake[12:16], handshake[16:20])
 	}
-	_, err := conn.Write(handshake)
+	_, err := racingio.NewRacingWriter(conn).Write(ctx, handshake)
 	if err != nil {
 		return nil, err
 	}
 
 	// Receive accepted server version
 	buf := make([]byte, 4)
-	_, err = io.ReadFull(conn, buf)
+	_, err = racingio.NewRacingReader(conn).ReadFull(ctx, buf)
 	if err != nil {
 		return nil, err
 	}
@@ -82,7 +83,7 @@ func Connect(serverName string, conn net.Conn, auth map[string]interface{}, user
 	case 3:
 		// Handover rest of connection handshaking
 		boltConn := NewBolt3(serverName, conn, logger, boltLog)
-		err = boltConn.connect(int(minor), auth, userAgent)
+		err = boltConn.connect(ctx, int(minor), auth, userAgent)
 		if err != nil {
 			return nil, err
 		}
@@ -90,7 +91,7 @@ func Connect(serverName string, conn net.Conn, auth map[string]interface{}, user
 	case 4:
 		// Handover rest of connection handshaking
 		boltConn := NewBolt4(serverName, conn, logger, boltLog)
-		err = boltConn.connect(int(minor), auth, userAgent, routingContext)
+		err = boltConn.connect(ctx, int(minor), auth, userAgent, routingContext)
 		if err != nil {
 			return nil, err
 		}

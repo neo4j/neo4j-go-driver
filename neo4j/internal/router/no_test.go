@@ -21,9 +21,8 @@ package router
 
 import (
 	"context"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/log"
-
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/db"
 )
 
 type poolFake struct {
@@ -36,6 +35,6 @@ func (p *poolFake) Borrow(ctx context.Context, servers []string, wait bool, logg
 	return p.borrow(servers, p.cancel, logger)
 }
 
-func (p *poolFake) Return(c db.Connection) {
+func (p *poolFake) Return(ctx context.Context, c db.Connection) {
 	p.returned = append(p.returned, c)
 }

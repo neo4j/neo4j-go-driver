@@ -59,9 +59,9 @@ type sessionState struct {
 }
 
 const (
-	retryable_nothing  = 0
-	retryable_positive = 1
-	retryable_negative = -1
+	retryableNothing  = 0
+	retryablePositive = 1
+	retryableNegative = -1
 )
 
 func newBackend(rd *bufio.Reader, wr io.Writer) *backend {
@@ -263,7 +263,7 @@ func (b *backend) handleTransactionFunc(isRead bool, data map[string]interface{}
 	sid := data["sessionId"].(string)
 	sessionState := b.sessionStates[sid]
 	blockingRetry := func(tx neo4j.Transaction) (interface{}, error) {
-		sessionState.retryableState = retryable_nothing
+		sessionState.retryableState = retryableNothing
 		// Instruct client to start doing it's work
 		txid := b.nextId()
 		b.transactions[txid] = tx
@@ -273,17 +273,17 @@ func (b *backend) handleTransactionFunc(isRead bool, data map[string]interface{}
 		for {
 			b.process()
 			switch sessionState.retryableState {
-			case retryable_positive:
+			case retryablePositive:
 				// Client succeeded and wants to commit
 				return nil, nil
-			case retryable_negative:
+			case retryableNegative:
 				// Client failed in some way
 				if sessionState.retryableErrorId != "" {
 					return nil, b.recordedErrors[sessionState.retryableErrorId]
 				} else {
 					return nil, &frontendError{msg: "Error from client"}
 				}
-			case retryable_nothing:
+			case retryableNothing:
 				// Client did something not related to the retryable state
 			}
 		}
@@ -568,11 +568,11 @@ func (b *backend) handleRequest(req map[string]interface{}) {
 
 	case "RetryablePositive":
 		sessionState := b.sessionStates[data["sessionId"].(string)]
-		sessionState.retryableState = retryable_positive
+		sessionState.retryableState = retryablePositive
 
 	case "RetryableNegative":
 		sessionState := b.sessionStates[data["sessionId"].(string)]
-		sessionState.retryableState = retryable_negative
+		sessionState.retryableState = retryableNegative
 		sessionState.retryableErrorId = data["errorId"].(string)
 
 	case "ResultNext":

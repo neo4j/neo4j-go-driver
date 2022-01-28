@@ -20,7 +20,9 @@
 package test_integration
 
 import (
+	"context"
 	"crypto/rand"
+	idb "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
 	"math"
 	"math/big"
 	"net"
@@ -38,7 +40,8 @@ import (
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/test-integration/dbserver"
 )
 
-func makeRawConnection(logger log.Logger, boltLogger log.BoltLogger) (dbserver.DbServer, db.Connection) {
+func makeRawConnection(logger log.Logger, boltLogger log.BoltLogger) (
+	dbserver.DbServer, idb.Connection) {
 	server := dbserver.GetDbServer()
 	uri := server.BoltURI()
 	parsedUri, err := url.Parse(uri)
@@ -57,7 +60,7 @@ func makeRawConnection(logger log.Logger, boltLogger log.BoltLogger) (dbserver.D
 		"credentials": server.Password,
 	}
 
-	boltConn, err := bolt.Connect(parsedUri.Host, tcpConn, authMap, "007", nil, logger, boltLogger)
+	boltConn, err := bolt.Connect(context.Background(), parsedUri.Host, tcpConn, authMap, "007", nil, logger, boltLogger)
 	if err != nil {
 		panic(err)
 	}
@@ -66,7 +69,7 @@ func makeRawConnection(logger log.Logger, boltLogger log.BoltLogger) (dbserver.D
 
 func BenchmarkQuery(b *testing.B) {
 	_, conn := makeRawConnection(&log.Console{Debugs: true, Errors: true, Infos: true, Warns: true}, nil)
-	defer conn.Close()
+	defer conn.Close(context.Background())
 	params := map[string]interface{}{
 		"one": 1,
 		"arr": []int{1, 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096, 8192, 16384, 32768, 65536},
@@ -74,8 +77,10 @@ func BenchmarkQuery(b *testing.B) {
 	}
 
 	for i := 0; i < b.N; i++ {
-		stream, _ := conn.Run(db.Command{Cypher: "RETURN $one, $arr, $str", Params: params}, db.TxConfig{Mode: db.ReadMode})
-		record, _, _ := conn.Next(stream)
+		stream, _ := conn.Run(context.Background(),
+			idb.Command{Cypher: "RETURN $one, $arr, $str", Params: params},
+			idb.TxConfig{Mode: idb.ReadMode})
+		record, _, _ := conn.Next(context.Background(), stream)
 
 		if len(record.Values) != 3 {
 			panic("")
@@ -83,10 +88,10 @@ func BenchmarkQuery(b *testing.B) {
 	}
 }
 
-// Tests the specification of the internal db connection API
+// Tests the specification of the internal connection connection API
 func TestConnectionConformance(ot *testing.T) {
 	server, boltConn := makeRawConnection(&log.Console{Errors: true, Infos: true, Warns: true, Debugs: true}, nil)
-	defer boltConn.Close()
+	defer boltConn.Close(context.Background())
 
 	randInt := func() int64 {
 		bid, _ := rand.Int(rand.Reader, big.NewInt(math.MaxInt64))
@@ -97,17 +102,20 @@ func TestConnectionConformance(ot *testing.T) {
 	// for a reset. All tests share the same connection.
 	cases := []struct {
 		name string
-		fun  func(*testing.T, db.Connection)
+		fun  func(*testing.T, idb.Connection)
 	}{
 		{
 			// Leaves the connection in perfect state after creating and iterating through all records
 			name: "Run autocommit, full consume",
-			fun: func(t *testing.T, c db.Connection) {
-				s, err := c.Run(db.Command{Cypher: "CREATE (n:Rand {val: $r}) RETURN n", Params: map[string]interface{}{"r": randInt()}}, db.TxConfig{Mode: db.WriteMode})
+			fun: func(t *testing.T, c idb.Connection) {
+				s, err := c.Run(context.Background(),
+					idb.Command{Cypher: "CREATE (n:Rand {val: $r}) RETURN n",
+						Params: map[string]interface{}{"r": randInt()}},
+					idb.TxConfig{Mode: idb.WriteMode})
 				AssertNoError(t, err)
-				rec, sum, err := c.Next(s)
+				rec, sum, err := c.Next(context.Background(), s)
 				AssertNextOnlyRecord(t, rec, sum, err)
-				rec, sum, err = c.Next(s)
+				rec, sum, err = c.Next(context.Background(), s)
 				AssertNextOnlySummary(t, rec, sum, err)
 			},
 		},
@@ -115,32 +123,44 @@ func TestConnectionConformance(ot *testing.T) {
 			// Let the connection buffer the result before next autocommit.
 			// Leaves the connection in streaming state from the last Run.
 			name: "Run autocommit twice, no consume",
-			fun: func(t *testing.T, c db.Connection) {
-				_, err := c.Run(db.Command{Cypher: "CREATE (n:Rand {val: $r})", Params: map[string]interface{}{"r": randInt()}}, db.TxConfig{Mode: db.WriteMode})
+			fun: func(t *testing.T, c idb.Connection) {
+				_, err := c.Run(context.Background(),
+					idb.Command{Cypher: "CREATE (n:Rand {val: $r})",
+						Params: map[string]interface{}{"r": randInt()}},
+					idb.TxConfig{Mode: idb.WriteMode})
 				AssertNoError(t, err)
-				_, err = c.Run(db.Command{Cypher: "CREATE (n:Rand {val: $r})", Params: map[string]interface{}{"r": randInt()}}, db.TxConfig{Mode: db.WriteMode})
+				_, err = c.Run(context.Background(),
+					idb.Command{Cypher: "CREATE (n:Rand {val: $r})",
+						Params: map[string]interface{}{"r": randInt()}},
+					idb.TxConfig{Mode: idb.WriteMode})
 				AssertNoError(t, err)
 			},
 		},
 		{
 			// Iterate everything before committing
 			name: "Run explicit commit, full consume",
-			fun: func(t *testing.T, c db.Connection) {
-				txHandle, err := c.TxBegin(db.TxConfig{Mode: db.WriteMode, Timeout: 10 * time.Minute})
+			fun: func(t *testing.T, c idb.Connection) {
+				txHandle, err := c.TxBegin(context.Background(),
+					idb.TxConfig{Mode: idb.WriteMode,
+						Timeout: 10 * time.Minute})
 				AssertNoError(t, err)
 				r := randInt()
-				s, err := c.RunTx(txHandle, db.Command{Cypher: "CREATE (n:Rand {val: $r}) RETURN n", Params: map[string]interface{}{"r": r}})
+				s, err := c.RunTx(context.Background(), txHandle,
+					idb.Command{Cypher: "CREATE (n:Rand {val: $r}) RETURN n", Params: map[string]interface{}{"r": r}})
 				AssertNoError(t, err)
-				rec, sum, err := c.Next(s)
+				rec, sum, err := c.Next(context.Background(), s)
 				AssertNextOnlyRecord(t, rec, sum, err)
-				rec, sum, err = c.Next(s)
+				rec, sum, err = c.Next(context.Background(), s)
 				AssertNextOnlySummary(t, rec, sum, err)
-				err = c.TxCommit(txHandle)
+				err = c.TxCommit(context.Background(), txHandle)
 				AssertNoError(t, err)
 				// Make sure it's commited
-				s, err = c.Run(db.Command{Cypher: "MATCH (n:Rand {val: $r}) RETURN n", Params: map[string]interface{}{"r": r}}, db.TxConfig{Mode: db.ReadMode})
+				s, err = c.Run(context.Background(),
+					idb.Command{Cypher: "MATCH (n:Rand {val: $r}) RETURN n",
+						Params: map[string]interface{}{"r": r}},
+					idb.TxConfig{Mode: idb.ReadMode})
 				AssertNoError(t, err)
-				rec, sum, err = c.Next(s)
+				rec, sum, err = c.Next(context.Background(), s)
 				AssertNextOnlyRecord(t, rec, sum, err)
 				// Not everything consumed from the read check, but that is also fine
 			},
@@ -148,18 +168,24 @@ func TestConnectionConformance(ot *testing.T) {
 		{
 			// Do not consume anything before commiting
 			name: "Run explicit commit, no consume",
-			fun: func(t *testing.T, c db.Connection) {
-				txHandle, err := c.TxBegin(db.TxConfig{Mode: db.WriteMode, Timeout: 10 * time.Minute})
+			fun: func(t *testing.T, c idb.Connection) {
+				txHandle, err := c.TxBegin(context.Background(),
+					idb.TxConfig{Mode: idb.WriteMode,
+						Timeout: 10 * time.Minute})
 				AssertNoError(t, err)
 				r := randInt()
-				s, err := c.RunTx(txHandle, db.Command{Cypher: "CREATE (n:Rand {val: $r}) RETURN n", Params: map[string]interface{}{"r": r}})
+				s, err := c.RunTx(context.Background(), txHandle,
+					idb.Command{Cypher: "CREATE (n:Rand {val: $r}) RETURN n", Params: map[string]interface{}{"r": r}})
 				AssertNoError(t, err)
-				err = c.TxCommit(txHandle)
+				err = c.TxCommit(context.Background(), txHandle)
 				AssertNoError(t, err)
 				// Make sure it's commited
-				s, err = c.Run(db.Command{Cypher: "MATCH (n:Rand {val: $r}) RETURN n", Params: map[string]interface{}{"r": r}}, db.TxConfig{Mode: db.ReadMode})
+				s, err = c.Run(context.Background(),
+					idb.Command{Cypher: "MATCH (n:Rand {val: $r}) RETURN n",
+						Params: map[string]interface{}{"r": r}},
+					idb.TxConfig{Mode: idb.ReadMode})
 				AssertNoError(t, err)
-				rec, sum, err := c.Next(s)
+				rec, sum, err := c.Next(context.Background(), s)
 				AssertNextOnlyRecord(t, rec, sum, err)
 				// Not everything consumed from the read check, but that is also fine
 			},
@@ -167,92 +193,114 @@ func TestConnectionConformance(ot *testing.T) {
 		{
 			// Iterate everything returned from create before rolling back
 			name: "Run explicit rollback, full consume",
-			fun: func(t *testing.T, c db.Connection) {
-				txHandle, err := c.TxBegin(db.TxConfig{Mode: db.WriteMode, Timeout: 10 * time.Minute})
+			fun: func(t *testing.T, c idb.Connection) {
+				txHandle, err := c.TxBegin(context.Background(),
+					idb.TxConfig{Mode: idb.WriteMode,
+						Timeout: 10 * time.Minute})
 				AssertNoError(t, err)
 				r := randInt()
-				s, err := c.RunTx(txHandle, db.Command{Cypher: "CREATE (n:Rand {val: $r}) RETURN n", Params: map[string]interface{}{"r": r}})
+				s, err := c.RunTx(context.Background(), txHandle,
+					idb.Command{Cypher: "CREATE (n:Rand {val: $r}) RETURN n", Params: map[string]interface{}{"r": r}})
 				AssertNoError(t, err)
-				rec, sum, err := c.Next(s)
+				rec, sum, err := c.Next(context.Background(), s)
 				AssertNextOnlyRecord(t, rec, sum, err)
-				rec, sum, err = c.Next(s)
+				rec, sum, err = c.Next(context.Background(), s)
 				AssertNextOnlySummary(t, rec, sum, err)
-				err = c.TxRollback(txHandle)
+				err = c.TxRollback(context.Background(), txHandle)
 				AssertNoError(t, err)
 				// Make sure it's rolled back
-				s, err = c.Run(db.Command{Cypher: "MATCH (n:Rand {val: $r}) RETURN n", Params: map[string]interface{}{"r": r}}, db.TxConfig{Mode: db.ReadMode})
+				s, err = c.Run(context.Background(),
+					idb.Command{Cypher: "MATCH (n:Rand {val: $r}) RETURN n",
+						Params: map[string]interface{}{"r": r}},
+					idb.TxConfig{Mode: idb.ReadMode})
 				AssertNoError(t, err)
-				rec, sum, err = c.Next(s)
+				rec, sum, err = c.Next(context.Background(), s)
 				AssertNextOnlySummary(t, rec, sum, err)
 			},
 		},
 		{
 			// Do not consume anything before rolling back
 			name: "Run explicit rollback, no consume",
-			fun: func(t *testing.T, c db.Connection) {
-				txHandle, err := c.TxBegin(db.TxConfig{Mode: db.WriteMode, Timeout: 10 * time.Minute})
+			fun: func(t *testing.T, c idb.Connection) {
+				txHandle, err := c.TxBegin(context.Background(),
+					idb.TxConfig{Mode: idb.WriteMode,
+						Timeout: 10 * time.Minute})
 				AssertNoError(t, err)
 				r := randInt()
-				s, err := c.RunTx(txHandle, db.Command{Cypher: "CREATE (n:Rand {val: $r}) RETURN n", Params: map[string]interface{}{"r": r}})
+				s, err := c.RunTx(context.Background(), txHandle,
+					idb.Command{Cypher: "CREATE (n:Rand {val: $r}) RETURN n", Params: map[string]interface{}{"r": r}})
 				AssertNoError(t, err)
-				err = c.TxRollback(txHandle)
+				err = c.TxRollback(context.Background(), txHandle)
 				AssertNoError(t, err)
-				// Make sure it's commited
-				s, err = c.Run(db.Command{Cypher: "MATCH (n:Rand {val: $r}) RETURN n", Params: map[string]interface{}{"r": r}}, db.TxConfig{Mode: db.ReadMode})
+				// Make sure it's committed
+				s, err = c.Run(context.Background(),
+					idb.Command{Cypher: "MATCH (n:Rand {val: $r}) RETURN n",
+						Params: map[string]interface{}{"r": r}},
+					idb.TxConfig{Mode: idb.ReadMode})
 				AssertNoError(t, err)
-				rec, sum, err := c.Next(s)
+				rec, sum, err := c.Next(context.Background(), s)
 				AssertNextOnlySummary(t, rec, sum, err)
 			},
 		},
 		{
 			name: "Nested results in transaction, iterate outer result",
-			fun: func(t *testing.T, c db.Connection) {
-				tx, err := c.TxBegin(db.TxConfig{Mode: db.ReadMode})
+			fun: func(t *testing.T, c idb.Connection) {
+				tx, err := c.TxBegin(context.Background(),
+					idb.TxConfig{Mode: idb.ReadMode})
 				AssertNoError(t, err)
-				r1, err := c.RunTx(tx, db.Command{Cypher: "UNWIND RANGE(0, 100) AS n RETURN n"})
+				r1, err := c.RunTx(context.Background(), tx,
+					idb.Command{Cypher: "UNWIND RANGE(0, 100) AS n RETURN n"})
 				AssertNoError(t, err)
 				n := int64(0)
-				rec, _, _ := c.Next(r1)
-				for ; rec != nil; rec, _, _ = c.Next(r1) {
+				rec, _, _ := c.Next(context.Background(), r1)
+				for ; rec != nil; rec, _, _ = c.Next(context.Background(), r1) {
 					n = rec.Values[0].(int64)
-					_, err := c.RunTx(tx, db.Command{Cypher: "UNWIND RANGE (0, $x) AS x RETURN x", Params: map[string]interface{}{"x": n}})
+					_, err := c.RunTx(context.Background(), tx,
+						idb.Command{Cypher: "UNWIND RANGE (0, $x) AS x RETURN x", Params: map[string]interface{}{"x": n}})
 					AssertNoError(t, err)
 				}
 				if n != 100 {
 					t.Errorf("n should have reached 100: %d", n)
 				}
-				err = c.TxCommit(tx)
+				err = c.TxCommit(context.Background(), tx)
 				AssertNoError(t, err)
 				AssertStringNotEmpty(t, c.Bookmark())
 			},
 		},
 		{
 			name: "Next without streaming",
-			fun: func(t *testing.T, c db.Connection) {
-				rec, sum, err := c.Next(3)
+			fun: func(t *testing.T, c idb.Connection) {
+				rec, sum, err := c.Next(context.Background(), 3)
 				AssertNextOnlyError(t, rec, sum, err)
 			},
 		},
 		{
 			name: "Next passed the summary",
-			fun: func(t *testing.T, c db.Connection) {
-				s, err := boltConn.Run(db.Command{Cypher: "RETURN datetime()"}, db.TxConfig{Mode: db.ReadMode})
+			fun: func(t *testing.T, c idb.Connection) {
+				s, err := boltConn.Run(context.Background(),
+					idb.Command{Cypher: "RETURN datetime()"},
+					idb.TxConfig{Mode: idb.ReadMode})
 				AssertNoError(t, err)
-				rec, sum, err := c.Next(s)
+				rec, sum, err := c.Next(context.Background(), s)
 				AssertNextOnlyRecord(t, rec, sum, err)
-				rec, sum, err = c.Next(s)
+				rec, sum, err = c.Next(context.Background(), s)
 				AssertNextOnlySummary(t, rec, sum, err)
-				rec, sum, err = c.Next(s)
+				rec, sum, err = c.Next(context.Background(), s)
 				AssertNextOnlySummary(t, rec, sum, err)
 			},
 		},
 		{
 			name: "Run autocommit while in tx",
-			fun: func(t *testing.T, c db.Connection) {
-				txHandle, err := c.TxBegin(db.TxConfig{Mode: db.WriteMode, Timeout: 10 * time.Minute})
+			fun: func(t *testing.T, c idb.Connection) {
+				txHandle, err := c.TxBegin(context.Background(),
+					idb.TxConfig{Mode: idb.WriteMode,
+						Timeout: 10 * time.Minute})
 				AssertNoError(t, err)
-				defer c.TxRollback(txHandle)
-				s, err := c.Run(db.Command{Cypher: "CREATE (n:Rand {val: $r})", Params: map[string]interface{}{"r": randInt()}}, db.TxConfig{Mode: db.WriteMode})
+				defer c.TxRollback(context.Background(), txHandle)
+				s, err := c.Run(context.Background(),
+					idb.Command{Cypher: "CREATE (n:Rand {val: $r})",
+						Params: map[string]interface{}{"r": randInt()}},
+					idb.TxConfig{Mode: idb.WriteMode})
 				if s != nil || err == nil {
 					t.Fatal("Should fail to run auto commit when in transaction")
 				}
@@ -261,8 +309,8 @@ func TestConnectionConformance(ot *testing.T) {
 		},
 		{
 			name: "Commit while not in tx",
-			fun: func(t *testing.T, c db.Connection) {
-				err := c.TxCommit(1)
+			fun: func(t *testing.T, c idb.Connection) {
+				err := c.TxCommit(context.Background(), 1)
 				if err == nil {
 					t.Fatal("Should have failed")
 				}
@@ -271,8 +319,8 @@ func TestConnectionConformance(ot *testing.T) {
 		},
 		{
 			name: "Rollback while not in tx",
-			fun: func(t *testing.T, c db.Connection) {
-				err := c.TxRollback(3)
+			fun: func(t *testing.T, c idb.Connection) {
+				err := c.TxRollback(context.Background(), 3)
 				if err == nil {
 					t.Fatal("Should have failed")
 				}
@@ -304,75 +352,90 @@ func TestConnectionConformance(ot *testing.T) {
 		}
 	})
 
-	// All of these tests should leave the connection in a good state after a reset but not
-	// necessarily without it. All tests share the same connection.
+	// All of these tests should leave the connection in a good state after a
+	//reset/but not necessarily without it. All tests share the same connection.
 	cases = []struct {
 		name string
-		fun  func(*testing.T, db.Connection)
+		fun  func(*testing.T, idb.Connection)
 	}{
 		// Connection is in failed state due to syntax error
 		{
 			name: "Run autocommit with syntax error",
-			fun: func(t *testing.T, c db.Connection) {
-				s, err := c.Run(db.Command{Cypher: "MATCH (n:Rand {val: $r} ", Params: map[string]interface{}{"r": randInt()}}, db.TxConfig{Mode: db.ReadMode})
+			fun: func(t *testing.T, c idb.Connection) {
+				s, err := c.Run(context.Background(),
+					idb.Command{Cypher: "MATCH (n:Rand {val: $r} ",
+						Params: map[string]interface{}{"r": randInt()}},
+					idb.TxConfig{Mode: idb.ReadMode})
 				if err == nil || s != nil {
 					t.Fatal("Should have received error")
 				}
 				_, isDbError := err.(*db.Neo4jError)
 				if !isDbError {
-					t.Error("Should be db error")
+					t.Error("Should be connection error")
 				}
 			},
 		},
 		{
 			name: "Run autocommit with division by zero in result",
-			fun: func(t *testing.T, c db.Connection) {
-				s, err := c.Run(db.Command{Cypher: "UNWIND [0] AS x RETURN 10 / x", Params: map[string]interface{}{"r": randInt()}}, db.TxConfig{Mode: db.ReadMode})
+			fun: func(t *testing.T, c idb.Connection) {
+				s, err := c.Run(context.Background(),
+					idb.Command{Cypher: "UNWIND [0] AS x RETURN 10 / x",
+						Params: map[string]interface{}{"r": randInt()}},
+					idb.TxConfig{Mode: idb.ReadMode})
 				AssertNoError(t, err)
 				// Should get error while iterating
-				_, _, err = c.Next(s)
+				_, _, err = c.Next(context.Background(), s)
 				if err == nil {
 					t.Error("Should have error")
 				}
 				_, isDbError := err.(*db.Neo4jError)
 				if !isDbError {
-					t.Error("Should be db error")
+					t.Error("Should be connection error")
 				}
 			},
 		},
 		// Connection is in transaction (lazy)
 		{
 			name: "Set connection in transaction mode",
-			fun: func(t *testing.T, c db.Connection) {
-				_, err := c.TxBegin(db.TxConfig{Mode: db.WriteMode})
+			fun: func(t *testing.T, c idb.Connection) {
+				_, err := c.TxBegin(context.Background(),
+					idb.TxConfig{Mode: idb.WriteMode})
 				AssertNoError(t, err)
 			},
 		},
 		// Connection is in transaction
 		{
 			name: "Set connection in transaction mode",
-			fun: func(t *testing.T, c db.Connection) {
-				tx, err := c.TxBegin(db.TxConfig{Mode: db.WriteMode})
-				_, err = c.RunTx(tx, db.Command{Cypher: "UNWIND [1] AS n RETURN n"})
+			fun: func(t *testing.T, c idb.Connection) {
+				tx, err := c.TxBegin(context.Background(),
+					idb.TxConfig{Mode: idb.WriteMode})
+				_, err = c.RunTx(context.Background(), tx,
+					idb.Command{Cypher: "UNWIND [1] AS n RETURN n"})
 				AssertNoError(t, err)
 			},
 		},
 		// Really big stream streaming
 		{
 			name: "Streaming big stream",
-			fun: func(t *testing.T, c db.Connection) {
-				_, err := c.Run(db.Command{Cypher: "UNWIND RANGE (0, 1000000) AS x RETURN x"}, db.TxConfig{Mode: db.ReadMode})
+			fun: func(t *testing.T, c idb.Connection) {
+				_, err := c.Run(context.Background(),
+					idb.Command{Cypher: "UNWIND RANGE (0, " +
+						"1000000) AS x RETURN x"}, idb.TxConfig{Mode: idb.
+						ReadMode})
 				AssertNoError(t, err)
 			},
 		},
 		// Big nested streams in an uncommitted tx
 		{
 			name: "Streaming big stream",
-			fun: func(t *testing.T, c db.Connection) {
-				tx, err := c.TxBegin(db.TxConfig{Mode: db.WriteMode})
-				_, err = c.RunTx(tx, db.Command{Cypher: "UNWIND RANGE (0, 1000000) AS n RETURN n"})
+			fun: func(t *testing.T, c idb.Connection) {
+				tx, err := c.TxBegin(context.Background(),
+					idb.TxConfig{Mode: idb.WriteMode})
+				_, err = c.RunTx(context.Background(), tx,
+					idb.Command{Cypher: "UNWIND RANGE (0, 1000000) AS n RETURN n"})
 				AssertNoError(t, err)
-				_, err = c.RunTx(tx, db.Command{Cypher: "UNWIND RANGE (0, 1000000) AS n RETURN n"})
+				_, err = c.RunTx(context.Background(), tx,
+					idb.Command{Cypher: "UNWIND RANGE (0, 1000000) AS n RETURN n"})
 				AssertNoError(t, err)
 			},
 		},
@@ -383,15 +446,17 @@ func TestConnectionConformance(ot *testing.T) {
 			if !boltConn.IsAlive() {
 				t.Error("Connection died")
 			}
-			boltConn.Reset()
+			boltConn.Reset(context.Background())
 			// Should be working now
-			s, err := boltConn.Run(db.Command{Cypher: "RETURN datetime()"}, db.TxConfig{Mode: db.ReadMode})
+			s, err := boltConn.Run(context.Background(),
+				idb.Command{Cypher: "RETURN datetime()"},
+				idb.TxConfig{Mode: idb.ReadMode})
 			AssertNoError(t, err)
 			if s == nil {
 				t.Fatal("Didn't get a stream")
 			}
-			boltConn.Next(s)
-			boltConn.Next(s)
+			boltConn.Next(context.Background(), s)
+			boltConn.Next(context.Background(), s)
 		})
 	}
 	// Run some of the above at random as one test
@@ -406,7 +471,7 @@ func TestConnectionConformance(ot *testing.T) {
 			if !boltConn.IsAlive() {
 				t.Error("Connection died")
 			}
-			boltConn.Reset()
+			boltConn.Reset(context.Background())
 		}
 	})
 
@@ -422,19 +487,25 @@ func TestConnectionConformance(ot *testing.T) {
 			bigBuilder.WriteString("0123456789")
 		}
 
-		stream, err := boltConn.Run(db.Command{Cypher: query, Params: map[string]interface{}{"x": bigBuilder.String()}}, db.TxConfig{Mode: db.ReadMode})
+		stream, err := boltConn.Run(context.Background(),
+			idb.Command{Cypher: query,
+				Params: map[string]interface{}{"x": bigBuilder.String()}},
+			idb.TxConfig{Mode: idb.ReadMode})
 		AssertNoError(t, err)
-		rec, sum, err := boltConn.Next(stream)
+		rec, sum, err := boltConn.Next(context.Background(), stream)
 		AssertNextOnlyRecord(t, rec, sum, err)
 		recS := rec.Values[0].(string)
 		if recS != bigBuilder.String() {
 			t.Errorf("Strings differ")
 		}
-		// Run the same thing once again to excerise buffer reuse at connection
+		// Run the same thing once again to exercise buffer reuse at connection
 		// level (there has been a bug caught by this).
-		stream, err = boltConn.Run(db.Command{Cypher: query, Params: map[string]interface{}{"x": bigBuilder.String()}}, db.TxConfig{Mode: db.ReadMode})
+		stream, err = boltConn.Run(context.Background(),
+			idb.Command{Cypher: query,
+				Params: map[string]interface{}{"x": bigBuilder.String()}},
+			idb.TxConfig{Mode: idb.ReadMode})
 		AssertNoError(t, err)
-		rec, sum, err = boltConn.Next(stream)
+		rec, sum, err = boltConn.Next(context.Background(), stream)
 		AssertNextOnlyRecord(t, rec, sum, err)
 		recS = rec.Values[0].(string)
 		if recS != bigBuilder.String() {
@@ -510,9 +581,10 @@ func TestConnectionConformance(ot *testing.T) {
 		tt.Run("Reading", func(t *testing.T) {
 			query := "RETURN " +
 				cTime + ", " + cDate + ", " + cDateTimeO + ", " + cDateTimeZ + ", " + cLocalTime + ", " + cLocalDateTime + ", " + cDuration
-			stream, err := boltConn.Run(db.Command{Cypher: query}, db.TxConfig{Mode: db.ReadMode})
+			stream, err := boltConn.Run(context.Background(),
+				idb.Command{Cypher: query}, idb.TxConfig{Mode: idb.ReadMode})
 			AssertNoError(t, err)
-			rec, sum, err := boltConn.Next(stream)
+			rec, sum, err := boltConn.Next(context.Background(), stream)
 			if rec == nil || err != nil || sum != nil {
 				t.Fatalf("Should be a record, %+v, %+v, %+v", rec, sum, err)
 			}
@@ -551,7 +623,7 @@ func TestConnectionConformance(ot *testing.T) {
 			// Make a node with all temporal types as parameters and make sure that we can interpret
 			// it the same way again.
 			r := randInt()
-			stream, _ := boltConn.Run(db.Command{
+			stream, _ := boltConn.Run(context.Background(), idb.Command{
 				Cypher: "CREATE (n:Rand {" +
 					"val: $r, time: $time, date: $date, dateTimeO: $dateTimeO, " +
 					"dateTimeZ: $dateTimeZ, localTime: $localTime, localDateTime: $localDateTime}) " +
@@ -564,8 +636,8 @@ func TestConnectionConformance(ot *testing.T) {
 					"dateTimeZ":     tDateTimeZ,
 					"localTime":     dbtype.LocalTime(tLocalTime),
 					"localDateTime": dbtype.LocalDateTime(tLocalDateTime),
-				}}, db.TxConfig{Mode: db.WriteMode})
-			rec, sum, err := boltConn.Next(stream)
+				}}, idb.TxConfig{Mode: idb.WriteMode})
+			rec, sum, err := boltConn.Next(context.Background(), stream)
 			if rec == nil || err != nil || sum != nil {
 				t.Fatalf("Should be a record, %+v, %+v, %+v", rec, sum, err)
 			}
@@ -602,7 +674,7 @@ func TestConnectionConformance(ot *testing.T) {
 
 	// Bookmark tests
 	ot.Run("Bookmarks", func(tt *testing.T) {
-		boltConn.Reset()
+		boltConn.Reset(context.Background())
 		lastBookmark := boltConn.Bookmark()
 
 		assertNewBookmark := func(t *testing.T) {
@@ -626,47 +698,55 @@ func TestConnectionConformance(ot *testing.T) {
 		}
 
 		tt.Run("Auto-commit, bookmark by iteration", func(t *testing.T) {
-			s, _ := boltConn.Run(db.Command{
-				Cypher: "CREATE (n:BmRand {x: $rand}) RETURN n", Params: map[string]interface{}{"rand": randInt()}}, db.TxConfig{Mode: db.WriteMode})
-			boltConn.Next(s)
-			boltConn.Next(s)
+			s, _ := boltConn.Run(context.Background(), idb.Command{
+				Cypher: "CREATE (n:BmRand {x: $rand}) RETURN n",
+				Params: map[string]interface{}{"rand": randInt()}},
+				idb.TxConfig{Mode: idb.WriteMode})
+			boltConn.Next(context.Background(), s)
+			boltConn.Next(context.Background(), s)
 			assertNewBookmark(t)
 		})
 		tt.Run("Auto-commit, bookmark by new auto-commit", func(t *testing.T) {
-			boltConn.Run(db.Command{
-				Cypher: "CREATE (n:BmRand {x: $rand}) RETURN n", Params: map[string]interface{}{"rand": randInt()}}, db.TxConfig{Mode: db.WriteMode})
-			s, _ := boltConn.Run(db.Command{
-				Cypher: "CREATE (n:BmRand {x: $rand}) RETURN n", Params: map[string]interface{}{"rand": randInt()}}, db.TxConfig{Mode: db.WriteMode})
+			boltConn.Run(context.Background(), idb.Command{
+				Cypher: "CREATE (n:BmRand {x: $rand}) RETURN n",
+				Params: map[string]interface{}{"rand": randInt()}},
+				idb.TxConfig{Mode: idb.WriteMode})
+			s, _ := boltConn.Run(context.Background(), idb.Command{
+				Cypher: "CREATE (n:BmRand {x: $rand}) RETURN n",
+				Params: map[string]interface{}{"rand": randInt()}},
+				idb.TxConfig{Mode: idb.WriteMode})
 			assertNewBookmark(t)
-			boltConn.Next(s)
-			boltConn.Next(s)
+			boltConn.Next(context.Background(), s)
+			boltConn.Next(context.Background(), s)
 			assertNewBookmark(t)
 		})
 		tt.Run("Commit", func(t *testing.T) {
-			tx, _ := boltConn.TxBegin(db.TxConfig{Mode: db.WriteMode})
-			s, _ := boltConn.RunTx(tx, db.Command{
+			tx, _ := boltConn.TxBegin(context.Background(),
+				idb.TxConfig{Mode: idb.WriteMode})
+			s, _ := boltConn.RunTx(context.Background(), tx, idb.Command{
 				Cypher: "CREATE (n:BmRand {x: $rand}) RETURN n", Params: map[string]interface{}{"rand": randInt()}})
-			boltConn.Next(s)
-			boltConn.Next(s)
+			boltConn.Next(context.Background(), s)
+			boltConn.Next(context.Background(), s)
 			assertNoNewBookmark(t)
-			boltConn.TxCommit(tx)
+			boltConn.TxCommit(context.Background(), tx)
 			assertNewBookmark(t)
 		})
 		tt.Run("Rollback", func(t *testing.T) {
-			tx, _ := boltConn.TxBegin(db.TxConfig{Mode: db.WriteMode})
-			s, _ := boltConn.RunTx(tx, db.Command{
+			tx, _ := boltConn.TxBegin(context.Background(),
+				idb.TxConfig{Mode: idb.WriteMode})
+			s, _ := boltConn.RunTx(context.Background(), tx, idb.Command{
 				Cypher: "CREATE (n:BmRand {x: $rand}) RETURN n", Params: map[string]interface{}{"rand": randInt()}})
-			boltConn.Next(s)
-			boltConn.Next(s)
+			boltConn.Next(context.Background(), s)
+			boltConn.Next(context.Background(), s)
 			assertNoNewBookmark(t)
-			boltConn.TxRollback(tx)
+			boltConn.TxRollback(context.Background(), tx)
 			assertNoNewBookmark(t)
 		})
 	})
 
 	// Enterprise feature
 	ot.Run("Multidatabase", func(tt *testing.T) {
-		selector, supportsMultidatabase := boltConn.(db.DatabaseSelector)
+		selector, supportsMultidatabase := boltConn.(idb.DatabaseSelector)
 		if !supportsMultidatabase {
 			tt.Skipf("Database %s:%s does not support multidatabase functionality", boltConn.ServerName(), boltConn.ServerVersion())
 		}
@@ -676,36 +756,49 @@ func TestConnectionConformance(ot *testing.T) {
 		}
 
 		// Should always reset before selecting a database
-		boltConn.Reset()
+		boltConn.Reset(context.Background())
 		// Connect to system database and create a test databases
 		selector.SelectDatabase("system")
-		boltConn.Run(db.Command{Cypher: "DROP DATABASE test1 IF EXISTS"}, db.TxConfig{Mode: db.WriteMode})
-		_, err := boltConn.Run(db.Command{Cypher: "CREATE DATABASE test1"}, db.TxConfig{Mode: db.WriteMode})
+		boltConn.Run(context.Background(),
+			idb.Command{Cypher: "DROP DATABASE test1 IF EXISTS"},
+			idb.TxConfig{Mode: idb.WriteMode})
+		_, err := boltConn.Run(context.Background(),
+			idb.Command{Cypher: "CREATE DATABASE test1"},
+			idb.TxConfig{Mode: idb.WriteMode})
 		if err != nil {
 			dbErr, _ := err.(*db.Neo4jError)
 			if dbErr == nil || dbErr.Code != "Neo.ClientError.Database.ExistingDatabaseFound" {
 				tt.Fatal(err)
 			}
 		}
-		boltConn.Reset()
+		boltConn.Reset(context.Background())
 		// Use test database to create a random node
 		selector.SelectDatabase("test1")
 		r := randInt()
-		_, err = boltConn.Run(db.Command{Cypher: "CREATE (n:MdbRand {x: $x}) RETURN n", Params: map[string]interface{}{"x": r}}, db.TxConfig{Mode: db.WriteMode})
+		_, err = boltConn.Run(context.Background(),
+			idb.Command{Cypher: "CREATE (n:MdbRand {x: $x}) RETURN n",
+				Params: map[string]interface{}{"x": r}},
+			idb.TxConfig{Mode: idb.WriteMode})
 		AssertNoError(tt, err)
-		boltConn.Reset()
+		boltConn.Reset(context.Background())
 		// Connect to standard database and make sure we can't see the node
-		s, err := boltConn.Run(db.Command{Cypher: "MATCH (n:MdbRand {x: $x}) RETURN n", Params: map[string]interface{}{"x": r}}, db.TxConfig{Mode: db.ReadMode})
+		s, err := boltConn.Run(context.Background(),
+			idb.Command{Cypher: "MATCH (n:MdbRand {x: $x}) RETURN n",
+				Params: map[string]interface{}{"x": r}},
+			idb.TxConfig{Mode: idb.ReadMode})
 		AssertNoError(tt, err)
-		rec, sum, err := boltConn.Next(s)
+		rec, sum, err := boltConn.Next(context.Background(), s)
 		AssertNextOnlySummary(tt, rec, sum, err)
-		boltConn.Reset()
+		boltConn.Reset(context.Background())
 		// Connect to test database and make sure we can see the node
 		selector.SelectDatabase("test1")
-		s, err = boltConn.Run(db.Command{Cypher: "MATCH (n:MdbRand {x: $x}) RETURN n", Params: map[string]interface{}{"x": r}}, db.TxConfig{Mode: db.ReadMode})
+		s, err = boltConn.Run(context.Background(),
+			idb.Command{Cypher: "MATCH (n:MdbRand {x: $x}) RETURN n",
+				Params: map[string]interface{}{"x": r}},
+			idb.TxConfig{Mode: idb.ReadMode})
 		AssertNoError(tt, err)
-		rec, sum, err = boltConn.Next(s)
+		rec, sum, err = boltConn.Next(context.Background(), s)
 		AssertNextOnlyRecord(tt, rec, sum, err)
-		boltConn.Reset()
+		boltConn.Reset(context.Background())
 	})
 }

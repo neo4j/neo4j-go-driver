@@ -21,14 +21,14 @@ package neo4j
 
 import (
 	"fmt"
-	"io"
-	"net"
-
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/db"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/bolt"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/connector"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/pool"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/retry"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/router"
+	"io"
+	"net"
 )
 
 // Neo4jError represents errors originating from Neo4j service.
@@ -133,7 +133,7 @@ func wrapError(err error) error {
 		// Usage of a type not supported by database network protocol or feature
 		// not supported by current version or edition.
 		return &UsageError{Message: err.Error()}
-	case *connector.TlsError, *connector.ConnectError:
+	case *connector.TlsError, net.Error:
 		return &ConnectivityError{inner: err}
 	case *pool.PoolTimeout, *pool.PoolFull:
 		return &ConnectivityError{inner: err}
@@ -141,7 +141,9 @@ func wrapError(err error) error {
 		return &ConnectivityError{inner: err}
 	case *retry.CommitFailedDeadError:
 		return &ConnectivityError{inner: err}
-	case net.Error:
+	case *bolt.ConnectionReadTimeout:
+		return &ConnectivityError{inner: err}
+	case *bolt.ConnectionWriteTimeout:
 		return &ConnectivityError{inner: err}
 	case *db.Neo4jError:
 		if e.Code == "Neo.ClientError.Security.TokenExpired" {

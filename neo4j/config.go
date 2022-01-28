@@ -47,12 +47,12 @@ type Config struct {
 	Log log.Logger
 	// Resolver that would be used to resolve initial router address. This may
 	// be useful if you want to provide more than one URL for initial router.
-	// If not specified, the URL provided to NewDriver is used as the initial
-	// router.
+	// If not specified, the URL provided to NewDriver or NewDriverWithContext
+	// is used as the initial router.
 	//
 	// default: nil
 	AddressResolver ServerAddressResolver
-	// Maximum amount of time a retriable operation would continue retrying. It
+	// Maximum amount of time a retryable operation would continue retrying. It
 	// cannot be specified as a negative value.
 	//
 	// default: 30 * time.Second
@@ -63,20 +63,42 @@ type Config struct {
 	//
 	// default: 100
 	MaxConnectionPoolSize int
-	// Maximum connection life time on pooled connections. Values less than
+	// Maximum connection lifetime on pooled connections. Values less than
 	// or equal to 0 disables the lifetime check.
 	//
 	// default: 1 * time.Hour
 	MaxConnectionLifetime time.Duration
 	// Maximum amount of time to either acquire an idle connection from the pool
 	// or create a new connection (when the pool is not full). Negative values
-	// result in an infinite wait time where 0 value results in no timeout which
-	// results in immediate failure when there are no available connections.
+	// result in an infinite wait time, whereas a 0 value results in no timeout.
+	// If no timeout is set, an immediate failure follows when there are no
+	// available connections.
+	//
+	// Since 4.3, this setting competes with connection read timeout hints, if
+	// the server-side option called
+	// "dbms.connector.bolt.connection_keep_alive_for_requests" is enabled.
+	// The read timeout is automatically applied and may result in connections
+	// being dropped if they are idle beyond the corresponding period.
+	//
+	// Since 5.0, this setting competes with the context-aware APIs. These APIs
+	// are discoverable through NewDriverWithContext.
+	// When a connection needs to be acquired from the internal driver
+	// connection pool and the user-provided context.Context carries a deadline
+	// (through context.WithTimeout or context.WithDeadline), the earliest
+	// deadline wins. Connections are still subject to early terminations if a read timeout
+	// hint is received.
 	//
 	// default: 1 * time.Minute
 	ConnectionAcquisitionTimeout time.Duration
 	// Connect timeout that will be set on underlying sockets. Values less than
 	// or equal to 0 results in no timeout being applied.
+	//
+	// Since 5.0, this setting competes with the context-aware APIs. These APIs
+	// are discoverable through NewDriverWithContext.
+	// If a connection needs to be created when one of these APIs is called
+	// and the user-provided context.Context carries a deadline (through
+	// context.WithTimeout or context.WithDeadline), the TCP dialer will pick
+	// the earliest between this setting and the context deadline.
 	//
 	// default: 5 * time.Second
 	SocketConnectTimeout time.Duration
@@ -89,14 +111,17 @@ type Config struct {
 	// default: neo4j.UserAgent
 	UserAgent string
 	// FetchSize defines how many records to pull from server in each batch.
-	// From Bolt protocol v4 (Neo4j 4+) records can be fetched in batches as compared to fetching
-	// all in previous versions.
+	// From Bolt protocol v4 (Neo4j 4+) records can be fetched in batches as
+	// compared to fetching all in previous versions.
 	//
-	// If FetchSize is set to FetchDefault, the driver decides the appropriate size. If set to a positive value
-	// that size is used if the underlying protocol supports it otherwise it is ignored.
+	// If FetchSize is set to FetchDefault, the driver decides the appropriate
+	// size. If set to a positive value that size is used if the underlying
+	// protocol supports it otherwise it is ignored.
 	//
-	// To turn off fetching in batches and always fetch everything, set FetchSize to FetchAll.
-	// If a single large result is to be retrieved this is the most performant setting.
+	// To turn off fetching in batches and always fetch everything, set
+	// FetchSize to FetchAll.
+	// If a single large result is to be retrieved, this is the most performant
+	// setting.
 	FetchSize int
 }
 

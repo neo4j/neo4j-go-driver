@@ -21,10 +21,10 @@ package pool
 
 import (
 	"container/list"
+	"context"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
 	"sync/atomic"
 	"time"
-
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/db"
 )
 
 // Represents a server with a number of connections that either is in use (borrowed) or
@@ -112,7 +112,7 @@ func (s server) numIdle() int {
 	return s.idle.Len()
 }
 
-// Adds a connection to busy list
+// Adds a db to busy list
 func (s *server) registerBusy(c db.Connection) {
 	// Update round-robin to indicate when this server was last used.
 	s.roundRobin = atomic.AddUint32(&sharedRoundRobin, 1)
@@ -135,7 +135,7 @@ func (s *server) size() int {
 	return s.busy.Len() + s.idle.Len()
 }
 
-func (s *server) removeIdleOlderThan(now time.Time, maxAge time.Duration) {
+func (s *server) removeIdleOlderThan(ctx context.Context, now time.Time, maxAge time.Duration) {
 	e := s.idle.Front()
 	for e != nil {
 		n := e.Next()
@@ -144,23 +144,23 @@ func (s *server) removeIdleOlderThan(now time.Time, maxAge time.Duration) {
 		age := now.Sub(c.Birthdate())
 		if age >= maxAge {
 			s.idle.Remove(e)
-			go c.Close()
+			go c.Close(ctx)
 		}
 
 		e = n
 	}
 }
 
-func closeAndEmptyConnections(l list.List) {
-	for e := l.Front(); e != nil; e = e.Next() {
-		c := e.Value.(db.Connection)
-		c.Close()
-	}
-	l.Init()
+func (s *server) closeAll(ctx context.Context) {
+	closeAndEmptyConnections(ctx, s.idle)
+	// Closing the busy connections could mean here that we do close from another thread.
+	closeAndEmptyConnections(ctx, s.busy)
 }
 
-func (s *server) closeAll() {
-	closeAndEmptyConnections(s.idle)
-	// Closing the busy connections could mean here that we do close from another thread.
-	closeAndEmptyConnections(s.busy)
+func closeAndEmptyConnections(ctx context.Context, l list.List) {
+	for e := l.Front(); e != nil; e = e.Next() {
+		c := e.Value.(db.Connection)
+		c.Close(ctx)
+	}
+	l.Init()
 }

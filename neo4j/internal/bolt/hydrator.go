@@ -22,6 +22,7 @@ package bolt
 import (
 	"errors"
 	"fmt"
+	idb "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/log"
 	"time"
 
@@ -49,7 +50,7 @@ type success struct {
 	plan               *db.Plan
 	profile            *db.ProfiledPlan
 	notifications      []db.Notification
-	routingTable       *db.RoutingTable
+	routingTable       *idb.RoutingTable
 	num                uint32
 	configurationHints map[string]interface{}
 }
@@ -318,8 +319,8 @@ func (h *hydrator) parseStatValue(key string) interface{} {
 // routingTable parses a routing table sent from the server. This is done
 // the 'hard' way to reduce number of allocations (would be easier to go via
 // a map) since it is called in normal flow (not that frequent...).
-func (h *hydrator) routingTable() *db.RoutingTable {
-	rt := db.RoutingTable{}
+func (h *hydrator) routingTable() *idb.RoutingTable {
+	rt := idb.RoutingTable{}
 	// Length of map
 	nkeys := h.unp.Len()
 	for ; nkeys > 0; nkeys-- {
@@ -344,7 +345,7 @@ func (h *hydrator) routingTable() *db.RoutingTable {
 	return &rt
 }
 
-func (h *hydrator) routingTableRole(rt *db.RoutingTable) {
+func (h *hydrator) routingTableRole(rt *idb.RoutingTable) {
 	h.unp.Next()
 	nkeys := h.unp.Len()
 	var role string

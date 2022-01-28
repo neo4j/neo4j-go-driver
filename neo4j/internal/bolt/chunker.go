@@ -20,7 +20,9 @@
 package bolt
 
 import (
+	"context"
 	"encoding/binary"
+	rio "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/racingio"
 	"io"
 )
 
@@ -55,29 +57,31 @@ func (c *chunker) endMessage() {
 	c.offset += 2
 }
 
-func (c *chunker) send(wr io.Writer) error {
+func (c *chunker) send(ctx context.Context, wr io.Writer) error {
 	// Try to make as few writes as possible to reduce network overhead
 	// Whenever we encounter a message that is bigger than max chunk size we need
 	// to write and make a new chunk
 	start := 0
 	end := 0
 
+	writer := rio.NewRacingWriter(wr)
+
 	for _, size := range c.sizes {
 		if size <= 0xffff {
 			binary.BigEndian.PutUint16(c.buf[end:], uint16(size))
-			// Size + messge + end of message marker
+			// Size + message + end of message marker
 			end += 2 + size + 2
 		} else {
 			// Could be a message that ranges over multiple chunks
 			for size > 0xffff {
 				c.buf[end] = 0xff
 				c.buf[end+1] = 0xff
-				// Size + messge
+				// Size + message
 				end += 2 + 0xffff
 
-				_, err := wr.Write(c.buf[start:end])
+				_, err := writer.Write(ctx, c.buf[start:end])
 				if err != nil {
-					return err
+					return processWriteError(err, ctx)
 				}
 				// Reuse part of buffer that has already been written to specify size
 				// of the chunk
@@ -86,15 +90,15 @@ func (c *chunker) send(wr io.Writer) error {
 				size -= 0xffff
 			}
 			binary.BigEndian.PutUint16(c.buf[end:], uint16(size))
-			// Size + messge + end of message marker
+			// Size + message + end of message marker
 			end += 2 + size + 2
 		}
 	}
 
 	if end > start {
-		_, err := wr.Write(c.buf[start:end])
+		_, err := writer.Write(ctx, c.buf[start:end])
 		if err != nil {
-			return err
+			return processWriteError(err, ctx)
 		}
 	}
 
@@ -104,4 +108,19 @@ func (c *chunker) send(wr io.Writer) error {
 	c.sizes = c.sizes[:0]
 
 	return nil
+}
+
+func processWriteError(err error, ctx context.Context) error {
+	if IsTimeoutError(err) {
+		return &ConnectionWriteTimeout{
+			userContext: ctx,
+			err:         err,
+		}
+	}
+	if err == context.Canceled {
+		return &ConnectionWriteCanceled{
+			err: err,
+		}
+	}
+	return err
 }

@@ -21,14 +21,15 @@
 package connector
 
 import (
+	"context"
 	"crypto/tls"
 	"crypto/x509"
 	"errors"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
 	"io"
 	"net"
 	"time"
 
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/db"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/bolt"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/log"
 )
@@ -46,36 +47,20 @@ type Connector struct {
 	Network         string
 }
 
-type ConnectError struct {
-	inner error
-}
-
-func (e *ConnectError) Error() string {
-	return e.inner.Error()
-}
-
-type TlsError struct {
-	inner error
-}
-
-func (e *TlsError) Error() string {
-	return e.inner.Error()
-}
-
-func (c Connector) Connect(address string, boltLogger log.BoltLogger) (db.Connection, error) {
+func (c Connector) Connect(ctx context.Context, address string, boltLogger log.BoltLogger) (db.Connection, error) {
 	dialer := net.Dialer{Timeout: c.DialTimeout}
 	if !c.SocketKeepAlive {
 		dialer.KeepAlive = -1 * time.Second // Turns keep-alive off
 	}
 
-	conn, err := dialer.Dial(c.Network, address)
+	conn, err := dialer.DialContext(ctx, c.Network, address)
 	if err != nil {
-		return nil, &ConnectError{inner: err}
+		return nil, err
 	}
 
 	// TLS not requested, perform Bolt handshake
 	if c.SkipEncryption {
-		return bolt.Connect(address, conn, c.Auth, c.UserAgent, c.RoutingContext, c.Log, boltLogger)
+		return bolt.Connect(ctx, address, conn, c.Auth, c.UserAgent, c.RoutingContext, c.Log, boltLogger)
 	}
 
 	// TLS requested, continue with handshake
@@ -86,7 +71,7 @@ func (c Connector) Connect(address string, boltLogger log.BoltLogger) (db.Connec
 	}
 	config := tls.Config{InsecureSkipVerify: c.SkipVerify, RootCAs: c.RootCAs, ServerName: serverName}
 	tlsconn := tls.Client(conn, &config)
-	err = tlsconn.Handshake()
+	err = tlsconn.HandshakeContext(ctx)
 	if err != nil {
 		if err == io.EOF {
 			// Give a bit nicer error message
@@ -96,5 +81,17 @@ func (c Connector) Connect(address string, boltLogger log.BoltLogger) (db.Connec
 		return nil, &TlsError{inner: err}
 	}
 	// Perform Bolt handshake
-	return bolt.Connect(address, tlsconn, c.Auth, c.UserAgent, c.RoutingContext, c.Log, boltLogger)
+	return bolt.Connect(ctx, address, tlsconn, c.Auth, c.UserAgent, c.RoutingContext, c.Log, boltLogger)
+}
+
+// TlsError encapsulates all errors related to TLS connection creation
+// This is needed since the tls package does not provide a common error type
+// à la net.Error, and a common type is needed to properly classify the error
+// for Testkit
+type TlsError struct {
+	inner error
+}
+
+func (e *TlsError) Error() string {
+	return e.inner.Error()
 }
