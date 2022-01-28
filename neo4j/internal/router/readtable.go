@@ -21,9 +21,8 @@ package router
 
 import (
 	"context"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/log"
-
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/db"
 )
 
 // Tries to read routing table from any of the specified routers using new or existing connection
@@ -49,8 +48,8 @@ func readTable(ctx context.Context, pool Pool, routers []string, routerContext m
 
 		// We have a connection to the "router"
 		var table *db.RoutingTable
-		table, err = conn.GetRoutingTable(routerContext, bookmarks, database, impersonatedUser)
-		pool.Return(conn)
+		table, err = conn.GetRoutingTable(ctx, routerContext, bookmarks, database, impersonatedUser)
+		pool.Return(ctx, conn)
 		if err == nil {
 			return table, nil
 		}

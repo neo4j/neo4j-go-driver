@@ -20,6 +20,7 @@
 package bolt
 
 import (
+	"context"
 	"testing"
 
 	. "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/testutil"
@@ -50,7 +51,7 @@ func TestConnect(ot *testing.T) {
 			srv.closeConnection()
 		}()
 
-		_, err := Connect("servername", conn, auth, "007", nil, logger, boltLogger)
+		_, err := Connect(context.Background(), "servername", conn, auth, "007", nil, logger, boltLogger)
 		AssertError(t, err)
 	})
 
@@ -65,7 +66,7 @@ func TestConnect(ot *testing.T) {
 			srv.acceptVersion(1, 0)
 		}()
 
-		boltconn, err := Connect("servername", conn, auth, "007", nil, logger, boltLogger)
+		boltconn, err := Connect(context.Background(), "servername", conn, auth, "007", nil, logger, boltLogger)
 		AssertError(t, err)
 		if boltconn != nil {
 			t.Error("Shouldn't returned conn")

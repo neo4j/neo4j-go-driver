@@ -20,10 +20,15 @@
 package neo4j
 
 import (
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/db"
+	"context"
 )
 
 // Transaction represents a transaction in the Neo4j database
+// Deprecated: use TransactionWithContext instead.
+// TransactionWithContext is available via SessionWithContext.
+// SessionWithContext is available via the context-aware driver/returned
+// by NewDriverWithContext.
+// Transaction will be removed in 6.0.
 type Transaction interface {
 	// Run executes a statement on this transaction and returns a result
 	Run(cypher string, params map[string]interface{}) (Result, error)
@@ -38,99 +43,25 @@ type Transaction interface {
 
 // Transaction implementation when explicit transaction started
 type transaction struct {
-	conn      db.Connection
-	fetchSize int
-	txHandle  db.TxHandle
-	done      bool
-	err       error
-	onClosed  func()
+	delegate TransactionWithContext
 }
 
 func (tx *transaction) Run(cypher string, params map[string]interface{}) (Result, error) {
-	stream, err := tx.conn.RunTx(tx.txHandle, db.Command{Cypher: cypher, Params: params, FetchSize: tx.fetchSize})
+	result, err := tx.delegate.Run(context.Background(), cypher, params)
 	if err != nil {
-		return nil, wrapError(err)
+		return nil, err
 	}
-	return newResult(tx.conn, stream, cypher, params), nil
+	return result.legacy(), nil
 }
 
 func (tx *transaction) Commit() error {
-	if tx.done {
-		return tx.err
-	}
-	tx.err = tx.conn.TxCommit(tx.txHandle)
-	tx.done = true
-	tx.onClosed()
-	return wrapError(tx.err)
+	return tx.delegate.Commit(context.Background())
 }
 
 func (tx *transaction) Rollback() error {
-	if tx.done {
-		return tx.err
-	}
-	if !tx.conn.IsAlive() || tx.conn.HasFailed() {
-		// tx implicitly rolled back by having failed
-		tx.err = nil
-	} else {
-		tx.err = tx.conn.TxRollback(tx.txHandle)
-	}
-	tx.done = true
-	tx.onClosed()
-	return wrapError(tx.err)
+	return tx.delegate.Rollback(context.Background())
 }
 
 func (tx *transaction) Close() error {
-	return tx.Rollback()
-}
-
-// Transaction implementation used as parameter to transactional functions
-type retryableTransaction struct {
-	conn      db.Connection
-	fetchSize int
-	txHandle  db.TxHandle
-}
-
-func (tx *retryableTransaction) Run(cypher string, params map[string]interface{}) (Result, error) {
-	stream, err := tx.conn.RunTx(tx.txHandle, db.Command{Cypher: cypher, Params: params, FetchSize: tx.fetchSize})
-	if err != nil {
-		return nil, wrapError(err)
-	}
-	return newResult(tx.conn, stream, cypher, params), nil
-}
-
-func (tx *retryableTransaction) Commit() error {
-	return &UsageError{Message: "Commit not allowed on retryable transaction"}
-}
-
-func (tx *retryableTransaction) Rollback() error {
-	return &UsageError{Message: "Rollback not allowed on retryable transaction"}
-}
-
-func (tx *retryableTransaction) Close() error {
-	return &UsageError{Message: "Close not allowed on retryable transaction"}
-}
-
-// Represents an auto commit transaction.
-// Does not implement the Transaction interface.
-type autoTransaction struct {
-	conn     db.Connection
-	res      *result
-	closed   bool
-	onClosed func()
-}
-
-func (tx *autoTransaction) done() {
-	if !tx.closed {
-		tx.res.buffer()
-		tx.closed = true
-		tx.onClosed()
-	}
-}
-
-func (tx *autoTransaction) discard() {
-	if !tx.closed {
-		tx.res.Consume()
-		tx.closed = true
-		tx.onClosed()
-	}
+	return tx.delegate.Close(context.Background())
 }

@@ -20,8 +20,10 @@
 package bolt
 
 import (
+	"context"
 	"errors"
 	"fmt"
+	idb "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
 	"net"
 	"time"
 
@@ -42,7 +44,7 @@ const (
 )
 
 type internalTx3 struct {
-	mode      db.AccessMode
+	mode      idb.AccessMode
 	bookmarks []string
 	timeout   time.Duration
 	txMeta    map[string]interface{}
@@ -50,7 +52,7 @@ type internalTx3 struct {
 
 func (i *internalTx3) toMeta() map[string]interface{} {
 	meta := map[string]interface{}{}
-	if i.mode == db.ReadMode {
+	if i.mode == idb.ReadMode {
 		meta["mode"] = "r"
 	}
 	if len(i.bookmarks) > 0 {
@@ -68,7 +70,7 @@ func (i *internalTx3) toMeta() map[string]interface{} {
 
 type bolt3 struct {
 	state         int
-	txId          db.TxHandle
+	txId          idb.TxHandle
 	currStream    *stream
 	conn          net.Conn
 	serverName    string
@@ -86,7 +88,7 @@ type bolt3 struct {
 	minor         int
 }
 
-func NewBolt3(serverName string, conn net.Conn, log log.Logger, boltLog log.BoltLogger) *bolt3 {
+func NewBolt3(serverName string, conn net.Conn, logger log.Logger, boltLog log.BoltLogger) *bolt3 {
 	b := &bolt3{
 		state:      bolt3_unauthorized,
 		conn:       conn,
@@ -97,10 +99,11 @@ func NewBolt3(serverName string, conn net.Conn, log log.Logger, boltLog log.Bolt
 				boltLogger: boltLog,
 			},
 			connReadTimeout: -1,
-			logger:          log,
+			logger:          logger,
+			logName:         log.Bolt3,
 		},
 		birthDate: time.Now(),
-		log:       log,
+		log:       logger,
 	}
 	b.out = &outgoing{
 		chunker: newChunker(),
@@ -125,8 +128,8 @@ func (b *bolt3) ServerVersion() string {
 }
 
 // Sets b.err and b.state on failure
-func (b *bolt3) receiveMsg() interface{} {
-	msg, err := b.in.next(b.conn)
+func (b *bolt3) receiveMsg(ctx context.Context) interface{} {
+	msg, err := b.in.next(ctx, b.conn)
 	if err != nil {
 		b.err = err
 		b.log.Error(log.Bolt3, b.logId, b.err)
@@ -139,8 +142,8 @@ func (b *bolt3) receiveMsg() interface{} {
 // Receives a message that is assumed to be a success response or a failure in response
 // to a sent command.
 // Sets b.err and b.state on failure
-func (b *bolt3) receiveSuccess() *success {
-	switch v := b.receiveMsg().(type) {
+func (b *bolt3) receiveSuccess(ctx context.Context) *success {
+	switch v := b.receiveMsg(ctx).(type) {
 	case *success:
 		return v
 	case *db.Neo4jError:
@@ -166,7 +169,7 @@ func (b *bolt3) receiveSuccess() *success {
 	}
 }
 
-func (b *bolt3) connect(minor int, auth map[string]interface{}, userAgent string) error {
+func (b *bolt3) connect(ctx context.Context, minor int, auth map[string]interface{}, userAgent string) error {
 	if err := b.assertState(bolt3_unauthorized); err != nil {
 		return err
 	}
@@ -185,11 +188,11 @@ func (b *bolt3) connect(minor int, auth map[string]interface{}, userAgent string
 
 	// Send hello message and wait for confirmation
 	b.out.appendHello(hello)
-	if b.out.send(b.conn); b.err != nil {
+	if b.out.send(ctx, b.conn); b.err != nil {
 		return b.err
 	}
 
-	succ := b.receiveSuccess()
+	succ := b.receiveSuccess(ctx)
 	if b.err != nil {
 		return b.err
 	}
@@ -209,10 +212,11 @@ func (b *bolt3) connect(minor int, auth map[string]interface{}, userAgent string
 	return nil
 }
 
-func (b *bolt3) TxBegin(txConfig db.TxConfig) (db.TxHandle, error) {
+func (b *bolt3) TxBegin(ctx context.Context, txConfig idb.TxConfig) (idb.
+TxHandle, error) {
 	// Ok, to begin transaction while streaming auto-commit, just empty the stream and continue.
 	if b.state == bolt3_streaming {
-		if err := b.bufferStream(); err != nil {
+		if err := b.bufferStream(ctx); err != nil {
 			return 0, err
 		}
 	}
@@ -235,10 +239,10 @@ func (b *bolt3) TxBegin(txConfig db.TxConfig) (db.TxHandle, error) {
 	// server early on. Requires a network roundtrip.
 	if len(tx.bookmarks) > 0 {
 		b.out.appendBegin(tx.toMeta())
-		if b.out.send(b.conn); b.err != nil {
+		if b.out.send(ctx, b.conn); b.err != nil {
 			return 0, b.err
 		}
-		if b.receiveSuccess(); b.err != nil {
+		if b.receiveSuccess(ctx); b.err != nil {
 			return 0, b.err
 		}
 		b.state = bolt3_tx
@@ -247,13 +251,13 @@ func (b *bolt3) TxBegin(txConfig db.TxConfig) (db.TxHandle, error) {
 		b.pendingTx = tx
 		b.state = bolt3_pendingtx
 	}
-	b.txId = db.TxHandle(time.Now().Unix())
+	b.txId = idb.TxHandle(time.Now().Unix())
 	return b.txId, nil
 }
 
 // Should NOT set b.err or change b.state as this is used to guard from
 // misuse from clients that stick to their connections when they shouldn't.
-func (b *bolt3) assertTxHandle(h1, h2 db.TxHandle) error {
+func (b *bolt3) assertTxHandle(h1, h2 idb.TxHandle) error {
 	if h1 != h2 {
 		err := errors.New("Invalid transaction handle")
 		b.log.Error(log.Bolt3, b.logId, err)
@@ -281,7 +285,7 @@ func (b *bolt3) assertState(allowed ...int) error {
 	return err
 }
 
-func (b *bolt3) TxCommit(txh db.TxHandle) error {
+func (b *bolt3) TxCommit(ctx context.Context, txh idb.TxHandle) error {
 	if err := b.assertTxHandle(b.txId, txh); err != nil {
 		return err
 	}
@@ -296,7 +300,7 @@ func (b *bolt3) TxCommit(txh db.TxHandle) error {
 	// Access to streams outside of tx boundary is not allowed, therefore we should discard
 	// the stream (not buffer).
 	if b.state == bolt3_streamingtx {
-		if err := b.discardStream(); err != nil {
+		if err := b.discardStream(ctx); err != nil {
 			return err
 		}
 	}
@@ -308,12 +312,12 @@ func (b *bolt3) TxCommit(txh db.TxHandle) error {
 
 	// Send request to server to commit
 	b.out.appendCommit()
-	if b.out.send(b.conn); b.err != nil {
+	if b.out.send(ctx, b.conn); b.err != nil {
 		return b.err
 	}
 
 	// Evaluate server response
-	succ := b.receiveSuccess()
+	succ := b.receiveSuccess(ctx)
 	if b.err != nil {
 		return b.err
 	}
@@ -327,7 +331,7 @@ func (b *bolt3) TxCommit(txh db.TxHandle) error {
 	return nil
 }
 
-func (b *bolt3) TxRollback(txh db.TxHandle) error {
+func (b *bolt3) TxRollback(ctx context.Context, txh idb.TxHandle) error {
 	if err := b.assertTxHandle(b.txId, txh); err != nil {
 		return err
 	}
@@ -342,7 +346,7 @@ func (b *bolt3) TxRollback(txh db.TxHandle) error {
 	// Access to streams outside of tx boundary is not allowed, therefore we should discard
 	// the stream (not buffer).
 	if b.state == bolt3_streamingtx {
-		if err := b.discardStream(); err != nil {
+		if err := b.discardStream(ctx); err != nil {
 			return err
 		}
 	}
@@ -354,12 +358,12 @@ func (b *bolt3) TxRollback(txh db.TxHandle) error {
 
 	// Send rollback request to server
 	b.out.appendRollback()
-	if b.out.send(b.conn); b.err != nil {
+	if b.out.send(ctx, b.conn); b.err != nil {
 		return b.err
 	}
 
 	// Receive rollback confirmation
-	if b.receiveSuccess(); b.err != nil {
+	if b.receiveSuccess(ctx); b.err != nil {
 		return b.err
 	}
 
@@ -368,7 +372,7 @@ func (b *bolt3) TxRollback(txh db.TxHandle) error {
 }
 
 // Discards all records in current stream
-func (b *bolt3) discardStream() error {
+func (b *bolt3) discardStream(ctx context.Context) error {
 	if b.state != bolt3_streaming && b.state != bolt3_streamingtx {
 		// Nothing to do
 		return nil
@@ -379,13 +383,13 @@ func (b *bolt3) discardStream() error {
 		err error
 	)
 	for sum == nil && err == nil {
-		_, sum, err = b.receiveNext()
+		_, sum, err = b.receiveNext(ctx)
 	}
 	return err
 }
 
 // Collects all records in current stream
-func (b *bolt3) bufferStream() error {
+func (b *bolt3) bufferStream(ctx context.Context) error {
 	if b.state != bolt3_streaming && b.state != bolt3_streamingtx {
 		// Nothing to do
 		return nil
@@ -398,7 +402,7 @@ func (b *bolt3) bufferStream() error {
 		rec *db.Record
 	)
 	for sum == nil && err == nil {
-		rec, sum, err = b.receiveNext()
+		rec, sum, err = b.receiveNext(ctx)
 		if rec != nil {
 			b.currStream.push(rec)
 			n++
@@ -412,9 +416,9 @@ func (b *bolt3) bufferStream() error {
 	return err
 }
 
-func (b *bolt3) run(cypher string, params map[string]interface{}, tx *internalTx3) (*stream, error) {
+func (b *bolt3) run(ctx context.Context, cypher string, params map[string]interface{}, tx *internalTx3) (*stream, error) {
 	// If already streaming, finish current stream first
-	if err := b.bufferStream(); err != nil {
+	if err := b.bufferStream(ctx); err != nil {
 		return nil, err
 	}
 
@@ -438,21 +442,21 @@ func (b *bolt3) run(cypher string, params map[string]interface{}, tx *internalTx
 
 	// Append pull all message and send it along with other pending messages
 	b.out.appendPullAll()
-	if b.out.send(b.conn); b.err != nil {
+	if b.out.send(ctx, b.conn); b.err != nil {
 		return nil, b.err
 	}
 
 	// Process server responses
 	// Receive confirmation of transaction begin if it was started above
 	if b.state == bolt3_pendingtx {
-		if b.receiveSuccess(); b.err != nil {
+		if b.receiveSuccess(ctx); b.err != nil {
 			return nil, b.err
 		}
 		b.state = bolt3_tx
 	}
 
 	// Receive confirmation of run message
-	succ := b.receiveSuccess()
+	succ := b.receiveSuccess(ctx)
 	if b.err != nil {
 		return nil, b.err
 	}
@@ -468,7 +472,8 @@ func (b *bolt3) run(cypher string, params map[string]interface{}, tx *internalTx
 	return b.currStream, nil
 }
 
-func (b *bolt3) Run(runCommand db.Command, txConfig db.TxConfig) (db.StreamHandle, error) {
+func (b *bolt3) Run(ctx context.Context, runCommand idb.Command,
+	txConfig idb.TxConfig) (idb.StreamHandle, error) {
 	if err := b.assertState(bolt3_streaming, bolt3_ready); err != nil {
 		return nil, err
 	}
@@ -482,19 +487,20 @@ func (b *bolt3) Run(runCommand db.Command, txConfig db.TxConfig) (db.StreamHandl
 		timeout:   txConfig.Timeout,
 		txMeta:    txConfig.Meta,
 	}
-	stream, err := b.run(runCommand.Cypher, runCommand.Params, &tx)
+	stream, err := b.run(ctx, runCommand.Cypher, runCommand.Params, &tx)
 	if err != nil {
 		return nil, err
 	}
 	return stream, nil
 }
 
-func (b *bolt3) RunTx(txh db.TxHandle, runCommand db.Command) (db.StreamHandle, error) {
+func (b *bolt3) RunTx(ctx context.Context, txh idb.TxHandle,
+	runCommand idb.Command) (idb.StreamHandle, error) {
 	if err := b.assertTxHandle(b.txId, txh); err != nil {
 		return nil, err
 	}
 
-	stream, err := b.run(runCommand.Cypher, runCommand.Params, b.pendingTx)
+	stream, err := b.run(ctx, runCommand.Cypher, runCommand.Params, b.pendingTx)
 	b.pendingTx = nil
 	if err != nil {
 		return nil, err
@@ -502,7 +508,7 @@ func (b *bolt3) RunTx(txh db.TxHandle, runCommand db.Command) (db.StreamHandle, 
 	return stream, nil
 }
 
-func (b *bolt3) Keys(streamHandle db.StreamHandle) ([]string, error) {
+func (b *bolt3) Keys(streamHandle idb.StreamHandle) ([]string, error) {
 	stream, ok := streamHandle.(*stream)
 	if !ok {
 		return nil, errors.New("Invalid stream handle")
@@ -512,7 +518,8 @@ func (b *bolt3) Keys(streamHandle db.StreamHandle) ([]string, error) {
 }
 
 // Reads one record from the stream.
-func (b *bolt3) Next(streamHandle db.StreamHandle) (*db.Record, *db.Summary, error) {
+func (b *bolt3) Next(ctx context.Context, streamHandle idb.StreamHandle) (
+	*db.Record, *db.Summary, error) {
 	stream, ok := streamHandle.(*stream)
 	if !ok {
 		return nil, nil, errors.New("Invalid stream handle")
@@ -530,10 +537,11 @@ func (b *bolt3) Next(streamHandle db.StreamHandle) (*db.Record, *db.Summary, err
 		return nil, nil, errors.New("Invalid stream handle")
 	}
 
-	return b.receiveNext()
+	return b.receiveNext(ctx)
 }
 
-func (b *bolt3) Consume(streamHandle db.StreamHandle) (*db.Summary, error) {
+func (b *bolt3) Consume(ctx context.Context, streamHandle idb.StreamHandle) (
+	*db.Summary, error) {
 	stream, ok := streamHandle.(*stream)
 	if !ok {
 		return nil, errors.New("Invalid stream handle")
@@ -550,11 +558,12 @@ func (b *bolt3) Consume(streamHandle db.StreamHandle) (*db.Summary, error) {
 		return stream.sum, stream.err
 	}
 
-	b.discardStream()
+	b.discardStream(ctx)
 	return stream.sum, stream.err
 }
 
-func (b *bolt3) Buffer(streamHandle db.StreamHandle) error {
+func (b *bolt3) Buffer(ctx context.Context,
+	streamHandle idb.StreamHandle) error {
 	stream, ok := streamHandle.(*stream)
 	if !ok {
 		return errors.New("Invalid stream handle")
@@ -571,17 +580,17 @@ func (b *bolt3) Buffer(streamHandle db.StreamHandle) error {
 		return stream.Err()
 	}
 
-	b.bufferStream()
+	b.bufferStream(ctx)
 	return stream.Err()
 }
 
 // Reads one record from the network.
-func (b *bolt3) receiveNext() (*db.Record, *db.Summary, error) {
+func (b *bolt3) receiveNext(ctx context.Context) (*db.Record, *db.Summary, error) {
 	if err := b.assertState(bolt3_streaming, bolt3_streamingtx); err != nil {
 		return nil, nil, err
 	}
 
-	res := b.receiveMsg()
+	res := b.receiveMsg(ctx)
 	if b.err != nil {
 		return nil, nil, b.err
 	}
@@ -657,7 +666,7 @@ func (b *bolt3) Birthdate() time.Time {
 	return b.birthDate
 }
 
-func (b *bolt3) Reset() {
+func (b *bolt3) Reset(ctx context.Context) {
 	defer func() {
 		// Reset internal state
 		b.txId = 0
@@ -673,7 +682,7 @@ func (b *bolt3) Reset() {
 	}
 
 	// Discard any pending stream
-	b.discardStream()
+	b.discardStream(ctx)
 
 	if b.state == bolt3_ready || b.state == bolt3_dead {
 		// No need for reset
@@ -684,13 +693,13 @@ func (b *bolt3) Reset() {
 	// Need to clear any pending error
 	b.err = nil
 	b.out.appendReset()
-	if b.out.send(b.conn); b.err != nil {
+	if b.out.send(ctx, b.conn); b.err != nil {
 		return
 	}
 
 	// Should receive x number of ignores until we get a success
 	for {
-		msg := b.receiveMsg()
+		msg := b.receiveMsg(ctx)
 		if b.err != nil {
 			return
 		}
@@ -715,11 +724,12 @@ func (b *bolt3) checkImpersonation(impersonatedUser string) error {
 	return nil
 }
 
-func (b *bolt3) GetRoutingTable(context map[string]string, bookmarks []string, database, impersonatedUser string) (*db.RoutingTable, error) {
+func (b *bolt3) GetRoutingTable(ctx context.Context,
+	routingContext map[string]string, _ []string, database, impersonatedUser string) (*idb.RoutingTable, error) {
 	if err := b.assertState(bolt3_ready); err != nil {
 		return nil, err
 	}
-	if database != db.DefaultDatabase {
+	if database != idb.DefaultDatabase {
 		return nil, &db.FeatureNotSupportedError{Server: b.serverName, Feature: "route to database", Reason: "requires at least server v4"}
 	}
 	if err := b.checkImpersonation(impersonatedUser); err != nil {
@@ -727,12 +737,12 @@ func (b *bolt3) GetRoutingTable(context map[string]string, bookmarks []string, d
 	}
 
 	// Only available when Neo4j is setup with clustering
-	runCommand := db.Command{
+	runCommand := idb.Command{
 		Cypher: "CALL dbms.cluster.routing.getRoutingTable($context)",
-		Params: map[string]interface{}{"context": context},
+		Params: map[string]interface{}{"context": routingContext},
 	}
-	txConfig := db.TxConfig{Mode: db.ReadMode}
-	streamHandle, err := b.Run(runCommand, txConfig)
+	txConfig := idb.TxConfig{Mode: idb.ReadMode}
+	streamHandle, err := b.Run(ctx, runCommand, txConfig)
 	if err != nil {
 		// Give a better error
 		dbError, isDbError := err.(*db.Neo4jError)
@@ -742,7 +752,7 @@ func (b *bolt3) GetRoutingTable(context map[string]string, bookmarks []string, d
 		return nil, err
 	}
 
-	rec, _, err := b.Next(streamHandle)
+	rec, _, err := b.Next(ctx, streamHandle)
 	if err != nil {
 		return nil, err
 	}
@@ -750,30 +760,31 @@ func (b *bolt3) GetRoutingTable(context map[string]string, bookmarks []string, d
 		return nil, errors.New("No routing table record")
 	}
 	// Just empty the stream, ignore the summary should leave the connecion in ready state
-	b.Next(streamHandle)
+	b.Next(ctx, streamHandle)
 
 	table := parseRoutingTableRecord(rec)
 	if table == nil {
 		return nil, errors.New("Unable to parse routing table")
 	}
 	// Just because
-	table.DatabaseName = db.DefaultDatabase
+	table.DatabaseName = idb.DefaultDatabase
 
 	return table, nil
 }
 
-// Beware, could be called on another thread when driver is closed.
-func (b *bolt3) Close() {
+// Close closes the underlying connection.
+// Beware: could be called on another thread when driver is closed.
+func (b *bolt3) Close(ctx context.Context) {
 	b.log.Infof(log.Bolt3, b.logId, "Close")
 	if b.state != bolt3_dead {
 		b.out.appendGoodbye()
-		b.out.send(b.conn)
+		b.out.send(ctx, b.conn)
 	}
 	b.conn.Close()
 	b.state = bolt3_dead
 }
 
-func (b *bolt3) ForceReset() error {
+func (b *bolt3) ForceReset(ctx context.Context) error {
 	return nil
 }
 

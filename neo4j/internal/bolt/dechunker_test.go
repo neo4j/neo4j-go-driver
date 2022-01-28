@@ -21,7 +21,9 @@ package bolt
 
 import (
 	"bytes"
+	"context"
 	"encoding/binary"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/log"
 	"net"
 	"reflect"
 	"testing"
@@ -81,7 +83,7 @@ func TestDechunker(t *testing.T) {
 		go func() {
 			AssertWriteSucceeds(t, cli, str.Bytes())
 		}()
-		buf, msgBuf, err = dechunkMessage(serv, buf, -1, nil, "")
+		buf, msgBuf, err = dechunkMessage(context.Background(), serv, buf, -1, log.Void{}, "", "")
 		AssertNoError(t, err)
 		AssertLen(t, msgBuf, int(msg.size))
 		// Check content of buffer
@@ -108,16 +110,10 @@ func TestDechunker(t *testing.T) {
 
 func TestDechunkerWithTimeout(ot *testing.T) {
 	timeout := time.Millisecond * 600
-	serv, cli := net.Pipe()
-	defer func() {
-		AssertNoError(ot, serv.Close())
-		AssertNoError(ot, cli.Close())
-	}()
-	AssertNoError(ot, serv.SetReadDeadline(time.Now().Add(timeout)))
-	logger := &noopLogger{}
-	logId := "dechunker-test"
 
 	ot.Run("Resets connection deadline upon successful reads", func(t *testing.T) {
+		serv, cli := net.Pipe()
+		defer closePipe(ot, serv, cli)
 		go func() {
 			time.Sleep(timeout / 2)
 			AssertWriteSucceeds(t, cli, []byte{0x00, 0x00})
@@ -127,30 +123,36 @@ func TestDechunkerWithTimeout(ot *testing.T) {
 			AssertWriteSucceeds(t, cli, []byte{0x00, 0x00})
 		}()
 		buffer := make([]byte, 2)
-		_, _, err := dechunkMessage(serv, buffer, timeout, logger, logId)
+		_, _, err := dechunkMessage(context.Background(), serv, buffer, timeout, log.Void{}, "", "")
 		AssertNoError(t, err)
 		AssertTrue(t, reflect.DeepEqual(buffer, []byte{0xCA, 0xFE}))
 	})
 
 	ot.Run("Fails when connection deadline is reached", func(t *testing.T) {
-		_, _, err := dechunkMessage(serv, nil, timeout, logger, logId)
+		serv, cli := net.Pipe()
+		defer closePipe(ot, serv, cli)
+
+		_, _, err := dechunkMessage(context.Background(), serv, nil, timeout, log.Void{}, "", "")
+
 		AssertError(t, err)
-		AssertStringContain(t, err.Error(), "read pipe")
+		AssertStringContain(t, err.Error(), "context deadline exceeded")
+	})
+
+	ot.Run("Fails when connection deadline is reached via context", func(t *testing.T) {
+		serv, cli := net.Pipe()
+		defer closePipe(ot, serv, cli)
+		ctx, cancelFunc := context.WithTimeout(context.Background(), timeout)
+		defer cancelFunc()
+
+		_, _, err := dechunkMessage(ctx, serv, nil, -1, log.Void{}, "", "")
+
+		AssertError(t, err)
+		AssertStringContain(t, err.Error(), "context deadline exceeded")
 	})
 
 }
 
-type noopLogger struct {
-}
-
-func (*noopLogger) Error(string, string, error) {
-}
-
-func (*noopLogger) Warnf(string, string, string, ...interface{}) {
-}
-
-func (*noopLogger) Infof(string, string, string, ...interface{}) {
-}
-
-func (*noopLogger) Debugf(string, string, string, ...interface{}) {
+func closePipe(t *testing.T, srv, cli net.Conn) {
+	AssertNoError(t, srv.Close())
+	AssertNoError(t, cli.Close())
 }

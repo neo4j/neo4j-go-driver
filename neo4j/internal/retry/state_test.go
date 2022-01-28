@@ -21,6 +21,7 @@ package retry
 
 import (
 	"errors"
+	idb "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
 	"io"
 	"reflect"
 	"testing"
@@ -33,7 +34,7 @@ import (
 )
 
 type TStateInvocation struct {
-	conn                      db.Connection
+	conn                      idb.Connection
 	err                       error
 	isCommitting              bool
 	now                       time.Time

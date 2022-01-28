@@ -21,6 +21,8 @@
 package db
 
 import (
+	"context"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/db"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/log"
 	"time"
 )
@@ -54,57 +56,57 @@ type TxConfig struct {
 
 // Connection defines an abstract database server connection.
 type Connection interface {
-	TxBegin(txConfig TxConfig) (TxHandle, error)
-	TxRollback(tx TxHandle) error
-	TxCommit(tx TxHandle) error
-	Run(cmd Command, txConfig TxConfig) (StreamHandle, error)
-	RunTx(tx TxHandle, cmd Command) (StreamHandle, error)
+	TxBegin(ctx context.Context, txConfig TxConfig) (TxHandle, error)
+	TxRollback(ctx context.Context, tx TxHandle) error
+	TxCommit(ctx context.Context, tx TxHandle) error
+	Run(ctx context.Context, cmd Command, txConfig TxConfig) (StreamHandle, error)
+	RunTx(ctx context.Context, tx TxHandle, cmd Command) (StreamHandle, error)
 	// Keys for the specified stream.
 	Keys(streamHandle StreamHandle) ([]string, error)
-	// Moves to next item in the stream.
+	// Next moves to next item in the stream.
 	// If error is nil, either Record or Summary has a value, if Record is nil there are no more records.
 	// If error is non nil, neither Record or Summary has a value.
-	Next(streamHandle StreamHandle) (*Record, *Summary, error)
-	// Discards all records on the stream and returns the summary otherwise it will return the error.
-	Consume(streamHandle StreamHandle) (*Summary, error)
-	// Buffers all records on the stream, records, summary and error will be received through call to Next
+	Next(ctx context.Context, streamHandle StreamHandle) (*db.Record, *db.Summary, error)
+	// Consume discards all records on the stream and returns the summary otherwise it will return the error.
+	Consume(ctx context.Context, streamHandle StreamHandle) (*db.Summary, error)
+	// Buffer buffers all records on the stream, records, summary and error will be received through call to Next
 	// The Connection implementation should preserve/buffer streams automatically if needed when new
 	// streams are created and the server doesn't support multiple streams. Use Buffer to force
 	// buffering before calling Reset to get all records and the bookmark.
-	Buffer(streamHandle StreamHandle) error
-	// Returns bookmark from last committed transaction or last finished auto-commit transaction.
+	Buffer(ctx context.Context, streamHandle StreamHandle) error
+	// Bookmark returns the bookmark from last committed transaction or last finished auto-commit transaction.
 	// Note that if there is an ongoing auto-commit transaction (stream active) the bookmark
 	// from that is not included, use Buffer or Consume to end the stream with a bookmark.
 	// Empty string if no bookmark.
 	Bookmark() string
-	// Returns name of the remote server
+	// ServerName returns the name of the remote server
 	ServerName() string
-	// Returns server version on pattern Neo4j/1.2.3
+	// ServerVersion returns the server version on pattern Neo4j/1.2.3
 	ServerVersion() string
-	// Returns true if the connection is fully functional.
+	// IsAlive returns true if the connection is fully functional.
 	// Implementation of this should be passive, no pinging or similair since it might be
 	// called rather frequently.
 	IsAlive() bool
 	// HasFailed returns true if the connection has received a recoverable error (``FAILURE``).
 	HasFailed() bool
-	// Returns the point in time when this connection was established.
+	// Birthdate returns the point in time when this connection was established.
 	Birthdate() time.Time
-	// Resets connection to same state as directly after a connect.
+	// Reset resets connection to same state as directly after a connect.
 	// Active streams will be discarded and the bookmark will be lost.
-	Reset()
-	ForceReset() error
-	// Closes the database connection as well as any underlying connection.
+	Reset(ctx context.Context)
+	ForceReset(ctx context.Context) error
+	// Close closes the database connection as well as any underlying connection.
 	// The instance should not be used after being closed.
-	Close()
-	// Gets routing table for specified database name or the default database if
+	Close(ctx context.Context)
+	// GetRoutingTable gets the routing table for specified database name or the default database if
 	// database equals DefaultDatabase. If the underlying connection does not support
 	// multiple databases, DefaultDatabase should be used as database.
 	// If user impersonation is used (impersonatedUser != "") and default database is used
 	// the database name in the returned routing table will contain the actual name of the
 	// configured default database for the impersonated user. If no impersonation is used
 	// database name in routing table will be set to the name of the requested database.
-	GetRoutingTable(context map[string]string, bookmarks []string, database, impersonatedUser string) (*RoutingTable, error)
-	// Sets Bolt message logger on already initialized connections
+	GetRoutingTable(ctx context.Context, context map[string]string, bookmarks []string, database, impersonatedUser string) (*RoutingTable, error)
+	// SetBoltLogger sets Bolt message logger on already initialized connections
 	SetBoltLogger(boltLogger log.BoltLogger)
 }
 
@@ -119,10 +121,10 @@ type RoutingTable struct {
 // Marker for using the default database instance.
 const DefaultDatabase = ""
 
-// If database server connection supports selecting which database instance on the server
+// DatabaseSelector allows to select a database if the database server connection supports selecting which database instance on the server
 // to connect to. Prior to Neo4j 4 there was only one database per server.
 type DatabaseSelector interface {
-	// Should be called immediately after Reset. Not allowed to call multiple times with different
-	// databases without a reset inbetween.
+	// SelectDatabase should be called immediately after Reset. Not allowed to call multiple times with different
+	// databases without a reset in-between.
 	SelectDatabase(database string)
 }

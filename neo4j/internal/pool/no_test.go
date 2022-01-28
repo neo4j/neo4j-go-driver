@@ -20,9 +20,8 @@
 package pool
 
 import (
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
 	"testing"
-
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/db"
 )
 
 func assertConnection(t *testing.T, c db.Connection, err error) {

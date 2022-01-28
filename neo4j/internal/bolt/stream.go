@@ -16,11 +16,13 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
+
 package bolt
 
 import (
 	"container/list"
 	"errors"
+	idb "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
 	"time"
 
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/db"
@@ -136,7 +138,7 @@ func (o *openstreams) reset() {
 
 // Checks that the handle represents a stream but not necessarily a stream belonging
 // to this set of open streams.
-func (o openstreams) getUnsafe(h db.StreamHandle) (*stream, error) {
+func (o openstreams) getUnsafe(h idb.StreamHandle) (*stream, error) {
 	stream, ok := h.(*stream)
 	if !ok || stream == nil {
 		return nil, invalidStream

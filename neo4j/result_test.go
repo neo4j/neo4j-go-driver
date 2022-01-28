@@ -22,6 +22,7 @@ package neo4j
 import (
 	"errors"
 	"fmt"
+	idb "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
 	"testing"
 
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/db"
@@ -37,7 +38,7 @@ type iter struct {
 }
 
 func TestResult(ot *testing.T) {
-	streamHandle := db.StreamHandle(0)
+	streamHandle := idb.StreamHandle(0)
 	cypher := ""
 	params := map[string]interface{}{}
 	recs := []*db.Record{

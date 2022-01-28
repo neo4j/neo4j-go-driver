@@ -20,7 +20,9 @@
 package bolt
 
 import (
+	"context"
 	"fmt"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/log"
 	"io"
 	"net"
 	"testing"
@@ -91,7 +93,7 @@ func (s *bolt3server) waitForHello() {
 }
 
 func (s *bolt3server) receiveMsg() *testStruct {
-	_, buf, err := dechunkMessage(s.conn, []byte{}, -1, nil, "")
+	_, buf, err := dechunkMessage(context.Background(), s.conn, []byte{}, -1, log.Void{}, "", "")
 	if err != nil {
 		panic(err)
 	}
@@ -160,7 +162,7 @@ func (s *bolt3server) closeConnection() {
 
 func (s *bolt3server) send(tag byte, field ...interface{}) {
 	s.out.appendX(byte(tag), field...)
-	s.out.send(s.conn)
+	s.out.send(context.Background(), s.conn)
 }
 
 func (s *bolt3server) sendSuccess(m map[string]interface{}) {
@@ -211,7 +213,7 @@ func (s *bolt3server) serveRunTx(stream []testStruct, commit bool, bookmark stri
 		s.out.appendX(byte(msgSuccess), map[string]interface{}{
 			"bookmark": bookmark,
 		})
-		s.out.send(s.conn)
+		s.out.send(context.Background(), s.conn)
 	} else {
 		s.waitForTxRollback()
 		s.send(msgSuccess, map[string]interface{}{})

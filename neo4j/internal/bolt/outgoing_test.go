@@ -20,6 +20,9 @@
 package bolt
 
 import (
+	"context"
+	idb "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/log"
 	"net"
 	"reflect"
 	"testing"
@@ -105,11 +108,11 @@ func TestOutgoing(ot *testing.T) {
 			t.Fatal(err)
 		}
 		go func() {
-			out.send(cli)
+			out.send(context.Background(), cli)
 		}()
 
 		// Dechunk it
-		_, byts, err := dechunkMessage(serv, []byte{}, -1, nil, "")
+		_, byts, err := dechunkMessage(context.Background(), serv, []byte{}, -1, log.Void{}, "", "")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -277,7 +280,8 @@ func TestOutgoing(ot *testing.T) {
 		{
 			name: "route, default database v43",
 			build: func(out *outgoing) {
-				out.appendRouteToV43(map[string]string{"key1": "val1", "key2": "val2"}, []string{"deutsch-mark", "mark-twain"}, db.DefaultDatabase)
+				out.appendRouteToV43(map[string]string{"key1": "val1",
+					"key2": "val2"}, []string{"deutsch-mark", "mark-twain"}, idb.DefaultDatabase)
 			},
 			expect: &testStruct{
 				tag:    byte(msgRoute),
@@ -297,7 +301,8 @@ func TestOutgoing(ot *testing.T) {
 		{
 			name: "route, default bookmarks and database v43",
 			build: func(out *outgoing) {
-				out.appendRouteToV43(map[string]string{"key1": "val1", "key2": "val2"}, nil, db.DefaultDatabase)
+				out.appendRouteToV43(map[string]string{"key1": "val1",
+					"key2": "val2"}, nil, idb.DefaultDatabase)
 			},
 			expect: &testStruct{
 				tag:    byte(msgRoute),

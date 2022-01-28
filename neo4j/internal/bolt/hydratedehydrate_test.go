@@ -20,6 +20,8 @@
 package bolt
 
 import (
+	"context"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/log"
 	"net"
 	"testing"
 	"time"
@@ -54,9 +56,9 @@ func TestDehydrateHydrate(ot *testing.T) {
 		// format data in a record to avoid confusing the hydrator
 		out.appendX(msgRecord, []interface{}{xi})
 		go func() {
-			out.send(cli)
+			out.send(context.Background(), cli)
 		}()
-		_, byts, err := dechunkMessage(serv, []byte{}, -1, nil, "")
+		_, byts, err := dechunkMessage(context.Background(), serv, []byte{}, -1, log.Void{}, "", "")
 		if err != nil {
 			t.Fatal(err)
 		}

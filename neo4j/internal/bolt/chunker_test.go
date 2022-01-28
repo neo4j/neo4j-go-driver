@@ -21,6 +21,8 @@ package bolt
 
 import (
 	"bytes"
+	"context"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/log"
 	"net"
 	"testing"
 
@@ -81,7 +83,7 @@ func TestChunker(ot *testing.T) {
 
 	receiveAndAssertMessage := func(t *testing.T, conn net.Conn, expected []byte) {
 		t.Helper()
-		_, msg, err := dechunkMessage(conn, []byte{}, -1, nil, "")
+		_, msg, err := dechunkMessage(context.Background(), conn, []byte{}, -1, log.Void{}, "", "")
 		AssertNoError(t, err)
 		assertSlices(t, msg, expected)
 	}
@@ -92,7 +94,7 @@ func TestChunker(ot *testing.T) {
 		chunker := newChunker()
 		var chunked []byte
 		chunked = writeSmall(&chunker, chunked)
-		err := chunker.send(cbuf)
+		err := chunker.send(context.Background(), cbuf)
 		AssertNoError(t, err)
 		assertBuf(t, cbuf, chunked)
 
@@ -114,7 +116,7 @@ func TestChunker(ot *testing.T) {
 		var chunked []byte
 		chunked = writeSmall(&chunker, chunked)
 		chunked = writeSmall(&chunker, chunked)
-		err := chunker.send(cbuf)
+		err := chunker.send(context.Background(), cbuf)
 		AssertNoError(t, err)
 		assertBuf(t, cbuf, chunked)
 
@@ -134,9 +136,9 @@ func TestChunker(ot *testing.T) {
 		// Chunk
 		cbuf := &bytes.Buffer{}
 		chunker := newChunker()
-		chunked := []byte{}
+		var chunked []byte
 		chunked = writeLarge(&chunker, chunked)
-		err := chunker.send(cbuf)
+		err := chunker.send(context.Background(), cbuf)
 		AssertNoError(t, err)
 		assertBuf(t, cbuf, chunked)
 
@@ -155,10 +157,10 @@ func TestChunker(ot *testing.T) {
 		// Chunk
 		cbuf := &bytes.Buffer{}
 		chunker := newChunker()
-		chunked := []byte{}
+		var chunked []byte
 		chunked = writeSmall(&chunker, chunked)
 		chunked = writeLarge(&chunker, chunked)
-		err := chunker.send(cbuf)
+		err := chunker.send(context.Background(), cbuf)
 		AssertNoError(t, err)
 		assertBuf(t, cbuf, chunked)
 

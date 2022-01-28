@@ -129,7 +129,7 @@ var _ = Describe("Session", func() {
 			stmt := "UNWIND [1, 2, 3, 4, 0] AS x RETURN 10 / 0"
 
 			result, err = session.Run(stmt, nil)
-			// Up to the db when the error occures
+			// Up to the db when the error occurs
 			if err != nil {
 				Expect(result).To(BeNil())
 				//Expect(err).To(BeArithmeticError())
@@ -532,7 +532,7 @@ var _ = Describe("Session", func() {
 			session3 := driver.NewSession(neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
 
 			result3, err := session3.Run("MATCH (n:RunTxTimeOut) SET n.id = 2", nil, neo4j.WithTxTimeout(1*time.Second))
-			// Up to db to determine when error occures
+			// Up to db to determine when error occurs
 			if err != nil {
 				dbErr := err.(*db.Neo4jError)
 				Expect(dbErr.Msg).To(ContainSubstring("terminated"))

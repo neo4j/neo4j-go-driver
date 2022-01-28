@@ -16,9 +16,12 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
+
 package bolt
 
 import (
+	"context"
+	idb "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/log"
 	"io"
 	"reflect"
@@ -178,7 +181,7 @@ func (o *outgoing) appendRouteToV43(context map[string]string, bookmarks []strin
 	for _, bookmark := range bookmarks {
 		o.packer.String(bookmark)
 	}
-	if database == db.DefaultDatabase {
+	if database == idb.DefaultDatabase {
 		o.packer.Nil()
 	} else {
 		o.packer.String(database)
@@ -233,8 +236,8 @@ func (o *outgoing) appendX(tag byte, fields ...interface{}) {
 	o.end()
 }
 
-func (o *outgoing) send(wr io.Writer) {
-	err := o.chunker.send(wr)
+func (o *outgoing) send(ctx context.Context, wr io.Writer) {
+	err := o.chunker.send(ctx, wr)
 	if err != nil {
 		o.onErr(err)
 	}

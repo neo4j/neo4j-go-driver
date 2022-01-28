@@ -21,6 +21,7 @@ package bolt
 
 import (
 	"fmt"
+	idb "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
 	"reflect"
 	"testing"
 	"time"
@@ -358,7 +359,7 @@ func TestHydrator(ot *testing.T) {
 				packer.ArrayHeader(1)
 				packer.String("writer1")
 			},
-			x: &success{qid: -1, num: 1, routingTable: &db.RoutingTable{
+			x: &success{qid: -1, num: 1, routingTable: &idb.RoutingTable{
 				TimeToLive:   1001,
 				DatabaseName: "dbname",
 				Routers:      []string{"router1", "router2"},
@@ -401,7 +402,7 @@ func TestHydrator(ot *testing.T) {
 				packer.ArrayHeader(1)
 				packer.String("writer1")
 			},
-			x: &success{qid: -1, num: 1, routingTable: &db.RoutingTable{
+			x: &success{qid: -1, num: 1, routingTable: &idb.RoutingTable{
 				TimeToLive: 1001,
 				Routers:    []string{"router1", "router2"},
 				Readers:    []string{"reader1", "reader2", "reader3"},
@@ -433,7 +434,7 @@ func TestHydrator(ot *testing.T) {
 				packer.ArrayHeader(1)
 				packer.String("router1")
 			},
-			x: &success{qid: -1, num: 2, routingTable: &db.RoutingTable{
+			x: &success{qid: -1, num: 2, routingTable: &idb.RoutingTable{
 				TimeToLive: 1001,
 				Routers:    []string{"router1"}}},
 		},

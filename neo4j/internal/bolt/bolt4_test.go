@@ -20,7 +20,9 @@
 package bolt
 
 import (
+	"context"
 	"fmt"
+	idb "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
 	"reflect"
 	"testing"
 	"time"
@@ -85,13 +87,14 @@ func TestBolt4(ot *testing.T) {
 		}
 	}
 
-	assertRunResponseOk := func(t *testing.T, bolt *bolt4, stream db.StreamHandle) {
+	assertRunResponseOk := func(t *testing.T, bolt *bolt4,
+		stream idb.StreamHandle) {
 		for i := 1; i < len(runResponse)-1; i++ {
-			rec, sum, err := bolt.Next(stream)
+			rec, sum, err := bolt.Next(context.Background(), stream)
 			AssertNextOnlyRecord(t, rec, sum, err)
 		}
 		// Retrieve the summary
-		rec, sum, err := bolt.Next(stream)
+		rec, sum, err := bolt.Next(context.Background(), stream)
 		AssertNextOnlySummary(t, rec, sum, err)
 	}
 
@@ -100,7 +103,7 @@ func TestBolt4(ot *testing.T) {
 		tcpConn, srv, cleanup := setupBolt4Pipe(t)
 		go serverJob(srv)
 
-		c, err := Connect("serverName", tcpConn, auth, "007", nil, logger, boltLogger)
+		c, err := Connect(context.Background(), "serverName", tcpConn, auth, "007", nil, logger, boltLogger)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -132,7 +135,7 @@ func TestBolt4(ot *testing.T) {
 			srv.acceptHello()
 		})
 		defer cleanup()
-		defer bolt.Close()
+		defer bolt.Close(context.Background())
 
 		// Check Bolt properties
 		AssertStringEqual(t, bolt.ServerName(), "serverName")
@@ -148,7 +151,7 @@ func TestBolt4(ot *testing.T) {
 			srv.acceptHelloWithHints(map[string]interface{}{"connection.recv_timeout_seconds": 42})
 		})
 		defer cleanup()
-		defer bolt.Close()
+		defer bolt.Close(context.Background())
 
 		AssertTrue(t, reflect.DeepEqual(bolt.in.connReadTimeout, 42*time.Second))
 	})
@@ -163,7 +166,7 @@ func TestBolt4(ot *testing.T) {
 				srv.acceptHelloWithHints(map[string]interface{}{"connection.recv_timeout_seconds": value})
 			})
 			defer cleanup()
-			defer bolt.Close()
+			defer bolt.Close(context.Background())
 
 			AssertTrue(t, reflect.DeepEqual(bolt.in.connReadTimeout, time.Duration(-1)))
 		})
@@ -183,9 +186,9 @@ func TestBolt4(ot *testing.T) {
 			}
 			srv.acceptHello()
 		}()
-		bolt, err := Connect("serverName", conn, auth, "007", routingContext, logger, boltLogger)
+		bolt, err := Connect(context.Background(), "serverName", conn, auth, "007", routingContext, logger, boltLogger)
 		AssertNoError(t, err)
-		bolt.Close()
+		bolt.Close(context.Background())
 	})
 
 	ot.Run("No routing in hello", func(t *testing.T) {
@@ -201,9 +204,9 @@ func TestBolt4(ot *testing.T) {
 			}
 			srv.acceptHello()
 		}()
-		bolt, err := Connect("serverName", conn, auth, "007", nil, logger, boltLogger)
+		bolt, err := Connect(context.Background(), "serverName", conn, auth, "007", nil, logger, boltLogger)
 		AssertNoError(t, err)
-		bolt.Close()
+		bolt.Close(context.Background())
 	})
 
 	ot.Run("No routing in hello on 4.0", func(t *testing.T) {
@@ -220,9 +223,9 @@ func TestBolt4(ot *testing.T) {
 			}
 			srv.acceptHello()
 		}()
-		bolt, err := Connect("serverName", conn, auth, "007", routingContext, logger, boltLogger)
+		bolt, err := Connect(context.Background(), "serverName", conn, auth, "007", routingContext, logger, boltLogger)
 		AssertNoError(t, err)
-		bolt.Close()
+		bolt.Close(context.Background())
 	})
 
 	ot.Run("Failed authentication", func(t *testing.T) {
@@ -235,7 +238,7 @@ func TestBolt4(ot *testing.T) {
 			srv.waitForHello()
 			srv.rejectHelloUnauthorized()
 		}()
-		bolt, err := Connect("serverName", conn, auth, "007", nil, logger, boltLogger)
+		bolt, err := Connect(context.Background(), "serverName", conn, auth, "007", nil, logger, boltLogger)
 		AssertNil(t, bolt)
 		AssertError(t, err)
 		dbErr, isDbErr := err.(*db.Neo4jError)
@@ -253,17 +256,18 @@ func TestBolt4(ot *testing.T) {
 		bolt, cleanup := connectToServer(t, func(srv *bolt4server) {
 			srv.accept(4)
 			srv.serveRun(runResponse, func(fields []interface{}) {
-				// fields consists of cypher text, cypher params, meta
+				// fields consist of cypher text, cypher params, meta
 				AssertStringEqual(t, fields[0].(string), cypherText)
 				meta := fields[2].(map[string]interface{})
 				AssertStringEqual(t, meta["db"].(string), theDb)
 			})
 		})
 		defer cleanup()
-		defer bolt.Close()
+		defer bolt.Close(context.Background())
 
 		bolt.SelectDatabase(theDb)
-		str, _ := bolt.Run(db.Command{Cypher: cypherText}, db.TxConfig{Mode: db.ReadMode})
+		str, _ := bolt.Run(context.Background(),
+			idb.Command{Cypher: cypherText}, idb.TxConfig{Mode: idb.ReadMode})
 		skeys, _ := bolt.Keys(str)
 		assertKeys(t, runKeys, skeys)
 		assertBoltState(t, bolt4_streaming, bolt)
@@ -281,7 +285,7 @@ func TestBolt4(ot *testing.T) {
 			srv.acceptWithMinor(4, 4)
 			// Make sure that impersonation id is sent
 			srv.serveRun(runResponse, func(fields []interface{}) {
-				// fields consists of cypher text, cypher params, meta
+				// fields consist of cypher text, cypher params, meta
 				AssertStringEqual(t, fields[0].(string), cypherText)
 				meta := fields[2].(map[string]interface{})
 				AssertStringEqual(t, meta["db"].(string), theDb)
@@ -289,10 +293,12 @@ func TestBolt4(ot *testing.T) {
 			})
 		})
 		defer cleanup()
-		defer bolt.Close()
+		defer bolt.Close(context.Background())
 
 		bolt.SelectDatabase(theDb)
-		str, _ := bolt.Run(db.Command{Cypher: cypherText}, db.TxConfig{Mode: db.ReadMode, ImpersonatedUser: impersonatedUser})
+		str, _ := bolt.Run(context.Background(),
+			idb.Command{Cypher: cypherText}, idb.TxConfig{Mode: idb.ReadMode,
+				ImpersonatedUser: impersonatedUser})
 		skeys, _ := bolt.Keys(str)
 		assertKeys(t, runKeys, skeys)
 		assertBoltState(t, bolt4_streaming, bolt)
@@ -316,9 +322,11 @@ func TestBolt4(ot *testing.T) {
 			srv.send(runResponse[4].tag, runResponse[4].fields...)
 		})
 		defer cleanup()
-		defer bolt.Close()
+		defer bolt.Close(context.Background())
 
-		str, _ := bolt.Run(db.Command{Cypher: "cypher", FetchSize: 2}, db.TxConfig{Mode: db.ReadMode})
+		str, _ := bolt.Run(context.Background(),
+			idb.Command{Cypher: "cypher", FetchSize: 2},
+			idb.TxConfig{Mode: idb.ReadMode})
 		assertBoltState(t, bolt4_streaming, bolt)
 
 		// Retrieve the records
@@ -333,13 +341,15 @@ func TestBolt4(ot *testing.T) {
 			srv.serveRunTx(runResponse, true, committedBookmark)
 		})
 		defer cleanup()
-		defer bolt.Close()
+		defer bolt.Close(context.Background())
 
-		tx, err := bolt.TxBegin(db.TxConfig{Mode: db.ReadMode})
+		tx, err := bolt.TxBegin(context.Background(),
+			idb.TxConfig{Mode: idb.ReadMode})
 		AssertNoError(t, err)
 		// Lazy start of transaction when no bookmark
 		assertBoltState(t, bolt4_pendingtx, bolt)
-		str, err := bolt.RunTx(tx, db.Command{Cypher: "MATCH (n) RETURN n"})
+		str, err := bolt.RunTx(context.Background(), tx,
+			idb.Command{Cypher: "MATCH (n) RETURN n"})
 		assertBoltState(t, bolt4_streamingtx, bolt)
 		AssertNoError(t, err)
 		skeys, _ := bolt.Keys(str)
@@ -349,7 +359,7 @@ func TestBolt4(ot *testing.T) {
 		assertRunResponseOk(t, bolt, str)
 		assertBoltState(t, bolt4_tx, bolt)
 
-		bolt.TxCommit(tx)
+		bolt.TxCommit(context.Background(), tx)
 		assertBoltState(t, bolt4_ready, bolt)
 		AssertStringEqual(t, committedBookmark, bolt.Bookmark())
 	})
@@ -379,14 +389,16 @@ func TestBolt4(ot *testing.T) {
 			srv.send(msgSuccess, map[string]interface{}{"bookmark": "x"})
 		})
 		defer cleanup()
-		defer bolt.Close()
+		defer bolt.Close(context.Background())
 
-		tx, err := bolt.TxBegin(db.TxConfig{Mode: db.ReadMode})
+		tx, err := bolt.TxBegin(context.Background(),
+			idb.TxConfig{Mode: idb.ReadMode})
 		AssertNoError(t, err)
-		_, err = bolt.RunTx(tx, db.Command{Cypher: "Whatever", FetchSize: 1})
+		_, err = bolt.RunTx(context.Background(), tx,
+			idb.Command{Cypher: "Whatever", FetchSize: 1})
 		AssertNoError(t, err)
 
-		err = bolt.TxCommit(tx)
+		err = bolt.TxCommit(context.Background(), tx)
 		AssertNoError(t, err)
 		assertBoltState(t, bolt4_ready, bolt)
 	})
@@ -419,20 +431,23 @@ func TestBolt4(ot *testing.T) {
 			srv.send(msgSuccess, map[string]interface{}{"bookmark": "x"})
 		})
 		defer cleanup()
-		defer bolt.Close()
+		defer bolt.Close(context.Background())
 
-		tx, err := bolt.TxBegin(db.TxConfig{Mode: db.ReadMode})
+		tx, err := bolt.TxBegin(context.Background(),
+			idb.TxConfig{Mode: idb.ReadMode})
 		AssertNoError(t, err)
-		s, err := bolt.RunTx(tx, db.Command{Cypher: "Whatever", FetchSize: 1})
+		s, err := bolt.RunTx(context.Background(), tx,
+			idb.Command{Cypher: "Whatever", FetchSize: 1})
 		AssertNoError(t, err)
-		_, err = bolt.Consume(s)
+		_, err = bolt.Consume(context.Background(), s)
 		AssertNoError(t, err)
-		s, err = bolt.RunTx(tx, db.Command{Cypher: "Whatever", FetchSize: 1})
+		s, err = bolt.RunTx(context.Background(), tx,
+			idb.Command{Cypher: "Whatever", FetchSize: 1})
 		AssertNoError(t, err)
-		_, err = bolt.Consume(s)
+		_, err = bolt.Consume(context.Background(), s)
 		AssertNoError(t, err)
 
-		err = bolt.TxCommit(tx)
+		err = bolt.TxCommit(context.Background(), tx)
 		AssertNoError(t, err)
 		assertBoltState(t, bolt4_ready, bolt)
 	})
@@ -444,14 +459,16 @@ func TestBolt4(ot *testing.T) {
 			srv.serveRunTx(runResponse, true, committedBookmark)
 		})
 		defer cleanup()
-		defer bolt.Close()
+		defer bolt.Close(context.Background())
 
-		tx, err := bolt.TxBegin(db.TxConfig{Mode: db.ReadMode, Bookmarks: []string{"bm1"}})
+		tx, err := bolt.TxBegin(context.Background(),
+			idb.TxConfig{Mode: idb.ReadMode, Bookmarks: []string{"bm1"}})
 		AssertNoError(t, err)
 		assertBoltState(t, bolt4_tx, bolt)
-		bolt.RunTx(tx, db.Command{Cypher: "MATCH (n) RETURN n"})
+		bolt.RunTx(context.Background(), tx, idb.Command{Cypher: "MATCH (" +
+			"n) RETURN n"})
 		assertBoltState(t, bolt4_streamingtx, bolt)
-		bolt.TxCommit(tx)
+		bolt.TxCommit(context.Background(), tx)
 		assertBoltState(t, bolt4_ready, bolt)
 		AssertStringEqual(t, committedBookmark, bolt.Bookmark())
 	})
@@ -463,9 +480,10 @@ func TestBolt4(ot *testing.T) {
 			srv.sendFailureMsg("code", "not synced")
 		})
 		defer cleanup()
-		defer bolt.Close()
+		defer bolt.Close(context.Background())
 
-		_, err := bolt.TxBegin(db.TxConfig{Mode: db.ReadMode, Bookmarks: []string{"bm1"}})
+		_, err := bolt.TxBegin(context.Background(),
+			idb.TxConfig{Mode: idb.ReadMode, Bookmarks: []string{"bm1"}})
 		assertBoltState(t, bolt4_failed, bolt)
 		AssertError(t, err)
 		AssertStringEqual(t, "", bolt.Bookmark())
@@ -477,12 +495,14 @@ func TestBolt4(ot *testing.T) {
 			srv.serveRunTx(runResponse, false, "")
 		})
 		defer cleanup()
-		defer bolt.Close()
+		defer bolt.Close(context.Background())
 
-		tx, err := bolt.TxBegin(db.TxConfig{Mode: db.ReadMode})
+		tx, err := bolt.TxBegin(context.Background(),
+			idb.TxConfig{Mode: idb.ReadMode})
 		AssertNoError(t, err)
 		assertBoltState(t, bolt4_pendingtx, bolt)
-		str, err := bolt.RunTx(tx, db.Command{Cypher: "MATCH (n) RETURN n"})
+		str, err := bolt.RunTx(context.Background(), tx,
+			idb.Command{Cypher: "MATCH (n) RETURN n"})
 		AssertNoError(t, err)
 		assertBoltState(t, bolt4_streamingtx, bolt)
 		skeys, _ := bolt.Keys(str)
@@ -492,7 +512,7 @@ func TestBolt4(ot *testing.T) {
 		assertRunResponseOk(t, bolt, str)
 		assertBoltState(t, bolt4_tx, bolt)
 
-		bolt.TxRollback(tx)
+		bolt.TxRollback(context.Background(), tx)
 		assertBoltState(t, bolt4_ready, bolt)
 	})
 
@@ -511,18 +531,20 @@ func TestBolt4(ot *testing.T) {
 			srv.closeConnection()
 		})
 		defer cleanup()
-		defer bolt.Close()
+		defer bolt.Close(context.Background())
 
-		str, err := bolt.Run(db.Command{Cypher: "MATCH (n) RETURN n"}, db.TxConfig{Mode: db.ReadMode})
+		str, err := bolt.Run(context.Background(),
+			idb.Command{Cypher: "MATCH (n) RETURN n"},
+			idb.TxConfig{Mode: idb.ReadMode})
 		AssertNoError(t, err)
 		assertBoltState(t, bolt4_streaming, bolt)
 
 		// Retrieve the first record
-		rec, sum, err := bolt.Next(str)
+		rec, sum, err := bolt.Next(context.Background(), str)
 		AssertNextOnlyRecord(t, rec, sum, err)
 
 		// Next one should fail due to connection closed
-		rec, sum, err = bolt.Next(str)
+		rec, sum, err = bolt.Next(context.Background(), str)
 		AssertNextOnlyError(t, rec, sum, err)
 		assertBoltDead(t, bolt)
 	})
@@ -538,14 +560,15 @@ func TestBolt4(ot *testing.T) {
 			srv.sendSuccess(map[string]interface{}{})
 		})
 		defer cleanup()
-		defer bolt.Close()
+		defer bolt.Close(context.Background())
 
 		// Fake syntax error that doesn't really matter...
-		_, err := bolt.Run(db.Command{Cypher: "MATCH (n RETURN n"}, db.TxConfig{Mode: db.ReadMode})
+		_, err := bolt.Run(context.Background(), idb.Command{Cypher: "MATCH (" +
+			"n RETURN n"}, idb.TxConfig{Mode: idb.ReadMode})
 		AssertNeo4jError(t, err)
 		assertBoltState(t, bolt4_failed, bolt)
 
-		bolt.Reset()
+		bolt.Reset(context.Background())
 		assertBoltState(t, bolt4_ready, bolt)
 	})
 
@@ -558,14 +581,16 @@ func TestBolt4(ot *testing.T) {
 			srv.sendFailureMsg("code", "msg")
 		})
 		defer cleanup()
-		defer bolt.Close()
+		defer bolt.Close(context.Background())
 
-		tx, err := bolt.TxBegin(db.TxConfig{Mode: db.ReadMode})
+		tx, err := bolt.TxBegin(context.Background(),
+			idb.TxConfig{Mode: idb.ReadMode})
 		AssertNoError(t, err)
-		_, err = bolt.RunTx(tx, db.Command{Cypher: "MATCH (n) RETURN n"})
+		_, err = bolt.RunTx(context.Background(), tx,
+			idb.Command{Cypher: "MATCH (n) RETURN n"})
 		AssertNeo4jError(t, err)
-		err = bolt.TxCommit(tx)  // This will fail due to above failed
-		AssertNeo4jError(t, err) // Should have same error as from run since that is original cause
+		err = bolt.TxCommit(context.Background(), tx) // This will fail due to above failed
+		AssertNeo4jError(t, err)                      // Should have same error as from run since that is original cause
 	})
 
 	ot.Run("Reset while streaming", func(t *testing.T) {
@@ -582,13 +607,14 @@ func TestBolt4(ot *testing.T) {
 			srv.sendSuccess(map[string]interface{}{})
 		})
 		defer cleanup()
-		defer bolt.Close()
+		defer bolt.Close(context.Background())
 
-		_, err := bolt.Run(db.Command{Cypher: "MATCH (n) RETURN n"}, db.TxConfig{Mode: db.ReadMode})
+		_, err := bolt.Run(context.Background(), idb.Command{Cypher: "MATCH (" +
+			"n) RETURN n"}, idb.TxConfig{Mode: idb.ReadMode})
 		AssertNoError(t, err)
 		assertBoltState(t, bolt4_streaming, bolt)
 
-		bolt.Reset()
+		bolt.Reset(context.Background())
 		assertBoltState(t, bolt4_ready, bolt)
 	})
 
@@ -598,13 +624,14 @@ func TestBolt4(ot *testing.T) {
 			srv.serveRun(runResponse, nil)
 		})
 		defer cleanup()
-		defer bolt.Close()
-		s, err := bolt.Run(db.Command{Cypher: "MATCH (n) RETURN n"}, db.TxConfig{Mode: db.ReadMode})
+		defer bolt.Close(context.Background())
+		s, err := bolt.Run(context.Background(), idb.Command{Cypher: "MATCH (" +
+			"n) RETURN n"}, idb.TxConfig{Mode: idb.ReadMode})
 		AssertNoError(t, err)
-		_, err = bolt.Consume(s)
+		_, err = bolt.Consume(context.Background(), s)
 		AssertNoError(t, err)
 		// Should be no-op since state already is ready
-		bolt.Reset()
+		bolt.Reset(context.Background())
 	})
 
 	ot.Run("Forces reset in ready state", func(t *testing.T) {
@@ -614,9 +641,9 @@ func TestBolt4(ot *testing.T) {
 			srv.sendSuccess(map[string]interface{}{})
 		})
 		defer cleanup()
-		defer bolt.Close()
+		defer bolt.Close(context.Background())
 
-		err := bolt.ForceReset()
+		err := bolt.ForceReset(context.Background())
 		AssertNoError(t, err)
 		assertBoltState(t, bolt4_ready, bolt)
 	})
@@ -629,11 +656,12 @@ func TestBolt4(ot *testing.T) {
 			srv.sendSuccess(map[string]interface{}{})
 		})
 		defer cleanup()
-		defer bolt.Close()
-		_, err := bolt.Run(db.Command{Cypher: "MATCH (n) RETURN n"}, db.TxConfig{Mode: db.ReadMode})
+		defer bolt.Close(context.Background())
+		_, err := bolt.Run(context.Background(), idb.Command{Cypher: "MATCH (" +
+			"n) RETURN n"}, idb.TxConfig{Mode: idb.ReadMode})
 		AssertNoError(t, err)
 
-		err = bolt.ForceReset()
+		err = bolt.ForceReset(context.Background())
 		AssertNoError(t, err)
 		assertBoltState(t, bolt4_ready, bolt)
 	})
@@ -647,17 +675,19 @@ func TestBolt4(ot *testing.T) {
 			srv.closeConnection()
 		})
 		defer cleanup()
-		defer bolt.Close()
+		defer bolt.Close(context.Background())
 
-		stream, _ := bolt.Run(db.Command{Cypher: "cypher"}, db.TxConfig{Mode: db.ReadMode})
+		stream, _ := bolt.Run(context.Background(),
+			idb.Command{Cypher: "cypher"}, idb.TxConfig{Mode: idb.ReadMode})
 		// This should force all records to be buffered in the stream
-		err := bolt.Buffer(stream)
+		err := bolt.Buffer(context.Background(), stream)
 		AssertNoError(t, err)
 		// The bookmark should be set
 		AssertStringEqual(t, bolt.Bookmark(), runBookmark)
 
 		// Server closed connection and bolt will go into failed state
-		_, err = bolt.Run(db.Command{Cypher: "cypher"}, db.TxConfig{Mode: db.ReadMode})
+		_, err = bolt.Run(context.Background(),
+			idb.Command{Cypher: "cypher"}, idb.TxConfig{Mode: idb.ReadMode})
 		AssertError(t, err)
 		assertBoltState(t, bolt4_dead, bolt)
 
@@ -665,9 +695,9 @@ func TestBolt4(ot *testing.T) {
 		assertRunResponseOk(t, bolt, stream)
 
 		// Buffering again should not affect anything
-		err = bolt.Buffer(stream)
+		err = bolt.Buffer(context.Background(), stream)
 		AssertNoError(t, err)
-		rec, sum, err := bolt.Next(stream)
+		rec, sum, err := bolt.Next(context.Background(), stream)
 		AssertNextOnlySummary(t, rec, sum, err)
 	})
 
@@ -689,28 +719,30 @@ func TestBolt4(ot *testing.T) {
 			srv.send(msgSuccess, map[string]interface{}{"bookmark": bookmark, "type": "r"})
 		})
 		defer cleanup()
-		defer bolt.Close()
+		defer bolt.Close(context.Background())
 
-		stream, _ := bolt.Run(db.Command{Cypher: "cypher", FetchSize: 3}, db.TxConfig{Mode: db.ReadMode})
+		stream, _ := bolt.Run(context.Background(),
+			idb.Command{Cypher: "cypher", FetchSize: 3},
+			idb.TxConfig{Mode: idb.ReadMode})
 		// Read one to put it in less comfortable state
-		rec, sum, err := bolt.Next(stream)
+		rec, sum, err := bolt.Next(context.Background(), stream)
 		AssertNextOnlyRecord(t, rec, sum, err)
 		// Buffer the rest
-		err = bolt.Buffer(stream)
+		err = bolt.Buffer(context.Background(), stream)
 		AssertNoError(t, err)
 		// The bookmark should be set
 		AssertStringEqual(t, bolt.Bookmark(), bookmark)
 
 		for i := 0; i < 4; i++ {
-			rec, sum, err = bolt.Next(stream)
+			rec, sum, err = bolt.Next(context.Background(), stream)
 			AssertNextOnlyRecord(t, rec, sum, err)
 		}
-		rec, sum, err = bolt.Next(stream)
+		rec, sum, err = bolt.Next(context.Background(), stream)
 		AssertNextOnlySummary(t, rec, sum, err)
 		// Buffering again should not affect anything
-		err = bolt.Buffer(stream)
+		err = bolt.Buffer(context.Background(), stream)
 		AssertNoError(t, err)
-		rec, sum, err = bolt.Next(stream)
+		rec, sum, err = bolt.Next(context.Background(), stream)
 		AssertNextOnlySummary(t, rec, sum, err)
 	})
 
@@ -728,19 +760,20 @@ func TestBolt4(ot *testing.T) {
 			srv.sendFailureMsg("thecode", "themessage")
 		})
 		defer cleanup()
-		defer bolt.Close()
+		defer bolt.Close(context.Background())
 
-		stream, _ := bolt.Run(db.Command{Cypher: "cypher"}, db.TxConfig{Mode: db.ReadMode})
+		stream, _ := bolt.Run(context.Background(),
+			idb.Command{Cypher: "cypher"}, idb.TxConfig{Mode: idb.ReadMode})
 		// This should force all records to be buffered in the stream
-		err := bolt.Buffer(stream)
+		err := bolt.Buffer(context.Background(), stream)
 		// Should be no error here since we got one record before the error
 		AssertNoError(t, err)
 		// Retrieve the one record we got
-		rec, sum, err := bolt.Next(stream)
+		rec, sum, err := bolt.Next(context.Background(), stream)
 		AssertNextOnlyRecord(t, rec, sum, err)
 		// Now we should see the error, this is to handle errors happening on a specifiec
 		// record, like division by zero.
-		rec, sum, err = bolt.Next(stream)
+		rec, sum, err = bolt.Next(context.Background(), stream)
 		AssertNextOnlyError(t, rec, sum, err)
 		// Should be no bookmark since we failed
 		AssertStringEqual(t, bolt.Bookmark(), "")
@@ -751,9 +784,9 @@ func TestBolt4(ot *testing.T) {
 			srv.accept(4)
 		})
 		defer cleanup()
-		defer bolt.Close()
+		defer bolt.Close(context.Background())
 
-		err := bolt.Buffer(db.StreamHandle(1))
+		err := bolt.Buffer(context.Background(), idb.StreamHandle(1))
 		AssertError(t, err)
 	})
 
@@ -764,11 +797,12 @@ func TestBolt4(ot *testing.T) {
 			srv.closeConnection()
 		})
 		defer cleanup()
-		defer bolt.Close()
+		defer bolt.Close(context.Background())
 
-		stream, _ := bolt.Run(db.Command{Cypher: "cypher"}, db.TxConfig{Mode: db.ReadMode})
+		stream, _ := bolt.Run(context.Background(),
+			idb.Command{Cypher: "cypher"}, idb.TxConfig{Mode: idb.ReadMode})
 		// This should force all records to be buffered in the stream
-		sum, err := bolt.Consume(stream)
+		sum, err := bolt.Consume(context.Background(), stream)
 		AssertNoError(t, err)
 		AssertNotNil(t, sum)
 		assertBoltState(t, bolt4_ready, bolt)
@@ -777,11 +811,11 @@ func TestBolt4(ot *testing.T) {
 		AssertStringEqual(t, sum.Bookmark, runBookmark)
 
 		// Should only get the summary from the stream since we consumed everything
-		rec, sum, err := bolt.Next(stream)
+		rec, sum, err := bolt.Next(context.Background(), stream)
 		AssertNextOnlySummary(t, rec, sum, err)
 
 		// Consuming again should just return the summary again
-		sum, err = bolt.Consume(stream)
+		sum, err = bolt.Consume(context.Background(), stream)
 		AssertNoError(t, err)
 		AssertNotNil(t, sum)
 	})
@@ -803,14 +837,16 @@ func TestBolt4(ot *testing.T) {
 			srv.send(msgSuccess, map[string]interface{}{"bookmark": bookmark, "type": "r"})
 		})
 		defer cleanup()
-		defer bolt.Close()
+		defer bolt.Close(context.Background())
 
-		stream, _ := bolt.Run(db.Command{Cypher: "cypher", FetchSize: 3}, db.TxConfig{Mode: db.ReadMode})
+		stream, _ := bolt.Run(context.Background(),
+			idb.Command{Cypher: "cypher", FetchSize: 3},
+			idb.TxConfig{Mode: idb.ReadMode})
 		// Read one to put it in less comfortable state
-		rec, sum, err := bolt.Next(stream)
+		rec, sum, err := bolt.Next(context.Background(), stream)
 		AssertNextOnlyRecord(t, rec, sum, err)
 		// Consume the rest
-		sum, err = bolt.Consume(stream)
+		sum, err = bolt.Consume(context.Background(), stream)
 		AssertNoError(t, err)
 		AssertNotNil(t, sum)
 		assertBoltState(t, bolt4_ready, bolt)
@@ -820,11 +856,11 @@ func TestBolt4(ot *testing.T) {
 		AssertStringEqual(t, sum.Bookmark, bookmark)
 
 		// Should only get the summary from the stream since we consumed everything
-		rec, sum, err = bolt.Next(stream)
+		rec, sum, err = bolt.Next(context.Background(), stream)
 		AssertNextOnlySummary(t, rec, sum, err)
 
 		// Consuming again should just return the summary again
-		sum, err = bolt.Consume(stream)
+		sum, err = bolt.Consume(context.Background(), stream)
 		AssertNoError(t, err)
 		AssertNotNil(t, sum)
 	})
@@ -843,17 +879,18 @@ func TestBolt4(ot *testing.T) {
 			srv.sendFailureMsg("thecode", "themessage")
 		})
 		defer cleanup()
-		defer bolt.Close()
+		defer bolt.Close(context.Background())
 
-		stream, _ := bolt.Run(db.Command{Cypher: "cypher"}, db.TxConfig{Mode: db.ReadMode})
+		stream, _ := bolt.Run(context.Background(),
+			idb.Command{Cypher: "cypher"}, idb.TxConfig{Mode: idb.ReadMode})
 		// This should force all records to be buffered in the stream
-		sum, err := bolt.Consume(stream)
+		sum, err := bolt.Consume(context.Background(), stream)
 		AssertNeo4jError(t, err)
 		AssertNil(t, sum)
 		AssertStringEqual(t, bolt.Bookmark(), "")
 
 		// Should not get the summary since there was an error
-		rec, sum, err := bolt.Next(stream)
+		rec, sum, err := bolt.Next(context.Background(), stream)
 		AssertNeo4jError(t, err)
 		AssertNextOnlyError(t, rec, sum, err)
 	})
@@ -863,9 +900,9 @@ func TestBolt4(ot *testing.T) {
 			srv.accept(4)
 		})
 		defer cleanup()
-		defer bolt.Close()
+		defer bolt.Close(context.Background())
 
-		sum, err := bolt.Consume(db.StreamHandle(1))
+		sum, err := bolt.Consume(context.Background(), idb.StreamHandle(1))
 		AssertNil(t, sum)
 		AssertError(t, err)
 	})
@@ -893,11 +930,12 @@ func TestBolt4(ot *testing.T) {
 			})
 		})
 		defer cleanup()
-		defer bolt.Close()
+		defer bolt.Close(context.Background())
 
-		rt, err := bolt.GetRoutingTable(map[string]string{"region": "space"}, nil, theDb, "")
+		rt, err := bolt.GetRoutingTable(context.Background(), map[string]string{"region": "space"}, nil, theDb, "")
 		AssertNoError(t, err)
-		ert := &db.RoutingTable{Routers: []string{"router1"}, TimeToLive: 1000, DatabaseName: theDb}
+		ert := &idb.RoutingTable{Routers: []string{"router1"},
+			TimeToLive: 1000, DatabaseName: theDb}
 		if !reflect.DeepEqual(rt, ert) {
 			t.Fatalf("Expected:\n%+v\n != Actual: \n%+v\n", rt, ert)
 		}
@@ -923,11 +961,12 @@ func TestBolt4(ot *testing.T) {
 			})
 		})
 		defer cleanup()
-		defer bolt.Close()
+		defer bolt.Close(context.Background())
 
-		rt, err := bolt.GetRoutingTable(map[string]string{"region": "space"}, nil, "thedb", "")
+		rt, err := bolt.GetRoutingTable(context.Background(), map[string]string{"region": "space"}, nil, "thedb", "")
 		AssertNoError(t, err)
-		ert := &db.RoutingTable{Routers: []string{"router1"}, TimeToLive: 1000, DatabaseName: "thedb"}
+		ert := &idb.RoutingTable{Routers: []string{"router1"},
+			TimeToLive: 1000, DatabaseName: "thedb"}
 		if !reflect.DeepEqual(rt, ert) {
 			t.Fatalf("Expected:\n%+v\n != Actual: \n%+v\n", rt, ert)
 		}
@@ -940,7 +979,8 @@ func TestBolt4(ot *testing.T) {
 		})
 		defer cleanup()
 
-		_, err := bolt.Run(db.Command{Cypher: "MATCH (n) RETURN n"}, db.TxConfig{Mode: db.ReadMode})
+		_, err := bolt.Run(context.Background(), idb.Command{Cypher: "MATCH (" +
+			"n) RETURN n"}, idb.TxConfig{Mode: idb.ReadMode})
 		assertBoltState(t, bolt4_dead, bolt)
 		AssertError(t, err)
 	})
@@ -952,7 +992,8 @@ func TestBolt4(ot *testing.T) {
 		})
 		defer cleanup()
 
-		_, err := bolt.Run(db.Command{Cypher: "MATCH (n) RETURN n"}, db.TxConfig{Mode: db.ReadMode})
+		_, err := bolt.Run(context.Background(), idb.Command{Cypher: "MATCH (" +
+			"n) RETURN n"}, idb.TxConfig{Mode: idb.ReadMode})
 		assertBoltState(t, bolt4_failed, bolt)
 		AssertError(t, err)
 	})
@@ -965,7 +1006,8 @@ func TestBolt4(ot *testing.T) {
 		})
 		defer cleanup()
 
-		_, err := bolt.Run(db.Command{Cypher: "MATCH (n) RETURN n"}, db.TxConfig{Mode: db.ReadMode})
+		_, err := bolt.Run(context.Background(), idb.Command{Cypher: "MATCH (" +
+			"n) RETURN n"}, idb.TxConfig{Mode: idb.ReadMode})
 		assertBoltState(t, bolt4_failed, bolt)
 		AssertError(t, err)
 	})

@@ -21,11 +21,12 @@ package bolt
 
 import (
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/db"
+	idb "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
 )
 
-// Parses a record assumed to contain a routing table into common db API routing table struct
+// Parses a record assumed to contain a routing table into common DB API routing table struct
 // Returns nil if error while parsing
-func parseRoutingTableRecord(rec *db.Record) *db.RoutingTable {
+func parseRoutingTableRecord(rec *db.Record) *idb.RoutingTable {
 	ttl, ok := rec.Values[0].(int64)
 	if !ok {
 		return nil
@@ -35,7 +36,7 @@ func parseRoutingTableRecord(rec *db.Record) *db.RoutingTable {
 		return nil
 	}
 
-	table := &db.RoutingTable{
+	table := &idb.RoutingTable{
 		TimeToLive: int(ttl),
 	}
 

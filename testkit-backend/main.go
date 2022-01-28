@@ -17,7 +17,7 @@
  *  limitations under the License.
  */
 
-// Implmentation of testkit backend
+// Implementation of testkit backend
 package main
 
 import (
