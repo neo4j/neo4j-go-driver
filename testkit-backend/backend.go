@@ -133,10 +133,10 @@ func (b *backend) writeError(err error) {
 	if isDriverError {
 		id := b.setError(err)
 		b.writeResponse("DriverError", map[string]interface{}{
-			"id": id,
+			"id":        id,
 			"errorType": strings.Split(err.Error(), ":")[0],
-			"msg": err.Error(),
-			"code": code})
+			"msg":       err.Error(),
+			"code":      code})
 		return
 	}
 
@@ -597,6 +597,7 @@ func (b *backend) handleRequest(req map[string]interface{}) {
 				"Feature:Bolt:4.2",
 				"Feature:Bolt:4.3",
 				"Feature:Bolt:4.4",
+				"Feature:Bolt:5.0",
 				"Feature:Impersonation",
 				"Feature:TLS:1.1",
 				"Feature:TLS:1.2",
@@ -684,14 +685,16 @@ func testSkips() map[string]string {
 		"stub.routing.test_routing_v4x1.RoutingV4x1.test_should_use_resolver_during_rediscovery_when_existing_routers_fail":      "It needs investigation - custom resolver does not seem to be called",
 		"stub.routing.test_routing_v4x3.RoutingV4x3.test_should_use_resolver_during_rediscovery_when_existing_routers_fail":      "It needs investigation - custom resolver does not seem to be called",
 		"stub.routing.test_routing_v4x4.RoutingV4x4.test_should_use_resolver_during_rediscovery_when_existing_routers_fail":      "It needs investigation - custom resolver does not seem to be called",
+		"stub.routing.test_routing_v5x0.RoutingV5x0.test_should_use_resolver_during_rediscovery_when_existing_routers_fail":      "It needs investigation - custom resolver does not seem to be called",
 		"stub.routing.test_routing_v3.RoutingV3.test_should_revert_to_initial_router_if_known_router_throws_protocol_errors":     "It needs investigation - custom resolver does not seem to be called",
 		"stub.routing.test_routing_v4x1.RoutingV4x1.test_should_revert_to_initial_router_if_known_router_throws_protocol_errors": "It needs investigation - custom resolver does not seem to be called",
 		"stub.routing.test_routing_v4x3.RoutingV4x3.test_should_revert_to_initial_router_if_known_router_throws_protocol_errors": "It needs investigation - custom resolver does not seem to be called",
 		"stub.routing.test_routing_v4x4.RoutingV4x4.test_should_revert_to_initial_router_if_known_router_throws_protocol_errors": "It needs investigation - custom resolver does not seem to be called",
+		"stub.routing.test_routing_v5x0.RoutingV5x0.test_should_revert_to_initial_router_if_known_router_throws_protocol_errors": "It needs investigation - custom resolver does not seem to be called",
 		"stub.configuration_hints.test_connection_recv_timeout_seconds.TestRoutingConnectionRecvTimeout.*":                       "No GetRoutingTable support - too tricky to implement in Go",
 		"stub.homedb.test_homedb.TestHomeDb.test_session_should_cache_home_db_despite_new_rt":                                    "Driver does not remove servers from RT when connection breaks.",
 		"neo4j.test_authentication.TestAuthenticationBasic.test_error_on_incorrect_credentials_tx":                               "Driver retries tx on failed authentication.",
-		"stub.*.test_0_timeout":                                                                                                  "Driver omits 0 as tx timeout value",
-		"stub.*.test_negative_timeout":                                                                                           "Driver omits negative tx timeout values",
+		"stub.*.test_0_timeout":        "Driver omits 0 as tx timeout value",
+		"stub.*.test_negative_timeout": "Driver omits negative tx timeout values",
 	}
 }
