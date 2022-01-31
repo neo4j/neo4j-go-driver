@@ -49,7 +49,7 @@ var _ = Describe("Bookmark", func() {
 		})
 		Expect(err).To(BeNil())
 
-		bookmarks := session.LastBookmarks()
+		bookmarks := neo4j.BookmarksToRawValues(session.LastBookmarks())
 		Expect(len(bookmarks)).To(Equal(1))
 		return bookmarks[0]
 	}
@@ -85,7 +85,7 @@ var _ = Describe("Bookmark", func() {
 			summary, err = result.Consume()
 			Expect(err).To(BeNil())
 
-			Expect(session.LastBookmarks()).NotTo(BeEmpty())
+			Expect(neo4j.BookmarksToRawValues(session.LastBookmarks())).NotTo(BeEmpty())
 		})
 
 		Specify("when a node is created in explicit transaction and committed, last bookmark should not be empty", func() {
@@ -101,7 +101,7 @@ var _ = Describe("Bookmark", func() {
 			err = tx.Commit()
 			Expect(err).To(BeNil())
 
-			Expect(session.LastBookmarks()).NotTo(BeEmpty())
+			Expect(neo4j.BookmarksToRawValues(session.LastBookmarks())).NotTo(BeEmpty())
 		})
 
 		Specify("when a node is created in explicit transaction and rolled back, last bookmark should be empty", func() {
@@ -117,7 +117,7 @@ var _ = Describe("Bookmark", func() {
 			err = tx.Rollback()
 			Expect(err).To(BeNil())
 
-			Expect(session.LastBookmarks()).To(BeEmpty())
+			Expect(neo4j.BookmarksToRawValues(session.LastBookmarks())).To(BeEmpty())
 		})
 
 		Specify("when a node is created in transaction function, last bookmark should not be empty", func() {
@@ -133,7 +133,7 @@ var _ = Describe("Bookmark", func() {
 
 			Expect(err).To(BeNil())
 			Expect(result).To(Equal(1))
-			Expect(session.LastBookmarks()).NotTo(BeEmpty())
+			Expect(neo4j.BookmarksToRawValues(session.LastBookmarks())).NotTo(BeEmpty())
 		})
 
 		Specify("when a node is created in transaction function and rolled back, last bookmark should be empty", func() {
@@ -150,7 +150,7 @@ var _ = Describe("Bookmark", func() {
 
 			Expect(err).To(Equal(failWith))
 			Expect(result).To(BeNil())
-			Expect(session.LastBookmarks()).To(BeEmpty())
+			Expect(neo4j.BookmarksToRawValues(session.LastBookmarks())).To(BeEmpty())
 		})
 
 		Specify("when a node is queried in transaction function, last bookmark should not be empty", func() {
@@ -169,7 +169,7 @@ var _ = Describe("Bookmark", func() {
 
 			Expect(err).To(BeNil())
 			Expect(result).To(Equal(1))
-			Expect(session.LastBookmarks()).NotTo(BeEmpty())
+			Expect(neo4j.BookmarksToRawValues(session.LastBookmarks())).NotTo(BeEmpty())
 		})
 
 		Specify("when a node is created in transaction function and rolled back, last bookmark should be empty", func() {
@@ -189,7 +189,7 @@ var _ = Describe("Bookmark", func() {
 
 			Expect(err).To(Equal(failWith))
 			Expect(result).To(BeNil())
-			Expect(session.LastBookmarks()).To(BeEmpty())
+			Expect(neo4j.BookmarksToRawValues(session.LastBookmarks())).To(BeEmpty())
 		})
 	})
 
@@ -205,7 +205,10 @@ var _ = Describe("Bookmark", func() {
 
 			bookmark = createNodeInTx(driver)
 
-			session = driver.NewSession(neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite, Bookmarks: []string{bookmark}})
+			session = driver.NewSession(neo4j.SessionConfig{
+				AccessMode: neo4j.AccessModeWrite,
+				Bookmarks: neo4j.BookmarksFromRawValues(bookmark),
+			})
 		})
 
 		AfterEach(func() {
@@ -223,7 +226,7 @@ var _ = Describe("Bookmark", func() {
 			Expect(err).To(BeNil())
 			defer tx.Close()
 
-			Expect(session.LastBookmarks()).To(Equal([]string{bookmark}))
+			Expect(neo4j.BookmarksToRawValues(session.LastBookmarks())).To(Equal([]string{bookmark}))
 		})
 
 		Specify("given bookmarks should be accessible after ROLLBACK", func() {
@@ -237,7 +240,7 @@ var _ = Describe("Bookmark", func() {
 			err = tx.Rollback()
 			Expect(err).To(BeNil())
 
-			Expect(session.LastBookmarks()).To(Equal([]string{bookmark}))
+			Expect(neo4j.BookmarksToRawValues(session.LastBookmarks())).To(Equal([]string{bookmark}))
 		})
 
 		Specify("given bookmarks should be accessible when transaction fails", func() {
@@ -250,7 +253,7 @@ var _ = Describe("Bookmark", func() {
 
 			err = tx.Close()
 			Expect(err).To(BeNil())
-			Expect(session.LastBookmarks()).To(Equal([]string{bookmark}))
+			Expect(neo4j.BookmarksToRawValues(session.LastBookmarks())).To(Equal([]string{bookmark}))
 		})
 
 		Specify("given bookmarks should be accessible after run", func() {
@@ -260,14 +263,14 @@ var _ = Describe("Bookmark", func() {
 			_, err = result.Consume()
 			Expect(err).To(BeNil())
 
-			Expect(session.LastBookmarks()).To(Equal([]string{bookmark}))
+			Expect(neo4j.BookmarksToRawValues(session.LastBookmarks())).To(Equal([]string{bookmark}))
 		})
 
 		Specify("given bookmarks should be accessible after failed run", func() {
 			_, err := session.Run("RETURN", nil)
 			Expect(err).To(Not(BeNil()))
 
-			Expect(session.LastBookmarks()).To(Equal([]string{bookmark}))
+			Expect(neo4j.BookmarksToRawValues(session.LastBookmarks())).To(Equal([]string{bookmark}))
 		})
 
 	})
@@ -289,7 +292,7 @@ var _ = Describe("Bookmark", func() {
 
 			session = driver.NewSession(neo4j.SessionConfig{
 				AccessMode: neo4j.AccessModeWrite,
-				Bookmarks:  []string{bookmark1, bookmark2},
+				Bookmarks:  neo4j.BookmarksFromRawValues(bookmark1, bookmark2),
 			})
 		})
 
@@ -308,7 +311,7 @@ var _ = Describe("Bookmark", func() {
 			Expect(err).To(BeNil())
 			defer tx.Close()
 
-			Expect(session.LastBookmarks()).To(Equal([]string{bookmark1, bookmark2}))
+			Expect(neo4j.BookmarksToRawValues(session.LastBookmarks())).To(Equal([]string{bookmark1, bookmark2}))
 		})
 
 		Specify("new bookmark should be reported back by the server after committing", func() {
@@ -326,9 +329,9 @@ var _ = Describe("Bookmark", func() {
 			err = tx.Commit()
 			Expect(err).To(BeNil())
 
-			Expect(session.LastBookmarks()).ToNot(BeNil())
-			Expect(session.LastBookmarks()).ToNot(Equal([]string{bookmark1}))
-			Expect(session.LastBookmarks()).ToNot(Equal([]string{bookmark2}))
+			Expect(neo4j.BookmarksToRawValues(session.LastBookmarks())).ToNot(BeNil())
+			Expect(neo4j.BookmarksToRawValues(session.LastBookmarks())).ToNot(Equal([]string{bookmark1}))
+			Expect(neo4j.BookmarksToRawValues(session.LastBookmarks())).ToNot(Equal([]string{bookmark2}))
 		})
 	})
 
@@ -346,7 +349,7 @@ var _ = Describe("Bookmark", func() {
 
 			session = driver.NewSession(neo4j.SessionConfig{
 				AccessMode: neo4j.AccessModeWrite,
-				Bookmarks:  []string{bookmark + "0"},
+				Bookmarks:  neo4j.BookmarksFromRawValues(bookmark + "0"),
 			})
 		})
 

@@ -6,7 +6,7 @@ import (
 )
 
 func TestCombineBookmarks(t *testing.T) {
-	f := func(slices [][]string) bool {
+	f := func(slices []Bookmarks) bool {
 		concatenation := CombineBookmarks(slices...)
 		totalLen := 0
 		for _, s := range slices {

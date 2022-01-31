@@ -38,7 +38,13 @@ type Session interface {
 	// LastBookmarks returns the bookmark received following the last successfully completed transaction.
 	// If no bookmark was received or if this transaction was rolled back, the initial set of bookmarks will be
 	// returned.
-	LastBookmarks() []string
+	LastBookmarks() Bookmarks
+	// LastBookmark returns the bookmark received following the last successfully completed transaction.
+	// If no bookmark was received or if this transaction was rolled back, the bookmark value will not be changed.
+	// Deprecated: since version 5.0. Will be removed in 6.0. Use LastBookmarks instead.
+	// Warning: this method can lead to unexpected behaviour if the session has not yet successfully completed a
+	// transaction.
+	LastBookmark() string
 	// BeginTransaction starts a new explicit transaction on this session
 	BeginTransaction(configurers ...func(*TransactionConfig)) (Transaction, error)
 	// ReadTransaction executes the given unit of work in a AccessModeRead transaction with
@@ -56,7 +62,7 @@ type Session interface {
 // SessionConfig is used to configure a new session, its zero value uses safe defaults.
 type SessionConfig struct {
 	// AccessMode used when using Session.Run and explicit transactions. Used to route query to
-	// to read or write servers when running in a cluster. Session.ReadTransaction and Session.WriteTransaction
+	// read or write servers when running in a cluster. Session.ReadTransaction and Session.WriteTransaction
 	// does not rely on this mode.
 	AccessMode AccessMode
 	// Bookmarks are the initial bookmarks used to ensure that the executing server is at least up
@@ -64,7 +70,7 @@ type SessionConfig struct {
 	// on the session the bookmark can be retrieved with Session.LastBookmark. All commands executing
 	// within the same session will automatically use the bookmark from the previous command in the
 	// session.
-	Bookmarks []string
+	Bookmarks Bookmarks
 	// DatabaseName contains the name of the database that the commands in the session will execute on.
 	DatabaseName string
 	// FetchSize defines how many records to pull from server in each batch.
@@ -170,7 +176,7 @@ func newSession(config *Config, sessConfig SessionConfig, router sessionRouter, 
 	}
 }
 
-func (s *session) LastBookmarks() []string {
+func (s *session) LastBookmarks() Bookmarks {
 	// Pick up bookmark from pending auto-commit if there is a bookmark on it
 	if s.txAuto != nil {
 		s.retrieveBookmarks(s.txAuto.conn)
@@ -178,6 +184,20 @@ func (s *session) LastBookmarks() []string {
 
 	// Report bookmarks from previously closed connection or from initial set
 	return s.bookmarks
+}
+
+func (s *session) LastBookmark() string {
+	// Pick up bookmark from pending auto-commit if there is a bookmark on it
+	if s.txAuto != nil {
+		s.retrieveBookmarks(s.txAuto.conn)
+	}
+
+	// Report bookmark from previously closed connection or from initial set
+	if len(s.bookmarks) > 0 {
+		return s.bookmarks[len(s.bookmarks)-1]
+	}
+
+	return ""
 }
 
 func (s *session) BeginTransaction(configurers ...func(*TransactionConfig)) (Transaction, error) {
@@ -498,7 +518,11 @@ type sessionWithError struct {
 	err error
 }
 
-func (s *sessionWithError) LastBookmarks() []string {
+func (s *sessionWithError) LastBookmark() string {
+	return ""
+}
+
+func (s *sessionWithError) LastBookmarks() Bookmarks {
 	return []string{}
 }
 

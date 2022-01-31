@@ -51,7 +51,7 @@ func NewTestContext(driver neo4j.Driver) *TestContext {
 		createdNodeCount:       0,
 	}
 
-	result.bookmarks.Store([]string{""})
+	result.bookmarks.Store(neo4j.Bookmarks{})
 
 	return result
 }
@@ -74,11 +74,11 @@ func (ctx *TestContext) addRead() {
 	atomic.AddInt32(&ctx.readNodeCount, 1)
 }
 
-func (ctx *TestContext) getBookmarks() []string {
-	return ctx.bookmarks.Load().([]string)
+func (ctx *TestContext) getBookmarks() neo4j.Bookmarks {
+	return ctx.bookmarks.Load().(neo4j.Bookmarks)
 }
 
-func (ctx *TestContext) setBookmarks(bookmarks []string) {
+func (ctx *TestContext) setBookmarks(bookmarks neo4j.Bookmarks) {
 	ctx.bookmarks.Store(bookmarks)
 }
 

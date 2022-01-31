@@ -765,7 +765,7 @@ func printFriendsTxFunc() neo4j.TransactionWork {
 	}
 }
 
-func addAndEmploy(driver neo4j.Driver, person string, company string) ([]string, error) {
+func addAndEmploy(driver neo4j.Driver, person string, company string) (neo4j.Bookmarks, error) {
 	session := driver.NewSession(neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
 	defer session.Close()
 
@@ -782,7 +782,7 @@ func addAndEmploy(driver neo4j.Driver, person string, company string) ([]string,
 	return session.LastBookmarks(), nil
 }
 
-func makeFriend(driver neo4j.Driver, person1 string, person2 string, bookmarks ...string) ([]string, error) {
+func makeFriend(driver neo4j.Driver, person1 string, person2 string, bookmarks neo4j.Bookmarks) (neo4j.Bookmarks, error) {
 	session := driver.NewSession(neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite, Bookmarks: bookmarks})
 	defer session.Close()
 
@@ -794,7 +794,7 @@ func makeFriend(driver neo4j.Driver, person1 string, person2 string, bookmarks .
 }
 
 func addEmployAndMakeFriends(driver neo4j.Driver) error {
-	var bookmarks1, bookmarks2, bookmarks3 []string
+	var bookmarks1, bookmarks2, bookmarks3 neo4j.Bookmarks
 	var err error
 
 	if bookmarks1, err = addAndEmploy(driver, "Alice", "Wayne Enterprises"); err != nil {
@@ -805,7 +805,7 @@ func addEmployAndMakeFriends(driver neo4j.Driver) error {
 		return err
 	}
 
-	if bookmarks3, err = makeFriend(driver, "Bob", "Alice", append(bookmarks1, bookmarks2...)...); err != nil {
+	if bookmarks3, err = makeFriend(driver, "Bob", "Alice", neo4j.CombineBookmarks(bookmarks1, bookmarks2)); err != nil {
 		return err
 	}
 
