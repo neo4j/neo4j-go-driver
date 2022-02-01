@@ -441,7 +441,7 @@ func (b *backend) handleRequest(req map[string]interface{}) {
 			for i, x := range bookmarksx {
 				bookmarks[i] = x.(string)
 			}
-			sessionConfig.Bookmarks = bookmarks
+			sessionConfig.Bookmarks = neo4j.BookmarksFromRawValues(bookmarks...)
 		}
 		if data["database"] != nil {
 			sessionConfig.DatabaseName = data["database"].(string)
@@ -493,10 +493,9 @@ func (b *backend) handleRequest(req map[string]interface{}) {
 
 	case "SessionLastBookmarks":
 		sessionState := b.sessionStates[data["sessionId"].(string)]
-		bookmark := sessionState.session.LastBookmark()
-		bookmarks := []string{}
-		if bookmark != "" {
-			bookmarks = append(bookmarks, bookmark)
+		bookmarks := neo4j.BookmarksToRawValues(sessionState.session.LastBookmarks())
+		if (bookmarks == nil) {
+			bookmarks = []string{}
 		}
 		b.writeResponse("Bookmarks", map[string]interface{}{"bookmarks": bookmarks})
 

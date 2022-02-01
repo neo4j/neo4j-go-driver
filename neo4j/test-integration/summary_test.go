@@ -21,7 +21,9 @@ var _ = Describe("Result Summary", func() {
 
 	BeforeEach(func() {
 		server = dbserver.GetDbServer()
-		driver = server.Driver()
+		driver = server.Driver(func(config *neo4j.Config) {
+			config.Log = neo4j.ConsoleLogger(neo4j.DEBUG)
+		})
 		Expect(driver).NotTo(BeNil())
 	})
 
@@ -33,7 +35,7 @@ var _ = Describe("Result Summary", func() {
 		})
 
 		It("does not include any database information", func() {
-			session := driver.NewSession(neo4j.SessionConfig{Bookmarks: []string{bookmark}})
+			session := driver.NewSession(neo4j.SessionConfig{Bookmarks: neo4j.BookmarksFromRawValues(bookmark)})
 			defer assertCloses(session)
 			result, err := session.Run("RETURN 42", noParams)
 			Expect(err).NotTo(HaveOccurred())
@@ -56,15 +58,19 @@ var _ = Describe("Result Summary", func() {
 		})
 
 		BeforeEach(func() {
-			session := driver.NewSession(neo4j.SessionConfig{DatabaseName: "system"})
+			session := driver.NewSession(neo4j.SessionConfig{DatabaseName: "system", BoltLogger: neo4j.ConsoleBoltLogger()})
 			defer assertCloses(session)
-			_, err := session.Run(fmt.Sprintf("CREATE DATABASE %s", extraDatabase), map[string]interface{}{})
+			res, err := session.Run(fmt.Sprintf("CREATE DATABASE %s", extraDatabase), map[string]interface{}{})
 			Expect(err).NotTo(HaveOccurred())
-			bookmark = session.LastBookmark()
+			_, err = res.Consume()  // consume result to obtain bookmark
+			Expect(err).NotTo(HaveOccurred())
+			bookmarks := neo4j.BookmarksToRawValues(session.LastBookmarks())
+			Expect(len(bookmarks)).To(Equal(1))
+			bookmark = bookmarks[0]
 		})
 
 		AfterEach(func() {
-			session := driver.NewSession(neo4j.SessionConfig{DatabaseName: "system", Bookmarks: []string{bookmark}})
+			session := driver.NewSession(neo4j.SessionConfig{DatabaseName: "system", Bookmarks: neo4j.BookmarksFromRawValues(bookmark)})
 			defer assertCloses(session)
 			_, err := session.Run(fmt.Sprintf("DROP DATABASE %s", extraDatabase), map[string]interface{}{})
 			Expect(err).NotTo(HaveOccurred())
@@ -72,7 +78,7 @@ var _ = Describe("Result Summary", func() {
 		})
 
 		It("includes the default database information", func() {
-			session := driver.NewSession(neo4j.SessionConfig{Bookmarks: []string{bookmark}})
+			session := driver.NewSession(neo4j.SessionConfig{Bookmarks: neo4j.BookmarksFromRawValues(bookmark)})
 			defer assertCloses(session)
 			result, err := session.Run("RETURN 42", noParams)
 			Expect(err).NotTo(HaveOccurred())
@@ -83,7 +89,7 @@ var _ = Describe("Result Summary", func() {
 		})
 
 		It("includes the database information, based on session configuration", func() {
-			session := driver.NewSession(neo4j.SessionConfig{DatabaseName: extraDatabase, Bookmarks: []string{bookmark}})
+			session := driver.NewSession(neo4j.SessionConfig{DatabaseName: extraDatabase, Bookmarks: neo4j.BookmarksFromRawValues(bookmark)})
 			defer assertCloses(session)
 			result, err := session.Run("RETURN 42", noParams)
 			Expect(err).NotTo(HaveOccurred())

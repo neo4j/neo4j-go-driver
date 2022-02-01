@@ -66,7 +66,7 @@ func newStressSession(driver neo4j.Driver, useBookmark bool, accessMode neo4j.Ac
 	if useBookmark {
 		session = driver.NewSession(neo4j.SessionConfig{
 			AccessMode: accessMode,
-			Bookmarks:  []string{ctx.getBookmark()},
+			Bookmarks:  ctx.getBookmarks(),
 		})
 	} else {
 		session = driver.NewSession(neo4j.SessionConfig{AccessMode: accessMode})
@@ -179,7 +179,7 @@ func WriteQueryExecutor(driver neo4j.Driver, useBookmark bool) func(ctx *TestCon
 		ExpectNoError(err)
 		ExpectInt(summary.Counters().NodesCreated(), 1)
 
-		ctx.setBookmark(session.LastBookmark())
+		ctx.setBookmarks(session.LastBookmarks())
 
 		ctx.addCreated()
 	}
@@ -205,7 +205,7 @@ func WriteQueryInTxExecutor(driver neo4j.Driver, useBookmark bool) func(ctx *Tes
 		err = tx.Commit()
 		ExpectNoError(err)
 
-		ctx.setBookmark(session.LastBookmark())
+		ctx.setBookmarks(session.LastBookmarks())
 
 		ctx.addCreated()
 	}
@@ -227,7 +227,7 @@ func WriteQueryWithWriteTransactionExecutor(driver neo4j.Driver, useBookmark boo
 		ExpectNoError(err)
 		ExpectNotNil(summary)
 		ExpectInt(summary.(neo4j.ResultSummary).Counters().NodesCreated(), 1)
-		ctx.setBookmark(session.LastBookmark())
+		ctx.setBookmarks(session.LastBookmarks())
 		ctx.addCreated()
 	}
 }
