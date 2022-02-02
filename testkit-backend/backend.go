@@ -116,6 +116,7 @@ func (b *backend) writeError(err error) {
 	// track of this error so that we can reuse the real thing within a retryable tx
 	fmt.Printf("Error: %s (%T)\n", err.Error(), err)
 	code := ""
+	_, isHydrationError := err.(*db.ProtocolError)
 	tokenErr, isTokenExpiredErr := err.(*neo4j.TokenExpiredError)
 	if isTokenExpiredErr {
 		code = tokenErr.Code
@@ -123,7 +124,8 @@ func (b *backend) writeError(err error) {
 	if neo4j.IsNeo4jError(err) {
 		code = err.(*db.Neo4jError).Code
 	}
-	isDriverError := isTokenExpiredErr ||
+	isDriverError := isHydrationError ||
+		isTokenExpiredErr ||
 		neo4j.IsNeo4jError(err) ||
 		neo4j.IsUsageError(err) ||
 		neo4j.IsConnectivityError(err) ||
@@ -236,7 +238,7 @@ func (b *backend) toTransactionConfigApply(data map[string]interface{}) func(*ne
 	}
 	// Optional timeout in milliseconds
 	if data["timeout"] != nil {
-		txConfig.Timeout = time.Millisecond * time.Duration((data["timeout"].(float64)))
+		txConfig.Timeout = time.Millisecond * time.Duration(data["timeout"].(float64))
 	}
 	return func(conf *neo4j.TransactionConfig) {
 		if txConfig.Metadata != nil {
@@ -402,6 +404,12 @@ func (b *backend) handleRequest(req map[string]interface{}) {
 			if data["maxConnectionPoolSize"] != nil {
 				c.MaxConnectionPoolSize = int(data["maxConnectionPoolSize"].(float64))
 			}
+			if data["fetchSize"] != nil {
+				c.FetchSize = int(data["fetchSize"].(float64))
+			}
+			if data["maxTxRetryTimeMs"] != nil {
+				c.MaxTransactionRetryTime = time.Millisecond * time.Duration(data["maxTxRetryTimeMs"].(float64))
+			}
 		})
 		if err != nil {
 			b.writeError(err)
@@ -476,9 +484,14 @@ func (b *backend) handleRequest(req map[string]interface{}) {
 			b.writeError(err)
 			return
 		}
+		keys, err := result.Keys()
+		if err != nil {
+			b.writeError(err)
+			return
+		}
 		idKey := b.nextId()
 		b.results[idKey] = result
-		b.writeResponse("Result", map[string]interface{}{"id": idKey})
+		b.writeResponse("Result", map[string]interface{}{"id": idKey, "keys": keys})
 
 	case "SessionBeginTransaction":
 		sessionState := b.sessionStates[data["sessionId"].(string)]
@@ -494,7 +507,7 @@ func (b *backend) handleRequest(req map[string]interface{}) {
 	case "SessionLastBookmarks":
 		sessionState := b.sessionStates[data["sessionId"].(string)]
 		bookmarks := neo4j.BookmarksToRawValues(sessionState.session.LastBookmarks())
-		if (bookmarks == nil) {
+		if bookmarks == nil {
 			bookmarks = []string{}
 		}
 		b.writeResponse("Bookmarks", map[string]interface{}{"bookmarks": bookmarks})
@@ -507,9 +520,14 @@ func (b *backend) handleRequest(req map[string]interface{}) {
 			b.writeError(err)
 			return
 		}
+		keys, err := result.Keys()
+		if err != nil {
+			b.writeError(err)
+			return
+		}
 		idKey := b.nextId()
 		b.results[idKey] = result
-		b.writeResponse("Result", map[string]interface{}{"id": idKey})
+		b.writeResponse("Result", map[string]interface{}{"id": idKey, "keys": keys})
 
 	case "TransactionCommit":
 		txId := data["txId"].(string)
@@ -574,18 +592,79 @@ func (b *backend) handleRequest(req map[string]interface{}) {
 			return
 		}
 		serverInfo := summary.Server()
+		counters := summary.Counters()
 		protocolVersion := serverInfo.ProtocolVersion()
-		b.writeResponse("Summary", map[string]interface{}{
+		response := map[string]interface{}{
 			"serverInfo": map[string]interface{}{
 				"protocolVersion": fmt.Sprintf("%d.%d", protocolVersion.Major, protocolVersion.Minor),
 				"agent":           serverInfo.Agent(),
+				"address":         serverInfo.Address(),
 			},
+			"counters": map[string]interface{}{
+				"constraintsAdded":      counters.ConstraintsAdded(),
+				"constraintsRemoved":    counters.ConstraintsRemoved(),
+				"containsSystemUpdates": counters.ContainsSystemUpdates(),
+				"containsUpdates":       counters.ContainsUpdates(),
+				"indexesAdded":          counters.IndexesAdded(),
+				"indexesRemoved":        counters.IndexesRemoved(),
+				"labelsAdded":           counters.LabelsAdded(),
+				"labelsRemoved":         counters.LabelsRemoved(),
+				"nodesCreated":          counters.NodesCreated(),
+				"nodesDeleted":          counters.NodesDeleted(),
+				"propertiesSet":         counters.PropertiesSet(),
+				"relationshipsCreated":  counters.RelationshipsCreated(),
+				"relationshipsDeleted":  counters.RelationshipsDeleted(),
+				"systemUpdates":         counters.SystemUpdates(),
+			},
+			"query": map[string]interface{}{
+				"text":       summary.Query().Text(),
+				"parameters": serializeParameters(summary.Query().Parameters()),
+			},
+			"notifications": serializeNotifications(summary.Notifications()),
+			"plan":          serializePlan(summary.Plan()),
+			"profile":       serializeProfile(summary.Profile()),
+		}
+		if summary.ResultAvailableAfter() > 0 {
+			response["resultAvailableAfter"] = summary.ResultAvailableAfter().Milliseconds()
+		}
+		if summary.ResultConsumedAfter() > 0 {
+			response["resultConsumedAfter"] = summary.ResultConsumedAfter().Milliseconds()
+		}
+		if summary.StatementType() != neo4j.StatementTypeUnknown {
+			response["queryType"] = summary.StatementType().String()
+		}
+		if summary.Database() != nil {
+			response["database"] = summary.Database().Name()
+		}
+		b.writeResponse("Summary", response)
+
+	case "CheckMultiDBSupport":
+		driver := b.drivers[data["driverId"].(string)]
+		session := driver.NewSession(neo4j.SessionConfig{})
+		result, err := session.Run("RETURN 42", nil)
+		defer session.Close()
+		if err != nil {
+			b.writeError(fmt.Errorf("could not check multi DB support: %w", err))
+			return
+		}
+		summary, err := result.Consume()
+		if err != nil {
+			b.writeError(fmt.Errorf("could not check multi DB support: %w", err))
+			return
+		}
+
+		server := summary.Server()
+		isMultiTenant := server.ProtocolVersion().Major >= 4
+		b.writeResponse("MultiDBSupport", map[string]interface{}{
+			"id":        b.nextId(),
+			"available": isMultiTenant,
 		})
 
 	case "GetFeatures":
 		b.writeResponse("FeatureList", map[string]interface{}{
 			"features": []string{
 				"ConfHint:connection.recv_timeout_seconds",
+				"Feature:API:Liveness.Check",
 				"Feature:API:Result.Peek",
 				"Feature:Auth:Custom",
 				"Feature:Auth:Bearer",
@@ -603,6 +682,15 @@ func (b *backend) handleRequest(req map[string]interface{}) {
 				"Optimization:ImplicitDefaultArguments",
 				"Optimization:PullPipelining",
 				"Temporary:ConnectionAcquisitionTimeout",
+				"Temporary:CypherPathAndRelationship",
+				"Temporary:DriverFetchSize",
+				"Temporary:DriverMaxConnectionPoolSize",
+				"Temporary:DriverMaxTxRetryTime",
+				"Temporary:FastFailingDiscovery",
+				"Temporary:FullSummary",
+				"Temporary:GetConnectionPoolMetrics",
+				"Temporary:ResultKeys",
+				"Temporary:TransactionClose",
 			},
 		})
 
@@ -674,6 +762,88 @@ func asRegex(rawPattern string) *regexp.Regexp {
 	return regexp.MustCompile(pattern)
 }
 
+func serializeNotifications(slice []neo4j.Notification) []map[string]interface{} {
+	if slice == nil {
+		return nil
+	}
+	if len(slice) == 0 {
+		return []map[string]interface{}{}
+	}
+	var res []map[string]interface{}
+	for i, notification := range slice {
+		res = append(res, map[string]interface{}{
+			"code":        notification.Code(),
+			"title":       notification.Title(),
+			"description": notification.Description(),
+			"severity":    notification.Severity(),
+		})
+		if notification.Position() != nil {
+			res[i]["position"] = map[string]interface{}{
+				"offset": notification.Position().Offset(),
+				"line":   notification.Position().Line(),
+				"column": notification.Position().Column(),
+			}
+		}
+	}
+	return res
+}
+
+func serializePlan(plan neo4j.Plan) map[string]interface{} {
+	if plan == nil {
+		return nil
+	}
+	return map[string]interface{}{
+		"args":         plan.Arguments(),
+		"operatorType": plan.Operator(),
+		"children":     serializePlans(plan.Children()),
+		"identifiers":  plan.Identifiers(),
+	}
+}
+
+func serializePlans(children []neo4j.Plan) []map[string]interface{} {
+	result := make([]map[string]interface{}, len(children))
+	for i, child := range children {
+		result[i] = serializePlan(child)
+	}
+	return result
+}
+
+func serializeProfile(profile neo4j.ProfiledPlan) map[string]interface{} {
+	if profile == nil {
+		return nil
+	}
+	result := map[string]interface{}{
+		"args":         profile.Arguments(),
+		"children":     serializeProfiles(profile.Children()),
+		"dbHits":       profile.DbHits(),
+		"identifiers":  profile.Identifiers(),
+		"operatorType": profile.Operator(),
+		"rows":         profile.Records(),
+	}
+	return result
+}
+
+func serializeProfiles(children []neo4j.ProfiledPlan) []map[string]interface{} {
+	result := make([]map[string]interface{}, len(children))
+	for i, child := range children {
+		childProfile := serializeProfile(child)
+		childProfile["pageCacheMisses"] = child.PageCacheMisses()
+		childProfile["pageCacheHits"] = child.PageCacheHits()
+		childProfile["pageCacheHitRatio"] = child.PageCacheHitRatio()
+		childProfile["time"] = child.Time()
+		result[i] = childProfile
+	}
+	return result
+}
+
+func serializeParameters(parameters map[string]interface{}) map[string]interface{} {
+	result := make(map[string]interface{}, len(parameters))
+	for k, parameter := range parameters {
+		result[k] = nativeToCypher(parameter)
+	}
+	return result
+}
+
 // you can use '*' as wildcards anywhere in the qualified test name (useful to exclude a whole class e.g.)
 func testSkips() map[string]string {
 	return map[string]string{
@@ -692,5 +862,10 @@ func testSkips() map[string]string {
 		"stub.iteration.test_result_scope.TestResultScope.*":                                                                     "Results are always valid but don't return records when out of scope",
 		"stub.*.test_0_timeout":        "Driver omits 0 as tx timeout value",
 		"stub.*.test_negative_timeout": "Driver omits negative tx timeout values",
+		"stub.routing.*.*.test_should_request_rt_from_all_initial_routers_until_successful_on_unknown_failure":       "Add DNS resolver TestKit message and connection timeout support",
+		"stub.routing.*.*.test_should_request_rt_from_all_initial_routers_until_successful_on_authorization_expired": "Add DNS resolver TestKit message and connection timeout support",
+		"stub.summary.test_summary.TestSummary.test_server_info":                                                     "Needs some kind of server address DNS resolution",
+		"stub.summary.test_summary.TestSummary.test_invalid_query_type":                                              "Driver does not verify query type returned from server.",
+		"stub.routing.*.test_should_drop_connections_failing_liveness_check":                                         "Needs support for GetConnectionPoolMetrics",
 	}
 }

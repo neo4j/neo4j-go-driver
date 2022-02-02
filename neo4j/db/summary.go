@@ -85,7 +85,11 @@ type ProfiledPlan struct {
 	// Children contains zero or more child plans. A plan is a tree, where each child is another plan.
 	// The children are where this part of the plan gets its input records - unless this is an operator that
 	// introduces new records on its own.
-	Children []ProfiledPlan
+	Children          []ProfiledPlan
+	PageCacheMisses   int64
+	PageCacheHits     int64
+	PageCacheHitRatio float64
+	Time              int64
 }
 
 // Notification represents notifications generated when executing a statement.
@@ -120,17 +124,19 @@ type ProtocolVersion struct {
 }
 
 type Summary struct {
-	Bookmark      string
-	StmntType     StatementType
-	ServerName    string
-	Agent         string
-	Major         int
-	Minor         int
-	Counters      map[string]int
-	TFirst        int64
-	TLast         int64
-	Plan          *Plan
-	ProfiledPlan  *ProfiledPlan
-	Notifications []Notification
-	Database      string
+	Bookmark              string
+	StmntType             StatementType
+	ServerName            string
+	Agent                 string
+	Major                 int
+	Minor                 int
+	Counters              map[string]int
+	TFirst                int64
+	TLast                 int64
+	Plan                  *Plan
+	ProfiledPlan          *ProfiledPlan
+	Notifications         []Notification
+	Database              string
+	ContainsSystemUpdates *bool
+	ContainsUpdates       *bool
 }
