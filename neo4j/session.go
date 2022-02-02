@@ -157,6 +157,11 @@ func newSession(config *Config, sessConfig SessionConfig, router sessionRouter, 
 	logId := log.NewId()
 	logger.Debugf(log.Session, logId, "Created")
 
+	fetchSize := config.FetchSize
+	if sessConfig.FetchSize != FetchDefault {
+		fetchSize = sessConfig.FetchSize
+	}
+
 	return &session{
 		config:           config,
 		router:           router,
@@ -171,7 +176,7 @@ func newSession(config *Config, sessConfig SessionConfig, router sessionRouter, 
 		log:              logger,
 		logId:            logId,
 		throttleTime:     time.Second * 1,
-		fetchSize:        sessConfig.FetchSize,
+		fetchSize:        fetchSize,
 		boltLogger:       sessConfig.BoltLogger,
 	}
 }

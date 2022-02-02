@@ -41,6 +41,21 @@ const (
 	StatementTypeSchemaWrite StatementType = 4
 )
 
+func (st StatementType) String() string {
+	switch st {
+	case StatementTypeReadOnly:
+		return "r"
+	case StatementTypeReadWrite:
+		return "rw"
+	case StatementTypeWriteOnly:
+		return "w"
+	case StatementTypeSchemaWrite:
+		return "s"
+	default:
+		return ""
+	}
+}
+
 type ResultSummary interface {
 	// Server returns basic information about the server where the statement is carried out.
 	Server() ServerInfo
@@ -95,6 +110,8 @@ type Counters interface {
 	ConstraintsRemoved() int
 	// The number of system updates
 	SystemUpdates() int
+	// ContainsSystemUpdates indicates whether the query contains system updates
+	ContainsSystemUpdates() bool
 }
 
 type Statement interface {
@@ -161,6 +178,10 @@ type ProfiledPlan interface {
 	// The children are where this part of the plan gets its input records - unless this is an operator that
 	// introduces new records on its own.
 	Children() []ProfiledPlan
+	PageCacheMisses() int64
+	PageCacheHits() int64
+	PageCacheHitRatio() float64
+	Time() int64
 }
 
 // Notification represents notifications generated when executing a statement.
@@ -235,7 +256,15 @@ func (s *resultSummary) Counters() Counters {
 }
 
 func (s *resultSummary) ContainsUpdates() bool {
-	return len(s.sum.Counters) > 0
+	if s.sum.ContainsUpdates != nil {
+		return *s.sum.ContainsUpdates
+	}
+	return s.ConstraintsAdded() > 0 || s.ConstraintsRemoved() > 0 ||
+		s.IndexesAdded() > 0 || s.IndexesRemoved() > 0 ||
+		s.NodesCreated() > 0 || s.NodesDeleted() > 0 ||
+		s.RelationshipsCreated() > 0 || s.RelationshipsDeleted() > 0 ||
+		s.LabelsAdded() > 0 || s.LabelsRemoved() > 0 ||
+		s.PropertiesSet() > 0
 }
 
 func (s *resultSummary) getCounter(n string) int {
@@ -247,6 +276,13 @@ func (s *resultSummary) getCounter(n string) int {
 
 func (s *resultSummary) SystemUpdates() int {
 	return s.getCounter(db.SystemUpdates)
+}
+
+func (s *resultSummary) ContainsSystemUpdates() bool {
+	if s.sum.ContainsSystemUpdates != nil {
+		return *s.sum.ContainsSystemUpdates
+	}
+	return s.getCounter(db.SystemUpdates) > 0
 }
 
 func (s *resultSummary) NodesCreated() int {
@@ -392,13 +428,29 @@ func (p *profile) Children() []ProfiledPlan {
 	return children
 }
 
+func (p *profile) PageCacheMisses() int64 {
+	return p.profile.PageCacheMisses
+}
+
+func (p *profile) PageCacheHits() int64 {
+	return p.profile.PageCacheHits
+}
+
+func (p *profile) PageCacheHitRatio() float64 {
+	return p.profile.PageCacheHitRatio
+}
+
+func (p *profile) Time() int64 {
+	return p.profile.Time
+}
+
 func (s *resultSummary) Notifications() []Notification {
 	if s.sum.Notifications == nil {
 		return nil
 	}
 	notifications := make([]Notification, len(s.sum.Notifications))
-	for i, n := range s.sum.Notifications {
-		notifications[i] = &notification{notification: &n}
+	for i := range s.sum.Notifications {
+		notifications[i] = &notification{notification: &s.sum.Notifications[i]}
 	}
 	return notifications
 }
