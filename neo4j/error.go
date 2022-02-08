@@ -141,11 +141,8 @@ func wrapError(err error) error {
 		return &ConnectivityError{inner: err}
 	case *retry.CommitFailedDeadError:
 		return &ConnectivityError{inner: err}
-	case *net.OpError:
-		if e.Timeout() && e.Op == "read" {
-			// most likely due to read timeout configuration hint being applied
-			return &ConnectivityError{inner: err}
-		}
+	case net.Error:
+		return &ConnectivityError{inner: err}
 	case *db.Neo4jError:
 		if e.Code == "Neo.ClientError.Security.TokenExpired" {
 			return &TokenExpiredError{Code: e.Code, Message: e.Msg}
