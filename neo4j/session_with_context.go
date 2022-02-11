@@ -324,8 +324,8 @@ func (s *sessionWithContext) runRetriable(
 		if err != nil {
 			// If the client returns a client specific error that means that
 			// client wants to rollback. We don't do an explicit rollback here
-			// but instead realy on pool invoking reset on the connection, that
-			// will do an implicit rollback.
+			// but instead rely on the pool invoking reset on the connection,
+			// that will do an implicit rollback.
 			state.OnFailure(conn, err, false)
 			s.pool.Return(ctx, conn)
 			continue

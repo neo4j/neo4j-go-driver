@@ -268,7 +268,6 @@ func (b *backend) handleTransactionFunc(isRead bool, data map[string]interface{}
 		txid := b.nextId()
 		b.transactions[txid] = tx
 		b.writeResponse("RetryableTry", map[string]interface{}{"id": txid})
-		defer delete(b.transactions, txid)
 		// Process all things that the client might do within the transaction
 		for {
 			b.process()
@@ -427,7 +426,6 @@ func (b *backend) handleRequest(req map[string]interface{}) {
 			b.writeError(err)
 			return
 		}
-		delete(b.drivers, driverId)
 		b.writeResponse("Driver", map[string]interface{}{"id": driverId})
 
 	case "NewSession":
@@ -473,7 +471,6 @@ func (b *backend) handleRequest(req map[string]interface{}) {
 			b.writeError(err)
 			return
 		}
-		delete(b.sessionStates, sessionId)
 		b.writeResponse("Session", map[string]interface{}{"id": sessionId})
 
 	case "SessionRun":
@@ -552,7 +549,6 @@ func (b *backend) handleRequest(req map[string]interface{}) {
 	case "TransactionClose":
 		txId := data["txId"].(string)
 		tx := b.transactions[txId]
-		delete(b.transactions, txId)
 		err := tx.Close()
 		if err != nil {
 			b.writeError(err)
@@ -867,5 +863,7 @@ func testSkips() map[string]string {
 		"stub.summary.test_summary.TestSummary.test_server_info":                                                     "Needs some kind of server address DNS resolution",
 		"stub.summary.test_summary.TestSummary.test_invalid_query_type":                                              "Driver does not verify query type returned from server.",
 		"stub.routing.*.test_should_drop_connections_failing_liveness_check":                                         "Needs support for GetConnectionPoolMetrics",
+		"stub.tx_lifetime.test_tx_lifetime.TestTxLifetime.test_managed_tx_raises_tx_managed_exec":                    "Failed tx functions cause a RESET not a ROLLBACK",
+		"stub.tx_lifetime.test_tx_lifetime.TestTxLifetime.test_unmanaged_tx_raises_tx_closed_exec":                   "tx.commit, tx.rollback, and tx.close are noops if the tx has already been closed",
 	}
 }
