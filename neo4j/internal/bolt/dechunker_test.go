@@ -81,7 +81,7 @@ func TestDechunker(t *testing.T) {
 		go func() {
 			AssertWriteSucceeds(t, cli, str.Bytes())
 		}()
-		buf, msgBuf, err = dechunkMessage(serv, buf, -1, nil, "")
+		buf, msgBuf, err = dechunkMessage(serv, buf, -1, nil, "", "")
 		AssertNoError(t, err)
 		AssertLen(t, msgBuf, int(msg.size))
 		// Check content of buffer
@@ -115,6 +115,7 @@ func TestDechunkerWithTimeout(ot *testing.T) {
 	}()
 	AssertNoError(ot, serv.SetReadDeadline(time.Now().Add(timeout)))
 	logger := &noopLogger{}
+	logName := "dechunker"
 	logId := "dechunker-test"
 
 	ot.Run("Resets connection deadline upon successful reads", func(t *testing.T) {
@@ -127,13 +128,15 @@ func TestDechunkerWithTimeout(ot *testing.T) {
 			AssertWriteSucceeds(t, cli, []byte{0x00, 0x00})
 		}()
 		buffer := make([]byte, 2)
-		_, _, err := dechunkMessage(serv, buffer, timeout, logger, logId)
+		_, _, err := dechunkMessage(serv, buffer, timeout, logger, logName,
+			logId)
 		AssertNoError(t, err)
 		AssertTrue(t, reflect.DeepEqual(buffer, []byte{0xCA, 0xFE}))
 	})
 
 	ot.Run("Fails when connection deadline is reached", func(t *testing.T) {
-		_, _, err := dechunkMessage(serv, nil, timeout, logger, logId)
+		_, _, err := dechunkMessage(serv, nil, timeout, logger, logName,
+			logId)
 		AssertError(t, err)
 		AssertStringContain(t, err.Error(), "read pipe")
 	})

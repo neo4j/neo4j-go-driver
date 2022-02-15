@@ -94,7 +94,7 @@ func (s *bolt4server) waitForHello() map[string]interface{} {
 }
 
 func (s *bolt4server) receiveMsg() *testStruct {
-	_, buf, err := dechunkMessage(s.conn, []byte{}, -1, nil, "")
+	_, buf, err := dechunkMessage(s.conn, []byte{}, -1, nil, "", "")
 	if err != nil {
 		panic(err)
 	}

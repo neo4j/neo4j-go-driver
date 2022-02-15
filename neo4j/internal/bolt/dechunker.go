@@ -32,7 +32,8 @@ import (
 // error.
 // If a non-default connection read timeout configuration hint is passed, the dechunker resets the connection read
 // deadline as well after successfully reading a chunk (NOOP messages included)
-func dechunkMessage(conn net.Conn, msgBuf []byte, readTimeout time.Duration, logger log.Logger, logId string) ([]byte, []byte, error) {
+func dechunkMessage(conn net.Conn, msgBuf []byte, readTimeout time.Duration,
+	logger log.Logger, logName, logId string) ([]byte, []byte, error) {
 	sizeBuf := []byte{0x00, 0x00}
 	off := 0
 
@@ -47,7 +48,8 @@ func dechunkMessage(conn net.Conn, msgBuf []byte, readTimeout time.Duration, log
 				return msgBuf, msgBuf[:off], nil
 			}
 			// Got a nop chunk
-			resetConnectionReadDeadline(conn, readTimeout, logger, logId)
+			resetConnectionReadDeadline(conn, readTimeout, logger,
+				logName, logId)
 			continue
 		}
 
@@ -63,15 +65,15 @@ func dechunkMessage(conn net.Conn, msgBuf []byte, readTimeout time.Duration, log
 			return msgBuf, nil, err
 		}
 		off += chunkSize
-		resetConnectionReadDeadline(conn, readTimeout, logger, logId)
+		resetConnectionReadDeadline(conn, readTimeout, logger, logName, logId)
 	}
 }
 
-func resetConnectionReadDeadline(conn net.Conn, readTimeout time.Duration, logger log.Logger, logId string) {
+func resetConnectionReadDeadline(conn net.Conn, readTimeout time.Duration, logger log.Logger, logName, logId string) {
 	if readTimeout < 0 {
 		return
 	}
 	if err := conn.SetReadDeadline(time.Now().Add(readTimeout)); err != nil {
-		logger.Error(log.Bolt4, logId, err)
+		logger.Error(logName, logId, err)
 	}
 }
