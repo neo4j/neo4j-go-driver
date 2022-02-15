@@ -86,7 +86,7 @@ type bolt3 struct {
 	minor         int
 }
 
-func NewBolt3(serverName string, conn net.Conn, log log.Logger, boltLog log.BoltLogger) *bolt3 {
+func NewBolt3(serverName string, conn net.Conn, logger log.Logger, boltLog log.BoltLogger) *bolt3 {
 	b := &bolt3{
 		state:      bolt3_unauthorized,
 		conn:       conn,
@@ -97,10 +97,11 @@ func NewBolt3(serverName string, conn net.Conn, log log.Logger, boltLog log.Bolt
 				boltLogger: boltLog,
 			},
 			connReadTimeout: -1,
-			logger: log,
+			logger:          logger,
+			logName:         log.Bolt3,
 		},
 		birthDate: time.Now(),
-		log:       log,
+		log:       logger,
 	}
 	b.out = &outgoing{
 		chunker: newChunker(),

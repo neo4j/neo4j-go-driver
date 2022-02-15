@@ -56,7 +56,7 @@ func TestDehydrateHydrate(ot *testing.T) {
 		go func() {
 			out.send(cli)
 		}()
-		_, byts, err := dechunkMessage(serv, []byte{}, -1, nil, "")
+		_, byts, err := dechunkMessage(serv, []byte{}, -1, nil, "", "")
 		if err != nil {
 			t.Fatal(err)
 		}
