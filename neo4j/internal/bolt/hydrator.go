@@ -95,7 +95,7 @@ type hydrator struct {
 }
 
 func (h *hydrator) setErr(err error) {
-	if h.err != nil {
+	if h.err == nil {
 		h.err = err
 	}
 }
