@@ -60,10 +60,10 @@ func TestHydrator(ot *testing.T) {
 				packer.String("the code")
 				packer.String("message")
 				packer.String("mess")
-				packer.String("extra key") // Should be ignored
+				packer.String("extra key")
 				packer.Int(1)
 			},
-			x: &db.Neo4jError{Code: "the code", Msg: "mess"},
+			err: fmt.Errorf("Invalid length of struct, expected 1 but was 0"),
 		},
 		{
 			name: "Success hello response",
@@ -603,6 +603,9 @@ func TestHydrator(ot *testing.T) {
 	hydrator := hydrator{}
 	for _, c := range cases {
 		ot.Run(c.name, func(t *testing.T) {
+			defer func() {
+				hydrator.err = nil
+			}()
 			packer.Begin([]byte{})
 			c.build()
 			buf, err := packer.End()
@@ -610,6 +613,13 @@ func TestHydrator(ot *testing.T) {
 				panic("Build error")
 			}
 			x, err := hydrator.hydrate(buf)
+			if c.err != nil {
+				if !reflect.DeepEqual(err, c.err) {
+					fmt.Printf("%+v", err)
+					t.Fatalf("Expected:\n%+v\n != Actual: \n%+v\n", c.err, err)
+				}
+				return
+			}
 			if err != nil {
 				panic(err)
 			}
