@@ -16,6 +16,7 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
+
 package bolt
 
 import (
@@ -29,6 +30,7 @@ type incoming struct {
 	hyd             hydrator
 	connReadTimeout time.Duration
 	logger          log.Logger
+	logName         string
 	logId           string
 }
 
@@ -36,7 +38,8 @@ func (i *incoming) next(rd net.Conn) (interface{}, error) {
 	// Get next message from transport layer
 	var err error
 	var msg []byte
-	i.buf, msg, err = dechunkMessage(rd, i.buf, i.connReadTimeout, i.logger, i.logId)
+	i.buf, msg, err = dechunkMessage(rd, i.buf, i.connReadTimeout, i.logger,
+		i.logName, i.logId)
 	if err != nil {
 		return nil, err
 	}

@@ -95,13 +95,13 @@ type bolt4 struct {
 	minor         int
 }
 
-func NewBolt4(serverName string, conn net.Conn, log log.Logger, boltLog log.BoltLogger) *bolt4 {
+func NewBolt4(serverName string, conn net.Conn, logger log.Logger, boltLog log.BoltLogger) *bolt4 {
 	b := &bolt4{
 		state:      bolt4_unauthorized,
 		conn:       conn,
 		serverName: serverName,
 		birthDate:  time.Now(),
-		log:        log,
+		log:        logger,
 		streams:    openstreams{},
 		in: incoming{
 			buf: make([]byte, 4096),
@@ -109,7 +109,8 @@ func NewBolt4(serverName string, conn net.Conn, log log.Logger, boltLog log.Bolt
 				boltLogger: boltLog,
 			},
 			connReadTimeout: -1,
-			logger:          log,
+			logger:          logger,
+			logName:         log.Bolt4,
 		},
 	}
 	b.out = outgoing{
