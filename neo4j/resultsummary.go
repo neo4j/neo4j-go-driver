@@ -400,8 +400,8 @@ func (s *resultSummary) Notifications() []Notification {
 		return nil
 	}
 	notifications := make([]Notification, len(s.sum.Notifications))
-	for i, n := range s.sum.Notifications {
-		notifications[i] = &notification{notification: &n}
+	for i := range s.sum.Notifications {
+		notifications[i] = &notification{notification: &s.sum.Notifications[i]}
 	}
 	return notifications
 }
