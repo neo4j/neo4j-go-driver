@@ -460,7 +460,7 @@ func (b *bolt4) discardAllStreams() {
 
 // Sends a PULL n request to server. State should be streaming and there should be a current stream.
 func (b *bolt4) sendPullN() {
-	b.assertState(bolt4_streaming, bolt3_streamingtx)
+	b.assertState(bolt4_streaming, bolt4_streamingtx)
 	if b.state == bolt4_streaming {
 		b.out.appendPullN(b.streams.curr.fetchSize)
 		b.out.send(b.conn)
