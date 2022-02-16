@@ -115,3 +115,20 @@ type UnsupportedTypeError struct {
 func (e *UnsupportedTypeError) Error() string {
 	return fmt.Sprintf("Usage of type '%s' is not supported", e.Type.String())
 }
+
+type ProtocolError struct {
+	MessageType string
+	Field       string
+	Err         string
+}
+
+func (e *ProtocolError) Error() string {
+	if e.MessageType == "" {
+		return fmt.Sprintf("ProtocolError: %s", e.Err)
+	}
+	if e.Field == "" {
+		return fmt.Sprintf("ProtocolError: message %s could not be hydrated: %s", e.MessageType, e.Err)
+	}
+	return fmt.Sprintf("ProtocolError: field %s of message %s could not be hydrated: %s",
+		e.Field, e.MessageType, e.Err)
+}

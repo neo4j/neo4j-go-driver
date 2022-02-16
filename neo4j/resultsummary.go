@@ -41,6 +41,21 @@ const (
 	StatementTypeSchemaWrite StatementType = 4
 )
 
+func (st StatementType) String() string {
+	switch st {
+	case StatementTypeReadOnly:
+		return "r"
+	case StatementTypeReadWrite:
+		return "rw"
+	case StatementTypeWriteOnly:
+		return "w"
+	case StatementTypeSchemaWrite:
+		return "s"
+	default:
+		return ""
+	}
+}
+
 type ResultSummary interface {
 	// Server returns basic information about the server where the statement is carried out.
 	Server() ServerInfo
@@ -97,6 +112,8 @@ type Counters interface {
 	ConstraintsRemoved() int
 	// The number of system updates
 	SystemUpdates() int
+	// ContainsSystemUpdates indicates whether the query contains system updates
+	ContainsSystemUpdates() bool
 }
 
 type Statement interface {
@@ -168,6 +185,10 @@ type ProfiledPlan interface {
 	// The children are where this part of the plan gets its input records - unless this is an operator that
 	// introduces new records on its own.
 	Children() []ProfiledPlan
+	PageCacheMisses() int64
+	PageCacheHits() int64
+	PageCacheHitRatio() float64
+	Time() int64
 }
 
 // Notification represents notifications generated when executing a statement.
@@ -266,6 +287,13 @@ func (s *resultSummary) getCounter(n string) int {
 
 func (s *resultSummary) SystemUpdates() int {
 	return s.getCounter(db.SystemUpdates)
+}
+
+func (s *resultSummary) ContainsSystemUpdates() bool {
+	if s.sum.ContainsSystemUpdates != nil {
+		return *s.sum.ContainsSystemUpdates
+	}
+	return s.getCounter(db.SystemUpdates) > 0
 }
 
 func (s *resultSummary) NodesCreated() int {

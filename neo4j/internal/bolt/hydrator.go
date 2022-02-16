@@ -30,7 +30,7 @@ import (
 	"github.com/neo4j/neo4j-go-driver/v4/neo4j/internal/packstream"
 )
 
-var hydrationInvalidState = errors.New("Hydration state error")
+const containsSystemUpdatesKey = "contains-system-updates"
 
 type ignored struct{}
 type success struct {
@@ -44,7 +44,7 @@ type success struct {
 	hasMore            bool
 	tlast              int64
 	qtype              db.StatementType
-	counters           map[string]int
+	counters           map[string]interface{}
 	plan               *db.Plan
 	profile            *db.ProfiledPlan
 	notifications      []db.Notification
@@ -69,15 +69,34 @@ func (s *success) String() string {
 
 func (s *success) summary() *db.Summary {
 	return &db.Summary{
-		Bookmark:      s.bookmark,
-		StmntType:     s.qtype,
-		Counters:      s.counters,
-		TLast:         s.tlast,
-		Plan:          s.plan,
-		ProfiledPlan:  s.profile,
-		Notifications: s.notifications,
-		Database:      s.db,
+		Bookmark:              s.bookmark,
+		StmntType:             s.qtype,
+		Counters:              extractIntCounters(s.counters),
+		TLast:                 s.tlast,
+		Plan:                  s.plan,
+		ProfiledPlan:          s.profile,
+		Notifications:         s.notifications,
+		Database:              s.db,
+		ContainsSystemUpdates: extractBoolPointer(s.counters, containsSystemUpdatesKey),
 	}
+}
+
+func extractIntCounters(counters map[string]interface{}) map[string]int {
+	result := make(map[string]int, len(counters))
+	for k, v := range counters {
+		if k != containsSystemUpdatesKey {
+			result[k] = v.(int)
+		}
+	}
+	return result
+}
+
+func extractBoolPointer(counters map[string]interface{}, key string) *bool {
+	result, ok := counters[key]
+	if !ok {
+		return nil
+	}
+	return result.(*bool)
 }
 
 func (s *success) isResetResponse() bool {
@@ -107,10 +126,13 @@ func (h *hydrator) getErr() error {
 	return h.err
 }
 
-func (h *hydrator) assertLength(expect, actual uint32) {
-	if expect != actual {
-		h.setErr(errors.New(fmt.Sprintf(
-			"Invalid length of struct, expected %d but was %d", expect, actual)))
+func (h *hydrator) assertLength(structType string, expected, actual uint32) {
+	if expected != actual {
+		h.setErr(&db.ProtocolError{
+			MessageType: structType,
+			Err: fmt.Sprintf("Invalid length of struct, expected %d but was %d",
+				expected, actual),
+		})
 	}
 }
 
@@ -143,7 +165,7 @@ func (h *hydrator) hydrate(buf []byte) (x interface{}, err error) {
 }
 
 func (h *hydrator) ignored(n uint32) *ignored {
-	h.assertLength(0, n)
+	h.assertLength("ignored", 0, n)
 	if h.getErr() != nil {
 		return nil
 	}
@@ -154,7 +176,7 @@ func (h *hydrator) ignored(n uint32) *ignored {
 }
 
 func (h *hydrator) failure(n uint32) *db.Neo4jError {
-	h.assertLength(1, n)
+	h.assertLength("failure", 1, n)
 	if h.getErr() != nil {
 		return nil
 	}
@@ -181,7 +203,7 @@ func (h *hydrator) failure(n uint32) *db.Neo4jError {
 }
 
 func (h *hydrator) success(n uint32) *success {
-	h.assertLength(1, n)
+	h.assertLength("success", 1, n)
 	if h.getErr() != nil {
 		return nil
 	}
@@ -217,7 +239,8 @@ func (h *hydrator) success(n uint32) *success {
 		case "t_last":
 			succ.tlast = h.unp.Int()
 		case "type":
-			switch h.unp.String() {
+			statementType := h.unp.String()
+			switch statementType {
 			case "r":
 				succ.qtype = db.StatementTypeRead
 			case "w":
@@ -226,6 +249,12 @@ func (h *hydrator) success(n uint32) *success {
 				succ.qtype = db.StatementTypeReadWrite
 			case "s":
 				succ.qtype = db.StatementTypeSchemaWrite
+			default:
+				h.setErr(&db.ProtocolError{
+					MessageType: "success",
+					Field:       "type",
+					Err:         fmt.Sprintf("unrecognized success statement type %s", statementType),
+				})
 			}
 		case "db":
 			succ.db = h.unp.String()
@@ -256,20 +285,32 @@ func (h *hydrator) success(n uint32) *success {
 	return succ
 }
 
-func (h *hydrator) successStats() map[string]int {
+func (h *hydrator) successStats() map[string]interface{} {
 	n := h.unp.Len()
 	if n == 0 {
 		return nil
 	}
-	counts := make(map[string]int, n)
+	counts := make(map[string]interface{}, n)
 	for ; n > 0; n-- {
 		h.unp.Next()
 		key := h.unp.String()
 		h.unp.Next()
-		val := h.unp.Int()
-		counts[key] = int(val)
+		val := h.parseStatValue(key)
+		counts[key] = val
 	}
 	return counts
+}
+
+func (h *hydrator) parseStatValue(key string) interface{} {
+	var val interface{}
+	switch key {
+	case containsSystemUpdatesKey:
+		boolValue := h.unp.Bool()
+		val = &boolValue
+	default:
+		val = int(h.unp.Int())
+	}
+	return val
 }
 
 // routingTable parses a routing table sent from the server. This is done
@@ -363,7 +404,7 @@ func (h *hydrator) array() []interface{} {
 }
 
 func (h *hydrator) record(n uint32) *db.Record {
-	h.assertLength(1, n)
+	h.assertLength("record", 1, n)
 	if h.getErr() != nil {
 		return nil
 	}
@@ -382,7 +423,8 @@ func (h *hydrator) record(n uint32) *db.Record {
 }
 
 func (h *hydrator) value() interface{} {
-	switch h.unp.Curr {
+	valueType := h.unp.Curr
+	switch valueType {
 	case packstream.PackedInt:
 		return h.unp.Int()
 	case packstream.PackedFloat:
@@ -420,7 +462,9 @@ func (h *hydrator) value() interface{} {
 		case 'E':
 			return h.duration(n)
 		default:
-			h.err = errors.New(fmt.Sprintf("Unknown tag: %02x", t))
+			h.setErr(&db.ProtocolError{
+				Err: fmt.Sprintf("Received unknown struct tag: %d", t),
+			})
 			return nil
 		}
 	case packstream.PackedByteArray:
@@ -436,7 +480,9 @@ func (h *hydrator) value() interface{} {
 	case packstream.PackedFalse:
 		return false
 	default:
-		h.setErr(hydrationInvalidState)
+		h.setErr(&db.ProtocolError{
+			Err: fmt.Sprintf("Received unknown packstream value type: %d", valueType),
+		})
 		return nil
 	}
 }
@@ -448,7 +494,7 @@ func (h *hydrator) trash() {
 }
 
 func (h *hydrator) node(num uint32) interface{} {
-	h.assertLength(3, num)
+	h.assertLength("node", 3, num)
 	if h.getErr() != nil {
 		return nil
 	}
@@ -463,7 +509,7 @@ func (h *hydrator) node(num uint32) interface{} {
 }
 
 func (h *hydrator) relationship(n uint32) interface{} {
-	h.assertLength(5, n)
+	h.assertLength("relationship", 5, n)
 	if h.getErr() != nil {
 		return nil
 	}
@@ -482,7 +528,7 @@ func (h *hydrator) relationship(n uint32) interface{} {
 }
 
 func (h *hydrator) relationnode(n uint32) interface{} {
-	h.assertLength(3, n)
+	h.assertLength("relationnode", 3, n)
 	if h.getErr() != nil {
 		return nil
 	}
@@ -497,7 +543,7 @@ func (h *hydrator) relationnode(n uint32) interface{} {
 }
 
 func (h *hydrator) path(n uint32) interface{} {
-	h.assertLength(3, n)
+	h.assertLength("path", 3, n)
 	if h.getErr() != nil {
 		return nil
 	}
@@ -509,7 +555,11 @@ func (h *hydrator) path(n uint32) interface{} {
 		h.unp.Next()
 		node, ok := h.value().(dbtype.Node)
 		if !ok {
-			h.setErr(errors.New("Path hydrate error"))
+			h.setErr(&db.ProtocolError{
+				MessageType: "path",
+				Field:       "nodes",
+				Err:         "value could not be cast to Node",
+			})
 			return nil
 		}
 		nodes[i] = node
@@ -522,7 +572,11 @@ func (h *hydrator) path(n uint32) interface{} {
 		h.unp.Next()
 		rnode, ok := h.value().(*relNode)
 		if !ok {
-			h.setErr(errors.New("Path hydrate error"))
+			h.setErr(&db.ProtocolError{
+				MessageType: "path",
+				Field:       "rnodes",
+				Err:         "value could be not cast to *relNode",
+			})
 			return nil
 		}
 		rnodes[i] = rnode
@@ -537,7 +591,11 @@ func (h *hydrator) path(n uint32) interface{} {
 	}
 
 	if (len(indexes) & 0x01) == 1 {
-		h.setErr(errors.New("Path hydrate error"))
+		h.setErr(&db.ProtocolError{
+			MessageType: "path",
+			Field:       "indices",
+			Err:         fmt.Sprintf("there should be an even number of indices, found %d", len(indexes)),
+		})
 		return nil
 	}
 
@@ -590,7 +648,11 @@ func (h *hydrator) dateTimeNamedZone(n uint32) interface{} {
 	t := time.Unix(secs, nans).UTC()
 	l, err := time.LoadLocation(zone)
 	if err != nil {
-		h.setErr(err)
+		h.setErr(&db.ProtocolError{
+			MessageType: "dateTimeNamedZone",
+			Field:       "location",
+			Err:         err.Error(),
+		})
 		return nil
 	}
 	return time.Date(t.Year(), t.Month(), t.Day(), t.Hour(), t.Minute(), t.Second(), t.Nanosecond(), l)
@@ -714,6 +776,18 @@ func parseProfile(profilex map[string]interface{}) *db.ProfiledPlan {
 		if len(childPlanx) > 0 {
 			childPlan := parseProfile(childPlanx)
 			if childPlan != nil {
+				if pageCacheMisses, ok := childPlanx["pageCacheMisses"]; ok {
+					childPlan.PageCacheMisses = pageCacheMisses.(int64)
+				}
+				if pageCacheHits, ok := childPlanx["pageCacheHits"]; ok {
+					childPlan.PageCacheHits = pageCacheHits.(int64)
+				}
+				if pageCacheHitRatio, ok := childPlanx["pageCacheHitRatio"]; ok {
+					childPlan.PageCacheHitRatio = pageCacheHitRatio.(float64)
+				}
+				if planTime, ok := childPlanx["time"]; ok {
+					childPlan.Time = planTime.(int64)
+				}
 				plan.Children = append(plan.Children, *childPlan)
 			}
 		}

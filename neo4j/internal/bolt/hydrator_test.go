@@ -63,7 +63,7 @@ func TestHydrator(ot *testing.T) {
 				packer.String("extra key")
 				packer.Int(1)
 			},
-			err: fmt.Errorf("Invalid length of struct, expected 1 but was 0"),
+			err: &db.ProtocolError{MessageType: "failure", Err: "Invalid length of struct, expected 1 but was 0"},
 		},
 		{
 			name: "Success hello response",
@@ -651,6 +651,9 @@ func TestHydrator(ot *testing.T) {
 			defer func() {
 				hydrator.err = nil
 			}()
+			if (c.x != nil) == (c.err != nil) {
+				t.Fatalf("test case needs to define either expected result or error (xor)")
+			}
 			packer.Begin([]byte{})
 			c.build()
 			buf, err := packer.End()
