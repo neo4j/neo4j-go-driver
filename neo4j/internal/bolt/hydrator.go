@@ -648,7 +648,7 @@ func (h *hydrator) duration(n uint32) interface{} {
 
 func parseNotifications(notificationsx []interface{}) []db.Notification {
 	var notifications []db.Notification
-	if len(notificationsx) > 0 {
+	if notificationsx != nil {
 		notifications = make([]db.Notification, 0, len(notificationsx))
 		for _, x := range notificationsx {
 			notificationx, ok := x.(map[string]interface{})
