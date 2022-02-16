@@ -411,6 +411,22 @@ func (p *profile) Children() []ProfiledPlan {
 	return children
 }
 
+func (p *profile) PageCacheMisses() int64 {
+	return p.profile.PageCacheMisses
+}
+
+func (p *profile) PageCacheHits() int64 {
+	return p.profile.PageCacheHits
+}
+
+func (p *profile) PageCacheHitRatio() float64 {
+	return p.profile.PageCacheHitRatio
+}
+
+func (p *profile) Time() int64 {
+	return p.profile.Time
+}
+
 func (s *resultSummary) Notifications() []Notification {
 	if s.sum.Notifications == nil {
 		return nil
