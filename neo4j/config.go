@@ -88,6 +88,16 @@ type Config struct {
 	//
 	// default: neo4j.UserAgent
 	UserAgent string
+	// FetchSize defines how many records to pull from server in each batch.
+	// From Bolt protocol v4 (Neo4j 4+) records can be fetched in batches as compared to fetching
+	// all in previous versions.
+	//
+	// If FetchSize is set to FetchDefault, the driver decides the appropriate size. If set to a positive value
+	// that size is used if the underlying protocol supports it otherwise it is ignored.
+	//
+	// To turn off fetching in batches and always fetch everything, set FetchSize to FetchAll.
+	// If a single large result is to be retrieved this is the most performant setting.
+	FetchSize int
 }
 
 func defaultConfig() *Config {
@@ -101,6 +111,7 @@ func defaultConfig() *Config {
 		SocketKeepalive:              true,
 		RootCAs:                      nil,
 		UserAgent:                    UserAgent,
+		FetchSize:                    FetchDefault,
 	}
 }
 

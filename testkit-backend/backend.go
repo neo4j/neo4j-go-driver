@@ -403,6 +403,9 @@ func (b *backend) handleRequest(req map[string]interface{}) {
 				maxTxRetryTime := int(rawMaxTxRetryTime.(float64))
 				c.MaxTransactionRetryTime = time.Millisecond * time.Duration(maxTxRetryTime)
 			}
+			if data["fetchSize"] != nil {
+				c.FetchSize = int(data["fetchSize"].(float64))
+			}
 		})
 		if err != nil {
 			b.writeError(err)
