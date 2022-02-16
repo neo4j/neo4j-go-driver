@@ -116,6 +116,7 @@ func (b *backend) writeError(err error) {
 	// track of this error so that we can reuse the real thing within a retryable tx
 	fmt.Printf("Error: %s (%T)\n", err.Error(), err)
 	code := ""
+	_, isHydrationError := err.(*db.ProtocolError)
 	tokenErr, isTokenExpiredErr := err.(*neo4j.TokenExpiredError)
 	if isTokenExpiredErr {
 		code = tokenErr.Code
@@ -123,7 +124,8 @@ func (b *backend) writeError(err error) {
 	if neo4j.IsNeo4jError(err) {
 		code = err.(*db.Neo4jError).Code
 	}
-	isDriverError := isTokenExpiredErr ||
+	isDriverError := isHydrationError ||
+		isTokenExpiredErr ||
 		neo4j.IsNeo4jError(err) ||
 		neo4j.IsUsageError(err) ||
 		neo4j.IsConnectivityError(err) ||
@@ -232,7 +234,7 @@ func (b *backend) toTransactionConfigApply(data map[string]interface{}) func(*ne
 	}
 	// Optional timeout in milliseconds
 	if data["timeout"] != nil {
-		txConfig.Timeout = time.Millisecond * time.Duration((data["timeout"].(float64)))
+		txConfig.Timeout = time.Millisecond * time.Duration(data["timeout"].(float64))
 	}
 	return func(conf *neo4j.TransactionConfig) {
 		if txConfig.Metadata != nil {
@@ -480,13 +482,13 @@ func (b *backend) handleRequest(req map[string]interface{}) {
 			b.writeError(err)
 			return
 		}
-		idKey := b.nextId()
-		b.results[idKey] = result
 		keys, err := result.Keys()
 		if err != nil {
 			b.writeError(err)
 			return
 		}
+		idKey := b.nextId()
+		b.results[idKey] = result
 		b.writeResponse("Result", map[string]interface{}{
 			"id":   idKey,
 			"keys": keys,
@@ -520,13 +522,13 @@ func (b *backend) handleRequest(req map[string]interface{}) {
 			b.writeError(err)
 			return
 		}
-		idKey := b.nextId()
-		b.results[idKey] = result
 		keys, err := result.Keys()
 		if err != nil {
 			b.writeError(err)
 			return
 		}
+		idKey := b.nextId()
+		b.results[idKey] = result
 		b.writeResponse("Result", map[string]interface{}{
 			"id":   idKey,
 			"keys": keys,
@@ -604,48 +606,81 @@ func (b *backend) handleRequest(req map[string]interface{}) {
 			return
 		}
 		serverInfo := summary.Server()
+		counters := summary.Counters()
 		protocolVersion := serverInfo.ProtocolVersion()
-		//counters := summary.Counters()
 		query := summary.Query()
 		database := summary.Database()
-		summaryResponse := map[string]interface{}{
+		response := map[string]interface{}{
 			"serverInfo": map[string]interface{}{
 				"protocolVersion": fmt.Sprintf("%d.%d", protocolVersion.Major, protocolVersion.Minor),
 				"agent":           serverInfo.Agent(),
+				"address":         serverInfo.Address(),
 			},
-			"notifications":        summary.Notifications(),
-			"plan":                 summary.Plan(),
-			"profile":              summary.Profile(),
-			"resultAvailableAfter": summary.ResultAvailableAfter(),
-			"resultConsumedAfter":  summary.ResultConsumedAfter(),
-			//"counters": map[string]interface{}{
-			//	"containsUpdates":      counters.ContainsUpdates(),
-			//	"nodesCreated":         counters.NodesCreated(),
-			//	"nodesDeleted":         counters.NodesDeleted(),
-			//	"relationshipsCreated": counters.RelationshipsCreated(),
-			//	"relationshipsDeleted": counters.RelationshipsDeleted(),
-			//	"propertiesSet":        counters.PropertiesSet(),
-			//	"labelsAdded":          counters.LabelsAdded(),
-			//	"labelsRemoved":        counters.LabelsRemoved(),
-			//	"indexesAdded":         counters.IndexesAdded(),
-			//	"indexesRemoved":       counters.IndexesRemoved(),
-			//	"constraintsAdded":     counters.ConstraintsAdded(),
-			//	"constraintsRemoved":   counters.ConstraintsRemoved(),
-			//},
+			"counters": map[string]interface{}{
+				"constraintsAdded":      counters.ConstraintsAdded(),
+				"constraintsRemoved":    counters.ConstraintsRemoved(),
+				"containsSystemUpdates": counters.ContainsSystemUpdates(),
+				"containsUpdates":       counters.ContainsUpdates(),
+				"indexesAdded":          counters.IndexesAdded(),
+				"indexesRemoved":        counters.IndexesRemoved(),
+				"labelsAdded":           counters.LabelsAdded(),
+				"labelsRemoved":         counters.LabelsRemoved(),
+				"nodesCreated":          counters.NodesCreated(),
+				"nodesDeleted":          counters.NodesDeleted(),
+				"propertiesSet":         counters.PropertiesSet(),
+				"relationshipsCreated":  counters.RelationshipsCreated(),
+				"relationshipsDeleted":  counters.RelationshipsDeleted(),
+				"systemUpdates":         counters.SystemUpdates(),
+			},
 			"query": map[string]interface{}{
 				"text":       query.Text(),
-				"parameters": query.Parameters(),
+				"parameters": serializeParameters(query.Parameters()),
 			},
+			"notifications": serializeNotifications(summary.Notifications()),
+			"plan":          serializePlan(summary.Plan()),
+			"profile":       serializeProfile(summary.Profile()),
+		}
+		if summary.ResultAvailableAfter() > 0 {
+			response["resultAvailableAfter"] = summary.ResultAvailableAfter().Milliseconds()
+		}
+		if summary.ResultConsumedAfter() > 0 {
+			response["resultConsumedAfter"] = summary.ResultConsumedAfter().Milliseconds()
+		}
+		if summary.StatementType() != neo4j.StatementTypeUnknown {
+			response["queryType"] = summary.StatementType().String()
 		}
 		if database != nil {
-			summaryResponse["database"] = database.Name()
+			response["database"] = database.Name()
 		}
-		b.writeResponse("Summary", summaryResponse)
+		b.writeResponse("Summary", response)
+
+	case "CheckMultiDBSupport":
+		driver := b.drivers[data["driverId"].(string)]
+		session := driver.NewSession(neo4j.SessionConfig{})
+		result, err := session.Run("RETURN 42", nil)
+		defer session.Close()
+		if err != nil {
+			b.writeError(fmt.Errorf("could not check multi DB support: %w", err))
+			return
+		}
+		summary, err := result.Consume()
+		if err != nil {
+			b.writeError(fmt.Errorf("could not check multi DB support: %w", err))
+			return
+		}
+
+		server := summary.Server()
+		isMultiTenant := server.ProtocolVersion().Major >= 4
+		b.writeResponse("MultiDBSupport", map[string]interface{}{
+			"id":        b.nextId(),
+			"available": isMultiTenant,
+		})
 
 	case "GetFeatures":
 		b.writeResponse("FeatureList", map[string]interface{}{
 			"features": []string{
 				"ConfHint:connection.recv_timeout_seconds",
+				"Feature:API:Liveness.Check",
 				"Feature:Auth:Custom",
 				"Feature:Auth:Bearer",
 				"Feature:Auth:Kerberos",
@@ -668,6 +703,11 @@ func (b *backend) handleRequest(req map[string]interface{}) {
 				"Temporary:DriverMaxTxRetryTime",
 				"Temporary:FastFailingDiscovery",
 				"Temporary:FullSummary",
+				"Temporary:DriverMaxConnectionPoolSize",
+				"Temporary:DriverMaxTxRetryTime",
+				"Temporary:FastFailingDiscovery",
+				"Temporary:FullSummary",
+				"Temporary:GetConnectionPoolMetrics",
 				"Temporary:ResultKeys",
 				"Temporary:TransactionClose",
 			},
@@ -713,27 +753,114 @@ func asRegex(rawPattern string) *regexp.Regexp {
 	return regexp.MustCompile(pattern)
 }
 
+func serializeNotifications(slice []neo4j.Notification) []map[string]interface{} {
+	if slice == nil {
+		return nil
+	}
+	if len(slice) == 0 {
+		return []map[string]interface{}{}
+	}
+	var res []map[string]interface{}
+	for i, notification := range slice {
+		res = append(res, map[string]interface{}{
+			"code":        notification.Code(),
+			"title":       notification.Title(),
+			"description": notification.Description(),
+			"severity":    notification.Severity(),
+		})
+		if notification.Position() != nil {
+			res[i]["position"] = map[string]interface{}{
+				"offset": notification.Position().Offset(),
+				"line":   notification.Position().Line(),
+				"column": notification.Position().Column(),
+			}
+		}
+	}
+	return res
+}
+
+func serializePlan(plan neo4j.Plan) map[string]interface{} {
+	if plan == nil {
+		return nil
+	}
+	return map[string]interface{}{
+		"args":         plan.Arguments(),
+		"operatorType": plan.Operator(),
+		"children":     serializePlans(plan.Children()),
+		"identifiers":  plan.Identifiers(),
+	}
+}
+
+func serializePlans(children []neo4j.Plan) []map[string]interface{} {
+	result := make([]map[string]interface{}, len(children))
+	for i, child := range children {
+		result[i] = serializePlan(child)
+	}
+	return result
+}
+
+func serializeProfile(profile neo4j.ProfiledPlan) map[string]interface{} {
+	if profile == nil {
+		return nil
+	}
+	result := map[string]interface{}{
+		"args":         profile.Arguments(),
+		"children":     serializeProfiles(profile.Children()),
+		"dbHits":       profile.DbHits(),
+		"identifiers":  profile.Identifiers(),
+		"operatorType": profile.Operator(),
+		"rows":         profile.Records(),
+	}
+	return result
+}
+
+func serializeProfiles(children []neo4j.ProfiledPlan) []map[string]interface{} {
+	result := make([]map[string]interface{}, len(children))
+	for i, child := range children {
+		childProfile := serializeProfile(child)
+		childProfile["pageCacheMisses"] = child.PageCacheMisses()
+		childProfile["pageCacheHits"] = child.PageCacheHits()
+		childProfile["pageCacheHitRatio"] = child.PageCacheHitRatio()
+		childProfile["time"] = child.Time()
+		result[i] = childProfile
+	}
+	return result
+}
+
+func serializeParameters(parameters map[string]interface{}) map[string]interface{} {
+	result := make(map[string]interface{}, len(parameters))
+	for k, parameter := range parameters {
+		result[k] = nativeToCypher(parameter)
+	}
+	return result
+}
+
 // you can use '*' as wildcards anywhere in the qualified test name (useful to exclude a whole class e.g.)
 func testSkips() map[string]string {
 	return map[string]string{
-		"stub.disconnects.test_disconnects.TestDisconnects.test_fail_on_reset":                                                    "It is not resetting driver when put back to pool",
-		"stub.routing.test_routing_v3.RoutingV3.test_should_use_resolver_during_rediscovery_when_existing_routers_fail":           "It needs investigation - custom resolver does not seem to be called",
-		"stub.routing.test_routing_v4x1.RoutingV4x1.test_should_use_resolver_during_rediscovery_when_existing_routers_fail":       "It needs investigation - custom resolver does not seem to be called",
-		"stub.routing.test_routing_v4x3.RoutingV4x3.test_should_use_resolver_during_rediscovery_when_existing_routers_fail":       "It needs investigation - custom resolver does not seem to be called",
-		"stub.routing.test_routing_v4x4.RoutingV4x4.test_should_use_resolver_during_rediscovery_when_existing_routers_fail":       "It needs investigation - custom resolver does not seem to be called",
-		"stub.routing.test_routing_v3.RoutingV3.test_should_revert_to_initial_router_if_known_router_throws_protocol_errors":      "It needs investigation - custom resolver does not seem to be called",
-		"stub.routing.test_routing_v4x1.RoutingV4x1.test_should_revert_to_initial_router_if_known_router_throws_protocol_errors":  "It needs investigation - custom resolver does not seem to be called",
-		"stub.routing.test_routing_v4x3.RoutingV4x3.test_should_revert_to_initial_router_if_known_router_throws_protocol_errors":  "It needs investigation - custom resolver does not seem to be called",
-		"stub.routing.test_routing_v4x4.RoutingV4x4.test_should_revert_to_initial_router_if_known_router_throws_protocol_errors":  "It needs investigation - custom resolver does not seem to be called",
-		"stub.configuration_hints.test_connection_recv_timeout_seconds.TestRoutingConnectionRecvTimeout.*":                        "No GetRoutingTable support - too tricky to implement in Go",
-		"stub.homedb.test_homedb.TestHomeDb.test_session_should_cache_home_db_despite_new_rt":                                     "Driver does not remove servers from RT when connection breaks.",
-		"neo4j.test_authentication.TestAuthenticationBasic.test_error_on_incorrect_credentials_tx":                                "Driver retries tx on failed authentication.",
-		"stub.routing.test_no_routing_v4x1.NoRoutingV4x1.test_should_accept_custom_fetch_size_using_driver_configuration":         "Does not support custom fetch size at driver level",
-		"stub.routing.test_no_routing_v4x1.NoRoutingV4x1.test_should_pull_all_when_fetch_is_minus_one_using_driver_configuration": "Does not support custom fetch size at driver level",
-		"stub.routing.RoutingV4x4.test_should_request_rt_from_all_initial_routers_until_successful_on_authorization_expired":      "Add resolvers and connection timeout support",
-		"stub.routing.RoutingV4x4.test_should_request_rt_from_all_initial_routers_until_successful_on_unknown_failure":            "Add resolvers and connection timeout support",
-		"neo4j.test_summary.TestSummary.*":                                 "Needs system update counter in summary counter to unblock the tests",
-		"stub.summary.test_summary.TestSummary.*":                          "Needs system update counter in summary counter to unblock the tests",
-		"neo4j.test_direct_driver.TestDirectDriver.test_supports_multi_db": "Needs support for CheckMultiDBSupport in backend",
+		"stub.disconnects.test_disconnects.TestDisconnects.test_fail_on_reset":                                                   "It is not resetting driver when put back to pool",
+		"stub.routing.test_routing_v3.RoutingV3.test_should_use_resolver_during_rediscovery_when_existing_routers_fail":          "It needs investigation - custom resolver does not seem to be called",
+		"stub.routing.test_routing_v4x1.RoutingV4x1.test_should_use_resolver_during_rediscovery_when_existing_routers_fail":      "It needs investigation - custom resolver does not seem to be called",
+		"stub.routing.test_routing_v4x3.RoutingV4x3.test_should_use_resolver_during_rediscovery_when_existing_routers_fail":      "It needs investigation - custom resolver does not seem to be called",
+		"stub.routing.test_routing_v4x4.RoutingV4x4.test_should_use_resolver_during_rediscovery_when_existing_routers_fail":      "It needs investigation - custom resolver does not seem to be called",
+		"stub.routing.test_routing_v3.RoutingV3.test_should_revert_to_initial_router_if_known_router_throws_protocol_errors":     "It needs investigation - custom resolver does not seem to be called",
+		"stub.routing.test_routing_v4x1.RoutingV4x1.test_should_revert_to_initial_router_if_known_router_throws_protocol_errors": "It needs investigation - custom resolver does not seem to be called",
+		"stub.routing.test_routing_v4x3.RoutingV4x3.test_should_revert_to_initial_router_if_known_router_throws_protocol_errors": "It needs investigation - custom resolver does not seem to be called",
+		"stub.routing.test_routing_v4x4.RoutingV4x4.test_should_revert_to_initial_router_if_known_router_throws_protocol_errors": "It needs investigation - custom resolver does not seem to be called",
+		"stub.configuration_hints.test_connection_recv_timeout_seconds.TestRoutingConnectionRecvTimeout.*":                       "No GetRoutingTable support - too tricky to implement in Go",
+		"stub.homedb.test_homedb.TestHomeDb.test_session_should_cache_home_db_despite_new_rt":                                    "Driver does not remove servers from RT when connection breaks.",
+		"neo4j.test_authentication.TestAuthenticationBasic.test_error_on_incorrect_credentials_tx":                               "Driver retries tx on failed authentication.",
+		"stub.iteration.test_result_scope.TestResultScope.*":                                                                     "Results are always valid but don't return records when out of scope",
+		"stub.*.test_0_timeout":        "Driver omits 0 as tx timeout value",
+		"stub.*.test_negative_timeout": "Driver omits negative tx timeout values",
+		"stub.routing.*.*.test_should_request_rt_from_all_initial_routers_until_successful_on_unknown_failure":       "Add DNS resolver TestKit message and connection timeout support",
+		"stub.routing.*.*.test_should_request_rt_from_all_initial_routers_until_successful_on_authorization_expired": "Add DNS resolver TestKit message and connection timeout support",
+		"stub.summary.test_summary.TestSummary.test_server_info":                                                     "Needs some kind of server address DNS resolution",
+		"stub.summary.test_summary.TestSummary.test_invalid_query_type":                                              "Driver does not verify query type returned from server.",
+		"stub.routing.*.test_should_drop_connections_failing_liveness_check":                                         "Needs support for GetConnectionPoolMetrics",
+		"stub.summary.test_summary.TestSummary.test_partial_summary_contains_updates":                                "Breaking change needed for summary#contains_update - only fixed in 5.0",
+		"stub.summary.test_summary.TestSummary.test_partial_summary_not_contains_updates":                            "Breaking change needed for summary#contains_update - only fixed in 5.0",
+		"stub.summary.test_summary.TestSummary.test_partial_summary_not_contains_system_updates":                     "Breaking change needed for summary#contains_update - only fixed in 5.0",
+		"stub.summary.test_summary.TestSummary.test_partial_summary_system_updates":                                  "Breaking change needed for summary#contains_update - only fixed in 5.0",
 	}
 }
