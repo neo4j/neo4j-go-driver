@@ -89,10 +89,10 @@ type SessionConfig struct {
 	ImpersonatedUser string
 }
 
-// Turns off fetching records in batches.
+// FetchAll turns off fetching records in batches.
 const FetchAll = -1
 
-// Lets the driver decide fetch size
+// FetchDefault lets the driver decide fetch size
 const FetchDefault = 0
 
 // Connection pool as seen by the session.
@@ -150,6 +150,11 @@ func newSession(config *Config, sessConfig SessionConfig, router sessionRouter, 
 	logId := log.NewId()
 	logger.Debugf(log.Session, logId, "Created")
 
+	fetchSize := config.FetchSize
+	if sessConfig.FetchSize != FetchDefault {
+		fetchSize = sessConfig.FetchSize
+	}
+
 	return &session{
 		config:           config,
 		router:           router,
@@ -164,7 +169,7 @@ func newSession(config *Config, sessConfig SessionConfig, router sessionRouter, 
 		log:              logger,
 		logId:            logId,
 		throttleTime:     time.Second * 1,
-		fetchSize:        sessConfig.FetchSize,
+		fetchSize:        fetchSize,
 		boltLogger:       sessConfig.BoltLogger,
 	}
 }
