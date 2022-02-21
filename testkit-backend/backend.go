@@ -862,5 +862,6 @@ func testSkips() map[string]string {
 		"stub.summary.test_summary.TestSummary.test_partial_summary_not_contains_updates":                            "Breaking change needed for summary#contains_update - only fixed in 5.0",
 		"stub.summary.test_summary.TestSummary.test_partial_summary_not_contains_system_updates":                     "Breaking change needed for summary#contains_update - only fixed in 5.0",
 		"stub.summary.test_summary.TestSummary.test_partial_summary_system_updates":                                  "Breaking change needed for summary#contains_update - only fixed in 5.0",
+		"neo4j.test_summary.TestSummary.test_contains_time_information":                                              "Strange behavior with Neo4j 3.5 EE",
 	}
 }
