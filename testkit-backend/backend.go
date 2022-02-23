@@ -591,6 +591,8 @@ func (b *backend) handleRequest(req map[string]interface{}) {
 		counters := summary.Counters()
 		protocolVersion := serverInfo.ProtocolVersion()
 		response := map[string]interface{}{
+			"resultAvailableAfter": summary.ResultAvailableAfter().Milliseconds(),
+			"resultConsumedAfter":  summary.ResultConsumedAfter().Milliseconds(),
 			"serverInfo": map[string]interface{}{
 				"protocolVersion": fmt.Sprintf("%d.%d", protocolVersion.Major, protocolVersion.Minor),
 				"agent":           serverInfo.Agent(),
@@ -619,12 +621,6 @@ func (b *backend) handleRequest(req map[string]interface{}) {
 			"notifications": serializeNotifications(summary.Notifications()),
 			"plan":          serializePlan(summary.Plan()),
 			"profile":       serializeProfile(summary.Profile()),
-		}
-		if summary.ResultAvailableAfter() > 0 {
-			response["resultAvailableAfter"] = summary.ResultAvailableAfter().Milliseconds()
-		}
-		if summary.ResultConsumedAfter() > 0 {
-			response["resultConsumedAfter"] = summary.ResultConsumedAfter().Milliseconds()
 		}
 		if summary.StatementType() != neo4j.StatementTypeUnknown {
 			response["queryType"] = summary.StatementType().String()
