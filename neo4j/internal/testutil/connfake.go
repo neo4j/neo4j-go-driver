@@ -72,6 +72,10 @@ type ConnFake struct {
 	DatabaseName   string
 }
 
+func (c *ConnFake) Connect(context.Context, int, map[string]interface{}, string, map[string]string) error {
+	return nil
+}
+
 func (c *ConnFake) ServerName() string {
 	return c.Name
 }

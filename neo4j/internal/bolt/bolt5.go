@@ -33,20 +33,20 @@ import (
 )
 
 const (
-	bolt4_ready        = iota // Ready for use
-	bolt4_streaming           // Receiving result from auto commit query
-	bolt4_pendingtx           // Transaction has been requested but not applied
-	bolt4_tx                  // Transaction pending
-	bolt4_streamingtx         // Receiving result from a query within a transaction
-	bolt4_failed              // Recoverable error, needs reset
-	bolt4_dead                // Non recoverable protocol or connection error
-	bolt4_unauthorized        // Initial state, not sent hello message with authentication
+	bolt5Ready        = iota // Ready for use
+	bolt5Streaming           // Receiving result from auto commit query
+	bolt5PendingTx           // Transaction has been requested but not applied
+	bolt5Tx                  // Transaction pending
+	bolt5StreamingTx         // Receiving result from a query within a transaction
+	bolt5Failed              // Recoverable error, needs reset
+	bolt5Dead                // Non recoverable protocol or connection error
+	bolt5Unauthorized        // Initial state, not sent hello message with authentication
 )
 
 // Default fetch size
-const bolt4_fetchsize = 1000
+const bolt5FetchSize = 1000
 
-type internalTx4 struct {
+type internalTx5 struct {
 	mode             idb.AccessMode
 	bookmarks        []string
 	timeout          time.Duration
@@ -55,7 +55,7 @@ type internalTx4 struct {
 	impersonatedUser string
 }
 
-func (i *internalTx4) toMeta() map[string]interface{} {
+func (i *internalTx5) toMeta() map[string]interface{} {
 	meta := map[string]interface{}{}
 	if i.mode == idb.ReadMode {
 		meta["mode"] = "r"
@@ -79,7 +79,7 @@ func (i *internalTx4) toMeta() map[string]interface{} {
 	return meta
 }
 
-type bolt4 struct {
+type bolt5 struct {
 	state         int
 	txId          idb.TxHandle
 	streams       openstreams
@@ -91,7 +91,7 @@ type bolt4 struct {
 	logId         string
 	serverVersion string
 	tfirst        int64       // Time that server started streaming
-	pendingTx     internalTx4 // Stashed away when tx started explicitly
+	pendingTx     internalTx5 // Stashed away when tx started explicitly
 	hasPendingTx  bool
 	bookmark      string // Last bookmark
 	birthDate     time.Time
@@ -102,9 +102,9 @@ type bolt4 struct {
 	lastQid       int64 // Last seen qid
 }
 
-func NewBolt4(serverName string, conn net.Conn, logger log.Logger, boltLog log.BoltLogger) *bolt4 {
-	b := &bolt4{
-		state:      bolt4_unauthorized,
+func NewBolt5(serverName string, conn net.Conn, logger log.Logger, boltLog log.BoltLogger) *bolt5 {
+	b := &bolt5{
+		state:      bolt5Unauthorized,
 		conn:       conn,
 		serverName: serverName,
 		birthDate:  time.Now(),
@@ -117,7 +117,7 @@ func NewBolt4(serverName string, conn net.Conn, logger log.Logger, boltLog log.B
 			},
 			connReadTimeout: -1,
 			logger:          logger,
-			logName:         log.Bolt4,
+			logName:         log.Bolt5,
 		},
 	}
 	b.out = outgoing{
@@ -130,29 +130,29 @@ func NewBolt4(serverName string, conn net.Conn, logger log.Logger, boltLog log.B
 	return b
 }
 
-func (b *bolt4) checkStreams() {
+func (b *bolt5) checkStreams() {
 	if b.streams.num <= 0 {
 		// Perform state transition from streaming, if in that state otherwise keep the current
 		// state as we are in some kind of bad shape
 		switch b.state {
-		case bolt4_streamingtx:
-			b.state = bolt4_tx
-		case bolt4_streaming:
-			b.state = bolt4_ready
+		case bolt5StreamingTx:
+			b.state = bolt5Tx
+		case bolt5Streaming:
+			b.state = bolt5Ready
 		}
 	}
 }
 
-func (b *bolt4) ServerName() string {
+func (b *bolt5) ServerName() string {
 	return b.serverName
 }
 
-func (b *bolt4) ServerVersion() string {
+func (b *bolt5) ServerVersion() string {
 	return b.serverVersion
 }
 
-// Sets b.err and b.state to bolt4_failed or bolt4_dead when fatal is true.
-func (b *bolt4) setError(err error, fatal bool) {
+// Sets b.err and b.state to bolt5Failed or bolt5Dead when fatal is true.
+func (b *bolt5) setError(err error, fatal bool) {
 	// Has no effect, can reduce nested ifs
 	if err == nil {
 		return
@@ -161,12 +161,12 @@ func (b *bolt4) setError(err error, fatal bool) {
 	// No previous error
 	if b.err == nil {
 		b.err = err
-		b.state = bolt4_failed
+		b.state = bolt5Failed
 	}
 
 	// Increase severity even if it was a previous error
 	if fatal {
-		b.state = bolt4_dead
+		b.state = bolt5Dead
 	}
 
 	// Forward error to current stream if there is one
@@ -178,13 +178,13 @@ func (b *bolt4) setError(err error, fatal bool) {
 	// Do not log big cypher statements as errors
 	neo4jErr, casted := err.(*db.Neo4jError)
 	if casted && neo4jErr.Classification() == "ClientError" {
-		b.log.Debugf(log.Bolt4, b.logId, "%s", err)
+		b.log.Debugf(log.Bolt5, b.logId, "%s", err)
 	} else {
-		b.log.Error(log.Bolt4, b.logId, err)
+		b.log.Error(log.Bolt5, b.logId, err)
 	}
 }
 
-func (b *bolt4) receiveMsg(ctx context.Context) interface{} {
+func (b *bolt5) receiveMsg(ctx context.Context) interface{} {
 	// Potentially dangerous to receive when an error has occurred, could hang.
 	// Important, a lot of code has been simplified relying on this check.
 	if b.err != nil {
@@ -196,9 +196,9 @@ func (b *bolt4) receiveMsg(ctx context.Context) interface{} {
 	return msg
 }
 
-// Receives a message that is assumed to be a success response or a failure in response to a
-// sent command. Sets b.err and b.state on failure
-func (b *bolt4) receiveSuccess(ctx context.Context) *success {
+// Receives a message that is assumed to be a success response or a failure
+// in response to a sent command. Sets b.err and b.state on failure
+func (b *bolt5) receiveSuccess(ctx context.Context) *success {
 	msg := b.receiveMsg(ctx)
 	if b.err != nil {
 		return nil
@@ -215,13 +215,13 @@ func (b *bolt4) receiveSuccess(ctx context.Context) *success {
 		return nil
 	default:
 		// Unexpected message received
-		b.setError(errors.New("Expected success or database error"), true)
+		b.setError(errors.New("expected success or database error"), true)
 		return nil
 	}
 }
 
-func (b *bolt4) Connect(ctx context.Context, minor int, auth map[string]interface{}, userAgent string, routingContext map[string]string) error {
-	if err := b.assertState(bolt4_unauthorized); err != nil {
+func (b *bolt5) Connect(ctx context.Context, minor int, auth map[string]interface{}, userAgent string, routingContext map[string]string) error {
+	if err := b.assertState(bolt5Unauthorized); err != nil {
 		return err
 	}
 
@@ -229,11 +229,8 @@ func (b *bolt4) Connect(ctx context.Context, minor int, auth map[string]interfac
 	hello := map[string]interface{}{
 		"user_agent": userAgent,
 	}
-	// On bolt >= 4.1 add routing to enable/disable routing
-	if minor >= 1 {
-		if routingContext != nil {
-			hello["routing"] = routingContext
-		}
+	if routingContext != nil {
+		hello["routing"] = routingContext
 	}
 	// Merge authentication keys into hello, avoid overwriting existing keys
 	for k, v := range auth {
@@ -263,24 +260,17 @@ func (b *bolt4) Connect(ctx context.Context, minor int, auth map[string]interfac
 
 	b.initializeReadTimeoutHint(succ.configurationHints)
 	// Transition into ready state
-	b.state = bolt4_ready
+	b.state = bolt5Ready
 	b.minor = minor
 	b.streams.reset()
-	b.log.Infof(log.Bolt4, b.logId, "Connected")
+	b.log.Infof(log.Bolt5, b.logId, "Connected")
 	return nil
 }
 
-func (b *bolt4) checkImpersonationAndVersion(impersonatedUser string) error {
-	if impersonatedUser != "" && b.minor < 4 {
-		return &db.FeatureNotSupportedError{Server: b.serverName, Feature: "user impersonation", Reason: "requires at least server v4.4"}
-	}
-	return nil
-}
-
-func (b *bolt4) TxBegin(ctx context.Context, txConfig idb.TxConfig) (idb.
+func (b *bolt5) TxBegin(ctx context.Context, txConfig idb.TxConfig) (idb.
 	TxHandle, error) {
 	// Ok, to begin transaction while streaming auto-commit, just empty the stream and continue.
-	if b.state == bolt4_streaming {
+	if b.state == bolt5Streaming {
 		if b.bufferStream(ctx); b.err != nil {
 			return 0, b.err
 		}
@@ -288,15 +278,11 @@ func (b *bolt4) TxBegin(ctx context.Context, txConfig idb.TxConfig) (idb.
 	// Makes all outstanding streams invalid
 	b.streams.reset()
 
-	if err := b.assertState(bolt4_ready); err != nil {
+	if err := b.assertState(bolt5Ready); err != nil {
 		return 0, err
 	}
 
-	if err := b.checkImpersonationAndVersion(txConfig.ImpersonatedUser); err != nil {
-		return 0, err
-	}
-
-	tx := internalTx4{
+	tx := internalTx5{
 		mode:             txConfig.Mode,
 		bookmarks:        txConfig.Bookmarks,
 		timeout:          txConfig.Timeout,
@@ -314,31 +300,31 @@ func (b *bolt4) TxBegin(ctx context.Context, txConfig idb.TxConfig) (idb.
 		if b.err != nil {
 			return 0, b.err
 		}
-		b.state = bolt4_tx
+		b.state = bolt5Tx
 		b.hasPendingTx = false
 	} else {
 		// Stash this into pending internal tx
 		b.pendingTx = tx
 		b.hasPendingTx = true
-		b.state = bolt4_pendingtx
+		b.state = bolt5PendingTx
 	}
 	b.txId = idb.TxHandle(time.Now().Unix())
 	return b.txId, nil
 }
 
-// Should NOT set b.err or change b.state as this is used to guard from
+// Should NOT set b.err or change b.state as this is used to guard against
 // misuse from clients that stick to their connections when they shouldn't.
-func (b *bolt4) assertTxHandle(h1, h2 idb.TxHandle) error {
+func (b *bolt5) assertTxHandle(h1, h2 idb.TxHandle) error {
 	if h1 != h2 {
-		err := errors.New("Invalid transaction handle")
-		b.log.Error(log.Bolt4, b.logId, err)
+		err := errors.New("invalid transaction handle")
+		b.log.Error(log.Bolt5, b.logId, err)
 		return err
 	}
 	return nil
 }
 
 // Should NOT set b.err or b.state since the connection is still valid
-func (b *bolt4) assertState(allowed ...int) error {
+func (b *bolt5) assertState(allowed ...int) error {
 	// Forward prior error instead, this former error is probably the
 	// root cause of any state error. Like a call to Run with malformed
 	// cypher causes an error and another call to Commit would cause the
@@ -352,30 +338,30 @@ func (b *bolt4) assertState(allowed ...int) error {
 		}
 	}
 	err := errors.New(fmt.Sprintf("Invalid state %d, expected: %+v", b.state, allowed))
-	b.log.Error(log.Bolt4, b.logId, err)
+	b.log.Error(log.Bolt5, b.logId, err)
 	return err
 }
 
-func (b *bolt4) TxCommit(ctx context.Context, txh idb.TxHandle) error {
+func (b *bolt5) TxCommit(ctx context.Context, txh idb.TxHandle) error {
 	if err := b.assertTxHandle(b.txId, txh); err != nil {
 		return err
 	}
 
 	// Nothing to do, a transaction started but no commands were issued on it, server is unaware
-	if b.state == bolt4_pendingtx {
-		b.state = bolt4_ready
+	if b.state == bolt5PendingTx {
+		b.state = bolt5Ready
 		return nil
 	}
 
 	// Consume pending stream if any to turn state from streamingtx to tx
-	// Access to streams outside of tx boundary is not allowed, therefore we should discard
+	// Access to the streams outside tx boundary is not allowed, therefore we should discard
 	// the stream (not buffer).
 	if b.discardAllStreams(ctx); b.err != nil {
 		return b.err
 	}
 
 	// Should be in vanilla tx state now
-	if err := b.assertState(bolt4_tx); err != nil {
+	if err := b.assertState(bolt5Tx); err != nil {
 		return err
 	}
 
@@ -392,30 +378,30 @@ func (b *bolt4) TxCommit(ctx context.Context, txh idb.TxHandle) error {
 	}
 
 	// Transition into ready state
-	b.state = bolt4_ready
+	b.state = bolt5Ready
 	return nil
 }
 
-func (b *bolt4) TxRollback(ctx context.Context, txh idb.TxHandle) error {
+func (b *bolt5) TxRollback(ctx context.Context, txh idb.TxHandle) error {
 	if err := b.assertTxHandle(b.txId, txh); err != nil {
 		return err
 	}
 
 	// Nothing to do, a transaction started but no commands were issued on it
-	if b.state == bolt4_pendingtx {
-		b.state = bolt4_ready
+	if b.state == bolt5PendingTx {
+		b.state = bolt5Ready
 		return nil
 	}
 
 	// Can not send rollback while still streaming, consume to turn state into tx
-	// Access to streams outside of tx boundary is not allowed, therefore we should discard
+	// Access to the streams outside tx boundary is not allowed, therefore we should discard
 	// the stream (not buffer).
 	if b.discardAllStreams(ctx); b.err != nil {
 		return b.err
 	}
 
 	// Should be in vanilla tx state now
-	if err := b.assertState(bolt4_tx); err != nil {
+	if err := b.assertState(bolt5Tx); err != nil {
 		return err
 	}
 
@@ -426,13 +412,13 @@ func (b *bolt4) TxRollback(ctx context.Context, txh idb.TxHandle) error {
 		return b.err
 	}
 
-	b.state = bolt4_ready
+	b.state = bolt5Ready
 	return nil
 }
 
 // Discards all records in current stream if in streaming state and there is a current stream.
-func (b *bolt4) discardStream(ctx context.Context) {
-	if b.state != bolt4_streaming && b.state != bolt4_streamingtx {
+func (b *bolt5) discardStream(ctx context.Context) {
+	if b.state != bolt5Streaming && b.state != bolt5StreamingTx {
 		return
 	}
 
@@ -456,7 +442,7 @@ func (b *bolt4) discardStream(ctx context.Context) {
 			// already sent a discard.
 			discarded = true
 			stream.fetchSize = -1
-			if b.state == bolt4_streamingtx && stream.qid != b.lastQid {
+			if b.state == bolt5StreamingTx && stream.qid != b.lastQid {
 				b.out.appendDiscardNQid(stream.fetchSize, stream.qid)
 			} else {
 				b.out.appendDiscardN(stream.fetchSize)
@@ -469,8 +455,8 @@ func (b *bolt4) discardStream(ctx context.Context) {
 	}
 }
 
-func (b *bolt4) discardAllStreams(ctx context.Context) {
-	if b.state != bolt4_streaming && b.state != bolt4_streamingtx {
+func (b *bolt5) discardAllStreams(ctx context.Context) {
+	if b.state != bolt5Streaming && b.state != bolt5StreamingTx {
 		return
 	}
 
@@ -481,12 +467,12 @@ func (b *bolt4) discardAllStreams(ctx context.Context) {
 }
 
 // Sends a PULL n request to server. State should be streaming and there should be a current stream.
-func (b *bolt4) sendPullN(ctx context.Context) {
-	b.assertState(bolt4_streaming, bolt4_streamingtx)
-	if b.state == bolt4_streaming {
+func (b *bolt5) sendPullN(ctx context.Context) {
+	_ = b.assertState(bolt5Streaming, bolt5StreamingTx)
+	if b.state == bolt5Streaming {
 		b.out.appendPullN(b.streams.curr.fetchSize)
 		b.out.send(ctx, b.conn)
-	} else if b.state == bolt4_streamingtx {
+	} else if b.state == bolt5StreamingTx {
 		fetchSize := b.streams.curr.fetchSize
 		if b.streams.curr.qid == b.lastQid {
 			b.out.appendPullN(fetchSize)
@@ -498,7 +484,7 @@ func (b *bolt4) sendPullN(ctx context.Context) {
 }
 
 // Collects all records in current stream if in streaming state and there is a current stream.
-func (b *bolt4) bufferStream(ctx context.Context) {
+func (b *bolt5) bufferStream(ctx context.Context) {
 	stream := b.streams.curr
 	if stream == nil {
 		return
@@ -521,7 +507,7 @@ func (b *bolt4) bufferStream(ctx context.Context) {
 
 // Prepares the current stream for being switched out by collecting all records in the current
 // stream up until the next batch. Assumes that we are in a streaming state.
-func (b *bolt4) pauseStream(ctx context.Context) {
+func (b *bolt5) pauseStream(ctx context.Context) {
 	stream := b.streams.curr
 	if stream == nil {
 		return
@@ -541,7 +527,7 @@ func (b *bolt4) pauseStream(ctx context.Context) {
 	}
 }
 
-func (b *bolt4) resumeStream(ctx context.Context, s *stream) {
+func (b *bolt5) resumeStream(ctx context.Context, s *stream) {
 	b.streams.resume(s)
 	b.sendPullN(ctx)
 	if b.err != nil {
@@ -549,19 +535,19 @@ func (b *bolt4) resumeStream(ctx context.Context, s *stream) {
 	}
 }
 
-func (b *bolt4) run(ctx context.Context, cypher string, params map[string]interface{}, fetchSize int, tx *internalTx4) (*stream, error) {
+func (b *bolt5) run(ctx context.Context, cypher string, params map[string]interface{}, fetchSize int, tx *internalTx5) (*stream, error) {
 	// If already streaming, consume the whole thing first
-	if b.state == bolt4_streaming {
+	if b.state == bolt5Streaming {
 		if b.bufferStream(ctx); b.err != nil {
 			return nil, b.err
 		}
-	} else if b.state == bolt4_streamingtx {
+	} else if b.state == bolt5StreamingTx {
 		if b.pauseStream(ctx); b.err != nil {
 			return nil, b.err
 		}
 	}
 
-	if err := b.assertState(bolt4_tx, bolt4_ready, bolt4_pendingtx, bolt4_streamingtx); err != nil {
+	if err := b.assertState(bolt5Tx, bolt5Ready, bolt5PendingTx, bolt5StreamingTx); err != nil {
 		return nil, err
 	}
 
@@ -570,7 +556,7 @@ func (b *bolt4) run(ctx context.Context, cypher string, params map[string]interf
 	if tx != nil {
 		meta = tx.toMeta()
 	}
-	if b.state == bolt4_pendingtx {
+	if b.state == bolt5PendingTx {
 		// Append lazy begin transaction message
 		b.out.appendBegin(meta)
 		meta = nil // Don't add this to run message again
@@ -584,7 +570,7 @@ func (b *bolt4) run(ctx context.Context, cypher string, params map[string]interf
 	case fetchSize < 0:
 		fetchSize = -1
 	case fetchSize == 0:
-		fetchSize = bolt4_fetchsize
+		fetchSize = bolt5FetchSize
 	}
 	// Append pull message and send it along with other pending messages
 	b.out.appendPullN(fetchSize)
@@ -592,11 +578,11 @@ func (b *bolt4) run(ctx context.Context, cypher string, params map[string]interf
 
 	// Process server responses
 	// Receive confirmation of transaction begin if it was started above
-	if b.state == bolt4_pendingtx {
+	if b.state == bolt5PendingTx {
 		if b.receiveSuccess(ctx); b.err != nil {
 			return nil, b.err
 		}
-		b.state = bolt4_tx
+		b.state = bolt5Tx
 	}
 
 	// Receive confirmation of run message
@@ -609,10 +595,10 @@ func (b *bolt4) run(ctx context.Context, cypher string, params map[string]interf
 	// Extract the RUN response from success response
 	b.tfirst = succ.tfirst
 	// Change state to streaming
-	if b.state == bolt4_ready {
-		b.state = bolt4_streaming
+	if b.state == bolt5Ready {
+		b.state = bolt5Streaming
 	} else {
-		b.state = bolt4_streamingtx
+		b.state = bolt5StreamingTx
 	}
 
 	// Create a stream representation, set it to current and track it
@@ -623,17 +609,13 @@ func (b *bolt4) run(ctx context.Context, cypher string, params map[string]interf
 	return stream, nil
 }
 
-func (b *bolt4) Run(ctx context.Context, cmd idb.Command,
+func (b *bolt5) Run(ctx context.Context, cmd idb.Command,
 	txConfig idb.TxConfig) (idb.StreamHandle, error) {
-	if err := b.assertState(bolt4_streaming, bolt4_ready); err != nil {
+	if err := b.assertState(bolt5Streaming, bolt5Ready); err != nil {
 		return nil, err
 	}
 
-	if err := b.checkImpersonationAndVersion(txConfig.ImpersonatedUser); err != nil {
-		return 0, err
-	}
-
-	tx := internalTx4{
+	tx := internalTx5{
 		mode:             txConfig.Mode,
 		bookmarks:        txConfig.Bookmarks,
 		timeout:          txConfig.Timeout,
@@ -648,7 +630,7 @@ func (b *bolt4) Run(ctx context.Context, cmd idb.Command,
 	return stream, nil
 }
 
-func (b *bolt4) RunTx(ctx context.Context, txh idb.TxHandle,
+func (b *bolt5) RunTx(ctx context.Context, txh idb.TxHandle,
 	cmd idb.Command) (idb.StreamHandle, error) {
 	if err := b.assertTxHandle(b.txId, txh); err != nil {
 		return nil, err
@@ -666,7 +648,7 @@ func (b *bolt4) RunTx(ctx context.Context, txh idb.TxHandle,
 	return stream, nil
 }
 
-func (b *bolt4) Keys(streamHandle idb.StreamHandle) ([]string, error) {
+func (b *bolt5) Keys(streamHandle idb.StreamHandle) ([]string, error) {
 	// Don't care about if the stream is the current or even if it belongs to this connection.
 	// Do NOT set b.err for this error
 	stream, err := b.streams.getUnsafe(streamHandle)
@@ -676,8 +658,8 @@ func (b *bolt4) Keys(streamHandle idb.StreamHandle) ([]string, error) {
 	return stream.keys, nil
 }
 
-// Reads one record from the stream.
-func (b *bolt4) Next(ctx context.Context, streamHandle idb.StreamHandle) (
+// Next reads one record from the stream.
+func (b *bolt5) Next(ctx context.Context, streamHandle idb.StreamHandle) (
 	*db.Record, *db.Summary, error) {
 	// Do NOT set b.err for this error
 	stream, err := b.streams.getUnsafe(streamHandle)
@@ -693,7 +675,7 @@ func (b *bolt4) Next(ctx context.Context, streamHandle idb.StreamHandle) (
 	}
 
 	// Make sure that the stream belongs to this bolt instance otherwise we might mess
-	// up the internal state machine really bad. If clients stick to streams out of
+	// up the internal state machine. If clients stick to the streams out of
 	// transaction scope or after the connection been sent back to the pool we might end
 	// up here.
 	if err = b.streams.isSafe(stream); err != nil {
@@ -721,7 +703,7 @@ func (b *bolt4) Next(ctx context.Context, streamHandle idb.StreamHandle) (
 	return rec, sum, b.err
 }
 
-func (b *bolt4) Consume(ctx context.Context, streamHandle idb.StreamHandle) (
+func (b *bolt5) Consume(ctx context.Context, streamHandle idb.StreamHandle) (
 	*db.Summary, error) {
 	// Do NOT set b.err for this error
 	stream, err := b.streams.getUnsafe(streamHandle)
@@ -729,7 +711,7 @@ func (b *bolt4) Consume(ctx context.Context, streamHandle idb.StreamHandle) (
 		return nil, err
 	}
 
-	// If the stream already is complete we don't care about who it belongs to
+	// If the stream already is complete we don't care about whom it belongs to
 	if stream.sum != nil || stream.err != nil {
 		return stream.sum, stream.err
 	}
@@ -739,9 +721,9 @@ func (b *bolt4) Consume(ctx context.Context, streamHandle idb.StreamHandle) (
 		return nil, err
 	}
 
-	// We should be streaming otherwise it is a an internal error, shouldn't be
+	// We should be streaming otherwise it is an internal error, shouldn't be
 	// a safe stream while not streaming.
-	if err = b.assertState(bolt4_streaming, bolt4_streamingtx); err != nil {
+	if err = b.assertState(bolt5Streaming, bolt5StreamingTx); err != nil {
 		return nil, err
 	}
 
@@ -760,7 +742,7 @@ func (b *bolt4) Consume(ctx context.Context, streamHandle idb.StreamHandle) (
 	return stream.sum, stream.err
 }
 
-func (b *bolt4) Buffer(ctx context.Context,
+func (b *bolt5) Buffer(ctx context.Context,
 	streamHandle idb.StreamHandle) error {
 	// Do NOT set b.err for this error
 	stream, err := b.streams.getUnsafe(streamHandle)
@@ -768,7 +750,7 @@ func (b *bolt4) Buffer(ctx context.Context,
 		return err
 	}
 
-	// If the stream already is complete we don't care about who it belongs to
+	// If the stream already is complete we don't care about whom it belongs to
 	if stream.sum != nil || stream.err != nil {
 		return stream.Err()
 	}
@@ -779,9 +761,9 @@ func (b *bolt4) Buffer(ctx context.Context,
 		return err
 	}
 
-	// We should be streaming otherwise it is a an internal error, shouldn't be
+	// We should be streaming otherwise it is an internal error, shouldn't be
 	// a safe stream while not streaming.
-	if err = b.assertState(bolt4_streaming, bolt4_streamingtx); err != nil {
+	if err = b.assertState(bolt5Streaming, bolt5StreamingTx); err != nil {
 		return err
 	}
 
@@ -801,7 +783,7 @@ func (b *bolt4) Buffer(ctx context.Context,
 // Reads one record from the network and returns either a record, a flag that indicates that
 // a PULL N batch completed, a summary indicating end of stream or an error.
 // Assumes that there is a current stream and that streaming is active.
-func (b *bolt4) receiveNext(ctx context.Context) (*db.Record, bool, *db.Summary) {
+func (b *bolt5) receiveNext(ctx context.Context) (*db.Record, bool, *db.Summary) {
 	res := b.receiveMsg(ctx)
 	if b.err != nil {
 		return nil, false, nil
@@ -822,7 +804,7 @@ func (b *bolt4) receiveNext(ctx context.Context) (*db.Record, bool, *db.Summary)
 		sum := x.summary()
 		// Add some extras to the summary
 		sum.Agent = b.serverVersion
-		sum.Major = 4
+		sum.Major = 5
 		sum.Minor = b.minor
 		sum.ServerName = b.serverName
 		sum.TFirst = b.tfirst
@@ -838,28 +820,28 @@ func (b *bolt4) receiveNext(ctx context.Context) (*db.Record, bool, *db.Summary)
 		return nil, false, nil
 	default:
 		// Unknown territory
-		b.setError(errors.New("Unknown response"), true)
+		b.setError(errors.New("unknown response"), true)
 		return nil, false, nil
 	}
 }
 
-func (b *bolt4) Bookmark() string {
+func (b *bolt5) Bookmark() string {
 	return b.bookmark
 }
 
-func (b *bolt4) IsAlive() bool {
-	return b.state != bolt4_dead
+func (b *bolt5) IsAlive() bool {
+	return b.state != bolt5Dead
 }
 
-func (b *bolt4) HasFailed() bool {
-	return b.state == bolt4_failed
+func (b *bolt5) HasFailed() bool {
+	return b.state == bolt5Failed
 }
 
-func (b *bolt4) Birthdate() time.Time {
+func (b *bolt5) Birthdate() time.Time {
 	return b.birthDate
 }
 
-func (b *bolt4) Reset(ctx context.Context) {
+func (b *bolt5) Reset(ctx context.Context) {
 	defer func() {
 		// Reset internal state
 		b.txId = 0
@@ -870,12 +852,12 @@ func (b *bolt4) Reset(ctx context.Context) {
 		b.streams.reset()
 	}()
 
-	if b.state == bolt4_ready || b.state == bolt4_dead {
+	if b.state == bolt5Ready || b.state == bolt5Dead {
 		// No need for reset
 		return
 	}
 
-	// Reset any pending error, should be matching bolt4_failed so
+	// Reset any pending error, should be matching bolt5_failed, so
 	// it should be recoverable.
 	b.err = nil
 
@@ -897,118 +879,57 @@ func (b *bolt4) Reset(ctx context.Context) {
 		case *success:
 			if x.isResetResponse() {
 				// Reset confirmed
-				b.state = bolt4_ready
+				b.state = bolt5Ready
 				return
 			}
 		default:
-			b.state = bolt4_dead
+			b.state = bolt5Dead
 			return
 		}
 	}
 }
 
-func (b *bolt4) GetRoutingTable(ctx context.Context,
+func (b *bolt5) GetRoutingTable(ctx context.Context,
 	routingContext map[string]string, bookmarks []string, database, impersonatedUser string) (*idb.RoutingTable, error) {
-	if err := b.assertState(bolt4_ready); err != nil {
+	if err := b.assertState(bolt5Ready); err != nil {
 		return nil, err
 	}
 
-	b.log.Infof(log.Bolt4, b.logId, "Retrieving routing table")
-	if b.minor > 3 {
-		extras := map[string]interface{}{}
-		if database != idb.DefaultDatabase {
-			extras["db"] = database
-		}
-		if impersonatedUser != "" {
-			extras["imp_user"] = impersonatedUser
-		}
-		b.out.appendRoute(routingContext, bookmarks, extras)
-		b.out.send(ctx, b.conn)
-		succ := b.receiveSuccess(ctx)
-		if b.err != nil {
-			return nil, b.err
-		}
-		return succ.routingTable, nil
-	}
-
-	if err := b.checkImpersonationAndVersion(impersonatedUser); err != nil {
-		return nil, err
-	}
-
-	if b.minor > 2 {
-		b.out.appendRouteToV43(routingContext, bookmarks, database)
-		b.out.send(ctx, b.conn)
-		succ := b.receiveSuccess(ctx)
-		if b.err != nil {
-			return nil, b.err
-		}
-		// On this version we will not receive the database name
-		succ.routingTable.DatabaseName = database
-		return succ.routingTable, nil
-	}
-	return b.callGetRoutingTable(ctx, routingContext, bookmarks, database)
-}
-
-func (b *bolt4) callGetRoutingTable(ctx context.Context,
-	routingContext map[string]string, bookmarks []string, database string) (*idb.RoutingTable, error) {
-	// The query should run in system database, preserve current setting and restore it when
-	// done.
-	originalDatabaseName := b.databaseName
-	b.databaseName = "system"
-	defer func() { b.databaseName = originalDatabaseName }()
-
-	// Query for the users default database or a specific database
-	runCommand := idb.Command{
-		Cypher:    "CALL dbms.routing.getRoutingTable($context)",
-		Params:    map[string]interface{}{"context": routingContext},
-		FetchSize: -1,
-	}
+	b.log.Infof(log.Bolt5, b.logId, "Retrieving routing table")
+	extras := map[string]interface{}{}
 	if database != idb.DefaultDatabase {
-		runCommand.Cypher = "CALL dbms.routing.getRoutingTable($context, $database)"
-		runCommand.Params["database"] = database
+		extras["db"] = database
 	}
-	txConfig := idb.TxConfig{Mode: idb.ReadMode, Bookmarks: bookmarks}
-	streamHandle, err := b.Run(ctx, runCommand, txConfig)
-	if err != nil {
-		return nil, err
+	if impersonatedUser != "" {
+		extras["imp_user"] = impersonatedUser
 	}
-	rec, _, err := b.Next(ctx, streamHandle)
-	if err != nil {
-		return nil, err
+	b.out.appendRoute(routingContext, bookmarks, extras)
+	b.out.send(ctx, b.conn)
+	succ := b.receiveSuccess(ctx)
+	if b.err != nil {
+		return nil, b.err
 	}
-	if rec == nil {
-		return nil, errors.New("No routing table record")
-	}
-	// Just empty the stream, ignore the summary should leave the connection in ready state
-	b.Next(ctx, streamHandle)
-
-	table := parseRoutingTableRecord(rec)
-	if table == nil {
-		return nil, errors.New("Unable to parse routing table")
-	}
-	// On this version we will not receive the database name
-	table.DatabaseName = database
-	return table, nil
+	return succ.routingTable, nil
 }
 
 // Close closes the underlying connection.
 // Beware: could be called on another thread when driver is closed.
-func (b *bolt4) Close(ctx context.Context) {
-	b.log.Infof(log.Bolt4, b.logId, "Close")
-	if b.state != bolt4_dead {
+func (b *bolt5) Close(ctx context.Context) {
+	b.log.Infof(log.Bolt5, b.logId, "Close")
+	if b.state != bolt5Dead {
 		b.out.appendGoodbye()
 		b.out.send(ctx, b.conn)
 	}
-	b.conn.Close()
-	b.state = bolt4_dead
+	_ = b.conn.Close()
+	b.state = bolt5Dead
 }
 
-func (b *bolt4) SelectDatabase(database string) {
+func (b *bolt5) SelectDatabase(database string) {
 	b.databaseName = database
 }
 
-func (b *bolt4) ForceReset(ctx context.Context) error {
-	if b.state == bolt4_ready {
+func (b *bolt5) ForceReset(ctx context.Context) error {
+	if b.state == bolt5Ready {
 		b.out.appendReset()
 		b.out.send(ctx, b.conn)
 		if b.err != nil {
@@ -1021,32 +942,24 @@ func (b *bolt4) ForceReset(ctx context.Context) error {
 	return b.err
 }
 
-func (b *bolt4) SetBoltLogger(boltLogger log.BoltLogger) {
+func (b *bolt5) SetBoltLogger(boltLogger log.BoltLogger) {
 	b.in.hyd.boltLogger = boltLogger
 	b.out.boltLogger = boltLogger
 }
 
-const readTimeoutHintName = "connection.recv_timeout_seconds"
-
-func (b *bolt4) initializeReadTimeoutHint(hints map[string]interface{}) {
+func (b *bolt5) initializeReadTimeoutHint(hints map[string]interface{}) {
 	readTimeoutHint, ok := hints[readTimeoutHintName]
 	if !ok {
 		return
 	}
 	readTimeout, ok := readTimeoutHint.(int64)
 	if !ok {
-		b.log.Warnf(log.Bolt4, b.logId, `invalid %q value: %v, ignoring hint. Only strictly positive integer values are accepted`, readTimeoutHintName, readTimeoutHint)
+		b.log.Infof(log.Bolt5, b.logId, `invalid %q value: %v, ignoring hint. Only strictly positive integer values are accepted`, readTimeoutHintName, readTimeoutHint)
 		return
 	}
 	if readTimeout <= 0 {
-		b.log.Warnf(log.Bolt4, b.logId, `invalid %q integer value: %d. Only strictly positive values are accepted"`, readTimeoutHintName, readTimeout)
+		b.log.Infof(log.Bolt5, b.logId, `invalid %q integer value: %d. Only strictly positive values are accepted"`, readTimeoutHintName, readTimeout)
 		return
 	}
-	b.log.Infof(log.Bolt4, b.logId, `received "connection.recv_timeout_seconds" hint value of %d second(s)`, readTimeout)
 	b.in.connReadTimeout = time.Duration(readTimeout) * time.Second
-}
-
-func isFatalError(err *db.Neo4jError) bool {
-	// Treat expired auth as fatal so that pool is cleaned up of old connections
-	return err != nil && err.Code == "Status.Security.AuthorizationExpired"
 }
