@@ -39,9 +39,9 @@ type protocolVersion struct {
 
 // Supported versions in priority order
 var versions = [4]protocolVersion{
+	{major: 5, minor: 0},
 	{major: 4, minor: 4, back: 2},
 	{major: 4, minor: 1},
-	{major: 4, minor: 0},
 	{major: 3, minor: 0},
 }
 
