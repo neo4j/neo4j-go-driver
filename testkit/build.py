@@ -22,3 +22,6 @@ if __name__ == "__main__":
     arm32Env["GOARCH"] = "arm"
     arm32Env["GOARM"] = "7"
     run(["go", "build", "./..."], env=arm32Env)
+
+    print("Vet sources")
+    run(["go", "vet", "./..."])
