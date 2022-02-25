@@ -82,6 +82,12 @@ func (s *State) OnFailure(conn idb.Connection, err error, isCommitting bool) {
 	// Reset after determined to evaluate this error
 	s.LastErrWasRetryable = false
 
+	if neo4jErr, ok := err.(*db.Neo4jError); ok && neo4jErr.IsAuthenticationFailed() {
+		s.cause = "Authentication failed"
+		s.stop = true
+		return
+	}
+
 	// Failed to connect
 	if conn == nil {
 		s.LastErrWasRetryable = true
