@@ -259,7 +259,7 @@ var _ = Describe("Examples", func() {
 			fieldCartesian, _ := field.(dbtype.Point2D)
 
 			// Serializing
-			fieldCartesian.String() // Point{srId=7203, x=2.500000, y=-2.000000}
+			_ = fieldCartesian.String() // Point{srId=7203, x=2.500000, y=-2.000000}
 
 			// Acessing members
 			print(fieldCartesian.X)            // 2.500000
@@ -271,7 +271,7 @@ var _ = Describe("Examples", func() {
 			fieldWgs84 := field.(dbtype.Point2D)
 
 			// Serializing
-			fieldWgs84.String() // Point{srId=4326, x=-1.500000, y=1.00000}
+			_ = fieldWgs84.String() // Point{srId=4326, x=-1.500000, y=1.00000}
 
 			// Acessing members
 			print(fieldWgs84.X)            // -1.500000
@@ -333,7 +333,7 @@ var _ = Describe("Examples", func() {
 			fieldCartesian := field.(dbtype.Point3D)
 
 			// Serializing
-			fieldCartesian.String() // Point{srId=9157, x=2.500000, y=-2.000000, z=2.000000}
+			_ = fieldCartesian.String() // Point{srId=9157, x=2.500000, y=-2.000000, z=2.000000}
 
 			// Acessing members
 			print(fieldCartesian.X)            // 2.500000
@@ -346,7 +346,7 @@ var _ = Describe("Examples", func() {
 			fieldWgs84 := field.(dbtype.Point3D)
 
 			// Serializing
-			fieldWgs84.String() // Point{srId=4979, x=-1.500000, y=1.00000, z=3.000000}
+			_ = fieldWgs84.String() // Point{srId=4979, x=-1.500000, y=1.00000, z=3.000000}
 
 			// Acessing members
 			print(fieldWgs84.X)            // -1.500000
@@ -811,7 +811,7 @@ func addEmployAndMakeFriends(driver neo4j.Driver) error {
 
 	session := driver.NewSession(neo4j.SessionConfig{
 		AccessMode: neo4j.AccessModeRead,
-		Bookmarks: neo4j.CombineBookmarks(bookmarks1, bookmarks2, bookmarks3),
+		Bookmarks:  neo4j.CombineBookmarks(bookmarks1, bookmarks2, bookmarks3),
 	})
 	defer session.Close()
 
