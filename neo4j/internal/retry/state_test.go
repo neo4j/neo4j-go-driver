@@ -53,16 +53,17 @@ func TestState(tt *testing.T) {
 		halfTime       = baseTime.Add(maxRetryTime / 2)
 		maxDead        = 2
 		dbName         = "thedb"
+		authErr        = &db.Neo4jError{Code: "Neo.ClientError.Security.Unauthorized"}
 		clusterErr     = &db.Neo4jError{Code: "Neo.ClientError.Cluster.NotALeader"}
 		dbTransientErr = &db.Neo4jError{Code: "Neo.TransientError.Some.Some"}
 	)
 
 	cases := map[string][]TStateInvocation{
-		"Retry connect": []TStateInvocation{
+		"Retry connect": {
 			{conn: nil, err: &pool.PoolTimeout{}, expectContinued: true,
 				expectLastErrWasRetryable: true, expectLastErrType: &pool.PoolTimeout{}},
 		},
-		"Retry connect timeout": []TStateInvocation{
+		"Retry connect timeout": {
 			{conn: nil, err: errors.New("connect error 1"), expectContinued: true, now: baseTime,
 				expectLastErrWasRetryable: true},
 			{conn: nil, err: errors.New("connect error 2"), expectContinued: true, now: halfTime,
@@ -70,17 +71,17 @@ func TestState(tt *testing.T) {
 			{conn: nil, err: errors.New("connect error 3"), expectContinued: false, now: overTime,
 				expectLastErrWasRetryable: true},
 		},
-		"Retry dead connection": []TStateInvocation{
+		"Retry dead connection": {
 			{conn: &testutil.ConnFake{Alive: false}, err: errors.New("some error"), expectContinued: true,
 				expectLastErrWasRetryable: true},
 		},
-		"Retry dead connection timeout": []TStateInvocation{
+		"Retry dead connection timeout": {
 			{conn: &testutil.ConnFake{Alive: false}, err: errors.New("some error 1"), expectContinued: true, now: baseTime,
 				expectLastErrWasRetryable: true},
 			{conn: &testutil.ConnFake{Alive: false}, err: errors.New("some error 2"), expectContinued: false, now: overTime,
 				expectLastErrWasRetryable: true},
 		},
-		"Retry dead connection max": []TStateInvocation{
+		"Retry dead connection max": {
 			{conn: &testutil.ConnFake{Alive: false}, err: errors.New("some error 1"), expectContinued: true,
 				expectLastErrWasRetryable: true},
 			{conn: &testutil.ConnFake{Alive: false}, err: errors.New("some error 2"), expectContinued: true,
@@ -88,39 +89,43 @@ func TestState(tt *testing.T) {
 			{conn: &testutil.ConnFake{Alive: false}, err: errors.New("some error 3"), expectContinued: false,
 				expectLastErrWasRetryable: true},
 		},
-		"Cluster error": []TStateInvocation{
+		"Cluster error": {
 			{conn: &testutil.ConnFake{Alive: true}, err: clusterErr, expectContinued: true,
 				expectRouterInvalidated: true, expectRouterInvalidatedDb: dbName, expectLastErrWasRetryable: true},
 		},
-		"Cluster error timeout": []TStateInvocation{
+		"Cluster error timeout": {
 			{conn: &testutil.ConnFake{Alive: true}, err: clusterErr, expectContinued: true,
 				expectRouterInvalidated: true, expectRouterInvalidatedDb: dbName, expectLastErrWasRetryable: true},
 			{conn: &testutil.ConnFake{Alive: true}, err: clusterErr, expectContinued: false, now: overTime,
 				expectLastErrWasRetryable: true},
 		},
-		"Database transient error": []TStateInvocation{
+		"Database transient error": {
 			{conn: &testutil.ConnFake{Alive: true}, err: dbTransientErr, expectContinued: true,
 				expectLastErrWasRetryable: true},
 		},
-		"Database transient error timeout": []TStateInvocation{
+		"Database transient error timeout": {
 			{conn: &testutil.ConnFake{Alive: true}, err: dbTransientErr, expectContinued: true,
 				expectLastErrWasRetryable: true},
 			{conn: &testutil.ConnFake{Alive: true}, err: dbTransientErr, expectContinued: false, now: overTime,
 				expectLastErrWasRetryable: true},
 		},
-		"User defined error": []TStateInvocation{
+		"User defined error": {
 			{conn: &testutil.ConnFake{Alive: true}, err: errors.New("client error"), expectContinued: false,
 				expectLastErrWasRetryable: false},
 		},
-		"Fail during commit": []TStateInvocation{
+		"Fail during commit": {
 			{conn: &testutil.ConnFake{Alive: false}, err: io.EOF, isCommitting: true, expectContinued: false,
 				expectLastErrWasRetryable: false, expectLastErrType: &CommitFailedDeadError{}},
 		},
-		"Fail during commit after retry": []TStateInvocation{
+		"Fail during commit after retry": {
 			{conn: &testutil.ConnFake{Alive: true}, err: dbTransientErr, expectContinued: true,
 				expectLastErrWasRetryable: true},
 			{conn: &testutil.ConnFake{Alive: false}, err: io.EOF, isCommitting: true, expectContinued: false,
 				expectLastErrWasRetryable: false, expectLastErrType: &CommitFailedDeadError{}},
+		},
+		"Does not retry on auth errors": {
+			{conn: nil, err: authErr, expectContinued: false,
+				expectLastErrWasRetryable: false},
 		},
 	}
 
