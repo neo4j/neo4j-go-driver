@@ -59,6 +59,10 @@ type DriverWithContext interface {
 	VerifyConnectivity(ctx context.Context) error
 	// Close the driver and all underlying connections
 	Close(ctx context.Context) error
+	// IsEncrypted determines whether the driver communication with the server
+	// is encrypted. This is a static check. The function can also be called on
+	// a closed Driver.
+	IsEncrypted() bool
 }
 
 // NewDriverWithContext is the entry point to the neo4j driver to create an instance of a Driver. It is the first function to
@@ -283,4 +287,8 @@ func (d *driverWithContext) Close(ctx context.Context) error {
 	d.pool = nil
 	d.log.Infof(log.Driver, d.logId, "Closed")
 	return nil
+}
+
+func (d *driverWithContext) IsEncrypted() bool {
+	return !d.connector.SkipEncryption
 }
