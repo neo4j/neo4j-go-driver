@@ -656,10 +656,18 @@ func (b *backend) handleRequest(req map[string]interface{}) {
 			"available": isMultiTenant,
 		})
 
+	case "CheckDriverIsEncrypted":
+		driver := b.drivers[data["driverId"].(string)]
+		b.writeResponse("DriverIsEncrypted", map[string]interface{}{
+			"encrypted": driver.IsEncrypted(),
+		})
+
 	case "GetFeatures":
 		b.writeResponse("FeatureList", map[string]interface{}{
 			"features": []string{
 				"ConfHint:connection.recv_timeout_seconds",
+				"Detail:ClosedDriverIsEncrypted",
+				"Feature:API:Driver.IsEncrypted",
 				"Feature:API:Liveness.Check",
 				"Feature:API:Result.Peek",
 				"Feature:Auth:Custom",
