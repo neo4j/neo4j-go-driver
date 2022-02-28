@@ -409,6 +409,9 @@ func (b *backend) handleRequest(req map[string]interface{}) {
 			if data["maxTxRetryTimeMs"] != nil {
 				c.MaxTransactionRetryTime = time.Millisecond * time.Duration(data["maxTxRetryTimeMs"].(float64))
 			}
+			if data["connectionTimeoutMs"] != nil {
+				c.SocketConnectTimeout = time.Millisecond * time.Duration(data["connectionTimeoutMs"].(float64))
+			}
 		})
 		if err != nil {
 			b.writeError(err)
