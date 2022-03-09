@@ -685,7 +685,6 @@ func (b *backend) handleRequest(req map[string]interface{}) {
 				"Optimization:ConnectionReuse",
 				"Optimization:ImplicitDefaultArguments",
 				"Optimization:PullPipelining",
-				"Temporary:ConnectionAcquisitionTimeout",
 				"Temporary:CypherPathAndRelationship",
 				"Temporary:DriverFetchSize",
 				"Temporary:DriverMaxConnectionPoolSize",
