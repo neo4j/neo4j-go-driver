@@ -20,19 +20,18 @@
 package test_integration
 
 import (
+	"fmt"
 	"math"
 	"math/rand"
+	"sort"
+	"testing"
 	"time"
 
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/test-integration/dbserver"
-
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/ginkgo/extensions/table"
-	. "github.com/onsi/gomega"
 )
 
-var _ = Describe("Temporal Types", func() {
+func TestTemporalTypes(outer *testing.T) {
 	const (
 		numberOfRandomValues = 200
 	)
@@ -45,18 +44,16 @@ var _ = Describe("Temporal Types", func() {
 
 	rand.Seed(time.Now().UnixNano())
 
-	BeforeEach(func() {
-		driver := server.Driver()
+	driver = server.Driver()
 
-		if server.Version.LessThan(V340) {
-			Skip("temporal types are only available after neo4j 3.4.0 release")
-		}
+	if server.Version.LessThan(V340) {
+		outer.Skip("temporal types are only available after neo4j 3.4.0 release")
+	}
 
-		session = driver.NewSession(neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
-		Expect(session).NotTo(BeNil())
-	})
+	session = driver.NewSession(neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
+	assertNotNil(outer, session)
 
-	AfterEach(func() {
+	defer func() {
 		if session != nil {
 			session.Close()
 		}
@@ -64,7 +61,7 @@ var _ = Describe("Temporal Types", func() {
 		if driver != nil {
 			driver.Close()
 		}
-	})
+	}()
 
 	randomDuration := func() neo4j.Duration {
 		sign := int64(1)
@@ -155,14 +152,14 @@ var _ = Describe("Temporal Types", func() {
 			time.FixedZone("Offset", sign*rand.Intn(64800)))
 	}
 
-	randomZonedDateTime := func() time.Time {
+	randomZonedDateTime := func(t *testing.T) time.Time {
 		var zones = []string{
 			"Africa/Harare", "America/Aruba", "Africa/Nairobi", "America/Dawson", "Asia/Beirut", "Asia/Tashkent",
 			"Canada/Eastern", "Europe/Malta", "Europe/Volgograd", "Indian/Kerguelen", "Etc/GMT+3",
 		}
 
 		location, err := time.LoadLocation(zones[rand.Intn(len(zones))])
-		Expect(err).To(BeNil())
+		assertNil(t, err)
 
 		return time.Date(
 			rand.Intn(300)+1900,
@@ -175,50 +172,50 @@ var _ = Describe("Temporal Types", func() {
 			location)
 	}
 
-	testSendAndReceive := func(query string, data interface{}, expected []interface{}) {
+	testSendAndReceive := func(t *testing.T, query string, data interface{}, expected []interface{}) {
 		result, err = session.Run(query, map[string]interface{}{"x": data})
-		Expect(err).To(BeNil())
+		assertNil(t, err)
 
 		if result.Next() {
 			var received = result.Record().Values
 
-			Expect(received).To(Equal(expected))
+			assertEquals(t, received, expected)
 		}
-		Expect(result.Err()).To(BeNil())
-		Expect(result.Next()).To(BeFalse())
+		assertNil(t, result.Err())
+		assertFalse(t, result.Next())
 	}
 
-	testSendAndReceiveValue := func(value interface{}) {
+	testSendAndReceiveValue := func(t *testing.T, value interface{}) {
 		result, err = session.Run("CREATE (n:Node {value: $value}) RETURN n.value", map[string]interface{}{"value": value})
-		Expect(err).To(BeNil())
+		assertNil(t, err)
 
 		if result.Next() {
 			var received = result.Record().Values[0]
 
-			Expect(received).To(Equal(value))
+			assertEquals(t, received, value)
 		}
-		Expect(result.Err()).To(BeNil())
-		Expect(result.Next()).To(BeFalse())
+		assertNil(t, result.Err())
+		assertFalse(t, result.Next())
 	}
 
-	testSendAndReceiveValueComp := func(value interface{}, comp func(x, y interface{}) bool) {
+	testSendAndReceiveValueComp := func(t *testing.T, value interface{}, comp func(x, y interface{}) bool) {
 		result, err = session.Run("CREATE (n:Node {value: $value}) RETURN n.value", map[string]interface{}{"value": value})
-		Expect(err).To(BeNil())
+		assertNil(t, err)
 
 		if result.Next() {
 			var received = result.Record().Values[0]
 
-			Expect(comp(value, received)).To(Equal(true))
+			assertEquals(t, comp(value, received), true)
 		}
-		Expect(result.Err()).To(BeNil())
-		Expect(result.Next()).To(BeFalse())
+		assertNil(t, result.Err())
+		assertFalse(t, result.Next())
 	}
 
-	Context("Send and Receive", func() {
-		It("duration", func() {
+	outer.Run("Send and Receive", func(inner *testing.T) {
+		inner.Run("duration", func(t *testing.T) {
 			data := neo4j.DurationOf(14, 35, 75, 789012587)
 
-			testSendAndReceive("WITH $x AS x RETURN x, x.months, x.days, x.seconds, x.millisecondsOfSecond, x.microsecondsOfSecond, x.nanosecondsOfSecond",
+			testSendAndReceive(t, "WITH $x AS x RETURN x, x.months, x.days, x.seconds, x.millisecondsOfSecond, x.microsecondsOfSecond, x.nanosecondsOfSecond",
 				data,
 				[]interface{}{
 					data,
@@ -231,10 +228,10 @@ var _ = Describe("Temporal Types", func() {
 				})
 		})
 
-		It("date", func() {
+		inner.Run("date", func(t *testing.T) {
 			data := neo4j.DateOf(time.Date(1976, 6, 13, 0, 0, 0, 0, time.Local))
 
-			testSendAndReceive("WITH $x AS x RETURN x, x.year, x.month, x.day",
+			testSendAndReceive(t, "WITH $x AS x RETURN x, x.year, x.month, x.day",
 				data,
 				[]interface{}{
 					data,
@@ -244,10 +241,10 @@ var _ = Describe("Temporal Types", func() {
 				})
 		})
 
-		It("local time", func() {
+		inner.Run("local time", func(t *testing.T) {
 			data := neo4j.LocalTimeOf(time.Date(0, 0, 0, 12, 34, 56, 789012587, time.Local))
 
-			testSendAndReceive("WITH $x AS x RETURN x, x.hour, x.minute, x.second, x.millisecond, x.microsecond, x.nanosecond",
+			testSendAndReceive(t, "WITH $x AS x RETURN x, x.hour, x.minute, x.second, x.millisecond, x.microsecond, x.nanosecond",
 				data,
 				[]interface{}{
 					data,
@@ -260,10 +257,10 @@ var _ = Describe("Temporal Types", func() {
 				})
 		})
 
-		It("offset time", func() {
+		inner.Run("offset time", func(t *testing.T) {
 			data := neo4j.OffsetTimeOf(time.Date(0, 0, 0, 12, 34, 56, 789012587, time.FixedZone("Offset", 90*60)))
 
-			testSendAndReceive("WITH $x AS x RETURN x, x.hour, x.minute, x.second, x.millisecond, x.microsecond, x.nanosecond, x.offset",
+			testSendAndReceive(t, "WITH $x AS x RETURN x, x.hour, x.minute, x.second, x.millisecond, x.microsecond, x.nanosecond, x.offset",
 				data,
 				[]interface{}{
 					data,
@@ -277,10 +274,10 @@ var _ = Describe("Temporal Types", func() {
 				})
 		})
 
-		It("local date time", func() {
+		inner.Run("local date time", func(t *testing.T) {
 			data := neo4j.LocalDateTimeOf(time.Date(1976, 6, 13, 12, 34, 56, 789012587, time.Local))
 
-			testSendAndReceive("WITH $x AS x RETURN x, x.year, x.month, x.day, x.hour, x.minute, x.second, x.millisecond, x.microsecond, x.nanosecond",
+			testSendAndReceive(t, "WITH $x AS x RETURN x, x.year, x.month, x.day, x.hour, x.minute, x.second, x.millisecond, x.microsecond, x.nanosecond",
 				data,
 				[]interface{}{
 					data,
@@ -296,10 +293,10 @@ var _ = Describe("Temporal Types", func() {
 				})
 		})
 
-		It("offset date time", func() {
+		inner.Run("offset date time", func(t *testing.T) {
 			data := time.Date(1976, 6, 13, 12, 34, 56, 789012587, time.FixedZone("Offset", -90*60))
 
-			testSendAndReceive("WITH $x AS x RETURN x, x.year, x.month, x.day, x.hour, x.minute, x.second, x.millisecond, x.microsecond, x.nanosecond, x.offset",
+			testSendAndReceive(t, "WITH $x AS x RETURN x, x.year, x.month, x.day, x.hour, x.minute, x.second, x.millisecond, x.microsecond, x.nanosecond, x.offset",
 				data,
 				[]interface{}{
 					data,
@@ -316,12 +313,12 @@ var _ = Describe("Temporal Types", func() {
 				})
 		})
 
-		It("zoned date time", func() {
+		inner.Run("zoned date time", func(t *testing.T) {
 			location, err := time.LoadLocation("US/Pacific")
-			Expect(err).To(BeNil())
+			assertNil(t, err)
 			data := time.Date(1959, 5, 31, 23, 49, 59, 999999999, location)
 
-			testSendAndReceive("WITH $x AS x RETURN x, x.year, x.month, x.day, x.hour, x.minute, x.second, x.millisecond, x.microsecond, x.nanosecond, x.timezone",
+			testSendAndReceive(t, "WITH $x AS x RETURN x, x.year, x.month, x.day, x.hour, x.minute, x.second, x.millisecond, x.microsecond, x.nanosecond, x.timezone",
 				data,
 				[]interface{}{
 					data,
@@ -339,55 +336,55 @@ var _ = Describe("Temporal Types", func() {
 		})
 	})
 
-	Context("Send and receive random arrays", func() {
-		It("duration", func() {
+	outer.Run("Send and receive random arrays", func(inner *testing.T) {
+		inner.Run("duration", func(t *testing.T) {
 			listSize := rand.Intn(1000)
 			list := make([]interface{}, listSize)
 			for i := 0; i < listSize; i++ {
 				list[i] = randomDuration()
 			}
 
-			testSendAndReceiveValue(list)
+			testSendAndReceiveValue(t, list)
 		})
 
-		It("date", func() {
+		inner.Run("date", func(t *testing.T) {
 			listSize := rand.Intn(1000)
 			list := make([]interface{}, listSize)
 			for i := 0; i < listSize; i++ {
 				list[i] = randomLocalDate()
 			}
 
-			testSendAndReceiveValue(list)
+			testSendAndReceiveValue(t, list)
 		})
 
-		It("local time", func() {
+		inner.Run("local time", func(t *testing.T) {
 			listSize := rand.Intn(1000)
 			list := make([]interface{}, listSize)
 			for i := 0; i < listSize; i++ {
 				list[i] = randomLocalTime()
 			}
 
-			testSendAndReceiveValue(list)
+			testSendAndReceiveValue(t, list)
 		})
 
-		It("offset time", func() {
+		inner.Run("offset time", func(t *testing.T) {
 			listSize := rand.Intn(1000)
 			list := make([]interface{}, listSize)
 			for i := 0; i < listSize; i++ {
 				list[i] = randomOffsetTime()
 			}
 
-			testSendAndReceiveValue(list)
+			testSendAndReceiveValue(t, list)
 		})
 
-		It("local date time", func() {
+		inner.Run("local date time", func(t *testing.T) {
 			listSize := rand.Intn(1000)
 			list := make([]interface{}, listSize)
 			for i := 0; i < listSize; i++ {
 				list[i] = randomLocalDateTime()
 			}
 
-			testSendAndReceiveValueComp(list, func(x, y interface{}) bool {
+			testSendAndReceiveValueComp(t, list, func(x, y interface{}) bool {
 				l1 := x.([]interface{})
 				l2 := y.([]interface{})
 
@@ -404,43 +401,60 @@ var _ = Describe("Temporal Types", func() {
 			})
 		})
 
-		It("offset date time", func() {
+		inner.Run("offset date time", func(t *testing.T) {
 			listSize := rand.Intn(1000)
 			list := make([]interface{}, listSize)
 			for i := 0; i < listSize; i++ {
 				list[i] = randomOffsetDateTime()
 			}
 
-			testSendAndReceiveValue(list)
+			testSendAndReceiveValue(t, list)
 		})
 
-		It("zoned date time", func() {
+		inner.Run("zoned date time", func(t *testing.T) {
 			listSize := rand.Intn(1000)
 			list := make([]interface{}, listSize)
 			for i := 0; i < listSize; i++ {
-				list[i] = randomZonedDateTime()
+				list[i] = randomZonedDateTime(t)
 			}
 
-			testSendAndReceiveValue(list)
+			testSendAndReceiveValue(t, list)
 		})
 	})
 
-	DescribeTable("should be able to send and receive nil pointer property",
-		func(value interface{}) {
-			result, err = session.Run("CREATE (n {value: $value}) RETURN n.value", map[string]interface{}{"value": value})
-			Expect(err).To(BeNil())
+	outer.Run("should be able to send and receive nil pointer property", func(inner *testing.T) {
+		nilPointers := map[string]interface{}{
+			"Date":          (*neo4j.Date)(nil),
+			"Duration":      (*neo4j.Duration)(nil),
+			"LocalDateTime": (*neo4j.LocalDateTime)(nil),
+			"LocalTime":     (*neo4j.LocalTime)(nil),
+			"OffsetTime":    (*neo4j.OffsetTime)(nil),
+			"Time":          (*time.Time)(nil),
+		}
 
-			if result.Next() {
-				Expect(result.Record().Values[0]).To(BeNil())
-			}
-			Expect(result.Next()).To(BeFalse())
-			Expect(result.Err()).To(BeNil())
-		},
-		Entry("Duration", (*neo4j.Duration)(nil)),
-		Entry("Date", (*neo4j.Date)(nil)),
-		Entry("LocalTime", (*neo4j.LocalTime)(nil)),
-		Entry("OffsetTime", (*neo4j.OffsetTime)(nil)),
-		Entry("LocalDateTime", (*neo4j.LocalDateTime)(nil)),
-		Entry("DateTime{Offset|Zoned}", (*time.Time)(nil)),
-	)
-})
+		for _, key := range sortedKeys(nilPointers) {
+			inner.Run(fmt.Sprintf("with %s type", key), func(t *testing.T) {
+				value := nilPointers[key]
+				result, err = session.Run("CREATE (n {value: $value}) RETURN n.value", map[string]interface{}{"value": value})
+				assertNil(t, err)
+
+				if result.Next() {
+					assertNil(t, result.Record().Values[0])
+				}
+				assertFalse(t, result.Next())
+				assertNil(t, result.Err())
+			})
+		}
+	})
+}
+
+func sortedKeys(m map[string]interface{}) []string {
+	result := make([]string, len(m))
+	i := 0
+	for k := range m {
+		result[i] = k
+		i++
+	}
+	sort.Strings(result)
+	return result
+}

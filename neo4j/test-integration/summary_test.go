@@ -4,13 +4,10 @@ import (
 	"fmt"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/test-integration/dbserver"
-	"io"
-
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
+	"testing"
 )
 
-var _ = Describe("Result Summary", func() {
+func TestResultSummary(outer *testing.T) {
 
 	const extraDatabase = "extra"
 
@@ -19,94 +16,81 @@ var _ = Describe("Result Summary", func() {
 	var bookmark string
 	noParams := map[string]interface{}{}
 
-	BeforeEach(func() {
-		server = dbserver.GetDbServer()
-		driver = server.Driver(func(config *neo4j.Config) {
-			config.Log = neo4j.ConsoleLogger(neo4j.DEBUG)
-		})
-		Expect(driver).NotTo(BeNil())
+	server = dbserver.GetDbServer()
+	driver = server.Driver(func(config *neo4j.Config) {
+		config.Log = neo4j.ConsoleLogger(neo4j.DEBUG)
 	})
+	assertNotNil(outer, driver)
 
-	Context("from single-tenant Neo4j servers", func() {
-		BeforeEach(func() {
-			if isMultiTenant(server) {
-				Skip(`Multi-tenant servers are covered in other tests`)
-			}
-		})
+	outer.Run("from single-tenant Neo4j servers", func(inner *testing.T) {
+		if isMultiTenant(server) {
+			inner.Skip(`Multi-tenant servers are covered in other tests`)
+		}
 
-		It("does not include any database information", func() {
+		inner.Run("does not include any database information", func(t *testing.T) {
 			session := driver.NewSession(neo4j.SessionConfig{Bookmarks: neo4j.BookmarksFromRawValues(bookmark)})
-			defer assertCloses(session)
+			defer assertCloses(t, session)
 			result, err := session.Run("RETURN 42", noParams)
-			Expect(err).NotTo(HaveOccurred())
+			assertNil(t, err)
 
 			summary, err := result.Consume()
-			Expect(err).NotTo(HaveOccurred())
+			assertNil(t, err)
 			if server.Version.GreaterThanOrEqual(V4) {
-				Expect(summary.Database().Name()).To(Equal("neo4j"))
+				assertEquals(t, summary.Database().Name(), "neo4j")
 			} else {
-				Expect(summary.Database()).To(BeNil())
+				assertNil(t, summary.Database())
 			}
 		})
 	})
 
-	Context("from multi-tenant Neo4j servers", func() {
-		BeforeEach(func() {
-			if !isMultiTenant(server) {
-				Skip("Multi-tenancy is a Neo4j 4+ feature")
-			}
-		})
+	outer.Run("from multi-tenant Neo4j servers", func(inner *testing.T) {
+		if !isMultiTenant(server) {
+			inner.Skip("Multi-tenancy is a Neo4j 4+ feature")
+		}
 
-		BeforeEach(func() {
-			session := driver.NewSession(neo4j.SessionConfig{DatabaseName: "system", BoltLogger: neo4j.ConsoleBoltLogger()})
-			defer assertCloses(session)
-			res, err := session.Run(fmt.Sprintf("CREATE DATABASE %s", extraDatabase), map[string]interface{}{})
-			Expect(err).NotTo(HaveOccurred())
-			_, err = res.Consume()  // consume result to obtain bookmark
-			Expect(err).NotTo(HaveOccurred())
-			bookmarks := neo4j.BookmarksToRawValues(session.LastBookmarks())
-			Expect(len(bookmarks)).To(Equal(1))
-			bookmark = bookmarks[0]
-		})
+		session := driver.NewSession(neo4j.SessionConfig{DatabaseName: "system", BoltLogger: neo4j.ConsoleBoltLogger()})
+		defer assertCloses(inner, session)
+		res, err := session.Run(fmt.Sprintf("CREATE DATABASE %s", extraDatabase), map[string]interface{}{})
+		assertNil(inner, err)
+		_, err = res.Consume() // consume result to obtain bookmark
+		assertNil(inner, err)
+		bookmarks := neo4j.BookmarksToRawValues(session.LastBookmarks())
+		assertEquals(inner, len(bookmarks), 1)
+		bookmark = bookmarks[0]
 
-		AfterEach(func() {
+		defer func() {
 			session := driver.NewSession(neo4j.SessionConfig{DatabaseName: "system", Bookmarks: neo4j.BookmarksFromRawValues(bookmark)})
-			defer assertCloses(session)
+			defer assertCloses(inner, session)
 			_, err := session.Run(fmt.Sprintf("DROP DATABASE %s", extraDatabase), map[string]interface{}{})
-			Expect(err).NotTo(HaveOccurred())
+			assertNil(inner, err)
 			bookmark = ""
-		})
+		}()
 
-		It("includes the default database information", func() {
+		inner.Run("includes the default database information", func(t *testing.T) {
 			session := driver.NewSession(neo4j.SessionConfig{Bookmarks: neo4j.BookmarksFromRawValues(bookmark)})
-			defer assertCloses(session)
+			defer assertCloses(t, session)
 			result, err := session.Run("RETURN 42", noParams)
-			Expect(err).NotTo(HaveOccurred())
+			assertNil(t, err)
 
 			summary, err := result.Consume()
-			Expect(err).NotTo(HaveOccurred())
-			Expect(summary.Database().Name()).To(Equal("neo4j"))
+			assertNil(t, err)
+			assertEquals(t, summary.Database().Name(), "neo4j")
 		})
 
-		It("includes the database information, based on session configuration", func() {
+		inner.Run("includes the database information, based on session configuration", func(t *testing.T) {
 			session := driver.NewSession(neo4j.SessionConfig{DatabaseName: extraDatabase, Bookmarks: neo4j.BookmarksFromRawValues(bookmark)})
-			defer assertCloses(session)
+			defer assertCloses(t, session)
 			result, err := session.Run("RETURN 42", noParams)
-			Expect(err).NotTo(HaveOccurred())
+			assertNil(t, err)
 
 			summary, err := result.Consume()
-			Expect(err).NotTo(HaveOccurred())
-			Expect(summary.Database().Name()).To(Equal(extraDatabase))
+			assertNil(t, err)
+			assertEquals(t, summary.Database().Name(), extraDatabase)
 		})
 	})
 
-})
+}
 
 func isMultiTenant(server dbserver.DbServer) bool {
 	return server.Version.GreaterThanOrEqual(V4) && server.IsEnterprise
-}
-
-func assertCloses(closer io.Closer) {
-	err := closer.Close()
-	Expect(err).NotTo(HaveOccurred())
 }

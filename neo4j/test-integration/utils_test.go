@@ -22,60 +22,58 @@ package test_integration
 import (
 	"fmt"
 	"reflect"
+	"testing"
 
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
-	"github.com/onsi/ginkgo"
-
-	. "github.com/onsi/gomega"
 )
 
-func intReturningWork(query string, params map[string]interface{}) neo4j.TransactionWork {
+func intReturningWork(t *testing.T, query string, params map[string]interface{}) neo4j.TransactionWork {
 	return func(tx neo4j.Transaction) (interface{}, error) {
 		create, err := tx.Run(query, params)
-		Expect(err).To(BeNil())
+		assertNil(t, err)
 
 		returnValue := int64(0)
 		if create.Next() {
 			returnValue = create.Record().Values[0].(int64)
 		}
-		Expect(create.Next()).To(BeFalse())
-		Expect(create.Err()).To(BeNil())
+		assertFalse(t, create.Next())
+		assertNil(t, create.Err())
 
 		return returnValue, nil
 	}
 }
 
-func transactionWithIntWork(tx neo4j.Transaction, work neo4j.TransactionWork) int64 {
+func transactionWithIntWork(t *testing.T, tx neo4j.Transaction, work neo4j.TransactionWork) int64 {
 	result, err := work(tx)
-	Expect(err).To(BeNil())
+	assertNil(t, err)
 
 	return result.(int64)
 }
 
-func readTransactionWithIntWork(session neo4j.Session, work neo4j.TransactionWork, configurers ...func(*neo4j.TransactionConfig)) int64 {
+func readTransactionWithIntWork(t *testing.T, session neo4j.Session, work neo4j.TransactionWork, configurers ...func(*neo4j.TransactionConfig)) int64 {
 	result, err := session.ReadTransaction(work, configurers...)
-	Expect(err).To(BeNil())
+	assertNil(t, err)
 
 	return result.(int64)
 }
 
-func writeTransactionWithIntWork(session neo4j.Session, work neo4j.TransactionWork, configurers ...func(*neo4j.TransactionConfig)) int64 {
+func writeTransactionWithIntWork(t *testing.T, session neo4j.Session, work neo4j.TransactionWork, configurers ...func(*neo4j.TransactionConfig)) int64 {
 	result, err := session.WriteTransaction(work, configurers...)
-	Expect(err).To(BeNil())
+	assertNil(t, err)
 
 	return result.(int64)
 }
 
-func newSessionAndTx(driver neo4j.Driver, mode neo4j.AccessMode, configurers ...func(*neo4j.TransactionConfig)) (neo4j.Session, neo4j.Transaction) {
+func newSessionAndTx(t *testing.T, driver neo4j.Driver, mode neo4j.AccessMode, configurers ...func(*neo4j.TransactionConfig)) (neo4j.Session, neo4j.Transaction) {
 	session := driver.NewSession(neo4j.SessionConfig{AccessMode: mode})
 
 	tx, err := session.BeginTransaction(configurers...)
-	Expect(err).To(BeNil())
+	assertNil(t, err)
 
 	return session, tx
 }
 
-func createNode(session neo4j.Session, label string, props map[string]interface{}) {
+func createNode(t *testing.T, session neo4j.Session, label string, props map[string]interface{}) {
 	var (
 		err     error
 		result  neo4j.Result
@@ -87,55 +85,15 @@ func createNode(session neo4j.Session, label string, props map[string]interface{
 	} else {
 		result, err = session.Run(fmt.Sprintf("CREATE (n:%s)", label), nil)
 	}
-	Expect(err).To(BeNil())
+	assertNil(t, err)
 
 	summary, err = result.Consume()
-	Expect(err).To(BeNil())
+	assertNil(t, err)
 
-	Expect(summary.Counters().NodesCreated()).To(BeEquivalentTo(1))
+	assertEquals(t, summary.Counters().NodesCreated(), 1)
 }
 
-func createNodeInTx(tx neo4j.Transaction, label string, props map[string]interface{}) {
-	var (
-		err     error
-		result  neo4j.Result
-		summary neo4j.ResultSummary
-	)
-
-	if len(props) > 0 {
-		result, err = tx.Run(fmt.Sprintf("CREATE (n:%s) SET n = $props", label), map[string]interface{}{"props": props})
-	} else {
-		result, err = tx.Run(fmt.Sprintf("CREATE (n:%s)", label), nil)
-	}
-	Expect(err).To(BeNil())
-
-	summary, err = result.Consume()
-	Expect(err).To(BeNil())
-
-	Expect(summary.Counters().ContainsUpdates()).To(BeTrue())
-}
-
-func createNodeWork(label string, props map[string]interface{}) neo4j.TransactionWork {
-	return func(tx neo4j.Transaction) (interface{}, error) {
-		var (
-			err    error
-			result neo4j.Result
-		)
-
-		if len(props) > 0 {
-			result, err = tx.Run(fmt.Sprintf("CREATE (n:%s) SET n = $props", label), map[string]interface{}{"props": props})
-		} else {
-			result, err = tx.Run(fmt.Sprintf("CREATE (n:%s)", label), nil)
-		}
-		if err != nil {
-			return nil, err
-		}
-
-		return result.Consume()
-	}
-}
-
-func updateNode(session neo4j.Session, label string, newProps map[string]interface{}) {
+func updateNodeInTx(t *testing.T, tx neo4j.Transaction, label string, newProps map[string]interface{}) {
 	var (
 		err     error
 		result  neo4j.Result
@@ -143,39 +101,19 @@ func updateNode(session neo4j.Session, label string, newProps map[string]interfa
 	)
 
 	if len(newProps) == 0 {
-		ginkgo.Fail("newProps is empty")
-	}
-
-	result, err = session.Run(fmt.Sprintf("MATCH (n:%s) SET n = $props", label), map[string]interface{}{"props": newProps})
-	Expect(err).To(BeNil())
-
-	summary, err = result.Consume()
-	Expect(err).To(BeNil())
-
-	Expect(summary.Counters().ContainsUpdates()).To(BeTrue())
-}
-
-func updateNodeInTx(tx neo4j.Transaction, label string, newProps map[string]interface{}) {
-	var (
-		err     error
-		result  neo4j.Result
-		summary neo4j.ResultSummary
-	)
-
-	if len(newProps) == 0 {
-		ginkgo.Fail("newProps is empty")
+		t.Fatal("newProps is empty")
 	}
 
 	result, err = tx.Run(fmt.Sprintf("MATCH (n:%s) SET n = $props", label), map[string]interface{}{"props": newProps})
-	Expect(err).To(BeNil())
+	assertNil(t, err)
 
 	summary, err = result.Consume()
-	Expect(err).To(BeNil())
+	assertNil(t, err)
 
-	Expect(summary.Counters().ContainsUpdates()).To(BeTrue())
+	assertTrue(t, summary.Counters().ContainsUpdates())
 }
 
-func updateNodeWork(label string, newProps map[string]interface{}) neo4j.TransactionWork {
+func updateNodeWork(t *testing.T, label string, newProps map[string]interface{}) neo4j.TransactionWork {
 	return func(tx neo4j.Transaction) (interface{}, error) {
 		var (
 			err    error
@@ -183,7 +121,7 @@ func updateNodeWork(label string, newProps map[string]interface{}) neo4j.Transac
 		)
 
 		if len(newProps) == 0 {
-			ginkgo.Fail("newProps is empty")
+			t.Fatal("newProps is empty")
 		}
 
 		result, err = tx.Run(fmt.Sprintf("MATCH (n:%s) SET n = $props", label), map[string]interface{}{"props": newProps})
