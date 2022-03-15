@@ -21,16 +21,14 @@ package test_integration
 
 import (
 	"errors"
+	"testing"
 	"time"
 
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/test-integration/dbserver"
-
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
 )
 
-var _ = Describe("Transaction", func() {
+func TestTransaction(outer *testing.T) {
 	server := dbserver.GetDbServer()
 	var err error
 	var driver neo4j.Driver
@@ -38,22 +36,20 @@ var _ = Describe("Transaction", func() {
 	var tx neo4j.Transaction
 	var result neo4j.Result
 
-	BeforeEach(func() {
-		driver = server.Driver()
-		session = driver.NewSession(neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
-	})
+	driver = server.Driver()
+	session = driver.NewSession(neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
 
-	AfterEach(func() {
+	defer func() {
 		if session != nil {
 			session.Close()
 		}
 		driver.Close()
-	})
+	}()
 
-	Context("Retry Mechanism", func() {
+	outer.Run("Retry Mechanism", func(inner *testing.T) {
 		transientError := &neo4j.Neo4jError{Code: "Neo.TransientError.Transaction.Outdated"}
 
-		It("should work on WriteTransaction", func() {
+		inner.Run("should work on WriteTransaction", func(t *testing.T) {
 			times := 0
 			_, err = session.WriteTransaction(func(transaction neo4j.Transaction) (interface{}, error) {
 				times++
@@ -61,12 +57,11 @@ var _ = Describe("Transaction", func() {
 				return nil, transientError
 			})
 
-			Expect(err).ToNot(BeNil())
-			//Expect(err).To(BeGenericError(And(ContainSubstring("retryable operation failed to complete after"), ContainSubstring("Neo.TransientError.Transaction.Outdated"))))
-			Expect(times).To(BeNumerically(">", 10))
+			assertNotNil(t, err)
+			assertTrue(t, times > 10)
 		})
 
-		It("should work on ReadTransaction", func() {
+		inner.Run("should work on ReadTransaction", func(t *testing.T) {
 			times := 0
 			_, err = session.ReadTransaction(func(transaction neo4j.Transaction) (interface{}, error) {
 				times++
@@ -74,142 +69,166 @@ var _ = Describe("Transaction", func() {
 				return nil, transientError
 			})
 
-			Expect(err).ToNot(BeNil())
-			//Expect(err).To(BeGenericError(And(ContainSubstring("retryable operation failed to complete after"), ContainSubstring("Neo.TransientError.Transaction.Outdated"))))
-			Expect(times).To(BeNumerically(">", 10))
+			assertNotNil(t, err)
+			assertTrue(t, times > 10)
 		})
 	})
 
-	It("should commit if work function doesn't return error", func() {
-		createResult := writeTransactionWithIntWork(session, intReturningWork("CREATE (n:Person1) RETURN count(n)", nil))
-		Expect(createResult).To(BeEquivalentTo(1))
+	outer.Run("should commit if work function doesn't return error", func(t *testing.T) {
+		createResult := writeTransactionWithIntWork(t, session, intReturningWork(t, "CREATE (n:Person1) RETURN count(n)", nil))
+		assertEquals(t, createResult, 1)
 
-		matchResult := readTransactionWithIntWork(session, intReturningWork("MATCH (n:Person1) RETURN count(n)", nil))
-		Expect(matchResult).To(BeEquivalentTo(1))
+		matchResult := readTransactionWithIntWork(t, session, intReturningWork(t, "MATCH (n:Person1) RETURN count(n)", nil))
+		assertEquals(t, matchResult, 1)
 	})
 
-	It("should rollback if work function returns error", func() {
-		createWork := intReturningWork("CREATE (n:Person2) RETURN count(n)", nil)
+	outer.Run("should rollback if work function returns error", func(t *testing.T) {
+		createWork := intReturningWork(t, "CREATE (n:Person2) RETURN count(n)", nil)
 		createResult, err := session.WriteTransaction(func(tx neo4j.Transaction) (interface{}, error) {
 			innerResult, err := createWork(tx)
-			Expect(err).To(BeNil())
-			Expect(innerResult).To(BeEquivalentTo(1))
+			assertNil(t, err)
+			assertEquals(t, innerResult, 1)
 
 			return nil, errors.New("some error")
 		})
-		Expect(err).NotTo(BeNil())
-		Expect(createResult).To(BeNil())
+		assertNotNil(t, err)
+		assertNil(t, createResult)
 
-		matchResult := readTransactionWithIntWork(session, intReturningWork("MATCH (n:Person2) RETURN count(n)", nil))
-		Expect(matchResult).To(BeEquivalentTo(0))
+		matchResult := readTransactionWithIntWork(t, session, intReturningWork(t, "MATCH (n:Person2) RETURN count(n)", nil))
+		assertEquals(t, matchResult, 0)
 	})
 
-	It("should have keys available after run", func() {
+	outer.Run("should have keys available after run", func(t *testing.T) {
 		tx, err = session.BeginTransaction()
-		Expect(err).To(BeNil())
+		assertNil(t, err)
 		defer tx.Close()
 
 		result, err = tx.Run("RETURN 1 AS N, 2 AS M", nil)
-		Expect(err).To(BeNil())
+		assertNil(t, err)
 
-		Expect(result.Keys()).To(BeEquivalentTo([]string{"N", "M"}))
+		keys, err := result.Keys()
+		assertNil(t, err)
+		assertEquals(t, keys, []string{"N", "M"})
 	})
 
-	It("should have keys available after run and consume", func() {
+	outer.Run("should have keys available after run and consume", func(t *testing.T) {
 		tx, err = session.BeginTransaction()
-		Expect(err).To(BeNil())
+		assertNil(t, err)
 		defer tx.Close()
 
 		result, err = tx.Run("RETURN 1 AS N, 2 AS M", nil)
-		Expect(err).To(BeNil())
+		assertNil(t, err)
 
-		Expect(result.Keys()).To(BeEquivalentTo([]string{"N", "M"}))
+		keys, err := result.Keys()
+		assertNil(t, err)
+		assertEquals(t, keys, []string{"N", "M"})
 
 		_, err = result.Consume()
-		Expect(err).To(BeNil())
+		assertNil(t, err)
 
-		Expect(result.Keys()).To(BeEquivalentTo([]string{"N", "M"}))
+		keys, err = result.Keys()
+		assertNil(t, err)
+		assertEquals(t, keys, []string{"N", "M"})
 	})
 
-	It("should have keys available for consecutive runs", func() {
+	outer.Run("should have keys available for consecutive runs", func(t *testing.T) {
 		tx, err = session.BeginTransaction()
-		Expect(err).To(BeNil())
+		assertNil(t, err)
 		defer tx.Close()
 
 		result1, err := tx.Run("RETURN 1 AS N, 2 AS M", nil)
-		Expect(err).To(BeNil())
+		assertNil(t, err)
 
 		result2, err := tx.Run("RETURN 1 AS X, 2 AS Y", nil)
-		Expect(err).To(BeNil())
+		assertNil(t, err)
 
-		Expect(result1.Keys()).To(BeEquivalentTo([]string{"N", "M"}))
-		Expect(result2.Keys()).To(BeEquivalentTo([]string{"X", "Y"}))
+		keys, err := result1.Keys()
+		assertNil(t, err)
+		assertEquals(t, keys, []string{"N", "M"})
+
+		keys, err = result2.Keys()
+		assertNil(t, err)
+		assertEquals(t, keys, []string{"X", "Y"})
 	})
 
-	It("should have keys available for consecutive runs and consumes", func() {
+	outer.Run("should have keys available for consecutive runs and consumes", func(t *testing.T) {
 		tx, err = session.BeginTransaction()
-		Expect(err).To(BeNil())
+		assertNil(t, err)
 		defer tx.Close()
 
 		result1, err := tx.Run("RETURN 1 AS N, 2 AS M", nil)
-		Expect(err).To(BeNil())
+		assertNil(t, err)
 
 		result2, err := tx.Run("RETURN 1 AS X, 2 AS Y", nil)
-		Expect(err).To(BeNil())
+		assertNil(t, err)
 
 		_, err = result1.Consume()
-		Expect(err).To(BeNil())
+		assertNil(t, err)
 		_, err = result2.Consume()
-		Expect(err).To(BeNil())
+		assertNil(t, err)
 
-		Expect(result1.Keys()).To(BeEquivalentTo([]string{"N", "M"}))
-		Expect(result2.Keys()).To(BeEquivalentTo([]string{"X", "Y"}))
+		keys, err := result1.Keys()
+		assertNil(t, err)
+		assertEquals(t, keys, []string{"N", "M"})
+
+		keys, err = result2.Keys()
+		assertNil(t, err)
+		assertEquals(t, keys, []string{"X", "Y"})
 	})
 
-	It("should have keys available for consecutive runs independent of order", func() {
+	outer.Run("should have keys available for consecutive runs independent of order", func(t *testing.T) {
 		tx, err = session.BeginTransaction()
-		Expect(err).To(BeNil())
+		assertNil(t, err)
 		defer tx.Close()
 
 		result1, err := tx.Run("RETURN 1 AS N, 2 AS M", nil)
-		Expect(err).To(BeNil())
+		assertNil(t, err)
 
 		result2, err := tx.Run("RETURN 1 AS X, 2 AS Y", nil)
-		Expect(err).To(BeNil())
+		assertNil(t, err)
 
-		Expect(result2.Keys()).To(BeEquivalentTo([]string{"X", "Y"}))
-		Expect(result1.Keys()).To(BeEquivalentTo([]string{"N", "M"}))
+		keys, err := result2.Keys()
+		assertNil(t, err)
+		assertEquals(t, keys, []string{"X", "Y"})
+
+		keys, err = result1.Keys()
+		assertNil(t, err)
+		assertEquals(t, keys, []string{"N", "M"})
+
 	})
 
-	It("should have keys available for consecutive runs and consumes independent of order", func() {
+	outer.Run("should have keys available for consecutive runs and consumes independent of order", func(t *testing.T) {
 		tx, err = session.BeginTransaction()
-		Expect(err).To(BeNil())
+		assertNil(t, err)
 		defer tx.Close()
 
 		result1, err := tx.Run("RETURN 1 AS N, 2 AS M", nil)
-		Expect(err).To(BeNil())
+		assertNil(t, err)
 
 		result2, err := tx.Run("RETURN 1 AS X, 2 AS Y", nil)
-		Expect(err).To(BeNil())
+		assertNil(t, err)
 
 		_, err = result1.Consume()
-		Expect(err).To(BeNil())
+		assertNil(t, err)
 		_, err = result2.Consume()
-		Expect(err).To(BeNil())
+		assertNil(t, err)
 
-		Expect(result2.Keys()).To(BeEquivalentTo([]string{"X", "Y"}))
-		Expect(result1.Keys()).To(BeEquivalentTo([]string{"N", "M"}))
+		keys, err := result2.Keys()
+		assertNil(t, err)
+		assertEquals(t, keys, []string{"X", "Y"})
+
+		keys, err = result1.Keys()
+		assertNil(t, err)
+		assertEquals(t, keys, []string{"N", "M"})
 	})
 
-	Context("V3", func() {
+	outer.Run("V3", func(inner *testing.T) {
 
-		BeforeEach(func() {
-			if server.Version.LessThan(V350) {
-				Skip("this test is targeted for server version after neo4j 3.5.0")
-			}
-		})
+		if server.Version.LessThan(V350) {
+			inner.Skip("this test is targeted for server version after neo4j 3.5.0")
+		}
 
-		It("should set transaction metadata", func() {
+		inner.Run("should set transaction metadata", func(t *testing.T) {
 			metadata := map[string]interface{}{
 				"m1": int64(1),
 				"m2": "some string",
@@ -218,60 +237,55 @@ var _ = Describe("Transaction", func() {
 			}
 
 			tx, err = session.BeginTransaction(neo4j.WithTxMetadata(metadata))
-			Expect(err).To(BeNil())
+			assertNil(t, err)
 			defer tx.Close()
 
-			number := transactionWithIntWork(tx, intReturningWork("RETURN $x", map[string]interface{}{"x": 1}))
-			Expect(number).To(BeEquivalentTo(1))
+			number := transactionWithIntWork(t, tx, intReturningWork(t, "RETURN $x", map[string]interface{}{"x": 1}))
+			assertEquals(t, number, 1)
 
 			if !server.IsEnterprise {
-				Skip("Can not use dbms.listTransactions on non-enterprise version")
+				t.Skip("Can not use dbms.listTransactions on non-enterprise version")
 			}
 
 			session2 := driver.NewSession(neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead})
 			defer session2.Close()
 			matched, err := session2.ReadTransaction(listTransactionsAndMatchMetadataWork(metadata))
-			Expect(err).To(BeNil())
-			Expect(matched).To(BeTrue())
+			assertNil(t, err)
+			assertTrue(t, matched.(bool))
 		})
 
-		It("should set transaction timeout", func() {
-			createNode(session, "TxTimeOut", nil)
+		inner.Run("should set transaction timeout", func(t *testing.T) {
+			createNode(t, session, "TxTimeOut", nil)
 
-			session2, tx2 := newSessionAndTx(driver, neo4j.AccessModeWrite)
+			session2, tx2 := newSessionAndTx(t, driver, neo4j.AccessModeWrite)
 			defer session2.Close()
 			defer tx2.Close()
 
-			updateNodeInTx(tx2, "TxTimeOut", map[string]interface{}{"id": 1})
+			updateNodeInTx(t, tx2, "TxTimeOut", map[string]interface{}{"id": 1})
 
-			session3, tx3 := newSessionAndTx(driver, neo4j.AccessModeWrite, neo4j.WithTxTimeout(1*time.Second))
+			session3, tx3 := newSessionAndTx(t, driver, neo4j.AccessModeWrite, neo4j.WithTxTimeout(1*time.Second))
 			defer session3.Close()
 			defer tx3.Close()
 
-			_, err := updateNodeWork("TxTimeOut", map[string]interface{}{"id": 2})(tx3)
-			Expect(err).ToNot(BeNil())
-			//Expect(err).To(BeTransientError(nil, ContainSubstring("terminated")))
+			_, err := updateNodeWork(t, "TxTimeOut", map[string]interface{}{"id": 2})(tx3)
+			assertNotNil(t, err)
 		})
 
 	})
 
-	Context("V3 API on V1 & V2", func() {
-		BeforeEach(func() {
-			if server.Version.GreaterThanOrEqual(V350) {
-				Skip("this test is targeted for server versions less than neo4j 3.5.0")
-			}
-		})
+	outer.Run("V3 API on V1 & V2", func(t *testing.T) {
+		if server.Version.GreaterThanOrEqual(V350) {
+			t.Skip("this test is targeted for server versions less than neo4j 3.5.0")
+		}
 
-		It("should fail when transaction timeout is set for Session.BeginTransaction", func() {
+		t.Run("should fail when transaction timeout is set for Session.BeginTransaction", func(t *testing.T) {
 			_, err := session.BeginTransaction(neo4j.WithTxTimeout(1 * time.Second))
-			Expect(err).ToNot(BeNil())
-			//Expect(err).To(BeConnectorErrorWithCode(0x504))
+			assertNotNil(t, err)
 		})
 
-		It("should fail when transaction metadata is set for Session.BeginTransaction", func() {
+		t.Run("should fail when transaction metadata is set for Session.BeginTransaction", func(t *testing.T) {
 			_, err := session.BeginTransaction(neo4j.WithTxMetadata(map[string]interface{}{"x": 1}))
-			Expect(err).ToNot(BeNil())
-			//Expect(err).To(BeConnectorErrorWithCode(0x504))
+			assertNotNil(t, err)
 		})
 	})
-})
+}

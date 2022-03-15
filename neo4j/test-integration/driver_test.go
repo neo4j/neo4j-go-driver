@@ -21,51 +21,42 @@ package test_integration
 
 import (
 	"math"
+	"testing"
 	"time"
 
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/test-integration/dbserver"
-
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
 )
 
-var _ = Describe("Driver", func() {
+func TestDriver(outer *testing.T) {
 	server := dbserver.GetDbServer()
 
-	Context("VerifyConnectivity", func() {
-		It("should return nil upon good connection", func() {
+	outer.Run("VerifyConnectivity", func(inner *testing.T) {
+		inner.Run("should return nil upon good connection", func(t *testing.T) {
 			driver := server.Driver()
 			defer driver.Close()
-			err := driver.VerifyConnectivity()
-			Expect(err).To(BeNil())
+			assertNil(t, driver.VerifyConnectivity())
 		})
 
-		It("should return error upon bad connection", func() {
+		inner.Run("should return error upon bad connection", func(t *testing.T) {
 			auth := neo4j.BasicAuth("bad user", "bad pass", "bad area")
 			driver, err := neo4j.NewDriver(server.BoltURI(), auth, server.ConfigFunc())
-			Expect(err).To(BeNil())
+			assertNil(t, err)
 			defer driver.Close()
 			err = driver.VerifyConnectivity()
-			Expect(err).ToNot(BeNil())
+			assertNotNil(t, err)
 		})
 	})
 
-	Context("Direct", func() {
-		var (
-			err     error
-			driver  neo4j.Driver
-			session neo4j.Session
-			result  neo4j.Result
-		)
+	outer.Run("Direct", func(inner *testing.T) {
 
-		BeforeEach(func() {
-			driver = server.Driver()
+		setUp := func() (neo4j.Driver, neo4j.Session) {
+			driver := server.Driver()
+			session := driver.NewSession(neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
+			return driver, session
+		}
 
-			session = driver.NewSession(neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
-		})
-
-		AfterEach(func() {
+		tearDown := func(driver neo4j.Driver, session neo4j.Session) {
 			if session != nil {
 				session.Close()
 			}
@@ -73,117 +64,117 @@ var _ = Describe("Driver", func() {
 			if driver != nil {
 				driver.Close()
 			}
-		})
+		}
 
-		It("it should not allow work on existing sessions, after driver is closed", func() {
-			result, err = session.Run("RETURN 1", nil)
-			Expect(err).To(BeNil())
+		inner.Run("it should not allow work on existing sessions, after driver is closed", func(t *testing.T) {
+			driver, session := setUp()
+			defer tearDown(driver, session)
+
+			result, err := session.Run("RETURN 1", nil)
+			assertNil(t, err)
 
 			if result.Next() {
-				Expect(result.Record().Values[0]).To(BeEquivalentTo(1))
+				assertEquals(t, result.Record().Values[0], int64(1))
 			}
-			Expect(result.Next()).To(BeFalse())
-			Expect(result.Err()).To(BeNil())
+			assertFalse(t, result.Next())
+			assertNil(t, result.Err())
 
-			err := driver.Close()
-			Expect(err).To(BeNil())
+			err = driver.Close()
+			assertNil(t, err)
 
 			_, err = session.Run("RETURN 1", nil)
-			Expect(err).NotTo(BeNil())
+			assertNotNil(t, err)
 		})
 
-		It("it should not allow new sessions, after driver is closed", func() {
-			result, err = session.Run("RETURN 1", nil)
-			Expect(err).To(BeNil())
+		inner.Run("it should not allow new sessions, after driver is closed", func(t *testing.T) {
+			driver, session := setUp()
+			defer tearDown(driver, session)
+			result, err := session.Run("RETURN 1", nil)
+			assertNil(t, err)
 
 			if result.Next() {
-				Expect(result.Record().Values[0]).To(BeEquivalentTo(1))
+				assertEquals(t, result.Record().Values[0], int64(1))
 			}
-			Expect(result.Next()).To(BeFalse())
-			Expect(result.Err()).To(BeNil())
+			assertFalse(t, result.Next())
+			assertNil(t, result.Err())
 
-			err := driver.Close()
-			Expect(err).To(BeNil())
+			err = driver.Close()
+			assertNil(t, err)
 
 			_ = driver.NewSession(neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
 		})
 
 	})
 
-	Context("Pooling without Connection Acquisition Timeout", func() {
+	outer.Run("Pooling without Connection Acquisition Timeout", func(inner *testing.T) {
 		var (
 			err    error
 			driver neo4j.Driver
 		)
 
-		BeforeEach(func() {
-			driver, err = neo4j.NewDriver(server.BoltURI(), server.AuthToken(), server.ConfigFunc(), func(config *neo4j.Config) {
-				config.MaxConnectionPoolSize = 2
-				config.ConnectionAcquisitionTimeout = 0
-			})
-			Expect(err).To(BeNil())
+		driver, err = neo4j.NewDriver(server.BoltURI(), server.AuthToken(), server.ConfigFunc(), func(config *neo4j.Config) {
+			config.MaxConnectionPoolSize = 2
+			config.ConnectionAcquisitionTimeout = 0
 		})
+		assertNil(inner, err)
 
-		AfterEach(func() {
+		defer func() {
 			if driver != nil {
 				driver.Close()
 			}
-		})
+		}()
 
-		It("should return error when pool is full", func() {
+		inner.Run("should return error when pool is full", func(t *testing.T) {
 			// Open connection 1
 			session1 := driver.NewSession(neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
 
 			_, err = session1.Run("UNWIND RANGE(1, 100) AS N RETURN N", nil)
-			Expect(err).To(BeNil())
+			assertNil(t, err)
 
 			// Open connection 2
 			session2 := driver.NewSession(neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
 
 			_, err = session2.Run("UNWIND RANGE(1, 100) AS N RETURN N", nil)
-			Expect(err).To(BeNil())
+			assertNil(t, err)
 
 			// Try opening connection 3
 			session3 := driver.NewSession(neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
 
 			_, err = session3.Run("UNWIND RANGE(1, 100) AS N RETURN N", nil)
-			Expect(neo4j.IsConnectivityError(err)).To(BeTrue())
-			//Expect(err).To(BeConnectorErrorWithCode(0x600))
+			assertTrue(t, neo4j.IsConnectivityError(err))
 		})
 	})
 
-	Context("Pooling with Connection Acquisition Timeout", func() {
+	outer.Run("Pooling with Connection Acquisition Timeout", func(inner *testing.T) {
 		var (
 			err    error
 			driver neo4j.Driver
 		)
 
-		BeforeEach(func() {
-			driver, err = neo4j.NewDriver(server.BoltURI(), server.AuthToken(), server.ConfigFunc(), func(config *neo4j.Config) {
-				config.MaxConnectionPoolSize = 2
-				config.ConnectionAcquisitionTimeout = 10 * time.Second
-			})
-			Expect(err).To(BeNil())
+		driver, err = neo4j.NewDriver(server.BoltURI(), server.AuthToken(), server.ConfigFunc(), func(config *neo4j.Config) {
+			config.MaxConnectionPoolSize = 2
+			config.ConnectionAcquisitionTimeout = 10 * time.Second
 		})
+		assertNil(inner, err)
 
-		AfterEach(func() {
+		defer func() {
 			if driver != nil {
 				driver.Close()
 			}
-		})
+		}()
 
-		It("should return error when pool is full", func() {
+		inner.Run("should return error when pool is full", func(t *testing.T) {
 			// Open connection 1
 			session1 := driver.NewSession(neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
 
 			_, err = session1.Run("UNWIND RANGE(1, 100) AS N RETURN N", nil)
-			Expect(err).To(BeNil())
+			assertNil(t, err)
 
 			// Open connection 2
 			session2 := driver.NewSession(neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
 
 			_, err = session2.Run("UNWIND RANGE(1, 100) AS N RETURN N", nil)
-			Expect(err).To(BeNil())
+			assertNil(t, err)
 
 			// Try opening connection 3
 			session3 := driver.NewSession(neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
@@ -191,9 +182,8 @@ var _ = Describe("Driver", func() {
 			start := time.Now()
 			_, err = session3.Run("UNWIND RANGE(1, 100) AS N RETURN N", nil)
 			elapsed := time.Since(start)
-			Expect(neo4j.IsConnectivityError(err)).To(BeTrue())
-			//Expect(err).To(BeConnectorErrorWithCode(0x601))
-			Expect(math.Round(float64(elapsed / time.Second))).To(BeNumerically(">=", 10))
+			assertTrue(t, neo4j.IsConnectivityError(err))
+			assertTrue(t, math.Round(float64(elapsed/time.Second)) >= 10)
 		})
 	})
-})
+}

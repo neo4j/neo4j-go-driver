@@ -29,11 +29,11 @@ import (
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/test-integration/dbserver"
 )
 
-func TestTemporalTypes(tt *testing.T) {
+func TestTemporalTypes2(outer *testing.T) {
 	server := dbserver.GetDbServer()
 	driver := server.Driver()
 	if server.Version.LessThan(V340) {
-		tt.Skip("Temporal types are only available after neo4j 3.4.0 release")
+		outer.Skip("Temporal types are only available after neo4j 3.4.0 release")
 	}
 
 	sendAndReceive := func(t *testing.T, p interface{}) interface{} {
@@ -89,8 +89,8 @@ func TestTemporalTypes(tt *testing.T) {
 		}
 	}
 
-	tt.Run("Receive", func(rt *testing.T) {
-		rt.Run("neo4j.Duration", func(t *testing.T) {
+	outer.Run("Receive", func(inner *testing.T) {
+		inner.Run("neo4j.Duration", func(t *testing.T) {
 			d1 := single(t, driver, "RETURN duration({ months: 16, days: 45, seconds: 120, nanoseconds: 187309812 })", nil).(neo4j.Duration)
 			d2 := neo4j.Duration{Months: 16, Days: 45, Seconds: 120, Nanos: 187309812}
 			assertDurationEqual(t, d1, d2)
@@ -98,7 +98,7 @@ func TestTemporalTypes(tt *testing.T) {
 			assertDurationEqual(t, d1, neo4j.DurationOf(16, 45, 120, 187309812))
 		})
 
-		rt.Run("neo4j.Date", func(t *testing.T) {
+		inner.Run("neo4j.Date", func(t *testing.T) {
 			t1 := time.Time(single(t, driver, "RETURN date({ year: 1994, month: 11, day: 15 })", nil).(neo4j.Date))
 			t2 := time.Date(1994, 11, 15, 0, 0, 0, 0, time.Local)
 			assertDatePart(t, t1, t2)
@@ -107,7 +107,7 @@ func TestTemporalTypes(tt *testing.T) {
 			assertEqual(t, t1, t3)
 		})
 
-		rt.Run("neo4j.LocalTime", func(t *testing.T) {
+		inner.Run("neo4j.LocalTime", func(t *testing.T) {
 			t1 := time.Time(single(t, driver, "RETURN localtime({ hour: 23, minute: 49, second: 59, nanosecond: 999999999 })", nil).(neo4j.LocalTime))
 			t2 := time.Date(0, 0, 0, 23, 49, 59, 999999999, time.Local)
 			assertTimePart(t, t1, t2)
@@ -119,7 +119,7 @@ func TestTemporalTypes(tt *testing.T) {
 			assertLocal(t, t3)
 		})
 
-		rt.Run("neo4j.Time+offset", func(t *testing.T) {
+		inner.Run("neo4j.Time+offset", func(t *testing.T) {
 			t1 := time.Time(single(t, driver, "RETURN time({ hour: 23, minute: 49, second: 59, nanosecond: 999999999, timezone:'+03:00' })", nil).(neo4j.Time))
 			t2 := time.Date(0, 0, 0, 23, 49, 59, 999999999, time.FixedZone("Offset", 3*60*60))
 			assertTimePart(t, t1, t2)
@@ -129,7 +129,7 @@ func TestTemporalTypes(tt *testing.T) {
 			assertEqual(t, t1, t3)
 		})
 
-		rt.Run("neo4j.LocalDateTime", func(t *testing.T) {
+		inner.Run("neo4j.LocalDateTime", func(t *testing.T) {
 			t1 := time.Time(single(t, driver,
 				"RETURN localdatetime({ year: 1859, month: 5, day: 31, hour: 23, minute: 49, second: 59, nanosecond: 999999999 })", nil).(neo4j.LocalDateTime))
 			t2 := time.Date(1859, 5, 31, 23, 49, 59, 999999999, time.Local)
@@ -146,7 +146,7 @@ func TestTemporalTypes(tt *testing.T) {
 			assertDatePart(t, t1, t4)
 		})
 
-		rt.Run("time.Time+offset", func(t *testing.T) {
+		inner.Run("time.Time+offset", func(t *testing.T) {
 			t1 := single(t, driver,
 				"RETURN datetime({ year: 1859, month: 5, day: 31, hour: 23, minute: 49, second: 59, nanosecond: 999999999, timezone:'+02:30' })", nil).(time.Time)
 			offset := 150 * 60
@@ -156,7 +156,7 @@ func TestTemporalTypes(tt *testing.T) {
 			assertOffset(t, t1, offset)
 		})
 
-		rt.Run("time.Time+zone", func(t *testing.T) {
+		inner.Run("time.Time+zone", func(t *testing.T) {
 			t1 := single(t, driver,
 				"RETURN datetime({ year: 1959, month: 5, day: 31, hour: 23, minute: 49, second: 59, nanosecond: 999999999, timezone:'Europe/London'})", nil).(time.Time)
 			offset := 60 * 60
@@ -172,7 +172,7 @@ func TestTemporalTypes(tt *testing.T) {
 		})
 	})
 
-	tt.Run("Random", func(rt *testing.T) {
+	outer.Run("Random", func(inner *testing.T) {
 		const numRand = 100
 
 		randomDate := func() neo4j.Date {
@@ -284,7 +284,7 @@ func TestTemporalTypes(tt *testing.T) {
 				location)
 		}
 
-		rt.Run("Date", func(t *testing.T) {
+		inner.Run("Date", func(t *testing.T) {
 			for i := 0; i < numRand; i++ {
 				d1 := randomDate()
 				d2 := sendAndReceive(t, d1).(neo4j.Date)
@@ -292,7 +292,7 @@ func TestTemporalTypes(tt *testing.T) {
 			}
 		})
 
-		rt.Run("Duration", func(t *testing.T) {
+		inner.Run("Duration", func(t *testing.T) {
 			for i := 0; i < numRand; i++ {
 				d1 := randomDuration()
 				d2 := sendAndReceive(t, d1).(neo4j.Duration)
@@ -300,7 +300,7 @@ func TestTemporalTypes(tt *testing.T) {
 			}
 		})
 
-		rt.Run("LocalTime", func(t *testing.T) {
+		inner.Run("LocalTime", func(t *testing.T) {
 			for i := 0; i < numRand; i++ {
 				d1 := randomLocalTime()
 				d2 := sendAndReceive(t, d1).(neo4j.LocalTime)
@@ -309,7 +309,7 @@ func TestTemporalTypes(tt *testing.T) {
 			}
 		})
 
-		rt.Run("OffsetTime", func(t *testing.T) {
+		inner.Run("OffsetTime", func(t *testing.T) {
 			for i := 0; i < numRand; i++ {
 				d1 := randomOffsetTime()
 				d2 := sendAndReceive(t, d1).(neo4j.OffsetTime)
@@ -318,7 +318,7 @@ func TestTemporalTypes(tt *testing.T) {
 			}
 		})
 
-		rt.Run("LocalDateTime", func(t *testing.T) {
+		inner.Run("LocalDateTime", func(t *testing.T) {
 			for i := 0; i < numRand; i++ {
 				d1 := randomLocalDateTime()
 				d2 := sendAndReceive(t, d1).(neo4j.LocalDateTime)
@@ -328,7 +328,7 @@ func TestTemporalTypes(tt *testing.T) {
 			}
 		})
 
-		rt.Run("Offset DateTime", func(t *testing.T) {
+		inner.Run("Offset DateTime", func(t *testing.T) {
 			for i := 0; i < numRand; i++ {
 				d1 := randomOffsetDateTime()
 				d2 := sendAndReceive(t, d1).(time.Time)
@@ -338,7 +338,7 @@ func TestTemporalTypes(tt *testing.T) {
 			}
 		})
 
-		rt.Run("Zoned DateTime", func(t *testing.T) {
+		inner.Run("Zoned DateTime", func(t *testing.T) {
 			for i := 0; i < numRand; i++ {
 				d1 := randomZonedDateTime()
 				d2 := sendAndReceive(t, d1).(time.Time)

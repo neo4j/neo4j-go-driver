@@ -20,14 +20,13 @@
 package test_integration
 
 import (
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
+	"testing"
 
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/test-integration/dbserver"
 )
 
-var _ = Describe("Routing", func() {
+func TestRouting(outer *testing.T) {
 	server := dbserver.GetDbServer()
 
 	var session neo4j.Session
@@ -43,34 +42,34 @@ var _ = Describe("Routing", func() {
 		return driver
 	}
 
-	Specify("should successfully execute read/write when initial address contains unusable items", func() {
+	outer.Run("should successfully execute read/write when initial address contains unusable items", func(t *testing.T) {
 		if !server.IsCluster {
-			Skip("Needs cluster")
+			t.Skip("Needs cluster")
 		}
 		// Rely on address resolving
 		driver := getDriver("neo4j://localhost")
-		Expect(err).To(BeNil())
+		assertNil(t, err)
 		defer driver.Close()
 
 		session = driver.NewSession(neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead})
 		defer session.Close()
 
 		result, err = session.Run("RETURN 1", nil)
-		Expect(err).To(BeNil())
+		assertNil(t, err)
 
 		summary, err = result.Consume()
-		Expect(err).To(BeNil())
-		Expect(summary).NotTo(BeNil())
+		assertNil(t, err)
+		assertNotNil(t, summary)
 	})
 
-	Specify("writes should be visible on followers", func() {
+	outer.Run("writes should be visible on followers", func(t *testing.T) {
 		if !server.IsCluster {
-			Skip("Needs cluster")
+			t.Skip("Needs cluster")
 		}
 		var readCount, writeCount interface{}
 
 		driver := getDriver(server.URI())
-		Expect(err).To(BeNil())
+		assertNil(t, err)
 
 		session = driver.NewSession(neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
 
@@ -90,8 +89,8 @@ var _ = Describe("Routing", func() {
 
 			return 0, nil
 		})
-		Expect(err).To(BeNil())
-		Expect(writeCount).To(BeNumerically("==", 1))
+		assertNil(t, err)
+		assertTrue(t, writeCount == 1)
 
 		readCount, err = session.ReadTransaction(func(tx neo4j.Transaction) (interface{}, error) {
 			readResult, err := tx.Run("MATCH (n:Person {name: 'John'}) RETURN COUNT(*) AS count", nil)
@@ -109,7 +108,7 @@ var _ = Describe("Routing", func() {
 
 			return 0, nil
 		})
-		Expect(err).To(BeNil())
-		Expect(readCount).To(BeNumerically("==", 1))
+		assertNil(t, err)
+		assertTrue(t, readCount == 1)
 	})
-})
+}
