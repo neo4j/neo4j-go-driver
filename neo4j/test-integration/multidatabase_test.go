@@ -46,9 +46,9 @@ func TestMultidatabase(ot *testing.T) {
 		sysSess := driver.NewSession(neo4j.SessionConfig{DatabaseName: "system"})
 		defer sysSess.Close()
 		_, err := sysSess.Run("DROP DATABASE testdb IF EXISTS", nil)
-		assertNoError(ot, err)
+		assertNil(ot, err)
 		_, err = sysSess.Run("CREATE DATABASE testdb", nil)
-		assertNoError(ot, err)
+		assertNil(ot, err)
 	}()
 
 	ot.Run("Node created in test db should not be visible in default db", func(t *testing.T) {
