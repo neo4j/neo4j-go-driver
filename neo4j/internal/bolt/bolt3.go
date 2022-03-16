@@ -97,6 +97,7 @@ func NewBolt3(serverName string, conn net.Conn, logger log.Logger, boltLog log.B
 			buf: make([]byte, 4096),
 			hyd: hydrator{
 				boltLogger: boltLog,
+				boltMajor:  3,
 			},
 			connReadTimeout: -1,
 			logger:          logger,

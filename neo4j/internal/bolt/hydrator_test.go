@@ -31,6 +31,13 @@ import (
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/packstream"
 )
 
+type hydratorTestCase struct {
+	name  string
+	build func()      // Builds/encodes stream same was as server would
+	x     interface{} // Expected hydrated
+	err   error
+}
+
 func TestHydrator(ot *testing.T) {
 	zone := "America/New_York"
 	loc, err := time.LoadLocation(zone)
@@ -39,12 +46,7 @@ func TestHydrator(ot *testing.T) {
 	}
 
 	packer := packstream.Packer{}
-	cases := []struct {
-		name  string
-		build func()      // Builds/encodes stream same was as server would
-		x     interface{} // Expected hydrated
-		err   error
-	}{
+	cases := []hydratorTestCase{
 		{
 			name: "Ignored",
 			build: func() {
@@ -547,8 +549,9 @@ func TestHydrator(ot *testing.T) {
 			},
 			x: &db.Record{Values: []interface{}{
 				dbtype.Node{
-					Id:     19000,
-					Labels: []string{"lbl1", "lbl2", "lbl3"},
+					Id:        19000,
+					ElementId: "19000",
+					Labels:    []string{"lbl1", "lbl2", "lbl3"},
 					Props: map[string]interface{}{
 						"key1": int64(7),
 						"key2": []interface{}{
@@ -584,10 +587,13 @@ func TestHydrator(ot *testing.T) {
 			},
 			x: &db.Record{Values: []interface{}{
 				dbtype.Relationship{
-					Id:      19000,
-					StartId: 19001,
-					EndId:   1000,
-					Type:    "lbl",
+					Id:             19000,
+					ElementId:      "19000",
+					StartId:        19001,
+					StartElementId: "19001",
+					EndId:          1000,
+					EndElementId:   "1000",
+					Type:           "lbl",
 					Props: map[string]interface{}{
 						"key1": int64(7),
 						"key2": []interface{}{
@@ -635,11 +641,11 @@ func TestHydrator(ot *testing.T) {
 			x: &db.Record{Values: []interface{}{
 				dbtype.Path{
 					Nodes: []dbtype.Node{
-						{Id: 3, Labels: []string{"lbl1"}, Props: map[string]interface{}{"key1": int64(7)}},
-						{Id: 7, Labels: []string{"lbl2"}, Props: map[string]interface{}{"key2": int64(9)}},
+						{Id: 3, ElementId: "3", Labels: []string{"lbl1"}, Props: map[string]interface{}{"key1": int64(7)}},
+						{Id: 7, ElementId: "7", Labels: []string{"lbl2"}, Props: map[string]interface{}{"key2": int64(9)}},
 					},
 					Relationships: []dbtype.Relationship{
-						{Id: 9, StartId: 3, EndId: 7, Type: "x", Props: map[string]interface{}{"akey": "aval"}},
+						{Id: 9, ElementId: "9", StartId: 3, StartElementId: "3", EndId: 7, EndElementId: "7", Type: "x", Props: map[string]interface{}{"akey": "aval"}},
 					}},
 			}},
 		},
@@ -647,6 +653,313 @@ func TestHydrator(ot *testing.T) {
 
 	// Shared among calls in real usage so we do the same while testing it.
 	hydrator := hydrator{}
+	for _, c := range cases {
+		ot.Run(c.name, func(t *testing.T) {
+			defer func() {
+				hydrator.err = nil
+			}()
+			if (c.x != nil) == (c.err != nil) {
+				t.Fatalf("test case needs to define either expected result or error (xor)")
+			}
+			packer.Begin([]byte{})
+			c.build()
+			buf, err := packer.End()
+			if err != nil {
+				panic("Build error")
+			}
+			x, err := hydrator.hydrate(buf)
+			if c.err != nil {
+				if !reflect.DeepEqual(err, c.err) {
+					fmt.Printf("%+v", err)
+					t.Fatalf("Expected:\n%+v\n != Actual: \n%+v\n", c.err, err)
+				}
+				return
+			}
+			if err != nil {
+				panic(err)
+			}
+			if !reflect.DeepEqual(x, c.x) {
+				fmt.Printf("%+v", hydrator.cachedSuccess.plan)
+				t.Fatalf("Expected:\n%+v\n != Actual: \n%+v\n", c.x, x)
+			}
+		})
+	}
+}
+
+func TestHydratorBolt5(ot *testing.T) {
+	packer := packstream.Packer{}
+	cases := []hydratorTestCase{
+		{
+			name: "Record with node with element ID",
+			build: func() {
+				packer.StructHeader(byte(msgRecord), 1)
+				packer.ArrayHeader(1)
+				packer.StructHeader('N', 4)
+				packer.Int64(19000)
+				packer.ArrayHeader(3)
+				packer.String("lbl1")
+				packer.String("lbl2")
+				packer.String("lbl3")
+				packer.MapHeader(2)
+				packer.String("key1")
+				packer.Int8(7)
+				packer.String("key2")
+				packer.ArrayHeader(2)
+				packer.StructHeader('X', 3) // Point2D
+				packer.Int64(1)             //
+				packer.Float64(7.123)       //
+				packer.Float64(123.7)       //
+				packer.StructHeader('X', 3) // Point2D
+				packer.Int64(2)             //
+				packer.Float64(7.123)       //
+				packer.Float64(123.7)       //
+				packer.String("19091")
+			},
+			x: &db.Record{Values: []interface{}{
+				dbtype.Node{
+					Id:        19000,
+					ElementId: "19091",
+					Labels:    []string{"lbl1", "lbl2", "lbl3"},
+					Props: map[string]interface{}{
+						"key1": int64(7),
+						"key2": []interface{}{
+							dbtype.Point2D{SpatialRefId: 1, X: 7.123, Y: 123.7},
+							dbtype.Point2D{SpatialRefId: 2, X: 7.123, Y: 123.7},
+						},
+					}},
+			}},
+		},
+		{
+			name: "Record with node with only element ID",
+			build: func() {
+				packer.StructHeader(byte(msgRecord), 1)
+				packer.ArrayHeader(1)
+				packer.StructHeader('N', 4)
+				packer.Nil() // no ID
+				packer.ArrayHeader(3)
+				packer.String("lbl1")
+				packer.String("lbl2")
+				packer.String("lbl3")
+				packer.MapHeader(2)
+				packer.String("key1")
+				packer.Int8(7)
+				packer.String("key2")
+				packer.ArrayHeader(2)
+				packer.StructHeader('X', 3) // Point2D
+				packer.Int64(1)             //
+				packer.Float64(7.123)       //
+				packer.Float64(123.7)       //
+				packer.StructHeader('X', 3) // Point2D
+				packer.Int64(2)             //
+				packer.Float64(7.123)       //
+				packer.Float64(123.7)       //
+				packer.String("19091")      // element ID
+			},
+			x: &db.Record{Values: []interface{}{
+				dbtype.Node{
+					Id:        -1,
+					ElementId: "19091",
+					Labels:    []string{"lbl1", "lbl2", "lbl3"},
+					Props: map[string]interface{}{
+						"key1": int64(7),
+						"key2": []interface{}{
+							dbtype.Point2D{SpatialRefId: 1, X: 7.123, Y: 123.7},
+							dbtype.Point2D{SpatialRefId: 2, X: 7.123, Y: 123.7},
+						},
+					}},
+			}},
+		},
+		{
+			name: "Record with relationship with element ID",
+			build: func() {
+				packer.StructHeader(byte(msgRecord), 1)
+				packer.ArrayHeader(1)
+				packer.StructHeader('R', 8)
+				packer.Int64(19000)
+				packer.Int64(19001)
+				packer.Int64(1000)
+				packer.String("lbl")
+				packer.MapHeader(2)
+				packer.String("key1")
+				packer.Int8(7)
+				packer.String("key2")
+				packer.ArrayHeader(2)
+				packer.StructHeader('X', 3) // Point2D
+				packer.Int64(1)             //
+				packer.Float64(7.123)       //
+				packer.Float64(123.7)       //
+				packer.StructHeader('X', 3) // Point2D
+				packer.Int64(2)             //
+				packer.Float64(7.123)       //
+				packer.Float64(123.7)       //
+				packer.String("19091")      // rel element ID
+				packer.String("19191")      // start element ID
+				packer.String("1001")       // end element ID
+			},
+			x: &db.Record{Values: []interface{}{
+				dbtype.Relationship{
+					Id:             19000,
+					ElementId:      "19091",
+					StartId:        19001,
+					StartElementId: "19191",
+					EndId:          1000,
+					EndElementId:   "1001",
+					Type:           "lbl",
+					Props: map[string]interface{}{
+						"key1": int64(7),
+						"key2": []interface{}{
+							dbtype.Point2D{SpatialRefId: 1, X: 7.123, Y: 123.7},
+							dbtype.Point2D{SpatialRefId: 2, X: 7.123, Y: 123.7},
+						},
+					}},
+			}},
+		},
+		{
+			name: "Record with relationship with only element ID",
+			build: func() {
+				packer.StructHeader(byte(msgRecord), 1)
+				packer.ArrayHeader(1)
+				packer.StructHeader('R', 8)
+				packer.Nil() // no rel ID
+				packer.Nil() // no start ID
+				packer.Nil() // no end ID
+				packer.String("lbl")
+				packer.MapHeader(2)
+				packer.String("key1")
+				packer.Int8(7)
+				packer.String("key2")
+				packer.ArrayHeader(2)
+				packer.StructHeader('X', 3) // Point2D
+				packer.Int64(1)             //
+				packer.Float64(7.123)       //
+				packer.Float64(123.7)       //
+				packer.StructHeader('X', 3) // Point2D
+				packer.Int64(2)             //
+				packer.Float64(7.123)       //
+				packer.Float64(123.7)       //
+				packer.String("19091")      // rel element ID
+				packer.String("19191")      // start element ID
+				packer.String("1001")       // end element ID
+			},
+			x: &db.Record{Values: []interface{}{
+				dbtype.Relationship{
+					Id:             -1,
+					ElementId:      "19091",
+					StartId:        -1,
+					StartElementId: "19191",
+					EndId:          -1,
+					EndElementId:   "1001",
+					Type:           "lbl",
+					Props: map[string]interface{}{
+						"key1": int64(7),
+						"key2": []interface{}{
+							dbtype.Point2D{SpatialRefId: 1, X: 7.123, Y: 123.7},
+							dbtype.Point2D{SpatialRefId: 2, X: 7.123, Y: 123.7},
+						},
+					}},
+			}},
+		},
+		{
+			name: "Record with path with element ID",
+			build: func() {
+				packer.StructHeader(byte(msgRecord), 1)
+				packer.ArrayHeader(1)
+				packer.StructHeader('P', 3)
+				// Two nodes
+				packer.ArrayHeader(2)
+				packer.StructHeader('N', 4) // Node 1
+				packer.Int64(3)
+				packer.ArrayHeader(1)
+				packer.String("lbl1")
+				packer.MapHeader(1)
+				packer.String("key1")
+				packer.Int8(7)
+				packer.String("33")         // node 1 element ID
+				packer.StructHeader('N', 4) // Node 2
+				packer.Int64(7)
+				packer.ArrayHeader(1)
+				packer.String("lbl2")
+				packer.MapHeader(1)
+				packer.String("key2")
+				packer.Int8(9)
+				packer.String("77") // node 2 element ID
+				// Relation node
+				packer.ArrayHeader(1)
+				packer.StructHeader('r', 4)
+				packer.Int(9)
+				packer.String("x")
+				packer.MapHeader(1)
+				packer.String("akey")
+				packer.String("aval")
+				packer.String("99") // rel element ID
+				// Path
+				packer.ArrayHeader(2)
+				packer.Int(1)
+				packer.Int(1)
+			},
+			x: &db.Record{Values: []interface{}{
+				dbtype.Path{
+					Nodes: []dbtype.Node{
+						{Id: 3, ElementId: "33", Labels: []string{"lbl1"}, Props: map[string]interface{}{"key1": int64(7)}},
+						{Id: 7, ElementId: "77", Labels: []string{"lbl2"}, Props: map[string]interface{}{"key2": int64(9)}},
+					},
+					Relationships: []dbtype.Relationship{
+						{Id: 9, ElementId: "99", StartId: 3, StartElementId: "33", EndId: 7, EndElementId: "77", Type: "x", Props: map[string]interface{}{"akey": "aval"}},
+					}},
+			}},
+		},
+		{
+			name: "Record with path with only element ID",
+			build: func() {
+				packer.StructHeader(byte(msgRecord), 1)
+				packer.ArrayHeader(1)
+				packer.StructHeader('P', 3)
+				// Two nodes
+				packer.ArrayHeader(2)
+				packer.StructHeader('N', 4) // Node 1
+				packer.Nil()                // no ID for node 1
+				packer.ArrayHeader(1)
+				packer.String("lbl1")
+				packer.MapHeader(1)
+				packer.String("key1")
+				packer.Int8(7)
+				packer.String("33")         // node 1 element ID
+				packer.StructHeader('N', 4) // Node 2
+				packer.Nil()                // no ID for node 2
+				packer.ArrayHeader(1)
+				packer.String("lbl2")
+				packer.MapHeader(1)
+				packer.String("key2")
+				packer.Int8(9)
+				packer.String("77") // node 2 element ID
+				// Relation node
+				packer.ArrayHeader(1)
+				packer.StructHeader('r', 4)
+				packer.Nil() // no ID for rel
+				packer.String("x")
+				packer.MapHeader(1)
+				packer.String("akey")
+				packer.String("aval")
+				packer.String("99") // rel element ID
+				// Path
+				packer.ArrayHeader(2)
+				packer.Int(1)
+				packer.Int(1)
+			},
+			x: &db.Record{Values: []interface{}{
+				dbtype.Path{
+					Nodes: []dbtype.Node{
+						{Id: -1, ElementId: "33", Labels: []string{"lbl1"}, Props: map[string]interface{}{"key1": int64(7)}},
+						{Id: -1, ElementId: "77", Labels: []string{"lbl2"}, Props: map[string]interface{}{"key2": int64(9)}},
+					},
+					Relationships: []dbtype.Relationship{
+						{Id: -1, ElementId: "99", StartId: -1, StartElementId: "33", EndId: -1, EndElementId: "77", Type: "x", Props: map[string]interface{}{"akey": "aval"}},
+					}},
+			}},
+		},
+	}
+
+	hydrator := hydrator{boltMajor: 5}
 	for _, c := range cases {
 		ot.Run(c.name, func(t *testing.T) {
 			defer func() {
