@@ -39,6 +39,10 @@ type Driver interface {
 	VerifyConnectivity() error
 	// Close the driver and all underlying connections
 	Close() error
+	// IsEncrypted determines whether the driver communication with the server
+	// is encrypted. This is a static check. The function can also be called on
+	// a closed Driver.
+	IsEncrypted() bool
 }
 
 // NewDriver is the entry point to the neo4j driver to create an instance of a Driver. It is the first function to
@@ -84,4 +88,8 @@ func (d *driver) VerifyConnectivity() error {
 
 func (d *driver) Close() error {
 	return d.delegate.Close(context.Background())
+}
+
+func (d *driver) IsEncrypted() bool {
+	return d.delegate.IsEncrypted()
 }

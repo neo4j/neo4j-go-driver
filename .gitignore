@@ -11,3 +11,4 @@ testkit/CAs/
 testkit-backend/testkit-backend
 test-stress/test-stress
 benchmark/main
+/testkit/CustomCAs/

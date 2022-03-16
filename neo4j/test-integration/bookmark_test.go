@@ -21,15 +21,13 @@ package test_integration
 
 import (
 	"errors"
+	"testing"
 
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/test-integration/dbserver"
-
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
 )
 
-var _ = Describe("Bookmark", func() {
+func TestBookmark(outer *testing.T) {
 	server := dbserver.GetDbServer()
 
 	createNodeInTx := func(driver neo4j.Driver) string {
@@ -38,37 +36,30 @@ var _ = Describe("Bookmark", func() {
 
 		_, err := session.WriteTransaction(func(tx neo4j.Transaction) (interface{}, error) {
 			result, err := tx.Run("CREATE ()", nil)
-			Expect(err).To(BeNil())
+			assertNil(outer, err)
 
 			summary, err := result.Consume()
-			Expect(err).To(BeNil())
+			assertNil(outer, err)
 
-			Expect(summary.Counters().NodesCreated()).To(Equal(1))
+			assertEquals(outer, summary.Counters().NodesCreated(), 1)
 
 			return 0, nil
 		})
-		Expect(err).To(BeNil())
+		assertNil(outer, err)
 
 		bookmarks := neo4j.BookmarksToRawValues(session.LastBookmarks())
-		Expect(len(bookmarks)).To(Equal(1))
+		assertEquals(outer, len(bookmarks), 1)
 		return bookmarks[0]
 	}
 
-	Context("session constructed with no bookmarks", func() {
-		var (
-			err     error
-			driver  neo4j.Driver
-			session neo4j.Session
-			result  neo4j.Result
-			summary neo4j.ResultSummary
-		)
+	outer.Run("session constructed with no bookmarks", func(inner *testing.T) {
+		setUp := func() (neo4j.Driver, neo4j.Session) {
+			driver := server.Driver()
+			session := driver.NewSession(neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
+			return driver, session
+		}
 
-		BeforeEach(func() {
-			driver = server.Driver()
-			session = driver.NewSession(neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
-		})
-
-		AfterEach(func() {
+		tearDown := func(session neo4j.Session, driver neo4j.Driver) {
 			if session != nil {
 				session.Close()
 			}
@@ -76,142 +67,155 @@ var _ = Describe("Bookmark", func() {
 			if driver != nil {
 				driver.Close()
 			}
+		}
+
+		inner.Run("when a node is created in auto-commit mode, last bookmark should not be empty", func(t *testing.T) {
+			driver, session := setUp()
+			defer tearDown(session, driver)
+
+			result, err := session.Run("CREATE (p:Person { name: 'Test'})", nil)
+			assertNil(t, err)
+			_, err = result.Consume()
+
+			assertNil(t, err)
+			assertStringsNotEmpty(t, neo4j.BookmarksToRawValues(session.LastBookmarks()))
 		})
 
-		Specify("when a node is created in auto-commit mode, last bookmark should not be empty", func() {
-			result, err = session.Run("CREATE (p:Person { name: 'Test'})", nil)
-			Expect(err).To(BeNil())
+		inner.Run("when a node is created in explicit transaction and committed, last bookmark should not be empty", func(t *testing.T) {
+			driver, session := setUp()
+			defer tearDown(session, driver)
 
-			summary, err = result.Consume()
-			Expect(err).To(BeNil())
-
-			Expect(neo4j.BookmarksToRawValues(session.LastBookmarks())).NotTo(BeEmpty())
-		})
-
-		Specify("when a node is created in explicit transaction and committed, last bookmark should not be empty", func() {
 			tx, err := session.BeginTransaction()
-			Expect(err).To(BeNil())
+			assertNil(t, err)
 
-			result, err = tx.Run("CREATE (p:Person { name: 'Test'})", nil)
-			Expect(err).To(BeNil())
+			result, err := tx.Run("CREATE (p:Person { name: 'Test'})", nil)
+			assertNil(t, err)
 
-			summary, err = result.Consume()
-			Expect(err).To(BeNil())
+			_, err = result.Consume()
+			assertNil(t, err)
 
 			err = tx.Commit()
-			Expect(err).To(BeNil())
+			assertNil(t, err)
 
-			Expect(neo4j.BookmarksToRawValues(session.LastBookmarks())).NotTo(BeEmpty())
+			assertStringsNotEmpty(t, neo4j.BookmarksToRawValues(session.LastBookmarks()))
 		})
 
-		Specify("when a node is created in explicit transaction and rolled back, last bookmark should be empty", func() {
+		inner.Run("when a node is created in explicit transaction and rolled back, last bookmark should be empty", func(t *testing.T) {
+			driver, session := setUp()
+			defer tearDown(session, driver)
+
 			tx, err := session.BeginTransaction()
-			Expect(err).To(BeNil())
+			assertNil(t, err)
 
-			result, err = tx.Run("CREATE (p:Person { name: 'Test'})", nil)
-			Expect(err).To(BeNil())
+			result, err := tx.Run("CREATE (p:Person { name: 'Test'})", nil)
+			assertNil(t, err)
 
-			summary, err = result.Consume()
-			Expect(err).To(BeNil())
+			_, err = result.Consume()
+			assertNil(t, err)
 
 			err = tx.Rollback()
-			Expect(err).To(BeNil())
+			assertNil(t, err)
 
-			Expect(neo4j.BookmarksToRawValues(session.LastBookmarks())).To(BeEmpty())
+			assertStringsEmpty(t, neo4j.BookmarksToRawValues(session.LastBookmarks()))
 		})
 
-		Specify("when a node is created in transaction function, last bookmark should not be empty", func() {
+		inner.Run("when a node is created in transaction function, last bookmark should not be empty", func(t *testing.T) {
+			driver, session := setUp()
+			defer tearDown(session, driver)
+
 			result, err := session.WriteTransaction(func(tx neo4j.Transaction) (interface{}, error) {
 				result, err := tx.Run("CREATE (p:Person { name: 'Test'})", nil)
-				Expect(err).To(BeNil())
+				assertNil(t, err)
 
-				summary, err = result.Consume()
-				Expect(err).To(BeNil())
+				summary, err := result.Consume()
+				assertNil(t, err)
 
 				return summary.Counters().NodesCreated(), nil
 			})
 
-			Expect(err).To(BeNil())
-			Expect(result).To(Equal(1))
-			Expect(neo4j.BookmarksToRawValues(session.LastBookmarks())).NotTo(BeEmpty())
+			assertNil(t, err)
+			assertEquals(t, result, 1)
+			assertStringsNotEmpty(t, neo4j.BookmarksToRawValues(session.LastBookmarks()))
 		})
 
-		Specify("when a node is created in transaction function and rolled back, last bookmark should be empty", func() {
+		inner.Run("when a node is created in transaction function and rolled back, last bookmark should be empty", func(t *testing.T) {
+			driver, session := setUp()
+			defer tearDown(session, driver)
+
 			failWith := errors.New("some error")
 			result, err := session.WriteTransaction(func(tx neo4j.Transaction) (interface{}, error) {
 				result, err := tx.Run("CREATE (p:Person { name: 'Test'})", nil)
-				Expect(err).To(BeNil())
+				assertNil(t, err)
 
-				summary, err = result.Consume()
-				Expect(err).To(BeNil())
+				_, err = result.Consume()
+				assertNil(t, err)
 
 				return 0, failWith
 			})
 
-			Expect(err).To(Equal(failWith))
-			Expect(result).To(BeNil())
-			Expect(neo4j.BookmarksToRawValues(session.LastBookmarks())).To(BeEmpty())
+			assertEquals(t, err, failWith)
+			assertNil(t, result)
+			assertStringsEmpty(t, neo4j.BookmarksToRawValues(session.LastBookmarks()))
 		})
 
-		Specify("when a node is queried in transaction function, last bookmark should not be empty", func() {
+		inner.Run("when a node is queried in transaction function, last bookmark should not be empty", func(t *testing.T) {
+			driver, session := setUp()
+			defer tearDown(session, driver)
+
 			result, err := session.ReadTransaction(func(tx neo4j.Transaction) (interface{}, error) {
 				result, err := tx.Run("MATCH (p:Person) RETURN count(p)", nil)
-				Expect(err).To(BeNil())
+				assertNil(t, err)
 
 				count := 0
 				for result.Next() {
 					count++
 				}
-				Expect(result.Err()).To(BeNil())
+				assertNil(t, result.Err())
 
 				return count, nil
 			})
 
-			Expect(err).To(BeNil())
-			Expect(result).To(Equal(1))
-			Expect(neo4j.BookmarksToRawValues(session.LastBookmarks())).NotTo(BeEmpty())
+			assertNil(t, err)
+			assertEquals(t, result, 1)
+			assertStringsNotEmpty(t, neo4j.BookmarksToRawValues(session.LastBookmarks()))
 		})
 
-		Specify("when a node is created in transaction function and rolled back, last bookmark should be empty", func() {
+		inner.Run("when a node is created in transaction function and rolled back, last bookmark should be empty", func(t *testing.T) {
+			driver, session := setUp()
+			defer tearDown(session, driver)
+
 			failWith := errors.New("some error")
 			result, err := session.ReadTransaction(func(tx neo4j.Transaction) (interface{}, error) {
 				result, err := tx.Run("MATCH (p:Person) RETURN count(p)", nil)
-				Expect(err).To(BeNil())
+				assertNil(t, err)
 
 				count := 0
 				for result.Next() {
 					count++
 				}
-				Expect(result.Err()).To(BeNil())
+				assertNil(t, result.Err())
 
 				return count, failWith
 			})
 
-			Expect(err).To(Equal(failWith))
-			Expect(result).To(BeNil())
-			Expect(neo4j.BookmarksToRawValues(session.LastBookmarks())).To(BeEmpty())
+			assertEquals(t, err, failWith)
+			assertNil(t, result)
+			assertStringsEmpty(t, neo4j.BookmarksToRawValues(session.LastBookmarks()))
 		})
 	})
 
-	Context("session constructed with one bookmark", func() {
-		var (
-			driver   neo4j.Driver
-			session  neo4j.Session
-			bookmark string
-		)
-
-		BeforeEach(func() {
-			driver = server.Driver()
-
-			bookmark = createNodeInTx(driver)
-
-			session = driver.NewSession(neo4j.SessionConfig{
+	outer.Run("session constructed with one bookmark", func(inner *testing.T) {
+		setUp := func() (neo4j.Driver, neo4j.Session, string) {
+			driver := server.Driver()
+			bookmark := createNodeInTx(driver)
+			session := driver.NewSession(neo4j.SessionConfig{
 				AccessMode: neo4j.AccessModeWrite,
-				Bookmarks: neo4j.BookmarksFromRawValues(bookmark),
+				Bookmarks:  neo4j.BookmarksFromRawValues(bookmark),
 			})
-		})
+			return driver, session, bookmark
+		}
 
-		AfterEach(func() {
+		tearDown := func(session neo4j.Session, driver neo4j.Driver) {
 			if session != nil {
 				session.Close()
 			}
@@ -219,63 +223,78 @@ var _ = Describe("Bookmark", func() {
 			if driver != nil {
 				driver.Close()
 			}
-		})
+		}
 
-		Specify("given bookmarks should be reported back by the server after BEGIN", func() {
+		inner.Run("given bookmarks should be reported back by the server after BEGIN", func(t *testing.T) {
+			driver, session, bookmark := setUp()
+			defer tearDown(session, driver)
+
 			tx, err := session.BeginTransaction()
-			Expect(err).To(BeNil())
+			assertNil(t, err)
 			defer tx.Close()
 
-			Expect(neo4j.BookmarksToRawValues(session.LastBookmarks())).To(Equal([]string{bookmark}))
+			assertEquals(t, neo4j.BookmarksToRawValues(session.LastBookmarks()), []string{bookmark})
 		})
 
-		Specify("given bookmarks should be accessible after ROLLBACK", func() {
+		inner.Run("given bookmarks should be accessible after ROLLBACK", func(t *testing.T) {
+			driver, session, bookmark := setUp()
+			defer tearDown(session, driver)
+
 			tx, err := session.BeginTransaction()
-			Expect(err).To(BeNil())
+			assertNil(t, err)
 			defer tx.Close()
 
 			_, err = tx.Run("CREATE ()", nil)
-			Expect(err).To(BeNil())
+			assertNil(t, err)
 
 			err = tx.Rollback()
-			Expect(err).To(BeNil())
+			assertNil(t, err)
 
-			Expect(neo4j.BookmarksToRawValues(session.LastBookmarks())).To(Equal([]string{bookmark}))
+			assertEquals(t, neo4j.BookmarksToRawValues(session.LastBookmarks()), []string{bookmark})
 		})
 
-		Specify("given bookmarks should be accessible when transaction fails", func() {
+		inner.Run("given bookmarks should be accessible when transaction fails", func(t *testing.T) {
+			driver, session, bookmark := setUp()
+			defer tearDown(session, driver)
+
 			tx, err := session.BeginTransaction()
-			Expect(err).To(BeNil())
+			assertNil(t, err)
 			defer tx.Close()
 
 			_, err = tx.Run("RETURN", nil)
-			Expect(err).To(Not(BeNil()))
+			assertNotNil(t, err)
 
 			err = tx.Close()
-			Expect(err).To(BeNil())
-			Expect(neo4j.BookmarksToRawValues(session.LastBookmarks())).To(Equal([]string{bookmark}))
+			assertNil(t, err)
+			assertEquals(t, neo4j.BookmarksToRawValues(session.LastBookmarks()), []string{bookmark})
 		})
 
-		Specify("given bookmarks should be accessible after run", func() {
+		inner.Run("given bookmarks should be accessible after run", func(t *testing.T) {
+			driver, session, bookmark := setUp()
+			defer tearDown(session, driver)
+
 			result, err := session.Run("RETURN 1", nil)
-			Expect(err).To(BeNil())
+			assertNil(t, err)
 
 			_, err = result.Consume()
-			Expect(err).To(BeNil())
+			assertNil(t, err)
 
-			Expect(neo4j.BookmarksToRawValues(session.LastBookmarks())).To(Equal([]string{bookmark}))
+			assertEquals(t, neo4j.BookmarksToRawValues(session.LastBookmarks()), []string{bookmark})
 		})
 
-		Specify("given bookmarks should be accessible after failed run", func() {
-			_, err := session.Run("RETURN", nil)
-			Expect(err).To(Not(BeNil()))
+		inner.Run("given bookmarks should be accessible after failed run", func(t *testing.T) {
+			driver, session, bookmark := setUp()
+			defer tearDown(session, driver)
 
-			Expect(neo4j.BookmarksToRawValues(session.LastBookmarks())).To(Equal([]string{bookmark}))
+			_, err := session.Run("RETURN", nil)
+			assertNotNil(t, err)
+
+			assertEquals(t, neo4j.BookmarksToRawValues(session.LastBookmarks()), []string{bookmark})
 		})
 
 	})
 
-	Context("session constructed with two sets of bookmarks", func() {
+	outer.Run("session constructed with two sets of bookmarks", func(inner *testing.T) {
 		var (
 			driver    neo4j.Driver
 			session   neo4j.Session
@@ -283,20 +302,18 @@ var _ = Describe("Bookmark", func() {
 			bookmark2 string
 		)
 
-		BeforeEach(func() {
-			driver = server.Driver()
+		driver = server.Driver()
 
-			bookmark1 = createNodeInTx(driver)
-			bookmark2 = createNodeInTx(driver)
-			Expect(bookmark1).NotTo(Equal(bookmark2))
+		bookmark1 = createNodeInTx(driver)
+		bookmark2 = createNodeInTx(driver)
+		assertNotEquals(inner, bookmark1, bookmark2)
 
-			session = driver.NewSession(neo4j.SessionConfig{
-				AccessMode: neo4j.AccessModeWrite,
-				Bookmarks:  neo4j.BookmarksFromRawValues(bookmark1, bookmark2),
-			})
+		session = driver.NewSession(neo4j.SessionConfig{
+			AccessMode: neo4j.AccessModeWrite,
+			Bookmarks:  neo4j.BookmarksFromRawValues(bookmark1, bookmark2),
 		})
 
-		AfterEach(func() {
+		defer func() {
 			if session != nil {
 				session.Close()
 			}
@@ -304,56 +321,53 @@ var _ = Describe("Bookmark", func() {
 			if driver != nil {
 				driver.Close()
 			}
-		})
+		}()
 
-		Specify("all bookmarks should be reported back by the server after BEGIN", func() {
+		inner.Run("all bookmarks should be reported back by the server after BEGIN", func(t *testing.T) {
 			tx, err := session.BeginTransaction()
-			Expect(err).To(BeNil())
+			assertNil(t, err)
 			defer tx.Close()
 
-			Expect(neo4j.BookmarksToRawValues(session.LastBookmarks())).To(Equal([]string{bookmark1, bookmark2}))
+			assertEquals(t, neo4j.BookmarksToRawValues(session.LastBookmarks()), []string{bookmark1, bookmark2})
 		})
 
-		Specify("new bookmark should be reported back by the server after committing", func() {
+		inner.Run("new bookmark should be reported back by the server after committing", func(t *testing.T) {
 			tx, err := session.BeginTransaction()
-			Expect(err).To(BeNil())
+			assertNil(t, err)
 			defer tx.Close()
 
 			result, err := tx.Run("CREATE ()", nil)
-			Expect(err).To(BeNil())
+			assertNil(t, err)
 
 			summary, err := result.Consume()
-			Expect(err).To(BeNil())
-			Expect(summary.Counters().NodesCreated()).To(Equal(1))
+			assertNil(t, err)
+			assertEquals(t, summary.Counters().NodesCreated(), 1)
 
 			err = tx.Commit()
-			Expect(err).To(BeNil())
+			assertNil(t, err)
 
-			Expect(neo4j.BookmarksToRawValues(session.LastBookmarks())).ToNot(BeNil())
-			Expect(neo4j.BookmarksToRawValues(session.LastBookmarks())).ToNot(Equal([]string{bookmark1}))
-			Expect(neo4j.BookmarksToRawValues(session.LastBookmarks())).ToNot(Equal([]string{bookmark2}))
+			assertNotNil(t, neo4j.BookmarksToRawValues(session.LastBookmarks()))
+			assertNotEquals(t, neo4j.BookmarksToRawValues(session.LastBookmarks()), []string{bookmark1})
+			assertNotEquals(t, neo4j.BookmarksToRawValues(session.LastBookmarks()), []string{bookmark2})
 		})
+
 	})
 
-	Context("session constructed with unreachable bookmark", func() {
-		var (
-			driver   neo4j.Driver
-			session  neo4j.Session
-			bookmark string
-		)
+	outer.Run("session constructed with unreachable bookmark", func(inner *testing.T) {
 
-		BeforeEach(func() {
-			driver = server.Driver()
+		setUp := func() (neo4j.Driver, neo4j.Session, string) {
+			driver := server.Driver()
 
-			bookmark = createNodeInTx(driver)
+			bookmark := createNodeInTx(driver)
 
-			session = driver.NewSession(neo4j.SessionConfig{
+			session := driver.NewSession(neo4j.SessionConfig{
 				AccessMode: neo4j.AccessModeWrite,
 				Bookmarks:  neo4j.BookmarksFromRawValues(bookmark + "0"),
 			})
-		})
+			return driver, session, bookmark
+		}
 
-		AfterEach(func() {
+		tearDown := func(session neo4j.Session, driver neo4j.Driver) {
 			if session != nil {
 				session.Close()
 			}
@@ -361,21 +375,24 @@ var _ = Describe("Bookmark", func() {
 			if driver != nil {
 				driver.Close()
 			}
-		})
+		}
 
-		Specify("the request should fail", func() {
+		inner.Run("the request should fail", func(t *testing.T) {
+			driver, session, _ := setUp()
+			defer tearDown(session, driver)
+
 			tx, err := session.BeginTransaction()
 
-			Expect(tx).To(BeNil())
+			assertNil(t, tx)
 			neo4jErr := err.(*neo4j.Neo4jError)
 			if server.Version.GreaterThan(V4) {
-				// The error is not retriable since it is on the wrong format
-				Expect(neo4jErr.Code, Equal("Neo.ClientError.Transaction.InvalidBookmark"))
+				// The error is not retryable since it is on the wrong format
+				assertEquals(t, neo4jErr.Code, "Neo.ClientError.Transaction.InvalidBookmark")
 			} else {
-				Expect(neo4jErr.IsRetriableTransient()).To(BeTrue())
-				Expect(neo4jErr.Msg).To(ContainSubstring("not up to the requested version"))
+				assertTrue(t, neo4jErr.IsRetriableTransient())
+				assertStringContains(t, neo4jErr.Msg, "not up to the requested version")
 			}
 		})
-	})
 
-})
+	})
+}

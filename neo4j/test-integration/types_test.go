@@ -20,30 +20,27 @@
 package test_integration
 
 import (
+	"fmt"
 	"math/rand"
-	"reflect"
+	"sort"
+	"testing"
 
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/test-integration/dbserver"
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/ginkgo/extensions/table"
-	. "github.com/onsi/gomega"
 )
 
-var _ = Describe("Types", func() {
+func TestTypes(outer *testing.T) {
 	server := dbserver.GetDbServer()
 	var err error
 	var driver neo4j.Driver
 	var session neo4j.Session
 	var result neo4j.Result
 
-	BeforeEach(func() {
-		driver = server.Driver()
-		session = driver.NewSession(neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
-		Expect(session).NotTo(BeNil())
-	})
+	driver = server.Driver()
+	session = driver.NewSession(neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
+	assertNotNil(outer, session)
 
-	AfterEach(func() {
+	defer func() {
 		if session != nil {
 			session.Close()
 		}
@@ -51,188 +48,188 @@ var _ = Describe("Types", func() {
 		if driver != nil {
 			driver.Close()
 		}
-	})
+	}()
 
-	It("should be able to send and receive boolean property", func() {
+	outer.Run("should be able to send and receive boolean property", func(t *testing.T) {
 		value := true
 		result, err = session.Run("CREATE (n {value: $value}) RETURN n.value", map[string]interface{}{"value": value})
-		Expect(err).To(BeNil())
+		assertNil(t, err)
 
-		Expect(result.Next()).To(BeTrue())
-		Expect(result.Record().Values[0]).To(Equal(value))
-		Expect(result.Next()).To(BeFalse())
-		Expect(result.Err()).To(BeNil())
+		assertTrue(t, result.Next())
+		assertEquals(t, result.Record().Values[0], value)
+		assertFalse(t, result.Next())
+		assertNil(t, result.Err())
 	})
 
-	It("should be able to send and receive byte property", func() {
+	outer.Run("should be able to send and receive byte property", func(t *testing.T) {
 		value := byte(1)
 		result, err = session.Run("CREATE (n {value: $value}) RETURN n.value", map[string]interface{}{"value": value})
-		Expect(err).To(BeNil())
+		assertNil(t, err)
 
-		Expect(result.Next()).To(BeTrue())
-		Expect(result.Record().Values[0]).To(BeAssignableToTypeOf(int64(0)))
-		Expect(result.Record().Values[0]).To(BeNumerically("==", value))
-		Expect(result.Next()).To(BeFalse())
-		Expect(result.Err()).To(BeNil())
+		assertTrue(t, result.Next())
+		assertAssignableToTypeOf(t, result.Record().Values[0], int64(0))
+		assertEquals(t, result.Record().Values[0], int64(value))
+		assertFalse(t, result.Next())
+		assertNil(t, result.Err())
 	})
 
-	It("should be able to send and receive int8 property", func() {
+	outer.Run("should be able to send and receive int8 property", func(t *testing.T) {
 		value := int8(2)
 		result, err = session.Run("CREATE (n {value: $value}) RETURN n.value", map[string]interface{}{"value": value})
-		Expect(err).To(BeNil())
+		assertNil(t, err)
 
-		Expect(result.Next()).To(BeTrue())
-		Expect(result.Record().Values[0]).To(BeAssignableToTypeOf(int64(0)))
-		Expect(result.Record().Values[0]).To(BeNumerically("==", value))
-		Expect(result.Next()).To(BeFalse())
-		Expect(result.Err()).To(BeNil())
+		assertTrue(t, result.Next())
+		assertAssignableToTypeOf(t, result.Record().Values[0], int64(0))
+		assertEquals(t, result.Record().Values[0], int64(value))
+		assertFalse(t, result.Next())
+		assertNil(t, result.Err())
 	})
 
-	It("should be able to send and receive int16 property", func() {
+	outer.Run("should be able to send and receive int16 property", func(t *testing.T) {
 		value := int16(3)
 		result, err = session.Run("CREATE (n {value: $value}) RETURN n.value", map[string]interface{}{"value": value})
-		Expect(err).To(BeNil())
+		assertNil(t, err)
 
-		Expect(result.Next()).To(BeTrue())
-		Expect(result.Record().Values[0]).To(BeAssignableToTypeOf(int64(0)))
-		Expect(result.Record().Values[0]).To(BeNumerically("==", value))
-		Expect(result.Next()).To(BeFalse())
-		Expect(result.Err()).To(BeNil())
+		assertTrue(t, result.Next())
+		assertAssignableToTypeOf(t, result.Record().Values[0], int64(0))
+		assertEquals(t, result.Record().Values[0], int64(value))
+		assertFalse(t, result.Next())
+		assertNil(t, result.Err())
 	})
 
-	It("should be able to send and receive int property", func() {
+	outer.Run("should be able to send and receive int property", func(t *testing.T) {
 		value := int(4)
 		result, err = session.Run("CREATE (n {value: $value}) RETURN n.value", map[string]interface{}{"value": value})
-		Expect(err).To(BeNil())
+		assertNil(t, err)
 
-		Expect(result.Next()).To(BeTrue())
-		Expect(result.Record().Values[0]).To(BeAssignableToTypeOf(int64(0)))
-		Expect(result.Record().Values[0]).To(BeNumerically("==", value))
-		Expect(result.Next()).To(BeFalse())
-		Expect(result.Err()).To(BeNil())
+		assertTrue(t, result.Next())
+		assertAssignableToTypeOf(t, result.Record().Values[0], int64(0))
+		assertEquals(t, result.Record().Values[0], int64(value))
+		assertFalse(t, result.Next())
+		assertNil(t, result.Err())
 	})
 
-	It("should be able to send and receive int32 property", func() {
+	outer.Run("should be able to send and receive int32 property", func(t *testing.T) {
 		value := int32(5)
 		result, err = session.Run("CREATE (n {value: $value}) RETURN n.value", map[string]interface{}{"value": value})
-		Expect(err).To(BeNil())
+		assertNil(t, err)
 
-		Expect(result.Next()).To(BeTrue())
-		Expect(result.Record().Values[0]).To(BeAssignableToTypeOf(int64(0)))
-		Expect(result.Record().Values[0]).To(BeNumerically("==", value))
-		Expect(result.Next()).To(BeFalse())
-		Expect(result.Err()).To(BeNil())
+		assertTrue(t, result.Next())
+		assertAssignableToTypeOf(t, result.Record().Values[0], int64(0))
+		assertEquals(t, result.Record().Values[0], int64(value))
+		assertFalse(t, result.Next())
+		assertNil(t, result.Err())
 	})
 
-	It("should be able to send and receive int64 property", func() {
+	outer.Run("should be able to send and receive int64 property", func(t *testing.T) {
 		value := int64(6)
 		result, err = session.Run("CREATE (n {value: $value}) RETURN n.value", map[string]interface{}{"value": value})
-		Expect(err).To(BeNil())
+		assertNil(t, err)
 
-		Expect(result.Next()).To(BeTrue())
-		Expect(result.Record().Values[0]).To(BeAssignableToTypeOf(int64(0)))
-		Expect(result.Record().Values[0]).To(BeNumerically("==", value))
-		Expect(result.Next()).To(BeFalse())
-		Expect(result.Err()).To(BeNil())
+		assertTrue(t, result.Next())
+		assertAssignableToTypeOf(t, result.Record().Values[0], int64(0))
+		assertEquals(t, result.Record().Values[0], value)
+		assertFalse(t, result.Next())
+		assertNil(t, result.Err())
 	})
 
-	It("should be able to send and receive float32 property", func() {
+	outer.Run("should be able to send and receive float32 property", func(t *testing.T) {
 		value := float32(7.1)
 		result, err = session.Run("CREATE (n {value: $value}) RETURN n.value", map[string]interface{}{"value": value})
-		Expect(err).To(BeNil())
+		assertNil(t, err)
 
-		Expect(result.Next()).To(BeTrue())
-		Expect(result.Record().Values[0]).To(BeAssignableToTypeOf(float64(0)))
-		Expect(result.Record().Values[0]).To(BeNumerically("==", value))
-		Expect(result.Next()).To(BeFalse())
-		Expect(result.Err()).To(BeNil())
+		assertTrue(t, result.Next())
+		assertAssignableToTypeOf(t, result.Record().Values[0], float64(0))
+		assertEquals(t, result.Record().Values[0], float64(value))
+		assertFalse(t, result.Next())
+		assertNil(t, result.Err())
 	})
 
-	It("should be able to send and receive float64 property", func() {
+	outer.Run("should be able to send and receive float64 property", func(t *testing.T) {
 		value := float64(81.9224)
 		result, err = session.Run("CREATE (n {value: $value}) RETURN n.value", map[string]interface{}{"value": value})
-		Expect(err).To(BeNil())
+		assertNil(t, err)
 
-		Expect(result.Next()).To(BeTrue())
-		Expect(result.Record().Values[0]).To(BeAssignableToTypeOf(float64(0)))
-		Expect(result.Record().Values[0]).To(BeNumerically("==", value))
-		Expect(result.Next()).To(BeFalse())
-		Expect(result.Err()).To(BeNil())
+		assertTrue(t, result.Next())
+		assertAssignableToTypeOf(t, result.Record().Values[0], float64(0))
+		assertEquals(t, result.Record().Values[0], value)
+		assertFalse(t, result.Next())
+		assertNil(t, result.Err())
 	})
 
-	It("should be able to send and receive string property", func() {
+	outer.Run("should be able to send and receive string property", func(t *testing.T) {
 		value := "a string"
 		result, err = session.Run("CREATE (n {value: $value}) RETURN n.value", map[string]interface{}{"value": value})
-		Expect(err).To(BeNil())
+		assertNil(t, err)
 
-		Expect(result.Next()).To(BeTrue())
-		Expect(result.Record().Values[0]).To(BeAssignableToTypeOf(""))
-		Expect(result.Record().Values[0]).To(Equal(value))
-		Expect(result.Next()).To(BeFalse())
-		Expect(result.Err()).To(BeNil())
+		assertTrue(t, result.Next())
+		assertAssignableToTypeOf(t, result.Record().Values[0], "")
+		assertEquals(t, result.Record().Values[0], value)
+		assertFalse(t, result.Next())
+		assertNil(t, result.Err())
 	})
 
-	It("should be able to send and receive byte array property", func() {
+	outer.Run("should be able to send and receive byte array property", func(t *testing.T) {
 		value := []byte{1, 2, 3, 4, 5}
 		result, err = session.Run("CREATE (n {value: $value}) RETURN n.value", map[string]interface{}{"value": value})
-		Expect(err).To(BeNil())
+		assertNil(t, err)
 
-		Expect(result.Next()).To(BeTrue())
-		Expect(result.Record().Values[0]).To(BeAssignableToTypeOf([]byte(nil)))
-		Expect(result.Record().Values[0]).To(BeEquivalentTo(value))
-		Expect(result.Next()).To(BeFalse())
-		Expect(result.Err()).To(BeNil())
+		assertTrue(t, result.Next())
+		assertAssignableToTypeOf(t, result.Record().Values[0], []byte(nil))
+		assertEquals(t, result.Record().Values[0], value)
+		assertFalse(t, result.Next())
+		assertNil(t, result.Err())
 	})
 
-	It("should be able to send and receive boolean array property", func() {
+	outer.Run("should be able to send and receive boolean array property", func(t *testing.T) {
 		value := []bool{true, false, false, true}
 		result, err = session.Run("CREATE (n {value: $value}) RETURN n.value", map[string]interface{}{"value": value})
-		Expect(err).To(BeNil())
+		assertNil(t, err)
 
-		Expect(result.Next()).To(BeTrue())
-		Expect(result.Record().Values[0]).To(BeAssignableToTypeOf([]interface{}(nil)))
-		Expect(result.Record().Values[0]).To(Equal([]interface{}{value[0], value[1], value[2], value[3]}))
-		Expect(result.Next()).To(BeFalse())
-		Expect(result.Err()).To(BeNil())
+		assertTrue(t, result.Next())
+		assertAssignableToTypeOf(t, result.Record().Values[0], []interface{}(nil))
+		assertEquals(t, result.Record().Values[0], []interface{}{value[0], value[1], value[2], value[3]})
+		assertFalse(t, result.Next())
+		assertNil(t, result.Err())
 	})
 
-	It("should be able to send and receive int array property", func() {
+	outer.Run("should be able to send and receive int array property", func(t *testing.T) {
 		value := []int{1, 2, 3, 4, 5}
 		result, err = session.Run("CREATE (n {value: $value}) RETURN n.value", map[string]interface{}{"value": value})
-		Expect(err).To(BeNil())
+		assertNil(t, err)
 
-		Expect(result.Next()).To(BeTrue())
-		Expect(result.Record().Values[0]).To(BeAssignableToTypeOf([]interface{}(nil)))
-		Expect(result.Record().Values[0]).To(Equal([]interface{}{int64(1), int64(2), int64(3), int64(4), int64(5)}))
-		Expect(result.Next()).To(BeFalse())
-		Expect(result.Err()).To(BeNil())
+		assertTrue(t, result.Next())
+		assertAssignableToTypeOf(t, result.Record().Values[0], []interface{}(nil))
+		assertEquals(t, result.Record().Values[0], []interface{}{int64(1), int64(2), int64(3), int64(4), int64(5)})
+		assertFalse(t, result.Next())
+		assertNil(t, result.Err())
 	})
 
-	It("should be able to send and receive float64 array property", func() {
+	outer.Run("should be able to send and receive float64 array property", func(t *testing.T) {
 		value := []float64{1.11, 2.22, 3.33, 4.44, 5.55}
 		result, err = session.Run("CREATE (n {value: $value}) RETURN n.value", map[string]interface{}{"value": value})
-		Expect(err).To(BeNil())
+		assertNil(t, err)
 
-		Expect(result.Next()).To(BeTrue())
-		Expect(result.Record().Values[0]).To(BeAssignableToTypeOf([]interface{}(nil)))
-		Expect(result.Record().Values[0]).To(Equal([]interface{}{1.11, 2.22, 3.33, 4.44, 5.55}))
-		Expect(result.Next()).To(BeFalse())
-		Expect(result.Err()).To(BeNil())
+		assertTrue(t, result.Next())
+		assertAssignableToTypeOf(t, result.Record().Values[0], []interface{}(nil))
+		assertEquals(t, result.Record().Values[0], []interface{}{1.11, 2.22, 3.33, 4.44, 5.55})
+		assertFalse(t, result.Next())
+		assertNil(t, result.Err())
 	})
 
-	It("should be able to send and receive string array property", func() {
+	outer.Run("should be able to send and receive string array property", func(t *testing.T) {
 		value := []string{"a", "b", "c", "d", "e"}
 		result, err = session.Run("CREATE (n {value: $value}) RETURN n.value", map[string]interface{}{"value": value})
-		Expect(err).To(BeNil())
+		assertNil(t, err)
 
-		Expect(result.Next()).To(BeTrue())
-		Expect(result.Record().Values[0]).To(BeAssignableToTypeOf([]interface{}(nil)))
-		Expect(result.Record().Values[0]).To(Equal([]interface{}{"a", "b", "c", "d", "e"}))
-		Expect(result.Next()).To(BeFalse())
-		Expect(result.Err()).To(BeNil())
+		assertTrue(t, result.Next())
+		assertAssignableToTypeOf(t, result.Record().Values[0], []interface{}(nil))
+		assertEquals(t, result.Record().Values[0], []interface{}{"a", "b", "c", "d", "e"})
+		assertFalse(t, result.Next())
+		assertNil(t, result.Err())
 	})
 
-	It("should be able to send and receive large string property", func() {
+	outer.Run("should be able to send and receive large string property", func(t *testing.T) {
 		var letters = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
 
 		randSeq := func(n int) string {
@@ -246,92 +243,92 @@ var _ = Describe("Types", func() {
 		value := randSeq(20 * 1024)
 
 		result, err = session.Run("CREATE (n {value: $value}) RETURN n.value", map[string]interface{}{"value": value})
-		Expect(err).To(BeNil())
+		assertNil(t, err)
 
-		Expect(result.Next()).To(BeTrue())
-		Expect(result.Record().Values[0]).To(BeAssignableToTypeOf(""))
-		Expect(result.Record().Values[0]).To(Equal(value))
-		Expect(result.Next()).To(BeFalse())
-		Expect(result.Err()).To(BeNil())
+		assertTrue(t, result.Next())
+		assertAssignableToTypeOf(t, result.Record().Values[0], "")
+		assertEquals(t, result.Record().Values[0], value)
+		assertFalse(t, result.Next())
+		assertNil(t, result.Err())
 	})
 
-	It("should be able to receive a node with properties", func() {
+	outer.Run("should be able to receive a node with properties", func(t *testing.T) {
 		result, err = session.Run("CREATE (n:Person:Manager {id: 1, name: 'a name'}) RETURN n", nil)
-		Expect(err).To(BeNil())
+		assertNil(t, err)
 
-		Expect(result.Next()).To(BeTrue())
+		assertTrue(t, result.Next())
 		node := result.Record().Values[0].(neo4j.Node)
 
-		Expect(node).NotTo(BeNil())
-		Expect(node.Id).NotTo(BeNil())
-		Expect(node.Labels).To(HaveLen(2))
-		Expect(node.Labels).To(ContainElement("Person"))
-		Expect(node.Labels).To(ContainElement("Manager"))
-		Expect(node.Props).To(HaveLen(2))
-		Expect(node.Props).To(HaveKeyWithValue("id", int64(1)))
-		Expect(node.Props).To(HaveKeyWithValue("name", "a name"))
-		Expect(result.Next()).To(BeFalse())
-		Expect(result.Err()).To(BeNil())
+		assertNotNil(t, node)
+		assertNotNil(t, node.Id)
+		assertEquals(t, len(node.Labels), 2)
+		assertStringsHas(t, node.Labels, "Person")
+		assertStringsHas(t, node.Labels, "Manager")
+		assertEquals(t, len(node.Props), 2)
+		assertMapHas(t, node.Props, "id", int64(1))
+		assertMapHas(t, node.Props, "name", "a name")
+		assertFalse(t, result.Next())
+		assertNil(t, result.Err())
 	})
 
-	It("should be able to receive a relationship with properties", func() {
+	outer.Run("should be able to receive a relationship with properties", func(t *testing.T) {
 		result, err = session.Run("CREATE (e:Person:Employee {id: 1, name: 'employee 1'})-[w:WORKS_FOR { from: '2017-01-01' }]->(m:Person:Manager {id: 2, name: 'manager 1'}) RETURN e, w, m", nil)
-		Expect(err).To(BeNil())
+		assertNil(t, err)
 
-		Expect(result.Next()).To(BeTrue())
+		assertTrue(t, result.Next())
 		employee := result.Record().Values[0].(neo4j.Node)
 		worksFor := result.Record().Values[1].(neo4j.Relationship)
 		manager := result.Record().Values[2].(neo4j.Node)
 
-		Expect(employee).NotTo(BeNil())
-		Expect(employee.Id).NotTo(BeNil())
-		Expect(employee.Labels).To(HaveLen(2))
-		Expect(employee.Labels).To(ContainElement("Person"))
-		Expect(employee.Labels).To(ContainElement("Employee"))
-		Expect(employee.Props).To(HaveLen(2))
-		Expect(employee.Props).To(HaveKeyWithValue("id", int64(1)))
-		Expect(employee.Props).To(HaveKeyWithValue("name", "employee 1"))
+		assertNotNil(t, employee)
+		assertNotNil(t, employee.Id)
+		assertEquals(t, len(employee.Labels), 2)
+		assertStringsHas(t, employee.Labels, "Person")
+		assertStringsHas(t, employee.Labels, "Employee")
+		assertEquals(t, len(employee.Props), 2)
+		assertMapHas(t, employee.Props, "id", int64(1))
+		assertMapHas(t, employee.Props, "name", "employee 1")
 
-		Expect(worksFor).NotTo(BeNil())
-		Expect(worksFor.Id).NotTo(BeNil())
-		Expect(worksFor.StartId).To(Equal(employee.Id))
-		Expect(worksFor.EndId).To(Equal(manager.Id))
-		Expect(worksFor.Type).To(Equal("WORKS_FOR"))
-		Expect(worksFor.Props).To(HaveLen(1))
-		Expect(worksFor.Props).To(HaveKeyWithValue("from", "2017-01-01"))
+		assertNotNil(t, worksFor)
+		assertNotNil(t, worksFor.Id)
+		assertEquals(t, worksFor.StartId, employee.Id)
+		assertEquals(t, worksFor.EndId, manager.Id)
+		assertEquals(t, worksFor.Type, "WORKS_FOR")
+		assertEquals(t, len(worksFor.Props), 1)
+		assertMapHas(t, worksFor.Props, "from", "2017-01-01")
 
-		Expect(manager).NotTo(BeNil())
-		Expect(manager.Id).NotTo(BeNil())
-		Expect(manager.Labels).To(HaveLen(2))
-		Expect(manager.Labels).To(ContainElement("Person"))
-		Expect(manager.Labels).To(ContainElement("Manager"))
-		Expect(manager.Props).To(HaveLen(2))
-		Expect(manager.Props).To(HaveKeyWithValue("id", int64(2)))
-		Expect(manager.Props).To(HaveKeyWithValue("name", "manager 1"))
-		Expect(result.Next()).To(BeFalse())
-		Expect(result.Err()).To(BeNil())
+		assertNotNil(t, manager)
+		assertNotNil(t, manager.Id)
+		assertEquals(t, len(manager.Labels), 2)
+		assertStringsHas(t, manager.Labels, "Person")
+		assertStringsHas(t, manager.Labels, "Manager")
+		assertEquals(t, len(manager.Props), 2)
+		assertMapHas(t, manager.Props, "id", int64(2))
+		assertMapHas(t, manager.Props, "name", "manager 1")
+		assertFalse(t, result.Next())
+		assertNil(t, result.Err())
 	})
 
-	It("should be able to receive a path with two nodes and one relationship", func() {
+	outer.Run("should be able to receive a path with two nodes and one relationship", func(t *testing.T) {
 		result, err = session.Run("CREATE p=(e:Person:Employee {id: 1, name: 'employee 1'})-[w:WORKS_FOR { from: '2017-01-01' }]->(m:Person:Manager {id: 2, name: 'manager 1'}) RETURN p, e, w, m", nil)
-		Expect(err).To(BeNil())
-		Expect(result.Next()).To(BeTrue())
+		assertNil(t, err)
+		assertTrue(t, result.Next())
 		path := result.Record().Values[0].(neo4j.Path)
 		employee := result.Record().Values[1].(neo4j.Node)
 		worksFor := result.Record().Values[2].(neo4j.Relationship)
 		manager := result.Record().Values[3].(neo4j.Node)
 
-		Expect(path).NotTo(BeNil())
-		Expect(path.Nodes).To(HaveLen(2))
-		Expect(path.Nodes).To(ContainElement(employee))
-		Expect(path.Nodes).To(ContainElement(manager))
-		Expect(path.Relationships).To(HaveLen(1))
-		Expect(path.Relationships).To(ContainElement(worksFor))
-		Expect(result.Next()).To(BeFalse())
-		Expect(result.Err()).To(BeNil())
+		assertNotNil(t, path)
+		assertEquals(t, len(path.Nodes), 2)
+		assertNodesHas(t, path.Nodes, employee)
+		assertNodesHas(t, path.Nodes, manager)
+		assertEquals(t, len(path.Relationships), 1)
+		assertRelationshipsHas(t, path.Relationships, worksFor)
+		assertFalse(t, result.Next())
+		assertNil(t, result.Err())
 	})
 
-	It("should be able to receive a path with three nodes and two relationship", func() {
+	outer.Run("should be able to receive a path with three nodes and two relationship", func(t *testing.T) {
 		result, err = session.Run(`CREATE (e1:Person:Employee $employee) 
 				CREATE (l1:Person:Lead $lead) 
 				CREATE (m1:Person:Manager $manager) 
@@ -350,8 +347,8 @@ var _ = Describe("Types", func() {
 				"name": "manager 1",
 			},
 		})
-		Expect(err).To(BeNil())
-		Expect(result.Next()).To(BeTrue())
+		assertNil(t, err)
+		assertTrue(t, result.Next())
 
 		path := result.Record().Values[0].(neo4j.Path)
 		employee := result.Record().Values[1].(neo4j.Node)
@@ -360,143 +357,103 @@ var _ = Describe("Types", func() {
 		ledBy := result.Record().Values[4].(neo4j.Relationship)
 		reportsTo := result.Record().Values[5].(neo4j.Relationship)
 
-		Expect(path).NotTo(BeNil())
-		Expect(path.Nodes).To(HaveLen(3))
-		Expect(path.Nodes).To(ContainElement(employee))
-		Expect(path.Nodes).To(ContainElement(lead))
-		Expect(path.Nodes).To(ContainElement(manager))
-		Expect(path.Relationships).To(HaveLen(2))
-		Expect(path.Relationships).To(ContainElement(ledBy))
-		Expect(path.Relationships).To(ContainElement(reportsTo))
-		Expect(result.Next()).To(BeFalse())
-		Expect(result.Err()).To(BeNil())
+		assertNotNil(t, path)
+		assertEquals(t, len(path.Nodes), 3)
+		assertNodesHas(t, path.Nodes, employee)
+		assertNodesHas(t, path.Nodes, lead)
+		assertNodesHas(t, path.Nodes, manager)
+		assertEquals(t, len(path.Relationships), 2)
+		assertRelationshipsHas(t, path.Relationships, ledBy)
+		assertRelationshipsHas(t, path.Relationships, reportsTo)
+		assertFalse(t, result.Next())
+		assertNil(t, result.Err())
 	})
 
-	DescribeTable("should be able to send and receive nil pointer property",
-		func(value interface{}) {
-			result, err = session.Run("CREATE (n {value: $value}) RETURN n.value", map[string]interface{}{"value": value})
-			Expect(err).To(BeNil())
+	outer.Run("should be able to send and receive nil pointer property", func(inner *testing.T) {
+		nilPointers := map[string]interface{}{
+			"boolean":       (*bool)(nil),
+			"byte":          (*byte)(nil),
+			"int8":          (*int8)(nil),
+			"int16":         (*int16)(nil),
+			"int32":         (*int32)(nil),
+			"int64":         (*int64)(nil),
+			"int":           (*int)(nil),
+			"uint8":         (*uint8)(nil),
+			"uint16":        (*uint16)(nil),
+			"uint32":        (*uint32)(nil),
+			"uint64":        (*uint64)(nil),
+			"uint":          (*uint)(nil),
+			"float32":       (*float32)(nil),
+			"float64":       (*float64)(nil),
+			"string":        (*string)(nil),
+			"boolean array": (*[]bool)(nil),
+			"byte array":    (*[]byte)(nil),
+			"int8 array":    (*[]int8)(nil),
+			"int16 array":   (*[]int16)(nil),
+			"int32 array":   (*[]int32)(nil),
+			"int64 array":   (*[]int64)(nil),
+			"int array":     (*[]int)(nil),
+			"uint8 array":   (*[]uint8)(nil),
+			"uint16 array":  (*[]uint16)(nil),
+			"uint32 array":  (*[]uint32)(nil),
+			"uint64 array":  (*[]uint64)(nil),
+			"uint array":    (*[]uint)(nil),
+			"float32 array": (*[]float32)(nil),
+			"float64 array": (*[]float64)(nil),
+			"string array":  (*[]string)(nil),
+		}
 
-			Expect(result.Next()).To(BeTrue())
-			Expect(result.Record().Values[0]).To(BeNil())
-			Expect(result.Next()).To(BeFalse())
-			Expect(result.Err()).To(BeNil())
-		},
-		Entry("boolean", (*bool)(nil)),
-		Entry("byte", (*byte)(nil)),
-		Entry("int8", (*int8)(nil)),
-		Entry("int16", (*int16)(nil)),
-		Entry("int32", (*int32)(nil)),
-		Entry("int64", (*int64)(nil)),
-		Entry("int", (*int)(nil)),
-		Entry("uint8", (*uint8)(nil)),
-		Entry("uint16", (*uint16)(nil)),
-		Entry("uint32", (*uint32)(nil)),
-		Entry("uint64", (*uint64)(nil)),
-		Entry("uint", (*uint)(nil)),
-		Entry("float32", (*float32)(nil)),
-		Entry("float64", (*float64)(nil)),
-		Entry("string", (*string)(nil)),
-		Entry("boolean array", (*[]bool)(nil)),
-		Entry("byte array", (*[]byte)(nil)),
-		Entry("int8 array", (*[]int8)(nil)),
-		Entry("int16 array", (*[]int16)(nil)),
-		Entry("int32 array", (*[]int32)(nil)),
-		Entry("int64 array", (*[]int64)(nil)),
-		Entry("int array", (*[]int)(nil)),
-		Entry("uint8 array", (*[]uint8)(nil)),
-		Entry("uint16 array", (*[]uint16)(nil)),
-		Entry("uint32 array", (*[]uint32)(nil)),
-		Entry("uint64 array", (*[]uint64)(nil)),
-		Entry("uint array", (*[]uint)(nil)),
-		Entry("float32 array", (*[]float32)(nil)),
-		Entry("float64 array", (*[]float64)(nil)),
-		Entry("string array", (*[]string)(nil)),
-	)
+		for _, k := range sortedKeys(nilPointers) {
+			inner.Run(fmt.Sprintf("with %s type", k), func(t *testing.T) {
+				result, err = session.Run("CREATE (n {value: $value}) RETURN n.value", map[string]interface{}{"value": nilPointers[k]})
+				assertNil(t, err)
 
-	Context("Un-convertible Go types", func() {
+				assertTrue(t, result.Next())
+				assertNil(t, result.Record().Values[0])
+				assertFalse(t, result.Next())
+				assertNil(t, result.Err())
+			})
+		}
+
+	})
+
+	outer.Run("Un-convertible Go types", func(inner *testing.T) {
 		type unsupportedType struct {
 		}
 
-		Context("Session.Run", func() {
-			It("should fail when sending as parameter", func() {
+		inner.Run("Session.Run", func(deepT *testing.T) {
+			deepT.Run("should fail when sending as parameter", func(t *testing.T) {
 				result, err = session.Run("CREATE (n {value: $value}) RETURN n.value", map[string]interface{}{"value": unsupportedType{}})
-				Expect(err).ToNot(BeNil())
+				assertNotNil(t, err)
 				//Expect(err).To(BeGenericError(ContainSubstring("unable to convert parameter \"value\" to connector value for run message")))
-				Expect(result).To(BeNil())
+				assertNil(t, result)
 			})
 
-			It("should fail when sending as tx metadata", func() {
+			deepT.Run("should fail when sending as tx metadata", func(t *testing.T) {
 				result, err = session.Run("CREATE (n)", nil, neo4j.WithTxMetadata(map[string]interface{}{"m1": unsupportedType{}}))
-				Expect(err).ToNot(BeNil())
+				assertNotNil(t, err)
 				//Expect(err).To(BeGenericError(ContainSubstring("unable to convert tx metadata to connector value for run message")))
-				Expect(result).To(BeNil())
+				assertNil(t, result)
 			})
 		})
 
-		/* Fails due to lazy transaction start
-		Context("Session.BeginTransaction", func() {
+		inner.Run("Transaction.Run", func(deepT *testing.T) {
 			var tx neo4j.Transaction
 
-			It("should fail when sending as tx metadata", func() {
-				tx, err = session.BeginTransaction(neo4j.WithTxMetadata(map[string]interface{}{"m1": unsupportedType{}}))
-				Expect(err).ToNot(BeNil())
-				//Expect(err).To(BeGenericError(ContainSubstring("unable to convert tx metadata to connector value for begin message")))
-				Expect(tx).To(BeNil())
-			})
-		})
-
-		Context("Session.BeginTransaction", func() {
-			var tx neo4j.Transaction
-
-			It("should fail when sending as tx metadata", func() {
-				tx, err = session.BeginTransaction(neo4j.WithTxMetadata(map[string]interface{}{"m1": unsupportedType{}}))
-				Expect(err).ToNot(BeNil())
-				//Expect(err).To(BeGenericError(ContainSubstring("unable to convert tx metadata to connector value for begin message")))
-				Expect(tx).To(BeNil())
-			})
-		})
-
-		Context("Session.ReadTransaction", func() {
-			It("should fail when sending as tx metadata", func() {
-				result, err := session.ReadTransaction(func(tx neo4j.Transaction) (i interface{}, e error) {
-					return nil, nil
-				}, neo4j.WithTxMetadata(map[string]interface{}{"m1": unsupportedType{}}))
-				Expect(err).ToNot(BeNil())
-				//Expect(err).To(BeGenericError(ContainSubstring("unable to convert tx metadata to connector value for begin message")))
-				Expect(result).To(BeNil())
-			})
-		})
-
-		Context("Session.WriteTransaction", func() {
-			It("should fail when sending as tx metadata", func() {
-				result, err := session.WriteTransaction(func(tx neo4j.Transaction) (i interface{}, e error) {
-					return nil, nil
-				}, neo4j.WithTxMetadata(map[string]interface{}{"m1": unsupportedType{}}))
-				Expect(err).ToNot(BeNil())
-				//Expect(err).To(BeGenericError(ContainSubstring("unable to convert tx metadata to connector value for begin message")))
-				Expect(result).To(BeNil())
-			})
-		})
-		*/
-
-		Context("Transaction.Run", func() {
-			var tx neo4j.Transaction
-
-			It("should fail when sending as tx metadata", func() {
+			deepT.Run("should fail when sending as tx metadata", func(t *testing.T) {
 				tx, err = session.BeginTransaction()
-				Expect(err).To(BeNil())
-				Expect(tx).NotTo(BeNil())
+				defer assertCloses(deepT, tx)
+				assertNil(t, err)
+				assertNotNil(t, tx)
 
 				result, err = tx.Run("CREATE (n)", map[string]interface{}{"unsupported": unsupportedType{}})
-				Expect(err).ToNot(BeNil())
-				//				Expect(err).To(BeGenericError(ContainSubstring("unable to convert parameter \"unsupported\" to connector value for run messag")))
-				Expect(result).To(BeNil())
+				assertNotNil(t, err)
+				assertNil(t, result)
 			})
 		})
 	})
 
-	Context("Aliased types", func() {
+	outer.Run("Aliased types", func(inner *testing.T) {
 		type (
 			booleanAlias      bool
 			byteAlias         byte
@@ -548,135 +505,151 @@ var _ = Describe("Types", func() {
 			stringAliasValue  = stringAlias("a string with alias type")
 		)
 
-		DescribeTable("should be able to send and receive nil pointers",
-			func(value interface{}) {
-				result, err = session.Run("CREATE (n {value: $value}) RETURN n.value", map[string]interface{}{"value": value})
-				Expect(err).To(BeNil())
+		inner.Run("should be able to send and receive nil pointers", func(deepT *testing.T) {
+			nilPointers := map[string]interface{}{
+				"boolean":             (*booleanAlias)(nil),
+				"byte":                (*byteAlias)(nil),
+				"int8":                (*int8Alias)(nil),
+				"int16":               (*int16Alias)(nil),
+				"int32":               (*int32Alias)(nil),
+				"int64":               (*int64Alias)(nil),
+				"int":                 (*intAlias)(nil),
+				"uint8":               (*uint8Alias)(nil),
+				"uint16":              (*uint16Alias)(nil),
+				"uint32":              (*uint32Alias)(nil),
+				"uint64":              (*uint64Alias)(nil),
+				"uint":                (*uintAlias)(nil),
+				"float32":             (*float32Alias)(nil),
+				"float64":             (*float64Alias)(nil),
+				"string":              (*stringAlias)(nil),
+				"boolean array":       (*[]booleanAlias)(nil),
+				"byte array":          (*[]byteAlias)(nil),
+				"int8 array":          (*[]int8Alias)(nil),
+				"int16 array":         (*[]int16Alias)(nil),
+				"int32 array":         (*[]int32Alias)(nil),
+				"int64 array":         (*[]int64Alias)(nil),
+				"int array":           (*[]intAlias)(nil),
+				"uint8 array":         (*[]uint8Alias)(nil),
+				"uint16 array":        (*[]uint16Alias)(nil),
+				"uint32 array":        (*[]uint32Alias)(nil),
+				"uint64 array":        (*[]uint64Alias)(nil),
+				"uint array":          (*[]uintAlias)(nil),
+				"float32 array":       (*[]float32Alias)(nil),
+				"float64 array":       (*[]float64Alias)(nil),
+				"string array":        (*[]stringAlias)(nil),
+				"boolean array alias": (*booleanArrayAlias)(nil),
+				"byte array alias":    (*byteArrayAlias)(nil),
+				"int8 array alias":    (*int8ArrayAlias)(nil),
+				"int16 array alias":   (*int16ArrayAlias)(nil),
+				"int32 array alias":   (*int32ArrayAlias)(nil),
+				"int64 array alias":   (*int64ArrayAlias)(nil),
+				"int array alias":     (*intArrayAlias)(nil),
+				"uint8 array alias":   (*uint8ArrayAlias)(nil),
+				"uint16 array alias":  (*uint16ArrayAlias)(nil),
+				"uint32 array alias":  (*uint32ArrayAlias)(nil),
+				"uint64 array alias":  (*uint64ArrayAlias)(nil),
+				"uint array alias":    (*uintArrayAlias)(nil),
+				"float32 array alias": (*float32ArrayAlias)(nil),
+				"float64 array alias": (*float64ArrayAlias)(nil),
+				"string array alias":  (*stringArrayAlias)(nil),
+			}
 
-				Expect(result.Next()).To(BeTrue())
-				Expect(result.Record().Values[0]).To(BeNil())
-				Expect(result.Next()).To(BeFalse())
-				Expect(result.Err()).To(BeNil())
-			},
-			Entry("boolean", (*booleanAlias)(nil)),
-			Entry("byte", (*byteAlias)(nil)),
-			Entry("int8", (*int8Alias)(nil)),
-			Entry("int16", (*int16Alias)(nil)),
-			Entry("int32", (*int32Alias)(nil)),
-			Entry("int64", (*int64Alias)(nil)),
-			Entry("int", (*intAlias)(nil)),
-			Entry("uint8", (*uint8Alias)(nil)),
-			Entry("uint16", (*uint16Alias)(nil)),
-			Entry("uint32", (*uint32Alias)(nil)),
-			Entry("uint64", (*uint64Alias)(nil)),
-			Entry("uint", (*uintAlias)(nil)),
-			Entry("float32", (*float32Alias)(nil)),
-			Entry("float64", (*float64Alias)(nil)),
-			Entry("string", (*stringAlias)(nil)),
-			Entry("boolean array", (*[]booleanAlias)(nil)),
-			Entry("byte array", (*[]byteAlias)(nil)),
-			Entry("int8 array", (*[]int8Alias)(nil)),
-			Entry("int16 array", (*[]int16Alias)(nil)),
-			Entry("int32 array", (*[]int32Alias)(nil)),
-			Entry("int64 array", (*[]int64Alias)(nil)),
-			Entry("int array", (*[]intAlias)(nil)),
-			Entry("uint8 array", (*[]uint8Alias)(nil)),
-			Entry("uint16 array", (*[]uint16Alias)(nil)),
-			Entry("uint32 array", (*[]uint32Alias)(nil)),
-			Entry("uint64 array", (*[]uint64Alias)(nil)),
-			Entry("uint array", (*[]uintAlias)(nil)),
-			Entry("float32 array", (*[]float32Alias)(nil)),
-			Entry("float64 array", (*[]float64Alias)(nil)),
-			Entry("string array", (*[]stringAlias)(nil)),
-			Entry("boolean array alias", (*booleanArrayAlias)(nil)),
-			Entry("byte array alias", (*byteArrayAlias)(nil)),
-			Entry("int8 array alias", (*int8ArrayAlias)(nil)),
-			Entry("int16 array alias", (*int16ArrayAlias)(nil)),
-			Entry("int32 array alias", (*int32ArrayAlias)(nil)),
-			Entry("int64 array alias", (*int64ArrayAlias)(nil)),
-			Entry("int array alias", (*intArrayAlias)(nil)),
-			Entry("uint8 array alias", (*uint8ArrayAlias)(nil)),
-			Entry("uint16 array alias", (*uint16ArrayAlias)(nil)),
-			Entry("uint32 array alias", (*uint32ArrayAlias)(nil)),
-			Entry("uint64 array alias", (*uint64ArrayAlias)(nil)),
-			Entry("uint array alias", (*uintArrayAlias)(nil)),
-			Entry("float32 array alias", (*float32ArrayAlias)(nil)),
-			Entry("float64 array alias", (*float64ArrayAlias)(nil)),
-			Entry("string array alias", (*stringArrayAlias)(nil)),
+			for _, k := range sortedKeys(nilPointers) {
+				deepT.Run(fmt.Sprintf("with %s type", k), func(t *testing.T) {
+					result, err = session.Run("CREATE (n {value: $value}) RETURN n.value", map[string]interface{}{"value": nilPointers[k]})
+					assertNil(t, err)
+
+					assertTrue(t, result.Next())
+					assertNil(t, result.Record().Values[0])
+					assertFalse(t, result.Next())
+					assertNil(t, result.Err())
+				})
+			}
+
+		},
 		)
 
-		DescribeTable("should be able to send aliased types",
-			func(value interface{}, expected interface{}) {
-				assertEquals := func(actual interface{}) {
-					actualValue := reflect.ValueOf(actual)
+		inner.Run("should be able to send aliased types", func(deepT *testing.T) {
 
-					if actualValue.Kind() == reflect.Slice {
-						expectedItems := make([]interface{}, actualValue.Len())
+			type aliasedValue struct {
+				aliased interface{}
+				value   interface{}
+			}
 
-						for i := 0; i < actualValue.Len(); i++ {
-							expectedItems[i] = actualValue.Index(i).Interface()
-						}
-
-						Expect(actualValue.Interface()).Should(ConsistOf(expectedItems...))
-					} else {
-						Expect(actualValue.Interface()).Should(BeEquivalentTo(expected))
-					}
+			sortedKeys := func(m map[string]aliasedValue) []string {
+				result := make([]string, len(m))
+				i := 0
+				for k := range m {
+					result[i] = k
+					i++
 				}
+				sort.Strings(result)
+				return result
+			}
 
-				result, err = session.Run("CREATE (n {value1: $value1, value2: $value2}) RETURN n.value1, n.value2", map[string]interface{}{"value1": value, "value2": &value})
-				Expect(err).To(BeNil())
+			aliases := map[string]aliasedValue{
+				"boolean":             {boolAliasValue, bool(boolAliasValue)},
+				"byte":                {byteAliasValue, byte(byteAliasValue)},
+				"int8":                {int8AliasValue, int8(int8AliasValue)},
+				"int16":               {int16AliasValue, int16(int16AliasValue)},
+				"int32":               {int32AliasValue, int32(int32AliasValue)},
+				"int64":               {int64AliasValue, int64(int64AliasValue)},
+				"int":                 {intAliasValue, int(intAliasValue)},
+				"uint8":               {uint8AliasValue, uint8(uint8AliasValue)},
+				"uint16":              {uint16AliasValue, uint16(uint16AliasValue)},
+				"uint32":              {uint32AliasValue, uint32(uint32AliasValue)},
+				"uint64":              {uint64AliasValue, uint64(uint64AliasValue)},
+				"uint":                {uintAliasValue, uint(uintAliasValue)},
+				"float32":             {float32AliasValue, float32(float32AliasValue)},
+				"float64":             {float64AliasValue, float64(float64AliasValue)},
+				"string":              {stringAliasValue, string(stringAliasValue)},
+				"boolean array":       {[]booleanAlias{true, false}, []bool{true, false}},
+				"byte array":          {[]byteAlias{'A', 'B', 'C'}, []byte{'A', 'B', 'C'}},
+				"int8 array":          {[]int8Alias{-5, -10, 1, 2, 45}, []int8{-5, -10, 1, 2, 45}},
+				"int16 array":         {[]int16Alias{-412, 9, 0, 124}, []int16{-412, 9, 0, 124}},
+				"int32 array":         {[]int32Alias{-138923, 3123, 2120021312}, []int32{-138923, 3123, 2120021312}},
+				"int64 array":         {[]int64Alias{-1322489234, 1239817239821, -1}, []int64{-1322489234, 1239817239821, -1}},
+				"int array":           {[]intAlias{1123213, -23423442, 83282347423}, []int{1123213, -23423442, 83282347423}},
+				"uint8 array":         {[]uint8Alias{0, 4, 128}, []uint8{0, 4, 128}},
+				"uint16 array":        {[]uint16Alias{12, 5534, 21333}, []uint16{12, 5534, 21333}},
+				"uint32 array":        {[]uint32Alias{21323, 12355343, 3545364}, []uint32{21323, 12355343, 3545364}},
+				"uint64 array":        {[]uint64Alias{129389, 123, 0, 24294323}, []uint64{129389, 123, 0, 24294323}},
+				"uint array":          {[]uintAlias{12309312, 120398213}, []uint{12309312, 120398213}},
+				"float32 array":       {[]float32Alias{12.5863, 32424.43534}, []float32{12.5863, 32424.43534}},
+				"float64 array":       {[]float64Alias{873983.24239, 249872384.9723}, []float64{873983.24239, 249872384.9723}},
+				"string array":        {[]stringAlias{"string 1", "string 2"}, []string{"string 1", "string 2"}},
+				"boolean array alias": {booleanArrayAlias{true, false}, []bool{true, false}},
+				"byte array alias":    {byteArrayAlias{'A', 'B', 'C'}, []byte{'A', 'B', 'C'}},
+				"int8 array alias":    {int8ArrayAlias{-5, -10, 1, 2, 45}, []int8{-5, -10, 1, 2, 45}},
+				"int16 array alias":   {int16ArrayAlias{-412, 9, 0, 124}, []int16{-412, 9, 0, 124}},
+				"int32 array alias":   {int32ArrayAlias{-138923, 3123, 2120021312}, []int32{-138923, 3123, 2120021312}},
+				"int64 array alias":   {int64ArrayAlias{-1322489234, 1239817239821, -1}, []int64{-1322489234, 1239817239821, -1}},
+				"int array alias":     {intArrayAlias{1123213, -23423442, 83282347423}, []int{1123213, -23423442, 83282347423}},
+				"uint8 array alias":   {uint8ArrayAlias{0, 4, 128}, []uint8{0, 4, 128}},
+				"uint16 array alias":  {uint16ArrayAlias{12, 5534, 21333}, []uint16{12, 5534, 21333}},
+				"uint32 array alias":  {uint32ArrayAlias{21323, 12355343, 3545364}, []uint32{21323, 12355343, 3545364}},
+				"uint64 array alias":  {uint64ArrayAlias{129389, 123, 0, 24294323}, []uint64{129389, 123, 0, 24294323}},
+				"uint array alias":    {uintArrayAlias{12309312, 120398213}, []uint{12309312, 120398213}},
+				"float32 array alias": {float32ArrayAlias{12.5863, 32424.43534}, []float32{12.5863, 32424.43534}},
+				"float64 array alias": {float64ArrayAlias{873983.24239, 249872384.9723}, []float64{873983.24239, 249872384.9723}},
+				"string array alias":  {stringArrayAlias{"string 1", "string 2"}, []string{"string 1", "string 2"}},
+			}
 
-				Expect(result.Next()).To(BeTrue())
-				assertEquals(result.Record().Values[0])
-				assertEquals(result.Record().Values[1])
-				Expect(result.Next()).To(BeFalse())
-				Expect(result.Err()).To(BeNil())
-			},
-			Entry("boolean", boolAliasValue, bool(boolAliasValue)),
-			Entry("byte", byteAliasValue, byte(byteAliasValue)),
-			Entry("int8", int8AliasValue, int8(int8AliasValue)),
-			Entry("int16", int16AliasValue, int16(int16AliasValue)),
-			Entry("int32", int32AliasValue, int32(int32AliasValue)),
-			Entry("int64", int64AliasValue, int64(int64AliasValue)),
-			Entry("int", intAliasValue, int(intAliasValue)),
-			Entry("uint8", uint8AliasValue, uint8(uint8AliasValue)),
-			Entry("uint16", uint16AliasValue, uint16(uint16AliasValue)),
-			Entry("uint32", uint32AliasValue, uint32(uint32AliasValue)),
-			Entry("uint64", uint64AliasValue, uint64(uint64AliasValue)),
-			Entry("uint", uintAliasValue, uint(uintAliasValue)),
-			Entry("float32", float32AliasValue, float32(float32AliasValue)),
-			Entry("float64", float64AliasValue, float64(float64AliasValue)),
-			Entry("string", stringAliasValue, string(stringAliasValue)),
-			Entry("boolean array", []booleanAlias{true, false}, []bool{true, false}),
-			Entry("byte array", []byteAlias{'A', 'B', 'C'}, []byte{'A', 'B', 'C'}),
-			Entry("int8 array", []int8Alias{-5, -10, 1, 2, 45}, []int8{-5, -10, 1, 2, 45}),
-			Entry("int16 array", []int16Alias{-412, 9, 0, 124}, []int16{-412, 9, 0, 124}),
-			Entry("int32 array", []int32Alias{-138923, 3123, 2120021312}, []int32{-138923, 3123, 2120021312}),
-			Entry("int64 array", []int64Alias{-1322489234, 1239817239821, -1}, []int64{-1322489234, 1239817239821, -1}),
-			Entry("int array", []intAlias{1123213, -23423442, 83282347423}, []int{1123213, -23423442, 83282347423}),
-			Entry("uint8 array", []uint8Alias{0, 4, 128}, []uint8{0, 4, 128}),
-			Entry("uint16 array", []uint16Alias{12, 5534, 21333}, []uint16{12, 5534, 21333}),
-			Entry("uint32 array", []uint32Alias{21323, 12355343, 3545364}, []uint32{21323, 12355343, 3545364}),
-			Entry("uint64 array", []uint64Alias{129389, 123, 0, 24294323}, []uint64{129389, 123, 0, 24294323}),
-			Entry("uint array", []uintAlias{12309312, 120398213}, []uint{12309312, 120398213}),
-			Entry("float32 array", []float32Alias{12.5863, 32424.43534}, []float32{12.5863, 32424.43534}),
-			Entry("float64 array", []float64Alias{873983.24239, 249872384.9723}, []float64{873983.24239, 249872384.9723}),
-			Entry("string array", []stringAlias{"string 1", "string 2"}, []string{"string 1", "string 2"}),
-			Entry("boolean array alias", booleanArrayAlias{true, false}, []bool{true, false}),
-			Entry("byte array alias", byteArrayAlias{'A', 'B', 'C'}, []byte{'A', 'B', 'C'}),
-			Entry("int8 array alias", int8ArrayAlias{-5, -10, 1, 2, 45}, []int8{-5, -10, 1, 2, 45}),
-			Entry("int16 array alias", int16ArrayAlias{-412, 9, 0, 124}, []int16{-412, 9, 0, 124}),
-			Entry("int32 array alias", int32ArrayAlias{-138923, 3123, 2120021312}, []int32{-138923, 3123, 2120021312}),
-			Entry("int64 array alias", int64ArrayAlias{-1322489234, 1239817239821, -1}, []int64{-1322489234, 1239817239821, -1}),
-			Entry("int array alias", intArrayAlias{1123213, -23423442, 83282347423}, []int{1123213, -23423442, 83282347423}),
-			Entry("uint8 array alias", uint8ArrayAlias{0, 4, 128}, []uint8{0, 4, 128}),
-			Entry("uint16 array alias", uint16ArrayAlias{12, 5534, 21333}, []uint16{12, 5534, 21333}),
-			Entry("uint32 array alias", uint32ArrayAlias{21323, 12355343, 3545364}, []uint32{21323, 12355343, 3545364}),
-			Entry("uint64 array alias", uint64ArrayAlias{129389, 123, 0, 24294323}, []uint64{129389, 123, 0, 24294323}),
-			Entry("uint array alias", uintArrayAlias{12309312, 120398213}, []uint{12309312, 120398213}),
-			Entry("float32 array alias", float32ArrayAlias{12.5863, 32424.43534}, []float32{12.5863, 32424.43534}),
-			Entry("float64 array alias", float64ArrayAlias{873983.24239, 249872384.9723}, []float64{873983.24239, 249872384.9723}),
-			Entry("string array alias", stringArrayAlias{"string 1", "string 2"}, []string{"string 1", "string 2"}),
+			for _, k := range sortedKeys(aliases) {
+				deepT.Run(k, func(t *testing.T) {
+					alias := aliases[k]
+
+					result, err = session.Run("CREATE (n {value1: $value1, value2: $value2}) RETURN n.value1, n.value2", map[string]interface{}{"value1": alias.aliased, "value2": alias.value})
+					assertNil(t, err)
+
+					assertTrue(t, result.Next())
+					assertEquals(t, result.Record().Values[0], alias.aliased)
+					assertEquals(t, result.Record().Values[1], alias.value)
+					assertFalse(t, result.Next())
+					assertNil(t, result.Err())
+				})
+			}
+		},
 		)
 	})
-})
+}

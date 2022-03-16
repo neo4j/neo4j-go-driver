@@ -22,20 +22,18 @@ package test_integration
 import (
 	"fmt"
 	"reflect"
+	"testing"
 	"time"
 
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/db"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/test-integration/dbserver"
-
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
 )
 
-var _ = Describe("Session", func() {
+func TestSession(outer *testing.T) {
 	server := dbserver.GetDbServer()
 
-	Context("with read access mode", func() {
+	outer.Run("with read access mode", func(inner *testing.T) {
 		var (
 			err     error
 			driver  neo4j.Driver
@@ -44,17 +42,15 @@ var _ = Describe("Session", func() {
 			summary neo4j.ResultSummary
 		)
 
-		BeforeEach(func() {
-			driver = server.Driver(func(c *neo4j.Config) {
-				c.Log = neo4j.ConsoleLogger(neo4j.DEBUG)
-			})
-			Expect(driver).NotTo(BeNil())
-
-			session = driver.NewSession(neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead})
-			Expect(session).NotTo(BeNil())
+		driver = server.Driver(func(c *neo4j.Config) {
+			c.Log = neo4j.ConsoleLogger(neo4j.DEBUG)
 		})
+		assertNotNil(inner, driver)
 
-		AfterEach(func() {
+		session = driver.NewSession(neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead})
+		assertNotNil(inner, session)
+
+		defer func() {
 			if session != nil {
 				session.Close()
 			}
@@ -62,111 +58,111 @@ var _ = Describe("Session", func() {
 			if driver != nil {
 				driver.Close()
 			}
-		})
+		}()
 
-		Specify("when a query is executed, it should run and return summary with correct statement", func() {
+		inner.Run("when a query is executed, it should run and return summary with correct statement", func(t *testing.T) {
 			stmt := "UNWIND [1, 2, 3, 4, 5] AS x RETURN x"
 			result, err = session.Run(stmt, nil)
-			Expect(err).To(BeNil())
-			Expect(result).NotTo(BeNil())
+			assertNil(t, err)
+			assertNotNil(t, result)
 
 			summary, err = result.Consume()
-			Expect(err).To(BeNil())
-			Expect(summary).NotTo(BeNil())
+			assertNil(t, err)
+			assertNotNil(t, summary)
 
-			Expect(result.Next()).To(BeFalse())
-			Expect(result.Err()).To(BeNil())
+			assertFalse(t, result.Next())
+			assertNil(t, result.Err())
 
-			Expect(summary.Query().Text()).To(BeIdenticalTo(stmt))
-			Expect(summary.Query().Parameters()).To(BeNil())
+			assertEquals(t, summary.Query().Text(), stmt)
+			assertNil(t, summary.Query().Parameters())
 		})
 
-		Specify("when a query is executed, it should run and return summary with correct statement and params", func() {
+		inner.Run("when a query is executed, it should run and return summary with correct statement and params", func(t *testing.T) {
 			stmt := "UNWIND RANGE(0, $x) AS n RETURN n"
 			params := map[string]interface{}{"x": 1000}
 			result, err = session.Run(stmt, params)
-			Expect(err).To(BeNil())
-			Expect(result).NotTo(BeNil())
+			assertNil(t, err)
+			assertNotNil(t, result)
 
 			summary, err = result.Consume()
-			Expect(err).To(BeNil())
-			Expect(summary).NotTo(BeNil())
+			assertNil(t, err)
+			assertNotNil(t, summary)
 
-			Expect(result.Next()).To(BeFalse())
-			Expect(result.Err()).To(BeNil())
+			assertFalse(t, result.Next())
+			assertNil(t, result.Err())
 
-			Expect(summary.Query().Text()).To(Equal(stmt))
-			Expect(summary.Query().Parameters()).To(Equal(params))
+			assertEquals(t, summary.Query().Text(), stmt)
+			assertEquals(t, summary.Query().Parameters(), params)
 		})
 
-		Specify("when a query is executed, it should run and return summary when consumed", func() {
+		inner.Run("when a query is executed, it should run and return summary when consumed", func(t *testing.T) {
 			stmt := "UNWIND [1, 2, 3, 4, 5] AS x RETURN x"
 			result, err = session.Run(stmt, nil)
-			Expect(err).To(BeNil())
-			Expect(result).NotTo(BeNil())
+			assertNil(t, err)
+			assertNotNil(t, result)
 
 			summary, err = result.Consume()
-			Expect(err).To(BeNil())
-			Expect(summary).NotTo(BeNil())
+			assertNil(t, err)
+			assertNotNil(t, summary)
 
-			Expect(result.Next()).To(BeFalse())
-			Expect(result.Err()).To(BeNil())
+			assertFalse(t, result.Next())
+			assertNil(t, result.Err())
 
-			Expect(summary.StatementType()).To(BeEquivalentTo(neo4j.StatementTypeReadOnly))
+			assertEquals(t, summary.StatementType(), neo4j.StatementTypeReadOnly)
 		})
 
-		Specify("when an invalid query is executed, it should return error", func() {
+		inner.Run("when an invalid query is executed, it should return error", func(t *testing.T) {
 			stmt := "UNWIND RANGE(0,100) RETURN N"
 
 			result, err = session.Run(stmt, nil)
-			Expect(result).To(BeNil())
+			assertNil(t, result)
 			neo4jErr, isNeo4jErr := err.(*neo4j.Neo4jError)
-			Expect(isNeo4jErr).To(BeTrue())
-			Expect(neo4jErr.Classification()).To(Equal("ClientError"))
+			assertTrue(t, isNeo4jErr)
+			assertEquals(t, neo4jErr.Classification(), "ClientError")
 		})
 
-		Specify("when a fail-on-streaming query is executed, it should run and return error when consuming", func() {
+		inner.Run("when a fail-on-streaming query is executed, it should run and return error when consuming", func(t *testing.T) {
 			stmt := "UNWIND [1, 2, 3, 4, 0] AS x RETURN 10 / 0"
 
 			result, err = session.Run(stmt, nil)
 			// Up to the db when the error occurs
 			if err != nil {
-				Expect(result).To(BeNil())
+				assertNil(t, result)
 				//Expect(err).To(BeArithmeticError())
 				neo4jErr, isNeo4jErr := err.(*neo4j.Neo4jError)
-				Expect(isNeo4jErr).To(BeTrue())
-				Expect(neo4jErr.Classification()).To(Equal("ClientError"))
+				assertTrue(t, isNeo4jErr)
+				assertEquals(t, neo4jErr.Classification(), "ClientError")
 				return
 			}
-			Expect(result).NotTo(BeNil())
+			assertNotNil(t, result)
 			summary, err = result.Consume()
 			neo4jErr, isNeo4jErr := err.(*neo4j.Neo4jError)
-			Expect(isNeo4jErr).To(BeTrue())
-			Expect(neo4jErr.Classification()).To(Equal("ClientError"))
+			assertTrue(t, isNeo4jErr)
+			assertEquals(t, neo4jErr.Classification(), "ClientError")
 			//Expect(err).To(BeArithmeticError())
-			Expect(summary).To(BeNil())
+			assertNil(t, summary)
 
-			Expect(result.Next()).To(BeFalse())
+			assertFalse(t, result.Next())
 			neo4jErr, isNeo4jErr = err.(*neo4j.Neo4jError)
-			Expect(isNeo4jErr).To(BeTrue())
-			Expect(neo4jErr.Classification()).To(Equal("ClientError"))
+			assertTrue(t, isNeo4jErr)
+			assertEquals(t, neo4jErr.Classification(), "ClientError")
 			//Expect(result.Err()).To(BeArithmeticError())
 		})
 
-		Specify("when a query is executed, the returned summary should contain correct timer values", func() {
+		inner.Run("when a query is executed, the returned summary should contain correct timer values", func(t *testing.T) {
 			stmt := "UNWIND RANGE(0, 10000) AS N RETURN N"
 
 			result, err = session.Run(stmt, nil)
-			Expect(err).To(BeNil())
+			assertNil(t, err)
 
 			summary, err = result.Consume()
-			Expect(err).To(BeNil())
-			Expect(summary.ResultAvailableAfter()).To(BeNumerically(">=", 0))
-			Expect(summary.ResultConsumedAfter()).To(BeNumerically(">=", 0))
+			assertNil(t, err)
+			assertTrue(t, summary.ResultAvailableAfter() >= 0)
+			assertTrue(t, summary.ResultConsumedAfter() >= 0)
 		})
 	})
 
-	Context("with write access mode", func() {
+	outer.Run("with write access mode", func(inner *testing.T) {
 		var (
 			err     error
 			driver  neo4j.Driver
@@ -175,13 +171,10 @@ var _ = Describe("Session", func() {
 			summary neo4j.ResultSummary
 		)
 
-		BeforeEach(func() {
-			driver = server.Driver()
+		driver = server.Driver()
+		session = driver.NewSession(neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
 
-			session = driver.NewSession(neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
-		})
-
-		AfterEach(func() {
+		defer func() {
 			if session != nil {
 				session.Close()
 			}
@@ -189,114 +182,114 @@ var _ = Describe("Session", func() {
 			if driver != nil {
 				driver.Close()
 			}
-		})
+		}()
 
-		Specify("when nested queries are executed, all queries should run and return results from all queries", func() {
+		inner.Run("when nested queries are executed, all queries should run and return results from all queries", func(t *testing.T) {
 			result, err = session.Run("UNWIND range(1, 100) AS x CREATE (:Property {id: x})", nil)
-			Expect(err).To(BeNil())
+			assertNil(t, err)
 			_, err = result.Consume()
-			Expect(err).To(BeNil())
+			assertNil(t, err)
 
 			result, err = session.Run("UNWIND range(1, 10) AS x CREATE (:Resource {id: x})", nil)
-			Expect(err).To(BeNil())
+			assertNil(t, err)
 			_, err = result.Consume()
-			Expect(err).To(BeNil())
+			assertNil(t, err)
 
 			seenProps := 0
 			seenResources := 0
 			properties, err := session.Run("MATCH (p:Property) RETURN p", nil)
-			Expect(err).To(BeNil())
+			assertNil(t, err)
 			for properties.Next() {
-				Expect(properties.Record()).ToNot(BeNil())
+				assertNotNil(t, properties.Record())
 				seenProps++
 
 				resources, err := session.Run("MATCH (r:Resource) RETURN r", nil)
-				Expect(err).To(BeNil())
+				assertNil(t, err)
 				for resources.Next() {
-					Expect(resources.Record()).ToNot(BeNil())
+					assertNotNil(t, resources.Record())
 					seenResources++
 				}
-				Expect(resources.Err()).To(BeNil())
+				assertNil(t, resources.Err())
 			}
-			Expect(properties.Err()).To(BeNil())
+			assertNil(t, properties.Err())
 
-			Expect(seenProps).To(BeIdenticalTo(100))
-			Expect(seenResources).To(BeIdenticalTo(1000))
+			assertEquals(t, seenProps, 100)
+			assertEquals(t, seenResources, 1000)
 		})
 
-		Specify("when a node is created, summary should contain correct counter values", func() {
+		inner.Run("when a node is created, summary should contain correct counter values", func(t *testing.T) {
 			result, err = session.Run("CREATE (p:Person { name: 'Test'})", nil)
-			Expect(err).To(BeNil())
+			assertNil(t, err)
 
 			summary, err = result.Consume()
 			fmt.Printf("%+v", summary)
-			Expect(err).To(BeNil())
+			assertNil(t, err)
 
-			Expect(summary.Counters().NodesCreated()).To(BeIdenticalTo(1))
-			Expect(summary.Counters().NodesDeleted()).To(BeZero())
-			Expect(summary.Counters().RelationshipsCreated()).To(BeZero())
-			Expect(summary.Counters().RelationshipsDeleted()).To(BeZero())
-			Expect(summary.Counters().PropertiesSet()).To(BeIdenticalTo(1))
-			Expect(summary.Counters().LabelsAdded()).To(BeIdenticalTo(1))
-			Expect(summary.Counters().LabelsRemoved()).To(BeZero())
-			Expect(summary.Counters().IndexesAdded()).To(BeZero())
-			Expect(summary.Counters().IndexesRemoved()).To(BeZero())
-			Expect(summary.Counters().ConstraintsAdded()).To(BeZero())
-			Expect(summary.Counters().ConstraintsRemoved()).To(BeZero())
+			assertEquals(t, summary.Counters().NodesCreated(), 1)
+			assertEquals(t, summary.Counters().NodesDeleted(), 0)
+			assertEquals(t, summary.Counters().RelationshipsCreated(), 0)
+			assertEquals(t, summary.Counters().RelationshipsDeleted(), 0)
+			assertEquals(t, summary.Counters().PropertiesSet(), 1)
+			assertEquals(t, summary.Counters().LabelsAdded(), 1)
+			assertEquals(t, summary.Counters().LabelsRemoved(), 0)
+			assertEquals(t, summary.Counters().IndexesAdded(), 0)
+			assertEquals(t, summary.Counters().IndexesRemoved(), 0)
+			assertEquals(t, summary.Counters().ConstraintsAdded(), 0)
+			assertEquals(t, summary.Counters().ConstraintsRemoved(), 0)
 		})
 
-		Specify("when a node is created, summary should contain correct timer values", func() {
+		inner.Run("when a node is created, summary should contain correct timer values", func(t *testing.T) {
 			result, err = session.Run("CREATE (p:Person { name: 'Test'})", nil)
-			Expect(err).To(BeNil())
+			assertNil(t, err)
 
 			summary, err = result.Consume()
-			Expect(err).To(BeNil())
-			Expect(summary.ResultAvailableAfter()).To(BeNumerically(">=", 0))
-			Expect(summary.ResultConsumedAfter()).To(BeNumerically(">=", 0))
+			assertNil(t, err)
+			assertTrue(t, summary.ResultAvailableAfter() >= 0)
+			assertTrue(t, summary.ResultConsumedAfter() >= 0)
 		})
 
-		Specify("on multiple runs summary counters should be correct", func() {
+		inner.Run("on multiple runs summary counters should be correct", func(t *testing.T) {
 			result, _ = session.Run("CREATE (p:Person { name: 'one'})", nil)
 			summary, _ = result.Consume()
 			counters := summary.Counters()
 
-			Expect(counters.NodesCreated()).To(BeIdenticalTo(1))
-			Expect(counters.NodesDeleted()).To(BeZero())
-			Expect(counters.RelationshipsCreated()).To(BeZero())
-			Expect(counters.RelationshipsDeleted()).To(BeZero())
+			assertEquals(t, counters.NodesCreated(), 1)
+			assertEquals(t, counters.NodesDeleted(), 0)
+			assertEquals(t, counters.RelationshipsCreated(), 0)
+			assertEquals(t, counters.RelationshipsDeleted(), 0)
 
 			result, _ = session.Run("MATCH (p:Person { name: 'one'}) RETURN p", nil)
 			summary, _ = result.Consume()
 			counters = summary.Counters()
 
-			Expect(counters.NodesCreated()).To(BeZero())
-			Expect(counters.NodesDeleted()).To(BeZero())
-			Expect(counters.RelationshipsCreated()).To(BeZero())
-			Expect(counters.RelationshipsDeleted()).To(BeZero())
+			assertEquals(t, counters.NodesCreated(), 0)
+			assertEquals(t, counters.NodesDeleted(), 0)
+			assertEquals(t, counters.RelationshipsCreated(), 0)
+			assertEquals(t, counters.RelationshipsDeleted(), 0)
 		})
 
-		Specify("when one statement fails, the next one should run successfully", func() {
+		inner.Run("when one statement fails, the next one should run successfully", func(t *testing.T) {
 			result, err = session.Run("Invalid Cypher", nil)
-			Expect(result).To(BeNil())
+			assertNil(t, result)
 			neo4jErr, isNeo4jErr := err.(*neo4j.Neo4jError)
-			Expect(isNeo4jErr).To(BeTrue())
-			Expect(neo4jErr.Classification()).To(Equal("ClientError"))
+			assertTrue(t, isNeo4jErr)
+			assertEquals(t, neo4jErr.Classification(), "ClientError")
 
 			result, err = session.Run("RETURN 1", nil)
-			Expect(err).To(BeNil())
+			assertNil(t, err)
 
 			if result.Next() {
-				Expect(result.Record().Values[0]).To(BeEquivalentTo(1))
+				assertEquals(t, result.Record().Values[0], 1)
 			}
-			Expect(result.Next()).To(BeFalse())
-			Expect(result.Err()).To(BeNil())
+			assertFalse(t, result.Next())
+			assertNil(t, result.Err())
 		})
 
-		Specify("when two statements are queued, the second one should cause first one's results to be cached", func() {
+		inner.Run("when two statements are queued, the second one should cause first one's results to be cached", func(t *testing.T) {
 			result1, err := session.Run("UNWIND RANGE(1,10) AS N RETURN N", nil)
-			Expect(err).To(BeNil())
+			assertNil(t, err)
 			result2, err := session.Run("UNWIND RANGE(11,20) AS N RETURN N", nil)
-			Expect(err).To(BeNil())
+			assertNil(t, err)
 
 			result2Values := []int(nil)
 			for result2.Next() {
@@ -304,7 +297,7 @@ var _ = Describe("Session", func() {
 					result2Values = append(result2Values, int(val.(int64)))
 				}
 			}
-			Expect(result2.Err()).To(BeNil())
+			assertNil(t, result2.Err())
 
 			result1Values := []int(nil)
 			for result1.Next() {
@@ -312,13 +305,13 @@ var _ = Describe("Session", func() {
 					result1Values = append(result1Values, int(val.(int64)))
 				}
 			}
-			Expect(result1.Err()).To(BeNil())
+			assertNil(t, result1.Err())
 
-			Expect(result1Values).To(BeEquivalentTo([]int{1, 2, 3, 4, 5, 6, 7, 8, 9, 10}))
-			Expect(result2Values).To(BeEquivalentTo([]int{11, 12, 13, 14, 15, 16, 17, 18, 19, 20}))
+			assertEquals(t, result1Values, []int{1, 2, 3, 4, 5, 6, 7, 8, 9, 10})
+			assertEquals(t, result2Values, []int{11, 12, 13, 14, 15, 16, 17, 18, 19, 20})
 		})
 
-		Specify("when session is closed, pending query result should be discarded", func() {
+		inner.Run("when session is closed, pending query result should be discarded", func(t *testing.T) {
 			var result neo4j.Result
 			var err error
 
@@ -333,14 +326,14 @@ var _ = Describe("Session", func() {
 				return nil
 			}
 
-			Expect(innerExecutor()).To(Succeed())
+			assertNil(t, innerExecutor())
 
 			records, _ := neo4j.Collect(result, nil)
-			Expect(records).NotTo(BeNil())
-			Expect(records).To(HaveLen(0))
+			assertNotNil(t, records)
+			assertEquals(t, len(records), 0)
 		})
 
-		Specify("when session is closed, last pending result shoud be discarded", func() {
+		inner.Run("when session is closed, last pending result shoud be discarded", func(t *testing.T) {
 			var result1, result2 neo4j.Result
 			var err error
 
@@ -359,20 +352,20 @@ var _ = Describe("Session", func() {
 				return nil
 			}
 
-			Expect(innerExecutor()).To(Succeed())
+			assertNil(t, innerExecutor())
 
 			records1, _ := neo4j.Collect(result1, nil)
-			Expect(records1).NotTo(BeNil())
-			Expect(records1).To(HaveLen(100))
-			Expect(records1[0].Values[0]).To(BeEquivalentTo(1))
-			Expect(records1[99].Values[0]).To(BeEquivalentTo(100))
+			assertNotNil(t, records1)
+			assertEquals(t, len(records1), 100)
+			assertEquals(t, records1[0].Values[0], 1)
+			assertEquals(t, records1[99].Values[0], 100)
 
 			records2, _ := neo4j.Collect(result2, nil)
-			Expect(records2).NotTo(BeNil())
-			Expect(records2).To(HaveLen(0))
+			assertNotNil(t, records2)
+			assertEquals(t, len(records2), 0)
 		})
 
-		Specify("when session is closed, pending explicit transaction should be rolled-back", func() {
+		inner.Run("when session is closed, pending explicit transaction should be rolled-back", func(t *testing.T) {
 			var (
 				err      error
 				records1 []*neo4j.Record
@@ -404,29 +397,29 @@ var _ = Describe("Session", func() {
 				return nil
 			}
 
-			Expect(innerExecutor()).To(Succeed())
-			Expect(records1).NotTo(BeNil())
-			Expect(records1).To(HaveLen(100))
-			Expect(records1[0].Values[0]).To(BeEquivalentTo(1))
-			Expect(records1[99].Values[0]).To(BeEquivalentTo(100))
+			assertNil(t, innerExecutor())
+			assertNotNil(t, records1)
+			assertEquals(t, len(records1), 100)
+			assertEquals(t, records1[0].Values[0], 1)
+			assertEquals(t, records1[99].Values[0], 100)
 
-			Expect(records2).NotTo(BeNil())
-			Expect(records2).To(HaveLen(100))
-			Expect(records2[0].Values[0]).To(BeEquivalentTo(1))
-			Expect(records2[0].Values[1]).Should(Equal("Text 1"))
-			Expect(records2[99].Values[0]).To(BeEquivalentTo(100))
-			Expect(records2[99].Values[1]).Should(Equal("Text 100"))
+			assertNotNil(t, records2)
+			assertEquals(t, len(records2), 100)
+			assertEquals(t, records2[0].Values[0], 1)
+			assertEquals(t, records2[0].Values[1], "Text 1")
+			assertEquals(t, records2[99].Values[0], 100)
+			assertEquals(t, records2[99].Values[1], "Text 100")
 
 			newSession := driver.NewSession(neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead})
-			Expect(newSession).NotTo(BeNil())
+			assertNotNil(t, newSession)
 			defer newSession.Close()
 
 			records3, _ := neo4j.Collect(newSession.Run("MATCH (n:TxRollbackOnClose) RETURN n.id, n.text", nil))
-			Expect(records3).To(HaveLen(0))
+			assertEquals(t, len(records3), 0)
 		})
 	})
 
-	Context("V3", func() {
+	outer.Run("V3", func(inner *testing.T) {
 		var (
 			err     error
 			driver  neo4j.Driver
@@ -434,19 +427,17 @@ var _ = Describe("Session", func() {
 			result  neo4j.Result
 		)
 
-		BeforeEach(func() {
-			driver = server.Driver()
-			Expect(driver).NotTo(BeNil())
+		driver = server.Driver()
+		assertNotNil(inner, driver)
 
-			if server.Version.LessThan(V350) {
-				Skip("this test is targeted for server version after neo4j 3.5.0")
-			}
+		if server.Version.LessThan(V350) {
+			inner.Skip("this test is targeted for server version after neo4j 3.5.0")
+		}
 
-			session = driver.NewSession(neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
-			Expect(session).NotTo(BeNil())
-		})
+		session = driver.NewSession(neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
+		assertNotNil(inner, session)
 
-		AfterEach(func() {
+		defer func() {
 			if session != nil {
 				session.Close()
 			}
@@ -454,9 +445,9 @@ var _ = Describe("Session", func() {
 			if driver != nil {
 				driver.Close()
 			}
-		})
+		}()
 
-		It("should set transaction metadata on Session.Run", func() {
+		inner.Run("should set transaction metadata on Session.Run", func(t *testing.T) {
 			metadata := map[string]interface{}{
 				"m1": int64(1),
 				"m2": "some string",
@@ -465,13 +456,13 @@ var _ = Describe("Session", func() {
 			}
 
 			if !server.IsEnterprise {
-				Skip("Can not use dbms.listTransactions on non-enterprise version")
+				t.Skip("Can not use dbms.listTransactions on non-enterprise version")
 			}
 
 			result, err = session.Run("CALL dbms.listTransactions()", nil, neo4j.WithTxMetadata(metadata))
-			Expect(err).To(BeNil())
+			assertNil(t, err)
 
-			var matched bool = false
+			matched := false
 			for result.Next() {
 				if txMetadataInt, ok := result.Record().Get("metaData"); ok {
 					if txMetadata, ok := txMetadataInt.(map[string]interface{}); ok {
@@ -482,12 +473,12 @@ var _ = Describe("Session", func() {
 					}
 				}
 			}
-			Expect(result.Err()).To(BeNil())
+			assertNil(t, result.Err())
 
-			Expect(matched).To(BeTrue(), fmt.Sprintf("dbms.listTransactions did not include a metadata of %v", metadata))
+			assertTrue(t, matched)
 		})
 
-		It("should set transaction metadata on ReadTransaction", func() {
+		inner.Run("should set transaction metadata on ReadTransaction", func(t *testing.T) {
 			metadata := map[string]interface{}{
 				"m1": int64(1),
 				"m2": "some string",
@@ -496,15 +487,15 @@ var _ = Describe("Session", func() {
 			}
 
 			if !server.IsEnterprise {
-				Skip("Can not use dbms.listTransactions on non-enterprise version")
+				t.Skip("Can not use dbms.listTransactions on non-enterprise version")
 			}
 
 			matched, err := session.ReadTransaction(listTransactionsAndMatchMetadataWork(metadata), neo4j.WithTxMetadata(metadata))
-			Expect(err).To(BeNil())
-			Expect(matched).To(BeTrue(), fmt.Sprintf("dbms.listTransactions did not include a metadata of %v", metadata))
+			assertNil(t, err)
+			assertTrue(t, matched.(bool))
 		})
 
-		It("should set transaction metadata on WriteTransaction", func() {
+		inner.Run("should set transaction metadata on WriteTransaction", func(t *testing.T) {
 			metadata := map[string]interface{}{
 				"m1": true,
 				"m2": []byte{0x00, 0x01, 0x02},
@@ -513,21 +504,21 @@ var _ = Describe("Session", func() {
 			}
 
 			if !server.IsEnterprise {
-				Skip("Can not use dbms.listTransactions on non-enterprise version")
+				t.Skip("Can not use dbms.listTransactions on non-enterprise version")
 			}
 
 			matched, err := session.WriteTransaction(listTransactionsAndMatchMetadataWork(metadata), neo4j.WithTxMetadata(metadata))
-			Expect(err).To(BeNil())
-			Expect(matched).To(BeTrue(), fmt.Sprintf("dbms.listTransactions did not include a metadata of %v", metadata))
+			assertNil(t, err)
+			assertTrue(t, matched.(bool))
 		})
 
-		It("should set transaction timeout", func() {
-			createNode(session, "RunTxTimeOut", nil)
+		inner.Run("should set transaction timeout", func(t *testing.T) {
+			createNode(t, session, "RunTxTimeOut", nil)
 
-			session2, tx2 := newSessionAndTx(driver, neo4j.AccessModeWrite)
+			session2, tx2 := newSessionAndTx(t, driver, neo4j.AccessModeWrite)
 			defer session2.Close()
 			defer tx2.Close()
-			updateNodeInTx(tx2, "RunTxTimeOut", map[string]interface{}{"id": 1})
+			updateNodeInTx(t, tx2, "RunTxTimeOut", map[string]interface{}{"id": 1})
 
 			session3 := driver.NewSession(neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
 
@@ -535,7 +526,7 @@ var _ = Describe("Session", func() {
 			// Up to db to determine when error occurs
 			if err != nil {
 				dbErr := err.(*db.Neo4jError)
-				Expect(dbErr.Msg).To(ContainSubstring("terminated"))
+				assertStringContains(t, dbErr.Msg, "terminated")
 				return
 			}
 
@@ -544,26 +535,25 @@ var _ = Describe("Session", func() {
 			// has been terminated. For some reason this should not be considered transient
 			// by the IsTransientError.
 			dbErr := err.(*db.Neo4jError)
-			Expect(dbErr.Msg).To(ContainSubstring("terminated"))
+			assertStringContains(t, dbErr.Msg, "terminated")
 			//Expect(err).To(BeTransientError(nil, ContainSubstring("terminated")))
 		})
 
-		It("should set transaction timeout on WriteTransaction", func() {
-			createNode(session, "WriteTransactionTxTimeOut", nil)
+		inner.Run("should set transaction timeout on WriteTransaction", func(t *testing.T) {
+			createNode(t, session, "WriteTransactionTxTimeOut", nil)
 
-			session2, tx2 := newSessionAndTx(driver, neo4j.AccessModeWrite)
+			session2, tx2 := newSessionAndTx(t, driver, neo4j.AccessModeWrite)
 			defer session2.Close()
 			defer tx2.Close()
-			updateNodeInTx(tx2, "WriteTransactionTxTimeOut", map[string]interface{}{"id": 1})
+			updateNodeInTx(t, tx2, "WriteTransactionTxTimeOut", map[string]interface{}{"id": 1})
 
 			session3 := driver.NewSession(neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
 
-			_, err := session3.WriteTransaction(updateNodeWork("WriteTransactionTxTimeOut", map[string]interface{}{"id": 2}), neo4j.WithTxTimeout(1*time.Second))
-			Expect(err).ToNot(BeNil())
+			_, err := session3.WriteTransaction(updateNodeWork(t, "WriteTransactionTxTimeOut", map[string]interface{}{"id": 2}), neo4j.WithTxTimeout(1*time.Second))
+			assertNotNil(t, err)
 			dbErr := err.(*db.Neo4jError)
-			Expect(dbErr.Msg).To(ContainSubstring("terminated"))
+			assertStringContains(t, dbErr.Msg, "terminated")
 			//Expect(err).To(BeTransientError(nil, ContainSubstring("terminated")))
 		})
 	})
-
-})
+}

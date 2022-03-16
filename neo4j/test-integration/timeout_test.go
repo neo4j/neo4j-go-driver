@@ -20,19 +20,17 @@
 package test_integration
 
 import (
+	"testing"
 	"time"
 
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/test-integration/dbserver"
-
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
 )
 
-var _ = Describe("Timeout and Lifetime", func() {
+func TestTimeoutAndLifetime(outer *testing.T) {
 	server := dbserver.GetDbServer()
 
-	It("should error when ConnectionAcquisitionTimeout is hit", func() {
+	outer.Run("should error when ConnectionAcquisitionTimeout is hit", func(t *testing.T) {
 		var err error
 		var driver neo4j.Driver
 		var session1, session2 neo4j.Session
@@ -41,23 +39,22 @@ var _ = Describe("Timeout and Lifetime", func() {
 			config.ConnectionAcquisitionTimeout = 1 * time.Second
 			config.MaxConnectionPoolSize = 1
 		})
-		Expect(err).To(BeNil())
-		Expect(driver).NotTo(BeNil())
+		assertNil(t, err)
+		assertNotNil(t, driver)
 		defer driver.Close()
 
-		session1, _ = newSessionAndTx(driver, neo4j.AccessModeRead)
+		session1, _ = newSessionAndTx(t, driver, neo4j.AccessModeRead)
 		defer session1.Close()
 
 		session2 = driver.NewSession(neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead})
-		Expect(session2).NotTo(BeNil())
+		assertNotNil(t, session2)
 		defer session2.Close()
 
 		_, err = session2.Run("RETURN 1", nil)
-		Expect(err).ToNot(BeNil())
-		//Expect(err).To(test.BeConnectorErrorWithCode(0x601))
+		assertNotNil(t, err)
 	})
 
-	It("should timeout connection when SocketConnectTimeout is hit", func() {
+	outer.Run("should timeout connection when SocketConnectTimeout is hit", func(t *testing.T) {
 		var err error
 		var driver neo4j.Driver
 		var session neo4j.Session
@@ -65,16 +62,15 @@ var _ = Describe("Timeout and Lifetime", func() {
 		driver, err = neo4j.NewDriver("bolt://10.255.255.1:8080", server.AuthToken(), server.ConfigFunc(), func(config *neo4j.Config) {
 			config.SocketConnectTimeout = 1 * time.Second
 		})
-		Expect(err).To(BeNil())
-		Expect(driver).NotTo(BeNil())
+		assertNil(t, err)
+		assertNotNil(t, driver)
 		defer driver.Close()
 
 		session = driver.NewSession(neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead})
 		defer session.Close()
 
 		_, err = session.BeginTransaction()
-		Expect(err).ToNot(BeNil())
-		//Expect(err).To(test.BeConnectorErrorWithCode(6))
+		assertNotNil(t, err)
 	})
 
-})
+}

@@ -28,14 +28,11 @@ import (
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/dbtype"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/test-integration/dbserver"
-
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
 )
 
-var _ = Describe("Examples", func() {
+func TestExamples(outer *testing.T) {
 
-	Context("Single Instance", func() {
+	outer.Run("Single Instance", func(inner *testing.T) {
 		var (
 			uri      string
 			username string
@@ -44,184 +41,168 @@ var _ = Describe("Examples", func() {
 
 		server := dbserver.GetDbServer()
 
-		BeforeEach(func() {
-			uri = server.BoltURI()
-			username = server.Username
-			password = server.Password
-		})
+		uri = server.BoltURI()
+		username = server.Username
+		password = server.Password
 
-		Specify("Hello World", func() {
+		inner.Run("Hello World", func(t *testing.T) {
 			greeting, err := helloWorld(uri, username, password)
 
-			Expect(err).To(BeNil())
-			Expect(greeting).To(ContainSubstring("hello, world"))
+			assertNil(t, err)
+			assertStringContains(t, greeting, "hello, world")
 		})
 
-		Specify("Driver Lifecycle", func() {
+		inner.Run("Driver Lifecycle", func(t *testing.T) {
 			driver, err := createDriver(uri, username, password)
-			Expect(err).To(BeNil())
-			Expect(driver).NotTo(BeNil())
+			assertNil(t, err)
+			assertNotNil(t, driver)
 
 			err = closeDriver(driver)
-			Expect(err).To(BeNil())
+			assertNil(t, err)
 		})
 
-		Specify("Basic Authentication", func() {
+		inner.Run("Basic Authentication", func(t *testing.T) {
 			driver, err := createDriverWithBasicAuth(uri, username, password)
-			Expect(err).To(BeNil())
-			Expect(driver).NotTo(BeNil())
+			assertNil(t, err)
+			assertNotNil(t, driver)
 
 			err = driver.Close()
-			Expect(err).To(BeNil())
+			assertNil(t, err)
 		})
 
-		Specify("Config - With Max Retry Time", func() {
+		inner.Run("Config - With Max Retry Time", func(t *testing.T) {
 			driver, err := createDriverWithMaxRetryTime(uri, username, password)
-			Expect(err).To(BeNil())
-			Expect(driver).NotTo(BeNil())
+			assertNil(t, err)
+			assertNotNil(t, driver)
 
 			err = driver.Close()
-			Expect(err).To(BeNil())
+			assertNil(t, err)
 		})
 
-		Specify("Config - With Customized Connection Pool", func() {
+		inner.Run("Config - With Customized Connection Pool", func(t *testing.T) {
 			driver, err := createDriverWithCustomizedConnectionPool(uri, username, password)
-			Expect(err).To(BeNil())
-			Expect(driver).NotTo(BeNil())
+			assertNil(t, err)
+			assertNotNil(t, driver)
 
 			err = driver.Close()
-			Expect(err).To(BeNil())
+			assertNil(t, err)
 		})
 
-		Specify("Config - With Connection Timeout", func() {
+		inner.Run("Config - With Connection Timeout", func(t *testing.T) {
 			driver, err := createDriverWithConnectionTimeout(uri, username, password)
-			Expect(err).To(BeNil())
-			Expect(driver).NotTo(BeNil())
+			assertNil(t, err)
+			assertNotNil(t, driver)
 
 			err = driver.Close()
-			Expect(err).To(BeNil())
+			assertNil(t, err)
 		})
 
-		/*
-			Specify("Service Unavailable", func() {
-				driver, err := createDriverWithMaxRetryTime("bolt://localhost:8080", username, password)
-				Expect(err).To(BeNil())
-				Expect(driver).NotTo(BeNil())
-				defer driver.Close()
-
-				err = createItem(driver)
-				errDescr := err.Error()
-				Expect(errDescr).To(ContainSubstring("retryable operation failed to complete after"))
-				//Expect(err).To(test.BeGenericError(ContainSubstring("retryable operation failed to complete after")))
-			})
-		*/
-
-		Specify("Session", func() {
+		inner.Run("Session", func(t *testing.T) {
 			driver, err := createDriverWithMaxRetryTime(uri, username, password)
-			Expect(err).To(BeNil())
-			Expect(driver).NotTo(BeNil())
+			assertNil(t, err)
+			assertNotNil(t, driver)
 			defer driver.Close()
 
 			err = addPersonInSession(driver, "Tom")
-			Expect(err).To(BeNil())
+			assertNil(t, err)
 			count, err := countNodes(driver, "Person", "name", "Tom")
-			Expect(err).To(BeNil())
-			Expect(count).To(BeNumerically("==", 1))
+			assertNil(t, err)
+			assertEquals(t, count, int64(1))
 		})
 
-		Specify("Autocommit Transaction", func() {
+		inner.Run("Autocommit Transaction", func(t *testing.T) {
 			driver, err := createDriverWithMaxRetryTime(uri, username, password)
-			Expect(err).To(BeNil())
-			Expect(driver).NotTo(BeNil())
+			assertNil(t, err)
+			assertNotNil(t, driver)
 			defer driver.Close()
 
 			err = addPersonInAutoCommitTx(driver, "Shanon")
-			Expect(err).To(BeNil())
+			assertNil(t, err)
 			count, err := countNodes(driver, "Person", "name", "Shanon")
-			Expect(err).To(BeNil())
-			Expect(count).To(BeNumerically("==", 1))
+			assertNil(t, err)
+			assertEquals(t, count, int64(1))
 		})
 
-		Specify("Pass Bookmarks", func() {
+		inner.Run("Pass Bookmarks", func(t *testing.T) {
 			driver, err := createDriverWithMaxRetryTime(uri, username, password)
-			Expect(err).To(BeNil())
-			Expect(driver).NotTo(BeNil())
+			assertNil(t, err)
+			assertNotNil(t, driver)
 			defer driver.Close()
 
 			err = addEmployAndMakeFriends(driver)
-			Expect(err).To(BeNil())
+			assertNil(t, err)
 
 			count, err := countNodes(driver, "Person", "name", "Alice")
-			Expect(err).To(BeNil())
-			Expect(count).To(BeNumerically("==", 1))
+			assertNil(t, err)
+			assertEquals(t, count, int64(1))
 
 			count, err = countNodes(driver, "Person", "name", "Bob")
-			Expect(err).To(BeNil())
-			Expect(count).To(BeNumerically("==", 1))
+			assertNil(t, err)
+			assertEquals(t, count, int64(1))
 
 			count, err = countNodes(driver, "Company", "name", "LexCorp")
-			Expect(err).To(BeNil())
-			Expect(count).To(BeNumerically("==", 1))
+			assertNil(t, err)
+			assertEquals(t, count, int64(1))
 
 			count, err = countNodes(driver, "Company", "name", "Wayne Enterprises")
-			Expect(err).To(BeNil())
-			Expect(count).To(BeNumerically("==", 1))
+			assertNil(t, err)
+			assertEquals(t, count, int64(1))
 		})
 
-		Specify("Read/Write Transaction", func() {
+		inner.Run("Read/Write Transaction", func(t *testing.T) {
 			driver, err := createDriverWithMaxRetryTime(uri, username, password)
-			Expect(err).To(BeNil())
-			Expect(driver).NotTo(BeNil())
+			assertNil(t, err)
+			assertNotNil(t, driver)
 			defer driver.Close()
 
 			id, err := addPersonNode(driver, "Jason")
-			Expect(err).To(BeNil())
-			Expect(id).To(BeNumerically(">=", 0))
+			assertNil(t, err)
+			assertTrue(t, id >= 0)
 		})
 
-		Specify("Get People", func() {
+		inner.Run("Get People", func(t *testing.T) {
 			driver, err := createDriverWithMaxRetryTime(uri, username, password)
-			Expect(err).To(BeNil())
-			Expect(driver).NotTo(BeNil())
+			assertNil(t, err)
+			assertNotNil(t, driver)
 			defer driver.Close()
 
 			id, err := addPersonNode(driver, "Annie")
-			Expect(err).To(BeNil())
-			Expect(id).To(BeNumerically(">=", 0))
+			assertNil(t, err)
+			assertTrue(t, id >= 0)
 
 			id, err = addPersonNode(driver, "Joe")
-			Expect(err).To(BeNil())
-			Expect(id).To(BeNumerically(">=", 0))
+			assertNil(t, err)
+			assertTrue(t, id >= 0)
 
 			people, err := getPeople(driver)
-			Expect(err).To(BeNil())
-			Expect(people).To(ContainElement("Annie"))
-			Expect(people).To(ContainElement("Joe"))
+			assertNil(t, err)
+			assertStringsHas(t, people, "Annie")
+			assertStringsHas(t, people, "Joe")
 		})
 
-		Specify("Result Retain", func() {
+		inner.Run("Result Retain", func(t *testing.T) {
 			driver, err := createDriverWithMaxRetryTime(uri, username, password)
-			Expect(err).To(BeNil())
-			Expect(driver).NotTo(BeNil())
+			assertNil(t, err)
+			assertNotNil(t, driver)
 			defer driver.Close()
 
 			id, err := addPersonNode(driver, "Carl")
-			Expect(err).To(BeNil())
-			Expect(id).To(BeNumerically(">=", 0))
+			assertNil(t, err)
+			assertTrue(t, id >= 0)
 
 			id, err = addPersonNode(driver, "Thomas")
-			Expect(err).To(BeNil())
-			Expect(id).To(BeNumerically(">=", 0))
+			assertNil(t, err)
+			assertTrue(t, id >= 0)
 
 			count, err := addPersonsAsEmployees(driver, "Acme")
-			Expect(err).To(BeNil())
-			Expect(count).To(BeNumerically(">=", 2))
+			assertNil(t, err)
+			assertTrue(t, count >= 2)
 		})
 
-		Specify("Point2D", func() {
+		inner.Run("Point2D", func(t *testing.T) {
 			driver, err := createDriverWithMaxRetryTime(uri, username, password)
-			Expect(err).To(BeNil())
-			Expect(driver).NotTo(BeNil())
+			assertNil(t, err)
+			assertNotNil(t, driver)
 			defer driver.Close()
 
 			// tag::geospatial-types-point2d[]
@@ -241,16 +222,16 @@ var _ = Describe("Examples", func() {
 			// end::geospatial-types-point2d[]
 
 			session := driver.NewSession(neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
-			Expect(session).ToNot(BeNil())
+			assertNotNil(t, session)
 			defer session.Close()
 
 			recordWithCartesian, err := echo(session, cartesian)
-			Expect(err).To(BeNil())
-			Expect(recordWithCartesian).ToNot(BeNil())
+			assertNil(t, err)
+			assertNotNil(t, recordWithCartesian)
 
 			recordWithWgs84, err := echo(session, wgs84)
-			Expect(err).To(BeNil())
-			Expect(recordWithWgs84).ToNot(BeNil())
+			assertNil(t, err)
+			assertNotNil(t, recordWithWgs84)
 
 			// tag::geospatial-types-point2d[]
 
@@ -259,7 +240,7 @@ var _ = Describe("Examples", func() {
 			fieldCartesian, _ := field.(dbtype.Point2D)
 
 			// Serializing
-			fieldCartesian.String() // Point{srId=7203, x=2.500000, y=-2.000000}
+			_ = fieldCartesian.String() // Point{srId=7203, x=2.500000, y=-2.000000}
 
 			// Acessing members
 			print(fieldCartesian.X)            // 2.500000
@@ -271,7 +252,7 @@ var _ = Describe("Examples", func() {
 			fieldWgs84 := field.(dbtype.Point2D)
 
 			// Serializing
-			fieldWgs84.String() // Point{srId=4326, x=-1.500000, y=1.00000}
+			_ = fieldWgs84.String() // Point{srId=4326, x=-1.500000, y=1.00000}
 
 			// Acessing members
 			print(fieldWgs84.X)            // -1.500000
@@ -279,21 +260,21 @@ var _ = Describe("Examples", func() {
 			print(fieldWgs84.SpatialRefId) // 4326
 			// end::geospatial-types-point2d[]
 
-			Expect(fieldCartesian.String()).To(Equal("Point{srId=7203, x=2.500000, y=-2.000000}"))
-			Expect(fieldCartesian.X).To(Equal(cartesian.X))
-			Expect(fieldCartesian.Y).To(Equal(cartesian.Y))
-			Expect(fieldCartesian.SpatialRefId).To(Equal(cartesian.SpatialRefId))
+			assertEquals(t, fieldCartesian.String(), "Point{srId=7203, x=2.500000, y=-2.000000}")
+			assertEquals(t, fieldCartesian.X, cartesian.X)
+			assertEquals(t, fieldCartesian.Y, cartesian.Y)
+			assertEquals(t, fieldCartesian.SpatialRefId, cartesian.SpatialRefId)
 
-			Expect(fieldWgs84.String()).To(Equal("Point{srId=4326, x=-1.500000, y=1.000000}"))
-			Expect(fieldWgs84.X).To(Equal(wgs84.X))
-			Expect(fieldWgs84.Y).To(Equal(wgs84.Y))
-			Expect(fieldWgs84.SpatialRefId).To(Equal(wgs84.SpatialRefId))
+			assertEquals(t, fieldWgs84.String(), "Point{srId=4326, x=-1.500000, y=1.000000}")
+			assertEquals(t, fieldWgs84.X, wgs84.X)
+			assertEquals(t, fieldWgs84.Y, wgs84.Y)
+			assertEquals(t, fieldWgs84.SpatialRefId, wgs84.SpatialRefId)
 		})
 
-		Specify("Point3D", func() {
+		inner.Run("Point3D", func(t *testing.T) {
 			driver, err := createDriverWithMaxRetryTime(uri, username, password)
-			Expect(err).To(BeNil())
-			Expect(driver).NotTo(BeNil())
+			assertNil(t, err)
+			assertNotNil(t, driver)
 			defer driver.Close()
 
 			// tag::geospatial-types-point3d[]
@@ -315,16 +296,16 @@ var _ = Describe("Examples", func() {
 			// end::geospatial-types-point3d[]
 
 			session := driver.NewSession(neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
-			Expect(session).ToNot(BeNil())
+			assertNotNil(t, session)
 			defer session.Close()
 
 			recordWithCartesian, err := echo(session, cartesian)
-			Expect(err).To(BeNil())
-			Expect(recordWithCartesian).ToNot(BeNil())
+			assertNil(t, err)
+			assertNotNil(t, recordWithCartesian)
 
 			recordWithWgs84, err := echo(session, wgs84)
-			Expect(err).To(BeNil())
-			Expect(recordWithWgs84).ToNot(BeNil())
+			assertNil(t, err)
+			assertNotNil(t, recordWithWgs84)
 
 			// tag::geospatial-types-point3d[]
 
@@ -333,7 +314,7 @@ var _ = Describe("Examples", func() {
 			fieldCartesian := field.(dbtype.Point3D)
 
 			// Serializing
-			fieldCartesian.String() // Point{srId=9157, x=2.500000, y=-2.000000, z=2.000000}
+			_ = fieldCartesian.String() // Point{srId=9157, x=2.500000, y=-2.000000, z=2.000000}
 
 			// Acessing members
 			print(fieldCartesian.X)            // 2.500000
@@ -346,7 +327,7 @@ var _ = Describe("Examples", func() {
 			fieldWgs84 := field.(dbtype.Point3D)
 
 			// Serializing
-			fieldWgs84.String() // Point{srId=4979, x=-1.500000, y=1.00000, z=3.000000}
+			_ = fieldWgs84.String() // Point{srId=4979, x=-1.500000, y=1.00000, z=3.000000}
 
 			// Acessing members
 			print(fieldWgs84.X)            // -1.500000
@@ -355,49 +336,20 @@ var _ = Describe("Examples", func() {
 			print(fieldWgs84.SpatialRefId) // 4979
 			// end::geospatial-types-point3d[]
 
-			Expect(fieldCartesian.String()).To(Equal("Point{srId=9157, x=2.500000, y=-2.000000, z=2.000000}"))
-			Expect(fieldCartesian.X).To(Equal(cartesian.X))
-			Expect(fieldCartesian.Y).To(Equal(cartesian.Y))
-			Expect(fieldCartesian.Z).To(Equal(cartesian.Z))
-			Expect(fieldCartesian.SpatialRefId).To(Equal(cartesian.SpatialRefId))
+			assertEquals(t, fieldCartesian.String(), "Point{srId=9157, x=2.500000, y=-2.000000, z=2.000000}")
+			assertEquals(t, fieldCartesian.X, cartesian.X)
+			assertEquals(t, fieldCartesian.Y, cartesian.Y)
+			assertEquals(t, fieldCartesian.Z, cartesian.Z)
+			assertEquals(t, fieldCartesian.SpatialRefId, cartesian.SpatialRefId)
 
-			Expect(fieldWgs84.String()).To(Equal("Point{srId=4979, x=-1.500000, y=1.000000, z=3.000000}"))
-			Expect(fieldWgs84.X).To(Equal(wgs84.X))
-			Expect(fieldWgs84.Y).To(Equal(wgs84.Y))
-			Expect(fieldWgs84.Z).To(Equal(wgs84.Z))
-			Expect(fieldWgs84.SpatialRefId).To(Equal(wgs84.SpatialRefId))
+			assertEquals(t, fieldWgs84.String(), "Point{srId=4979, x=-1.500000, y=1.000000, z=3.000000}")
+			assertEquals(t, fieldWgs84.X, wgs84.X)
+			assertEquals(t, fieldWgs84.Y, wgs84.Y)
+			assertEquals(t, fieldWgs84.Z, wgs84.Z)
+			assertEquals(t, fieldWgs84.SpatialRefId, wgs84.SpatialRefId)
 		})
 	})
-
-	/*
-		Context("Causal Cluster", func() {
-			server := dbserver.GetDbServer()
-			username := server.Username
-			password := server.Password
-
-			Specify("Config - Address Resolver", func() {
-				if !server.IsCluster {
-					Skip("Need cluster")
-				}
-				var addresses []neo4j.ServerAddress
-				for _, server := range server.ClusterMembers {
-					addresses = append(addresses, &url.URL{Host: server.HostnameAndPort})
-				}
-
-				driver, err := createDriverWithAddressResolver("neo4j://x.acme.com", username, password, addresses...)
-				Expect(err).To(BeNil())
-				Expect(driver).NotTo(BeNil())
-
-				err = createItem(driver)
-				Expect(err).To(BeNil())
-
-				err = driver.Close()
-				Expect(err).To(BeNil())
-			})
-		})
-	*/
-
-})
+}
 
 // tag::hello-world[]
 func helloWorld(uri, username, password string) (string, error) {
@@ -474,23 +426,10 @@ func createDriverWithCustomAuth(uri, principal, credentials, realm, scheme strin
 // end::custom-auth[]
 
 // tag::config-unencrypted[]
-/*
-func createDriverWithoutEncryption(uri, username, password string) (neo4j.Driver, error) {
-	return neo4j.NewDriver(uri, neo4j.BasicAuth(username, password, ""), func(config *neo4j.Config) {
-	})
-}
-
 // end::config-unencrypted[]
 
 // tag::config-trust[]
-func createDriverWithTrustStrategy(uri, username, password string) (neo4j.Driver, error) {
-	return neo4j.NewDriver(uri, neo4j.BasicAuth(username, password, ""), func(config *neo4j.Config) {
-		config.TrustStrategy = neo4j.TrustAny(true)
-	})
-}
-
 // end::config-trust[]
-*/
 
 // tag::config-custom-resolver[]
 func createDriverWithAddressResolver(virtualURI, username, password string, addresses ...neo4j.ServerAddress) (neo4j.Driver, error) {
@@ -811,7 +750,7 @@ func addEmployAndMakeFriends(driver neo4j.Driver) error {
 
 	session := driver.NewSession(neo4j.SessionConfig{
 		AccessMode: neo4j.AccessModeRead,
-		Bookmarks: neo4j.CombineBookmarks(bookmarks1, bookmarks2, bookmarks3),
+		Bookmarks:  neo4j.CombineBookmarks(bookmarks1, bookmarks2, bookmarks3),
 	})
 	defer session.Close()
 

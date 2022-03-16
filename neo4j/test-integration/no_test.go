@@ -21,8 +21,12 @@ package test_integration
 
 import (
 	"crypto/rand"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/dbtype"
+	"io"
 	"math"
 	"math/big"
+	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/test-integration/dbserver"
@@ -38,10 +42,162 @@ var (
 	V4   = dbserver.VersionOf("4.0.0")
 )
 
-func assertNoError(t *testing.T, err error) {
+func assertCloses(t *testing.T, closer io.Closer) {
 	t.Helper()
-	if err != nil {
-		t.Fatalf("Expected no error but got: %s", err)
+	assertNil(t, closer.Close())
+}
+
+func assertAssignableToTypeOf(t *testing.T, x, y interface{}) {
+	t.Helper()
+	xType := reflect.TypeOf(x)
+	yType := reflect.TypeOf(y)
+	if !xType.AssignableTo(yType) {
+		t.Fatalf("expected %v to be assignable to type of %v, but was not", x, y)
+	}
+}
+
+func assertNil(t *testing.T, v interface{}) {
+	t.Helper()
+	if !isNil(v) {
+		t.Fatalf("expected nil (or default value), got %+v", v)
+	}
+}
+
+func assertNotNil(t *testing.T, v interface{}) {
+	t.Helper()
+	if isNil(v) {
+		t.Fatalf("expected not nil, got nil")
+	}
+}
+
+func assertEquals(t *testing.T, a, b interface{}) {
+	t.Helper()
+
+	if reflect.TypeOf(a).Kind() == reflect.Slice && reflect.TypeOf(b).Kind() == reflect.Slice {
+		assertSliceEquals(t, a, b)
+		return
+	}
+	if reflect.TypeOf(a).Kind() == reflect.Array && reflect.TypeOf(b).Kind() == reflect.Array {
+		assertArrayEquals(t, a, b)
+		return
+	}
+	convertedA := a
+	if a != nil && b != nil && reflect.TypeOf(a).ConvertibleTo(reflect.TypeOf(b)) {
+		convertedA = reflect.ValueOf(a).Convert(reflect.TypeOf(b)).Interface()
+	}
+	if !reflect.DeepEqual(convertedA, b) {
+		t.Fatalf("expected %+v to equal %+v, but did not", a, b)
+	}
+}
+
+func assertSliceEquals(t *testing.T, a, b interface{}) {
+	t.Helper()
+
+	valueA := reflect.ValueOf(a)
+	valueB := reflect.ValueOf(b)
+	lengthA := valueA.Len()
+	if lengthA != valueB.Len() {
+		t.Fatalf("expected %+v to equal %+v, but did not", a, b)
+	}
+	for i := 0; i < lengthA; i++ {
+		assertEquals(t,
+			valueA.Index(i).Interface(),
+			valueB.Index(i).Interface(),
+		)
+	}
+}
+
+func assertArrayEquals(t *testing.T, a, b interface{}) {
+	t.Helper()
+
+	valueA := reflect.ValueOf(a)
+	valueB := reflect.ValueOf(b)
+	lengthA := reflect.TypeOf(a).Len()
+	if lengthA != reflect.TypeOf(b).Len() {
+		t.Fatalf("expected %+v to equal %+v, but did not", a, b)
+	}
+	for i := 0; i < lengthA; i++ {
+		assertEquals(t,
+			valueA.Index(i).Interface(),
+			valueB.Index(i).Interface(),
+		)
+	}
+}
+
+func assertNotEquals(t *testing.T, a, b interface{}) {
+	t.Helper()
+
+	convertedA := a
+	if a != nil && b != nil && reflect.TypeOf(a).ConvertibleTo(reflect.TypeOf(b)) {
+		convertedA = reflect.ValueOf(a).Convert(reflect.TypeOf(b)).Interface()
+	}
+	if reflect.DeepEqual(convertedA, b) {
+		t.Fatalf("expected %+v to not equal %+v, but did", a, b)
+	}
+}
+
+func assertStringsNotEmpty(t *testing.T, xs []string) {
+	t.Helper()
+	if len(xs) == 0 {
+		t.Fatalf("expected %+v to be not empty, but was empty", xs)
+	}
+}
+
+func assertStringsHas(t *testing.T, xs []string, x string) {
+	t.Helper()
+	for _, s := range xs {
+		if s == x {
+			return
+		}
+	}
+	t.Fatalf("expected %+v to contain %s but did not", xs, x)
+}
+
+func assertNodesHas(t *testing.T, xs []dbtype.Node, x dbtype.Node) {
+	t.Helper()
+	for _, s := range xs {
+		if reflect.DeepEqual(x, s) {
+			return
+		}
+	}
+	t.Fatalf("expected %+v to contain %v but did not", xs, x)
+}
+
+func assertRelationshipsHas(t *testing.T, xs []dbtype.Relationship, x dbtype.Relationship) {
+	t.Helper()
+	for _, s := range xs {
+		if reflect.DeepEqual(x, s) {
+			return
+		}
+	}
+	t.Fatalf("expected %+v to contain %v but did not", xs, x)
+}
+
+func assertStringsEmpty(t *testing.T, xs []string) {
+	t.Helper()
+	if len(xs) != 0 {
+		t.Fatalf("expected %+v to be empty, but was", xs)
+	}
+}
+
+func assertTrue(t *testing.T, b bool) {
+	t.Helper()
+	if !b {
+		t.Fatalf("expected true but was false")
+	}
+}
+
+func assertFalse(t *testing.T, b bool) {
+	t.Helper()
+	if b {
+		t.Fatalf("expected false but was true")
+	}
+}
+
+func assertStringContains(t *testing.T, s, sub string) {
+	t.Helper()
+	if !strings.Contains(s, sub) {
+		t.Fatalf("expected %q to contain %q but did not", s, sub)
 	}
 }
 
@@ -63,6 +219,17 @@ func assertDbError(t *testing.T, rec *db.Record, sum *db.Summary, err error) {
 	t.Helper()
 	if rec != nil || err == nil || sum != nil {
 		t.Fatalf("Should only be an error, %+v, %+v, %+v", rec, sum, err)
+	}
+}
+
+func assertMapHas(t *testing.T, m map[string]interface{}, k string, v interface{}) {
+	t.Helper()
+	value, found := m[k]
+	if !found {
+		t.Fatalf("map %v does not have key %s", m, k)
+	}
+	if !reflect.DeepEqual(v, value) {
+		t.Fatalf("map %v value %v at key %s does not equal %v", m, value, k, v)
 	}
 }
 
@@ -140,4 +307,16 @@ func single(t *testing.T, driver neo4j.Driver, cypher string, params map[string]
 		t.Fatal(err)
 	}
 	return val
+}
+
+// from https://github.com/onsi/gomega
+func isNil(a interface{}) bool {
+	if a == nil {
+		return true
+	}
+	switch reflect.TypeOf(a).Kind() {
+	case reflect.Chan, reflect.Func, reflect.Interface, reflect.Map, reflect.Ptr, reflect.Slice:
+		return reflect.ValueOf(a).IsNil()
+	}
+	return false
 }
