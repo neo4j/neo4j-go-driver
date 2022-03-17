@@ -29,6 +29,9 @@ import (
 )
 
 func TestDriver(outer *testing.T) {
+	if testing.Short() {
+		outer.Skip()
+	}
 	server := dbserver.GetDbServer()
 
 	outer.Run("VerifyConnectivity", func(inner *testing.T) {

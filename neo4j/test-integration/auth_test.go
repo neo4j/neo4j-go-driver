@@ -26,7 +26,10 @@ import (
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/test-integration/dbserver"
 )
 
-func TestAuthentication(tt *testing.T) {
+func TestAuthentication(outer *testing.T) {
+	if testing.Short() {
+		outer.Skip()
+	}
 	server := dbserver.GetDbServer()
 
 	getDriverAndSession := func(token neo4j.AuthToken) (neo4j.Driver, neo4j.Session) {
@@ -38,7 +41,7 @@ func TestAuthentication(tt *testing.T) {
 		return driver, driver.NewSession(neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead})
 	}
 
-	tt.Run("when wrong credentials are provided, it should fail with authentication error", func(t *testing.T) {
+	outer.Run("when wrong credentials are provided, it should fail with authentication error", func(t *testing.T) {
 		token := neo4j.BasicAuth("wrong", "wrong", "")
 		driver, session := getDriverAndSession(token)
 		defer driver.Close()

@@ -19,5 +19,4 @@ if __name__ == "__main__":
     if os.environ.get("TEST_IN_TEAMCITY", False):
         cmd = cmd + ["-v", "-json"]
 
-    run(cmd + ["./neo4j"])
-    run(cmd + ["./neo4j/internal/..."])
+    run(cmd + ["-short", "./..."])

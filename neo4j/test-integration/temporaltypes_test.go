@@ -32,9 +32,9 @@ import (
 )
 
 func TestTemporalTypes(outer *testing.T) {
-	const (
-		numberOfRandomValues = 200
-	)
+	if testing.Short() {
+		outer.Skip()
+	}
 
 	server := dbserver.GetDbServer()
 	var driver neo4j.Driver

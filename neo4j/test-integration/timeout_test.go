@@ -28,6 +28,10 @@ import (
 )
 
 func TestTimeoutAndLifetime(outer *testing.T) {
+	if testing.Short() {
+		outer.Skip()
+	}
+
 	server := dbserver.GetDbServer()
 
 	outer.Run("should error when ConnectionAcquisitionTimeout is hit", func(t *testing.T) {
