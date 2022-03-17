@@ -25,6 +25,7 @@ import (
 
 // Intermediate representation of part of path
 type relNode struct {
+	// Deprecated: id is deprecated and will be removed in 6.0. Use elementId instead.
 	id        int64
 	elementId string
 	name      string
