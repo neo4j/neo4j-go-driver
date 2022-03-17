@@ -27,7 +27,11 @@ import (
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/test-integration/dbserver"
 )
 
-func TestSpatialTypes(st *testing.T) {
+func TestSpatialTypes(outer *testing.T) {
+	if testing.Short() {
+		outer.Skip()
+	}
+
 	const (
 		WGS84SrID       uint32 = 4326
 		WGS843DSrID     uint32 = 4979
@@ -38,7 +42,7 @@ func TestSpatialTypes(st *testing.T) {
 	server := dbserver.GetDbServer()
 	driver := server.Driver()
 	if server.Version.LessThan(V340) {
-		st.Skip("Spatial types are only available after neo4j 3.4.0 release")
+		outer.Skip("Spatial types are only available after neo4j 3.4.0 release")
 	}
 
 	// Returns a random 2D/3D point (depending on seq) with random values for X, Y and Z when applicable.
@@ -103,7 +107,7 @@ func TestSpatialTypes(st *testing.T) {
 	}
 
 	// Verifies that a single 2D point can be received.
-	st.Run("Receive", func(rt *testing.T) {
+	outer.Run("Receive", func(rt *testing.T) {
 		rt.Run("Point2D", func(t *testing.T) {
 			p1 := single(t, driver, "RETURN point({x: 39.111748, y:-76.775635})", nil).(neo4j.Point2D)
 			p2 := neo4j.Point2D{X: 39.111748, Y: -76.775635, SpatialRefId: CartesianSrID}
@@ -118,7 +122,7 @@ func TestSpatialTypes(st *testing.T) {
 		})
 	})
 
-	st.Run("Send", func(tt *testing.T) {
+	outer.Run("Send", func(tt *testing.T) {
 		// Verifies that a single 2D point can be sent (and received)
 		tt.Run("Point2D", func(t *testing.T) {
 			p1 := neo4j.Point2D{SpatialRefId: WGS84SrID, X: 51.5044585, Y: -0.105658}

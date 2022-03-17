@@ -28,6 +28,9 @@ import (
 )
 
 func TestBookmark(outer *testing.T) {
+	if testing.Short() {
+		outer.Skip()
+	}
 	server := dbserver.GetDbServer()
 
 	createNodeInTx := func(driver neo4j.Driver) string {

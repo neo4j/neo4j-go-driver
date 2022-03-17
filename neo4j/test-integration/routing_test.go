@@ -27,6 +27,9 @@ import (
 )
 
 func TestRouting(outer *testing.T) {
+	if testing.Short() {
+		outer.Skip()
+	}
 	server := dbserver.GetDbServer()
 
 	var session neo4j.Session

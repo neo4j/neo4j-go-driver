@@ -29,6 +29,10 @@ import (
 )
 
 func TestTransaction(outer *testing.T) {
+	if testing.Short() {
+		outer.Skip()
+	}
+
 	server := dbserver.GetDbServer()
 	var err error
 	var driver neo4j.Driver

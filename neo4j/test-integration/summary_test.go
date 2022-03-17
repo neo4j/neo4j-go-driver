@@ -8,6 +8,9 @@ import (
 )
 
 func TestResultSummary(outer *testing.T) {
+	if testing.Short() {
+		outer.Skip()
+	}
 
 	const extraDatabase = "extra"
 

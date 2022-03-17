@@ -31,6 +31,9 @@ import (
 )
 
 func TestExamples(outer *testing.T) {
+	if testing.Short() {
+		outer.Skip()
+	}
 
 	outer.Run("Single Instance", func(inner *testing.T) {
 		var (
@@ -810,6 +813,10 @@ func addPersonNode(driver neo4j.Driver, name string) (int64, error) {
 // end::read-write-transaction[]
 
 func TestExamplesDatabaseSelection(t *testing.T) {
+	if testing.Short() {
+		t.Skip()
+	}
+
 	driver := dbserver.GetDbServer().Driver()
 	defer driver.Close()
 	// tag::database-selection[]
