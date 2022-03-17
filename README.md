@@ -25,7 +25,8 @@ go get github.com/neo4j/neo4j-go-driver/v4@<the 4.x tag>
 ```
 
 #### 1.x
-For versions 1.x of the driver (notice the absence of `/v4`), run instead the following:
+
+For versions 1.x of the driver (notice the absence of `/v4` or `/v5`), run instead the following:
 
 ```shell
 go get github.com/neo4j/neo4j-go-driver@<the 1.x tag>
