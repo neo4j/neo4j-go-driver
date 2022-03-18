@@ -97,6 +97,7 @@ func NewBolt3(serverName string, conn net.Conn, logger log.Logger, boltLog log.B
 			buf: make([]byte, 4096),
 			hyd: hydrator{
 				boltLogger: boltLog,
+				boltMajor:  3,
 			},
 			connReadTimeout: -1,
 			logger:          logger,
@@ -169,7 +170,7 @@ func (b *bolt3) receiveSuccess(ctx context.Context) *success {
 	}
 }
 
-func (b *bolt3) connect(ctx context.Context, minor int, auth map[string]interface{}, userAgent string) error {
+func (b *bolt3) Connect(ctx context.Context, minor int, auth map[string]interface{}, userAgent string, routingContext map[string]string) error {
 	if err := b.assertState(bolt3_unauthorized); err != nil {
 		return err
 	}
@@ -213,7 +214,7 @@ func (b *bolt3) connect(ctx context.Context, minor int, auth map[string]interfac
 }
 
 func (b *bolt3) TxBegin(ctx context.Context, txConfig idb.TxConfig) (idb.
-TxHandle, error) {
+	TxHandle, error) {
 	// Ok, to begin transaction while streaming auto-commit, just empty the stream and continue.
 	if b.state == bolt3_streaming {
 		if err := b.bufferStream(ctx); err != nil {

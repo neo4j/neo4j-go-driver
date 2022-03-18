@@ -31,8 +31,8 @@ import (
 	. "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/testutil"
 )
 
-// bolt4.Connect is tested through Connect, no need to test it here
-func TestBolt4(ot *testing.T) {
+// bolt5.Connect is tested through Connect, no need to test it here
+func TestBolt5(ot *testing.T) {
 	// Test streams
 	// Faked returns from a server
 	runKeys := []interface{}{"f1", "f2"}
@@ -73,21 +73,21 @@ func TestBolt4(ot *testing.T) {
 		"credentials": "pass",
 	}
 
-	assertBoltState := func(t *testing.T, expected int, bolt *bolt4) {
+	assertBoltState := func(t *testing.T, expected int, bolt *bolt5) {
 		t.Helper()
 		if expected != bolt.state {
 			t.Errorf("Bolt is in unexpected state %d vs %d", expected, bolt.state)
 		}
 	}
 
-	assertBoltDead := func(t *testing.T, bolt *bolt4) {
+	assertBoltDead := func(t *testing.T, bolt *bolt5) {
 		t.Helper()
 		if bolt.IsAlive() {
 			t.Error("Bolt is alive when it should be dead")
 		}
 	}
 
-	assertRunResponseOk := func(t *testing.T, bolt *bolt4,
+	assertRunResponseOk := func(t *testing.T, bolt *bolt5,
 		stream idb.StreamHandle) {
 		for i := 1; i < len(runResponse)-1; i++ {
 			rec, sum, err := bolt.Next(context.Background(), stream)
@@ -98,9 +98,9 @@ func TestBolt4(ot *testing.T) {
 		AssertNextOnlySummary(t, rec, sum, err)
 	}
 
-	connectToServer := func(t *testing.T, serverJob func(srv *bolt4server)) (*bolt4, func()) {
+	connectToServer := func(t *testing.T, serverJob func(srv *bolt5server)) (*bolt5, func()) {
 		// Connect client+server
-		tcpConn, srv, cleanup := setupBolt4Pipe(t)
+		tcpConn, srv, cleanup := setupBolt5Pipe(t)
 		go serverJob(srv)
 
 		c, err := Connect(context.Background(), "serverName", tcpConn, auth, "007", nil, logger, boltLogger)
@@ -108,29 +108,28 @@ func TestBolt4(ot *testing.T) {
 			t.Fatal(err)
 		}
 
-		bolt := c.(*bolt4)
-		assertBoltState(t, bolt4_ready, bolt)
+		bolt := c.(*bolt5)
+		assertBoltState(t, bolt5Ready, bolt)
 		return bolt, cleanup
 	}
 
 	// Simple successful connect
 	ot.Run("Connect success", func(t *testing.T) {
-		bolt, cleanup := connectToServer(t, func(srv *bolt4server) {
+		bolt, cleanup := connectToServer(t, func(srv *bolt5server) {
 			handshake := srv.waitForHandshake()
-			// There should be a version 4 somewhere
+			// There should be a version 5 somewhere
 			foundV := false
 			for i := 0; i < 5; i++ {
 				ver := handshake[(i * 4) : (i*4)+4]
-				if ver[3] == 4 {
+				if ver[3] == 5 {
 					foundV = true
 				}
 			}
 			if !foundV {
-				t.Fatalf("Didn't find version 4 in handshake: %+v", handshake)
+				t.Fatalf("Didn't find version 5 in handshake: %+v", handshake)
 			}
 
-			// Accept bolt version 4
-			srv.acceptVersion(4, 0)
+			srv.acceptVersion(5, 0)
 			srv.waitForHello()
 			srv.acceptHello()
 		})
@@ -144,9 +143,9 @@ func TestBolt4(ot *testing.T) {
 	})
 
 	ot.Run("Connect success with timeout hint", func(t *testing.T) {
-		bolt, cleanup := connectToServer(t, func(srv *bolt4server) {
+		bolt, cleanup := connectToServer(t, func(srv *bolt5server) {
 			srv.waitForHandshake()
-			srv.acceptVersion(4, 0)
+			srv.acceptVersion(5, 0)
 			srv.waitForHello()
 			srv.acceptHelloWithHints(map[string]interface{}{"connection.recv_timeout_seconds": 42})
 		})
@@ -159,9 +158,9 @@ func TestBolt4(ot *testing.T) {
 	invalidValues := []interface{}{4.2, "42", -42}
 	for _, value := range invalidValues {
 		ot.Run(fmt.Sprintf("Connect success with ignored invalid timeout hint %v", value), func(t *testing.T) {
-			bolt, cleanup := connectToServer(t, func(srv *bolt4server) {
+			bolt, cleanup := connectToServer(t, func(srv *bolt5server) {
 				srv.waitForHandshake()
-				srv.acceptVersion(4, 0)
+				srv.acceptVersion(5, 0)
 				srv.waitForHello()
 				srv.acceptHelloWithHints(map[string]interface{}{"connection.recv_timeout_seconds": value})
 			})
@@ -174,11 +173,11 @@ func TestBolt4(ot *testing.T) {
 
 	ot.Run("Routing in hello", func(t *testing.T) {
 		routingContext := map[string]string{"some": "thing"}
-		conn, srv, cleanup := setupBolt4Pipe(t)
+		conn, srv, cleanup := setupBolt5Pipe(t)
 		defer cleanup()
 		go func() {
 			srv.waitForHandshake()
-			srv.acceptVersion(4, 1)
+			srv.acceptVersion(5, 1)
 			hmap := srv.waitForHello()
 			helloRoutingContext := hmap["routing"].(map[string]interface{})
 			if len(helloRoutingContext) != len(routingContext) {
@@ -192,11 +191,11 @@ func TestBolt4(ot *testing.T) {
 	})
 
 	ot.Run("No routing in hello", func(t *testing.T) {
-		conn, srv, cleanup := setupBolt4Pipe(t)
+		conn, srv, cleanup := setupBolt5Pipe(t)
 		defer cleanup()
 		go func() {
 			srv.waitForHandshake()
-			srv.acceptVersion(4, 1)
+			srv.acceptVersion(5, 1)
 			hmap := srv.waitForHello()
 			_, exists := hmap["routing"].(map[string]interface{})
 			if exists {
@@ -209,32 +208,13 @@ func TestBolt4(ot *testing.T) {
 		bolt.Close(context.Background())
 	})
 
-	ot.Run("No routing in hello on 4.0", func(t *testing.T) {
-		routingContext := map[string]string{"some": "thing"}
-		conn, srv, cleanup := setupBolt4Pipe(t)
-		defer cleanup()
-		go func() {
-			srv.waitForHandshake()
-			srv.acceptVersion(4, 0)
-			hmap := srv.waitForHello()
-			_, exists := hmap["routing"].(map[string]interface{})
-			if exists {
-				panic("Should be no routing entry")
-			}
-			srv.acceptHello()
-		}()
-		bolt, err := Connect(context.Background(), "serverName", conn, auth, "007", routingContext, logger, boltLogger)
-		AssertNoError(t, err)
-		bolt.Close(context.Background())
-	})
-
 	ot.Run("Failed authentication", func(t *testing.T) {
-		conn, srv, cleanup := setupBolt4Pipe(t)
+		conn, srv, cleanup := setupBolt5Pipe(t)
 		defer cleanup()
 		defer conn.Close()
 		go func() {
 			srv.waitForHandshake()
-			srv.acceptVersion(4, 0)
+			srv.acceptVersion(5, 0)
 			srv.waitForHello()
 			srv.rejectHelloUnauthorized()
 		}()
@@ -253,8 +233,8 @@ func TestBolt4(ot *testing.T) {
 	ot.Run("Run auto-commit", func(t *testing.T) {
 		cypherText := "MATCH (n)"
 		theDb := "thedb"
-		bolt, cleanup := connectToServer(t, func(srv *bolt4server) {
-			srv.accept(4)
+		bolt, cleanup := connectToServer(t, func(srv *bolt5server) {
+			srv.accept(5)
 			srv.serveRun(runResponse, func(fields []interface{}) {
 				// fields consist of cypher text, cypher params, meta
 				AssertStringEqual(t, fields[0].(string), cypherText)
@@ -270,19 +250,19 @@ func TestBolt4(ot *testing.T) {
 			idb.Command{Cypher: cypherText}, idb.TxConfig{Mode: idb.ReadMode})
 		skeys, _ := bolt.Keys(str)
 		assertKeys(t, runKeys, skeys)
-		assertBoltState(t, bolt4_streaming, bolt)
+		assertBoltState(t, bolt5Streaming, bolt)
 
 		// Retrieve the records
 		assertRunResponseOk(t, bolt, str)
-		assertBoltState(t, bolt4_ready, bolt)
+		assertBoltState(t, bolt5Ready, bolt)
 	})
 
 	ot.Run("Run auto-commit with impersonation", func(t *testing.T) {
 		cypherText := "MATCH (n)"
 		impersonatedUser := "a user"
 		theDb := "thedb"
-		bolt, cleanup := connectToServer(t, func(srv *bolt4server) {
-			srv.acceptWithMinor(4, 4)
+		bolt, cleanup := connectToServer(t, func(srv *bolt5server) {
+			srv.acceptWithMinor(5, 0)
 			// Make sure that impersonation id is sent
 			srv.serveRun(runResponse, func(fields []interface{}) {
 				// fields consist of cypher text, cypher params, meta
@@ -301,16 +281,16 @@ func TestBolt4(ot *testing.T) {
 				ImpersonatedUser: impersonatedUser})
 		skeys, _ := bolt.Keys(str)
 		assertKeys(t, runKeys, skeys)
-		assertBoltState(t, bolt4_streaming, bolt)
+		assertBoltState(t, bolt5Streaming, bolt)
 
 		// Retrieve the records
 		assertRunResponseOk(t, bolt, str)
-		assertBoltState(t, bolt4_ready, bolt)
+		assertBoltState(t, bolt5Ready, bolt)
 	})
 
 	ot.Run("Run auto-commit with fetch size 2 of 3", func(t *testing.T) {
-		bolt, cleanup := connectToServer(t, func(srv *bolt4server) {
-			srv.accept(4)
+		bolt, cleanup := connectToServer(t, func(srv *bolt5server) {
+			srv.accept(5)
 			srv.waitForRun(nil)
 			srv.waitForPullN(2)
 			srv.send(runResponse[0].tag, runResponse[0].fields...)
@@ -327,17 +307,17 @@ func TestBolt4(ot *testing.T) {
 		str, _ := bolt.Run(context.Background(),
 			idb.Command{Cypher: "cypher", FetchSize: 2},
 			idb.TxConfig{Mode: idb.ReadMode})
-		assertBoltState(t, bolt4_streaming, bolt)
+		assertBoltState(t, bolt5Streaming, bolt)
 
 		// Retrieve the records
 		assertRunResponseOk(t, bolt, str)
-		assertBoltState(t, bolt4_ready, bolt)
+		assertBoltState(t, bolt5Ready, bolt)
 	})
 
 	ot.Run("Run transactional commit", func(t *testing.T) {
 		committedBookmark := "cbm"
-		bolt, cleanup := connectToServer(t, func(srv *bolt4server) {
-			srv.accept(4)
+		bolt, cleanup := connectToServer(t, func(srv *bolt5server) {
+			srv.accept(5)
 			srv.serveRunTx(runResponse, true, committedBookmark)
 		})
 		defer cleanup()
@@ -347,20 +327,20 @@ func TestBolt4(ot *testing.T) {
 			idb.TxConfig{Mode: idb.ReadMode})
 		AssertNoError(t, err)
 		// Lazy start of transaction when no bookmark
-		assertBoltState(t, bolt4_pendingtx, bolt)
+		assertBoltState(t, bolt5PendingTx, bolt)
 		str, err := bolt.RunTx(context.Background(), tx,
 			idb.Command{Cypher: "MATCH (n) RETURN n"})
-		assertBoltState(t, bolt4_streamingtx, bolt)
+		assertBoltState(t, bolt5StreamingTx, bolt)
 		AssertNoError(t, err)
 		skeys, _ := bolt.Keys(str)
 		assertKeys(t, runKeys, skeys)
 
 		// Retrieve the records
 		assertRunResponseOk(t, bolt, str)
-		assertBoltState(t, bolt4_tx, bolt)
+		assertBoltState(t, bolt5Tx, bolt)
 
-		bolt.TxCommit(context.Background(), tx)
-		assertBoltState(t, bolt4_ready, bolt)
+		_ = bolt.TxCommit(context.Background(), tx)
+		assertBoltState(t, bolt5Ready, bolt)
 		AssertStringEqual(t, committedBookmark, bolt.Bookmark())
 	})
 
@@ -368,8 +348,8 @@ func TestBolt4(ot *testing.T) {
 	// than what is served by a single pull.
 	ot.Run("Commit while streaming", func(t *testing.T) {
 		qid := int64(2)
-		bolt, cleanup := connectToServer(t, func(srv *bolt4server) {
-			srv.accept(4)
+		bolt, cleanup := connectToServer(t, func(srv *bolt5server) {
+			srv.accept(5)
 			srv.waitForTxBegin()
 			srv.send(msgSuccess, map[string]interface{}{})
 			srv.waitForRun(nil)
@@ -400,15 +380,15 @@ func TestBolt4(ot *testing.T) {
 
 		err = bolt.TxCommit(context.Background(), tx)
 		AssertNoError(t, err)
-		assertBoltState(t, bolt4_ready, bolt)
+		assertBoltState(t, bolt5Ready, bolt)
 	})
 
 	// Verifies that current stream is discarded correctly even if it is larger
 	// than what is served by a single pull.
 	ot.Run("Commit while streams, explicit consume", func(t *testing.T) {
 		qid := int64(2)
-		bolt, cleanup := connectToServer(t, func(srv *bolt4server) {
-			srv.accept(4)
+		bolt, cleanup := connectToServer(t, func(srv *bolt5server) {
+			srv.accept(5)
 			srv.waitForTxBegin()
 			srv.send(msgSuccess, map[string]interface{}{})
 			// First RunTx
@@ -449,13 +429,13 @@ func TestBolt4(ot *testing.T) {
 
 		err = bolt.TxCommit(context.Background(), tx)
 		AssertNoError(t, err)
-		assertBoltState(t, bolt4_ready, bolt)
+		assertBoltState(t, bolt5Ready, bolt)
 	})
 
 	ot.Run("Begin transaction with bookmark success", func(t *testing.T) {
 		committedBookmark := "cbm"
-		bolt, cleanup := connectToServer(t, func(srv *bolt4server) {
-			srv.accept(4)
+		bolt, cleanup := connectToServer(t, func(srv *bolt5server) {
+			srv.accept(5)
 			srv.serveRunTx(runResponse, true, committedBookmark)
 		})
 		defer cleanup()
@@ -464,18 +444,18 @@ func TestBolt4(ot *testing.T) {
 		tx, err := bolt.TxBegin(context.Background(),
 			idb.TxConfig{Mode: idb.ReadMode, Bookmarks: []string{"bm1"}})
 		AssertNoError(t, err)
-		assertBoltState(t, bolt4_tx, bolt)
-		bolt.RunTx(context.Background(), tx, idb.Command{Cypher: "MATCH (" +
+		assertBoltState(t, bolt5Tx, bolt)
+		_, _ = bolt.RunTx(context.Background(), tx, idb.Command{Cypher: "MATCH (" +
 			"n) RETURN n"})
-		assertBoltState(t, bolt4_streamingtx, bolt)
-		bolt.TxCommit(context.Background(), tx)
-		assertBoltState(t, bolt4_ready, bolt)
+		assertBoltState(t, bolt5StreamingTx, bolt)
+		_ = bolt.TxCommit(context.Background(), tx)
+		assertBoltState(t, bolt5Ready, bolt)
 		AssertStringEqual(t, committedBookmark, bolt.Bookmark())
 	})
 
 	ot.Run("Begin transaction with bookmark failure", func(t *testing.T) {
-		bolt, cleanup := connectToServer(t, func(srv *bolt4server) {
-			srv.accept(4)
+		bolt, cleanup := connectToServer(t, func(srv *bolt5server) {
+			srv.accept(5)
 			srv.waitForTxBegin()
 			srv.sendFailureMsg("code", "not synced")
 		})
@@ -484,14 +464,14 @@ func TestBolt4(ot *testing.T) {
 
 		_, err := bolt.TxBegin(context.Background(),
 			idb.TxConfig{Mode: idb.ReadMode, Bookmarks: []string{"bm1"}})
-		assertBoltState(t, bolt4_failed, bolt)
+		assertBoltState(t, bolt5Failed, bolt)
 		AssertError(t, err)
 		AssertStringEqual(t, "", bolt.Bookmark())
 	})
 
 	ot.Run("Run transactional rollback", func(t *testing.T) {
-		bolt, cleanup := connectToServer(t, func(srv *bolt4server) {
-			srv.accept(4)
+		bolt, cleanup := connectToServer(t, func(srv *bolt5server) {
+			srv.accept(5)
 			srv.serveRunTx(runResponse, false, "")
 		})
 		defer cleanup()
@@ -500,27 +480,27 @@ func TestBolt4(ot *testing.T) {
 		tx, err := bolt.TxBegin(context.Background(),
 			idb.TxConfig{Mode: idb.ReadMode})
 		AssertNoError(t, err)
-		assertBoltState(t, bolt4_pendingtx, bolt)
+		assertBoltState(t, bolt5PendingTx, bolt)
 		str, err := bolt.RunTx(context.Background(), tx,
 			idb.Command{Cypher: "MATCH (n) RETURN n"})
 		AssertNoError(t, err)
-		assertBoltState(t, bolt4_streamingtx, bolt)
+		assertBoltState(t, bolt5StreamingTx, bolt)
 		skeys, _ := bolt.Keys(str)
 		assertKeys(t, runKeys, skeys)
 
 		// Retrieve the records
 		assertRunResponseOk(t, bolt, str)
-		assertBoltState(t, bolt4_tx, bolt)
+		assertBoltState(t, bolt5Tx, bolt)
 
-		bolt.TxRollback(context.Background(), tx)
-		assertBoltState(t, bolt4_ready, bolt)
+		_ = bolt.TxRollback(context.Background(), tx)
+		assertBoltState(t, bolt5Ready, bolt)
 	})
 
 	ot.Run("Server close while streaming", func(t *testing.T) {
-		bolt, cleanup := connectToServer(t, func(srv *bolt4server) {
-			srv.accept(4)
+		bolt, cleanup := connectToServer(t, func(srv *bolt5server) {
+			srv.accept(5)
 			srv.waitForRun(nil)
-			srv.waitForPullN(bolt4_fetchsize)
+			srv.waitForPullN(bolt5FetchSize)
 			// Send response to run and first record as response to pull
 			srv.send(msgSuccess, map[string]interface{}{
 				"fields":  runKeys,
@@ -537,7 +517,7 @@ func TestBolt4(ot *testing.T) {
 			idb.Command{Cypher: "MATCH (n) RETURN n"},
 			idb.TxConfig{Mode: idb.ReadMode})
 		AssertNoError(t, err)
-		assertBoltState(t, bolt4_streaming, bolt)
+		assertBoltState(t, bolt5Streaming, bolt)
 
 		// Retrieve the first record
 		rec, sum, err := bolt.Next(context.Background(), str)
@@ -550,10 +530,10 @@ func TestBolt4(ot *testing.T) {
 	})
 
 	ot.Run("Server fail on run with reset", func(t *testing.T) {
-		bolt, cleanup := connectToServer(t, func(srv *bolt4server) {
-			srv.accept(4)
+		bolt, cleanup := connectToServer(t, func(srv *bolt5server) {
+			srv.accept(5)
 			srv.waitForRun(nil)
-			srv.waitForPullN(bolt4_fetchsize)
+			srv.waitForPullN(bolt5FetchSize)
 			srv.sendFailureMsg("code", "msg") // RUN failed
 			srv.waitForReset()
 			srv.sendIgnoredMsg() // PULL Ignored
@@ -566,18 +546,18 @@ func TestBolt4(ot *testing.T) {
 		_, err := bolt.Run(context.Background(), idb.Command{Cypher: "MATCH (" +
 			"n RETURN n"}, idb.TxConfig{Mode: idb.ReadMode})
 		AssertNeo4jError(t, err)
-		assertBoltState(t, bolt4_failed, bolt)
+		assertBoltState(t, bolt5Failed, bolt)
 
 		bolt.Reset(context.Background())
-		assertBoltState(t, bolt4_ready, bolt)
+		assertBoltState(t, bolt5Ready, bolt)
 	})
 
 	ot.Run("Server fail on run continue to commit", func(t *testing.T) {
-		bolt, cleanup := connectToServer(t, func(srv *bolt4server) {
-			srv.accept(4)
+		bolt, cleanup := connectToServer(t, func(srv *bolt5server) {
+			srv.accept(5)
 			srv.waitForTxBegin()
 			srv.waitForRun(nil)
-			srv.waitForPullN(bolt4_fetchsize)
+			srv.waitForPullN(bolt5FetchSize)
 			srv.sendFailureMsg("code", "msg")
 		})
 		defer cleanup()
@@ -594,10 +574,10 @@ func TestBolt4(ot *testing.T) {
 	})
 
 	ot.Run("Reset while streaming", func(t *testing.T) {
-		bolt, cleanup := connectToServer(t, func(srv *bolt4server) {
-			srv.accept(4)
+		bolt, cleanup := connectToServer(t, func(srv *bolt5server) {
+			srv.accept(5)
 			srv.waitForRun(nil)
-			srv.waitForPullN(bolt4_fetchsize)
+			srv.waitForPullN(bolt5FetchSize)
 			// Send RUN response and a record
 			for i := 0; i < 2; i++ {
 				srv.send(runResponse[i].tag, runResponse[i].fields...)
@@ -612,15 +592,15 @@ func TestBolt4(ot *testing.T) {
 		_, err := bolt.Run(context.Background(), idb.Command{Cypher: "MATCH (" +
 			"n) RETURN n"}, idb.TxConfig{Mode: idb.ReadMode})
 		AssertNoError(t, err)
-		assertBoltState(t, bolt4_streaming, bolt)
+		assertBoltState(t, bolt5Streaming, bolt)
 
 		bolt.Reset(context.Background())
-		assertBoltState(t, bolt4_ready, bolt)
+		assertBoltState(t, bolt5Ready, bolt)
 	})
 
 	ot.Run("Reset in ready state", func(t *testing.T) {
-		bolt, cleanup := connectToServer(t, func(srv *bolt4server) {
-			srv.accept(4)
+		bolt, cleanup := connectToServer(t, func(srv *bolt5server) {
+			srv.accept(5)
 			srv.serveRun(runResponse, nil)
 		})
 		defer cleanup()
@@ -635,8 +615,8 @@ func TestBolt4(ot *testing.T) {
 	})
 
 	ot.Run("Forces reset in ready state", func(t *testing.T) {
-		bolt, cleanup := connectToServer(t, func(srv *bolt4server) {
-			srv.accept(4)
+		bolt, cleanup := connectToServer(t, func(srv *bolt5server) {
+			srv.accept(5)
 			srv.waitForReset()
 			srv.sendSuccess(map[string]interface{}{})
 		})
@@ -645,12 +625,12 @@ func TestBolt4(ot *testing.T) {
 
 		err := bolt.ForceReset(context.Background())
 		AssertNoError(t, err)
-		assertBoltState(t, bolt4_ready, bolt)
+		assertBoltState(t, bolt5Ready, bolt)
 	})
 
 	ot.Run("Forces reset while streaming", func(t *testing.T) {
-		bolt, cleanup := connectToServer(t, func(srv *bolt4server) {
-			srv.accept(4)
+		bolt, cleanup := connectToServer(t, func(srv *bolt5server) {
+			srv.accept(5)
 			srv.serveRun(runResponse, nil)
 			srv.waitForReset()
 			srv.sendSuccess(map[string]interface{}{})
@@ -663,14 +643,14 @@ func TestBolt4(ot *testing.T) {
 
 		err = bolt.ForceReset(context.Background())
 		AssertNoError(t, err)
-		assertBoltState(t, bolt4_ready, bolt)
+		assertBoltState(t, bolt5Ready, bolt)
 	})
 
 	// Reset where state is ready
 
 	ot.Run("Buffer stream", func(t *testing.T) {
-		bolt, cleanup := connectToServer(t, func(srv *bolt4server) {
-			srv.accept(4)
+		bolt, cleanup := connectToServer(t, func(srv *bolt5server) {
+			srv.accept(5)
 			srv.serveRun(runResponse, nil)
 			srv.closeConnection()
 		})
@@ -689,7 +669,7 @@ func TestBolt4(ot *testing.T) {
 		_, err = bolt.Run(context.Background(),
 			idb.Command{Cypher: "cypher"}, idb.TxConfig{Mode: idb.ReadMode})
 		AssertError(t, err)
-		assertBoltState(t, bolt4_dead, bolt)
+		assertBoltState(t, bolt5Dead, bolt)
 
 		// Should still be able to read from the stream even though bolt is dead
 		assertRunResponseOk(t, bolt, stream)
@@ -704,8 +684,8 @@ func TestBolt4(ot *testing.T) {
 	ot.Run("Buffer stream with fetch size", func(t *testing.T) {
 		keys := []interface{}{"k1"}
 		bookmark := "x"
-		bolt, cleanup := connectToServer(t, func(srv *bolt4server) {
-			srv.accept(4)
+		bolt, cleanup := connectToServer(t, func(srv *bolt5server) {
+			srv.accept(5)
 			srv.waitForRun(nil)
 			srv.waitForPullN(3)
 			srv.send(msgSuccess, map[string]interface{}{"fields": keys})
@@ -747,10 +727,10 @@ func TestBolt4(ot *testing.T) {
 	})
 
 	ot.Run("Buffer stream with error", func(t *testing.T) {
-		bolt, cleanup := connectToServer(t, func(srv *bolt4server) {
-			srv.accept(4)
+		bolt, cleanup := connectToServer(t, func(srv *bolt5server) {
+			srv.accept(5)
 			srv.waitForRun(nil)
-			srv.waitForPullN(bolt4_fetchsize)
+			srv.waitForPullN(bolt5FetchSize)
 			// Send response to run and first record as response to pull
 			srv.send(msgSuccess, map[string]interface{}{
 				"fields":  runKeys,
@@ -780,8 +760,8 @@ func TestBolt4(ot *testing.T) {
 	})
 
 	ot.Run("Buffer stream with invalid handle", func(t *testing.T) {
-		bolt, cleanup := connectToServer(t, func(srv *bolt4server) {
-			srv.accept(4)
+		bolt, cleanup := connectToServer(t, func(srv *bolt5server) {
+			srv.accept(5)
 		})
 		defer cleanup()
 		defer bolt.Close(context.Background())
@@ -791,8 +771,8 @@ func TestBolt4(ot *testing.T) {
 	})
 
 	ot.Run("Consume stream", func(t *testing.T) {
-		bolt, cleanup := connectToServer(t, func(srv *bolt4server) {
-			srv.accept(4)
+		bolt, cleanup := connectToServer(t, func(srv *bolt5server) {
+			srv.accept(5)
 			srv.serveRun(runResponse, nil)
 			srv.closeConnection()
 		})
@@ -805,7 +785,7 @@ func TestBolt4(ot *testing.T) {
 		sum, err := bolt.Consume(context.Background(), stream)
 		AssertNoError(t, err)
 		AssertNotNil(t, sum)
-		assertBoltState(t, bolt4_ready, bolt)
+		assertBoltState(t, bolt5Ready, bolt)
 		// The bookmark should be set
 		AssertStringEqual(t, bolt.Bookmark(), runBookmark)
 		AssertStringEqual(t, sum.Bookmark, runBookmark)
@@ -824,8 +804,8 @@ func TestBolt4(ot *testing.T) {
 		qid := 3
 		keys := []interface{}{"k1"}
 		bookmark := "x"
-		bolt, cleanup := connectToServer(t, func(srv *bolt4server) {
-			srv.accept(4)
+		bolt, cleanup := connectToServer(t, func(srv *bolt5server) {
+			srv.accept(5)
 			srv.waitForRun(nil)
 			srv.waitForPullN(3)
 			srv.send(msgSuccess, map[string]interface{}{"fields": keys, "qid": int64(qid)})
@@ -849,7 +829,7 @@ func TestBolt4(ot *testing.T) {
 		sum, err = bolt.Consume(context.Background(), stream)
 		AssertNoError(t, err)
 		AssertNotNil(t, sum)
-		assertBoltState(t, bolt4_ready, bolt)
+		assertBoltState(t, bolt5Ready, bolt)
 
 		// The bookmark should be set
 		AssertStringEqual(t, bolt.Bookmark(), bookmark)
@@ -866,10 +846,10 @@ func TestBolt4(ot *testing.T) {
 	})
 
 	ot.Run("Consume stream with error", func(t *testing.T) {
-		bolt, cleanup := connectToServer(t, func(srv *bolt4server) {
-			srv.accept(4)
+		bolt, cleanup := connectToServer(t, func(srv *bolt5server) {
+			srv.accept(5)
 			srv.waitForRun(nil)
-			srv.waitForPullN(bolt4_fetchsize)
+			srv.waitForPullN(bolt5FetchSize)
 			// Send response to run and first record as response to pull
 			srv.send(msgSuccess, map[string]interface{}{
 				"fields":  runKeys,
@@ -896,8 +876,8 @@ func TestBolt4(ot *testing.T) {
 	})
 
 	ot.Run("Consume with invalid stream", func(t *testing.T) {
-		bolt, cleanup := connectToServer(t, func(srv *bolt4server) {
-			srv.accept(4)
+		bolt, cleanup := connectToServer(t, func(srv *bolt5server) {
+			srv.accept(5)
 		})
 		defer cleanup()
 		defer bolt.Close(context.Background())
@@ -906,44 +886,10 @@ func TestBolt4(ot *testing.T) {
 		AssertNil(t, sum)
 		AssertError(t, err)
 	})
-
-	ot.Run("GetRoutingTable using ROUTE message on 4.3", func(t *testing.T) {
-		theDb := "theDb"
-		bolt, cleanup := connectToServer(t, func(srv *bolt4server) {
-			srv.acceptWithMinor(4, 3)
-			srv.waitForRoute(func(fields []interface{}) {
-				// Fields contains context(map), bookmarks ([]string), database name(string or nil)
-
-				// No database selected, should be nil
-				AssertStringEqual(t, fields[2].(string), theDb)
-			})
-			srv.sendSuccess(map[string]interface{}{
-				"rt": map[string]interface{}{
-					"ttl": 1000,
-					"servers": []interface{}{
-						map[string]interface{}{
-							"role":      "ROUTE",
-							"addresses": []interface{}{"router1"},
-						},
-					},
-				},
-			})
-		})
-		defer cleanup()
-		defer bolt.Close(context.Background())
-
-		rt, err := bolt.GetRoutingTable(context.Background(), map[string]string{"region": "space"}, nil, theDb, "")
-		AssertNoError(t, err)
-		ert := &idb.RoutingTable{Routers: []string{"router1"},
-			TimeToLive: 1000, DatabaseName: theDb}
-		if !reflect.DeepEqual(rt, ert) {
-			t.Fatalf("Expected:\n%+v\n != Actual: \n%+v\n", rt, ert)
-		}
-	})
-
+	
 	ot.Run("GetRoutingTable using ROUTE message", func(t *testing.T) {
-		bolt, cleanup := connectToServer(t, func(srv *bolt4server) {
-			srv.acceptWithMinor(4, 4)
+		bolt, cleanup := connectToServer(t, func(srv *bolt5server) {
+			srv.acceptWithMinor(5, 0)
 			srv.waitForRoute(func(fields []interface{}) {
 				// Fields contains context(map), bookmarks([]string), extras(map)
 			})
@@ -973,34 +919,34 @@ func TestBolt4(ot *testing.T) {
 	})
 
 	ot.Run("Expired authentication error should close connection", func(t *testing.T) {
-		bolt, cleanup := connectToServer(t, func(srv *bolt4server) {
-			srv.accept(4)
+		bolt, cleanup := connectToServer(t, func(srv *bolt5server) {
+			srv.accept(5)
 			srv.sendFailureMsg("Status.Security.AuthorizationExpired", "auth token is... expired")
 		})
 		defer cleanup()
 
 		_, err := bolt.Run(context.Background(), idb.Command{Cypher: "MATCH (" +
 			"n) RETURN n"}, idb.TxConfig{Mode: idb.ReadMode})
-		assertBoltState(t, bolt4_dead, bolt)
+		assertBoltState(t, bolt5Dead, bolt)
 		AssertError(t, err)
 	})
 
 	ot.Run("Immediately expired authentication token error triggers a connection failure", func(t *testing.T) {
-		bolt, cleanup := connectToServer(t, func(srv *bolt4server) {
-			srv.accept(4)
+		bolt, cleanup := connectToServer(t, func(srv *bolt5server) {
+			srv.accept(5)
 			srv.sendFailureMsg("Neo.ClientError.Security.TokenExpired", "SSO token is... expired")
 		})
 		defer cleanup()
 
 		_, err := bolt.Run(context.Background(), idb.Command{Cypher: "MATCH (" +
 			"n) RETURN n"}, idb.TxConfig{Mode: idb.ReadMode})
-		assertBoltState(t, bolt4_failed, bolt)
+		assertBoltState(t, bolt5Failed, bolt)
 		AssertError(t, err)
 	})
 
 	ot.Run("Expired authentication token error after run triggers a connection failure", func(t *testing.T) {
-		bolt, cleanup := connectToServer(t, func(srv *bolt4server) {
-			srv.accept(4)
+		bolt, cleanup := connectToServer(t, func(srv *bolt5server) {
+			srv.accept(5)
 			srv.waitForRun(nil)
 			srv.sendFailureMsg("Neo.ClientError.Security.TokenExpired", "SSO token is... expired")
 		})
@@ -1008,7 +954,7 @@ func TestBolt4(ot *testing.T) {
 
 		_, err := bolt.Run(context.Background(), idb.Command{Cypher: "MATCH (" +
 			"n) RETURN n"}, idb.TxConfig{Mode: idb.ReadMode})
-		assertBoltState(t, bolt4_failed, bolt)
+		assertBoltState(t, bolt5Failed, bolt)
 		AssertError(t, err)
 	})
 }

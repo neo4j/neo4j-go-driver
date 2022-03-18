@@ -31,6 +31,9 @@ import (
 )
 
 func TestSession(outer *testing.T) {
+	if testing.Short() {
+		outer.Skip()
+	}
 	server := dbserver.GetDbServer()
 
 	outer.Run("with read access mode", func(inner *testing.T) {

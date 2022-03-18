@@ -30,6 +30,9 @@ import (
 )
 
 func TestTemporalTypes2(outer *testing.T) {
+	if testing.Short() {
+		outer.Skip()
+	}
 	server := dbserver.GetDbServer()
 	driver := server.Driver()
 	if server.Version.LessThan(V340) {

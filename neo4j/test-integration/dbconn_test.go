@@ -88,8 +88,11 @@ func BenchmarkQuery(b *testing.B) {
 	}
 }
 
-// Tests the specification of the internal connection connection API
-func TestConnectionConformance(ot *testing.T) {
+// Tests the specification of the internal connection API
+func TestConnectionConformance(outer *testing.T) {
+	if testing.Short() {
+		outer.Skip()
+	}
 	server, boltConn := makeRawConnection(&log.Console{Errors: true, Infos: true, Warns: true, Debugs: true}, nil)
 	defer boltConn.Close(context.Background())
 
@@ -330,7 +333,7 @@ func TestConnectionConformance(ot *testing.T) {
 	}
 	// Run all above in sequence
 	for _, c := range cases {
-		ot.Run(c.name, func(t *testing.T) {
+		outer.Run(c.name, func(t *testing.T) {
 			c.fun(t, boltConn)
 			if !boltConn.IsAlive() {
 				t.Error("Connection died")
@@ -338,7 +341,7 @@ func TestConnectionConformance(ot *testing.T) {
 		})
 	}
 	// Run some of the above at random as one test
-	ot.Run("Random sequence", func(t *testing.T) {
+	outer.Run("Random sequence", func(t *testing.T) {
 		randoms := make([]int, 25)
 		for i := range randoms {
 			randoms[i] = int(randInt() % int64(len(cases)))
@@ -441,7 +444,7 @@ func TestConnectionConformance(ot *testing.T) {
 		},
 	}
 	for _, c := range cases {
-		ot.Run(c.name, func(t *testing.T) {
+		outer.Run(c.name, func(t *testing.T) {
 			c.fun(t, boltConn)
 			if !boltConn.IsAlive() {
 				t.Error("Connection died")
@@ -460,7 +463,7 @@ func TestConnectionConformance(ot *testing.T) {
 		})
 	}
 	// Run some of the above at random as one test
-	ot.Run("Random reset sequence", func(t *testing.T) {
+	outer.Run("Random reset sequence", func(t *testing.T) {
 		randoms := make([]int, 25)
 		for i := range randoms {
 			randoms[i] = int(randInt() % int64(len(cases)))
@@ -476,7 +479,7 @@ func TestConnectionConformance(ot *testing.T) {
 	})
 
 	// Write really big query
-	ot.Run("Really big query", func(t *testing.T) {
+	outer.Run("Really big query", func(t *testing.T) {
 		query := "RETURN $x"
 		bigBuilder := strings.Builder{}
 		s := "0123456789"
@@ -558,7 +561,7 @@ func TestConnectionConformance(ot *testing.T) {
 	}
 
 	// Temporal types
-	ot.Run("Temporal types", func(tt *testing.T) {
+	outer.Run("Temporal types", func(tt *testing.T) {
 		london, _ := time.LoadLocation("Europe/London")
 
 		// In Cypher
@@ -673,7 +676,7 @@ func TestConnectionConformance(ot *testing.T) {
 	})
 
 	// Bookmark tests
-	ot.Run("Bookmarks", func(tt *testing.T) {
+	outer.Run("Bookmarks", func(tt *testing.T) {
 		boltConn.Reset(context.Background())
 		lastBookmark := boltConn.Bookmark()
 
@@ -745,7 +748,7 @@ func TestConnectionConformance(ot *testing.T) {
 	})
 
 	// Enterprise feature
-	ot.Run("Multidatabase", func(tt *testing.T) {
+	outer.Run("Multidatabase", func(tt *testing.T) {
 		selector, supportsMultidatabase := boltConn.(idb.DatabaseSelector)
 		if !supportsMultidatabase {
 			tt.Skipf("Database %s:%s does not support multidatabase functionality", boltConn.ServerName(), boltConn.ServerVersion())

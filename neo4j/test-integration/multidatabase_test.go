@@ -26,7 +26,11 @@ import (
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/test-integration/dbserver"
 )
 
-func TestMultidatabase(ot *testing.T) {
+func TestMultidatabase(outer *testing.T) {
+	if testing.Short() {
+		outer.Skip()
+	}
+
 	server := dbserver.GetDbServer()
 
 	driver := server.Driver()
@@ -34,11 +38,11 @@ func TestMultidatabase(ot *testing.T) {
 
 	// Need > 4.0 for database support
 	if server.Version.LessThan(V4) {
-		ot.Skip("Versions prior to 4.0 does not support multidatabase")
+		outer.Skip("Versions prior to 4.0 does not support multidatabase")
 	}
 
 	if !server.IsEnterprise {
-		ot.Skip("Need enterprise version to test multidatabase")
+		outer.Skip("Need enterprise version to test multidatabase")
 	}
 
 	// Ensure that a test database exists using system database
@@ -46,12 +50,12 @@ func TestMultidatabase(ot *testing.T) {
 		sysSess := driver.NewSession(neo4j.SessionConfig{DatabaseName: "system"})
 		defer sysSess.Close()
 		_, err := sysSess.Run("DROP DATABASE testdb IF EXISTS", nil)
-		assertNil(ot, err)
+		assertNil(outer, err)
 		_, err = sysSess.Run("CREATE DATABASE testdb", nil)
-		assertNil(ot, err)
+		assertNil(outer, err)
 	}()
 
-	ot.Run("Node created in test db should not be visible in default db", func(t *testing.T) {
+	outer.Run("Node created in test db should not be visible in default db", func(t *testing.T) {
 		// Create node in testdb session
 		testSess := driver.NewSession(neo4j.SessionConfig{DatabaseName: "testdb"})
 		randId := createRandomNode(t, testSess)
