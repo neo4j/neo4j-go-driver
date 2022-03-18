@@ -56,6 +56,8 @@ type TxConfig struct {
 
 // Connection defines an abstract database server connection.
 type Connection interface {
+	Connect(ctx context.Context, minor int, auth map[string]interface{}, userAgent string, routingContext map[string]string) error
+
 	TxBegin(ctx context.Context, txConfig TxConfig) (TxHandle, error)
 	TxRollback(ctx context.Context, tx TxHandle) error
 	TxCommit(ctx context.Context, tx TxHandle) error

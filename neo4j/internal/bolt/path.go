@@ -25,9 +25,11 @@ import (
 
 // Intermediate representation of part of path
 type relNode struct {
-	id    int64
-	name  string
-	props map[string]interface{}
+	// Deprecated: id is deprecated and will be removed in 6.0. Use elementId instead.
+	id        int64
+	elementId string
+	name      string
+	props     map[string]interface{}
 }
 
 // buildPath builds a path from Bolt representation
@@ -36,7 +38,7 @@ func buildPath(nodes []dbtype.Node, relNodes []*relNode, indexes []int) dbtype.P
 	if num == 0 {
 		var path dbtype.Path
 		if len(nodes) > 0 {
-			// there could be a single disconnected node
+			// there could be a single, disconnected node
 			path.Nodes = nodes
 		}
 		return path
@@ -62,16 +64,17 @@ func buildPath(nodes []dbtype.Node, relNodes []*relNode, indexes []int) dbtype.P
 		n2 := nodes[n2i]
 
 		rel := dbtype.Relationship{
-			Id:    reln.id,
-			Type:  reln.name,
-			Props: reln.props,
+			Id:        reln.id,
+			ElementId: reln.elementId,
+			Type:      reln.name,
+			Props:     reln.props,
 		}
 		if n1start {
-			rel.StartId = n1.Id
-			rel.EndId = n2.Id
+			rel.StartId, rel.EndId = n1.Id, n2.Id
+			rel.StartElementId, rel.EndElementId = n1.ElementId, n2.ElementId
 		} else {
-			rel.StartId = n2.Id
-			rel.EndId = n1.Id
+			rel.StartId, rel.EndId = n2.Id, n1.Id
+			rel.StartElementId, rel.EndElementId = n2.ElementId, n1.ElementId
 		}
 		rels = append(rels, rel)
 		n1 = n2

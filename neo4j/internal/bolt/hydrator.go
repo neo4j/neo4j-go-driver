@@ -34,6 +34,8 @@ import (
 const containsSystemUpdatesKey = "contains-system-updates"
 const containsUpdatesKey = "contains-updates"
 
+const defaultForMissingId = -1
+
 type ignored struct{}
 type success struct {
 	fields             []string
@@ -114,6 +116,7 @@ type hydrator struct {
 	cachedSuccess success
 	boltLogger    log.BoltLogger
 	logId         string
+	boltMajor     int
 }
 
 func (h *hydrator) setErr(err error) {
@@ -439,10 +442,19 @@ func (h *hydrator) value() interface{} {
 		n := h.unp.Len()
 		switch t {
 		case 'N':
+			if h.boltMajor >= 5 {
+				return h.nodeWithElementId(n)
+			}
 			return h.node(n)
 		case 'R':
+			if h.boltMajor >= 5 {
+				return h.relationshipWithElementId(n)
+			}
 			return h.relationship(n)
 		case 'r':
+			if h.boltMajor >= 5 {
+				return h.relationnodeWithElementId(n)
+			}
 			return h.relationnode(n)
 		case 'P':
 			return h.path(n)
@@ -508,6 +520,24 @@ func (h *hydrator) node(num uint32) interface{} {
 	n.Labels = h.strings()
 	h.unp.Next()
 	n.Props = h.amap()
+	n.ElementId = fmt.Sprintf("%d", n.Id)
+	return n
+}
+
+func (h *hydrator) nodeWithElementId(num uint32) interface{} {
+	h.assertLength("node", 4, num)
+	if h.getErr() != nil {
+		return nil
+	}
+	n := dbtype.Node{}
+	h.unp.Next()
+	n.Id = h.unp.IntOrDefault(defaultForMissingId)
+	h.unp.Next()
+	n.Labels = h.strings()
+	h.unp.Next()
+	n.Props = h.amap()
+	h.unp.Next()
+	n.ElementId = h.unp.String()
 	return n
 }
 
@@ -527,6 +557,34 @@ func (h *hydrator) relationship(n uint32) interface{} {
 	r.Type = h.unp.String()
 	h.unp.Next()
 	r.Props = h.amap()
+	r.ElementId = fmt.Sprintf("%d", r.Id)
+	r.StartElementId = fmt.Sprintf("%d", r.StartId)
+	r.EndElementId = fmt.Sprintf("%d", r.EndId)
+	return r
+}
+
+func (h *hydrator) relationshipWithElementId(n uint32) interface{} {
+	h.assertLength("relationship", 8, n)
+	if h.getErr() != nil {
+		return nil
+	}
+	r := dbtype.Relationship{}
+	h.unp.Next()
+	r.Id = h.unp.IntOrDefault(defaultForMissingId)
+	h.unp.Next()
+	r.StartId = h.unp.IntOrDefault(defaultForMissingId)
+	h.unp.Next()
+	r.EndId = h.unp.IntOrDefault(defaultForMissingId)
+	h.unp.Next()
+	r.Type = h.unp.String()
+	h.unp.Next()
+	r.Props = h.amap()
+	h.unp.Next()
+	r.ElementId = h.unp.String()
+	h.unp.Next()
+	r.StartElementId = h.unp.String()
+	h.unp.Next()
+	r.EndElementId = h.unp.String()
 	return r
 }
 
@@ -542,6 +600,24 @@ func (h *hydrator) relationnode(n uint32) interface{} {
 	r.name = h.unp.String()
 	h.unp.Next()
 	r.props = h.amap()
+	r.elementId = fmt.Sprintf("%d", r.id)
+	return &r
+}
+
+func (h *hydrator) relationnodeWithElementId(n uint32) interface{} {
+	h.assertLength("relationnode", 4, n)
+	if h.getErr() != nil {
+		return nil
+	}
+	r := relNode{}
+	h.unp.Next()
+	r.id = h.unp.IntOrDefault(defaultForMissingId)
+	h.unp.Next()
+	r.name = h.unp.String()
+	h.unp.Next()
+	r.props = h.amap()
+	h.unp.Next()
+	r.elementId = h.unp.String()
 	return &r
 }
 

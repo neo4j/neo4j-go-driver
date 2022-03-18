@@ -61,19 +61,23 @@ func nativeToCypher(v interface{}) map[string]interface{} {
 		return map[string]interface{}{
 			"name": "Node",
 			"data": map[string]interface{}{
-				"id":     nativeToCypher(x.Id),
-				"labels": nativeToCypher(x.Labels),
-				"props":  nativeToCypher(x.Props),
+				"id":        nativeToCypher(x.Id),
+				"elementId": nativeToCypher(x.ElementId),
+				"labels":    nativeToCypher(x.Labels),
+				"props":     nativeToCypher(x.Props),
 			}}
 	case neo4j.Relationship:
 		return map[string]interface{}{
 			"name": "Relationship",
 			"data": map[string]interface{}{
-				"id":          nativeToCypher(x.Id),
-				"startNodeId": nativeToCypher(x.StartId),
-				"endNodeId":   nativeToCypher(x.EndId),
-				"type":        nativeToCypher(x.Type),
-				"props":       nativeToCypher(x.Props),
+				"id":                 nativeToCypher(x.Id),
+				"elementId":          nativeToCypher(x.ElementId),
+				"startNodeId":        nativeToCypher(x.StartId),
+				"startNodeElementId": nativeToCypher(x.StartElementId),
+				"endNodeId":          nativeToCypher(x.EndId),
+				"endNodeElementId":   nativeToCypher(x.EndElementId),
+				"type":               nativeToCypher(x.Type),
+				"props":              nativeToCypher(x.Props),
 			}}
 	case neo4j.Path:
 		nodes := make([]interface{}, len(x.Nodes))

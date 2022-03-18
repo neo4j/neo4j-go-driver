@@ -39,9 +39,9 @@ type protocolVersion struct {
 
 // Supported versions in priority order
 var versions = [4]protocolVersion{
+	{major: 5, minor: 0},
 	{major: 4, minor: 4, back: 2},
 	{major: 4, minor: 1},
-	{major: 4, minor: 0},
 	{major: 3, minor: 0},
 }
 
@@ -76,31 +76,24 @@ func Connect(ctx context.Context, serverName string, conn net.Conn, auth map[str
 	if boltLog != nil {
 		boltLog.LogServerMessage("", "<HANDSHAKE> %#010X", buf)
 	}
-	// Parse received version and construct the correct instance
+
 	major := buf[3]
 	minor := buf[2]
+	var boltConn db.Connection
 	switch major {
 	case 3:
-		// Handover rest of connection handshaking
-		boltConn := NewBolt3(serverName, conn, logger, boltLog)
-		err = boltConn.connect(ctx, int(minor), auth, userAgent)
-		if err != nil {
-			return nil, err
-		}
-		return boltConn, nil
+		boltConn = NewBolt3(serverName, conn, logger, boltLog)
 	case 4:
-		// Handover rest of connection handshaking
-		boltConn := NewBolt4(serverName, conn, logger, boltLog)
-		err = boltConn.connect(ctx, int(minor), auth, userAgent, routingContext)
-		if err != nil {
-			return nil, err
-		}
-		return boltConn, nil
+		boltConn = NewBolt4(serverName, conn, logger, boltLog)
+	case 5:
+		boltConn = NewBolt5(serverName, conn, logger, boltLog)
 	case 0:
-		err = errors.New(fmt.Sprintf("Server did not accept any of the requested Bolt versions (%#v)", versions))
+		return nil, errors.New(fmt.Sprintf("Server did not accept any of the requested Bolt versions (%#v)", versions))
 	default:
-		err = errors.New(fmt.Sprintf("Server responded with unsupported version %d.%d", major, minor))
+		return nil, errors.New(fmt.Sprintf("Server responded with unsupported version %d.%d", major, minor))
 	}
-
-	return nil, err
+	if err = boltConn.Connect(ctx, int(minor), auth, userAgent, routingContext); err != nil {
+		return nil, err
+	}
+	return boltConn, nil
 }
