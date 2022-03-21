@@ -16,7 +16,7 @@ RUN apt-get update && \
     && rm -rf /var/lib/apt/lists/* \
     # the packaged Golang version of Ubuntu is too old (requires manual install of gcc first)
     && wget --quiet https://golang.org/dl/go${go_version}.linux-amd64.tar.gz \
-    && tar -xvf go${go_version}.linux-amd64.tar.gz \
+    && tar -xzf go${go_version}.linux-amd64.tar.gz \
     && mv go /usr/local
 
 ENV GOROOT=/usr/local/go
