@@ -35,8 +35,9 @@ import (
 )
 
 type Connector struct {
-	SkipEncryption  bool
-	SkipVerify      bool
+	SkipEncryption bool
+	SkipVerify     bool
+	// Deprecated: RootCAs will be removed in 6.0. Configure TlsConfig directly instead.
 	RootCAs         *x509.CertPool
 	DialTimeout     time.Duration
 	SocketKeepAlive bool
@@ -45,6 +46,7 @@ type Connector struct {
 	UserAgent       string
 	RoutingContext  map[string]string
 	Network         string
+	TlsConfig       *tls.Config
 }
 
 func (c Connector) Connect(ctx context.Context, address string, boltLogger log.BoltLogger) (db.Connection, error) {
@@ -69,19 +71,28 @@ func (c Connector) Connect(ctx context.Context, address string, boltLogger log.B
 		conn.Close()
 		return nil, err
 	}
-	config := tls.Config{InsecureSkipVerify: c.SkipVerify, RootCAs: c.RootCAs, ServerName: serverName}
-	tlsconn := tls.Client(conn, &config)
-	err = tlsconn.HandshakeContext(ctx)
+	tlsConn := tls.Client(conn, c.tlsConfig(serverName))
+	err = tlsConn.HandshakeContext(ctx)
 	if err != nil {
 		if err == io.EOF {
 			// Give a bit nicer error message
-			err = errors.New("Remote end closed the connection, check that TLS is enabled on the server")
+			err = errors.New("remote end closed the connection, check that TLS is enabled on the server")
 		}
 		conn.Close()
 		return nil, &TlsError{inner: err}
 	}
 	// Perform Bolt handshake
-	return bolt.Connect(ctx, address, tlsconn, c.Auth, c.UserAgent, c.RoutingContext, c.Log, boltLogger)
+	return bolt.Connect(ctx, address, tlsConn, c.Auth, c.UserAgent, c.RoutingContext, c.Log, boltLogger)
+}
+
+func (c Connector) tlsConfig(serverName string) *tls.Config {
+	if c.TlsConfig == nil {
+		return &tls.Config{InsecureSkipVerify: c.SkipVerify, RootCAs: c.RootCAs, ServerName: serverName}
+	}
+	config := c.TlsConfig
+	config.InsecureSkipVerify = c.SkipVerify
+	config.ServerName = serverName
+	return config
 }
 
 // TlsError encapsulates all errors related to TLS connection creation

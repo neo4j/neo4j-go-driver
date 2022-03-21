@@ -160,6 +160,7 @@ func NewDriverWithContext(target string, auth AuthToken, configurers ...func(*Co
 	d.connector.SocketKeepAlive = d.config.SocketKeepalive
 	d.connector.UserAgent = d.config.UserAgent
 	d.connector.RootCAs = d.config.RootCAs
+	d.connector.TlsConfig = d.config.TlsConfig
 	d.connector.Log = d.log
 	d.connector.Auth = auth.tokens
 	d.connector.RoutingContext = routingContext
