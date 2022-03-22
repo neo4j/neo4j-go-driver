@@ -13,6 +13,8 @@ def run(args, env=None):
 
 if __name__ == "__main__":
     print("Building for current target")
+    run(["which", "go"])
+    run(["go", "version"])
     run(["go", "build", "-v", "./..."])
 
     # Compile for 32 bits ARM to make sure it builds
