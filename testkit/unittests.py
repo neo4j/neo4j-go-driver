@@ -19,4 +19,4 @@ if __name__ == "__main__":
     if os.environ.get("TEST_IN_TEAMCITY", False):
         cmd = cmd + ["-v", "-json"]
 
-    run(cmd + ["-short", "./..."])
+    run(cmd + ["-buildvcs=false", "-short", "./..."])

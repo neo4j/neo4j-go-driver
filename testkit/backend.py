@@ -9,5 +9,5 @@ import sys
 
 if __name__ == "__main__":
     backend_path = os.path.join(".", "testkit-backend")
-    subprocess.check_call(["go", "run", backend_path],
+    subprocess.check_call(["go", "run", "-buildvcs=false", backend_path],
                           stdout=sys.stdout, stderr=sys.stderr)

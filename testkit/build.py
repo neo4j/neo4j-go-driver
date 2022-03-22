@@ -13,9 +13,7 @@ def run(args, env=None):
 
 if __name__ == "__main__":
     print("Building for current target")
-    run(["which", "go"])
-    run(["go", "version"])
-    run(["go", "build", "-v", "./..."])
+    run(["go", "build", "-buildvcs=false", "-v", "./..."])
 
     # Compile for 32 bits ARM to make sure it builds
     print("Building for 32 bits")
@@ -23,7 +21,7 @@ if __name__ == "__main__":
     arm32Env["GOOS"] = "linux"
     arm32Env["GOARCH"] = "arm"
     arm32Env["GOARM"] = "7"
-    run(["go", "build", "./..."], env=arm32Env)
+    run(["go", "build", "-buildvcs=false", "./..."], env=arm32Env)
 
     print("Vet sources")
-    run(["go", "vet", "./..."])
+    run(["go", "vet", "-buildvcs=false", "./..."])
