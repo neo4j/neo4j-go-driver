@@ -19,7 +19,50 @@
 
 package neo4j
 
-import "fmt"
+import (
+	"context"
+	"fmt"
+)
+
+// SingleTWithContext is like SingleT. It accepts a context.Context parameter
+func SingleTWithContext[T any](ctx context.Context, result ResultWithContext, mapper func(*Record) (T, error)) (T, error) {
+	single, err := result.Single(ctx)
+	if err != nil {
+		return *new(T), err
+	}
+	return mapper(single)
+}
+
+// SingleT is like Single but maps the single Record with the provided mapper.
+// Deprecated: use SingleTWithContext instead (the entry point of context-aware
+// APIs is NewDriverWithContext)
+func SingleT[T any](result Result, mapper func(*Record) (T, error)) (T, error) {
+	single, err := result.Single()
+	if err != nil {
+		return *new(T), err
+	}
+	return mapper(single)
+}
+
+// CollectTWithContext is like CollectT. It accepts a context.Context parameter
+func CollectTWithContext[T any](ctx context.Context, result ResultWithContext, mapper func(*Record) (T, error)) ([]T, error) {
+	records, err := result.Collect(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return mapAll(records, mapper)
+}
+
+// CollectT is like Collect but maps each record with the provided mapper.
+// Deprecated: use CollectTWithContext instead (the entry point of context-aware
+// APIs is NewDriverWithContext)
+func CollectT[T any](result Result, mapper func(*Record) (T, error)) ([]T, error) {
+	records, err := result.Collect()
+	if err != nil {
+		return nil, err
+	}
+	return mapAll(records, mapper)
+}
 
 // Single returns one and only one record from the result stream. Any error passed in
 // or reported while navigating the result stream is returned without any conversion.
@@ -77,4 +120,16 @@ func AsRecord(from interface{}, err error) (*Record, error) {
 		}
 	}
 	return rec, nil
+}
+
+func mapAll[T any](records []*Record, mapper func(*Record) (T, error)) ([]T, error) {
+	results := make([]T, len(records))
+	for i, record := range records {
+		mappedRecord, err := mapper(record)
+		if err != nil {
+			return nil, err
+		}
+		results[i] = mappedRecord
+	}
+	return results, nil
 }

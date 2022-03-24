@@ -25,7 +25,7 @@ if __name__ == "__main__":
 
     # Run the stress tests
     stressPath = os.path.join(".", "test-stress")
-    cmd = ["go", "run", "--race", stressPath,
+    cmd = ["go", "run", "-buildvcs=false", "--race", stressPath,
            "--seconds", duration,
            "-uri", uri, "-user", user, "-password", password]
     if os.environ.get("TEST_NEO4J_IS_CLUSTER"):

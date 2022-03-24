@@ -1,6 +1,6 @@
 FROM ubuntu:20.04
 
-ARG go_version=1.17.5
+ARG go_version=1.18
 
 # Install all needed to build and run tests
 # Install tzdata to make sure Go timezone info works correctly (need noninteractive to avoid
@@ -15,8 +15,8 @@ RUN apt-get update && \
         gcc \
     && rm -rf /var/lib/apt/lists/* \
     # the packaged Golang version of Ubuntu is too old (requires manual install of gcc first)
-    && wget https://golang.org/dl/go${go_version}.linux-amd64.tar.gz \
-    && tar -xvf go${go_version}.linux-amd64.tar.gz \
+    && wget --quiet https://golang.org/dl/go${go_version}.linux-amd64.tar.gz \
+    && tar -xzf go${go_version}.linux-amd64.tar.gz \
     && mv go /usr/local
 
 ENV GOROOT=/usr/local/go

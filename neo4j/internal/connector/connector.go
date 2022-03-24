@@ -86,10 +86,13 @@ func (c Connector) Connect(ctx context.Context, address string, boltLogger log.B
 }
 
 func (c Connector) tlsConfig(serverName string) *tls.Config {
+	var config *tls.Config
 	if c.TlsConfig == nil {
-		return &tls.Config{InsecureSkipVerify: c.SkipVerify, RootCAs: c.RootCAs, ServerName: serverName}
+		config = &tls.Config{RootCAs: c.RootCAs}
+	} else {
+		config = c.TlsConfig
 	}
-	config := c.TlsConfig
+	config.MinVersion = tls.VersionTLS11
 	config.InsecureSkipVerify = c.SkipVerify
 	config.ServerName = serverName
 	return config

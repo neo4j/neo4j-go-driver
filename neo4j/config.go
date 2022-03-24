@@ -37,18 +37,19 @@ type Config struct {
 	//
 	// The trusted certificates are used to validate connections for URI schemes 'bolt+s'
 	// and 'neo4j+s'.
-	// Deprecated: RootCAs will be removed in 6.0. Please rely on TlsConfig's RootCAs attribute instead.
+	//
+	// Deprecated: RootCAs will be removed in 6.0.
+	// Please rely on TlsConfig's RootCAs attribute instead.
+	// RootCAs is ignored if TlsConfig is set.
 	RootCAs *x509.CertPool
 	// TlsConfig defines the TLS configuration of the driver.
 	//
 	// The configuration is only used for URI schemes 'bolt+s', 'bolt+ssc',
 	// 'neo4j+s' and 'neo4j+ssc'.
 	//
+	// The MinVersion attribute is always set to VersionTLS11
 	// The InsecureSkipVerify attribute of TlsConfig is always derived from the initial URI scheme.
 	// The ServerName attribute of TlsConfig is always derived from the initial URI host.
-
-	// The RootCAs attribute of this TlsConfig has higher precedence than the
-	// attribute set on the enclosing Config.
 	TlsConfig *tls.Config
 
 	// Logging target the driver will send its log outputs

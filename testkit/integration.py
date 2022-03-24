@@ -9,7 +9,7 @@ def run(args):
 
 if __name__ == "__main__":
     package = "./neo4j/test-integration/..."
-    cmd = ["go", "test"]
+    cmd = ["go", "test", "-buildvcs=false"]
     if os.environ.get("TEST_IN_TEAMCITY", False):
         cmd = cmd + ["-v", "-json"]
     run(cmd + [package])
