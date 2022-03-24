@@ -216,6 +216,8 @@ func (h *hydrator) success(n uint32) *success {
 	// Use cached success but clear it first
 	h.cachedSuccess = success{}
 	h.cachedSuccess.qid = -1
+	h.cachedSuccess.tfirst = -1
+	h.cachedSuccess.tlast = -1
 	succ := &h.cachedSuccess
 
 	h.unp.Next() // Detect map

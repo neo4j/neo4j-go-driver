@@ -623,10 +623,10 @@ func (b *backend) handleRequest(req map[string]interface{}) {
 			"plan":          serializePlan(summary.Plan()),
 			"profile":       serializeProfile(summary.Profile()),
 		}
-		if summary.ResultAvailableAfter() > 0 {
+		if summary.ResultAvailableAfter() >= 0 {
 			response["resultAvailableAfter"] = summary.ResultAvailableAfter().Milliseconds()
 		}
-		if summary.ResultConsumedAfter() > 0 {
+		if summary.ResultConsumedAfter() >= 0 {
 			response["resultConsumedAfter"] = summary.ResultConsumedAfter().Milliseconds()
 		}
 		if summary.StatementType() != neo4j.StatementTypeUnknown {
