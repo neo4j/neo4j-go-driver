@@ -47,6 +47,7 @@ type transactionWithContext struct {
 	fetchSize int
 	txHandle  db.TxHandle
 	done      bool
+	runFailed bool
 	err       error
 	onClosed  func()
 }
@@ -55,28 +56,42 @@ func (tx *transactionWithContext) Run(ctx context.Context, cypher string,
 	params map[string]interface{}) (ResultWithContext, error) {
 	stream, err := tx.conn.RunTx(ctx, tx.txHandle, db.Command{Cypher: cypher, Params: params, FetchSize: tx.fetchSize})
 	if err != nil {
-		return nil, wrapError(err)
+		tx.err = err
+		tx.runFailed = true
+		tx.onClosed()
+		return nil, wrapError(tx.err)
 	}
 	return newResultWithContext(tx.conn, stream, cypher, params), nil
 }
 
 func (tx *transactionWithContext) Commit(ctx context.Context) error {
-	if tx.done {
+	if tx.runFailed {
+		tx.runFailed, tx.done = false, true
 		return tx.err
+	}
+	if tx.done {
+		return transactionAlreadyCompletedError()
 	}
 	tx.err = tx.conn.TxCommit(ctx, tx.txHandle)
 	tx.done = true
 	tx.onClosed()
 	return wrapError(tx.err)
 }
-
 func (tx *transactionWithContext) Close(ctx context.Context) error {
+	if tx.done {
+		// repeated calls to Close => NOOP
+		return nil
+	}
 	return tx.Rollback(ctx)
 }
 
 func (tx *transactionWithContext) Rollback(ctx context.Context) error {
+	if tx.runFailed {
+		tx.done, tx.runFailed = true, false
+		return nil
+	}
 	if tx.done {
-		return tx.err
+		return transactionAlreadyCompletedError()
 	}
 	if !tx.conn.IsAlive() || tx.conn.HasFailed() {
 		// tx implicitly rolled back by having failed
@@ -151,4 +166,8 @@ func (tx *autoTransactionWithContext) discard(ctx context.Context) {
 		tx.closed = true
 		tx.onClosed()
 	}
+}
+
+func transactionAlreadyCompletedError() *UsageError {
+	return &UsageError{Message: "commit or rollback already called once on this transaction"}
 }
