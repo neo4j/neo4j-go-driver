@@ -670,6 +670,7 @@ func (b *backend) handleRequest(req map[string]interface{}) {
 			"features": []string{
 				"ConfHint:connection.recv_timeout_seconds",
 				"Detail:ClosedDriverIsEncrypted",
+				"Feature:API:ConnectionAcquisitionTimeout",
 				"Feature:API:Driver.IsEncrypted",
 				"Feature:API:Liveness.Check",
 				"Feature:API:Result.Peek",
