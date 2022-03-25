@@ -73,8 +73,10 @@ type ResultSummary interface {
 	// The list will be empty if no notifications produced while executing the statement.
 	Notifications() []Notification
 	// ResultAvailableAfter returns the time it took for the server to make the result available for consumption.
+	// Since 5.0, this returns a negative duration if the server has not sent the corresponding statistic.
 	ResultAvailableAfter() time.Duration
 	// ResultConsumedAfter returns the time it took the server to consume the result.
+	// Since 5.0, this returns a negative duration if the server has not sent the corresponding statistic.
 	ResultConsumedAfter() time.Duration
 	// Database returns information about the database where the result is obtained from
 	// Returns nil for Neo4j versions prior to v4.
