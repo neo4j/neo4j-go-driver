@@ -80,7 +80,7 @@ func TestHydrator(ot *testing.T) {
 				packer.String("details") // Should be ignored
 				packer.Int8(1)
 			},
-			x: &success{connectionId: "connid", server: "srv", qid: -1, num: 3},
+			x: &success{tlast: -1, tfirst: -1, connectionId: "connid", server: "srv", qid: -1, num: 3},
 		},
 		{
 			name: "Success commit/rollback/reset response",
@@ -88,7 +88,7 @@ func TestHydrator(ot *testing.T) {
 				packer.StructHeader(byte(msgSuccess), 1)
 				packer.MapHeader(0)
 			},
-			x: &success{qid: -1, num: 0},
+			x: &success{tlast: -1, tfirst: -1, qid: -1, num: 0},
 		},
 		{
 			name: "Success run response",
@@ -104,7 +104,7 @@ func TestHydrator(ot *testing.T) {
 				packer.String("t_first")
 				packer.Int64(10000)
 			},
-			x: &success{fields: []string{"field1", "field2"}, tfirst: 10000, qid: -1, num: 3},
+			x: &success{tlast: -1, fields: []string{"field1", "field2"}, tfirst: 10000, qid: -1, num: 3},
 		},
 		{
 			name: "Success run response with qid",
@@ -122,7 +122,7 @@ func TestHydrator(ot *testing.T) {
 				packer.String("qid")
 				packer.Int64(777)
 			},
-			x: &success{fields: []string{"field1", "field2"}, tfirst: 10000, qid: int64(777), num: 4},
+			x: &success{tlast: -1, fields: []string{"field1", "field2"}, tfirst: 10000, qid: int64(777), num: 4},
 		},
 		{
 			name: "Success discard/end of page response with more data",
@@ -132,7 +132,7 @@ func TestHydrator(ot *testing.T) {
 				packer.String("has_more")
 				packer.Bool(true)
 			},
-			x: &success{hasMore: true, qid: -1, num: 1},
+			x: &success{tlast: -1, tfirst: -1, hasMore: true, qid: -1, num: 1},
 		},
 		{
 			name: "Success discard response with no more data",
@@ -150,7 +150,7 @@ func TestHydrator(ot *testing.T) {
 				packer.String("db")
 				packer.String("sys")
 			},
-			x: &success{bookmark: "bm", db: "sys", qid: -1, num: 4},
+			x: &success{tlast: -1, tfirst: -1, bookmark: "bm", db: "sys", qid: -1, num: 4},
 		},
 		{
 			name: "Success pull response, write with db",
@@ -166,7 +166,7 @@ func TestHydrator(ot *testing.T) {
 				packer.String("db")
 				packer.String("s")
 			},
-			x: &success{tlast: 124, bookmark: "b", qtype: db.StatementTypeWrite, db: "s", qid: -1, num: 4},
+			x: &success{tlast: 124, tfirst: -1, bookmark: "b", qtype: db.StatementTypeWrite, db: "s", qid: -1, num: 4},
 		},
 		{
 			name: "Success summary with plan",
@@ -200,7 +200,7 @@ func TestHydrator(ot *testing.T) {
 				packer.ArrayHeader(1)
 				packer.String("cid")
 			},
-			x: &success{bookmark: "bm", db: "sys", qid: -1, num: 4, plan: &db.Plan{
+			x: &success{tlast: -1, tfirst: -1, bookmark: "bm", db: "sys", qid: -1, num: 4, plan: &db.Plan{
 				Operator:    "opType",
 				Arguments:   map[string]interface{}{"arg1": int64(1001)},
 				Identifiers: []string{"id1", "id2"},
@@ -249,7 +249,7 @@ func TestHydrator(ot *testing.T) {
 				packer.String("rows")
 				packer.Int(2)
 			},
-			x: &success{bookmark: "bm", db: "sys", qid: -1, num: 4,
+			x: &success{tlast: -1, tfirst: -1, bookmark: "bm", db: "sys", qid: -1, num: 4,
 				profile: &db.ProfiledPlan{
 					Operator:    "opType",
 					Arguments:   map[string]interface{}{"arg1": int64(1001)},
@@ -301,7 +301,7 @@ func TestHydrator(ot *testing.T) {
 				packer.String("severity")
 				packer.String("s2")
 			},
-			x: &success{bookmark: "bm", db: "sys", qid: -1, num: 4,
+			x: &success{tlast: -1, tfirst: -1, bookmark: "bm", db: "sys", qid: -1, num: 4,
 				notifications: []db.Notification{
 					{Code: "c1", Title: "t1", Description: "d1", Severity: "s1", Position: &db.InputPosition{Offset: 1, Line: 2, Column: 3}},
 					{Code: "c2", Title: "t2", Description: "d2", Severity: "s2"},
@@ -321,7 +321,7 @@ func TestHydrator(ot *testing.T) {
 				packer.String("has_more")
 				packer.Bool(false)
 			},
-			x: &success{tlast: 7, bookmark: "b1", qtype: db.StatementTypeRead, qid: -1, num: 4},
+			x: &success{tlast: 7, tfirst: -1, bookmark: "b1", qtype: db.StatementTypeRead, qid: -1, num: 4},
 		},
 		{
 			name: "Success route response",
@@ -361,7 +361,7 @@ func TestHydrator(ot *testing.T) {
 				packer.ArrayHeader(1)
 				packer.String("writer1")
 			},
-			x: &success{qid: -1, num: 1, routingTable: &idb.RoutingTable{
+			x: &success{tlast: -1, tfirst: -1, qid: -1, num: 1, routingTable: &idb.RoutingTable{
 				TimeToLive:   1001,
 				DatabaseName: "dbname",
 				Routers:      []string{"router1", "router2"},
@@ -404,7 +404,7 @@ func TestHydrator(ot *testing.T) {
 				packer.ArrayHeader(1)
 				packer.String("writer1")
 			},
-			x: &success{qid: -1, num: 1, routingTable: &idb.RoutingTable{
+			x: &success{tlast: -1, tfirst: -1, qid: -1, num: 1, routingTable: &idb.RoutingTable{
 				TimeToLive: 1001,
 				Routers:    []string{"router1", "router2"},
 				Readers:    []string{"reader1", "reader2", "reader3"},
@@ -436,7 +436,7 @@ func TestHydrator(ot *testing.T) {
 				packer.ArrayHeader(1)
 				packer.String("router1")
 			},
-			x: &success{qid: -1, num: 2, routingTable: &idb.RoutingTable{
+			x: &success{tlast: -1, tfirst: -1, qid: -1, num: 2, routingTable: &idb.RoutingTable{
 				TimeToLive: 1001,
 				Routers:    []string{"router1"}}},
 		},
