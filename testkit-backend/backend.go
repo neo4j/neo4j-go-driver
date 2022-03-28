@@ -583,6 +583,20 @@ func (b *backend) handleRequest(req map[string]interface{}) {
 		var record *db.Record = nil
 		more := result.PeekRecord(&record)
 		b.writeRecord(result, record, more)
+	case "ResultList":
+		result := b.results[data["resultId"].(string)]
+		records, err := result.Collect()
+		if err != nil {
+			b.writeError(err)
+			return
+		}
+		response := make([]interface{}, len(records))
+		for i, record := range records {
+			response[i] = serializeRecord(record)
+		}
+		b.writeResponse("RecordList", map[string]interface{}{
+			"records": response,
+		})
 	case "ResultConsume":
 		result := b.results[data["resultId"].(string)]
 		summary, err := result.Consume()
@@ -672,6 +686,7 @@ func (b *backend) handleRequest(req map[string]interface{}) {
 				"Detail:ClosedDriverIsEncrypted",
 				"Feature:API:Driver.IsEncrypted",
 				"Feature:API:Liveness.Check",
+				"Feature:API:Result.List",
 				"Feature:API:Result.Peek",
 				"Feature:Auth:Custom",
 				"Feature:Auth:Bearer",
@@ -726,12 +741,7 @@ func (b *backend) writeRecord(result neo4j.Result, record *neo4j.Record, expectR
 	}
 
 	if record != nil {
-		values := record.Values
-		cypherValues := make([]interface{}, len(values))
-		for i, v := range values {
-			cypherValues[i] = nativeToCypher(v)
-		}
-		b.writeResponse("Record", map[string]interface{}{"values": cypherValues})
+		b.writeResponse("Record", serializeRecord(record))
 	} else {
 		err := result.Err()
 		if err != nil {
@@ -767,6 +777,16 @@ func asRegex(rawPattern string) *regexp.Regexp {
 	pattern := regexp.QuoteMeta(rawPattern)
 	pattern = strings.ReplaceAll(pattern, `\*`, ".*")
 	return regexp.MustCompile(pattern)
+}
+
+func serializeRecord(record *neo4j.Record) map[string]interface{} {
+	values := record.Values
+	cypherValues := make([]interface{}, len(values))
+	for i, v := range values {
+		cypherValues[i] = nativeToCypher(v)
+	}
+	data := map[string]interface{}{"values": cypherValues}
+	return data
 }
 
 func serializeNotifications(slice []neo4j.Notification) []map[string]interface{} {
