@@ -48,8 +48,6 @@ func dechunkMessage(conn net.Conn, msgBuf []byte, readTimeout time.Duration,
 				return msgBuf, msgBuf[:off], nil
 			}
 			// Got a nop chunk
-			resetConnectionReadDeadline(conn, readTimeout, logger,
-				logName, logId)
 			continue
 		}
 
@@ -65,15 +63,5 @@ func dechunkMessage(conn net.Conn, msgBuf []byte, readTimeout time.Duration,
 			return msgBuf, nil, err
 		}
 		off += chunkSize
-		resetConnectionReadDeadline(conn, readTimeout, logger, logName, logId)
-	}
-}
-
-func resetConnectionReadDeadline(conn net.Conn, readTimeout time.Duration, logger log.Logger, logName, logId string) {
-	if readTimeout < 0 {
-		return
-	}
-	if err := conn.SetReadDeadline(time.Now().Add(readTimeout)); err != nil {
-		logger.Error(logName, logId, err)
 	}
 }
