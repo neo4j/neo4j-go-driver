@@ -20,9 +20,10 @@
 package bolt
 
 import (
+	"context"
 	"encoding/binary"
+	rio "github.com/neo4j/neo4j-go-driver/v4/neo4j/internal/racingio"
 	"github.com/neo4j/neo4j-go-driver/v4/neo4j/log"
-	"io"
 	"net"
 	"time"
 )
@@ -30,17 +31,30 @@ import (
 // dechunkMessage takes a buffer to be reused and returns the reusable buffer
 // (might have been reallocated to handle growth), the message buffer and
 // error.
-// If a non-default connection read timeout configuration hint is passed, the dechunker resets the connection read
-// deadline as well after successfully reading a chunk (NOOP messages included)
-func dechunkMessage(conn net.Conn, msgBuf []byte, readTimeout time.Duration,
-	logger log.Logger, logName, logId string) ([]byte, []byte, error) {
+// Reads will race against the provided context ctx
+// If the server provides the connection read timeout hint readTimeout, a new context will be created from that timeout
+// and the user-provided context ctx before every read
+func dechunkMessage(
+	conn net.Conn,
+	msgBuf []byte,
+	readTimeout time.Duration,
+	logger log.Logger,
+	logName string,
+	logId string) ([]byte, []byte, error) {
+
 	sizeBuf := []byte{0x00, 0x00}
 	off := 0
 
+	reader := rio.NewRacingReader(conn)
+
 	for {
-		_, err := io.ReadFull(conn, sizeBuf)
+		updatedCtx, cancelFunc := newContext(readTimeout, logger, logName, logId)
+		_, err := reader.ReadFull(updatedCtx, sizeBuf)
 		if err != nil {
 			return msgBuf, nil, err
+		}
+		if cancelFunc != nil { // reading has been completed, time to release the context
+			cancelFunc()
 		}
 		chunkSize := int(binary.BigEndian.Uint16(sizeBuf))
 		if chunkSize == 0 {
@@ -48,8 +62,6 @@ func dechunkMessage(conn net.Conn, msgBuf []byte, readTimeout time.Duration,
 				return msgBuf, msgBuf[:off], nil
 			}
 			// Got a nop chunk
-			resetConnectionReadDeadline(conn, readTimeout, logger,
-				logName, logId)
 			continue
 		}
 
@@ -60,20 +72,42 @@ func dechunkMessage(conn net.Conn, msgBuf []byte, readTimeout time.Duration,
 			msgBuf = newMsgBuf
 		}
 		// Read the chunk into buffer
-		_, err = io.ReadFull(conn, msgBuf[off:(off+chunkSize)])
+		updatedCtx, cancelFunc = newContext(readTimeout, logger, logName, logId)
+		_, err = reader.ReadFull(updatedCtx, msgBuf[off:(off+chunkSize)])
 		if err != nil {
 			return msgBuf, nil, err
 		}
+		if cancelFunc != nil { // reading has been completed, time to release the context
+			cancelFunc()
+		}
 		off += chunkSize
-		resetConnectionReadDeadline(conn, readTimeout, logger, logName, logId)
 	}
 }
 
-func resetConnectionReadDeadline(conn net.Conn, readTimeout time.Duration, logger log.Logger, logName, logId string) {
-	if readTimeout < 0 {
-		return
+// newContext computes a new context and cancel function if a readTimeout is set
+func newContext(
+	readTimeout time.Duration,
+	logger log.Logger,
+	logName string,
+	logId string) (context.Context, context.CancelFunc) {
+
+	ctx := context.Background()
+	if readTimeout >= 0 {
+		newCtx, cancelFunc := context.WithTimeout(ctx, readTimeout)
+		logger.Debugf(logName, logId,
+			"read timeout of %s applied, chunk read deadline is now: %s",
+			readTimeout.String(),
+			deadlineOf(newCtx),
+		)
+		return newCtx, cancelFunc
 	}
-	if err := conn.SetReadDeadline(time.Now().Add(readTimeout)); err != nil {
-		logger.Error(logName, logId, err)
+	return ctx, nil
+}
+
+func deadlineOf(ctx context.Context) string {
+	deadline, hasDeadline := ctx.Deadline()
+	if !hasDeadline {
+		return "N/A (no deadline set)"
 	}
+	return deadline.String()
 }

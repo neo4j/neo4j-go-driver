@@ -20,6 +20,8 @@
 package neo4j
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -114,7 +116,9 @@ func wrapError(err error) error {
 	if err == nil {
 		return nil
 	}
-	if err == io.EOF {
+	if err == io.EOF ||
+		errors.Is(err, context.DeadlineExceeded) ||
+		errors.Is(err, context.Canceled) {
 		return &ConnectivityError{inner: err}
 	}
 	switch e := err.(type) {
