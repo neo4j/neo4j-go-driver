@@ -614,40 +614,6 @@ func TestBolt5(ot *testing.T) {
 		bolt.Reset(context.Background())
 	})
 
-	ot.Run("Forces reset in ready state", func(t *testing.T) {
-		bolt, cleanup := connectToServer(t, func(srv *bolt5server) {
-			srv.accept(5)
-			srv.waitForReset()
-			srv.sendSuccess(map[string]interface{}{})
-		})
-		defer cleanup()
-		defer bolt.Close(context.Background())
-
-		err := bolt.ForceReset(context.Background())
-		AssertNoError(t, err)
-		assertBoltState(t, bolt5Ready, bolt)
-	})
-
-	ot.Run("Forces reset while streaming", func(t *testing.T) {
-		bolt, cleanup := connectToServer(t, func(srv *bolt5server) {
-			srv.accept(5)
-			srv.serveRun(runResponse, nil)
-			srv.waitForReset()
-			srv.sendSuccess(map[string]interface{}{})
-		})
-		defer cleanup()
-		defer bolt.Close(context.Background())
-		_, err := bolt.Run(context.Background(), idb.Command{Cypher: "MATCH (" +
-			"n) RETURN n"}, idb.TxConfig{Mode: idb.ReadMode})
-		AssertNoError(t, err)
-
-		err = bolt.ForceReset(context.Background())
-		AssertNoError(t, err)
-		assertBoltState(t, bolt5Ready, bolt)
-	})
-
-	// Reset where state is ready
-
 	ot.Run("Buffer stream", func(t *testing.T) {
 		bolt, cleanup := connectToServer(t, func(srv *bolt5server) {
 			srv.accept(5)
@@ -886,7 +852,7 @@ func TestBolt5(ot *testing.T) {
 		AssertNil(t, sum)
 		AssertError(t, err)
 	})
-	
+
 	ot.Run("GetRoutingTable using ROUTE message", func(t *testing.T) {
 		bolt, cleanup := connectToServer(t, func(srv *bolt5server) {
 			srv.acceptWithMinor(5, 0)

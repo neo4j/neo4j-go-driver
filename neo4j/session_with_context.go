@@ -468,10 +468,8 @@ func (s *sessionWithContext) Run(ctx context.Context,
 		if err != nil {
 			return nil, err
 		}
-		err = conn.ForceReset(ctx)
-		if err == nil {
-			break
-		}
+		conn.Reset(ctx)
+		break
 	}
 
 	stream, err := conn.Run(

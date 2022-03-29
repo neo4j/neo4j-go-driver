@@ -785,10 +785,6 @@ func (b *bolt3) Close(ctx context.Context) {
 	b.state = bolt3_dead
 }
 
-func (b *bolt3) ForceReset(ctx context.Context) error {
-	return nil
-}
-
 func (b *bolt3) SetBoltLogger(boltLogger log.BoltLogger) {
 	b.in.hyd.boltLogger = boltLogger
 	b.out.boltLogger = boltLogger

@@ -43,33 +43,32 @@ type RecordedTx struct {
 }
 
 type ConnFake struct {
-	Name           string
-	Version        string
-	Alive          bool
-	Birth          time.Time
-	Table          *idb.RoutingTable
-	Err            error
-	Id             int
-	TxBeginErr     error
-	TxBeginHandle  idb.TxHandle
-	RunErr         error
-	RunStream      idb.StreamHandle
-	RunTxErr       error
-	RunTxStream    idb.StreamHandle
-	Nexts          []Next
-	Bookm          string
-	TxCommitErr    error
-	TxCommitHook   func()
-	TxRollbackErr  error
-	ResetHook      func()
-	ConsumeSum     *db.Summary
-	ConsumeErr     error
-	ConsumeHook    func()
-	RecordedTxs    []RecordedTx // Appended to by Run/TxBegin
-	BufferErr      error
-	BufferHook     func()
-	ForceResetHook func() error
-	DatabaseName   string
+	Name          string
+	Version       string
+	Alive         bool
+	Birth         time.Time
+	Table         *idb.RoutingTable
+	Err           error
+	Id            int
+	TxBeginErr    error
+	TxBeginHandle idb.TxHandle
+	RunErr        error
+	RunStream     idb.StreamHandle
+	RunTxErr      error
+	RunTxStream   idb.StreamHandle
+	Nexts         []Next
+	Bookm         string
+	TxCommitErr   error
+	TxCommitHook  func()
+	TxRollbackErr error
+	ResetHook     func()
+	ConsumeSum    *db.Summary
+	ConsumeErr    error
+	ConsumeHook   func()
+	RecordedTxs   []RecordedTx // Appended to by Run/TxBegin
+	BufferErr     error
+	BufferHook    func()
+	DatabaseName  string
 }
 
 func (c *ConnFake) Connect(context.Context, int, map[string]interface{}, string, map[string]string) error {
@@ -172,13 +171,6 @@ func (c *ConnFake) Next(ctx context.Context, streamHandle idb.StreamHandle) (*db
 		return next.Record, next.Summary, next.Err
 	}
 	return nil, nil, nil
-}
-
-func (c *ConnFake) ForceReset(ctx context.Context) error {
-	if c.ForceResetHook != nil {
-		return c.ForceResetHook()
-	}
-	return nil
 }
 
 func (c *ConnFake) SelectDatabase(database string) {

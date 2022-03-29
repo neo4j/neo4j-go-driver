@@ -704,6 +704,7 @@ func (b *backend) handleRequest(req map[string]interface{}) {
 				"Feature:TLS:1.3",
 				"Optimization:ConnectionReuse",
 				"Optimization:ImplicitDefaultArguments",
+				"Optimization:MinimalResets",
 				"Optimization:PullPipelining",
 				"Temporary:CypherPathAndRelationship",
 				"Temporary:DriverFetchSize",

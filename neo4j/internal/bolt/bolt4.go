@@ -1010,20 +1010,6 @@ func (b *bolt4) SelectDatabase(database string) {
 	b.databaseName = database
 }
 
-func (b *bolt4) ForceReset(ctx context.Context) error {
-	if b.state == bolt4_ready {
-		b.out.appendReset()
-		b.out.send(ctx, b.conn)
-		if b.err != nil {
-			return b.err
-		}
-		b.receiveMsg(ctx)
-		return b.err
-	}
-	b.Reset(ctx)
-	return b.err
-}
-
 func (b *bolt4) SetBoltLogger(boltLogger log.BoltLogger) {
 	b.in.hyd.boltLogger = boltLogger
 	b.out.boltLogger = boltLogger

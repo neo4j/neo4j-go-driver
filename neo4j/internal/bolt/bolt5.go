@@ -931,20 +931,6 @@ func (b *bolt5) SelectDatabase(database string) {
 	b.databaseName = database
 }
 
-func (b *bolt5) ForceReset(ctx context.Context) error {
-	if b.state == bolt5Ready {
-		b.out.appendReset()
-		b.out.send(ctx, b.conn)
-		if b.err != nil {
-			return b.err
-		}
-		b.receiveMsg(ctx)
-		return b.err
-	}
-	b.Reset(ctx)
-	return b.err
-}
-
 func (b *bolt5) SetBoltLogger(boltLogger log.BoltLogger) {
 	b.in.hyd.boltLogger = boltLogger
 	b.out.boltLogger = boltLogger
