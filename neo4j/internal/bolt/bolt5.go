@@ -120,6 +120,7 @@ func NewBolt5(serverName string, conn net.Conn, logger log.Logger, boltLog log.B
 			logger:          logger,
 			logName:         log.Bolt5,
 		},
+		lastQid: -1,
 	}
 	b.out = outgoing{
 		chunker:    newChunker(),
