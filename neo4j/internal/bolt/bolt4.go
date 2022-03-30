@@ -869,6 +869,7 @@ func (b *bolt4) Reset(ctx context.Context) {
 		b.hasPendingTx = false
 		b.databaseName = idb.DefaultDatabase
 		b.err = nil
+		b.lastQid = -1
 		b.streams.reset()
 	}()
 
