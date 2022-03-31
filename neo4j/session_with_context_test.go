@@ -40,7 +40,7 @@ func TestSession(st *testing.T) {
 	boltLogger := log.ConsoleBoltLogger{}
 
 	assertCleanSessionState := func(t *testing.T, sess *sessionWithContext) {
-		if sess.txExplicit != nil {
+		if sess.explicitTx != nil {
 			t.Errorf("Session should not be in tx mode")
 		}
 	}
@@ -84,7 +84,7 @@ func TestSession(st *testing.T) {
 			pool.BorrowConn = conn
 			transientErr := &db.Neo4jError{Code: "Neo.TransientError.General.MemoryPoolOutOfMemoryError"}
 			numRetries := 0
-			_, err := sess.WriteTransaction(context.Background(), func(tx TransactionWithContext) (interface{}, error) {
+			_, err := sess.WriteTransaction(context.Background(), func(tx ManagedTransaction) (interface{}, error) {
 				// Previous connection should be returned to pool since it failed
 				if numRetries > 0 && numReturns != numRetries {
 					t.Errorf("Should have returned previous connection to pool")
@@ -110,7 +110,7 @@ func TestSession(st *testing.T) {
 			causeOfRollbackErr := errors.New("UserErrorFake")
 			pool.BorrowConn = &ConnFake{Alive: true, TxRollbackErr: rollbackErr}
 			numRetries := 0
-			_, err := sess.WriteTransaction(context.Background(), func(tx TransactionWithContext) (interface{}, error) {
+			_, err := sess.WriteTransaction(context.Background(), func(tx ManagedTransaction) (interface{}, error) {
 				numRetries++
 				return nil, causeOfRollbackErr
 			})
@@ -126,7 +126,7 @@ func TestSession(st *testing.T) {
 			_, pool, sess := createSession()
 			pool.BorrowConn = &ConnFake{Alive: false, TxCommitErr: io.EOF}
 			numRetries := 0
-			_, err := sess.WriteTransaction(context.Background(), func(tx TransactionWithContext) (interface{}, error) {
+			_, err := sess.WriteTransaction(context.Background(), func(tx ManagedTransaction) (interface{}, error) {
 				numRetries++
 				return nil, nil
 			})
@@ -155,7 +155,7 @@ func TestSession(st *testing.T) {
 				return []string{"aserver"}, nil
 			}
 
-			sess.WriteTransaction(context.Background(), func(tx TransactionWithContext) (interface{}, error) {
+			sess.WriteTransaction(context.Background(), func(tx ManagedTransaction) (interface{}, error) {
 				return nil, nil
 			})
 			_, err := sess.BeginTransaction(context.Background())
@@ -181,10 +181,10 @@ func TestSession(st *testing.T) {
 
 			sess.Run(context.Background(), "cypher", nil)
 			sess.BeginTransaction(context.Background())
-			sess.ReadTransaction(context.Background(), func(tx TransactionWithContext) (interface{}, error) {
+			sess.ReadTransaction(context.Background(), func(tx ManagedTransaction) (interface{}, error) {
 				return nil, errors.New("something")
 			})
-			sess.WriteTransaction(context.Background(), func(tx TransactionWithContext) (interface{}, error) {
+			sess.WriteTransaction(context.Background(), func(tx ManagedTransaction) (interface{}, error) {
 				return nil, errors.New("something")
 			})
 			AssertLen(t, conn.RecordedTxs, 4)
@@ -249,7 +249,7 @@ func TestSession(st *testing.T) {
 			sess.Run(context.Background(), "cypher", nil)
 			AssertIntEqual(t, bufferCalls, 0)
 			// Run transaction function. assumes code is shared between ReadTransaction/WriteTransaction
-			sess.ReadTransaction(context.Background(), func(tx TransactionWithContext) (interface{}, error) {
+			sess.ReadTransaction(context.Background(), func(tx ManagedTransaction) (interface{}, error) {
 				return nil, errors.New("somehting")
 			})
 			AssertLen(t, conn.RecordedTxs, 2)
@@ -401,7 +401,7 @@ func TestSession(st *testing.T) {
 			conn := &ConnFake{Alive: true}
 			pool.BorrowConn = conn
 
-			_, err := sess.WriteTransaction(context.Background(), func(tx TransactionWithContext) (interface{}, error) {
+			_, err := sess.WriteTransaction(context.Background(), func(tx ManagedTransaction) (interface{}, error) {
 				return nil, tokenExpiredErr
 			})
 
@@ -413,7 +413,7 @@ func TestSession(st *testing.T) {
 			conn := &ConnFake{Alive: true}
 			pool.BorrowConn = conn
 
-			_, err := sess.ReadTransaction(context.Background(), func(tx TransactionWithContext) (interface{}, error) {
+			_, err := sess.ReadTransaction(context.Background(), func(tx ManagedTransaction) (interface{}, error) {
 				return nil, tokenExpiredErr
 			})
 

@@ -108,8 +108,8 @@ func (s *session) Close() error {
 	return s.delegate.Close(context.Background())
 }
 
-func transactionWorkBridge(work TransactionWork) TransactionWorkWithContext {
-	return func(txc TransactionWithContext) (interface{}, error) {
+func transactionWorkBridge(work TransactionWork) ManagedTransactionWork {
+	return func(txc ManagedTransaction) (interface{}, error) {
 		return work(txc.legacy())
 	}
 }

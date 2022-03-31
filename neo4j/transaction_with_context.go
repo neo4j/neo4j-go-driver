@@ -24,8 +24,16 @@ import (
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
 )
 
-// TransactionWithContext represents a transaction in the Neo4j database
-type TransactionWithContext interface {
+// ManagedTransaction represents a transaction managed by the driver and operated on by the user, via transaction functions
+type ManagedTransaction interface {
+	// Run executes a statement on this transaction and returns a result
+	Run(ctx context.Context, cypher string, params map[string]interface{}) (ResultWithContext, error)
+
+	legacy() Transaction
+}
+
+// ExplicitTransaction represents a transaction in the Neo4j database
+type ExplicitTransaction interface {
 	// Run executes a statement on this transaction and returns a result
 	Run(ctx context.Context, cypher string, params map[string]interface{}) (ResultWithContext, error)
 	// Commit commits the transaction
@@ -36,13 +44,13 @@ type TransactionWithContext interface {
 	// and closes all resources associated with this transaction
 	Close(ctx context.Context) error
 
-	// legacy returns the non-cancelling, legacy variant of this TransactionWithContext type
+	// legacy returns the non-cancelling, legacy variant of this ExplicitTransaction type
 	// This is used so that legacy transaction functions can delegate work to their newer, context-aware variants
 	legacy() Transaction
 }
 
 // Transaction implementation when explicit transaction started
-type transactionWithContext struct {
+type explicitTransaction struct {
 	conn      db.Connection
 	fetchSize int
 	txHandle  db.TxHandle
@@ -52,7 +60,7 @@ type transactionWithContext struct {
 	onClosed  func()
 }
 
-func (tx *transactionWithContext) Run(ctx context.Context, cypher string,
+func (tx *explicitTransaction) Run(ctx context.Context, cypher string,
 	params map[string]interface{}) (ResultWithContext, error) {
 	stream, err := tx.conn.RunTx(ctx, tx.txHandle, db.Command{Cypher: cypher, Params: params, FetchSize: tx.fetchSize})
 	if err != nil {
@@ -64,7 +72,7 @@ func (tx *transactionWithContext) Run(ctx context.Context, cypher string,
 	return newResultWithContext(tx.conn, stream, cypher, params), nil
 }
 
-func (tx *transactionWithContext) Commit(ctx context.Context) error {
+func (tx *explicitTransaction) Commit(ctx context.Context) error {
 	if tx.runFailed {
 		tx.runFailed, tx.done = false, true
 		return tx.err
@@ -77,7 +85,8 @@ func (tx *transactionWithContext) Commit(ctx context.Context) error {
 	tx.onClosed()
 	return wrapError(tx.err)
 }
-func (tx *transactionWithContext) Close(ctx context.Context) error {
+
+func (tx *explicitTransaction) Close(ctx context.Context) error {
 	if tx.done {
 		// repeated calls to Close => NOOP
 		return nil
@@ -85,7 +94,7 @@ func (tx *transactionWithContext) Close(ctx context.Context) error {
 	return tx.Rollback(ctx)
 }
 
-func (tx *transactionWithContext) Rollback(ctx context.Context) error {
+func (tx *explicitTransaction) Rollback(ctx context.Context) error {
 	if tx.runFailed {
 		tx.done, tx.runFailed = true, false
 		return nil
@@ -104,20 +113,20 @@ func (tx *transactionWithContext) Rollback(ctx context.Context) error {
 	return wrapError(tx.err)
 }
 
-func (tx *transactionWithContext) legacy() Transaction {
+func (tx *explicitTransaction) legacy() Transaction {
 	return &transaction{
 		delegate: tx,
 	}
 }
 
-// TransactionWithContext implementation used as parameter to transactional functions
-type retryableTransactionWithContext struct {
+// ManagedTransaction implementation used as parameter to transactional functions
+type managedTransaction struct {
 	conn      db.Connection
 	fetchSize int
 	txHandle  db.TxHandle
 }
 
-func (tx *retryableTransactionWithContext) Run(ctx context.Context, cypher string, params map[string]interface{}) (ResultWithContext, error) {
+func (tx *managedTransaction) Run(ctx context.Context, cypher string, params map[string]interface{}) (ResultWithContext, error) {
 	stream, err := tx.conn.RunTx(ctx, tx.txHandle, db.Command{Cypher: cypher, Params: params, FetchSize: tx.fetchSize})
 	if err != nil {
 		return nil, wrapError(err)
@@ -125,34 +134,38 @@ func (tx *retryableTransactionWithContext) Run(ctx context.Context, cypher strin
 	return newResultWithContext(tx.conn, stream, cypher, params), nil
 }
 
-func (tx *retryableTransactionWithContext) Commit(context.Context) error {
+// legacy interop only - remove in 6.0
+func (tx *managedTransaction) Commit(context.Context) error {
 	return &UsageError{Message: "Commit not allowed on retryable transaction"}
 }
 
-func (tx *retryableTransactionWithContext) Rollback(context.Context) error {
+// legacy interop only - remove in 6.0
+func (tx *managedTransaction) Rollback(context.Context) error {
 	return &UsageError{Message: "Rollback not allowed on retryable transaction"}
 }
 
-func (tx *retryableTransactionWithContext) Close(context.Context) error {
+// legacy interop only - remove in 6.0
+func (tx *managedTransaction) Close(context.Context) error {
 	return &UsageError{Message: "Close not allowed on retryable transaction"}
 }
 
-func (tx *retryableTransactionWithContext) legacy() Transaction {
+// legacy interop only - remove in 6.0
+func (tx *managedTransaction) legacy() Transaction {
 	return &transaction{
 		delegate: tx,
 	}
 }
 
 // Represents an auto commit transaction.
-// Does not implement the TransactionWithContext interface.
-type autoTransactionWithContext struct {
+// Does not implement the ExplicitTransaction nor the ManagedTransaction interface.
+type autocommitTransaction struct {
 	conn     db.Connection
 	res      *resultWithContext
 	closed   bool
 	onClosed func()
 }
 
-func (tx *autoTransactionWithContext) done(ctx context.Context) {
+func (tx *autocommitTransaction) done(ctx context.Context) {
 	if !tx.closed {
 		tx.res.buffer(ctx)
 		tx.closed = true
@@ -160,7 +173,7 @@ func (tx *autoTransactionWithContext) done(ctx context.Context) {
 	}
 }
 
-func (tx *autoTransactionWithContext) discard(ctx context.Context) {
+func (tx *autocommitTransaction) discard(ctx context.Context) {
 	if !tx.closed {
 		tx.res.Consume(ctx)
 		tx.closed = true

@@ -24,8 +24,8 @@ import (
 )
 
 // Transaction represents a transaction in the Neo4j database
-// Deprecated: use TransactionWithContext instead.
-// TransactionWithContext is available via SessionWithContext.
+// Deprecated: use ExplicitTransaction instead.
+// ExplicitTransaction is available via SessionWithContext.
 // SessionWithContext is available via the context-aware driver/returned
 // by NewDriverWithContext.
 // Transaction will be removed in 6.0.
@@ -43,7 +43,7 @@ type Transaction interface {
 
 // Transaction implementation when explicit transaction started
 type transaction struct {
-	delegate TransactionWithContext
+	delegate ExplicitTransaction
 }
 
 func (tx *transaction) Run(cypher string, params map[string]interface{}) (Result, error) {
