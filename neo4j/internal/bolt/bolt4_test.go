@@ -634,40 +634,6 @@ func TestBolt4(ot *testing.T) {
 		bolt.Reset(context.Background())
 	})
 
-	ot.Run("Forces reset in ready state", func(t *testing.T) {
-		bolt, cleanup := connectToServer(t, func(srv *bolt4server) {
-			srv.accept(4)
-			srv.waitForReset()
-			srv.sendSuccess(map[string]interface{}{})
-		})
-		defer cleanup()
-		defer bolt.Close(context.Background())
-
-		err := bolt.ForceReset(context.Background())
-		AssertNoError(t, err)
-		assertBoltState(t, bolt4_ready, bolt)
-	})
-
-	ot.Run("Forces reset while streaming", func(t *testing.T) {
-		bolt, cleanup := connectToServer(t, func(srv *bolt4server) {
-			srv.accept(4)
-			srv.serveRun(runResponse, nil)
-			srv.waitForReset()
-			srv.sendSuccess(map[string]interface{}{})
-		})
-		defer cleanup()
-		defer bolt.Close(context.Background())
-		_, err := bolt.Run(context.Background(), idb.Command{Cypher: "MATCH (" +
-			"n) RETURN n"}, idb.TxConfig{Mode: idb.ReadMode})
-		AssertNoError(t, err)
-
-		err = bolt.ForceReset(context.Background())
-		AssertNoError(t, err)
-		assertBoltState(t, bolt4_ready, bolt)
-	})
-
-	// Reset where state is ready
-
 	ot.Run("Buffer stream", func(t *testing.T) {
 		bolt, cleanup := connectToServer(t, func(srv *bolt4server) {
 			srv.accept(4)

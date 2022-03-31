@@ -845,7 +845,7 @@ func (b *bolt5) Birthdate() time.Time {
 
 func (b *bolt5) Reset(ctx context.Context) {
 	defer func() {
-		// Reset internal state
+		b.log.Debugf(log.Bolt5, b.logId, "Resetting connection internal state")
 		b.txId = 0
 		b.bookmark = ""
 		b.hasPendingTx = false
@@ -929,20 +929,6 @@ func (b *bolt5) Close(ctx context.Context) {
 
 func (b *bolt5) SelectDatabase(database string) {
 	b.databaseName = database
-}
-
-func (b *bolt5) ForceReset(ctx context.Context) error {
-	if b.state == bolt5Ready {
-		b.out.appendReset()
-		b.out.send(ctx, b.conn)
-		if b.err != nil {
-			return b.err
-		}
-		b.receiveMsg(ctx)
-		return b.err
-	}
-	b.Reset(ctx)
-	return b.err
 }
 
 func (b *bolt5) SetBoltLogger(boltLogger log.BoltLogger) {
