@@ -845,7 +845,7 @@ func (b *bolt5) Birthdate() time.Time {
 
 func (b *bolt5) Reset(ctx context.Context) {
 	defer func() {
-		// Reset internal state
+		b.log.Debugf(log.Bolt5, b.logId, "Resetting connection internal state")
 		b.txId = 0
 		b.bookmark = ""
 		b.hasPendingTx = false

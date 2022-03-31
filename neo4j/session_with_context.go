@@ -468,7 +468,6 @@ func (s *sessionWithContext) Run(ctx context.Context,
 		if err != nil {
 			return nil, err
 		}
-		conn.Reset(ctx)
 		break
 	}
 

@@ -669,7 +669,7 @@ func (b *bolt3) Birthdate() time.Time {
 
 func (b *bolt3) Reset(ctx context.Context) {
 	defer func() {
-		// Reset internal state
+		b.log.Debugf(log.Bolt3, b.logId, "Resetting connection internal state")
 		b.txId = 0
 		b.currStream = nil
 		b.bookmark = ""
