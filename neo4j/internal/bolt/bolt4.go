@@ -120,6 +120,7 @@ func NewBolt4(serverName string, conn net.Conn, logger log.Logger, boltLog log.B
 			logger:          logger,
 			logName:         log.Bolt4,
 		},
+		lastQid: -1,
 	}
 	b.out = outgoing{
 		chunker:    newChunker(),
@@ -868,6 +869,7 @@ func (b *bolt4) Reset(ctx context.Context) {
 		b.hasPendingTx = false
 		b.databaseName = idb.DefaultDatabase
 		b.err = nil
+		b.lastQid = -1
 		b.streams.reset()
 	}()
 
