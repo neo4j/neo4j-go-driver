@@ -21,7 +21,9 @@ package neo4j
 
 import (
 	"context"
+	"fmt"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
+	"math"
 	"time"
 
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/retry"
@@ -219,9 +221,12 @@ func (s *sessionWithContext) BeginTransaction(ctx context.Context, configurers .
 	}
 
 	// Apply configuration functions
-	config := TransactionConfig{Timeout: 0, Metadata: nil}
+	config := defaultTransactionConfig()
 	for _, c := range configurers {
 		c(&config)
+	}
+	if err := validateTransactionConfig(config); err != nil {
+		return nil, err
 	}
 
 	// Get a connection from the pool. This could fail in clustered environment.
@@ -275,9 +280,12 @@ func (s *sessionWithContext) runRetriable(
 		s.autocommitTx.done(ctx)
 	}
 
-	config := TransactionConfig{Timeout: 0, Metadata: nil}
+	config := defaultTransactionConfig()
 	for _, c := range configurers {
 		c(&config)
+	}
+	if err := validateTransactionConfig(config); err != nil {
+		return nil, err
 	}
 
 	state := retry.State{
@@ -454,9 +462,12 @@ func (s *sessionWithContext) Run(ctx context.Context,
 		s.autocommitTx.done(ctx)
 	}
 
-	config := TransactionConfig{Timeout: 0, Metadata: nil}
+	config := defaultTransactionConfig()
 	for _, c := range configurers {
 		c(&config)
+	}
+	if err := validateTransactionConfig(config); err != nil {
+		return nil, err
 	}
 
 	conn, err := s.getConnection(ctx, s.defaultMode)
@@ -528,6 +539,7 @@ type erroredSessionWithContext struct {
 func (s *erroredSessionWithContext) LastBookmarks() Bookmarks {
 	return nil
 }
+
 func (s *erroredSessionWithContext) lastBookmark() string {
 	return ""
 }
@@ -548,4 +560,16 @@ func (s *erroredSessionWithContext) Close(context.Context) error {
 }
 func (s *erroredSessionWithContext) legacy() Session {
 	return &erroredSession{err: s.err}
+}
+
+func defaultTransactionConfig() TransactionConfig {
+	return TransactionConfig{Timeout: math.MinInt, Metadata: nil}
+}
+
+func validateTransactionConfig(config TransactionConfig) error {
+	if config.Timeout != math.MinInt && config.Timeout < 0 {
+		err := fmt.Sprintf("Negative transaction timeouts are not allowed. Given: %d", config.Timeout)
+		return &UsageError{Message: err}
+	}
+	return nil
 }

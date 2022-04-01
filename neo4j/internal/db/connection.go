@@ -24,6 +24,7 @@ import (
 	"context"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/db"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/log"
+	"math"
 	"time"
 )
 
@@ -53,6 +54,8 @@ type TxConfig struct {
 	ImpersonatedUser string
 	Meta             map[string]interface{}
 }
+
+const DefaultTxConfigTimeout = math.MinInt
 
 // Connection defines an abstract database server connection.
 type Connection interface {

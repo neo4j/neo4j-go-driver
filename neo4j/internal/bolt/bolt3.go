@@ -742,7 +742,7 @@ func (b *bolt3) GetRoutingTable(ctx context.Context,
 		Cypher: "CALL dbms.cluster.routing.getRoutingTable($context)",
 		Params: map[string]interface{}{"context": routingContext},
 	}
-	txConfig := idb.TxConfig{Mode: idb.ReadMode}
+	txConfig := idb.TxConfig{Mode: idb.ReadMode, Timeout: idb.DefaultTxConfigTimeout}
 	streamHandle, err := b.Run(ctx, runCommand, txConfig)
 	if err != nil {
 		// Give a better error

@@ -25,6 +25,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"net/url"
 	"regexp"
 	"strings"
@@ -231,7 +232,7 @@ func (b *backend) toRequest(s string) map[string]interface{} {
 }
 
 func (b *backend) toTransactionConfigApply(data map[string]interface{}) func(*neo4j.TransactionConfig) {
-	txConfig := neo4j.TransactionConfig{}
+	txConfig := neo4j.TransactionConfig{Timeout: math.MinInt}
 	// Optional transaction meta data
 	if data["txMeta"] != nil {
 		txConfig.Metadata = data["txMeta"].(map[string]interface{})
@@ -244,7 +245,7 @@ func (b *backend) toTransactionConfigApply(data map[string]interface{}) func(*ne
 		if txConfig.Metadata != nil {
 			conf.Metadata = txConfig.Metadata
 		}
-		if txConfig.Timeout != 0 {
+		if txConfig.Timeout != math.MinInt {
 			conf.Timeout = txConfig.Timeout
 		}
 	}

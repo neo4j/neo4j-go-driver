@@ -64,7 +64,7 @@ func (i *internalTx4) toMeta() map[string]interface{} {
 		meta["bookmarks"] = i.bookmarks
 	}
 	ms := int(i.timeout.Nanoseconds() / 1e6)
-	if ms > 0 {
+	if ms >= 0 {
 		meta["tx_timeout"] = ms
 	}
 	if len(i.txMeta) > 0 {
@@ -279,8 +279,7 @@ func (b *bolt4) checkImpersonationAndVersion(impersonatedUser string) error {
 	return nil
 }
 
-func (b *bolt4) TxBegin(ctx context.Context, txConfig idb.TxConfig) (idb.
-	TxHandle, error) {
+func (b *bolt4) TxBegin(ctx context.Context, txConfig idb.TxConfig) (idb.TxHandle, error) {
 	// Ok, to begin transaction while streaming auto-commit, just empty the stream and continue.
 	if b.state == bolt4_streaming {
 		if b.bufferStream(ctx); b.err != nil {
@@ -970,7 +969,7 @@ func (b *bolt4) callGetRoutingTable(ctx context.Context,
 		runCommand.Cypher = "CALL dbms.routing.getRoutingTable($context, $database)"
 		runCommand.Params["database"] = database
 	}
-	txConfig := idb.TxConfig{Mode: idb.ReadMode, Bookmarks: bookmarks}
+	txConfig := idb.TxConfig{Mode: idb.ReadMode, Bookmarks: bookmarks, Timeout: idb.DefaultTxConfigTimeout}
 	streamHandle, err := b.Run(ctx, runCommand, txConfig)
 	if err != nil {
 		return nil, err
