@@ -86,7 +86,7 @@ type Connection interface {
 	// ServerVersion returns the server version on pattern Neo4j/1.2.3
 	ServerVersion() string
 	// IsAlive returns true if the connection is fully functional.
-	// Implementation of this should be passive, no pinging or similair since it might be
+	// Implementation of this should be passive, no pinging or similar since it might be
 	// called rather frequently.
 	IsAlive() bool
 	// HasFailed returns true if the connection has received a recoverable error (``FAILURE``).
