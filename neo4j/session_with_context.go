@@ -459,16 +459,9 @@ func (s *sessionWithContext) Run(ctx context.Context,
 		c(&config)
 	}
 
-	var (
-		conn db.Connection
-		err  error
-	)
-	for {
-		conn, err = s.getConnection(ctx, s.defaultMode)
-		if err != nil {
-			return nil, err
-		}
-		break
+	conn, err := s.getConnection(ctx, s.defaultMode)
+	if err != nil {
+		return nil, err
 	}
 
 	stream, err := conn.Run(
