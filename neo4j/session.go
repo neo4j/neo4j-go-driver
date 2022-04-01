@@ -77,7 +77,7 @@ func (s *session) BeginTransaction(configurers ...func(*TransactionConfig)) (Tra
 func (s *session) ReadTransaction(
 	work TransactionWork, configurers ...func(*TransactionConfig)) (interface{}, error) {
 
-	return s.delegate.ReadTransaction(
+	return s.delegate.ExecuteRead(
 		context.Background(),
 		transactionWorkBridge(work),
 		configurers...,
@@ -87,7 +87,7 @@ func (s *session) ReadTransaction(
 func (s *session) WriteTransaction(
 	work TransactionWork, configurers ...func(*TransactionConfig)) (interface{}, error) {
 
-	return s.delegate.WriteTransaction(
+	return s.delegate.ExecuteWrite(
 		context.Background(),
 		transactionWorkBridge(work),
 		configurers...,

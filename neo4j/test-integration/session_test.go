@@ -481,7 +481,7 @@ func TestSession(outer *testing.T) {
 			assertTrue(t, matched)
 		})
 
-		inner.Run("should set transaction metadata on ReadTransaction", func(t *testing.T) {
+		inner.Run("should set transaction metadata on ExecuteRead", func(t *testing.T) {
 			metadata := map[string]interface{}{
 				"m1": int64(1),
 				"m2": "some string",
@@ -498,7 +498,7 @@ func TestSession(outer *testing.T) {
 			assertTrue(t, matched.(bool))
 		})
 
-		inner.Run("should set transaction metadata on WriteTransaction", func(t *testing.T) {
+		inner.Run("should set transaction metadata on ExecuteWrite", func(t *testing.T) {
 			metadata := map[string]interface{}{
 				"m1": true,
 				"m2": []byte{0x00, 0x01, 0x02},
@@ -542,7 +542,7 @@ func TestSession(outer *testing.T) {
 			//Expect(err).To(BeTransientError(nil, ContainSubstring("terminated")))
 		})
 
-		inner.Run("should set transaction timeout on WriteTransaction", func(t *testing.T) {
+		inner.Run("should set transaction timeout on ExecuteWrite", func(t *testing.T) {
 			createNode(t, session, "WriteTransactionTxTimeOut", nil)
 
 			session2, tx2 := newSessionAndTx(t, driver, neo4j.AccessModeWrite)

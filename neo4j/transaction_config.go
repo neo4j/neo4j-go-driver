@@ -40,10 +40,10 @@ type TransactionConfig struct {
 //	session.Run("RETURN 1", nil, WithTxTimeout(5*time.Second))
 //
 // To apply a transaction timeout to a read transaction function:
-//	session.ReadTransaction(DoWork, WithTxTimeout(5*time.Second))
+//	session.ExecuteRead(DoWork, WithTxTimeout(5*time.Second))
 //
 // To apply a transaction timeout to a write transaction function:
-//	session.WriteTransaction(DoWork, WithTxTimeout(5*time.Second))
+//	session.ExecuteWrite(DoWork, WithTxTimeout(5*time.Second))
 func WithTxTimeout(timeout time.Duration) func(*TransactionConfig) {
 	return func(config *TransactionConfig) {
 		config.Timeout = timeout
@@ -59,10 +59,10 @@ func WithTxTimeout(timeout time.Duration) func(*TransactionConfig) {
 //	session.Run("RETURN 1", nil, WithTxMetadata(map[string)interface{}{"work-id": 1}))
 //
 // To attach a metadata to a read transaction function:
-//	session.ReadTransaction(DoWork, WithTxMetadata(map[string)interface{}{"work-id": 1}))
+//	session.ExecuteRead(DoWork, WithTxMetadata(map[string)interface{}{"work-id": 1}))
 //
 // To attach a metadata to a write transaction function:
-//	session.WriteTransaction(DoWork, WithTxMetadata(map[string)interface{}{"work-id": 1}))
+//	session.ExecuteWrite(DoWork, WithTxMetadata(map[string)interface{}{"work-id": 1}))
 func WithTxMetadata(metadata map[string]interface{}) func(*TransactionConfig) {
 	return func(config *TransactionConfig) {
 		config.Metadata = metadata

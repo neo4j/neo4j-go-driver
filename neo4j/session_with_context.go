@@ -48,12 +48,12 @@ type SessionWithContext interface {
 	lastBookmark() string
 	// BeginTransaction starts a new explicit transaction on this session
 	BeginTransaction(ctx context.Context, configurers ...func(*TransactionConfig)) (ExplicitTransaction, error)
-	// ReadTransaction executes the given unit of work in a AccessModeRead transaction with
+	// ExecuteRead executes the given unit of work in a AccessModeRead transaction with
 	// retry logic in place
-	ReadTransaction(ctx context.Context, work ManagedTransactionWork, configurers ...func(*TransactionConfig)) (interface{}, error)
-	// WriteTransaction executes the given unit of work in a AccessModeWrite transaction with
+	ExecuteRead(ctx context.Context, work ManagedTransactionWork, configurers ...func(*TransactionConfig)) (interface{}, error)
+	// ExecuteWrite executes the given unit of work in a AccessModeWrite transaction with
 	// retry logic in place
-	WriteTransaction(ctx context.Context, work ManagedTransactionWork, configurers ...func(*TransactionConfig)) (interface{}, error)
+	ExecuteWrite(ctx context.Context, work ManagedTransactionWork, configurers ...func(*TransactionConfig)) (interface{}, error)
 	// Run executes an auto-commit statement and returns a result
 	Run(ctx context.Context, cypher string, params map[string]interface{}, configurers ...func(*TransactionConfig)) (ResultWithContext, error)
 	// Close closes any open resources and marks this session as unusable
@@ -371,13 +371,13 @@ func (s *sessionWithContext) runRetriable(
 	return nil, err
 }
 
-func (s *sessionWithContext) ReadTransaction(ctx context.Context,
+func (s *sessionWithContext) ExecuteRead(ctx context.Context,
 	work ManagedTransactionWork, configurers ...func(*TransactionConfig)) (interface{}, error) {
 
 	return s.runRetriable(ctx, db.ReadMode, work, configurers...)
 }
 
-func (s *sessionWithContext) WriteTransaction(ctx context.Context,
+func (s *sessionWithContext) ExecuteWrite(ctx context.Context,
 	work ManagedTransactionWork, configurers ...func(*TransactionConfig)) (interface{}, error) {
 
 	return s.runRetriable(ctx, db.WriteMode, work, configurers...)
@@ -546,10 +546,10 @@ func (s *erroredSessionWithContext) lastBookmark() string {
 func (s *erroredSessionWithContext) BeginTransaction(context.Context, ...func(*TransactionConfig)) (ExplicitTransaction, error) {
 	return nil, s.err
 }
-func (s *erroredSessionWithContext) ReadTransaction(context.Context, ManagedTransactionWork, ...func(*TransactionConfig)) (interface{}, error) {
+func (s *erroredSessionWithContext) ExecuteRead(context.Context, ManagedTransactionWork, ...func(*TransactionConfig)) (interface{}, error) {
 	return nil, s.err
 }
-func (s *erroredSessionWithContext) WriteTransaction(context.Context, ManagedTransactionWork, ...func(*TransactionConfig)) (interface{}, error) {
+func (s *erroredSessionWithContext) ExecuteWrite(context.Context, ManagedTransactionWork, ...func(*TransactionConfig)) (interface{}, error) {
 	return nil, s.err
 }
 func (s *erroredSessionWithContext) Run(context.Context, string, map[string]interface{}, ...func(*TransactionConfig)) (ResultWithContext, error) {
