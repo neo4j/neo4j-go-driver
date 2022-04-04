@@ -90,9 +90,7 @@ type bolt5 struct {
 	connId        string
 	logId         string
 	serverVersion string
-	tfirst        int64       // Time that server started streaming
-	pendingTx     internalTx5 // Stashed away when tx started explicitly
-	hasPendingTx  bool
+	tfirst        int64  // Time that server started streaming
 	bookmark      string // Last bookmark
 	birthDate     time.Time
 	log           log.Logger
@@ -293,23 +291,13 @@ func (b *bolt5) TxBegin(ctx context.Context, txConfig idb.TxConfig) (idb.
 		impersonatedUser: txConfig.ImpersonatedUser,
 	}
 
-	// If there are bookmarks, begin the transaction immediately for backwards compatible
-	// reasons, otherwise delay it to save a round-trip
-	if len(tx.bookmarks) > 0 {
-		b.out.appendBegin(tx.toMeta())
-		b.out.send(ctx, b.conn)
-		b.receiveSuccess(ctx)
-		if b.err != nil {
-			return 0, b.err
-		}
-		b.state = bolt5Tx
-		b.hasPendingTx = false
-	} else {
-		// Stash this into pending internal tx
-		b.pendingTx = tx
-		b.hasPendingTx = true
-		b.state = bolt5PendingTx
+	b.out.appendBegin(tx.toMeta())
+	b.out.send(ctx, b.conn)
+	b.receiveSuccess(ctx)
+	if b.err != nil {
+		return 0, b.err
 	}
+	b.state = bolt5Tx
 	b.txId = idb.TxHandle(time.Now().Unix())
 	return b.txId, nil
 }
@@ -632,18 +620,12 @@ func (b *bolt5) Run(ctx context.Context, cmd idb.Command,
 	return stream, nil
 }
 
-func (b *bolt5) RunTx(ctx context.Context, txh idb.TxHandle,
-	cmd idb.Command) (idb.StreamHandle, error) {
+func (b *bolt5) RunTx(ctx context.Context, txh idb.TxHandle, cmd idb.Command) (idb.StreamHandle, error) {
 	if err := b.assertTxHandle(b.txId, txh); err != nil {
 		return nil, err
 	}
 
-	tx := &b.pendingTx
-	if !b.hasPendingTx {
-		tx = nil
-	}
-	stream, err := b.run(ctx, cmd.Cypher, cmd.Params, cmd.FetchSize, tx)
-	b.hasPendingTx = false
+	stream, err := b.run(ctx, cmd.Cypher, cmd.Params, cmd.FetchSize, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -848,7 +830,6 @@ func (b *bolt5) Reset(ctx context.Context) {
 		b.log.Debugf(log.Bolt5, b.logId, "Resetting connection internal state")
 		b.txId = 0
 		b.bookmark = ""
-		b.hasPendingTx = false
 		b.databaseName = idb.DefaultDatabase
 		b.err = nil
 		b.lastQid = -1

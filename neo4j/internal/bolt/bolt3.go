@@ -35,7 +35,6 @@ import (
 const (
 	bolt3_ready        = iota // Ready for use
 	bolt3_streaming           // Receiving result from auto commit query
-	bolt3_pendingtx           // Transaction has been requested but not applied
 	bolt3_tx                  // Transaction pending
 	bolt3_streamingtx         // Receiving result from a query within a transaction
 	bolt3_failed              // Recoverable error, needs reset
@@ -79,9 +78,8 @@ type bolt3 struct {
 	connId        string
 	logId         string
 	serverVersion string
-	tfirst        int64        // Time that server started streaming
-	pendingTx     *internalTx3 // Stashed away when tx started explcitly
-	bookmark      string       // Last bookmark
+	tfirst        int64  // Time that server started streaming
+	bookmark      string // Last bookmark
 	birthDate     time.Time
 	log           log.Logger
 	err           error // Last fatal error
@@ -170,7 +168,7 @@ func (b *bolt3) receiveSuccess(ctx context.Context) *success {
 	}
 }
 
-func (b *bolt3) Connect(ctx context.Context, minor int, auth map[string]interface{}, userAgent string, routingContext map[string]string) error {
+func (b *bolt3) Connect(ctx context.Context, minor int, auth map[string]interface{}, userAgent string, _ map[string]string) error {
 	if err := b.assertState(bolt3_unauthorized); err != nil {
 		return err
 	}
@@ -236,22 +234,14 @@ func (b *bolt3) TxBegin(ctx context.Context, txConfig idb.TxConfig) (idb.
 		txMeta:    txConfig.Meta,
 	}
 
-	// If there are bookmarks, begin the transaction immediately to get the error from the
-	// server early on. Requires a network roundtrip.
-	if len(tx.bookmarks) > 0 {
-		b.out.appendBegin(tx.toMeta())
-		if b.out.send(ctx, b.conn); b.err != nil {
-			return 0, b.err
-		}
-		if b.receiveSuccess(ctx); b.err != nil {
-			return 0, b.err
-		}
-		b.state = bolt3_tx
-	} else {
-		// Stash this into pending internal tx
-		b.pendingTx = tx
-		b.state = bolt3_pendingtx
+	b.out.appendBegin(tx.toMeta())
+	if b.out.send(ctx, b.conn); b.err != nil {
+		return 0, b.err
 	}
+	if b.receiveSuccess(ctx); b.err != nil {
+		return 0, b.err
+	}
+	b.state = bolt3_tx
 	b.txId = idb.TxHandle(time.Now().Unix())
 	return b.txId, nil
 }
@@ -289,12 +279,6 @@ func (b *bolt3) assertState(allowed ...int) error {
 func (b *bolt3) TxCommit(ctx context.Context, txh idb.TxHandle) error {
 	if err := b.assertTxHandle(b.txId, txh); err != nil {
 		return err
-	}
-
-	// Nothing to do, a transaction started but no commands were issued on it, server is unaware
-	if b.state == bolt3_pendingtx {
-		b.state = bolt3_ready
-		return nil
 	}
 
 	// Consume pending stream if any to turn state from streamingtx to tx
@@ -335,12 +319,6 @@ func (b *bolt3) TxCommit(ctx context.Context, txh idb.TxHandle) error {
 func (b *bolt3) TxRollback(ctx context.Context, txh idb.TxHandle) error {
 	if err := b.assertTxHandle(b.txId, txh); err != nil {
 		return err
-	}
-
-	// Nothing to do, a transaction started but no commands were issued on it
-	if b.state == bolt3_pendingtx {
-		b.state = bolt3_ready
-		return nil
 	}
 
 	// Can not send rollback while still streaming, consume to turn state into tx
@@ -423,19 +401,13 @@ func (b *bolt3) run(ctx context.Context, cypher string, params map[string]interf
 		return nil, err
 	}
 
-	if err := b.assertState(bolt3_tx, bolt3_ready, bolt3_pendingtx); err != nil {
+	if err := b.assertState(bolt3_tx, bolt3_ready); err != nil {
 		return nil, err
 	}
 
 	var meta map[string]interface{}
 	if tx != nil {
 		meta = tx.toMeta()
-	}
-
-	// Append lazy begin transaction message
-	if b.state == bolt3_pendingtx {
-		b.out.appendBegin(meta)
-		meta = nil
 	}
 
 	// Append run message
@@ -445,15 +417,6 @@ func (b *bolt3) run(ctx context.Context, cypher string, params map[string]interf
 	b.out.appendPullAll()
 	if b.out.send(ctx, b.conn); b.err != nil {
 		return nil, b.err
-	}
-
-	// Process server responses
-	// Receive confirmation of transaction begin if it was started above
-	if b.state == bolt3_pendingtx {
-		if b.receiveSuccess(ctx); b.err != nil {
-			return nil, b.err
-		}
-		b.state = bolt3_tx
 	}
 
 	// Receive confirmation of run message
@@ -495,14 +458,12 @@ func (b *bolt3) Run(ctx context.Context, runCommand idb.Command,
 	return stream, nil
 }
 
-func (b *bolt3) RunTx(ctx context.Context, txh idb.TxHandle,
-	runCommand idb.Command) (idb.StreamHandle, error) {
+func (b *bolt3) RunTx(ctx context.Context, txh idb.TxHandle, runCommand idb.Command) (idb.StreamHandle, error) {
 	if err := b.assertTxHandle(b.txId, txh); err != nil {
 		return nil, err
 	}
 
-	stream, err := b.run(ctx, runCommand.Cypher, runCommand.Params, b.pendingTx)
-	b.pendingTx = nil
+	stream, err := b.run(ctx, runCommand.Cypher, runCommand.Params, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -673,7 +634,6 @@ func (b *bolt3) Reset(ctx context.Context) {
 		b.txId = 0
 		b.currStream = nil
 		b.bookmark = ""
-		b.pendingTx = nil
 		b.err = nil
 	}()
 

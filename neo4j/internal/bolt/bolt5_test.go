@@ -327,7 +327,7 @@ func TestBolt5(ot *testing.T) {
 			idb.TxConfig{Mode: idb.ReadMode})
 		AssertNoError(t, err)
 		// Lazy start of transaction when no bookmark
-		assertBoltState(t, bolt5PendingTx, bolt)
+		assertBoltState(t, bolt5Tx, bolt)
 		str, err := bolt.RunTx(context.Background(), tx,
 			idb.Command{Cypher: "MATCH (n) RETURN n"})
 		assertBoltState(t, bolt5StreamingTx, bolt)
@@ -480,7 +480,7 @@ func TestBolt5(ot *testing.T) {
 		tx, err := bolt.TxBegin(context.Background(),
 			idb.TxConfig{Mode: idb.ReadMode})
 		AssertNoError(t, err)
-		assertBoltState(t, bolt5PendingTx, bolt)
+		assertBoltState(t, bolt5Tx, bolt)
 		str, err := bolt.RunTx(context.Background(), tx,
 			idb.Command{Cypher: "MATCH (n) RETURN n"})
 		AssertNoError(t, err)
@@ -556,6 +556,7 @@ func TestBolt5(ot *testing.T) {
 		bolt, cleanup := connectToServer(t, func(srv *bolt5server) {
 			srv.accept(5)
 			srv.waitForTxBegin()
+			srv.sendSuccess(nil)
 			srv.waitForRun(nil)
 			srv.waitForPullN(bolt5FetchSize)
 			srv.sendFailureMsg("code", "msg")
