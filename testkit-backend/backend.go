@@ -898,7 +898,5 @@ func testSkips() map[string]string {
 		"stub.summary.test_summary.TestSummary.test_server_info":                                                     "Needs some kind of server address DNS resolution",
 		"stub.summary.test_summary.TestSummary.test_invalid_query_type":                                              "Driver does not verify query type returned from server.",
 		"stub.routing.*.test_should_drop_connections_failing_liveness_check":                                         "Needs support for GetConnectionPoolMetrics",
-		"stub.tx_lifetime.test_tx_lifetime.TestTxLifetime.test_managed_tx_raises_tx_managed_exec":                    "Failed tx functions cause a RESET not a ROLLBACK",
-		"stub.tx_lifetime.test_tx_lifetime.TestTxLifetime.test_unmanaged_tx_raises_tx_closed_exec":                   "tx.commit, tx.rollback, and tx.close are noops if the tx has already been closed",
 	}
 }
