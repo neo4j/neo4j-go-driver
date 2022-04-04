@@ -53,7 +53,7 @@ func TestTransaction(outer *testing.T) {
 	outer.Run("Retry Mechanism", func(inner *testing.T) {
 		transientError := &neo4j.Neo4jError{Code: "Neo.TransientError.Transaction.Outdated"}
 
-		inner.Run("should work on WriteTransaction", func(t *testing.T) {
+		inner.Run("should work on ExecuteWrite", func(t *testing.T) {
 			times := 0
 			_, err = session.WriteTransaction(func(transaction neo4j.Transaction) (interface{}, error) {
 				times++
@@ -65,7 +65,7 @@ func TestTransaction(outer *testing.T) {
 			assertTrue(t, times > 10)
 		})
 
-		inner.Run("should work on ReadTransaction", func(t *testing.T) {
+		inner.Run("should work on ExecuteRead", func(t *testing.T) {
 			times := 0
 			_, err = session.ReadTransaction(func(transaction neo4j.Transaction) (interface{}, error) {
 				times++

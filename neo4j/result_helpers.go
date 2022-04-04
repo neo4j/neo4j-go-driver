@@ -88,7 +88,7 @@ func Collect(result Result, err error) ([]*Record, error) {
 
 // AsRecords passes any existing error or casts from to a slice of records.
 // Use in combination with Collect and transactional functions:
-//   records, err := neo4j.AsRecords(session.ReadTransaction(func (tx neo4j.Transaction) {
+//   records, err := neo4j.AsRecords(session.ExecuteRead(func (tx neo4j.Transaction) {
 //       return neo4j.Collect(tx.Run(...))
 //   }))
 func AsRecords(from interface{}, err error) ([]*Record, error) {
@@ -106,7 +106,7 @@ func AsRecords(from interface{}, err error) ([]*Record, error) {
 
 // AsRecord passes any existing error or casts from to a record.
 // Use in combination with Single and transactional functions:
-//   record, err := neo4j.AsRecord(session.ReadTransaction(func (tx neo4j.Transaction) {
+//   record, err := neo4j.AsRecord(session.ExecuteRead(func (tx neo4j.Transaction) {
 //       return neo4j.Single(tx.Run(...))
 //   }))
 func AsRecord(from interface{}, err error) (*Record, error) {

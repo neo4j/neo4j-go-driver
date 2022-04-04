@@ -21,7 +21,9 @@ package neo4j
 
 import (
 	"context"
+	"fmt"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
+	"math"
 	"time"
 
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/retry"
@@ -32,9 +34,9 @@ import (
 // transaction
 type TransactionWork func(tx Transaction) (interface{}, error)
 
-// TransactionWorkWithContext represents a unit of work that will be executed against the provided
+// ManagedTransactionWork represents a unit of work that will be executed against the provided
 // transaction
-type TransactionWorkWithContext func(tx TransactionWithContext) (interface{}, error)
+type ManagedTransactionWork func(tx ManagedTransaction) (interface{}, error)
 
 // SessionWithContext represents a logical connection (which is not tied to a physical connection)
 // to the server
@@ -45,13 +47,13 @@ type SessionWithContext interface {
 	LastBookmarks() Bookmarks
 	lastBookmark() string
 	// BeginTransaction starts a new explicit transaction on this session
-	BeginTransaction(ctx context.Context, configurers ...func(*TransactionConfig)) (TransactionWithContext, error)
-	// ReadTransaction executes the given unit of work in a AccessModeRead transaction with
+	BeginTransaction(ctx context.Context, configurers ...func(*TransactionConfig)) (ExplicitTransaction, error)
+	// ExecuteRead executes the given unit of work in a AccessModeRead transaction with
 	// retry logic in place
-	ReadTransaction(ctx context.Context, work TransactionWorkWithContext, configurers ...func(*TransactionConfig)) (interface{}, error)
-	// WriteTransaction executes the given unit of work in a AccessModeWrite transaction with
+	ExecuteRead(ctx context.Context, work ManagedTransactionWork, configurers ...func(*TransactionConfig)) (interface{}, error)
+	// ExecuteWrite executes the given unit of work in a AccessModeWrite transaction with
 	// retry logic in place
-	WriteTransaction(ctx context.Context, work TransactionWorkWithContext, configurers ...func(*TransactionConfig)) (interface{}, error)
+	ExecuteWrite(ctx context.Context, work ManagedTransactionWork, configurers ...func(*TransactionConfig)) (interface{}, error)
 	// Run executes an auto-commit statement and returns a result
 	Run(ctx context.Context, cypher string, params map[string]interface{}, configurers ...func(*TransactionConfig)) (ResultWithContext, error)
 	// Close closes any open resources and marks this session as unusable
@@ -119,8 +121,8 @@ type sessionWithContext struct {
 	getDefaultDbName bool
 	pool             sessionPool
 	router           sessionRouter
-	txExplicit       *transactionWithContext
-	txAuto           *autoTransactionWithContext
+	explicitTx       *explicitTransaction
+	autocommitTx     *autocommitTransaction
 	sleep            func(d time.Duration)
 	now              func() time.Time
 	logId            string
@@ -184,8 +186,8 @@ func newSessionWithContext(config *Config, sessConfig SessionConfig, router sess
 
 func (s *sessionWithContext) LastBookmarks() Bookmarks {
 	// Pick up bookmark from pending auto-commit if there is a bookmark on it
-	if s.txAuto != nil {
-		s.retrieveBookmarks(s.txAuto.conn)
+	if s.autocommitTx != nil {
+		s.retrieveBookmarks(s.autocommitTx.conn)
 	}
 
 	// Report bookmarks from previously closed connection or from initial set
@@ -194,8 +196,8 @@ func (s *sessionWithContext) LastBookmarks() Bookmarks {
 
 func (s *sessionWithContext) lastBookmark() string {
 	// Pick up bookmark from pending auto-commit if there is a bookmark on it
-	if s.txAuto != nil {
-		s.retrieveBookmarks(s.txAuto.conn)
+	if s.autocommitTx != nil {
+		s.retrieveBookmarks(s.autocommitTx.conn)
 	}
 
 	// Report bookmark from previously closed connection or from initial set
@@ -206,22 +208,25 @@ func (s *sessionWithContext) lastBookmark() string {
 	return ""
 }
 
-func (s *sessionWithContext) BeginTransaction(ctx context.Context, configurers ...func(*TransactionConfig)) (TransactionWithContext, error) {
+func (s *sessionWithContext) BeginTransaction(ctx context.Context, configurers ...func(*TransactionConfig)) (ExplicitTransaction, error) {
 	// Guard for more than one transaction per session
-	if s.txExplicit != nil {
+	if s.explicitTx != nil {
 		err := &UsageError{Message: "Session already has a pending transaction"}
 		s.log.Error(log.Session, s.logId, err)
 		return nil, err
 	}
 
-	if s.txAuto != nil {
-		s.txAuto.done(ctx)
+	if s.autocommitTx != nil {
+		s.autocommitTx.done(ctx)
 	}
 
 	// Apply configuration functions
-	config := TransactionConfig{Timeout: 0, Metadata: nil}
+	config := defaultTransactionConfig()
 	for _, c := range configurers {
 		c(&config)
+	}
+	if err := validateTransactionConfig(config); err != nil {
+		return nil, err
 	}
 
 	// Get a connection from the pool. This could fail in clustered environment.
@@ -245,7 +250,7 @@ func (s *sessionWithContext) BeginTransaction(ctx context.Context, configurers .
 	}
 
 	// Create transaction wrapper
-	s.txExplicit = &transactionWithContext{
+	s.explicitTx = &explicitTransaction{
 		conn:      conn,
 		fetchSize: s.fetchSize,
 		txHandle:  txHandle,
@@ -253,31 +258,34 @@ func (s *sessionWithContext) BeginTransaction(ctx context.Context, configurers .
 			// On transaction closed (rolled back or committed)
 			s.retrieveBookmarks(conn)
 			s.pool.Return(ctx, conn)
-			s.txExplicit = nil
+			s.explicitTx = nil
 		},
 	}
 
-	return s.txExplicit, nil
+	return s.explicitTx, nil
 }
 
 func (s *sessionWithContext) runRetriable(
 	ctx context.Context,
 	mode db.AccessMode,
-	work TransactionWorkWithContext, configurers ...func(*TransactionConfig)) (interface{}, error) {
+	work ManagedTransactionWork, configurers ...func(*TransactionConfig)) (interface{}, error) {
 
 	// Guard for more than one transaction per session
-	if s.txExplicit != nil {
+	if s.explicitTx != nil {
 		err := &UsageError{Message: "Session already has a pending transaction"}
 		return nil, err
 	}
 
-	if s.txAuto != nil {
-		s.txAuto.done(ctx)
+	if s.autocommitTx != nil {
+		s.autocommitTx.done(ctx)
 	}
 
-	config := TransactionConfig{Timeout: 0, Metadata: nil}
+	config := defaultTransactionConfig()
 	for _, c := range configurers {
 		c(&config)
+	}
+	if err := validateTransactionConfig(config); err != nil {
+		return nil, err
 	}
 
 	state := retry.State{
@@ -317,7 +325,7 @@ func (s *sessionWithContext) runRetriable(
 
 		// Construct a transaction like thing for client to execute stuff on
 		// and invoke the client work function.
-		tx := retryableTransactionWithContext{conn: conn, fetchSize: s.fetchSize, txHandle: txHandle}
+		tx := managedTransaction{conn: conn, fetchSize: s.fetchSize, txHandle: txHandle}
 		x, err := work(&tx)
 		// Evaluate the returned error from all the work for retryable, this means
 		// that client can mess up the error handling.
@@ -363,14 +371,14 @@ func (s *sessionWithContext) runRetriable(
 	return nil, err
 }
 
-func (s *sessionWithContext) ReadTransaction(ctx context.Context,
-	work TransactionWorkWithContext, configurers ...func(*TransactionConfig)) (interface{}, error) {
+func (s *sessionWithContext) ExecuteRead(ctx context.Context,
+	work ManagedTransactionWork, configurers ...func(*TransactionConfig)) (interface{}, error) {
 
 	return s.runRetriable(ctx, db.ReadMode, work, configurers...)
 }
 
-func (s *sessionWithContext) WriteTransaction(ctx context.Context,
-	work TransactionWorkWithContext, configurers ...func(*TransactionConfig)) (interface{}, error) {
+func (s *sessionWithContext) ExecuteWrite(ctx context.Context,
+	work ManagedTransactionWork, configurers ...func(*TransactionConfig)) (interface{}, error) {
 
 	return s.runRetriable(ctx, db.WriteMode, work, configurers...)
 }
@@ -444,19 +452,22 @@ func (s *sessionWithContext) retrieveBookmarks(conn db.Connection) {
 func (s *sessionWithContext) Run(ctx context.Context,
 	cypher string, params map[string]interface{}, configurers ...func(*TransactionConfig)) (ResultWithContext, error) {
 
-	if s.txExplicit != nil {
+	if s.explicitTx != nil {
 		err := &UsageError{Message: "Trying to run auto-commit transaction while in explicit transaction"}
 		s.log.Error(log.Session, s.logId, err)
 		return nil, err
 	}
 
-	if s.txAuto != nil {
-		s.txAuto.done(ctx)
+	if s.autocommitTx != nil {
+		s.autocommitTx.done(ctx)
 	}
 
-	config := TransactionConfig{Timeout: 0, Metadata: nil}
+	config := defaultTransactionConfig()
 	for _, c := range configurers {
 		c(&config)
+	}
+	if err := validateTransactionConfig(config); err != nil {
+		return nil, err
 	}
 
 	conn, err := s.getConnection(ctx, s.defaultMode)
@@ -483,28 +494,28 @@ func (s *sessionWithContext) Run(ctx context.Context,
 		return nil, wrapError(err)
 	}
 
-	s.txAuto = &autoTransactionWithContext{
+	s.autocommitTx = &autocommitTransaction{
 		conn: conn,
 		res:  newResultWithContext(conn, stream, cypher, params),
 		onClosed: func() {
 			s.retrieveBookmarks(conn)
 			s.pool.Return(ctx, conn)
-			s.txAuto = nil
+			s.autocommitTx = nil
 		},
 	}
 
-	return s.txAuto.res, nil
+	return s.autocommitTx.res, nil
 }
 
 func (s *sessionWithContext) Close(ctx context.Context) error {
 	var err error
 
-	if s.txExplicit != nil {
-		err = s.txExplicit.Close(ctx)
+	if s.explicitTx != nil {
+		err = s.explicitTx.Close(ctx)
 	}
 
-	if s.txAuto != nil {
-		s.txAuto.discard(ctx)
+	if s.autocommitTx != nil {
+		s.autocommitTx.discard(ctx)
 	}
 
 	s.log.Debugf(log.Session, s.logId, "Closed")
@@ -528,16 +539,17 @@ type erroredSessionWithContext struct {
 func (s *erroredSessionWithContext) LastBookmarks() Bookmarks {
 	return nil
 }
+
 func (s *erroredSessionWithContext) lastBookmark() string {
 	return ""
 }
-func (s *erroredSessionWithContext) BeginTransaction(context.Context, ...func(*TransactionConfig)) (TransactionWithContext, error) {
+func (s *erroredSessionWithContext) BeginTransaction(context.Context, ...func(*TransactionConfig)) (ExplicitTransaction, error) {
 	return nil, s.err
 }
-func (s *erroredSessionWithContext) ReadTransaction(context.Context, TransactionWorkWithContext, ...func(*TransactionConfig)) (interface{}, error) {
+func (s *erroredSessionWithContext) ExecuteRead(context.Context, ManagedTransactionWork, ...func(*TransactionConfig)) (interface{}, error) {
 	return nil, s.err
 }
-func (s *erroredSessionWithContext) WriteTransaction(context.Context, TransactionWorkWithContext, ...func(*TransactionConfig)) (interface{}, error) {
+func (s *erroredSessionWithContext) ExecuteWrite(context.Context, ManagedTransactionWork, ...func(*TransactionConfig)) (interface{}, error) {
 	return nil, s.err
 }
 func (s *erroredSessionWithContext) Run(context.Context, string, map[string]interface{}, ...func(*TransactionConfig)) (ResultWithContext, error) {
@@ -548,4 +560,16 @@ func (s *erroredSessionWithContext) Close(context.Context) error {
 }
 func (s *erroredSessionWithContext) legacy() Session {
 	return &erroredSession{err: s.err}
+}
+
+func defaultTransactionConfig() TransactionConfig {
+	return TransactionConfig{Timeout: math.MinInt, Metadata: nil}
+}
+
+func validateTransactionConfig(config TransactionConfig) error {
+	if config.Timeout != math.MinInt && config.Timeout < 0 {
+		err := fmt.Sprintf("Negative transaction timeouts are not allowed. Given: %d", config.Timeout)
+		return &UsageError{Message: err}
+	}
+	return nil
 }
