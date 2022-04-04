@@ -21,24 +21,24 @@ package retry
 
 import (
 	"testing"
+	"testing/quick"
 	"time"
 )
 
 func TestThrottler(t *testing.T) {
-	assertDurationVary := func(d1, d2 time.Duration) {
-		t.Logf("%s -> %s", d1, d2)
-		if d2 == d1 {
-			t.Errorf("Delay should vary, %s -> %s", d1, d2)
+	assertDurationGrows := func(d uint32) bool {
+		duration1 := time.Duration(d)
+		throttler := Throttler(duration1)
+		throttler = throttler.next()
+		duration2 := throttler.delay()
+		result := duration1 < duration2
+		if !result {
+			t.Logf("%s -> %s (factor: %f)", duration1, duration2, float64(duration2)/float64(duration1))
 		}
+		return result
 	}
 
-	thr := Throttler(1 * time.Second)
-	d1 := thr.delay()
-	var d2 time.Duration
-	for i := 0; i < 10; i++ {
-		thr = thr.next()
-		d2 = thr.delay()
-		assertDurationVary(d1, d2)
-		d1 = d2
+	if err := quick.Check(assertDurationGrows, nil); err != nil {
+		t.Fatal(err)
 	}
 }

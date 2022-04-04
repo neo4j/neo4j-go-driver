@@ -62,7 +62,7 @@ func TestTransaction(outer *testing.T) {
 			})
 
 			assertNotNil(t, err)
-			assertTrue(t, times > 10)
+			assertTrue(t, times > 1)
 		})
 
 		inner.Run("should work on ExecuteRead", func(t *testing.T) {
@@ -74,7 +74,7 @@ func TestTransaction(outer *testing.T) {
 			})
 
 			assertNotNil(t, err)
-			assertTrue(t, times > 10)
+			assertTrue(t, times > 1)
 		})
 	})
 
