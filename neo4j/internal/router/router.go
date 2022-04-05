@@ -228,6 +228,40 @@ func (r *Router) Invalidate(database string) {
 	}
 }
 
+func (r *Router) InvalidateWriter(db string, server string) {
+	r.dbRoutersMut.Lock()
+	defer r.dbRoutersMut.Unlock()
+
+	router := r.dbRouters[db]
+	if router == nil {
+		return
+	}
+	writers := router.table.Writers
+	for i, writer := range writers {
+		if writer == server {
+			router.table.Writers = append(writers[0:i], writers[i+1:]...)
+			return
+		}
+	}
+}
+
+func (r *Router) InvalidateReader(db string, server string) {
+	r.dbRoutersMut.Lock()
+	defer r.dbRoutersMut.Unlock()
+
+	router := r.dbRouters[db]
+	if router == nil {
+		return
+	}
+	readers := router.table.Readers
+	for i, reader := range readers {
+		if reader == server {
+			router.table.Readers = append(readers[0:i], readers[i+1:]...)
+			return
+		}
+	}
+}
+
 func (r *Router) CleanUp() {
 	r.log.Debugf(log.Router, r.logId, "Cleaning up")
 	now := r.now().Unix()

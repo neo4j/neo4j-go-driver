@@ -34,6 +34,15 @@ type RouterFake struct {
 	Err                    error
 	CleanUpHook            func()
 	GetNameOfDefaultDbHook func(user string) (string, error)
+	InvalidatedServer      string
+}
+
+func (r *RouterFake) InvalidateReader(database string, server string) {
+	r.Invalidate(database)
+	r.InvalidatedServer = server
+}
+
+func (r *RouterFake) InvalidateWriter(string, string) {
 }
 
 func (r *RouterFake) Invalidate(database string) {

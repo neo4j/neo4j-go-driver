@@ -299,6 +299,13 @@ func (s *sessionWithContext) runRetriable(
 		MaxDeadConnections:      s.config.MaxConnectionPoolSize,
 		Router:                  s.router,
 		DatabaseName:            s.databaseName,
+		OnDeadConnection: func(server string) {
+			if mode == db.WriteMode {
+				s.router.InvalidateWriter(s.databaseName, server)
+			} else {
+				s.router.InvalidateReader(s.databaseName, server)
+			}
+		},
 	}
 	for state.Continue() {
 		// Establish new connection
