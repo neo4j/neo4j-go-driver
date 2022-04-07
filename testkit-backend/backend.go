@@ -704,6 +704,7 @@ func (b *backend) handleRequest(req map[string]interface{}) {
 				"Feature:TLS:1.2",
 				"Feature:TLS:1.3",
 				"Optimization:ConnectionReuse",
+				"Optimization:EagerTransactionBegin",
 				"Optimization:ImplicitDefaultArguments",
 				"Optimization:MinimalResets",
 				"Optimization:PullPipelining",

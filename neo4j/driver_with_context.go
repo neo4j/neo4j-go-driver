@@ -236,6 +236,8 @@ type sessionRouter interface {
 	GetNameOfDefaultDatabase(ctx context.Context, bookmarks []string, user string, boltLogger log.BoltLogger) (string, error)
 	Invalidate(database string)
 	CleanUp()
+	InvalidateWriter(name string, server string)
+	InvalidateReader(name string, server string)
 }
 
 type driverWithContext struct {

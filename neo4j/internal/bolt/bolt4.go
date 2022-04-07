@@ -35,7 +35,6 @@ import (
 const (
 	bolt4_ready        = iota // Ready for use
 	bolt4_streaming           // Receiving result from auto commit query
-	bolt4_pendingtx           // Transaction has been requested but not applied
 	bolt4_tx                  // Transaction pending
 	bolt4_streamingtx         // Receiving result from a query within a transaction
 	bolt4_failed              // Recoverable error, needs reset
@@ -90,9 +89,7 @@ type bolt4 struct {
 	connId        string
 	logId         string
 	serverVersion string
-	tfirst        int64       // Time that server started streaming
-	pendingTx     internalTx4 // Stashed away when tx started explicitly
-	hasPendingTx  bool
+	tfirst        int64  // Time that server started streaming
 	bookmark      string // Last bookmark
 	birthDate     time.Time
 	log           log.Logger
@@ -306,23 +303,13 @@ func (b *bolt4) TxBegin(ctx context.Context, txConfig idb.TxConfig) (idb.TxHandl
 		impersonatedUser: txConfig.ImpersonatedUser,
 	}
 
-	// If there are bookmarks, begin the transaction immediately for backwards compatible
-	// reasons, otherwise delay it to save a round-trip
-	if len(tx.bookmarks) > 0 {
-		b.out.appendBegin(tx.toMeta())
-		b.out.send(ctx, b.conn)
-		b.receiveSuccess(ctx)
-		if b.err != nil {
-			return 0, b.err
-		}
-		b.state = bolt4_tx
-		b.hasPendingTx = false
-	} else {
-		// Stash this into pending internal tx
-		b.pendingTx = tx
-		b.hasPendingTx = true
-		b.state = bolt4_pendingtx
+	b.out.appendBegin(tx.toMeta())
+	b.out.send(ctx, b.conn)
+	b.receiveSuccess(ctx)
+	if b.err != nil {
+		return 0, b.err
 	}
+	b.state = bolt4_tx
 	b.txId = idb.TxHandle(time.Now().Unix())
 	return b.txId, nil
 }
@@ -362,12 +349,6 @@ func (b *bolt4) TxCommit(ctx context.Context, txh idb.TxHandle) error {
 		return err
 	}
 
-	// Nothing to do, a transaction started but no commands were issued on it, server is unaware
-	if b.state == bolt4_pendingtx {
-		b.state = bolt4_ready
-		return nil
-	}
-
 	// Consume pending stream if any to turn state from streamingtx to tx
 	// Access to streams outside of tx boundary is not allowed, therefore we should discard
 	// the stream (not buffer).
@@ -400,12 +381,6 @@ func (b *bolt4) TxCommit(ctx context.Context, txh idb.TxHandle) error {
 func (b *bolt4) TxRollback(ctx context.Context, txh idb.TxHandle) error {
 	if err := b.assertTxHandle(b.txId, txh); err != nil {
 		return err
-	}
-
-	// Nothing to do, a transaction started but no commands were issued on it
-	if b.state == bolt4_pendingtx {
-		b.state = bolt4_ready
-		return nil
 	}
 
 	// Can not send rollback while still streaming, consume to turn state into tx
@@ -562,7 +537,7 @@ func (b *bolt4) run(ctx context.Context, cypher string, params map[string]interf
 		}
 	}
 
-	if err := b.assertState(bolt4_tx, bolt4_ready, bolt4_pendingtx, bolt4_streamingtx); err != nil {
+	if err := b.assertState(bolt4_tx, bolt4_ready, bolt4_streamingtx); err != nil {
 		return nil, err
 	}
 
@@ -570,11 +545,6 @@ func (b *bolt4) run(ctx context.Context, cypher string, params map[string]interf
 	var meta map[string]interface{}
 	if tx != nil {
 		meta = tx.toMeta()
-	}
-	if b.state == bolt4_pendingtx {
-		// Append lazy begin transaction message
-		b.out.appendBegin(meta)
-		meta = nil // Don't add this to run message again
 	}
 
 	// Append run message
@@ -590,15 +560,6 @@ func (b *bolt4) run(ctx context.Context, cypher string, params map[string]interf
 	// Append pull message and send it along with other pending messages
 	b.out.appendPullN(fetchSize)
 	b.out.send(ctx, b.conn)
-
-	// Process server responses
-	// Receive confirmation of transaction begin if it was started above
-	if b.state == bolt4_pendingtx {
-		if b.receiveSuccess(ctx); b.err != nil {
-			return nil, b.err
-		}
-		b.state = bolt4_tx
-	}
 
 	// Receive confirmation of run message
 	succ := b.receiveSuccess(ctx)
@@ -655,12 +616,7 @@ func (b *bolt4) RunTx(ctx context.Context, txh idb.TxHandle,
 		return nil, err
 	}
 
-	tx := &b.pendingTx
-	if !b.hasPendingTx {
-		tx = nil
-	}
-	stream, err := b.run(ctx, cmd.Cypher, cmd.Params, cmd.FetchSize, tx)
-	b.hasPendingTx = false
+	stream, err := b.run(ctx, cmd.Cypher, cmd.Params, cmd.FetchSize, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -865,7 +821,6 @@ func (b *bolt4) Reset(ctx context.Context) {
 		b.log.Debugf(log.Bolt4, b.logId, "Resetting connection internal state")
 		b.txId = 0
 		b.bookmark = ""
-		b.hasPendingTx = false
 		b.databaseName = idb.DefaultDatabase
 		b.err = nil
 		b.lastQid = -1
