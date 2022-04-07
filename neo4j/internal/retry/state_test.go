@@ -34,31 +34,34 @@ import (
 )
 
 type TStateInvocation struct {
-	conn                      idb.Connection
-	err                       error
-	isCommitting              bool
-	now                       time.Time
-	expectContinued           bool
-	expectRouterInvalidated   bool
-	expectRouterInvalidatedDb string
-	expectLastErrWasRetryable bool
-	expectLastErrType         error
+	conn                          idb.Connection
+	err                           error
+	isCommitting                  bool
+	now                           time.Time
+	expectContinued               bool
+	expectRouterInvalidated       bool
+	expectRouterInvalidatedDb     string
+	expectRouterInvalidatedServer string
+	expectLastErrWasRetryable     bool
+	expectLastErrType             error
 }
 
-func TestState(tt *testing.T) {
+func TestState(outer *testing.T) {
 	var (
-		baseTime       = time.Now()
-		maxRetryTime   = time.Second * 10
-		overTime       = baseTime.Add(maxRetryTime).Add(1 * time.Second)
-		halfTime       = baseTime.Add(maxRetryTime / 2)
-		maxDead        = 2
-		dbName         = "thedb"
+		baseTime     = time.Now()
+		maxRetryTime = time.Second * 10
+		overTime     = baseTime.Add(maxRetryTime).Add(1 * time.Second)
+		halfTime     = baseTime.Add(maxRetryTime / 2)
+		maxDead      = 2
+		dbName       = "thedb"
+		// a single server can be reused here since the router is a fake impl
+		serverName     = "somehost:9999"
 		authErr        = &db.Neo4jError{Code: "Neo.ClientError.Security.Unauthorized"}
 		clusterErr     = &db.Neo4jError{Code: "Neo.ClientError.Cluster.NotALeader"}
 		dbTransientErr = &db.Neo4jError{Code: "Neo.TransientError.Some.Some"}
 	)
 
-	cases := map[string][]TStateInvocation{
+	testCases := map[string][]TStateInvocation{
 		"Retry connect": {
 			{conn: nil, err: &pool.PoolTimeout{}, expectContinued: true,
 				expectLastErrWasRetryable: true, expectLastErrType: &pool.PoolTimeout{}},
@@ -72,22 +75,27 @@ func TestState(tt *testing.T) {
 				expectLastErrWasRetryable: true},
 		},
 		"Retry dead connection": {
-			{conn: &testutil.ConnFake{Alive: false}, err: errors.New("some error"), expectContinued: true,
-				expectLastErrWasRetryable: true},
+			{conn: &testutil.ConnFake{Name: serverName, Alive: false},
+				err: errors.New("some error"), expectContinued: true,
+				expectLastErrWasRetryable: true, expectRouterInvalidated: true,
+				expectRouterInvalidatedDb: dbName, expectRouterInvalidatedServer: serverName},
 		},
 		"Retry dead connection timeout": {
-			{conn: &testutil.ConnFake{Alive: false}, err: errors.New("some error 1"), expectContinued: true, now: baseTime,
-				expectLastErrWasRetryable: true},
+			{conn: &testutil.ConnFake{Name: serverName, Alive: false}, err: errors.New("some error 1"), expectContinued: true, now: baseTime,
+				expectLastErrWasRetryable: true, expectRouterInvalidated: true, expectRouterInvalidatedDb: dbName, expectRouterInvalidatedServer: serverName},
 			{conn: &testutil.ConnFake{Alive: false}, err: errors.New("some error 2"), expectContinued: false, now: overTime,
 				expectLastErrWasRetryable: true},
 		},
 		"Retry dead connection max": {
-			{conn: &testutil.ConnFake{Alive: false}, err: errors.New("some error 1"), expectContinued: true,
-				expectLastErrWasRetryable: true},
-			{conn: &testutil.ConnFake{Alive: false}, err: errors.New("some error 2"), expectContinued: true,
-				expectLastErrWasRetryable: true},
-			{conn: &testutil.ConnFake{Alive: false}, err: errors.New("some error 3"), expectContinued: false,
-				expectLastErrWasRetryable: true},
+			{conn: &testutil.ConnFake{Name: serverName, Alive: false}, err: errors.New("some error 1"), expectContinued: true,
+				expectLastErrWasRetryable: true, expectRouterInvalidated: true,
+				expectRouterInvalidatedDb: dbName, expectRouterInvalidatedServer: serverName},
+			{conn: &testutil.ConnFake{Name: serverName, Alive: false}, err: errors.New("some error 2"), expectContinued: true,
+				expectLastErrWasRetryable: true, expectRouterInvalidated: true,
+				expectRouterInvalidatedDb: dbName, expectRouterInvalidatedServer: serverName},
+			{conn: &testutil.ConnFake{Name: serverName, Alive: false}, err: errors.New("some error 3"), expectContinued: false,
+				expectLastErrWasRetryable: true, expectRouterInvalidated: true,
+				expectRouterInvalidatedDb: dbName, expectRouterInvalidatedServer: serverName},
 		},
 		"Cluster error": {
 			{conn: &testutil.ConnFake{Alive: true}, err: clusterErr, expectContinued: true,
@@ -129,8 +137,8 @@ func TestState(tt *testing.T) {
 		},
 	}
 
-	for n, c := range cases {
-		tt.Run(n, func(t *testing.T) {
+	for i, testCase := range testCases {
+		outer.Run(i, func(t *testing.T) {
 			now := baseTime
 			state := State{
 				Now:                     func() time.Time { return now },
@@ -142,34 +150,38 @@ func TestState(tt *testing.T) {
 				MaxDeadConnections:      maxDead,
 				DatabaseName:            dbName,
 			}
-			for _, i := range c {
+			for _, invocation := range testCase {
 				// Update now if a value has been provided
-				if !i.now.IsZero() {
-					now = i.now
+				if !invocation.now.IsZero() {
+					now = invocation.now
 				}
 				router := &testutil.RouterFake{}
 				state.Router = router
-
-				state.OnFailure(i.conn, i.err, i.isCommitting)
-				continued := state.Continue()
-				if continued != i.expectContinued {
-					t.Errorf("Expected continue to return %v but returned %v", i.expectContinued, continued)
+				state.OnDeadConnection = func(server string) {
+					router.InvalidateReader(dbName, server)
 				}
-				if i.expectRouterInvalidated != router.Invalidated ||
-					i.expectRouterInvalidatedDb != router.InvalidatedDb {
-					t.Errorf("Expected router invalidated: (%v/%s) vs (%v/%s)",
-						i.expectRouterInvalidated, i.expectRouterInvalidatedDb,
-						router.Invalidated, router.InvalidatedDb)
+
+				state.OnFailure(invocation.conn, invocation.err, invocation.isCommitting)
+				continued := state.Continue()
+				if continued != invocation.expectContinued {
+					t.Errorf("Expected continue to return %v but returned %v", invocation.expectContinued, continued)
+				}
+				if invocation.expectRouterInvalidated != router.Invalidated ||
+					invocation.expectRouterInvalidatedDb != router.InvalidatedDb ||
+					invocation.expectRouterInvalidatedServer != router.InvalidatedServer {
+					t.Errorf("Expected router invalidated: expected (%v/%s/%s) vs. actual (%v/%s/%s)",
+						invocation.expectRouterInvalidated, invocation.expectRouterInvalidatedDb, invocation.expectRouterInvalidatedServer,
+						router.Invalidated, router.InvalidatedDb, router.InvalidatedServer)
 				}
 				if state.LastErr == nil {
 					t.Errorf("LastErr should be set")
 				}
-				if state.LastErrWasRetryable != i.expectLastErrWasRetryable {
+				if state.LastErrWasRetryable != invocation.expectLastErrWasRetryable {
 					t.Errorf("LastErrWasRetryable mismatch")
 				}
-				if i.expectLastErrType != nil {
+				if invocation.expectLastErrType != nil {
 					t1 := reflect.TypeOf(state.LastErr)
-					t2 := reflect.TypeOf(i.expectLastErrType)
+					t2 := reflect.TypeOf(invocation.expectLastErrType)
 					if t1 != t2 {
 						t.Errorf("LastErr type mismatch: %s vs %s", t1, t2)
 					}

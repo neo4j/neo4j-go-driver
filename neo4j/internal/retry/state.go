@@ -58,10 +58,11 @@ type State struct {
 	Router                  Router
 	DatabaseName            string
 
-	start      time.Time
-	cause      string
-	deadErrors int
-	skipSleep  bool
+	start            time.Time
+	cause            string
+	deadErrors       int
+	skipSleep        bool
+	OnDeadConnection func(server string)
 }
 
 func (s *State) OnFailure(conn idb.Connection, err error, isCommitting bool) {
@@ -105,6 +106,7 @@ func (s *State) OnFailure(conn idb.Connection, err error, isCommitting bool) {
 			return
 		}
 
+		s.OnDeadConnection(conn.ServerName())
 		s.deadErrors += 1
 		s.stop = s.deadErrors > s.MaxDeadConnections
 		s.LastErrWasRetryable = true

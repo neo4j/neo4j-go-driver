@@ -30,6 +30,12 @@ type directRouter struct {
 	address string
 }
 
+func (r *directRouter) InvalidateWriter(string, string) {
+}
+
+func (r *directRouter) InvalidateReader(string, string) {
+}
+
 func (r *directRouter) Readers(ctx context.Context, bookmarks []string, database string, boltLogger log.BoltLogger) ([]string, error) {
 	return []string{r.address}, nil
 }
