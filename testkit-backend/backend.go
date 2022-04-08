@@ -708,15 +708,6 @@ func (b *backend) handleRequest(req map[string]interface{}) {
 				"Optimization:ImplicitDefaultArguments",
 				"Optimization:MinimalResets",
 				"Optimization:PullPipelining",
-				"Temporary:CypherPathAndRelationship",
-				"Temporary:DriverFetchSize",
-				"Temporary:DriverMaxConnectionPoolSize",
-				"Temporary:DriverMaxTxRetryTime",
-				"Temporary:FastFailingDiscovery",
-				"Temporary:FullSummary",
-				"Temporary:GetConnectionPoolMetrics",
-				"Temporary:ResultKeys",
-				"Temporary:TransactionClose",
 			},
 		})
 
