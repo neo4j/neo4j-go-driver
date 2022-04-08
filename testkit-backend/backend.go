@@ -400,9 +400,8 @@ func (b *backend) handleRequest(req map[string]interface{}) {
 			if data["maxConnectionPoolSize"] != nil {
 				c.MaxConnectionPoolSize = int(data["maxConnectionPoolSize"].(float64))
 			}
-			rawMaxTxRetryTime, found := data["maxTxRetryTimeMs"]
-			if found {
-				maxTxRetryTime := int(rawMaxTxRetryTime.(float64))
+			if data["maxTxRetryTimeMs"] != nil {
+				maxTxRetryTime := int(data["maxTxRetryTimeMs"].(float64))
 				c.MaxTransactionRetryTime = time.Millisecond * time.Duration(maxTxRetryTime)
 			}
 			if data["fetchSize"] != nil {
