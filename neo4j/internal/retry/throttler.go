@@ -30,7 +30,7 @@ func (t Throttler) next() Throttler {
 	delay := time.Duration(t)
 	const delayJitter = 0.2
 	jitter := float64(delay) * delayJitter
-	return Throttler(delay - time.Duration(jitter) + time.Duration(2*jitter*rand.Float64()))
+	return Throttler(2*delay - time.Duration(jitter) + time.Duration(2*jitter*rand.Float64()))
 }
 
 func (t Throttler) delay() time.Duration {
