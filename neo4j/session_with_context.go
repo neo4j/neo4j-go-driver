@@ -333,7 +333,7 @@ func (s *sessionWithContext) runRetriable(
 		// Construct a transaction like thing for client to execute stuff on
 		// and invoke the client work function.
 		tx := managedTransaction{conn: conn, fetchSize: s.fetchSize, txHandle: txHandle}
-		x, err := work(&tx)
+		x, err := handlePanic(work)(&tx)
 		// Evaluate the returned error from all the work for retryable, this means
 		// that client can mess up the error handling.
 		if err != nil {
@@ -537,6 +537,18 @@ func (s *sessionWithContext) Close(ctx context.Context) error {
 
 func (s *sessionWithContext) legacy() Session {
 	return &session{delegate: s}
+}
+
+func handlePanic(work ManagedTransactionWork) ManagedTransactionWork {
+	return func(tx ManagedTransaction) (_ interface{}, err error) {
+		defer func() {
+			if pErr := recover(); pErr != nil {
+				msg := fmt.Sprintf("transaction function panicked, rolling back now: %v", pErr)
+				err = &UsageError{Message: msg}
+			}
+		}()
+		return work(tx)
+	}
 }
 
 type erroredSessionWithContext struct {

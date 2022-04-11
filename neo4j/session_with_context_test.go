@@ -35,6 +35,9 @@ import (
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/log"
 )
 
+type transactionFunc func(context.Context, ManagedTransactionWork, ...func(*TransactionConfig)) (any, error)
+type transactionFuncApi func(session SessionWithContext) transactionFunc
+
 func TestSession(st *testing.T) {
 	logger := log.Console{Errors: true, Infos: true, Warns: true, Debugs: true}
 	boltLogger := log.ConsoleBoltLogger{}
@@ -71,7 +74,7 @@ func TestSession(st *testing.T) {
 
 	tokenExpiredErr := &db.Neo4jError{Code: "Neo.ClientError.Security.TokenExpired", Msg: "oopsie whoopsie"}
 
-	st.Run("Retry mechanism", func(rt *testing.T) {
+	st.Run("Transaction Functions", func(rt *testing.T) {
 		// Checks that retries occur on database error and that it stops retrying after a certain
 		// amount of time and that connections are returned to pool upon failure.
 		rt.Run("Consistent transient error", func(t *testing.T) {
@@ -163,6 +166,29 @@ func TestSession(st *testing.T) {
 			AssertStringEqual(t, mydb, conn.DatabaseName)
 			AssertIntEqual(t, numDefaultDbLookups, 1)
 		})
+
+		transactionFunctions := map[string]transactionFuncApi{
+			"read tx func":  func(s SessionWithContext) transactionFunc { return s.ExecuteRead },
+			"write tx func": func(s SessionWithContext) transactionFunc { return s.ExecuteWrite },
+		}
+
+		for name, txFuncApi := range transactionFunctions {
+			rt.Run(fmt.Sprintf("Implicitly rolls back when a %s panics without retry", name), func(t *testing.T) {
+				_, pool, sess := createSessionFromConfig(SessionConfig{})
+				pool.BorrowConn = &ConnFake{Alive: true}
+				poolReturnCalled := 0
+				pool.ReturnHook = func() {
+					poolReturnCalled++
+				}
+
+				_, err := txFuncApi(sess)(context.Background(), func(tx ManagedTransaction) (interface{}, error) {
+					panic("oopsie")
+				})
+
+				AssertIntEqual(t, poolReturnCalled, 1)
+				AssertErrorMessageContains(t, err, "transaction function panicked")
+			})
+		}
 	})
 
 	st.Run("Bookmarking", func(bt *testing.T) {
