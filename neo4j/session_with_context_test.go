@@ -180,13 +180,17 @@ func TestSession(st *testing.T) {
 				pool.ReturnHook = func() {
 					poolReturnCalled++
 				}
-
-				_, err := txFuncApi(sess)(context.Background(), func(tx ManagedTransaction) (interface{}, error) {
-					panic("oopsie")
-				})
-
+				panicBubblesUp := false
+				func() {
+					defer func() {
+						panicBubblesUp = recover() != nil
+					}()
+					_, _ = txFuncApi(sess)(context.Background(), func(tx ManagedTransaction) (interface{}, error) {
+						panic("oopsie")
+					})
+				}()
 				AssertIntEqual(t, poolReturnCalled, 1)
-				AssertErrorMessageContains(t, err, "transaction function panicked")
+				AssertTrue(t, panicBubblesUp)
 			})
 		}
 	})
