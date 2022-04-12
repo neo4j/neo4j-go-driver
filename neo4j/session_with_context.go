@@ -265,6 +265,18 @@ func (s *sessionWithContext) BeginTransaction(ctx context.Context, configurers .
 	return s.explicitTx, nil
 }
 
+func (s *sessionWithContext) ExecuteRead(ctx context.Context,
+	work ManagedTransactionWork, configurers ...func(*TransactionConfig)) (interface{}, error) {
+
+	return s.runRetriable(ctx, db.ReadMode, work, configurers...)
+}
+
+func (s *sessionWithContext) ExecuteWrite(ctx context.Context,
+	work ManagedTransactionWork, configurers ...func(*TransactionConfig)) (interface{}, error) {
+
+	return s.runRetriable(ctx, db.WriteMode, work, configurers...)
+}
+
 func (s *sessionWithContext) runRetriable(
 	ctx context.Context,
 	mode db.AccessMode,
@@ -308,58 +320,11 @@ func (s *sessionWithContext) runRetriable(
 		},
 	}
 	for state.Continue() {
-		// Establish new connection
-		conn, err := s.getConnection(ctx, mode)
-		if err != nil {
-			state.OnFailure(conn, err, false)
+		if tryAgain, result := s.executeTransactionFunction(ctx, mode, config, &state, work); tryAgain {
 			continue
+		} else {
+			return result, nil
 		}
-
-		// Begin transaction
-		txHandle, err := conn.TxBegin(ctx,
-			db.TxConfig{
-				Mode:             mode,
-				Bookmarks:        s.bookmarks,
-				Timeout:          config.Timeout,
-				Meta:             config.Metadata,
-				ImpersonatedUser: s.impersonatedUser,
-			})
-		if err != nil {
-			state.OnFailure(conn, err, false)
-			s.pool.Return(ctx, conn)
-			continue
-		}
-
-		// Construct a transaction like thing for client to execute stuff on
-		// and invoke the client work function.
-		tx := managedTransaction{conn: conn, fetchSize: s.fetchSize, txHandle: txHandle}
-		x, err := s.handlePanic(ctx, conn, work)(&tx)
-		// Evaluate the returned error from all the work for retryable, this means
-		// that client can mess up the error handling.
-		if err != nil {
-			// If the client returns a client specific error that means that
-			// client wants to rollback. We don't do an explicit rollback here
-			// but instead rely on the pool invoking reset on the connection,
-			// that will do an implicit rollback.
-			state.OnFailure(conn, err, false)
-			s.pool.Return(ctx, conn)
-			continue
-		}
-
-		// Commit transaction
-		err = conn.TxCommit(ctx, txHandle)
-		if err != nil {
-			state.OnFailure(conn, err, true)
-			s.pool.Return(ctx, conn)
-			continue
-		}
-
-		// Collect bookmark and return connection to pool
-		s.retrieveBookmarks(conn)
-		s.pool.Return(ctx, conn)
-
-		// All well
-		return x, nil
 	}
 
 	// When retries has occurred wrap the error, the last error is always added but
@@ -378,16 +343,54 @@ func (s *sessionWithContext) runRetriable(
 	return nil, err
 }
 
-func (s *sessionWithContext) ExecuteRead(ctx context.Context,
-	work ManagedTransactionWork, configurers ...func(*TransactionConfig)) (interface{}, error) {
+func (s *sessionWithContext) executeTransactionFunction(
+	ctx context.Context,
+	mode db.AccessMode,
+	config TransactionConfig,
+	state *retry.State,
+	work ManagedTransactionWork) (bool, any) {
 
-	return s.runRetriable(ctx, db.ReadMode, work, configurers...)
-}
+	conn, err := s.getConnection(ctx, mode)
+	if err != nil {
+		state.OnFailure(conn, err, false)
+		return true, nil
+	}
 
-func (s *sessionWithContext) ExecuteWrite(ctx context.Context,
-	work ManagedTransactionWork, configurers ...func(*TransactionConfig)) (interface{}, error) {
+	// handle transaction function panic as well
+	defer s.pool.Return(ctx, conn)
 
-	return s.runRetriable(ctx, db.WriteMode, work, configurers...)
+	txHandle, err := conn.TxBegin(ctx,
+		db.TxConfig{
+			Mode:             mode,
+			Bookmarks:        s.bookmarks,
+			Timeout:          config.Timeout,
+			Meta:             config.Metadata,
+			ImpersonatedUser: s.impersonatedUser,
+		})
+	if err != nil {
+		state.OnFailure(conn, err, false)
+		return true, nil
+	}
+
+	tx := managedTransaction{conn: conn, fetchSize: s.fetchSize, txHandle: txHandle}
+	x, err := work(&tx)
+	if err != nil {
+		// If the client returns a client specific error that means that
+		// client wants to rollback. We don't do an explicit rollback here
+		// but instead rely on the pool invoking reset on the connection,
+		// that will do an implicit rollback.
+		state.OnFailure(conn, err, false)
+		return true, nil
+	}
+
+	err = conn.TxCommit(ctx, txHandle)
+	if err != nil {
+		state.OnFailure(conn, err, true)
+		return true, nil
+	}
+
+	s.retrieveBookmarks(conn)
+	return false, x
 }
 
 func (s *sessionWithContext) getServers(ctx context.Context, mode db.AccessMode) ([]string, error) {
@@ -537,18 +540,6 @@ func (s *sessionWithContext) Close(ctx context.Context) error {
 
 func (s *sessionWithContext) legacy() Session {
 	return &session{delegate: s}
-}
-
-func (s *sessionWithContext) handlePanic(ctx context.Context, conn db.Connection, work ManagedTransactionWork) ManagedTransactionWork {
-	return func(tx ManagedTransaction) (interface{}, error) {
-		defer func() {
-			if pErr := recover(); pErr != nil {
-				s.pool.Return(ctx, conn)
-				panic(pErr)
-			}
-		}()
-		return work(tx)
-	}
 }
 
 type erroredSessionWithContext struct {
