@@ -31,6 +31,14 @@ import (
 	"net"
 )
 
+// IsRetryable determines whether an operation can be retried based on the error
+// it triggered. This API is meant for use in scenarios where users want to
+// implement their own retry mechanism.
+// A similar logic is used by the driver for transaction functions.
+func IsRetryable(err error) bool {
+	return retry.IsRetryable(err)
+}
+
 // Neo4jError represents errors originating from Neo4j service.
 // Alias for convenience. This error is defined in db package and
 // used internally.

@@ -115,18 +115,16 @@ func (s *State) OnFailure(conn idb.Connection, err error, isCommitting bool) {
 		return
 	}
 
+	s.LastErrWasRetryable = IsRetryable(err)
 	if dbErr, isDbErr := err.(*db.Neo4jError); isDbErr {
 		if dbErr.IsRetriableCluster() {
 			// Force routing tables to be updated before trying again
 			s.Router.Invalidate(s.DatabaseName)
 			s.cause = "Cluster error"
-			s.LastErrWasRetryable = true
 			return
 		}
-
 		if dbErr.IsRetriableTransient() {
 			s.cause = "Transient error"
-			s.LastErrWasRetryable = true
 			return
 		}
 	}
@@ -161,4 +159,12 @@ func (s *State) Continue() bool {
 	}
 
 	return false
+}
+
+func IsRetryable(err error) bool {
+	dbErr, isDbErr := err.(*db.Neo4jError)
+	if !isDbErr {
+		return false
+	}
+	return dbErr.IsRetriableTransient() || dbErr.IsRetriableCluster()
 }
