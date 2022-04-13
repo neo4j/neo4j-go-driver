@@ -21,6 +21,7 @@
 package retry
 
 import (
+	"errors"
 	"fmt"
 	idb "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
 	"time"
@@ -162,9 +163,9 @@ func (s *State) Continue() bool {
 }
 
 func IsRetryable(err error) bool {
-	dbErr, isDbErr := err.(*db.Neo4jError)
-	if !isDbErr {
+	var dbError *db.Neo4jError
+	if !errors.As(err, &dbError) {
 		return false
 	}
-	return dbErr.IsRetriableTransient() || dbErr.IsRetriableCluster()
+	return dbError.IsRetriableTransient() || dbError.IsRetriableCluster()
 }

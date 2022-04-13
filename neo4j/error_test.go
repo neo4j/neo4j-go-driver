@@ -17,12 +17,12 @@
  * limitations under the License.
  */
 
-package neo4j_test
+package neo4j
 
 import (
 	"fmt"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/db"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/retry"
 	"testing"
 )
 
@@ -33,6 +33,9 @@ func TestIsRetryable(outer *testing.T) {
 	}
 
 	testCases := []retryableTestCase{
+		{true, &ConnectivityError{
+			inner: fmt.Errorf("hello, is it me you are looking for"),
+		}},
 		{true, &db.Neo4jError{
 			Code: "Neo.TransientError.No.Stress",
 			Msg:  "Relax: Retry it Easyyy",
@@ -45,13 +48,17 @@ func TestIsRetryable(outer *testing.T) {
 			Code: "Neo.ClientError.General.ForbiddenOnReadOnlyDatabase",
 			Msg:  "One does not simply write to a read-only database.",
 		}},
+		{false, nil},
+		{false, &ConnectivityError{
+			inner: &retry.CommitFailedDeadError{},
+		}},
 		{false, &db.Neo4jError{
 			Code: "Neo.TransientError.Transaction.Terminated",
 			Msg:  "Don't mess with TX",
 		}},
 		{false, &db.Neo4jError{
 			Code: "Neo.TransientError.Transaction.LockClientStopped",
-			Msg:  "Don’t tell me what I can’t do!",
+			Msg:  "Don't tell me what I can't do!",
 		}},
 		{false, &db.Neo4jError{
 			Code: "Neo.Completely.Made.Up",
@@ -60,11 +67,11 @@ func TestIsRetryable(outer *testing.T) {
 		{false, fmt.Errorf("do not try me... do not retry me either")},
 	}
 
-	for i, testCase := range testCases {
-		outer.Run(fmt.Sprintf("is error #%d retryable?", i), func(t *testing.T) {
+	for _, testCase := range testCases {
+		outer.Run(fmt.Sprintf("is error %s retryable?", testCase.err), func(t *testing.T) {
 			expected := testCase.isRetryable
 
-			actual := neo4j.IsRetryable(testCase.err)
+			actual := IsRetryable(testCase.err)
 
 			if actual != expected {
 				t.Fatalf("Expected %t, got %t", expected, actual)

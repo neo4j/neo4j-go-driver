@@ -20,6 +20,7 @@
 package neo4j
 
 import (
+	"errors"
 	"fmt"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/db"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/bolt"
@@ -36,6 +37,15 @@ import (
 // implement their own retry mechanism.
 // A similar logic is used by the driver for transaction functions.
 func IsRetryable(err error) bool {
+	if err == nil {
+		return false
+	}
+	var connectivityErr *ConnectivityError
+	var commitFailedError *retry.CommitFailedDeadError
+	if errors.As(err, &connectivityErr) && !errors.As(connectivityErr.inner, &commitFailedError) {
+		// all connectivity errors are safe to retry except during transaction commit
+		return true
+	}
 	return retry.IsRetryable(err)
 }
 
