@@ -890,6 +890,13 @@ func (b *bolt5) SetBoltLogger(boltLogger log.BoltLogger) {
 	b.out.boltLogger = boltLogger
 }
 
+func (b *bolt5) Version() db.ProtocolVersion {
+	return db.ProtocolVersion{
+		Major: 5,
+		Minor: b.minor,
+	}
+}
+
 func (b *bolt5) initializeReadTimeoutHint(hints map[string]interface{}) {
 	readTimeoutHint, ok := hints[readTimeoutHintName]
 	if !ok {

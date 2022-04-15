@@ -437,6 +437,21 @@ func (b *backend) handleRequest(req map[string]interface{}) {
 		}
 		b.writeResponse("Driver", map[string]interface{}{"id": driverId})
 
+	case "GetServerInfo":
+		driverId := data["driverId"].(string)
+		driver := b.drivers[driverId]
+		serverInfo, err := driver.GetServerInfo(context.Background())
+		if err != nil {
+			b.writeError(err)
+			return
+		}
+		protocolVersion := serverInfo.ProtocolVersion()
+		b.writeResponse("ServerInfo", map[string]interface{}{
+			"address":         serverInfo.Address(),
+			"agent":           serverInfo.Agent(),
+			"protocolVersion": fmt.Sprintf("%d.%d", protocolVersion.Major, protocolVersion.Minor),
+		})
+
 	case "NewSession":
 		driver := b.drivers[data["driverId"].(string)]
 		sessionConfig := neo4j.SessionConfig{}
@@ -703,6 +718,7 @@ func (b *backend) handleRequest(req map[string]interface{}) {
 				"ConfHint:connection.recv_timeout_seconds",
 				"Detail:ClosedDriverIsEncrypted",
 				"Feature:API:ConnectionAcquisitionTimeout",
+				"Feature:API:Driver:GetServerInfo",
 				"Feature:API:Driver.IsEncrypted",
 				"Feature:API:Liveness.Check",
 				"Feature:API:Result.List",

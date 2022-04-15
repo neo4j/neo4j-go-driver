@@ -749,3 +749,10 @@ func (b *bolt3) SetBoltLogger(boltLogger log.BoltLogger) {
 	b.in.hyd.boltLogger = boltLogger
 	b.out.boltLogger = boltLogger
 }
+
+func (b *bolt3) Version() db.ProtocolVersion {
+	return db.ProtocolVersion{
+		Major: 3,
+		Minor: b.minor,
+	}
+}

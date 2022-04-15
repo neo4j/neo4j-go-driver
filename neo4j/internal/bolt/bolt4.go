@@ -969,6 +969,13 @@ func (b *bolt4) SetBoltLogger(boltLogger log.BoltLogger) {
 	b.out.boltLogger = boltLogger
 }
 
+func (b *bolt4) Version() db.ProtocolVersion {
+	return db.ProtocolVersion{
+		Major: 4,
+		Minor: b.minor,
+	}
+}
+
 const readTimeoutHintName = "connection.recv_timeout_seconds"
 
 func (b *bolt4) initializeReadTimeoutHint(hints map[string]interface{}) {

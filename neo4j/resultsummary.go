@@ -135,6 +135,24 @@ type ServerInfo interface {
 	ProtocolVersion() db.ProtocolVersion
 }
 
+type simpleServerInfo struct {
+	address         string
+	agent           string
+	protocolVersion db.ProtocolVersion
+}
+
+func (s simpleServerInfo) Address() string {
+	return s.address
+}
+
+func (s simpleServerInfo) Agent() string {
+	return s.agent
+}
+
+func (s simpleServerInfo) ProtocolVersion() db.ProtocolVersion {
+	return s.protocolVersion
+}
+
 // DatabaseInfo contains basic information of the database the query result has been obtained from.
 type DatabaseInfo interface {
 	Name() string
