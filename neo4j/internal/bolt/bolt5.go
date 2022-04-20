@@ -35,7 +35,6 @@ import (
 const (
 	bolt5Ready        = iota // Ready for use
 	bolt5Streaming           // Receiving result from auto commit query
-	bolt5PendingTx           // Transaction has been requested but not applied
 	bolt5Tx                  // Transaction pending
 	bolt5StreamingTx         // Receiving result from a query within a transaction
 	bolt5Failed              // Recoverable error, needs reset
@@ -337,12 +336,6 @@ func (b *bolt5) TxCommit(ctx context.Context, txh idb.TxHandle) error {
 		return err
 	}
 
-	// Nothing to do, a transaction started but no commands were issued on it, server is unaware
-	if b.state == bolt5PendingTx {
-		b.state = bolt5Ready
-		return nil
-	}
-
 	// Consume pending stream if any to turn state from streamingtx to tx
 	// Access to the streams outside tx boundary is not allowed, therefore we should discard
 	// the stream (not buffer).
@@ -375,12 +368,6 @@ func (b *bolt5) TxCommit(ctx context.Context, txh idb.TxHandle) error {
 func (b *bolt5) TxRollback(ctx context.Context, txh idb.TxHandle) error {
 	if err := b.assertTxHandle(b.txId, txh); err != nil {
 		return err
-	}
-
-	// Nothing to do, a transaction started but no commands were issued on it
-	if b.state == bolt5PendingTx {
-		b.state = bolt5Ready
-		return nil
 	}
 
 	// Can not send rollback while still streaming, consume to turn state into tx
@@ -537,7 +524,7 @@ func (b *bolt5) run(ctx context.Context, cypher string, params map[string]interf
 		}
 	}
 
-	if err := b.assertState(bolt5Tx, bolt5Ready, bolt5PendingTx, bolt5StreamingTx); err != nil {
+	if err := b.assertState(bolt5Tx, bolt5Ready, bolt5StreamingTx); err != nil {
 		return nil, err
 	}
 
@@ -545,11 +532,6 @@ func (b *bolt5) run(ctx context.Context, cypher string, params map[string]interf
 	var meta map[string]interface{}
 	if tx != nil {
 		meta = tx.toMeta()
-	}
-	if b.state == bolt5PendingTx {
-		// Append lazy begin transaction message
-		b.out.appendBegin(meta)
-		meta = nil // Don't add this to run message again
 	}
 
 	// Append run message
@@ -565,15 +547,6 @@ func (b *bolt5) run(ctx context.Context, cypher string, params map[string]interf
 	// Append pull message and send it along with other pending messages
 	b.out.appendPullN(fetchSize)
 	b.out.send(ctx, b.conn)
-
-	// Process server responses
-	// Receive confirmation of transaction begin if it was started above
-	if b.state == bolt5PendingTx {
-		if b.receiveSuccess(ctx); b.err != nil {
-			return nil, b.err
-		}
-		b.state = bolt5Tx
-	}
 
 	// Receive confirmation of run message
 	succ := b.receiveSuccess(ctx)
