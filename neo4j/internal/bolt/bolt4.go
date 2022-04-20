@@ -97,14 +97,17 @@ type bolt4 struct {
 	err           error // Last fatal error
 	minor         int
 	lastQid       int64 // Last seen qid
+	idleDate      time.Time
 }
 
 func NewBolt4(serverName string, conn net.Conn, logger log.Logger, boltLog log.BoltLogger) *bolt4 {
+	now := time.Now()
 	b := &bolt4{
 		state:      bolt4_unauthorized,
 		conn:       conn,
 		serverName: serverName,
-		birthDate:  time.Now(),
+		birthDate:  now,
+		idleDate:   now,
 		log:        logger,
 		streams:    openstreams{},
 		in: incoming{
@@ -192,6 +195,9 @@ func (b *bolt4) receiveMsg(ctx context.Context) interface{} {
 
 	msg, err := b.in.next(ctx, b.conn)
 	b.setError(err, true)
+	if err == nil {
+		b.idleDate = time.Now()
+	}
 	return msg
 }
 
@@ -816,6 +822,10 @@ func (b *bolt4) Birthdate() time.Time {
 	return b.birthDate
 }
 
+func (b *bolt4) IdleDate() time.Time {
+	return b.idleDate
+}
+
 func (b *bolt4) Reset(ctx context.Context) {
 	defer func() {
 		b.log.Debugf(log.Bolt4, b.logId, "Resetting connection internal state")
@@ -827,11 +837,17 @@ func (b *bolt4) Reset(ctx context.Context) {
 		b.streams.reset()
 	}()
 
-	if b.state == bolt4_ready || b.state == bolt4_dead {
+	if b.state == bolt4_ready {
 		// No need for reset
 		return
 	}
+	b.ForceReset(ctx)
+}
 
+func (b *bolt4) ForceReset(ctx context.Context) {
+	if b.state == bolt4_dead {
+		return
+	}
 	// Reset any pending error, should be matching bolt4_failed so
 	// it should be recoverable.
 	b.err = nil

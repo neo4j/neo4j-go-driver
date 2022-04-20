@@ -41,17 +41,21 @@ var sharedRoundRobin uint32
 
 const rememberFailedConnectDuration = 3 * time.Minute
 
-// Returns a idle connection if any
-func (s *server) getIdle() db.Connection {
+// Returns an idle connection if any
+func (s *server) getIdle(ctx context.Context, idlenessThreshold time.Duration) db.Connection {
 	// Remove from idle list and add to busy list
 	e := s.idle.Front()
 	if e != nil {
-		c := s.idle.Remove(e)
-		s.busy.PushFront(c)
+		idleConnection := s.idle.Remove(e)
+		s.busy.PushFront(idleConnection)
 		// Update round-robin counter every time we give away a connection and keep track
 		// of our own round-robin index
 		s.roundRobin = atomic.AddUint32(&sharedRoundRobin, 1)
-		return c.(db.Connection)
+		connection := idleConnection.(db.Connection)
+		if time.Now().Sub(connection.IdleDate()) > idlenessThreshold {
+			connection.ForceReset(ctx)
+		}
+		return connection
 	}
 	return nil
 }
@@ -60,7 +64,7 @@ func (s *server) notifyFailedConnect(now time.Time) {
 	s.failedConnectAt = now
 }
 
-func (s *server) notifySuccesfulConnect() {
+func (s *server) notifySuccessfulConnect() {
 	s.failedConnectAt = time.Time{}
 }
 
@@ -78,7 +82,7 @@ const newConnectionPenalty = uint32(1 << 8)
 func (s *server) calculatePenalty(now time.Time) uint32 {
 	penalty := uint32(0)
 
-	// If a connect to the server has failed recently, add a penalty
+	// If a connection to the server has failed recently, add a penalty
 	if s.hasFailedConnect(now) {
 		penalty = 1 << 31
 	}
@@ -96,7 +100,7 @@ func (s *server) calculatePenalty(now time.Time) uint32 {
 	// Use last round-robin value as lowest priority penalty, so when all other is equal we will
 	// make sure to spread usage among the servers. And yes it will wrap around once in a while
 	// but since number of busy servers weights higher it will even out pretty fast.
-	penalty |= (s.roundRobin & 0xff)
+	penalty |= s.roundRobin & 0xff
 
 	return penalty
 }

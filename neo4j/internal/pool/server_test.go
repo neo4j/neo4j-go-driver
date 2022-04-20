@@ -90,13 +90,13 @@ func TestServer(ot *testing.T) {
 		s.registerBusy(c1)
 		s.returnBusy(c1)
 
-		c2 := s.getIdle()
+		c2 := s.getIdle(nil, 0)
 		assertConnection(t, c2)
-		c3 := s.getIdle()
+		c3 := s.getIdle(nil, 0)
 		assertNilConnection(t, c3)
 
 		s.returnBusy(c2)
-		c3 = s.getIdle()
+		c3 = s.getIdle(nil, 0)
 		assertConnection(t, c3)
 	})
 
@@ -118,11 +118,11 @@ func TestServer(ot *testing.T) {
 		assertSize(t, s, 2)
 
 		// Should be able to borrow twice
-		b1 := s.getIdle()
+		b1 := s.getIdle(nil, 0)
 		assertConnection(t, b1)
-		b2 := s.getIdle()
+		b2 := s.getIdle(nil, 0)
 		assertConnection(t, b2)
-		b3 := s.getIdle()
+		b3 := s.getIdle(nil, 0)
 		assertNilConnection(t, b3)
 
 		// Return the connections and let all of them be too old
@@ -133,7 +133,7 @@ func TestServer(ot *testing.T) {
 		s.removeIdleOlderThan(context.Background(), now, 10*time.Second)
 
 		// Shouldn't be able to borrow anything and size should be zero
-		b1 = s.getIdle()
+		b1 = s.getIdle(nil, 0)
 		assertNilConnection(t, b1)
 		assertSize(t, s, 0)
 	})
@@ -175,7 +175,7 @@ func TestServerPenalty(t *testing.T) {
 	assertGt(srv2, srv1, now)
 
 	// Get the connection from srv1 and return it, now srv1 should have higher penalty.
-	srv1.getIdle()
+	srv1.getIdle(nil, 0)
 	srv1.returnBusy(c11)
 	assertGt(srv1, srv2, now)
 
@@ -190,15 +190,15 @@ func TestServerPenalty(t *testing.T) {
 	// Both servers have two idle connections, srv2 was last used so it should have higher penalty.
 	assertGt(srv2, srv1, now)
 	// Get both idle connections from srv1
-	srv1.getIdle()
-	srv1.getIdle()
+	srv1.getIdle(nil, 0)
+	srv1.getIdle(nil, 0)
 	// Get one idle connection from srv2
-	srv2.getIdle()
+	srv2.getIdle(nil, 0)
 	// Since more connections are in use on srv1, it should have higher penalty even though
 	// srv2 was last used
 	assertGt(srv1, srv2, now)
 	// Return the connections
-	srv2.getIdle()
+	srv2.getIdle(nil, 0)
 	srv2.returnBusy(c21)
 	srv2.returnBusy(c22)
 	srv1.returnBusy(c11)
@@ -213,8 +213,8 @@ func TestServerPenalty(t *testing.T) {
 	assertTrue(t, srv1.hasFailedConnect(now))
 	assertFalse(t, srv2.hasFailedConnect(now))
 	// Use srv2 to the max
-	srv2.getIdle()
-	srv2.getIdle()
+	srv2.getIdle(nil, 0)
+	srv2.getIdle(nil, 0)
 	// Even at this point we should prefer srv2
 	assertGt(srv1, srv2, now)
 
@@ -223,6 +223,6 @@ func TestServerPenalty(t *testing.T) {
 	assertGt(srv2, srv1, now.Add(3*time.Hour))
 
 	// Alternatively a succesful connect should clear the problem
-	srv1.notifySuccesfulConnect()
+	srv1.notifySuccessfulConnect()
 	assertGt(srv2, srv1, now)
 }

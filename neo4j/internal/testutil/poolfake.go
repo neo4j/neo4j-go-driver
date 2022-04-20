@@ -23,6 +23,7 @@ import (
 	"context"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/log"
+	"time"
 )
 
 type PoolFake struct {
@@ -32,17 +33,17 @@ type PoolFake struct {
 	CleanUpHook func()
 }
 
-func (p *PoolFake) Borrow(ctx context.Context, serverNames []string, wait bool, _ log.BoltLogger) (db.Connection, error) {
+func (p *PoolFake) Borrow(context.Context, []string, bool, log.BoltLogger, time.Duration) (db.Connection, error) {
 	return p.BorrowConn, p.BorrowErr
 }
 
-func (p *PoolFake) Return(ctx context.Context, c db.Connection) {
+func (p *PoolFake) Return(context.Context, db.Connection) {
 	if p.ReturnHook != nil {
 		p.ReturnHook()
 	}
 }
 
-func (p *PoolFake) CleanUp(ctx context.Context) {
+func (p *PoolFake) CleanUp(context.Context) {
 	if p.CleanUpHook != nil {
 		p.CleanUpHook()
 	}

@@ -23,6 +23,7 @@ import (
 	"context"
 	"fmt"
 	idb "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/pool"
 	"math"
 	"time"
 
@@ -107,15 +108,15 @@ type SessionConfig struct {
 	ImpersonatedUser string
 }
 
-// Turns off fetching records in batches.
+// FetchAll turns off fetching records in batches.
 const FetchAll = -1
 
-// Lets the driver decide fetch size
+// FetchDefault lets the driver decide fetch size
 const FetchDefault = 0
 
 // Connection pool as seen by the session.
 type sessionPool interface {
-	Borrow(ctx context.Context, serverNames []string, wait bool, boltLogger log.BoltLogger) (idb.Connection, error)
+	Borrow(ctx context.Context, serverNames []string, wait bool, boltLogger log.BoltLogger, livenessCheckThreshold time.Duration) (idb.Connection, error)
 	Return(ctx context.Context, c idb.Connection)
 	CleanUp(ctx context.Context)
 }
@@ -238,7 +239,7 @@ func (s *sessionWithContext) BeginTransaction(ctx context.Context, configurers .
 	}
 
 	// Get a connection from the pool. This could fail in clustered environment.
-	conn, err := s.getConnection(ctx, s.defaultMode)
+	conn, err := s.getConnection(ctx, s.defaultMode, pool.DefaultLivenessCheckThreshold)
 	if err != nil {
 		return nil, err
 	}
@@ -358,7 +359,7 @@ func (s *sessionWithContext) executeTransactionFunction(
 	state *retry.State,
 	work ManagedTransactionWork) (bool, any) {
 
-	conn, err := s.getConnection(ctx, mode)
+	conn, err := s.getConnection(ctx, mode, pool.DefaultLivenessCheckThreshold)
 	if err != nil {
 		state.OnFailure(conn, err, false)
 		return true, nil
@@ -409,7 +410,7 @@ func (s *sessionWithContext) getServers(ctx context.Context, mode idb.AccessMode
 	}
 }
 
-func (s *sessionWithContext) getConnection(ctx context.Context, mode idb.AccessMode) (idb.Connection, error) {
+func (s *sessionWithContext) getConnection(ctx context.Context, mode idb.AccessMode, livenessCheckThreshold time.Duration) (idb.Connection, error) {
 	if s.config.ConnectionAcquisitionTimeout > 0 {
 		var cancel context.CancelFunc
 		ctx, cancel = context.WithTimeout(ctx, s.config.ConnectionAcquisitionTimeout)
@@ -439,7 +440,7 @@ func (s *sessionWithContext) getConnection(ctx context.Context, mode idb.AccessM
 		return nil, wrapError(err)
 	}
 
-	conn, err := s.pool.Borrow(ctx, servers, s.config.ConnectionAcquisitionTimeout != 0, s.boltLogger)
+	conn, err := s.pool.Borrow(ctx, servers, s.config.ConnectionAcquisitionTimeout != 0, s.boltLogger, livenessCheckThreshold)
 	if err != nil {
 		return nil, wrapError(err)
 	}
@@ -488,7 +489,7 @@ func (s *sessionWithContext) Run(ctx context.Context,
 		return nil, err
 	}
 
-	conn, err := s.getConnection(ctx, s.defaultMode)
+	conn, err := s.getConnection(ctx, s.defaultMode, pool.DefaultLivenessCheckThreshold)
 	if err != nil {
 		return nil, err
 	}
@@ -555,7 +556,7 @@ func (s *sessionWithContext) getServerInfo(ctx context.Context) (ServerInfo, err
 	if err != nil {
 		return nil, wrapError(err)
 	}
-	conn, err := s.pool.Borrow(ctx, servers, s.config.ConnectionAcquisitionTimeout != 0, s.boltLogger)
+	conn, err := s.pool.Borrow(ctx, servers, s.config.ConnectionAcquisitionTimeout != 0, s.boltLogger, 0)
 	if err != nil {
 		return nil, wrapError(err)
 	}

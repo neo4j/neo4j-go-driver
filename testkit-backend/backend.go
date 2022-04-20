@@ -454,8 +454,9 @@ func (b *backend) handleRequest(req map[string]interface{}) {
 
 	case "NewSession":
 		driver := b.drivers[data["driverId"].(string)]
-		sessionConfig := neo4j.SessionConfig{}
-		sessionConfig.BoltLogger = neo4j.ConsoleBoltLogger()
+		sessionConfig := neo4j.SessionConfig{
+			BoltLogger: neo4j.ConsoleBoltLogger(),
+		}
 		switch data["accessMode"].(string) {
 		case "r":
 			sessionConfig.AccessMode = neo4j.AccessModeRead
@@ -681,7 +682,9 @@ func (b *backend) handleRequest(req map[string]interface{}) {
 
 	case "CheckMultiDBSupport":
 		driver := b.drivers[data["driverId"].(string)]
-		session := driver.NewSession(neo4j.SessionConfig{})
+		session := driver.NewSession(neo4j.SessionConfig{
+			BoltLogger: neo4j.ConsoleBoltLogger(),
+		})
 		result, err := session.Run(ctx, "RETURN 42", nil)
 		defer func() {
 			err = session.Close(ctx)

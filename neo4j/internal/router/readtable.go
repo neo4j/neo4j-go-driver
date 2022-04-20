@@ -22,12 +22,13 @@ package router
 import (
 	"context"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/pool"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/log"
 )
 
 // Tries to read routing table from any of the specified routers using new or existing connection
 // from the supplied pool.
-func readTable(ctx context.Context, pool Pool, routers []string, routerContext map[string]string, bookmarks []string,
+func readTable(ctx context.Context, connectionPool Pool, routers []string, routerContext map[string]string, bookmarks []string,
 	database, impersonatedUser string, boltLogger log.BoltLogger) (*db.RoutingTable, error) {
 	// Preserve last error to be returned, set a default for case of no routers
 	var err error = &ReadRoutingTableError{}
@@ -37,7 +38,7 @@ func readTable(ctx context.Context, pool Pool, routers []string, routerContext m
 	// another db.
 	for _, router := range routers {
 		var conn db.Connection
-		if conn, err = pool.Borrow(ctx, []string{router}, true, boltLogger); err != nil {
+		if conn, err = connectionPool.Borrow(ctx, []string{router}, true, boltLogger, pool.DefaultLivenessCheckThreshold); err != nil {
 			// Check if failed due to context timing out
 			if ctx.Err() != nil {
 				return nil, wrapError(router, ctx.Err())
@@ -49,7 +50,7 @@ func readTable(ctx context.Context, pool Pool, routers []string, routerContext m
 		// We have a connection to the "router"
 		var table *db.RoutingTable
 		table, err = conn.GetRoutingTable(ctx, routerContext, bookmarks, database, impersonatedUser)
-		pool.Return(ctx, conn)
+		connectionPool.Return(ctx, conn)
 		if err == nil {
 			return table, nil
 		}

@@ -96,9 +96,14 @@ type Connection interface {
 	HasFailed() bool
 	// Birthdate returns the point in time when this connection was established.
 	Birthdate() time.Time
+	// IdleDate returns the point in time since which the connection is idle
+	IdleDate() time.Time
 	// Reset resets connection to same state as directly after a connection.
 	// Active streams will be discarded and the bookmark will be lost.
 	Reset(ctx context.Context)
+	// ForceReset is like Reset except it also sends a RESET messages for ready
+	// connections
+	ForceReset(ctx context.Context)
 	// Close closes the database connection as well as any underlying connection.
 	// The instance should not be used after being closed.
 	Close(ctx context.Context)
