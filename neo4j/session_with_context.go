@@ -91,11 +91,18 @@ type SessionConfig struct {
 	// Possible to use custom logger (implement log.BoltLogger interface) or
 	// use neo4j.ConsoleBoltLogger.
 	BoltLogger log.BoltLogger
-	// ImpersonatedUser sets the Neo4j user that the session should be acting as. If not set the user used to create
-	// the driver will be used. If user impersonation is used the the default database for the impersonated user
-	// will be used. Beware that using impersonation and not explicitly setting the database name and routing enabled
-	// will cause the driver to query the cluster for the name of the default database for the impersonated user to
-	// be able to route to the correct instance.
+	// ImpersonatedUser sets the Neo4j user that the session will be acting as.
+	// If not set, the user configured for the driver will be used.
+	//
+	// If user impersonation is used, the default database for that impersonated
+	// user will be used unless DatabaseName is set.
+	//
+	// In the former case, when routing is enabled, using impersonation
+	// without DatabaseName will cause the driver to query the
+	// cluster for the name of the default database of the impersonated user.
+	// This is done at the beginning of the session so that queries are routed
+	// to the correct cluster member (different databases may have different
+	// leaders).
 	ImpersonatedUser string
 }
 
