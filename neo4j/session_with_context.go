@@ -127,7 +127,7 @@ type sessionWithContext struct {
 	bookmarks        []string
 	databaseName     string
 	impersonatedUser string
-	getDefaultDbName bool
+	resolveHomeDb    bool
 	pool             sessionPool
 	router           sessionRouter
 	explicitTx       *explicitTransaction
@@ -182,7 +182,7 @@ func newSessionWithContext(config *Config, sessConfig SessionConfig, router sess
 		bookmarks:        cleanupBookmarks(sessConfig.Bookmarks),
 		databaseName:     sessConfig.DatabaseName,
 		impersonatedUser: sessConfig.ImpersonatedUser,
-		getDefaultDbName: sessConfig.DatabaseName == "",
+		resolveHomeDb:    sessConfig.DatabaseName == "",
 		sleep:            time.Sleep,
 		now:              time.Now,
 		log:              logger,
@@ -424,16 +424,9 @@ func (s *sessionWithContext) getConnection(ctx context.Context, mode idb.AccessM
 				deadline.String())
 		}
 	}
-	// If client requested user impersonation but provided no database we need to retrieve
-	// the name of the configured default database for that user before asking for a connection
-	if s.getDefaultDbName {
-		defaultDb, err := s.router.GetNameOfDefaultDatabase(ctx, s.bookmarks, s.impersonatedUser, s.boltLogger)
-		if err != nil {
-			return nil, wrapError(err)
-		}
-		s.log.Debugf(log.Session, s.logId, "Retrieved default database for impersonated user, uses db '%s'", defaultDb)
-		s.databaseName = defaultDb
-		s.getDefaultDbName = false
+
+	if err := s.resolveHomeDatabase(ctx); err != nil {
+		return nil, wrapError(err)
 	}
 	servers, err := s.getServers(ctx, mode)
 	if err != nil {
@@ -552,6 +545,9 @@ func (s *sessionWithContext) legacy() Session {
 }
 
 func (s *sessionWithContext) getServerInfo(ctx context.Context) (ServerInfo, error) {
+	if err := s.resolveHomeDatabase(ctx); err != nil {
+		return nil, wrapError(err)
+	}
 	servers, err := s.getServers(ctx, idb.ReadMode)
 	if err != nil {
 		return nil, wrapError(err)
@@ -566,6 +562,20 @@ func (s *sessionWithContext) getServerInfo(ctx context.Context) (ServerInfo, err
 		agent:           conn.ServerVersion(),
 		protocolVersion: conn.Version(),
 	}, nil
+}
+
+func (s *sessionWithContext) resolveHomeDatabase(ctx context.Context) error {
+	if !s.resolveHomeDb {
+		return nil
+	}
+	defaultDb, err := s.router.GetNameOfDefaultDatabase(ctx, s.bookmarks, s.impersonatedUser, s.boltLogger)
+	if err != nil {
+		return err
+	}
+	s.log.Debugf(log.Session, s.logId, "Resolved home database, uses db '%s'", defaultDb)
+	s.databaseName = defaultDb
+	s.resolveHomeDb = false
+	return nil
 }
 
 type erroredSessionWithContext struct {
