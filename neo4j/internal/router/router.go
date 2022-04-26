@@ -210,7 +210,7 @@ func (r *Router) GetNameOfDefaultDatabase(ctx context.Context, bookmarks []strin
 		table:   table,
 		dueUnix: now.Add(time.Duration(table.TimeToLive) * time.Second).Unix(),
 	}
-	r.log.Debugf(log.Router, r.logId, "New routing table when retrieving default database for impersonated user: '%s', TTL %d", table.DatabaseName, table.TimeToLive)
+	r.log.Debugf(log.Router, r.logId, "New routing table when resolving home database: '%s', TTL %d", table.DatabaseName, table.TimeToLive)
 
 	return table.DatabaseName, err
 }
