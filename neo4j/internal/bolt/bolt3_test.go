@@ -23,12 +23,13 @@ import (
 	"context"
 	idb "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
 	"testing"
+	"time"
 
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/db"
 	. "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/testutil"
 )
 
-func TestBolt3(ot *testing.T) {
+func TestBolt3(outer *testing.T) {
 	// Test streams
 	// Faked returns from a server
 	runKeys := []interface{}{"f1", "f2"}
@@ -107,8 +108,8 @@ func TestBolt3(ot *testing.T) {
 		return bolt, cleanup
 	}
 
-	// Simple succesful connect
-	ot.Run("Connect success", func(t *testing.T) {
+	// Simple successful connect
+	outer.Run("Connect success", func(t *testing.T) {
 		bolt, cleanup := connectToServer(t, func(srv *bolt3server) {
 			handshake := srv.waitForHandshake()
 			// There should be a version 3 somewhere
@@ -136,7 +137,7 @@ func TestBolt3(ot *testing.T) {
 		AssertTrue(t, bolt.IsAlive())
 	})
 
-	ot.Run("Failed authentication", func(t *testing.T) {
+	outer.Run("Failed authentication", func(t *testing.T) {
 		conn, srv, cleanup := setupBolt3Pipe(t)
 		defer cleanup()
 		defer conn.Close()
@@ -155,7 +156,7 @@ func TestBolt3(ot *testing.T) {
 		}
 	})
 
-	ot.Run("Run auto-commit", func(t *testing.T) {
+	outer.Run("Run auto-commit", func(t *testing.T) {
 		bolt, cleanup := connectToServer(t, func(srv *bolt3server) {
 			srv.accept(3)
 			srv.serveRun(runResponse)
@@ -174,7 +175,7 @@ func TestBolt3(ot *testing.T) {
 		assertBoltState(t, bolt3_ready, bolt)
 	})
 
-	ot.Run("Run transactional commit", func(t *testing.T) {
+	outer.Run("Run transactional commit", func(t *testing.T) {
 		committedBookmark := "cbm"
 		bolt, cleanup := connectToServer(t, func(srv *bolt3server) {
 			srv.accept(3)
@@ -203,7 +204,7 @@ func TestBolt3(ot *testing.T) {
 		AssertStringEqual(t, committedBookmark, bolt.Bookmark())
 	})
 
-	ot.Run("Begin transaction with bookmark success", func(t *testing.T) {
+	outer.Run("Begin transaction with bookmark success", func(t *testing.T) {
 		committedBookmark := "cbm"
 		bolt, cleanup := connectToServer(t, func(srv *bolt3server) {
 			srv.accept(3)
@@ -224,7 +225,7 @@ func TestBolt3(ot *testing.T) {
 		AssertStringEqual(t, committedBookmark, bolt.Bookmark())
 	})
 
-	ot.Run("Begin transaction with bookmark failure", func(t *testing.T) {
+	outer.Run("Begin transaction with bookmark failure", func(t *testing.T) {
 		bolt, cleanup := connectToServer(t, func(srv *bolt3server) {
 			srv.accept(3)
 			srv.waitForTxBegin()
@@ -240,7 +241,7 @@ func TestBolt3(ot *testing.T) {
 		AssertStringEqual(t, "", bolt.Bookmark())
 	})
 
-	ot.Run("Run transactional rollback", func(t *testing.T) {
+	outer.Run("Run transactional rollback", func(t *testing.T) {
 		bolt, cleanup := connectToServer(t, func(srv *bolt3server) {
 			srv.accept(3)
 			srv.serveRunTx(runResponse, false, "")
@@ -267,7 +268,7 @@ func TestBolt3(ot *testing.T) {
 		assertBoltState(t, bolt3_ready, bolt)
 	})
 
-	ot.Run("Server close while streaming", func(t *testing.T) {
+	outer.Run("Server close while streaming", func(t *testing.T) {
 		bolt, cleanup := connectToServer(t, func(srv *bolt3server) {
 			srv.accept(3)
 			srv.waitForRun()
@@ -300,7 +301,7 @@ func TestBolt3(ot *testing.T) {
 		assertBoltDead(t, bolt)
 	})
 
-	ot.Run("Server fail on run with reset", func(t *testing.T) {
+	outer.Run("Server fail on run with reset", func(t *testing.T) {
 		bolt, cleanup := connectToServer(t, func(srv *bolt3server) {
 			srv.accept(3)
 			srv.waitForRun()
@@ -324,7 +325,7 @@ func TestBolt3(ot *testing.T) {
 		assertBoltState(t, bolt3_ready, bolt)
 	})
 
-	ot.Run("Server fail on run continue to commit", func(t *testing.T) {
+	outer.Run("Server fail on run continue to commit", func(t *testing.T) {
 		bolt, cleanup := connectToServer(t, func(srv *bolt3server) {
 			srv.accept(3)
 			srv.waitForTxBegin()
@@ -346,7 +347,7 @@ func TestBolt3(ot *testing.T) {
 		AssertNeo4jError(t, err)                      // Should have same error as from run since that is original cause
 	})
 
-	ot.Run("Reset while streaming ", func(t *testing.T) {
+	outer.Run("Reset while streaming ", func(t *testing.T) {
 		bolt, cleanup := connectToServer(t, func(srv *bolt3server) {
 			srv.accept(3)
 			srv.serveRun(runResponse)
@@ -364,7 +365,7 @@ func TestBolt3(ot *testing.T) {
 		assertBoltState(t, bolt3_ready, bolt)
 	})
 
-	ot.Run("Buffer stream", func(t *testing.T) {
+	outer.Run("Buffer stream", func(t *testing.T) {
 		bolt, cleanup := connectToServer(t, func(srv *bolt3server) {
 			srv.accept(3)
 			srv.serveRun(runResponse)
@@ -397,7 +398,7 @@ func TestBolt3(ot *testing.T) {
 		AssertNextOnlySummary(t, rec, sum, err)
 	})
 
-	ot.Run("Buffer stream with error", func(t *testing.T) {
+	outer.Run("Buffer stream with error", func(t *testing.T) {
 		bolt, cleanup := connectToServer(t, func(srv *bolt3server) {
 			srv.accept(3)
 			srv.waitForRun()
@@ -431,7 +432,7 @@ func TestBolt3(ot *testing.T) {
 		AssertStringEqual(t, bolt.Bookmark(), "")
 	})
 
-	ot.Run("Buffer stream with invalid handle", func(t *testing.T) {
+	outer.Run("Buffer stream with invalid handle", func(t *testing.T) {
 		bolt, cleanup := connectToServer(t, func(srv *bolt3server) {
 			srv.accept(3)
 		})
@@ -442,7 +443,7 @@ func TestBolt3(ot *testing.T) {
 		AssertError(t, err)
 	})
 
-	ot.Run("Consume stream", func(t *testing.T) {
+	outer.Run("Consume stream", func(t *testing.T) {
 		bolt, cleanup := connectToServer(t, func(srv *bolt3server) {
 			srv.accept(3)
 			srv.serveRun(runResponse)
@@ -471,7 +472,7 @@ func TestBolt3(ot *testing.T) {
 		AssertNotNil(t, sum)
 	})
 
-	ot.Run("Consume stream with error", func(t *testing.T) {
+	outer.Run("Consume stream with error", func(t *testing.T) {
 		bolt, cleanup := connectToServer(t, func(srv *bolt3server) {
 			srv.accept(3)
 			srv.waitForRun()
@@ -501,7 +502,7 @@ func TestBolt3(ot *testing.T) {
 		AssertNextOnlyError(t, rec, sum, err)
 	})
 
-	ot.Run("Consume with invalid stream", func(t *testing.T) {
+	outer.Run("Consume with invalid stream", func(t *testing.T) {
 		bolt, cleanup := connectToServer(t, func(srv *bolt3server) {
 			srv.accept(3)
 		})
@@ -511,5 +512,40 @@ func TestBolt3(ot *testing.T) {
 		sum, err := bolt.Consume(context.Background(), idb.StreamHandle(1))
 		AssertNil(t, sum)
 		AssertError(t, err)
+	})
+
+	outer.Run("Updates idle date on every new message", func(t *testing.T) {
+		ctx := context.Background()
+		testStart := time.Now()
+		bolt, cleanup := connectToServer(t, func(srv *bolt3server) {
+			srv.accept(3)
+			srv.waitForReset()
+			srv.sendSuccess(map[string]interface{}{})
+		})
+		defer cleanup()
+		defer bolt.Close(ctx)
+
+		firstIdleDate := bolt.IdleDate()
+		AssertAfter(t, firstIdleDate, testStart)
+
+		bolt.ForceReset(ctx)
+		AssertAfter(t, bolt.IdleDate(), firstIdleDate)
+	})
+
+	outer.Run("Does not update idle date on error", func(t *testing.T) {
+		ctx := context.Background()
+		testStart := time.Now()
+		bolt, cleanup := connectToServer(t, func(srv *bolt3server) {
+			srv.accept(3)
+			srv.closeConnection()
+		})
+		defer cleanup()
+		defer bolt.Close(ctx)
+
+		firstIdleDate := bolt.IdleDate()
+		AssertAfter(t, firstIdleDate, testStart)
+
+		bolt.ForceReset(ctx)
+		AssertDeepEquals(t, bolt.IdleDate(), firstIdleDate)
 	})
 }
