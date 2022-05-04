@@ -43,32 +43,33 @@ type RecordedTx struct {
 }
 
 type ConnFake struct {
-	Name              string
-	ConnectionVersion db.ProtocolVersion
-	Alive             bool
-	Birth             time.Time
-	Table             *idb.RoutingTable
-	Err               error
-	Id                int
-	TxBeginErr        error
-	TxBeginHandle     idb.TxHandle
-	RunErr            error
-	RunStream         idb.StreamHandle
-	RunTxErr          error
-	RunTxStream       idb.StreamHandle
-	Nexts             []Next
-	Bookm             string
-	TxCommitErr       error
-	TxCommitHook      func()
-	TxRollbackErr     error
-	ConsumeSum        *db.Summary
-	ConsumeErr        error
-	ConsumeHook       func()
-	RecordedTxs       []RecordedTx // Appended to by Run/TxBegin
-	BufferErr         error
-	BufferHook        func()
-	DatabaseName      string
-	Idle              time.Time
+	Name               string
+	ConnectionVersion  db.ProtocolVersion
+	Alive              bool
+	Birth              time.Time
+	Table              *idb.RoutingTable
+	Err                error
+	Id                 int
+	TxBeginErr         error
+	TxBeginHandle      idb.TxHandle
+	RunErr             error
+	RunStream          idb.StreamHandle
+	RunTxErr           error
+	RunTxStream        idb.StreamHandle
+	Nexts              []Next
+	Bookm              string
+	TxCommitErr        error
+	TxCommitHook       func()
+	TxRollbackErr      error
+	ConsumeSum         *db.Summary
+	ConsumeErr         error
+	ConsumeHook        func()
+	RecordedTxs        []RecordedTx // Appended to by Run/TxBegin
+	BufferErr          error
+	BufferHook         func()
+	DatabaseName       string
+	Idle               time.Time
+	ServerVersionValue string
 }
 
 func (c *ConnFake) Connect(context.Context, int, map[string]interface{}, string, map[string]string) error {
@@ -109,7 +110,7 @@ func (c *ConnFake) Bookmark() string {
 }
 
 func (c *ConnFake) ServerVersion() string {
-	return "serverVersion"
+	return c.ServerVersionValue
 }
 
 func (c *ConnFake) Buffer(ctx context.Context, streamHandle idb.StreamHandle) error {
