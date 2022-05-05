@@ -86,7 +86,7 @@ func TestServer(ot *testing.T) {
 
 	ot.Run("getIdle/returnBusy", func(t *testing.T) {
 		s := &server{}
-		c1 := &testutil.ConnFake{}
+		c1 := &testutil.ConnFake{ForceResetHook: func() {}}
 		s.registerBusy(c1)
 		s.returnBusy(c1)
 
@@ -106,13 +106,13 @@ func TestServer(ot *testing.T) {
 		conns := make([]*testutil.ConnFake, 3)
 		now := time.Now()
 		for i := range conns {
-			c := &testutil.ConnFake{Birth: now}
+			c := &testutil.ConnFake{Birth: now, ForceResetHook: func() {}}
 			conns[i] = c
 			s.registerBusy(c)
 			s.returnBusy(c)
 		}
 
-		// Let the conn in the middle be too old
+		// Let the connection in the middle be too old
 		conns[1].Birth = now.Add(-20 * time.Second)
 		s.removeIdleOlderThan(context.Background(), now, 10*time.Second)
 		assertSize(t, s, 2)
@@ -155,7 +155,7 @@ func TestServerPenalty(t *testing.T) {
 
 	// Add one busy connection to srv1
 	// Higher penalty to srv1 since it is in use
-	c11 := &testutil.ConnFake{Id: 11}
+	c11 := &testutil.ConnFake{Id: 11, ForceResetHook: func() {}}
 	srv1.registerBusy(c11)
 	assertGt(srv1, srv2, now)
 
@@ -166,7 +166,7 @@ func TestServerPenalty(t *testing.T) {
 	assertGt(srv2, srv1, now)
 
 	// Add an idle connection to srv2 to make both servers have one idle connection each.
-	c21 := &testutil.ConnFake{Id: 21}
+	c21 := &testutil.ConnFake{Id: 21, ForceResetHook: func() {}}
 	srv2.registerBusy(c21)
 	srv2.returnBusy(c21)
 
@@ -180,14 +180,14 @@ func TestServerPenalty(t *testing.T) {
 	assertGt(srv1, srv2, now)
 
 	// Add one more connection each to the servers
-	c12 := &testutil.ConnFake{Id: 12}
+	c12 := &testutil.ConnFake{Id: 12, ForceResetHook: func() {}}
 	srv1.registerBusy(c12)
 	srv1.returnBusy(c12)
-	c22 := &testutil.ConnFake{Id: 22}
+	c22 := &testutil.ConnFake{Id: 22, ForceResetHook: func() {}}
 	srv2.registerBusy(c22)
 	srv2.returnBusy(c22)
 
-	// Both servers have two idle connections, srv2 was last used so it should have higher penalty.
+	// Both servers have two idle connections, srv2 was last used, so it should have higher penalty.
 	assertGt(srv2, srv1, now)
 	// Get both idle connections from srv1
 	srv1.getIdle(nil, 0)
@@ -206,7 +206,7 @@ func TestServerPenalty(t *testing.T) {
 	// Everything returned, srv2 should have higher penalty since it was last used
 	assertGt(srv2, srv1, now)
 
-	// Punish srv1 by faking that a connect to it failed, after that it should have much higher
+	// Punish srv1 by faking that a connection to it failed, after that it should have much higher
 	// penalty than srv2
 	srv1.notifyFailedConnect(now)
 	assertGt(srv1, srv2, now)
@@ -222,7 +222,7 @@ func TestServerPenalty(t *testing.T) {
 	// should prefer srv1
 	assertGt(srv2, srv1, now.Add(3*time.Hour))
 
-	// Alternatively a succesful connect should clear the problem
+	// Alternatively a successful connect should clear the problem
 	srv1.notifySuccessfulConnect()
 	assertGt(srv2, srv1, now)
 }

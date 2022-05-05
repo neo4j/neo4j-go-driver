@@ -70,6 +70,7 @@ type ConnFake struct {
 	DatabaseName       string
 	Idle               time.Time
 	ServerVersionValue string
+	ForceResetHook     func()
 }
 
 func (c *ConnFake) Connect(context.Context, int, map[string]interface{}, string, map[string]string) error {
@@ -92,6 +93,7 @@ func (c *ConnFake) Reset(ctx context.Context) {
 }
 
 func (c *ConnFake) ForceReset(ctx context.Context) {
+	c.ForceResetHook()
 }
 
 func (c *ConnFake) Close(ctx context.Context) {

@@ -20,6 +20,7 @@
 package pool
 
 import (
+	"container/list"
 	"context"
 	"errors"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
@@ -35,7 +36,7 @@ import (
 var logger = &log.Console{Errors: true, Infos: true, Warns: true}
 
 // Scenarios for Borrow and Return
-func TestPoolBorrowReturn(ot *testing.T) {
+func TestPoolBorrowReturn(outer *testing.T) {
 	maxAge := 1 * time.Second
 	birthdate := time.Now()
 
@@ -48,7 +49,7 @@ func TestPoolBorrowReturn(ot *testing.T) {
 		return nil, failingError
 	}
 
-	ot.Run("Single thread borrow+return", func(t *testing.T) {
+	outer.Run("Single thread borrow+return", func(t *testing.T) {
 		p := New(1, maxAge, succeedingConnect, logger, "pool id")
 		p.now = func() time.Time { return birthdate }
 		defer p.Close(context.Background())
@@ -64,7 +65,7 @@ func TestPoolBorrowReturn(ot *testing.T) {
 		}
 	})
 
-	ot.Run("First thread borrows, second thread blocks on borrow", func(t *testing.T) {
+	outer.Run("First thread borrows, second thread blocks on borrow", func(t *testing.T) {
 		p := New(1, maxAge, succeedingConnect, logger, "pool id")
 		p.now = func() time.Time { return birthdate }
 		defer p.Close(context.Background())
@@ -99,7 +100,7 @@ func TestPoolBorrowReturn(ot *testing.T) {
 		wg.Wait()
 	})
 
-	ot.Run("First thread borrows, second thread should not block on borrow without wait", func(t *testing.T) {
+	outer.Run("First thread borrows, second thread should not block on borrow without wait", func(t *testing.T) {
 		p := New(1, maxAge, succeedingConnect, logger, "pool id")
 		p.now = func() time.Time { return birthdate }
 		defer p.Close(context.Background())
@@ -118,7 +119,7 @@ func TestPoolBorrowReturn(ot *testing.T) {
 		_ = err2.(*PoolFull)
 	})
 
-	ot.Run("Multiple threads borrows and returns randomly", func(t *testing.T) {
+	outer.Run("Multiple threads borrows and returns randomly", func(t *testing.T) {
 		maxConnections := 2
 		p := New(maxConnections, maxAge, succeedingConnect, logger, "pool id")
 		p.now = func() time.Time { return birthdate }
@@ -151,7 +152,7 @@ func TestPoolBorrowReturn(ot *testing.T) {
 		}
 	})
 
-	ot.Run("Failing connect", func(t *testing.T) {
+	outer.Run("Failing connect", func(t *testing.T) {
 		p := New(2, maxAge, failingConnect, logger, "pool id")
 		p.now = func() time.Time { return birthdate }
 		serverNames := []string{"srv1"}
@@ -163,7 +164,7 @@ func TestPoolBorrowReturn(ot *testing.T) {
 		}
 	})
 
-	ot.Run("Cancel Borrow", func(t *testing.T) {
+	outer.Run("Cancel Borrow", func(t *testing.T) {
 		p := New(1, maxAge, succeedingConnect, logger, "pool id")
 		p.now = func() time.Time { return birthdate }
 		c1, _ := p.Borrow(context.Background(), []string{"A"}, true, nil, DefaultLivenessCheckThreshold)
@@ -190,6 +191,60 @@ func TestPoolBorrowReturn(ot *testing.T) {
 		}
 		// Should be a pool error with the cancellation error in it
 		_ = err.(*PoolTimeout)
+	})
+
+	outer.Run("Resets existing connection exceeding custom idleness threshold", func(t *testing.T) {
+		connectionCreationTime := time.Now().Add(-2 * time.Hour)
+		idlenessThreshold := 1 * time.Hour
+		forceResetCalls := 0
+		singleConnection := testutil.ConnFake{
+			Name:               "foobar",
+			Alive:              true,
+			Birth:              connectionCreationTime,
+			ServerVersionValue: "",
+			Idle:               connectionCreationTime,
+			ForceResetHook: func() {
+				forceResetCalls++
+			},
+		}
+		pool := New(1, maxAge, connectTo(singleConnection), logger, "pool id")
+		setIdleConnections(pool, map[string]db.Connection{"A": &singleConnection})
+
+		_, err := pool.Borrow(context.Background(), []string{"A"}, true, nil, idlenessThreshold)
+
+		if err != nil {
+			t.Error(err)
+		}
+		if forceResetCalls != 1 {
+			t.Errorf("expected 1 reset call, but %d occurred", forceResetCalls)
+		}
+	})
+
+	outer.Run("Does not reset existing connection below custom idleness threshold", func(t *testing.T) {
+		connectionCreationTime := time.Now().Add(-2 * time.Minute)
+		idlenessThreshold := 1 * time.Hour
+		forceResetCalls := 0
+		singleConnection := testutil.ConnFake{
+			Name:               "foobar",
+			Alive:              true,
+			Birth:              connectionCreationTime,
+			ServerVersionValue: "",
+			Idle:               connectionCreationTime,
+			ForceResetHook: func() {
+				forceResetCalls++
+			},
+		}
+		pool := New(1, maxAge, connectTo(singleConnection), logger, "pool id")
+		setIdleConnections(pool, map[string]db.Connection{"A": &singleConnection})
+
+		_, err := pool.Borrow(context.Background(), []string{"A"}, true, nil, idlenessThreshold)
+
+		if err != nil {
+			t.Error(err)
+		}
+		if forceResetCalls != 0 {
+			t.Errorf("expected no reset call, but %d occurred", forceResetCalls)
+		}
 	})
 }
 
@@ -375,4 +430,20 @@ func TestPoolCleanup(ot *testing.T) {
 		p.CleanUp(context.Background())
 		assertNumberOfServers(t, p, 0)
 	})
+}
+
+func connectTo(singleConnection testutil.ConnFake) func(ctx context.Context, name string, _ log.BoltLogger) (db.Connection, error) {
+	return func(ctx context.Context, name string, _ log.BoltLogger) (db.Connection, error) {
+		return &singleConnection, nil
+	}
+}
+
+func setIdleConnections(pool *Pool, servers map[string]db.Connection) {
+	poolServers := make(map[string]*server, len(servers))
+	for serverName, connection := range servers {
+		connections := list.New()
+		connections.PushFront(connection)
+		poolServers[serverName] = &server{idle: *connections}
+	}
+	pool.servers = poolServers
 }
