@@ -54,7 +54,8 @@ type Router struct {
 type Pool interface {
 	// Borrow acquires a connection from the provided list of servers
 	// If all connections are busy and the pool is full, calls to Borrow may wait for a connection to become idle
-	// If a connection has been idle for enough time, based on the idlenessThreshold, it will be reset.
+	// If a connection has been idle for longer than idlenessThreshold, it will be reset
+	// to check if it's still alive.
 	Borrow(ctx context.Context, servers []string, wait bool, boltLogger log.BoltLogger, idlenessThreshold time.Duration) (db.Connection, error)
 	Return(ctx context.Context, c db.Connection)
 }
