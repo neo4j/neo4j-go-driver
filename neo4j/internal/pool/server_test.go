@@ -86,17 +86,17 @@ func TestServer(ot *testing.T) {
 
 	ot.Run("getIdle/returnBusy", func(t *testing.T) {
 		s := &server{}
-		c1 := &testutil.ConnFake{ForceResetHook: func() {}}
+		c1 := &testutil.ConnFake{Alive: true, ForceResetHook: func() {}}
 		s.registerBusy(c1)
 		s.returnBusy(c1)
 
-		c2 := s.getIdle(nil, 0)
+		c2, _ := s.getIdle(context.Background(), 0)
 		assertConnection(t, c2)
-		c3 := s.getIdle(nil, 0)
+		c3, _ := s.getIdle(context.Background(), 0)
 		assertNilConnection(t, c3)
 
 		s.returnBusy(c2)
-		c3 = s.getIdle(nil, 0)
+		c3, _ = s.getIdle(context.Background(), 0)
 		assertConnection(t, c3)
 	})
 
@@ -106,7 +106,7 @@ func TestServer(ot *testing.T) {
 		conns := make([]*testutil.ConnFake, 3)
 		now := time.Now()
 		for i := range conns {
-			c := &testutil.ConnFake{Birth: now, ForceResetHook: func() {}}
+			c := &testutil.ConnFake{Birth: now, Alive: true, ForceResetHook: func() {}}
 			conns[i] = c
 			s.registerBusy(c)
 			s.returnBusy(c)
@@ -118,11 +118,11 @@ func TestServer(ot *testing.T) {
 		assertSize(t, s, 2)
 
 		// Should be able to borrow twice
-		b1 := s.getIdle(nil, 0)
+		b1, _ := s.getIdle(nil, 0)
 		assertConnection(t, b1)
-		b2 := s.getIdle(nil, 0)
+		b2, _ := s.getIdle(nil, 0)
 		assertConnection(t, b2)
-		b3 := s.getIdle(nil, 0)
+		b3, _ := s.getIdle(nil, 0)
 		assertNilConnection(t, b3)
 
 		// Return the connections and let all of them be too old
@@ -133,7 +133,7 @@ func TestServer(ot *testing.T) {
 		s.removeIdleOlderThan(context.Background(), now, 10*time.Second)
 
 		// Shouldn't be able to borrow anything and size should be zero
-		b1 = s.getIdle(nil, 0)
+		b1, _ = s.getIdle(nil, 0)
 		assertNilConnection(t, b1)
 		assertSize(t, s, 0)
 	})

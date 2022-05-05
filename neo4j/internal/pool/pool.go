@@ -172,14 +172,14 @@ func (p *Pool) getPenaltiesForServers(ctx context.Context, serverNames []string)
 	return penalties
 }
 
-func (p *Pool) tryAnyIdle(serverNames []string) db.Connection {
+func (p *Pool) tryAnyIdle(ctx context.Context, serverNames []string) db.Connection {
 	p.serversMut.Lock()
 	defer p.serversMut.Unlock()
 	for _, serverName := range serverNames {
 		srv := p.servers[serverName]
 		if srv != nil {
 			// Try to get an existing idle connection
-			conn := srv.getIdle(nil, 0)
+			conn, _ := srv.getIdle(ctx, 0)
 			if conn != nil {
 				return conn
 			}
@@ -236,7 +236,7 @@ func (p *Pool) Borrow(ctx context.Context, serverNames []string, wait bool, bolt
 	// Ok, now that we own the queue we can add the item there but between getting the lock
 	// and above check for an existing connection another thread might have returned a connection
 	// so check again to avoid potentially starving this thread.
-	conn = p.tryAnyIdle(serverNames)
+	conn = p.tryAnyIdle(ctx, serverNames)
 	if conn != nil {
 		p.queueMut.Unlock()
 		return conn, nil
@@ -276,13 +276,19 @@ func (p *Pool) tryBorrow(ctx context.Context, serverName string, boltLogger log.
 
 	srv := p.servers[serverName]
 	if srv != nil {
-		// Try to get an existing idle connection
-		if c := srv.getIdle(ctx, idlenessThreshold); c != nil {
-			c.SetBoltLogger(boltLogger)
-			return c, nil
-		}
-		if srv.size() >= p.maxSize {
-			return nil, &PoolFull{servers: []string{serverName}}
+		for {
+			connection, found := srv.getIdle(ctx, idlenessThreshold)
+			if connection == nil && found {
+				continue
+			}
+			if connection != nil {
+				connection.SetBoltLogger(boltLogger)
+				return connection, nil
+			}
+			if srv.size() >= p.maxSize {
+				return nil, &PoolFull{servers: []string{serverName}}
+			}
+			break
 		}
 	} else {
 		// Make sure that there is a server in the map

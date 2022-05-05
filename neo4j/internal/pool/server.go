@@ -42,11 +42,11 @@ var sharedRoundRobin uint32
 const rememberFailedConnectDuration = 3 * time.Minute
 
 // Returns an idle connection if any
-func (s *server) getIdle(ctx context.Context, idlenessThreshold time.Duration) db.Connection {
-	// Remove from idle list and add to busy list
-	e := s.idle.Front()
-	if e != nil {
-		idleConnection := s.idle.Remove(e)
+func (s *server) getIdle(ctx context.Context, idlenessThreshold time.Duration) (db.Connection, bool) {
+	availableConnection := s.idle.Front()
+	found := availableConnection != nil
+	if found {
+		idleConnection := s.idle.Remove(availableConnection)
 		s.busy.PushFront(idleConnection)
 		// Update round-robin counter every time we give away a connection and keep track
 		// of our own round-robin index
@@ -54,10 +54,13 @@ func (s *server) getIdle(ctx context.Context, idlenessThreshold time.Duration) d
 		connection := idleConnection.(db.Connection)
 		if time.Now().Sub(connection.IdleDate()) > idlenessThreshold {
 			connection.ForceReset(ctx)
+			if !connection.IsAlive() {
+				return nil, found
+			}
 		}
-		return connection
+		return connection, found
 	}
-	return nil
+	return nil, found
 }
 
 func (s *server) notifyFailedConnect(now time.Time) {
