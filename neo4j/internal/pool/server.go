@@ -37,6 +37,13 @@ type server struct {
 	roundRobin      uint32
 }
 
+func NewServer() *server {
+	return &server{
+		idle: list.List{},
+		busy: list.List{},
+	}
+}
+
 var sharedRoundRobin uint32
 
 const rememberFailedConnectDuration = 3 * time.Minute
@@ -47,10 +54,6 @@ func (s *server) getIdle(ctx context.Context, idlenessThreshold time.Duration) (
 	found := availableConnection != nil
 	if found {
 		idleConnection := s.idle.Remove(availableConnection)
-		s.busy.PushFront(idleConnection)
-		// Update round-robin counter every time we give away a connection and keep track
-		// of our own round-robin index
-		s.roundRobin = atomic.AddUint32(&sharedRoundRobin, 1)
 		connection := idleConnection.(db.Connection)
 		if time.Now().Sub(connection.IdleDate()) > idlenessThreshold {
 			connection.ForceReset(ctx)
@@ -58,6 +61,10 @@ func (s *server) getIdle(ctx context.Context, idlenessThreshold time.Duration) (
 				return nil, found
 			}
 		}
+		s.busy.PushFront(idleConnection)
+		// Update round-robin counter every time we give away a connection and keep track
+		// of our own round-robin index
+		s.roundRobin = atomic.AddUint32(&sharedRoundRobin, 1)
 		return connection, found
 	}
 	return nil, found
@@ -117,6 +124,11 @@ func (s *server) returnBusy(c db.Connection) {
 // Number of idle connections
 func (s server) numIdle() int {
 	return s.idle.Len()
+}
+
+// Number of busy connections
+func (s server) numBusy() int {
+	return s.busy.Len()
 }
 
 // Adds a db to busy list

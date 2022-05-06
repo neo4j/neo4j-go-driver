@@ -20,7 +20,6 @@
 package pool
 
 import (
-	"container/list"
 	"context"
 	"errors"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
@@ -33,9 +32,8 @@ import (
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/log"
 )
 
-var logger = &log.Console{Errors: true, Infos: true, Warns: true}
+var logger = &log.Console{}
 
-// Scenarios for Borrow and Return
 func TestPoolBorrowReturn(outer *testing.T) {
 	maxAge := 1 * time.Second
 	birthdate := time.Now()
@@ -193,58 +191,42 @@ func TestPoolBorrowReturn(outer *testing.T) {
 		_ = err.(*PoolTimeout)
 	})
 
-	outer.Run("Resets existing connection exceeding custom idleness threshold", func(t *testing.T) {
-		connectionCreationTime := time.Now().Add(-2 * time.Hour)
+	outer.Run("Borrows the first successfully reset long-idle connection", func(t *testing.T) {
 		idlenessThreshold := 1 * time.Hour
-		forceResetCalls := 0
-		singleConnection := testutil.ConnFake{
-			Name:               "foobar",
-			Alive:              true,
-			Birth:              connectionCreationTime,
-			ServerVersionValue: "",
-			Idle:               connectionCreationTime,
-			ForceResetHook: func() {
-				forceResetCalls++
-			},
-		}
-		pool := New(1, maxAge, connectTo(singleConnection), logger, "pool id")
-		setIdleConnections(pool, map[string]db.Connection{"A": &singleConnection})
+		idleness := time.Now().Add(-2 * idlenessThreshold)
+		deadAfterReset := deadConnectionAfterForceReset("deadAfterReset", idleness)
+		stayingAlive := &testutil.ConnFake{Alive: true, Idle: idleness, Name: "stayingAlive", ForceResetHook: func() {}}
+		whatATimeToBeAlive := &testutil.ConnFake{Alive: true, Idle: idleness, Name: "whatATimeToBeAlive", ForceResetHook: func() {
+			t.Errorf("y u call me?")
+		}}
+		pool := New(1, maxAge, nil, logger, "pool id")
+		setIdleConnections(pool, map[string][]db.Connection{"a server": {
+			deadAfterReset,
+			stayingAlive,
+			whatATimeToBeAlive,
+		}})
 
-		_, err := pool.Borrow(context.Background(), []string{"A"}, true, nil, idlenessThreshold)
+		result, err := pool.tryBorrow(context.Background(), "a server", nil, idlenessThreshold)
 
-		if err != nil {
-			t.Error(err)
-		}
-		if forceResetCalls != 1 {
-			t.Errorf("expected 1 reset call, but %d occurred", forceResetCalls)
-		}
+		testutil.AssertNil(t, err)
+		testutil.AssertDeepEquals(t, result, stayingAlive)
 	})
 
-	outer.Run("Does not reset existing connection below custom idleness threshold", func(t *testing.T) {
-		connectionCreationTime := time.Now().Add(-2 * time.Minute)
+	outer.Run("Borrows new connection if resets of all long-idle connections fail", func(t *testing.T) {
 		idlenessThreshold := 1 * time.Hour
-		forceResetCalls := 0
-		singleConnection := testutil.ConnFake{
-			Name:               "foobar",
-			Alive:              true,
-			Birth:              connectionCreationTime,
-			ServerVersionValue: "",
-			Idle:               connectionCreationTime,
-			ForceResetHook: func() {
-				forceResetCalls++
-			},
-		}
-		pool := New(1, maxAge, connectTo(singleConnection), logger, "pool id")
-		setIdleConnections(pool, map[string]db.Connection{"A": &singleConnection})
+		idleness := time.Now().Add(-2 * idlenessThreshold)
+		deadAfterReset1 := deadConnectionAfterForceReset("deadAfterReset1", idleness)
+		deadAfterReset2 := deadConnectionAfterForceReset("deadAfterReset2", idleness)
+		healthyConnection := &testutil.ConnFake{Name: "healthy", ForceResetHook: func() {
+			t.Errorf("force reset should not be called on new connections")
+		}}
+		pool := New(1, maxAge, connectTo(healthyConnection), logger, "pool id")
+		setIdleConnections(pool, map[string][]db.Connection{"a server": {deadAfterReset1, deadAfterReset2}})
 
-		_, err := pool.Borrow(context.Background(), []string{"A"}, true, nil, idlenessThreshold)
+		result, err := pool.tryBorrow(context.Background(), "a server", nil, idlenessThreshold)
 
-		if err != nil {
-			t.Error(err)
-		}
-		if forceResetCalls != 0 {
-			t.Errorf("expected no reset call, but %d occurred", forceResetCalls)
-		}
+		testutil.AssertNil(t, err)
+		testutil.AssertDeepEquals(t, result, healthyConnection)
 	})
 }
 
@@ -432,18 +414,30 @@ func TestPoolCleanup(ot *testing.T) {
 	})
 }
 
-func connectTo(singleConnection testutil.ConnFake) func(ctx context.Context, name string, _ log.BoltLogger) (db.Connection, error) {
+func connectTo(singleConnection *testutil.ConnFake) func(ctx context.Context, name string, _ log.BoltLogger) (db.Connection, error) {
 	return func(ctx context.Context, name string, _ log.BoltLogger) (db.Connection, error) {
-		return &singleConnection, nil
+		return singleConnection, nil
 	}
 }
 
-func setIdleConnections(pool *Pool, servers map[string]db.Connection) {
+func setIdleConnections(pool *Pool, servers map[string][]db.Connection) {
 	poolServers := make(map[string]*server, len(servers))
-	for serverName, connection := range servers {
-		connections := list.New()
-		connections.PushFront(connection)
-		poolServers[serverName] = &server{idle: *connections}
+	for serverName, connections := range servers {
+		srv := NewServer()
+		// iterate in reverse order since registerIdle uses PushFront
+		// we want connections to be tried in the slice order
+		for i := len(connections) - 1; i >= 0; i-- {
+			registerIdle(srv, connections[i])
+		}
+		poolServers[serverName] = srv
 	}
 	pool.servers = poolServers
+}
+
+func deadConnectionAfterForceReset(name string, idleness time.Time) *testutil.ConnFake {
+	result := &testutil.ConnFake{Alive: true, Idle: idleness, Name: name}
+	result.ForceResetHook = func() {
+		result.Alive = false
+	}
+	return result
 }
