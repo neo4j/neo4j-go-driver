@@ -23,6 +23,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	idb "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
 	"io"
 	"reflect"
 	"sync"
@@ -571,19 +572,27 @@ func TestSession(outer *testing.T) {
 
 	outer.Run("GetServerInfo", func(inner *testing.T) {
 
-		inner.Run("Retrieves info from first successful connection", func(t *testing.T) {
+		inner.Run("Retrieves info from first borrowed connection", func(t *testing.T) {
+			borrowCalled := false
 			ctx := context.Background()
 			_, pool, session := createSession()
 			defer session.Close(ctx)
-			pool.BorrowConn = &ConnFake{
-				Name: "home",
-				ConnectionVersion: db.ProtocolVersion{
-					Major: 5,
-					Minor: 0,
-				},
-				Alive:              true,
-				DatabaseName:       "neo4j",
-				ServerVersionValue: "smith",
+			pool.BorrowHook = func() (idb.Connection, error) {
+				if borrowCalled {
+					inner.Errorf("expected only 1 call to borrow, got more")
+				}
+				result := &ConnFake{
+					Name: "home",
+					ConnectionVersion: db.ProtocolVersion{
+						Major: 5,
+						Minor: 0,
+					},
+					Alive:              true,
+					DatabaseName:       "neo4j",
+					ServerVersionValue: "smith",
+				}
+				borrowCalled = true
+				return result, nil
 			}
 
 			info, err := session.getServerInfo(ctx)
