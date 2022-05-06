@@ -101,8 +101,8 @@ type Connection interface {
 	// Reset resets connection to same state as directly after a connection.
 	// Active streams will be discarded and the bookmark will be lost.
 	Reset(ctx context.Context)
-	// ForceReset is like Reset except it also sends a RESET messages for ready
-	// connections too
+	// ForceReset behaves like Reset except it also resets connections in the
+	// ready state (while Reset does not)
 	ForceReset(ctx context.Context)
 	// Close closes the database connection as well as any underlying connection.
 	// The instance should not be used after being closed.
