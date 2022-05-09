@@ -520,162 +520,162 @@ func TestBolt3(outer *testing.T) {
 
 		callbacks := []struct {
 			scenario string
-			server   func(*bolt3server)
-			client   func(*bolt3)
+			server   func(*testing.T, *bolt3server)
+			client   func(*testing.T, *bolt3)
 		}{
 			{
 				scenario: "after HELLO",
-				server:   func(srv *bolt3server) {},
-				client: func(cli *bolt3) {
-					AssertAfter(inner, cli.IdleDate(), testStart)
+				server:   func(t *testing.T, srv *bolt3server) {},
+				client: func(t *testing.T, cli *bolt3) {
+					AssertAfter(t, cli.IdleDate(), testStart)
 				},
 			},
 			{
 				scenario: "after successful RESET",
-				server: func(srv *bolt3server) {
+				server: func(t *testing.T, srv *bolt3server) {
 					srv.waitForReset()
 					srv.sendSuccess(map[string]interface{}{})
 				},
-				client: func(cli *bolt3) {
+				client: func(t *testing.T, cli *bolt3) {
 					idleDate := cli.IdleDate()
 					cli.ForceReset(ctx)
-					AssertAfter(inner, cli.IdleDate(), idleDate)
+					AssertAfter(t, cli.IdleDate(), idleDate)
 				},
 			},
 			{
 				scenario: "after failed RESET",
-				server: func(srv *bolt3server) {
+				server: func(t *testing.T, srv *bolt3server) {
 					srv.waitForReset()
 					srv.sendFailureMsg("o.o.p.s", "reset failed")
 				},
-				client: func(cli *bolt3) {
+				client: func(t *testing.T, cli *bolt3) {
 					idleDate := cli.IdleDate()
 					cli.ForceReset(ctx)
-					AssertAfter(inner, cli.IdleDate(), idleDate)
+					AssertAfter(t, cli.IdleDate(), idleDate)
 				},
 			},
 			{
 				scenario: "after successful RUN/PULLALL",
-				server: func(srv *bolt3server) {
+				server: func(t *testing.T, srv *bolt3server) {
 					srv.waitForRun()
 					srv.sendSuccess(map[string]interface{}{})
 					srv.waitForPullAll()
 					srv.sendSuccess(map[string]interface{}{})
 				},
-				client: func(cli *bolt3) {
+				client: func(t *testing.T, cli *bolt3) {
 					idleDate := cli.IdleDate()
 					_, _ = cli.Run(ctx, idb.Command{Cypher: "RETURN 42"}, idb.TxConfig{})
-					AssertAfter(inner, cli.IdleDate(), idleDate)
+					AssertAfter(t, cli.IdleDate(), idleDate)
 				},
 			},
 			{
 				scenario: "after failed RUN",
-				server: func(srv *bolt3server) {
+				server: func(t *testing.T, srv *bolt3server) {
 					srv.waitForRun()
 					srv.sendFailureMsg("o.o.p.s", "run failed")
 				},
-				client: func(cli *bolt3) {
+				client: func(t *testing.T, cli *bolt3) {
 					idleDate := cli.IdleDate()
 					_, _ = cli.Run(ctx, idb.Command{Cypher: "RETURN 42"}, idb.TxConfig{})
-					AssertAfter(inner, cli.IdleDate(), idleDate)
+					AssertAfter(t, cli.IdleDate(), idleDate)
 				},
 			},
 			{
 				scenario: "after failed PULLALL",
-				server: func(srv *bolt3server) {
+				server: func(t *testing.T, srv *bolt3server) {
 					srv.waitForRun()
 					srv.sendSuccess(map[string]interface{}{})
 					srv.waitForPullAll()
 					srv.sendFailureMsg("o.o.p.s", "pull all failed")
 				},
-				client: func(cli *bolt3) {
+				client: func(t *testing.T, cli *bolt3) {
 					idleDate := cli.IdleDate()
 					_, _ = cli.Run(ctx, idb.Command{Cypher: "RETURN 42"}, idb.TxConfig{})
-					AssertAfter(inner, cli.IdleDate(), idleDate)
+					AssertAfter(t, cli.IdleDate(), idleDate)
 				},
 			},
 			{
 				scenario: "after successful BEGIN",
-				server: func(srv *bolt3server) {
+				server: func(t *testing.T, srv *bolt3server) {
 					srv.waitForTxBegin()
 					srv.sendSuccess(map[string]interface{}{})
 				},
-				client: func(cli *bolt3) {
+				client: func(t *testing.T, cli *bolt3) {
 					idleDate := cli.IdleDate()
 					_, _ = cli.TxBegin(ctx, idb.TxConfig{})
-					AssertAfter(inner, cli.IdleDate(), idleDate)
+					AssertAfter(t, cli.IdleDate(), idleDate)
 				},
 			},
 			{
 				scenario: "after failed BEGIN",
-				server: func(srv *bolt3server) {
+				server: func(t *testing.T, srv *bolt3server) {
 					srv.waitForTxBegin()
 					srv.sendFailureMsg("o.o.p.s", "begin failed")
 				},
-				client: func(cli *bolt3) {
+				client: func(t *testing.T, cli *bolt3) {
 					idleDate := cli.IdleDate()
 					_, _ = cli.TxBegin(ctx, idb.TxConfig{})
-					AssertAfter(inner, cli.IdleDate(), idleDate)
+					AssertAfter(t, cli.IdleDate(), idleDate)
 				},
 			},
 			{
 				scenario: "after successful COMMIT",
-				server: func(srv *bolt3server) {
+				server: func(t *testing.T, srv *bolt3server) {
 					srv.waitForTxBegin()
 					srv.sendSuccess(map[string]interface{}{})
 					srv.waitForTxCommit()
 					srv.sendSuccess(map[string]interface{}{})
 				},
-				client: func(cli *bolt3) {
+				client: func(t *testing.T, cli *bolt3) {
 					tx, _ := cli.TxBegin(ctx, idb.TxConfig{})
 					idleDate := cli.IdleDate()
 					_ = cli.TxCommit(ctx, tx)
-					AssertAfter(inner, cli.IdleDate(), idleDate)
+					AssertAfter(t, cli.IdleDate(), idleDate)
 				},
 			},
 			{
 				scenario: "after failed COMMIT",
-				server: func(srv *bolt3server) {
+				server: func(t *testing.T, srv *bolt3server) {
 					srv.waitForTxBegin()
 					srv.sendSuccess(map[string]interface{}{})
 					srv.waitForTxCommit()
 					srv.sendFailureMsg("o.o.p.s", "commit failed")
 				},
-				client: func(cli *bolt3) {
+				client: func(t *testing.T, cli *bolt3) {
 					tx, _ := cli.TxBegin(ctx, idb.TxConfig{})
 					idleDate := cli.IdleDate()
 					_ = cli.TxCommit(ctx, tx)
-					AssertAfter(inner, cli.IdleDate(), idleDate)
+					AssertAfter(t, cli.IdleDate(), idleDate)
 				},
 			},
 			{
 				scenario: "after successful ROLLBACK",
-				server: func(srv *bolt3server) {
+				server: func(t *testing.T, srv *bolt3server) {
 					srv.waitForTxBegin()
 					srv.sendSuccess(map[string]interface{}{})
 					srv.waitForTxRollback()
 					srv.sendSuccess(map[string]interface{}{})
 				},
-				client: func(cli *bolt3) {
+				client: func(t *testing.T, cli *bolt3) {
 					tx, _ := cli.TxBegin(ctx, idb.TxConfig{})
 					idleDate := cli.IdleDate()
 					_ = cli.TxRollback(ctx, tx)
-					AssertAfter(inner, cli.IdleDate(), idleDate)
+					AssertAfter(t, cli.IdleDate(), idleDate)
 				},
 			},
 			{
 				scenario: "after failed ROLLBACK",
-				server: func(srv *bolt3server) {
+				server: func(t *testing.T, srv *bolt3server) {
 					srv.waitForTxBegin()
 					srv.sendSuccess(map[string]interface{}{})
 					srv.waitForTxRollback()
 					srv.sendFailureMsg("o.o.p.s", "rollback failed")
 				},
-				client: func(cli *bolt3) {
+				client: func(t *testing.T, cli *bolt3) {
 					tx, _ := cli.TxBegin(ctx, idb.TxConfig{})
 					idleDate := cli.IdleDate()
 					_ = cli.TxRollback(ctx, tx)
-					AssertAfter(inner, cli.IdleDate(), idleDate)
+					AssertAfter(t, cli.IdleDate(), idleDate)
 				},
 			},
 		}
@@ -684,12 +684,12 @@ func TestBolt3(outer *testing.T) {
 			inner.Run(callback.scenario, func(t *testing.T) {
 				bolt, cleanup := connectToServer(inner, func(srv *bolt3server) {
 					srv.accept(3)
-					callback.server(srv)
+					callback.server(t, srv)
 				})
 				defer cleanup()
 				defer bolt.Close(ctx)
 
-				callback.client(bolt)
+				callback.client(t, bolt)
 			})
 		}
 
