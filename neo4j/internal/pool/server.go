@@ -151,16 +151,16 @@ func (s *server) removeIdleOlderThan(now time.Time, maxAge time.Duration) {
 	}
 }
 
+func (s *server) closeAll() {
+	closeAndEmptyConnections(s.idle)
+	// Closing the busy connections could mean here that we do close from another thread.
+	closeAndEmptyConnections(s.busy)
+}
+
 func closeAndEmptyConnections(l list.List) {
 	for e := l.Front(); e != nil; e = e.Next() {
 		c := e.Value.(db.Connection)
 		c.Close()
 	}
 	l.Init()
-}
-
-func (s *server) closeAll() {
-	closeAndEmptyConnections(s.idle)
-	// Closing the busy connections could mean here that we do close from another thread.
-	closeAndEmptyConnections(s.busy)
 }
