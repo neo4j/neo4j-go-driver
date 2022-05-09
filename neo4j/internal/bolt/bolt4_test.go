@@ -978,7 +978,7 @@ func TestBolt4(outer *testing.T) {
 		AssertError(t, err)
 	})
 
-	outer.Run("Updates idle date on every new server response", func(inner *testing.T) {
+	outer.Run("Updates connection idle date on every response", func(inner *testing.T) {
 		ctx := context.Background()
 		testStart := time.Now()
 
@@ -1019,7 +1019,19 @@ func TestBolt4(outer *testing.T) {
 				},
 			},
 			{
-				scenario: "after successful RUN/PULL",
+				scenario: "not after error on RESET",
+				server: func(t *testing.T, srv *bolt4server) {
+					srv.waitForReset()
+					srv.closeConnection()
+				},
+				client: func(t *testing.T, cli *bolt4) {
+					idleDate := cli.IdleDate()
+					cli.ForceReset(ctx)
+					AssertDeepEquals(t, cli.IdleDate(), idleDate)
+				},
+			},
+			{
+				scenario: "after successful RUN/PULLALL",
 				server: func(t *testing.T, srv *bolt4server) {
 					srv.waitForRun(nil)
 					srv.sendSuccess(map[string]interface{}{})
@@ -1045,7 +1057,19 @@ func TestBolt4(outer *testing.T) {
 				},
 			},
 			{
-				scenario: "after failed PULL",
+				scenario: "not after errored RUN",
+				server: func(t *testing.T, srv *bolt4server) {
+					srv.waitForRun(nil)
+					srv.closeConnection()
+				},
+				client: func(t *testing.T, cli *bolt4) {
+					idleDate := cli.IdleDate()
+					_, _ = cli.Run(ctx, idb.Command{Cypher: "RETURN 42"}, idb.TxConfig{})
+					AssertDeepEquals(t, cli.IdleDate(), idleDate)
+				},
+			},
+			{
+				scenario: "after failed PULLALL",
 				server: func(t *testing.T, srv *bolt4server) {
 					srv.waitForRun(nil)
 					srv.sendSuccess(map[string]interface{}{})
@@ -1083,6 +1107,18 @@ func TestBolt4(outer *testing.T) {
 				},
 			},
 			{
+				scenario: "not after errored BEGIN",
+				server: func(t *testing.T, srv *bolt4server) {
+					srv.waitForTxBegin()
+					srv.closeConnection()
+				},
+				client: func(t *testing.T, cli *bolt4) {
+					idleDate := cli.IdleDate()
+					_, _ = cli.TxBegin(ctx, idb.TxConfig{})
+					AssertDeepEquals(t, cli.IdleDate(), idleDate)
+				},
+			},
+			{
 				scenario: "after successful COMMIT",
 				server: func(t *testing.T, srv *bolt4server) {
 					srv.waitForTxBegin()
@@ -1110,6 +1146,21 @@ func TestBolt4(outer *testing.T) {
 					idleDate := cli.IdleDate()
 					_ = cli.TxCommit(ctx, tx)
 					AssertAfter(t, cli.IdleDate(), idleDate)
+				},
+			},
+			{
+				scenario: "not after errored COMMIT",
+				server: func(t *testing.T, srv *bolt4server) {
+					srv.waitForTxBegin()
+					srv.sendSuccess(map[string]interface{}{})
+					srv.waitForTxCommit()
+					srv.closeConnection()
+				},
+				client: func(t *testing.T, cli *bolt4) {
+					tx, _ := cli.TxBegin(ctx, idb.TxConfig{})
+					idleDate := cli.IdleDate()
+					_ = cli.TxCommit(ctx, tx)
+					AssertDeepEquals(t, cli.IdleDate(), idleDate)
 				},
 			},
 			{
@@ -1142,6 +1193,21 @@ func TestBolt4(outer *testing.T) {
 					AssertAfter(t, cli.IdleDate(), idleDate)
 				},
 			},
+			{
+				scenario: "not after errored ROLLBACK",
+				server: func(t *testing.T, srv *bolt4server) {
+					srv.waitForTxBegin()
+					srv.sendSuccess(map[string]interface{}{})
+					srv.waitForTxRollback()
+					srv.closeConnection()
+				},
+				client: func(t *testing.T, cli *bolt4) {
+					tx, _ := cli.TxBegin(ctx, idb.TxConfig{})
+					idleDate := cli.IdleDate()
+					_ = cli.TxRollback(ctx, tx)
+					AssertDeepEquals(t, cli.IdleDate(), idleDate)
+				},
+			},
 		}
 
 		for _, callback := range callbacks {
@@ -1157,22 +1223,5 @@ func TestBolt4(outer *testing.T) {
 			})
 		}
 
-	})
-
-	outer.Run("Does not update idle date on error", func(t *testing.T) {
-		ctx := context.Background()
-		testStart := time.Now()
-		bolt, cleanup := connectToServer(t, func(srv *bolt4server) {
-			srv.accept(4)
-			srv.closeConnection()
-		})
-		defer cleanup()
-		defer bolt.Close(ctx)
-
-		firstIdleDate := bolt.IdleDate()
-		AssertAfter(t, firstIdleDate, testStart)
-
-		bolt.ForceReset(ctx)
-		AssertDeepEquals(t, bolt.IdleDate(), firstIdleDate)
 	})
 }
