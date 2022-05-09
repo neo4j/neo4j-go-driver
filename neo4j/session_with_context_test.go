@@ -40,8 +40,8 @@ type transactionFunc func(context.Context, ManagedTransactionWork, ...func(*Tran
 type transactionFuncApi func(session SessionWithContext) transactionFunc
 
 func TestSession(outer *testing.T) {
-	logger := log.Console{Errors: true, Infos: true, Warns: true, Debugs: true}
-	boltLogger := log.ConsoleBoltLogger{}
+	var logger log.Logger = &log.Void{}
+	var boltLogger log.BoltLogger = nil
 
 	assertCleanSessionState := func(t *testing.T, sess *sessionWithContext) {
 		if sess.explicitTx != nil {
@@ -53,8 +53,8 @@ func TestSession(outer *testing.T) {
 		conf := Config{MaxTransactionRetryTime: 3 * time.Millisecond}
 		router := RouterFake{}
 		pool := PoolFake{}
-		sessConfig := SessionConfig{AccessMode: AccessModeRead, BoltLogger: &boltLogger}
-		sess := newSessionWithContext(&conf, sessConfig, &router, &pool, &logger)
+		sessConfig := SessionConfig{AccessMode: AccessModeRead, BoltLogger: boltLogger}
+		sess := newSessionWithContext(&conf, sessConfig, &router, &pool, logger)
 		sess.throttleTime = time.Millisecond * 1
 		return &router, &pool, sess
 	}
@@ -63,13 +63,13 @@ func TestSession(outer *testing.T) {
 		conf := Config{MaxTransactionRetryTime: 3 * time.Millisecond}
 		router := RouterFake{}
 		pool := PoolFake{}
-		sess := newSessionWithContext(&conf, sessConfig, &router, &pool, &logger)
+		sess := newSessionWithContext(&conf, sessConfig, &router, &pool, logger)
 		sess.throttleTime = time.Millisecond * 1
 		return &router, &pool, sess
 	}
 
 	createSessionWithBookmarks := func(bookmarks Bookmarks) (*RouterFake, *PoolFake, *sessionWithContext) {
-		sessConfig := SessionConfig{AccessMode: AccessModeRead, Bookmarks: bookmarks, BoltLogger: &boltLogger}
+		sessConfig := SessionConfig{AccessMode: AccessModeRead, Bookmarks: bookmarks, BoltLogger: boltLogger}
 		return createSessionFromConfig(sessConfig)
 	}
 
