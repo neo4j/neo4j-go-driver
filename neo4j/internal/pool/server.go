@@ -31,10 +31,17 @@ import (
 // is ready for use.
 // Not thread safe
 type server struct {
-	idle            list.List
-	busy            list.List
+	idle            *list.List
+	busy            *list.List
 	failedConnectAt time.Time
 	roundRobin      uint32
+}
+
+func NewServer() *server {
+	return &server{
+		idle: list.New(),
+		busy: list.New(),
+	}
 }
 
 var sharedRoundRobin uint32
@@ -112,6 +119,11 @@ func (s server) numIdle() int {
 	return s.idle.Len()
 }
 
+// Number of busy connections
+func (s server) numBusy() int {
+	return s.busy.Len()
+}
+
 // Adds a connection to busy list
 func (s *server) registerBusy(c db.Connection) {
 	// Update round-robin to indicate when this server was last used.
@@ -157,7 +169,7 @@ func (s *server) closeAll() {
 	closeAndEmptyConnections(s.busy)
 }
 
-func closeAndEmptyConnections(l list.List) {
+func closeAndEmptyConnections(l *list.List) {
 	for e := l.Front(); e != nil; e = e.Next() {
 		c := e.Value.(db.Connection)
 		c.Close()

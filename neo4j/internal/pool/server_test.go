@@ -20,6 +20,7 @@
 package pool
 
 import (
+	"reflect"
 	"testing"
 	"time"
 
@@ -42,13 +43,6 @@ func assertFalse(t *testing.T, v bool) {
 }
 
 func TestServer(ot *testing.T) {
-	assertSize := func(t *testing.T, s *server, expected int) {
-		t.Helper()
-		actual := s.size()
-		if actual != expected {
-			t.Errorf("Size of connection pool was %d but %d expected", actual, expected)
-		}
-	}
 
 	assertConnection := func(t *testing.T, conn db.Connection) {
 		t.Helper()
@@ -65,26 +59,41 @@ func TestServer(ot *testing.T) {
 	}
 
 	ot.Run("registerBusy/unregisterBusy/size", func(t *testing.T) {
-		s := &server{}
-		assertSize(t, s, 0)
+		s := NewServer()
+		assertSize(t, s, serverCounts{
+			busy: 0,
+			idle: 0,
+		})
 
 		// Register should increase size
 		c1 := &testutil.ConnFake{}
 		s.registerBusy(c1)
-		assertSize(t, s, 1)
+		assertSize(t, s, serverCounts{
+			busy: 1,
+			idle: 0,
+		})
 		c2 := &testutil.ConnFake{}
 		s.registerBusy(c2)
-		assertSize(t, s, 2)
+		assertSize(t, s, serverCounts{
+			busy: 2,
+			idle: 0,
+		})
 
 		// Unregister should decrease size
 		s.unregisterBusy(c2)
-		assertSize(t, s, 1)
+		assertSize(t, s, serverCounts{
+			busy: 1,
+			idle: 0,
+		})
 		s.unregisterBusy(c1)
-		assertSize(t, s, 0)
+		assertSize(t, s, serverCounts{
+			busy: 0,
+			idle: 0,
+		})
 	})
 
 	ot.Run("getIdle/returnBusy", func(t *testing.T) {
-		s := &server{}
+		s := NewServer()
 		c1 := &testutil.ConnFake{}
 		s.registerBusy(c1)
 		s.returnBusy(c1)
@@ -100,7 +109,7 @@ func TestServer(ot *testing.T) {
 	})
 
 	ot.Run("removeIdleOlderThan", func(t *testing.T) {
-		s := &server{}
+		s := NewServer()
 		// Register and return three connections
 		conns := make([]*testutil.ConnFake, 3)
 		now := time.Now()
@@ -110,19 +119,25 @@ func TestServer(ot *testing.T) {
 			s.registerBusy(c)
 			s.returnBusy(c)
 		}
+		assertSize(t, s, serverCounts{
+			busy: 0,
+			idle: 3,
+		})
 
 		// Make the connection in the middle too old
 		conns[1].Birth = now.Add(-20 * time.Second)
 		s.removeIdleOlderThan(now, 10*time.Second)
-		assertSize(t, s, 2)
+		assertSize(t, s, serverCounts{
+			busy: 0,
+			idle: 2,
+		})
 
 		// Should be able to borrow twice
 		b1 := s.getIdle()
 		assertConnection(t, b1)
 		b2 := s.getIdle()
 		assertConnection(t, b2)
-		b3 := s.getIdle()
-		assertNilConnection(t, b3)
+		assertNilConnection(t, s.getIdle())
 
 		// Return the connections and let all of them be too old
 		s.returnBusy(b1)
@@ -130,11 +145,17 @@ func TestServer(ot *testing.T) {
 		conns[0].Birth = now.Add(-20 * time.Second)
 		conns[2].Birth = now.Add(-20 * time.Second)
 		s.removeIdleOlderThan(now, 10*time.Second)
+		assertSize(t, s, serverCounts{
+			busy: 0,
+			idle: 0,
+		})
 
 		// Shouldn't be able to borrow anything and size should be zero
-		b1 = s.getIdle()
-		assertNilConnection(t, b1)
-		assertSize(t, s, 0)
+		assertNilConnection(t, s.getIdle())
+		assertSize(t, s, serverCounts{
+			busy: 0,
+			idle: 0,
+		})
 	})
 }
 
@@ -149,8 +170,8 @@ func TestServerPenalty(t *testing.T) {
 	}
 
 	now := time.Now()
-	srv1 := &server{}
-	srv2 := &server{}
+	srv1 := NewServer()
+	srv2 := NewServer()
 
 	// Add one busy connection to srv1
 	// Higher penalty to srv1 since it is in use
@@ -224,4 +245,27 @@ func TestServerPenalty(t *testing.T) {
 	// Alternatively a successful connect should clear the problem
 	srv1.notifySuccessfulConnect()
 	assertGt(srv2, srv1, now)
+}
+
+type serverCounts struct {
+	busy int
+	idle int
+}
+
+func assertSize(t *testing.T, s *server, expected serverCounts) {
+	t.Helper()
+	actual := serverCounts{
+		busy: s.numBusy(),
+		idle: s.numIdle(),
+	}
+	if s.size() != s.numBusy()+s.numIdle() {
+		t.Errorf("inconsistent server state, got a total of %d instead of (busy: %d)+(idle: %d)",
+			s.size(),
+			s.numBusy(),
+			s.numIdle(),
+		)
+	}
+	if !reflect.DeepEqual(expected, actual) {
+		t.Errorf("Expected: %v, got: %v", expected, actual)
+	}
 }

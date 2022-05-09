@@ -164,7 +164,7 @@ func (p *Pool) tryBorrow(serverName string, boltLogger log.BoltLogger) (db.Conne
 		}
 	} else {
 		// Make sure that there is a server in the map
-		srv = &server{}
+		srv = NewServer()
 		p.servers[serverName] = srv
 	}
 
