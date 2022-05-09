@@ -142,7 +142,7 @@ func TestState(outer *testing.T) {
 			now := baseTime
 			state := State{
 				Now:                     func() time.Time { return now },
-				Log:                     &log.Console{Errors: true, Debugs: true},
+				Log:                     &log.Void{},
 				LogName:                 "TEST",
 				LogId:                   "State",
 				Sleep:                   func(time.Duration) {},

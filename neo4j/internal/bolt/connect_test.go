@@ -27,7 +27,7 @@ import (
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/log"
 )
 
-var logger = log.Void{}
+var logger = &log.Void{}
 
 func TestConnect(ot *testing.T) {
 	// TODO: Test connect timeout

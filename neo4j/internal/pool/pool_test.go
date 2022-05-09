@@ -32,7 +32,7 @@ import (
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/log"
 )
 
-var logger = &log.Console{}
+var logger = &log.Void{}
 
 func TestPoolBorrowReturn(outer *testing.T) {
 	maxAge := 1 * time.Second
