@@ -321,13 +321,61 @@ For a customised logging target, you can implement the above interface and pass 
 
 ## Development
 
-This section describes instructions to use during the development phase of the driver. 
+This section describes instructions to use during the development phase of the
+driver.
 
-### Testing
+### Prerequisites
 
-Tests **require** the latest [Testkit](https://github.com/neo4j-drivers/testkit/), Python3 and Docker.
+The Go driver on this branch requires at least Go 1.18 and relies on [Go
+modules](https://go.dev/ref/mod) for dependency resolution.
 
-Testkit needs to be cloned and configured to run against the Go Driver. Use the following steps to configure it.
+### Unit Testing
+
+You can run unit tests as follows:
+
+```shell
+go test -short ./...
+```
+
+### Integration and Benchmark Testing
+
+For these tests, you'll need to start a Neo4j server.
+This can be done with [Neo4j Desktop](https://neo4j.com/download/) or with
+the [official Docker image](https://hub.docker.com/_/neo4j):
+
+```shell
+docker run --rm \
+  --env NEO4J_ACCEPT_LICENSE_AGREEMENT=yes \
+  --env NEO4J_AUTH=neo4j/pass \
+  --publish=7687:7687 \
+  --health-cmd 'cypher-shell -u neo4j -p pass "RETURN 1"' \
+  --health-interval 5s \
+  --health-timeout 5s \
+  --health-retries 5 \
+  neo4j:4.4-enterprise
+```
+
+Once the server is running, you run integration tests like this:
+
+```shell
+TEST_NEO4J_HOST="localhost" TEST_NEO4J_VERSION=4.4 \
+  go test ./neo4j/test-integration/...
+```
+
+Likewise, benchmark tests are run like this:
+
+```shell
+cd benchmark
+go run . neo4j://localhost neo4j pass
+```
+
+### All-In-One / Acceptance Testing
+
+Tests **require** the
+latest [Testkit](https://github.com/neo4j-drivers/testkit/), Python3 and Docker.
+
+Testkit needs to be cloned and configured to run against the Go Driver. Use the
+following steps to configure it.
 
 1. Clone the Testkit repository
 
