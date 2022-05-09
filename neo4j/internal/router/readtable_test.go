@@ -1,6 +1,6 @@
 /*
  * Copyright (c) "Neo4j"
- * Neo4j Sweden AB [http://neo4j.com]
+ * Neo4j Sweden AB [https://neo4j.com]
  *
  * This file is part of Neo4j.
  *
@@ -8,7 +8,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  *  Unless required by applicable law or agreed to in writing, software
  *  distributed under the License is distributed on an "AS IS" BASIS,
@@ -132,7 +132,7 @@ func TestReadTableTable(ot *testing.T) {
 					_ log.BoltLogger) (idb.Connection, error) {
 					if names[0] == "router2" {
 						return &testutil.ConnFake{Table: &idb.
-						RoutingTable{}}, nil
+							RoutingTable{}}, nil
 					}
 					return nil, errors.New("borrow fail")
 				},
