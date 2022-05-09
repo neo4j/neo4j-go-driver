@@ -111,7 +111,7 @@ func TestServer(ot *testing.T) {
 			s.returnBusy(c)
 		}
 
-		// Let the conn in the middle be too old
+		// Make the connection in the middle too old
 		conns[1].Birth = now.Add(-20 * time.Second)
 		s.removeIdleOlderThan(now, 10*time.Second)
 		assertSize(t, s, 2)
@@ -186,7 +186,7 @@ func TestServerPenalty(t *testing.T) {
 	srv2.registerBusy(c22)
 	srv2.returnBusy(c22)
 
-	// Both servers have two idle connections, srv2 was last used so it should have higher penalty.
+	// Both servers have two idle connections, srv2 was last used, so it should have higher penalty.
 	assertGt(srv2, srv1, now)
 	// Get both idle connections from srv1
 	srv1.getIdle()
@@ -205,7 +205,7 @@ func TestServerPenalty(t *testing.T) {
 	// Everything returned, srv2 should have higher penalty since it was last used
 	assertGt(srv2, srv1, now)
 
-	// Punish srv1 by faking that a connect to it failed, after that it should have much higher
+	// Punish srv1 by faking that a connection to it failed, after that it should have much higher
 	// penalty than srv2
 	srv1.notifyFailedConnect(now)
 	assertGt(srv1, srv2, now)
@@ -221,7 +221,7 @@ func TestServerPenalty(t *testing.T) {
 	// should prefer srv1
 	assertGt(srv2, srv1, now.Add(3*time.Hour))
 
-	// Alternatively a succesful connect should clear the problem
-	srv1.notifySuccesfulConnect()
+	// Alternatively a successful connect should clear the problem
+	srv1.notifySuccessfulConnect()
 	assertGt(srv2, srv1, now)
 }

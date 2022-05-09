@@ -180,7 +180,7 @@ func (p *Pool) tryBorrow(serverName string, boltLogger log.BoltLogger) (db.Conne
 
 	// Ok, got a connection, register the connection
 	srv.registerBusy(c)
-	srv.notifySuccesfulConnect()
+	srv.notifySuccessfulConnect()
 	return c, nil
 }
 

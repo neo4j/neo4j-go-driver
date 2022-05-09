@@ -41,7 +41,7 @@ var sharedRoundRobin uint32
 
 const rememberFailedConnectDuration = 3 * time.Minute
 
-// Returns a idle connection if any
+// Returns an idle connection if any
 func (s *server) getIdle() db.Connection {
 	// Remove from idle list and add to busy list
 	e := s.idle.Front()
@@ -60,7 +60,7 @@ func (s *server) notifyFailedConnect(now time.Time) {
 	s.failedConnectAt = now
 }
 
-func (s *server) notifySuccesfulConnect() {
+func (s *server) notifySuccessfulConnect() {
 	s.failedConnectAt = time.Time{}
 }
 
@@ -78,7 +78,7 @@ const newConnectionPenalty = uint32(1 << 8)
 func (s *server) calculatePenalty(now time.Time) uint32 {
 	penalty := uint32(0)
 
-	// If a connect to the server has failed recently, add a penalty
+	// If a connection to the server has failed recently, add a penalty
 	if s.hasFailedConnect(now) {
 		penalty = 1 << 31
 	}
@@ -96,7 +96,7 @@ func (s *server) calculatePenalty(now time.Time) uint32 {
 	// Use last round-robin value as lowest priority penalty, so when all other is equal we will
 	// make sure to spread usage among the servers. And yes it will wrap around once in a while
 	// but since number of busy servers weights higher it will even out pretty fast.
-	penalty |= (s.roundRobin & 0xff)
+	penalty |= s.roundRobin & 0xff
 
 	return penalty
 }
