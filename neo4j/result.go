@@ -51,10 +51,12 @@ type Result interface {
 	Consume() (ResultSummary, error)
 }
 
+// deprecated: use resultWithContext instead
 type result struct {
 	delegate ResultWithContext
 }
 
+// deprecated: use newResultWithContext instead
 func newResult(conn db.Connection, str db.StreamHandle, cypher string, params map[string]interface{}) *result {
 	return newResultWithContext(conn, str, cypher, params).legacy()
 }
