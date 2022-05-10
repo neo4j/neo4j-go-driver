@@ -20,6 +20,7 @@
 package neo4j
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	idb "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
@@ -37,7 +38,8 @@ type iter struct {
 	expectErr    error
 }
 
-func TestResult(ot *testing.T) {
+func TestResult(outer *testing.T) {
+	ctx := context.Background()
 	streamHandle := idb.StreamHandle(0)
 	cypher := ""
 	params := map[string]interface{}{}
@@ -48,13 +50,13 @@ func TestResult(ot *testing.T) {
 	}
 	sums := []*db.Summary{{}}
 	errs := []error{
-		errors.New("Whatever"),
+		errors.New("whatever"),
 	}
 
 	// Initialization
-	ot.Run("Initialization", func(t *testing.T) {
+	outer.Run("Initialization", func(t *testing.T) {
 		conn := &ConnFake{}
-		res := newResult(conn, streamHandle, cypher, params)
+		res := newResultWithContext(conn, streamHandle, cypher, params)
 		rec := res.Record()
 		if rec != nil {
 			t.Errorf("Should be no record")
@@ -73,7 +75,7 @@ func TestResult(ot *testing.T) {
 	iterCases := []struct {
 		name   string
 		stream []Next
-		iters  []iter
+		rounds []iter
 		sum    db.Summary
 	}{
 		{
@@ -83,7 +85,7 @@ func TestResult(ot *testing.T) {
 				{Record: recs[1]},
 				{Summary: sums[0]},
 			},
-			iters: []iter{
+			rounds: []iter{
 				{expectNext: true, expectRec: recs[0]},
 				{expectNext: true, expectRec: recs[1]},
 				{expectNext: false, expectSum: sums[0]},
@@ -95,7 +97,7 @@ func TestResult(ot *testing.T) {
 				{Record: recs[0]},
 				{Err: errs[0]},
 			},
-			iters: []iter{
+			rounds: []iter{
 				{expectNext: true, expectRec: recs[0]},
 				{expectNext: false, expectErr: errs[0]},
 			},
@@ -106,7 +108,7 @@ func TestResult(ot *testing.T) {
 				{Record: recs[0]},
 				{Err: errs[0]},
 			},
-			iters: []iter{
+			rounds: []iter{
 				{expectNext: true, expectRec: recs[0]},
 				{expectNext: false, expectErr: errs[0]},
 				{expectNext: false, expectErr: errs[0]},
@@ -114,11 +116,11 @@ func TestResult(ot *testing.T) {
 		},
 	}
 	for _, c := range iterCases {
-		ot.Run(fmt.Sprintf("Next %s", c.name), func(t *testing.T) {
+		outer.Run(fmt.Sprintf("Next %s", c.name), func(t *testing.T) {
 			conn := &ConnFake{Nexts: c.stream}
-			res := newResult(conn, streamHandle, cypher, params)
-			for i, call := range c.iters {
-				gotNext := res.Next()
+			res := newResultWithContext(conn, streamHandle, cypher, params)
+			for i, call := range c.rounds {
+				gotNext := res.Next(context.Background())
 				if gotNext != call.expectNext {
 					t.Fatalf("Next at iter %d returned %t but expected to return %t", i, gotNext, call.expectNext)
 				}
@@ -143,55 +145,56 @@ func TestResult(ot *testing.T) {
 	}
 
 	// PeekRecord
-	ot.Run("Peeks records", func(t *testing.T) {
-		var peedkedFirst *Record
+	outer.Run("Peeks records", func(t *testing.T) {
+		var peekedFirst *Record
 		var peekedSecond *Record
 		var nextFirst *Record
 		var peekedAfterNextFirst *Record
 		var nextSecond *Record
 		conn := &ConnFake{Nexts: []Next{{Record: recs[0]}}}
 
-		result := newResult(conn, streamHandle, cypher, params)
+		result := newResultWithContext(conn, streamHandle, cypher, params)
 
-		AssertTrue(t, result.PeekRecord(&peedkedFirst))
-		AssertTrue(t, result.PeekRecord(&peekedSecond))
-		AssertTrue(t, result.NextRecord(&nextFirst))
-		AssertDeepEquals(t, recs[0], peedkedFirst, peekedSecond, nextFirst)
-		AssertFalse(t, result.PeekRecord(&peekedAfterNextFirst))
+		AssertTrue(t, result.PeekRecord(ctx, &peekedFirst))
+		AssertTrue(t, result.PeekRecord(ctx, &peekedSecond))
+		AssertTrue(t, result.NextRecord(ctx, &nextFirst))
+		AssertDeepEquals(t, recs[0], peekedFirst, peekedSecond, nextFirst)
+		AssertFalse(t, result.PeekRecord(ctx, &peekedAfterNextFirst))
 		AssertNil(t, peekedAfterNextFirst)
-		AssertFalse(t, result.NextRecord(&nextSecond))
+		AssertFalse(t, result.NextRecord(ctx, &nextSecond))
 		AssertNil(t, nextSecond)
 	})
 
 	// Consume
-	ot.Run("Consume with summary", func(t *testing.T) {
+	outer.Run("Consume with summary", func(t *testing.T) {
 		conn := &ConnFake{
 			ConsumeSum: sums[0],
 			ConsumeErr: nil,
 			Nexts:      []Next{{Record: recs[0]}},
 		}
-		res := newResult(conn, streamHandle, cypher, params)
+		res := newResultWithContext(conn, streamHandle, cypher, params)
 		// Get one record to make sure that Record() is cleared
-		res.Next()
+		res.Next(ctx)
 		AssertNotNil(t, res.Record())
-		sum, err := res.Consume()
+		sum, err := res.Consume(ctx)
 		AssertNotNil(t, sum)
 		AssertNil(t, err)
 		// The getters should be updated
 		AssertNil(t, res.Record())
 		AssertNil(t, res.Err())
 	})
-	ot.Run("Consume with error", func(t *testing.T) {
+
+	outer.Run("Consume with error", func(t *testing.T) {
 		conn := &ConnFake{
 			ConsumeSum: nil,
 			ConsumeErr: errs[0],
 			Nexts:      []Next{{Record: recs[0]}},
 		}
-		res := newResult(conn, streamHandle, cypher, params)
+		res := newResultWithContext(conn, streamHandle, cypher, params)
 		// Get one record to make sure that Record() is cleared
-		res.Next()
+		res.Next(ctx)
 		AssertNotNil(t, res.Record())
-		sum, err := res.Consume()
+		sum, err := res.Consume(ctx)
 		AssertNil(t, sum)
 		AssertNotNil(t, err)
 		// The getters should be updated
@@ -200,24 +203,24 @@ func TestResult(ot *testing.T) {
 	})
 
 	// Single
-	ot.Run("Single with one record", func(t *testing.T) {
+	outer.Run("Single with one record", func(t *testing.T) {
 		conn := &ConnFake{
 			Nexts: []Next{{Record: recs[0]}, {Summary: sums[0]}},
 		}
-		res := newResult(conn, streamHandle, cypher, params)
-		rec, err := res.Single()
+		res := newResultWithContext(conn, streamHandle, cypher, params)
+		rec, err := res.Single(ctx)
 		AssertNotNil(t, rec)
 		AssertNoError(t, err)
 		// The getters should be updated
 		AssertNotNil(t, res.Record())
 		AssertNil(t, res.Err())
 	})
-	ot.Run("Single with no record", func(t *testing.T) {
+	outer.Run("Single with no record", func(t *testing.T) {
 		conn := &ConnFake{
 			Nexts: []Next{{Summary: sums[0]}},
 		}
-		res := newResult(conn, streamHandle, cypher, params)
-		rec, err := res.Single()
+		res := newResultWithContext(conn, streamHandle, cypher, params)
+		rec, err := res.Single(ctx)
 		AssertNil(t, rec)
 		assertUsageError(t, err)
 		AssertError(t, err)
@@ -225,7 +228,8 @@ func TestResult(ot *testing.T) {
 		AssertNil(t, res.Record())
 		assertUsageError(t, res.Err())
 	})
-	ot.Run("Single with two records", func(t *testing.T) {
+
+	outer.Run("Single with two records", func(t *testing.T) {
 		calledConsume := false
 		conn := &ConnFake{
 			Nexts: []Next{{Record: recs[0]}, {Record: recs[1]}, {Summary: sums[0]}},
@@ -234,8 +238,8 @@ func TestResult(ot *testing.T) {
 			},
 			ConsumeSum: sums[0],
 		}
-		res := newResult(conn, streamHandle, cypher, params)
-		rec, err := res.Single()
+		res := newResultWithContext(conn, streamHandle, cypher, params)
+		rec, err := res.Single(ctx)
 		AssertNil(t, rec)
 		assertUsageError(t, err)
 		// The getters should be updated
@@ -245,17 +249,18 @@ func TestResult(ot *testing.T) {
 		// the result isn't useful after this.
 		AssertTrue(t, calledConsume)
 		// Calling Consume should preserve the usage error
-		sum, err := res.Consume()
+		sum, err := res.Consume(ctx)
 		AssertNil(t, sum)
 		assertUsageError(t, err)
 		assertUsageError(t, res.Err())
 	})
-	ot.Run("Single with error", func(t *testing.T) {
+
+	outer.Run("Single with error", func(t *testing.T) {
 		conn := &ConnFake{
 			Nexts: []Next{{Err: errs[0]}},
 		}
-		res := newResult(conn, streamHandle, cypher, params)
-		rec, err := res.Single()
+		res := newResultWithContext(conn, streamHandle, cypher, params)
+		rec, err := res.Single(ctx)
 		AssertNil(t, rec)
 		AssertError(t, err)
 		// The getters should be updated
@@ -264,12 +269,12 @@ func TestResult(ot *testing.T) {
 	})
 
 	// Collect
-	ot.Run("Collect n records", func(t *testing.T) {
+	outer.Run("Collect n records", func(t *testing.T) {
 		conn := &ConnFake{
 			Nexts: []Next{{Record: recs[0]}, {Record: recs[1]}, {Summary: sums[0]}},
 		}
-		res := newResult(conn, streamHandle, cypher, params)
-		coll, err := res.Collect()
+		res := newResultWithContext(conn, streamHandle, cypher, params)
+		coll, err := res.Collect(ctx)
 		AssertNoError(t, err)
 		AssertLen(t, coll, 2)
 		if recs[0] != coll[0] || recs[1] != coll[1] {
@@ -278,14 +283,15 @@ func TestResult(ot *testing.T) {
 		AssertNil(t, res.Record())
 		AssertNil(t, res.Err())
 	})
-	ot.Run("Collect n records after Next", func(t *testing.T) {
+
+	outer.Run("Collect n records after Next", func(t *testing.T) {
 		conn := &ConnFake{
 			Nexts: []Next{{Record: recs[0]}, {Record: recs[1]}, {Record: recs[2]}, {Summary: sums[0]}},
 		}
-		res := newResult(conn, streamHandle, cypher, params)
-		res.Next()
+		res := newResultWithContext(conn, streamHandle, cypher, params)
+		res.Next(ctx)
 		AssertNotNil(t, res.Record())
-		coll, err := res.Collect()
+		coll, err := res.Collect(ctx)
 		AssertNoError(t, err)
 		AssertLen(t, coll, 2)
 		if recs[1] != coll[0] || recs[2] != coll[1] {
@@ -294,47 +300,50 @@ func TestResult(ot *testing.T) {
 		AssertNil(t, res.Record())
 		AssertNil(t, res.Err())
 	})
-	ot.Run("Collect empty", func(t *testing.T) {
+
+	outer.Run("Collect empty", func(t *testing.T) {
 		conn := &ConnFake{
 			Nexts: []Next{{Summary: sums[0]}},
 		}
-		res := newResult(conn, streamHandle, cypher, params)
-		coll, err := res.Collect()
+		res := newResultWithContext(conn, streamHandle, cypher, params)
+		coll, err := res.Collect(ctx)
 		AssertNoError(t, err)
 		AssertLen(t, coll, 0)
 		AssertNil(t, res.Record())
 		AssertNil(t, res.Err())
 	})
-	ot.Run("Collect emptied", func(t *testing.T) {
+
+	outer.Run("Collect emptied", func(t *testing.T) {
 		conn := &ConnFake{
 			Nexts: []Next{{Summary: sums[0]}},
 		}
-		res := newResult(conn, streamHandle, cypher, params)
-		res.Next()
+		res := newResultWithContext(conn, streamHandle, cypher, params)
+		res.Next(ctx)
 		AssertNil(t, res.Record())
-		coll, err := res.Collect()
+		coll, err := res.Collect(ctx)
 		AssertNoError(t, err)
 		AssertLen(t, coll, 0)
 		AssertNil(t, res.Record())
 		AssertNil(t, res.Err())
 	})
-	ot.Run("Collect error", func(t *testing.T) {
+
+	outer.Run("Collect error", func(t *testing.T) {
 		conn := &ConnFake{
 			Nexts: []Next{{Err: errs[0]}},
 		}
-		res := newResult(conn, streamHandle, cypher, params)
-		coll, err := res.Collect()
+		res := newResultWithContext(conn, streamHandle, cypher, params)
+		coll, err := res.Collect(ctx)
 		AssertError(t, err)
 		AssertLen(t, coll, 0)
 		AssertNil(t, res.Record())
 		AssertNotNil(t, res.Err())
 	})
-	ot.Run("Collect stream error", func(t *testing.T) {
+	outer.Run("Collect stream error", func(t *testing.T) {
 		conn := &ConnFake{
 			Nexts: []Next{{Record: recs[0]}, {Err: errs[0]}},
 		}
-		res := newResult(conn, streamHandle, cypher, params)
-		coll, err := res.Collect()
+		res := newResultWithContext(conn, streamHandle, cypher, params)
+		coll, err := res.Collect(ctx)
 		AssertError(t, err)
 		AssertLen(t, coll, 0)
 		AssertNil(t, res.Record())
