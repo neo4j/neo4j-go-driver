@@ -273,26 +273,8 @@ func (d *driverWithContext) NewSession(config SessionConfig) SessionWithContext 
 }
 
 func (d *driverWithContext) VerifyConnectivity(ctx context.Context) error {
-	session := d.NewSession(SessionConfig{AccessMode: AccessModeRead})
-	defer session.Close(ctx)
-	result, err := session.Run(ctx, "RETURN 1 AS n", nil)
-	if err != nil {
-		return err
-	}
-	_, err = result.Consume(ctx)
+	_, err := d.GetServerInfo(ctx)
 	return err
-}
-
-func (d *driverWithContext) Close(ctx context.Context) error {
-	d.mut.Lock()
-	defer d.mut.Unlock()
-	// Safeguard against closing more than once
-	if d.pool != nil {
-		d.pool.Close(ctx)
-	}
-	d.pool = nil
-	d.log.Infof(log.Driver, d.logId, "Closed")
-	return nil
 }
 
 func (d *driverWithContext) IsEncrypted() bool {
@@ -305,4 +287,16 @@ func (d *driverWithContext) GetServerInfo(ctx context.Context) (_ ServerInfo, er
 		err = deferredClose(ctx, session, err)
 	}()
 	return session.getServerInfo(ctx)
+}
+
+func (d *driverWithContext) Close(ctx context.Context) error {
+	d.mut.Lock()
+	defer d.mut.Unlock()
+	// Safeguard against closing more than once
+	if d.pool != nil {
+		d.pool.Close(ctx)
+	}
+	d.pool = nil
+	d.log.Infof(log.Driver, d.logId, "Closed")
+	return nil
 }

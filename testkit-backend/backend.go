@@ -715,6 +715,14 @@ func (b *backend) handleRequest(req map[string]interface{}) {
 			"encrypted": driver.IsEncrypted(),
 		})
 
+	case "VerifyConnectivity":
+		driverId := data["driverId"].(string)
+		if err := b.drivers[driverId].VerifyConnectivity(ctx); err != nil {
+			b.writeError(err)
+			return
+		}
+		b.writeResponse("Driver", map[string]interface{}{"id": driverId})
+
 	case "GetFeatures":
 		b.writeResponse("FeatureList", map[string]interface{}{
 			"features": []string{
@@ -723,6 +731,7 @@ func (b *backend) handleRequest(req map[string]interface{}) {
 				"Feature:API:ConnectionAcquisitionTimeout",
 				"Feature:API:Driver:GetServerInfo",
 				"Feature:API:Driver.IsEncrypted",
+				"Feature:API:Driver.VerifyConnectivity",
 				"Feature:API:Liveness.Check",
 				"Feature:API:Result.List",
 				"Feature:API:Result.Peek",
@@ -921,11 +930,12 @@ func testSkips() map[string]string {
 		"stub.iteration.test_result_scope.TestResultScope.*":                                                                     "Results are always valid but don't return records when out of scope",
 		"stub.*.test_0_timeout":        "Driver omits 0 as tx timeout value",
 		"stub.*.test_negative_timeout": "Driver omits negative tx timeout values",
-		"stub.routing.*.*.test_should_request_rt_from_all_initial_routers_until_successful_on_unknown_failure":          "Add DNS resolver TestKit message and connection timeout support",
-		"stub.routing.*.*.test_should_request_rt_from_all_initial_routers_until_successful_on_authorization_expired":    "Add DNS resolver TestKit message and connection timeout support",
-		"stub.summary.test_summary.TestSummary.test_server_info":                                                        "Needs some kind of server address DNS resolution",
-		"stub.summary.test_summary.TestSummary.test_invalid_query_type":                                                 "Driver does not verify query type returned from server.",
-		"stub.routing.*.test_should_drop_connections_failing_liveness_check":                                            "Needs support for GetConnectionPoolMetrics",
-		"stub.connectivity_check.test_get_server_info.TestGetServerInfo.test_routing_fail_when_no_reader_are_available": "Won't fix - Go driver retries routing table when no readers are available",
+		"stub.routing.*.*.test_should_request_rt_from_all_initial_routers_until_successful_on_unknown_failure":                   "Add DNS resolver TestKit message and connection timeout support",
+		"stub.routing.*.*.test_should_request_rt_from_all_initial_routers_until_successful_on_authorization_expired":             "Add DNS resolver TestKit message and connection timeout support",
+		"stub.summary.test_summary.TestSummary.test_server_info":                                                                 "Needs some kind of server address DNS resolution",
+		"stub.summary.test_summary.TestSummary.test_invalid_query_type":                                                          "Driver does not verify query type returned from server.",
+		"stub.routing.*.test_should_drop_connections_failing_liveness_check":                                                     "Needs support for GetConnectionPoolMetrics",
+		"stub.connectivity_check.test_get_server_info.TestGetServerInfo.test_routing_fail_when_no_reader_are_available":          "Won't fix - Go driver retries routing table when no readers are available",
+		"stub.connectivity_check.test_verify_connectivity.TestVerifyConnectivity.test_routing_fail_when_no_reader_are_available": "Won't fix - Go driver retries routing table when no readers are available",
 	}
 }
