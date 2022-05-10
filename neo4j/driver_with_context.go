@@ -273,13 +273,7 @@ func (d *driverWithContext) NewSession(config SessionConfig) SessionWithContext 
 }
 
 func (d *driverWithContext) VerifyConnectivity(ctx context.Context) error {
-	session := d.NewSession(SessionConfig{AccessMode: AccessModeRead})
-	defer session.Close(ctx)
-	result, err := session.Run(ctx, "RETURN 1 AS n", nil)
-	if err != nil {
-		return err
-	}
-	_, err = result.Consume(ctx)
+	_, err := d.GetServerInfo(ctx)
 	return err
 }
 
