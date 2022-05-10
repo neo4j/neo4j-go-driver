@@ -89,10 +89,10 @@ func (c *ConnFake) HasFailed() bool {
 	return false
 }
 
-func (c *ConnFake) Reset(ctx context.Context) {
+func (c *ConnFake) Reset(context.Context) {
 }
 
-func (c *ConnFake) ForceReset(ctx context.Context) {
+func (c *ConnFake) ForceReset(context.Context) {
 	c.ForceResetHook()
 }
 
@@ -115,62 +115,58 @@ func (c *ConnFake) ServerVersion() string {
 	return c.ServerVersionValue
 }
 
-func (c *ConnFake) Buffer(ctx context.Context, streamHandle idb.StreamHandle) error {
+func (c *ConnFake) Buffer(context.Context, idb.StreamHandle) error {
 	if c.BufferHook != nil {
 		c.BufferHook()
 	}
 	return c.BufferErr
 }
 
-func (c *ConnFake) Consume(ctx context.Context, streamHandle idb.StreamHandle) (*db.Summary, error) {
+func (c *ConnFake) Consume(context.Context, idb.StreamHandle) (*db.Summary, error) {
 	if c.ConsumeHook != nil {
 		c.ConsumeHook()
 	}
 	return c.ConsumeSum, c.ConsumeErr
 }
 
-func (c *ConnFake) GetRoutingTable(ctx context.Context,
-	context map[string]string, bookmarks []string, database, impersonatedUser string) (*idb.RoutingTable, error) {
+func (c *ConnFake) GetRoutingTable(_ context.Context, _ map[string]string, _ []string, database, _ string) (*idb.RoutingTable, error) {
 	if c.Table != nil {
 		c.Table.DatabaseName = database
 	}
 	return c.Table, c.Err
 }
 
-func (c *ConnFake) TxBegin(ctx context.Context,
-	txConfig idb.TxConfig) (idb.TxHandle, error) {
+func (c *ConnFake) TxBegin(_ context.Context, txConfig idb.TxConfig) (idb.TxHandle, error) {
 	c.RecordedTxs = append(c.RecordedTxs, RecordedTx{Origin: "TxBegin", Mode: txConfig.Mode, Bookmarks: txConfig.Bookmarks, Timeout: txConfig.Timeout, Meta: txConfig.Meta})
 	return c.TxBeginHandle, c.TxBeginErr
 }
 
-func (c *ConnFake) TxRollback(ctx context.Context, tx idb.TxHandle) error {
+func (c *ConnFake) TxRollback(context.Context, idb.TxHandle) error {
 	return c.TxRollbackErr
 }
 
-func (c *ConnFake) TxCommit(ctx context.Context, tx idb.TxHandle) error {
+func (c *ConnFake) TxCommit(context.Context, idb.TxHandle) error {
 	if c.TxCommitHook != nil {
 		c.TxCommitHook()
 	}
 	return c.TxCommitErr
 }
 
-func (c *ConnFake) Run(ctx context.Context, runCommand idb.Command,
-	txConfig idb.TxConfig) (idb.StreamHandle, error) {
+func (c *ConnFake) Run(_ context.Context, _ idb.Command, txConfig idb.TxConfig) (idb.StreamHandle, error) {
 
 	c.RecordedTxs = append(c.RecordedTxs, RecordedTx{Origin: "Run", Mode: txConfig.Mode, Bookmarks: txConfig.Bookmarks, Timeout: txConfig.Timeout, Meta: txConfig.Meta})
 	return c.RunStream, c.RunErr
 }
 
-func (c *ConnFake) RunTx(ctx context.Context, tx idb.TxHandle,
-	runCommand idb.Command) (idb.StreamHandle, error) {
+func (c *ConnFake) RunTx(context.Context, idb.TxHandle, idb.Command) (idb.StreamHandle, error) {
 	return c.RunTxStream, c.RunTxErr
 }
 
-func (c *ConnFake) Keys(streamHandle idb.StreamHandle) ([]string, error) {
+func (c *ConnFake) Keys(idb.StreamHandle) ([]string, error) {
 	return nil, nil
 }
 
-func (c *ConnFake) Next(ctx context.Context, streamHandle idb.StreamHandle) (*db.Record, *db.Summary, error) {
+func (c *ConnFake) Next(context.Context, idb.StreamHandle) (*db.Record, *db.Summary, error) {
 	if len(c.Nexts) >= 1 {
 		next := c.Nexts[0]
 		// moves to next record only if the current record is not an error or summary
@@ -187,7 +183,7 @@ func (c *ConnFake) SelectDatabase(database string) {
 	c.DatabaseName = database
 }
 
-func (c *ConnFake) SetBoltLogger(_ log.BoltLogger) {
+func (c *ConnFake) SetBoltLogger(log.BoltLogger) {
 }
 
 func (c *ConnFake) Version() db.ProtocolVersion {

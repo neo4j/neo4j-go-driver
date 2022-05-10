@@ -51,6 +51,8 @@ type ResultWithContext interface {
 	legacy() *result
 }
 
+const consumedResultError = "result cursor is not available anymore"
+
 type resultWithContext struct {
 	conn          idb.Connection
 	streamHandle  idb.StreamHandle
@@ -79,11 +81,19 @@ func (r *resultWithContext) Keys() ([]string, error) {
 }
 
 func (r *resultWithContext) Next(ctx context.Context) bool {
+	r.checkOpen()
+	if r.err != nil {
+		return false
+	}
 	r.advance(ctx)
 	return r.record != nil
 }
 
 func (r *resultWithContext) NextRecord(ctx context.Context, out **Record) bool {
+	r.checkOpen()
+	if r.err != nil {
+		return false
+	}
 	r.advance(ctx)
 	if out != nil {
 		*out = r.record
@@ -92,6 +102,10 @@ func (r *resultWithContext) NextRecord(ctx context.Context, out **Record) bool {
 }
 
 func (r *resultWithContext) PeekRecord(ctx context.Context, out **Record) bool {
+	r.checkOpen()
+	if r.err != nil {
+		return false
+	}
 	r.peek(ctx)
 	if out != nil {
 		*out = r.peekedRecord
@@ -99,12 +113,12 @@ func (r *resultWithContext) PeekRecord(ctx context.Context, out **Record) bool {
 	return r.peekedRecord != nil
 }
 
-func (r *resultWithContext) Record() *Record {
-	return r.record
-}
-
 func (r *resultWithContext) Err() error {
 	return wrapError(r.err)
+}
+
+func (r *resultWithContext) Record() *Record {
+	return r.record
 }
 
 func (r *resultWithContext) Collect(ctx context.Context) ([]*Record, error) {
@@ -119,10 +133,6 @@ func (r *resultWithContext) Collect(ctx context.Context) ([]*Record, error) {
 		return nil, wrapError(r.err)
 	}
 	return recs, nil
-}
-
-func (r *resultWithContext) buffer(ctx context.Context) {
-	r.err = r.conn.Buffer(ctx, r.streamHandle)
 }
 
 func (r *resultWithContext) Single(ctx context.Context) (*Record, error) {
@@ -160,14 +170,6 @@ func (r *resultWithContext) Single(ctx context.Context) (*Record, error) {
 	return single, nil
 }
 
-func (r *resultWithContext) toResultSummary() ResultSummary {
-	return &resultSummary{
-		sum:    r.summary,
-		cypher: r.cypher,
-		params: r.params,
-	}
-}
-
 func (r *resultWithContext) Consume(ctx context.Context) (ResultSummary, error) {
 	// Already failed, reuse the internal error, might have been
 	// set by Single to indicate some kind of usage error that "destroyed"
@@ -188,6 +190,18 @@ func (r *resultWithContext) legacy() *result {
 	return &result{delegate: r}
 }
 
+func (r *resultWithContext) buffer(ctx context.Context) {
+	r.err = r.conn.Buffer(ctx, r.streamHandle)
+}
+
+func (r *resultWithContext) toResultSummary() ResultSummary {
+	return &resultSummary{
+		sum:    r.summary,
+		cypher: r.cypher,
+		params: r.params,
+	}
+}
+
 func (r *resultWithContext) advance(ctx context.Context) {
 	if r.peeked {
 		r.record, r.peekedRecord = r.peekedRecord, nil
@@ -202,5 +216,12 @@ func (r *resultWithContext) peek(ctx context.Context) {
 	if !r.peeked {
 		r.peekedRecord, r.peekedSummary, r.err = r.conn.Next(ctx, r.streamHandle)
 		r.peeked = true
+	}
+}
+
+func (r *resultWithContext) checkOpen() {
+	alreadyChecked := r.err != nil && r.err.Error() == consumedResultError
+	if r.summary != nil && !alreadyChecked {
+		r.err = &UsageError{Message: consumedResultError}
 	}
 }
