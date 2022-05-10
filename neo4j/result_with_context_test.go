@@ -215,6 +215,7 @@ func TestResult(outer *testing.T) {
 		AssertNotNil(t, res.Record())
 		AssertNil(t, res.Err())
 	})
+
 	outer.Run("Single with no record", func(t *testing.T) {
 		conn := &ConnFake{
 			Nexts: []Next{{Summary: sums[0]}},
@@ -338,6 +339,7 @@ func TestResult(outer *testing.T) {
 		AssertNil(t, res.Record())
 		AssertNotNil(t, res.Err())
 	})
+
 	outer.Run("Collect stream error", func(t *testing.T) {
 		conn := &ConnFake{
 			Nexts: []Next{{Record: recs[0]}, {Err: errs[0]}},
@@ -348,5 +350,74 @@ func TestResult(outer *testing.T) {
 		AssertLen(t, coll, 0)
 		AssertNil(t, res.Record())
 		AssertNotNil(t, res.Err())
+	})
+
+	outer.Run("Consuming closed result fails", func(inner *testing.T) {
+		testCases := []struct {
+			scenario string
+			callback func(*testing.T, *resultWithContext) error
+		}{
+			{
+				scenario: "with Next and Err",
+				callback: func(t *testing.T, result *resultWithContext) error {
+					AssertFalse(t, result.Next(ctx))
+					return result.Err()
+				},
+			},
+			{
+				scenario: "with several Next calls and Err",
+				callback: func(t *testing.T, result *resultWithContext) error {
+					AssertFalse(t, result.Next(ctx))
+					AssertFalse(t, result.Next(ctx))
+					return result.Err()
+				},
+			},
+			{
+				scenario: "with NextRecord and Err",
+				callback: func(t *testing.T, result *resultWithContext) error {
+					var record *Record
+					AssertFalse(t, result.NextRecord(ctx, &record))
+					return result.Err()
+				},
+			},
+			{
+				scenario: "with several NextRecord calls and Err",
+				callback: func(t *testing.T, result *resultWithContext) error {
+					var record *Record
+					AssertFalse(t, result.NextRecord(ctx, &record))
+					AssertFalse(t, result.NextRecord(ctx, &record))
+					return result.Err()
+				},
+			},
+			{
+				scenario: "with PeekRecord and Err",
+				callback: func(t *testing.T, result *resultWithContext) error {
+					var record *Record
+					AssertFalse(t, result.PeekRecord(ctx, &record))
+					return result.Err()
+				},
+			},
+			{
+				scenario: "with several PeekRecord calls and Err",
+				callback: func(t *testing.T, result *resultWithContext) error {
+					var record *Record
+					AssertFalse(t, result.PeekRecord(ctx, &record))
+					AssertFalse(t, result.PeekRecord(ctx, &record))
+					return result.Err()
+				},
+			},
+		}
+
+		for _, testCase := range testCases {
+			inner.Run(testCase.scenario, func(t *testing.T) {
+				result := &resultWithContext{summary: &db.Summary{}}
+
+				err := testCase.callback(t, result)
+
+				assertUsageError(t, err)
+				AssertStringEqual(t, err.Error(), consumedResultError)
+				AssertNil(t, result.Record())
+			})
+		}
 	})
 }

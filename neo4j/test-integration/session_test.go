@@ -74,7 +74,6 @@ func TestSession(outer *testing.T) {
 			assertNotNil(t, summary)
 
 			assertFalse(t, result.Next())
-			assertNil(t, result.Err())
 
 			assertEquals(t, summary.Query().Text(), stmt)
 			assertNil(t, summary.Query().Parameters())
@@ -92,7 +91,6 @@ func TestSession(outer *testing.T) {
 			assertNotNil(t, summary)
 
 			assertFalse(t, result.Next())
-			assertNil(t, result.Err())
 
 			assertEquals(t, summary.Query().Text(), stmt)
 			assertEquals(t, summary.Query().Parameters(), params)
@@ -109,7 +107,6 @@ func TestSession(outer *testing.T) {
 			assertNotNil(t, summary)
 
 			assertFalse(t, result.Next())
-			assertNil(t, result.Err())
 
 			assertEquals(t, summary.StatementType(), neo4j.StatementTypeReadOnly)
 		})

@@ -784,7 +784,7 @@ func (b *backend) writeRecord(result neo4j.ResultWithContext, record *neo4j.Reco
 		b.writeResponse("Record", serializeRecord(record))
 	} else {
 		err := result.Err()
-		if err != nil {
+		if err != nil && err.Error() != "result cursor is not available anymore" {
 			b.writeError(err)
 			return
 		}
