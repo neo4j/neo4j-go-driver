@@ -52,7 +52,11 @@ type Router struct {
 }
 
 type Pool interface {
-	Borrow(ctx context.Context, servers []string, wait bool, boltLogger log.BoltLogger) (db.Connection, error)
+	// Borrow acquires a connection from the provided list of servers
+	// If all connections are busy and the pool is full, calls to Borrow may wait for a connection to become idle
+	// If a connection has been idle for longer than idlenessThreshold, it will be reset
+	// to check if it's still alive.
+	Borrow(ctx context.Context, servers []string, wait bool, boltLogger log.BoltLogger, idlenessThreshold time.Duration) (db.Connection, error)
 	Return(ctx context.Context, c db.Connection)
 }
 
@@ -207,7 +211,7 @@ func (r *Router) GetNameOfDefaultDatabase(ctx context.Context, bookmarks []strin
 		table:   table,
 		dueUnix: now.Add(time.Duration(table.TimeToLive) * time.Second).Unix(),
 	}
-	r.log.Debugf(log.Router, r.logId, "New routing table when retrieving default database for impersonated user: '%s', TTL %d", table.DatabaseName, table.TimeToLive)
+	r.log.Debugf(log.Router, r.logId, "New routing table when resolving home database: '%s', TTL %d", table.DatabaseName, table.TimeToLive)
 
 	return table.DatabaseName, err
 }

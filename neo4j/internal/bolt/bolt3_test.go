@@ -23,12 +23,13 @@ import (
 	"context"
 	idb "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
 	"testing"
+	"time"
 
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/db"
 	. "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/testutil"
 )
 
-func TestBolt3(ot *testing.T) {
+func TestBolt3(outer *testing.T) {
 	// Test streams
 	// Faked returns from a server
 	runKeys := []interface{}{"f1", "f2"}
@@ -97,7 +98,7 @@ func TestBolt3(ot *testing.T) {
 		tcpConn, srv, cleanup := setupBolt3Pipe(t)
 		go serverJob(srv)
 
-		c, err := Connect(context.Background(), "serverName", tcpConn, auth, "007", nil, logger, boltLogger)
+		c, err := Connect(context.Background(), "serverName", tcpConn, auth, "007", nil, logger, nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -107,8 +108,8 @@ func TestBolt3(ot *testing.T) {
 		return bolt, cleanup
 	}
 
-	// Simple succesful connect
-	ot.Run("Connect success", func(t *testing.T) {
+	// Simple successful connect
+	outer.Run("Connect success", func(t *testing.T) {
 		bolt, cleanup := connectToServer(t, func(srv *bolt3server) {
 			handshake := srv.waitForHandshake()
 			// There should be a version 3 somewhere
@@ -136,7 +137,7 @@ func TestBolt3(ot *testing.T) {
 		AssertTrue(t, bolt.IsAlive())
 	})
 
-	ot.Run("Failed authentication", func(t *testing.T) {
+	outer.Run("Failed authentication", func(t *testing.T) {
 		conn, srv, cleanup := setupBolt3Pipe(t)
 		defer cleanup()
 		defer conn.Close()
@@ -146,7 +147,7 @@ func TestBolt3(ot *testing.T) {
 			srv.waitForHello()
 			srv.rejectHelloUnauthorized()
 		}()
-		bolt, err := Connect(context.Background(), "serverName", conn, auth, "007", nil, logger, boltLogger)
+		bolt, err := Connect(context.Background(), "serverName", conn, auth, "007", nil, logger, nil)
 		AssertNil(t, bolt)
 		AssertError(t, err)
 		dbErr := err.(*db.Neo4jError)
@@ -155,7 +156,7 @@ func TestBolt3(ot *testing.T) {
 		}
 	})
 
-	ot.Run("Run auto-commit", func(t *testing.T) {
+	outer.Run("Run auto-commit", func(t *testing.T) {
 		bolt, cleanup := connectToServer(t, func(srv *bolt3server) {
 			srv.accept(3)
 			srv.serveRun(runResponse)
@@ -174,7 +175,7 @@ func TestBolt3(ot *testing.T) {
 		assertBoltState(t, bolt3_ready, bolt)
 	})
 
-	ot.Run("Run transactional commit", func(t *testing.T) {
+	outer.Run("Run transactional commit", func(t *testing.T) {
 		committedBookmark := "cbm"
 		bolt, cleanup := connectToServer(t, func(srv *bolt3server) {
 			srv.accept(3)
@@ -203,7 +204,7 @@ func TestBolt3(ot *testing.T) {
 		AssertStringEqual(t, committedBookmark, bolt.Bookmark())
 	})
 
-	ot.Run("Begin transaction with bookmark success", func(t *testing.T) {
+	outer.Run("Begin transaction with bookmark success", func(t *testing.T) {
 		committedBookmark := "cbm"
 		bolt, cleanup := connectToServer(t, func(srv *bolt3server) {
 			srv.accept(3)
@@ -224,7 +225,7 @@ func TestBolt3(ot *testing.T) {
 		AssertStringEqual(t, committedBookmark, bolt.Bookmark())
 	})
 
-	ot.Run("Begin transaction with bookmark failure", func(t *testing.T) {
+	outer.Run("Begin transaction with bookmark failure", func(t *testing.T) {
 		bolt, cleanup := connectToServer(t, func(srv *bolt3server) {
 			srv.accept(3)
 			srv.waitForTxBegin()
@@ -240,7 +241,7 @@ func TestBolt3(ot *testing.T) {
 		AssertStringEqual(t, "", bolt.Bookmark())
 	})
 
-	ot.Run("Run transactional rollback", func(t *testing.T) {
+	outer.Run("Run transactional rollback", func(t *testing.T) {
 		bolt, cleanup := connectToServer(t, func(srv *bolt3server) {
 			srv.accept(3)
 			srv.serveRunTx(runResponse, false, "")
@@ -267,7 +268,7 @@ func TestBolt3(ot *testing.T) {
 		assertBoltState(t, bolt3_ready, bolt)
 	})
 
-	ot.Run("Server close while streaming", func(t *testing.T) {
+	outer.Run("Server close while streaming", func(t *testing.T) {
 		bolt, cleanup := connectToServer(t, func(srv *bolt3server) {
 			srv.accept(3)
 			srv.waitForRun()
@@ -300,7 +301,7 @@ func TestBolt3(ot *testing.T) {
 		assertBoltDead(t, bolt)
 	})
 
-	ot.Run("Server fail on run with reset", func(t *testing.T) {
+	outer.Run("Server fail on run with reset", func(t *testing.T) {
 		bolt, cleanup := connectToServer(t, func(srv *bolt3server) {
 			srv.accept(3)
 			srv.waitForRun()
@@ -324,7 +325,7 @@ func TestBolt3(ot *testing.T) {
 		assertBoltState(t, bolt3_ready, bolt)
 	})
 
-	ot.Run("Server fail on run continue to commit", func(t *testing.T) {
+	outer.Run("Server fail on run continue to commit", func(t *testing.T) {
 		bolt, cleanup := connectToServer(t, func(srv *bolt3server) {
 			srv.accept(3)
 			srv.waitForTxBegin()
@@ -346,7 +347,7 @@ func TestBolt3(ot *testing.T) {
 		AssertNeo4jError(t, err)                      // Should have same error as from run since that is original cause
 	})
 
-	ot.Run("Reset while streaming ", func(t *testing.T) {
+	outer.Run("Reset while streaming ", func(t *testing.T) {
 		bolt, cleanup := connectToServer(t, func(srv *bolt3server) {
 			srv.accept(3)
 			srv.serveRun(runResponse)
@@ -364,7 +365,7 @@ func TestBolt3(ot *testing.T) {
 		assertBoltState(t, bolt3_ready, bolt)
 	})
 
-	ot.Run("Buffer stream", func(t *testing.T) {
+	outer.Run("Buffer stream", func(t *testing.T) {
 		bolt, cleanup := connectToServer(t, func(srv *bolt3server) {
 			srv.accept(3)
 			srv.serveRun(runResponse)
@@ -397,7 +398,7 @@ func TestBolt3(ot *testing.T) {
 		AssertNextOnlySummary(t, rec, sum, err)
 	})
 
-	ot.Run("Buffer stream with error", func(t *testing.T) {
+	outer.Run("Buffer stream with error", func(t *testing.T) {
 		bolt, cleanup := connectToServer(t, func(srv *bolt3server) {
 			srv.accept(3)
 			srv.waitForRun()
@@ -431,7 +432,7 @@ func TestBolt3(ot *testing.T) {
 		AssertStringEqual(t, bolt.Bookmark(), "")
 	})
 
-	ot.Run("Buffer stream with invalid handle", func(t *testing.T) {
+	outer.Run("Buffer stream with invalid handle", func(t *testing.T) {
 		bolt, cleanup := connectToServer(t, func(srv *bolt3server) {
 			srv.accept(3)
 		})
@@ -442,7 +443,7 @@ func TestBolt3(ot *testing.T) {
 		AssertError(t, err)
 	})
 
-	ot.Run("Consume stream", func(t *testing.T) {
+	outer.Run("Consume stream", func(t *testing.T) {
 		bolt, cleanup := connectToServer(t, func(srv *bolt3server) {
 			srv.accept(3)
 			srv.serveRun(runResponse)
@@ -471,7 +472,7 @@ func TestBolt3(ot *testing.T) {
 		AssertNotNil(t, sum)
 	})
 
-	ot.Run("Consume stream with error", func(t *testing.T) {
+	outer.Run("Consume stream with error", func(t *testing.T) {
 		bolt, cleanup := connectToServer(t, func(srv *bolt3server) {
 			srv.accept(3)
 			srv.waitForRun()
@@ -501,7 +502,7 @@ func TestBolt3(ot *testing.T) {
 		AssertNextOnlyError(t, rec, sum, err)
 	})
 
-	ot.Run("Consume with invalid stream", func(t *testing.T) {
+	outer.Run("Consume with invalid stream", func(t *testing.T) {
 		bolt, cleanup := connectToServer(t, func(srv *bolt3server) {
 			srv.accept(3)
 		})
@@ -511,5 +512,252 @@ func TestBolt3(ot *testing.T) {
 		sum, err := bolt.Consume(context.Background(), idb.StreamHandle(1))
 		AssertNil(t, sum)
 		AssertError(t, err)
+	})
+
+	outer.Run("Updates connection idle date on every response", func(inner *testing.T) {
+		ctx := context.Background()
+		testStart := time.Now()
+
+		callbacks := []struct {
+			scenario string
+			server   func(*testing.T, *bolt3server)
+			client   func(*testing.T, *bolt3)
+		}{
+			{
+				scenario: "after HELLO",
+				server:   func(t *testing.T, srv *bolt3server) {},
+				client: func(t *testing.T, cli *bolt3) {
+					AssertAfter(t, cli.IdleDate(), testStart)
+				},
+			},
+			{
+				scenario: "after successful RESET",
+				server: func(t *testing.T, srv *bolt3server) {
+					srv.waitForReset()
+					srv.sendSuccess(map[string]interface{}{})
+				},
+				client: func(t *testing.T, cli *bolt3) {
+					idleDate := cli.IdleDate()
+					cli.ForceReset(ctx)
+					AssertAfter(t, cli.IdleDate(), idleDate)
+				},
+			},
+			{
+				scenario: "after failed RESET",
+				server: func(t *testing.T, srv *bolt3server) {
+					srv.waitForReset()
+					srv.sendFailureMsg("o.o.p.s", "reset failed")
+				},
+				client: func(t *testing.T, cli *bolt3) {
+					idleDate := cli.IdleDate()
+					cli.ForceReset(ctx)
+					AssertAfter(t, cli.IdleDate(), idleDate)
+				},
+			},
+			{
+				scenario: "not after error on RESET",
+				server: func(t *testing.T, srv *bolt3server) {
+					srv.waitForReset()
+					srv.closeConnection()
+				},
+				client: func(t *testing.T, cli *bolt3) {
+					idleDate := cli.IdleDate()
+					cli.ForceReset(ctx)
+					AssertDeepEquals(t, cli.IdleDate(), idleDate)
+				},
+			},
+			{
+				scenario: "after successful RUN/PULLALL",
+				server: func(t *testing.T, srv *bolt3server) {
+					srv.waitForRun()
+					srv.sendSuccess(map[string]interface{}{})
+					srv.waitForPullAll()
+					srv.sendSuccess(map[string]interface{}{})
+				},
+				client: func(t *testing.T, cli *bolt3) {
+					idleDate := cli.IdleDate()
+					_, _ = cli.Run(ctx, idb.Command{Cypher: "RETURN 42"}, idb.TxConfig{})
+					AssertAfter(t, cli.IdleDate(), idleDate)
+				},
+			},
+			{
+				scenario: "after failed RUN",
+				server: func(t *testing.T, srv *bolt3server) {
+					srv.waitForRun()
+					srv.sendFailureMsg("o.o.p.s", "run failed")
+				},
+				client: func(t *testing.T, cli *bolt3) {
+					idleDate := cli.IdleDate()
+					_, _ = cli.Run(ctx, idb.Command{Cypher: "RETURN 42"}, idb.TxConfig{})
+					AssertAfter(t, cli.IdleDate(), idleDate)
+				},
+			},
+			{
+				scenario: "not after errored RUN",
+				server: func(t *testing.T, srv *bolt3server) {
+					srv.waitForRun()
+					srv.closeConnection()
+				},
+				client: func(t *testing.T, cli *bolt3) {
+					idleDate := cli.IdleDate()
+					_, _ = cli.Run(ctx, idb.Command{Cypher: "RETURN 42"}, idb.TxConfig{})
+					AssertDeepEquals(t, cli.IdleDate(), idleDate)
+				},
+			},
+			{
+				scenario: "after failed PULLALL",
+				server: func(t *testing.T, srv *bolt3server) {
+					srv.waitForRun()
+					srv.sendSuccess(map[string]interface{}{})
+					srv.waitForPullAll()
+					srv.sendFailureMsg("o.o.p.s", "pull all failed")
+				},
+				client: func(t *testing.T, cli *bolt3) {
+					idleDate := cli.IdleDate()
+					_, _ = cli.Run(ctx, idb.Command{Cypher: "RETURN 42"}, idb.TxConfig{})
+					AssertAfter(t, cli.IdleDate(), idleDate)
+				},
+			},
+			{
+				scenario: "after successful BEGIN",
+				server: func(t *testing.T, srv *bolt3server) {
+					srv.waitForTxBegin()
+					srv.sendSuccess(map[string]interface{}{})
+				},
+				client: func(t *testing.T, cli *bolt3) {
+					idleDate := cli.IdleDate()
+					_, _ = cli.TxBegin(ctx, idb.TxConfig{})
+					AssertAfter(t, cli.IdleDate(), idleDate)
+				},
+			},
+			{
+				scenario: "after failed BEGIN",
+				server: func(t *testing.T, srv *bolt3server) {
+					srv.waitForTxBegin()
+					srv.sendFailureMsg("o.o.p.s", "begin failed")
+				},
+				client: func(t *testing.T, cli *bolt3) {
+					idleDate := cli.IdleDate()
+					_, _ = cli.TxBegin(ctx, idb.TxConfig{})
+					AssertAfter(t, cli.IdleDate(), idleDate)
+				},
+			},
+			{
+				scenario: "not after errored BEGIN",
+				server: func(t *testing.T, srv *bolt3server) {
+					srv.waitForTxBegin()
+					srv.closeConnection()
+				},
+				client: func(t *testing.T, cli *bolt3) {
+					idleDate := cli.IdleDate()
+					_, _ = cli.TxBegin(ctx, idb.TxConfig{})
+					AssertDeepEquals(t, cli.IdleDate(), idleDate)
+				},
+			},
+			{
+				scenario: "after successful COMMIT",
+				server: func(t *testing.T, srv *bolt3server) {
+					srv.waitForTxBegin()
+					srv.sendSuccess(map[string]interface{}{})
+					srv.waitForTxCommit()
+					srv.sendSuccess(map[string]interface{}{})
+				},
+				client: func(t *testing.T, cli *bolt3) {
+					tx, _ := cli.TxBegin(ctx, idb.TxConfig{})
+					idleDate := cli.IdleDate()
+					_ = cli.TxCommit(ctx, tx)
+					AssertAfter(t, cli.IdleDate(), idleDate)
+				},
+			},
+			{
+				scenario: "after failed COMMIT",
+				server: func(t *testing.T, srv *bolt3server) {
+					srv.waitForTxBegin()
+					srv.sendSuccess(map[string]interface{}{})
+					srv.waitForTxCommit()
+					srv.sendFailureMsg("o.o.p.s", "commit failed")
+				},
+				client: func(t *testing.T, cli *bolt3) {
+					tx, _ := cli.TxBegin(ctx, idb.TxConfig{})
+					idleDate := cli.IdleDate()
+					_ = cli.TxCommit(ctx, tx)
+					AssertAfter(t, cli.IdleDate(), idleDate)
+				},
+			},
+			{
+				scenario: "not after errored COMMIT",
+				server: func(t *testing.T, srv *bolt3server) {
+					srv.waitForTxBegin()
+					srv.sendSuccess(map[string]interface{}{})
+					srv.waitForTxCommit()
+					srv.closeConnection()
+				},
+				client: func(t *testing.T, cli *bolt3) {
+					tx, _ := cli.TxBegin(ctx, idb.TxConfig{})
+					idleDate := cli.IdleDate()
+					_ = cli.TxCommit(ctx, tx)
+					AssertDeepEquals(t, cli.IdleDate(), idleDate)
+				},
+			},
+			{
+				scenario: "after successful ROLLBACK",
+				server: func(t *testing.T, srv *bolt3server) {
+					srv.waitForTxBegin()
+					srv.sendSuccess(map[string]interface{}{})
+					srv.waitForTxRollback()
+					srv.sendSuccess(map[string]interface{}{})
+				},
+				client: func(t *testing.T, cli *bolt3) {
+					tx, _ := cli.TxBegin(ctx, idb.TxConfig{})
+					idleDate := cli.IdleDate()
+					_ = cli.TxRollback(ctx, tx)
+					AssertAfter(t, cli.IdleDate(), idleDate)
+				},
+			},
+			{
+				scenario: "after failed ROLLBACK",
+				server: func(t *testing.T, srv *bolt3server) {
+					srv.waitForTxBegin()
+					srv.sendSuccess(map[string]interface{}{})
+					srv.waitForTxRollback()
+					srv.sendFailureMsg("o.o.p.s", "rollback failed")
+				},
+				client: func(t *testing.T, cli *bolt3) {
+					tx, _ := cli.TxBegin(ctx, idb.TxConfig{})
+					idleDate := cli.IdleDate()
+					_ = cli.TxRollback(ctx, tx)
+					AssertAfter(t, cli.IdleDate(), idleDate)
+				},
+			},
+			{
+				scenario: "not after errored ROLLBACK",
+				server: func(t *testing.T, srv *bolt3server) {
+					srv.waitForTxBegin()
+					srv.sendSuccess(map[string]interface{}{})
+					srv.waitForTxRollback()
+					srv.closeConnection()
+				},
+				client: func(t *testing.T, cli *bolt3) {
+					tx, _ := cli.TxBegin(ctx, idb.TxConfig{})
+					idleDate := cli.IdleDate()
+					_ = cli.TxRollback(ctx, tx)
+					AssertDeepEquals(t, cli.IdleDate(), idleDate)
+				},
+			},
+		}
+
+		for _, callback := range callbacks {
+			inner.Run(callback.scenario, func(t *testing.T) {
+				bolt, cleanup := connectToServer(inner, func(srv *bolt3server) {
+					srv.accept(3)
+					callback.server(t, srv)
+				})
+				defer cleanup()
+				defer bolt.Close(ctx)
+
+				callback.client(t, bolt)
+			})
+		}
+
 	})
 }

@@ -23,6 +23,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	idb "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
 	"io"
 	"reflect"
 	"sync"
@@ -38,7 +39,7 @@ import (
 type transactionFunc func(context.Context, ManagedTransactionWork, ...func(*TransactionConfig)) (any, error)
 type transactionFuncApi func(session SessionWithContext) transactionFunc
 
-func TestSession(st *testing.T) {
+func TestSession(outer *testing.T) {
 	logger := log.Console{Errors: true, Infos: true, Warns: true, Debugs: true}
 	boltLogger := log.ConsoleBoltLogger{}
 
@@ -74,10 +75,10 @@ func TestSession(st *testing.T) {
 
 	tokenExpiredErr := &db.Neo4jError{Code: "Neo.ClientError.Security.TokenExpired", Msg: "oopsie whoopsie"}
 
-	st.Run("Transaction Functions", func(rt *testing.T) {
+	outer.Run("Transaction Functions", func(inner *testing.T) {
 		// Checks that retries occur on database error and that it stops retrying after a certain
 		// amount of time and that connections are returned to pool upon failure.
-		rt.Run("Consistent transient error", func(t *testing.T) {
+		inner.Run("Consistent transient error", func(t *testing.T) {
 			_, pool, sess := createSession()
 			numReturns := 0
 			pool.ReturnHook = func() {
@@ -107,7 +108,7 @@ func TestSession(st *testing.T) {
 
 		// Checks that session is in clean state after connection fails to rollback.
 		// "User" initiates rollback by letting the transaction function return a custom error.
-		rt.Run("Failed rollback", func(t *testing.T) {
+		inner.Run("Failed rollback", func(t *testing.T) {
 			_, pool, sess := createSession()
 			rollbackErr := errors.New("RollbackErrorFake")
 			causeOfRollbackErr := errors.New("UserErrorFake")
@@ -125,7 +126,7 @@ func TestSession(st *testing.T) {
 		})
 
 		// Check that sesssion is in clean state after connection fails to commit.
-		rt.Run("Failed commit", func(t *testing.T) {
+		inner.Run("Failed commit", func(t *testing.T) {
 			_, pool, sess := createSession()
 			pool.BorrowConn = &ConnFake{Alive: false, TxCommitErr: io.EOF}
 			numRetries := 0
@@ -142,7 +143,7 @@ func TestSession(st *testing.T) {
 			assertCleanSessionState(t, sess)
 		})
 
-		rt.Run("Retrieves default database name for impersonated user", func(t *testing.T) {
+		inner.Run("Retrieves default database name for impersonated user", func(t *testing.T) {
 			sessConfig := SessionConfig{ImpersonatedUser: "me"}
 			router, pool, sess := createSessionFromConfig(sessConfig)
 			conn := &ConnFake{}
@@ -173,7 +174,7 @@ func TestSession(st *testing.T) {
 		}
 
 		for name, txFuncApi := range transactionFunctions {
-			rt.Run(fmt.Sprintf("Implicitly rolls back when a %s panics without retry", name), func(t *testing.T) {
+			inner.Run(fmt.Sprintf("Implicitly rolls back when a %s panics without retry", name), func(t *testing.T) {
 				_, pool, sess := createSessionFromConfig(SessionConfig{})
 				pool.BorrowConn = &ConnFake{Alive: true}
 				poolReturnCalled := 0
@@ -195,13 +196,13 @@ func TestSession(st *testing.T) {
 		}
 	})
 
-	st.Run("Bookmarking", func(bt *testing.T) {
-		bt.Run("Initial bookmarks are returned from LastBookmarks", func(t *testing.T) {
+	outer.Run("Bookmarking", func(inner *testing.T) {
+		inner.Run("Initial bookmarks are returned from LastBookmarks", func(t *testing.T) {
 			_, _, sess := createSessionWithBookmarks(BookmarksFromRawValues("b1", "b2"))
 			AssertDeepEquals(t, sess.LastBookmarks(), BookmarksFromRawValues("b1", "b2"))
 		})
 
-		bt.Run("Initial bookmarks are used and cleaned up before usage", func(t *testing.T) {
+		inner.Run("Initial bookmarks are used and cleaned up before usage", func(t *testing.T) {
 			dirtyBookmarks := BookmarksFromRawValues("", "b1", "", "b2", "")
 			cleanBookmarks := BookmarksFromRawValues("b1", "b2")
 			_, pool, sess := createSessionWithBookmarks(dirtyBookmarks)
@@ -225,16 +226,16 @@ func TestSession(st *testing.T) {
 			}
 		})
 
-		bt.Run("LastBookmarks is empty when no initial bookmark", func(t *testing.T) {
+		inner.Run("LastBookmarks is empty when no initial bookmark", func(t *testing.T) {
 			_, _, sess := createSession()
 			AssertLen(t, sess.LastBookmarks(), 0)
 		})
 	})
 
-	st.Run("Run", func(bt *testing.T) {
+	outer.Run("Run", func(inner *testing.T) {
 		// Checks that chained Run results are buffered and that bookmarks are retrieved for
 		// those and that a Consume on the last result also gives the appropriate bookmark.
-		bt.Run("Chained and consume", func(t *testing.T) {
+		inner.Run("Chained and consume", func(t *testing.T) {
 			_, pool, sess := createSession()
 			bufferCalls := 0
 			consumeCalls := 0
@@ -265,7 +266,7 @@ func TestSession(st *testing.T) {
 			AssertDeepEquals(t, BookmarksToRawValues(sess.LastBookmarks()), []string{"1"})
 		})
 
-		bt.Run("Pending and invoke tx function", func(t *testing.T) {
+		inner.Run("Pending and invoke tx function", func(t *testing.T) {
 			// Checks that a pending Run (not consumed or iterated) gets buffered and it's
 			// bookmark is used when starting a transaction.
 			_, pool, sess := createSession()
@@ -291,7 +292,7 @@ func TestSession(st *testing.T) {
 			AssertIntEqual(t, bufferCalls, 1)
 		})
 
-		bt.Run("Pending and start tx", func(t *testing.T) {
+		inner.Run("Pending and start tx", func(t *testing.T) {
 			// Checks that a pending Run (not consumed or iterated) gets buffered and it's
 			// bookmark is used when starting a transaction.
 			_, pool, sess := createSession()
@@ -315,7 +316,7 @@ func TestSession(st *testing.T) {
 			AssertIntEqual(t, bufferCalls, 1)
 		})
 
-		bt.Run("While in tx", func(t *testing.T) {
+		inner.Run("While in tx", func(t *testing.T) {
 			_, pool, sess := createSession()
 			conn := &ConnFake{Alive: true}
 			pool.BorrowConn = conn
@@ -327,7 +328,7 @@ func TestSession(st *testing.T) {
 			assertUsageError(t, err)
 		})
 
-		bt.Run("Retrieves default database name for impersonated user", func(t *testing.T) {
+		inner.Run("Retrieves default database name for impersonated user", func(t *testing.T) {
 			sessConfig := SessionConfig{ImpersonatedUser: "me"}
 			router, pool, sess := createSessionFromConfig(sessConfig)
 			conn := &ConnFake{}
@@ -358,7 +359,7 @@ func TestSession(st *testing.T) {
 			AssertIntEqual(t, numDefaultDbLookups, 1)
 		})
 
-		bt.Run("Token expiration in session run after errored connection acquisition", func(t *testing.T) {
+		inner.Run("Token expiration in session run after errored connection acquisition", func(t *testing.T) {
 			_, pool, sess := createSession()
 			pool.BorrowErr = tokenExpiredErr
 
@@ -367,7 +368,7 @@ func TestSession(st *testing.T) {
 			assertTokenExpiredError(t, err)
 		})
 
-		bt.Run("Token expiration after run", func(t *testing.T) {
+		inner.Run("Token expiration after run", func(t *testing.T) {
 			_, pool, sess := createSession()
 			conn := &ConnFake{Alive: true, RunErr: tokenExpiredErr}
 			pool.BorrowConn = conn
@@ -377,7 +378,7 @@ func TestSession(st *testing.T) {
 			assertTokenExpiredError(t, err)
 		})
 
-		bt.Run("Token expiration after result collect call", func(t *testing.T) {
+		inner.Run("Token expiration after result collect call", func(t *testing.T) {
 			_, pool, sess := createSession()
 			conn := &ConnFake{Alive: true, Nexts: []Next{{Err: tokenExpiredErr}}}
 			pool.BorrowConn = conn
@@ -389,7 +390,7 @@ func TestSession(st *testing.T) {
 			assertTokenExpiredError(t, err)
 		})
 
-		bt.Run("Token expiration after result consume call", func(t *testing.T) {
+		inner.Run("Token expiration after result consume call", func(t *testing.T) {
 			_, pool, sess := createSession()
 			conn := &ConnFake{Alive: true, ConsumeErr: tokenExpiredErr}
 			pool.BorrowConn = conn
@@ -401,7 +402,7 @@ func TestSession(st *testing.T) {
 			assertTokenExpiredError(t, err)
 		})
 
-		bt.Run("Token expiration after result consume next and err call", func(t *testing.T) {
+		inner.Run("Token expiration after result consume next and err call", func(t *testing.T) {
 			_, pool, sess := createSession()
 			conn := &ConnFake{Alive: true, Nexts: []Next{{Err: tokenExpiredErr}}}
 			pool.BorrowConn = conn
@@ -414,7 +415,7 @@ func TestSession(st *testing.T) {
 			assertTokenExpiredError(t, err)
 		})
 
-		bt.Run("Token expiration after result single record extraction", func(t *testing.T) {
+		inner.Run("Token expiration after result single record extraction", func(t *testing.T) {
 			_, pool, sess := createSession()
 			conn := &ConnFake{Alive: true, Nexts: []Next{{Err: tokenExpiredErr}}}
 			pool.BorrowConn = conn
@@ -426,7 +427,7 @@ func TestSession(st *testing.T) {
 			assertTokenExpiredError(t, err)
 		})
 
-		bt.Run("Token expiration after write transaction function", func(t *testing.T) {
+		inner.Run("Token expiration after write transaction function", func(t *testing.T) {
 			_, pool, sess := createSession()
 			conn := &ConnFake{Alive: true}
 			pool.BorrowConn = conn
@@ -438,7 +439,7 @@ func TestSession(st *testing.T) {
 			assertTokenExpiredError(t, err)
 		})
 
-		bt.Run("Token expiration after read transaction function", func(t *testing.T) {
+		inner.Run("Token expiration after read transaction function", func(t *testing.T) {
 			_, pool, sess := createSession()
 			conn := &ConnFake{Alive: true}
 			pool.BorrowConn = conn
@@ -451,8 +452,8 @@ func TestSession(st *testing.T) {
 		})
 	})
 
-	st.Run("Explicit transaction", func(bt *testing.T) {
-		bt.Run("While already in tx", func(t *testing.T) {
+	outer.Run("Explicit transaction", func(inner *testing.T) {
+		inner.Run("While already in tx", func(t *testing.T) {
 			_, pool, sess := createSession()
 			conn := &ConnFake{Alive: true}
 			pool.BorrowConn = conn
@@ -464,7 +465,7 @@ func TestSession(st *testing.T) {
 			assertUsageError(t, err)
 		})
 
-		bt.Run("Commit propagates bookmark", func(t *testing.T) {
+		inner.Run("Commit propagates bookmark", func(t *testing.T) {
 			_, pool, sess := createSession()
 			conn := &ConnFake{Alive: true}
 			bookmark := "magic"
@@ -483,7 +484,7 @@ func TestSession(st *testing.T) {
 			}
 		})
 
-		bt.Run("Rollback", func(t *testing.T) {
+		inner.Run("Rollback", func(t *testing.T) {
 			_, pool, sess := createSession()
 			conn := &ConnFake{Alive: true}
 			pool.BorrowConn = conn
@@ -495,7 +496,7 @@ func TestSession(st *testing.T) {
 			AssertNoError(t, err)
 		})
 
-		bt.Run("Retrieves default database name for impersonated user", func(t *testing.T) {
+		inner.Run("Retrieves default database name for impersonated user", func(t *testing.T) {
 			sessConfig := SessionConfig{ImpersonatedUser: "me"}
 			router, pool, sess := createSessionFromConfig(sessConfig)
 			conn := &ConnFake{}
@@ -517,7 +518,7 @@ func TestSession(st *testing.T) {
 			AssertIntEqual(t, numDefaultDbLookups, 1)
 		})
 
-		bt.Run("Token expiration after transaction begin", func(t *testing.T) {
+		inner.Run("Token expiration after transaction begin", func(t *testing.T) {
 			_, pool, sess := createSession()
 			conn := &ConnFake{Alive: true, TxBeginErr: tokenExpiredErr}
 			pool.BorrowConn = conn
@@ -528,7 +529,7 @@ func TestSession(st *testing.T) {
 			assertTokenExpiredError(t, err)
 		})
 
-		bt.Run("Token expiration after transaction run", func(t *testing.T) {
+		inner.Run("Token expiration after transaction run", func(t *testing.T) {
 			_, pool, sess := createSession()
 			conn := &ConnFake{Alive: true, RunTxErr: tokenExpiredErr}
 			pool.BorrowConn = conn
@@ -540,7 +541,7 @@ func TestSession(st *testing.T) {
 			assertTokenExpiredError(t, err)
 		})
 
-		bt.Run("Token expiration after transaction commit", func(t *testing.T) {
+		inner.Run("Token expiration after transaction commit", func(t *testing.T) {
 			_, pool, sess := createSession()
 			conn := &ConnFake{Alive: true, TxCommitErr: tokenExpiredErr}
 			pool.BorrowConn = conn
@@ -554,7 +555,7 @@ func TestSession(st *testing.T) {
 			assertTokenExpiredError(t, err)
 		})
 
-		bt.Run("Token expiration after transaction rollback", func(t *testing.T) {
+		inner.Run("Token expiration after transaction rollback", func(t *testing.T) {
 			_, pool, sess := createSession()
 			conn := &ConnFake{Alive: true, TxRollbackErr: tokenExpiredErr}
 			pool.BorrowConn = conn
@@ -569,7 +570,82 @@ func TestSession(st *testing.T) {
 		})
 	})
 
-	st.Run("Close", func(ct *testing.T) {
+	outer.Run("GetServerInfo", func(inner *testing.T) {
+
+		inner.Run("Retrieves info from first borrowed connection", func(t *testing.T) {
+			borrowCalled := false
+			ctx := context.Background()
+			_, pool, session := createSession()
+			defer session.Close(ctx)
+			pool.BorrowHook = func() (idb.Connection, error) {
+				if borrowCalled {
+					inner.Errorf("expected only 1 call to borrow, got more")
+				}
+				result := &ConnFake{
+					Name: "home",
+					ConnectionVersion: db.ProtocolVersion{
+						Major: 5,
+						Minor: 0,
+					},
+					Alive:              true,
+					DatabaseName:       "neo4j",
+					ServerVersionValue: "smith",
+				}
+				borrowCalled = true
+				return result, nil
+			}
+
+			info, err := session.getServerInfo(ctx)
+
+			AssertNoError(t, err)
+			AssertDeepEquals(t, info.ProtocolVersion().Major, 5)
+			AssertDeepEquals(t, info.ProtocolVersion().Minor, 0)
+			AssertDeepEquals(t, info.Agent(), "smith")
+			AssertDeepEquals(t, info.Address(), "home")
+		})
+
+		inner.Run("Fails if home DB resolution fails", func(t *testing.T) {
+			ctx := context.Background()
+			router, _, session := createSession()
+			defer session.Close(ctx)
+			expectedErr := fmt.Errorf("home db err")
+			router.GetNameOfDefaultDbHook = func(string) (string, error) {
+				return "", expectedErr
+			}
+
+			_, err := session.getServerInfo(ctx)
+
+			assertErrorEq(t, err, expectedErr)
+		})
+
+		inner.Run("Fails if servers retrieval fails", func(t *testing.T) {
+			ctx := context.Background()
+			router, _, session := createSession()
+			defer session.Close(ctx)
+			expectedErr := fmt.Errorf("server retrieval err")
+			router.ReadersHook = func([]string, string) ([]string, error) {
+				return nil, expectedErr
+			}
+
+			_, err := session.getServerInfo(ctx)
+
+			assertErrorEq(t, err, expectedErr)
+		})
+
+		inner.Run("Fails if connection borrow fails", func(t *testing.T) {
+			ctx := context.Background()
+			_, pool, session := createSession()
+			defer session.Close(ctx)
+			expectedErr := fmt.Errorf("connection borrow err")
+			pool.BorrowErr = expectedErr
+
+			_, err := session.getServerInfo(ctx)
+
+			assertErrorEq(t, err, expectedErr)
+		})
+	})
+
+	outer.Run("Close", func(ct *testing.T) {
 		ct.Run("Cleans up connection pool async", func(t *testing.T) {
 			_, pool, sess := createSession()
 			wg := sync.WaitGroup{}

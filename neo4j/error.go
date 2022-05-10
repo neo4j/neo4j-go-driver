@@ -20,6 +20,7 @@
 package neo4j
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/db"
@@ -169,4 +170,19 @@ func wrapError(err error) error {
 		}
 	}
 	return err
+}
+
+type ctxCloser interface {
+	Close(ctx context.Context) error
+}
+
+func deferredClose(ctx context.Context, closer ctxCloser, prevErr error) error {
+	err := closer.Close(ctx)
+	if err == nil {
+		return prevErr
+	}
+	if prevErr == nil {
+		return err
+	}
+	return fmt.Errorf("close error %v after previous error %w", err, prevErr)
 }

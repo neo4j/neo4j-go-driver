@@ -63,6 +63,9 @@ type DriverWithContext interface {
 	// is encrypted. This is a static check. The function can also be called on
 	// a closed Driver.
 	IsEncrypted() bool
+	// GetServerInfo attempts to obtain server information from the target Neo4j
+	// deployment
+	GetServerInfo(ctx context.Context) (ServerInfo, error)
 }
 
 // NewDriverWithContext is the entry point to the neo4j driver to create an instance of a Driver. It is the first function to
@@ -294,4 +297,12 @@ func (d *driverWithContext) Close(ctx context.Context) error {
 
 func (d *driverWithContext) IsEncrypted() bool {
 	return !d.connector.SkipEncryption
+}
+
+func (d *driverWithContext) GetServerInfo(ctx context.Context) (_ ServerInfo, err error) {
+	session := d.NewSession(SessionConfig{})
+	defer func() {
+		err = deferredClose(ctx, session, err)
+	}()
+	return session.getServerInfo(ctx)
 }

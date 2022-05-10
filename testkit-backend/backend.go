@@ -437,10 +437,26 @@ func (b *backend) handleRequest(req map[string]interface{}) {
 		}
 		b.writeResponse("Driver", map[string]interface{}{"id": driverId})
 
+	case "GetServerInfo":
+		driverId := data["driverId"].(string)
+		driver := b.drivers[driverId]
+		serverInfo, err := driver.GetServerInfo(context.Background())
+		if err != nil {
+			b.writeError(err)
+			return
+		}
+		protocolVersion := serverInfo.ProtocolVersion()
+		b.writeResponse("ServerInfo", map[string]interface{}{
+			"address":         serverInfo.Address(),
+			"agent":           serverInfo.Agent(),
+			"protocolVersion": fmt.Sprintf("%d.%d", protocolVersion.Major, protocolVersion.Minor),
+		})
+
 	case "NewSession":
 		driver := b.drivers[data["driverId"].(string)]
-		sessionConfig := neo4j.SessionConfig{}
-		sessionConfig.BoltLogger = neo4j.ConsoleBoltLogger()
+		sessionConfig := neo4j.SessionConfig{
+			BoltLogger: neo4j.ConsoleBoltLogger(),
+		}
 		switch data["accessMode"].(string) {
 		case "r":
 			sessionConfig.AccessMode = neo4j.AccessModeRead
@@ -666,7 +682,9 @@ func (b *backend) handleRequest(req map[string]interface{}) {
 
 	case "CheckMultiDBSupport":
 		driver := b.drivers[data["driverId"].(string)]
-		session := driver.NewSession(neo4j.SessionConfig{})
+		session := driver.NewSession(neo4j.SessionConfig{
+			BoltLogger: neo4j.ConsoleBoltLogger(),
+		})
 		result, err := session.Run(ctx, "RETURN 42", nil)
 		defer func() {
 			err = session.Close(ctx)
@@ -703,6 +721,7 @@ func (b *backend) handleRequest(req map[string]interface{}) {
 				"ConfHint:connection.recv_timeout_seconds",
 				"Detail:ClosedDriverIsEncrypted",
 				"Feature:API:ConnectionAcquisitionTimeout",
+				"Feature:API:Driver:GetServerInfo",
 				"Feature:API:Driver.IsEncrypted",
 				"Feature:API:Liveness.Check",
 				"Feature:API:Result.List",
@@ -902,10 +921,11 @@ func testSkips() map[string]string {
 		"stub.iteration.test_result_scope.TestResultScope.*":                                                                     "Results are always valid but don't return records when out of scope",
 		"stub.*.test_0_timeout":        "Driver omits 0 as tx timeout value",
 		"stub.*.test_negative_timeout": "Driver omits negative tx timeout values",
-		"stub.routing.*.*.test_should_request_rt_from_all_initial_routers_until_successful_on_unknown_failure":       "Add DNS resolver TestKit message and connection timeout support",
-		"stub.routing.*.*.test_should_request_rt_from_all_initial_routers_until_successful_on_authorization_expired": "Add DNS resolver TestKit message and connection timeout support",
-		"stub.summary.test_summary.TestSummary.test_server_info":                                                     "Needs some kind of server address DNS resolution",
-		"stub.summary.test_summary.TestSummary.test_invalid_query_type":                                              "Driver does not verify query type returned from server.",
-		"stub.routing.*.test_should_drop_connections_failing_liveness_check":                                         "Needs support for GetConnectionPoolMetrics",
+		"stub.routing.*.*.test_should_request_rt_from_all_initial_routers_until_successful_on_unknown_failure":          "Add DNS resolver TestKit message and connection timeout support",
+		"stub.routing.*.*.test_should_request_rt_from_all_initial_routers_until_successful_on_authorization_expired":    "Add DNS resolver TestKit message and connection timeout support",
+		"stub.summary.test_summary.TestSummary.test_server_info":                                                        "Needs some kind of server address DNS resolution",
+		"stub.summary.test_summary.TestSummary.test_invalid_query_type":                                                 "Driver does not verify query type returned from server.",
+		"stub.routing.*.test_should_drop_connections_failing_liveness_check":                                            "Needs support for GetConnectionPoolMetrics",
+		"stub.connectivity_check.test_get_server_info.TestGetServerInfo.test_routing_fail_when_no_reader_are_available": "Won't fix - Go driver retries routing table when no readers are available",
 	}
 }

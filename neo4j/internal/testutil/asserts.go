@@ -26,6 +26,7 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/db"
 )
@@ -210,5 +211,13 @@ func AssertDeepEquals(t *testing.T, values ...interface{}) {
 			return
 		}
 		prev = current
+	}
+}
+
+func AssertAfter(t *testing.T, t1, t2 time.Time) {
+	t.Helper()
+	if !t1.After(t2) {
+		t.Errorf("Expected time %v to be after time %v", t1, t2)
+
 	}
 }

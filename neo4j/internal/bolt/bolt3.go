@@ -84,9 +84,11 @@ type bolt3 struct {
 	log           log.Logger
 	err           error // Last fatal error
 	minor         int
+	idleDate      time.Time
 }
 
 func NewBolt3(serverName string, conn net.Conn, logger log.Logger, boltLog log.BoltLogger) *bolt3 {
+	now := time.Now()
 	b := &bolt3{
 		state:      bolt3_unauthorized,
 		conn:       conn,
@@ -101,7 +103,8 @@ func NewBolt3(serverName string, conn net.Conn, logger log.Logger, boltLog log.B
 			logger:          logger,
 			logName:         log.Bolt3,
 		},
-		birthDate: time.Now(),
+		birthDate: now,
+		idleDate:  now,
 		log:       logger,
 	}
 	b.out = &outgoing{
@@ -135,6 +138,7 @@ func (b *bolt3) receiveMsg(ctx context.Context) interface{} {
 		b.state = bolt3_dead
 		return nil
 	}
+	b.idleDate = time.Now()
 	return msg
 }
 
@@ -628,6 +632,10 @@ func (b *bolt3) Birthdate() time.Time {
 	return b.birthDate
 }
 
+func (b *bolt3) IdleDate() time.Time {
+	return b.idleDate
+}
+
 func (b *bolt3) Reset(ctx context.Context) {
 	defer func() {
 		b.log.Debugf(log.Bolt3, b.logId, "Resetting connection internal state")
@@ -645,11 +653,18 @@ func (b *bolt3) Reset(ctx context.Context) {
 	// Discard any pending stream
 	b.discardStream(ctx)
 
-	if b.state == bolt3_ready || b.state == bolt3_dead {
+	if b.state == bolt3_ready {
 		// No need for reset
 		return
 	}
 
+	b.ForceReset(ctx)
+}
+
+func (b *bolt3) ForceReset(ctx context.Context) {
+	if b.state == bolt3_dead {
+		return
+	}
 	// Send the reset message to the server
 	// Need to clear any pending error
 	b.err = nil
@@ -748,4 +763,11 @@ func (b *bolt3) Close(ctx context.Context) {
 func (b *bolt3) SetBoltLogger(boltLogger log.BoltLogger) {
 	b.in.hyd.boltLogger = boltLogger
 	b.out.boltLogger = boltLogger
+}
+
+func (b *bolt3) Version() db.ProtocolVersion {
+	return db.ProtocolVersion{
+		Major: 3,
+		Minor: b.minor,
+	}
 }

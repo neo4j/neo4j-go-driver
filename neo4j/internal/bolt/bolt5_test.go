@@ -32,7 +32,7 @@ import (
 )
 
 // bolt5.Connect is tested through Connect, no need to test it here
-func TestBolt5(ot *testing.T) {
+func TestBolt5(outer *testing.T) {
 	// Test streams
 	// Faked returns from a server
 	runKeys := []interface{}{"f1", "f2"}
@@ -103,7 +103,7 @@ func TestBolt5(ot *testing.T) {
 		tcpConn, srv, cleanup := setupBolt5Pipe(t)
 		go serverJob(srv)
 
-		c, err := Connect(context.Background(), "serverName", tcpConn, auth, "007", nil, logger, boltLogger)
+		c, err := Connect(context.Background(), "serverName", tcpConn, auth, "007", nil, logger, nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -114,7 +114,7 @@ func TestBolt5(ot *testing.T) {
 	}
 
 	// Simple successful connect
-	ot.Run("Connect success", func(t *testing.T) {
+	outer.Run("Connect success", func(t *testing.T) {
 		bolt, cleanup := connectToServer(t, func(srv *bolt5server) {
 			handshake := srv.waitForHandshake()
 			// There should be a version 5 somewhere
@@ -142,7 +142,7 @@ func TestBolt5(ot *testing.T) {
 		AssertTrue(t, reflect.DeepEqual(bolt.in.connReadTimeout, time.Duration(-1)))
 	})
 
-	ot.Run("Connect success with timeout hint", func(t *testing.T) {
+	outer.Run("Connect success with timeout hint", func(t *testing.T) {
 		bolt, cleanup := connectToServer(t, func(srv *bolt5server) {
 			srv.waitForHandshake()
 			srv.acceptVersion(5, 0)
@@ -157,7 +157,7 @@ func TestBolt5(ot *testing.T) {
 
 	invalidValues := []interface{}{4.2, "42", -42}
 	for _, value := range invalidValues {
-		ot.Run(fmt.Sprintf("Connect success with ignored invalid timeout hint %v", value), func(t *testing.T) {
+		outer.Run(fmt.Sprintf("Connect success with ignored invalid timeout hint %v", value), func(t *testing.T) {
 			bolt, cleanup := connectToServer(t, func(srv *bolt5server) {
 				srv.waitForHandshake()
 				srv.acceptVersion(5, 0)
@@ -171,7 +171,7 @@ func TestBolt5(ot *testing.T) {
 		})
 	}
 
-	ot.Run("Routing in hello", func(t *testing.T) {
+	outer.Run("Routing in hello", func(t *testing.T) {
 		routingContext := map[string]string{"some": "thing"}
 		conn, srv, cleanup := setupBolt5Pipe(t)
 		defer cleanup()
@@ -185,12 +185,12 @@ func TestBolt5(ot *testing.T) {
 			}
 			srv.acceptHello()
 		}()
-		bolt, err := Connect(context.Background(), "serverName", conn, auth, "007", routingContext, logger, boltLogger)
+		bolt, err := Connect(context.Background(), "serverName", conn, auth, "007", routingContext, logger, nil)
 		AssertNoError(t, err)
 		bolt.Close(context.Background())
 	})
 
-	ot.Run("No routing in hello", func(t *testing.T) {
+	outer.Run("No routing in hello", func(t *testing.T) {
 		conn, srv, cleanup := setupBolt5Pipe(t)
 		defer cleanup()
 		go func() {
@@ -203,12 +203,12 @@ func TestBolt5(ot *testing.T) {
 			}
 			srv.acceptHello()
 		}()
-		bolt, err := Connect(context.Background(), "serverName", conn, auth, "007", nil, logger, boltLogger)
+		bolt, err := Connect(context.Background(), "serverName", conn, auth, "007", nil, logger, nil)
 		AssertNoError(t, err)
 		bolt.Close(context.Background())
 	})
 
-	ot.Run("Failed authentication", func(t *testing.T) {
+	outer.Run("Failed authentication", func(t *testing.T) {
 		conn, srv, cleanup := setupBolt5Pipe(t)
 		defer cleanup()
 		defer conn.Close()
@@ -218,7 +218,7 @@ func TestBolt5(ot *testing.T) {
 			srv.waitForHello()
 			srv.rejectHelloUnauthorized()
 		}()
-		bolt, err := Connect(context.Background(), "serverName", conn, auth, "007", nil, logger, boltLogger)
+		bolt, err := Connect(context.Background(), "serverName", conn, auth, "007", nil, logger, nil)
 		AssertNil(t, bolt)
 		AssertError(t, err)
 		dbErr, isDbErr := err.(*db.Neo4jError)
@@ -230,7 +230,7 @@ func TestBolt5(ot *testing.T) {
 		}
 	})
 
-	ot.Run("Run auto-commit", func(t *testing.T) {
+	outer.Run("Run auto-commit", func(t *testing.T) {
 		cypherText := "MATCH (n)"
 		theDb := "thedb"
 		bolt, cleanup := connectToServer(t, func(srv *bolt5server) {
@@ -257,7 +257,7 @@ func TestBolt5(ot *testing.T) {
 		assertBoltState(t, bolt5Ready, bolt)
 	})
 
-	ot.Run("Run auto-commit with impersonation", func(t *testing.T) {
+	outer.Run("Run auto-commit with impersonation", func(t *testing.T) {
 		cypherText := "MATCH (n)"
 		impersonatedUser := "a user"
 		theDb := "thedb"
@@ -288,7 +288,7 @@ func TestBolt5(ot *testing.T) {
 		assertBoltState(t, bolt5Ready, bolt)
 	})
 
-	ot.Run("Run auto-commit with fetch size 2 of 3", func(t *testing.T) {
+	outer.Run("Run auto-commit with fetch size 2 of 3", func(t *testing.T) {
 		bolt, cleanup := connectToServer(t, func(srv *bolt5server) {
 			srv.accept(5)
 			srv.waitForRun(nil)
@@ -314,7 +314,7 @@ func TestBolt5(ot *testing.T) {
 		assertBoltState(t, bolt5Ready, bolt)
 	})
 
-	ot.Run("Run transactional commit", func(t *testing.T) {
+	outer.Run("Run transactional commit", func(t *testing.T) {
 		committedBookmark := "cbm"
 		bolt, cleanup := connectToServer(t, func(srv *bolt5server) {
 			srv.accept(5)
@@ -346,7 +346,7 @@ func TestBolt5(ot *testing.T) {
 
 	// Verifies that current stream is discarded correctly even if it is larger
 	// than what is served by a single pull.
-	ot.Run("Commit while streaming", func(t *testing.T) {
+	outer.Run("Commit while streaming", func(t *testing.T) {
 		qid := int64(2)
 		bolt, cleanup := connectToServer(t, func(srv *bolt5server) {
 			srv.accept(5)
@@ -385,7 +385,7 @@ func TestBolt5(ot *testing.T) {
 
 	// Verifies that current stream is discarded correctly even if it is larger
 	// than what is served by a single pull.
-	ot.Run("Commit while streams, explicit consume", func(t *testing.T) {
+	outer.Run("Commit while streams, explicit consume", func(t *testing.T) {
 		qid := int64(2)
 		bolt, cleanup := connectToServer(t, func(srv *bolt5server) {
 			srv.accept(5)
@@ -432,7 +432,7 @@ func TestBolt5(ot *testing.T) {
 		assertBoltState(t, bolt5Ready, bolt)
 	})
 
-	ot.Run("Begin transaction with bookmark success", func(t *testing.T) {
+	outer.Run("Begin transaction with bookmark success", func(t *testing.T) {
 		committedBookmark := "cbm"
 		bolt, cleanup := connectToServer(t, func(srv *bolt5server) {
 			srv.accept(5)
@@ -453,7 +453,7 @@ func TestBolt5(ot *testing.T) {
 		AssertStringEqual(t, committedBookmark, bolt.Bookmark())
 	})
 
-	ot.Run("Begin transaction with bookmark failure", func(t *testing.T) {
+	outer.Run("Begin transaction with bookmark failure", func(t *testing.T) {
 		bolt, cleanup := connectToServer(t, func(srv *bolt5server) {
 			srv.accept(5)
 			srv.waitForTxBegin()
@@ -469,7 +469,7 @@ func TestBolt5(ot *testing.T) {
 		AssertStringEqual(t, "", bolt.Bookmark())
 	})
 
-	ot.Run("Run transactional rollback", func(t *testing.T) {
+	outer.Run("Run transactional rollback", func(t *testing.T) {
 		bolt, cleanup := connectToServer(t, func(srv *bolt5server) {
 			srv.accept(5)
 			srv.serveRunTx(runResponse, false, "")
@@ -496,7 +496,7 @@ func TestBolt5(ot *testing.T) {
 		assertBoltState(t, bolt5Ready, bolt)
 	})
 
-	ot.Run("Server close while streaming", func(t *testing.T) {
+	outer.Run("Server close while streaming", func(t *testing.T) {
 		bolt, cleanup := connectToServer(t, func(srv *bolt5server) {
 			srv.accept(5)
 			srv.waitForRun(nil)
@@ -529,7 +529,7 @@ func TestBolt5(ot *testing.T) {
 		assertBoltDead(t, bolt)
 	})
 
-	ot.Run("Server fail on run with reset", func(t *testing.T) {
+	outer.Run("Server fail on run with reset", func(t *testing.T) {
 		bolt, cleanup := connectToServer(t, func(srv *bolt5server) {
 			srv.accept(5)
 			srv.waitForRun(nil)
@@ -552,7 +552,7 @@ func TestBolt5(ot *testing.T) {
 		assertBoltState(t, bolt5Ready, bolt)
 	})
 
-	ot.Run("Server fail on run continue to commit", func(t *testing.T) {
+	outer.Run("Server fail on run continue to commit", func(t *testing.T) {
 		bolt, cleanup := connectToServer(t, func(srv *bolt5server) {
 			srv.accept(5)
 			srv.waitForTxBegin()
@@ -574,7 +574,7 @@ func TestBolt5(ot *testing.T) {
 		AssertNeo4jError(t, err)                      // Should have same error as from run since that is original cause
 	})
 
-	ot.Run("Reset while streaming", func(t *testing.T) {
+	outer.Run("Reset while streaming", func(t *testing.T) {
 		bolt, cleanup := connectToServer(t, func(srv *bolt5server) {
 			srv.accept(5)
 			srv.waitForRun(nil)
@@ -599,7 +599,7 @@ func TestBolt5(ot *testing.T) {
 		assertBoltState(t, bolt5Ready, bolt)
 	})
 
-	ot.Run("Reset in ready state", func(t *testing.T) {
+	outer.Run("Reset in ready state", func(t *testing.T) {
 		bolt, cleanup := connectToServer(t, func(srv *bolt5server) {
 			srv.accept(5)
 			srv.serveRun(runResponse, nil)
@@ -615,7 +615,7 @@ func TestBolt5(ot *testing.T) {
 		bolt.Reset(context.Background())
 	})
 
-	ot.Run("Buffer stream", func(t *testing.T) {
+	outer.Run("Buffer stream", func(t *testing.T) {
 		bolt, cleanup := connectToServer(t, func(srv *bolt5server) {
 			srv.accept(5)
 			srv.serveRun(runResponse, nil)
@@ -648,7 +648,7 @@ func TestBolt5(ot *testing.T) {
 		AssertNextOnlySummary(t, rec, sum, err)
 	})
 
-	ot.Run("Buffer stream with fetch size", func(t *testing.T) {
+	outer.Run("Buffer stream with fetch size", func(t *testing.T) {
 		keys := []interface{}{"k1"}
 		bookmark := "x"
 		bolt, cleanup := connectToServer(t, func(srv *bolt5server) {
@@ -693,7 +693,7 @@ func TestBolt5(ot *testing.T) {
 		AssertNextOnlySummary(t, rec, sum, err)
 	})
 
-	ot.Run("Buffer stream with error", func(t *testing.T) {
+	outer.Run("Buffer stream with error", func(t *testing.T) {
 		bolt, cleanup := connectToServer(t, func(srv *bolt5server) {
 			srv.accept(5)
 			srv.waitForRun(nil)
@@ -726,7 +726,7 @@ func TestBolt5(ot *testing.T) {
 		AssertStringEqual(t, bolt.Bookmark(), "")
 	})
 
-	ot.Run("Buffer stream with invalid handle", func(t *testing.T) {
+	outer.Run("Buffer stream with invalid handle", func(t *testing.T) {
 		bolt, cleanup := connectToServer(t, func(srv *bolt5server) {
 			srv.accept(5)
 		})
@@ -737,7 +737,7 @@ func TestBolt5(ot *testing.T) {
 		AssertError(t, err)
 	})
 
-	ot.Run("Consume stream", func(t *testing.T) {
+	outer.Run("Consume stream", func(t *testing.T) {
 		bolt, cleanup := connectToServer(t, func(srv *bolt5server) {
 			srv.accept(5)
 			srv.serveRun(runResponse, nil)
@@ -767,7 +767,7 @@ func TestBolt5(ot *testing.T) {
 		AssertNotNil(t, sum)
 	})
 
-	ot.Run("Consume stream with fetch size", func(t *testing.T) {
+	outer.Run("Consume stream with fetch size", func(t *testing.T) {
 		qid := 3
 		keys := []interface{}{"k1"}
 		bookmark := "x"
@@ -812,7 +812,7 @@ func TestBolt5(ot *testing.T) {
 		AssertNotNil(t, sum)
 	})
 
-	ot.Run("Consume stream with error", func(t *testing.T) {
+	outer.Run("Consume stream with error", func(t *testing.T) {
 		bolt, cleanup := connectToServer(t, func(srv *bolt5server) {
 			srv.accept(5)
 			srv.waitForRun(nil)
@@ -842,7 +842,7 @@ func TestBolt5(ot *testing.T) {
 		AssertNextOnlyError(t, rec, sum, err)
 	})
 
-	ot.Run("Consume with invalid stream", func(t *testing.T) {
+	outer.Run("Consume with invalid stream", func(t *testing.T) {
 		bolt, cleanup := connectToServer(t, func(srv *bolt5server) {
 			srv.accept(5)
 		})
@@ -854,7 +854,7 @@ func TestBolt5(ot *testing.T) {
 		AssertError(t, err)
 	})
 
-	ot.Run("GetRoutingTable using ROUTE message", func(t *testing.T) {
+	outer.Run("GetRoutingTable using ROUTE message", func(t *testing.T) {
 		bolt, cleanup := connectToServer(t, func(srv *bolt5server) {
 			srv.acceptWithMinor(5, 0)
 			srv.waitForRoute(func(fields []interface{}) {
@@ -885,7 +885,7 @@ func TestBolt5(ot *testing.T) {
 		}
 	})
 
-	ot.Run("Expired authentication error should close connection", func(t *testing.T) {
+	outer.Run("Expired authentication error should close connection", func(t *testing.T) {
 		bolt, cleanup := connectToServer(t, func(srv *bolt5server) {
 			srv.accept(5)
 			srv.sendFailureMsg("Status.Security.AuthorizationExpired", "auth token is... expired")
@@ -898,7 +898,7 @@ func TestBolt5(ot *testing.T) {
 		AssertError(t, err)
 	})
 
-	ot.Run("Immediately expired authentication token error triggers a connection failure", func(t *testing.T) {
+	outer.Run("Immediately expired authentication token error triggers a connection failure", func(t *testing.T) {
 		bolt, cleanup := connectToServer(t, func(srv *bolt5server) {
 			srv.accept(5)
 			srv.sendFailureMsg("Neo.ClientError.Security.TokenExpired", "SSO token is... expired")
@@ -911,7 +911,7 @@ func TestBolt5(ot *testing.T) {
 		AssertError(t, err)
 	})
 
-	ot.Run("Expired authentication token error after run triggers a connection failure", func(t *testing.T) {
+	outer.Run("Expired authentication token error after run triggers a connection failure", func(t *testing.T) {
 		bolt, cleanup := connectToServer(t, func(srv *bolt5server) {
 			srv.accept(5)
 			srv.waitForRun(nil)
@@ -923,5 +923,252 @@ func TestBolt5(ot *testing.T) {
 			"n) RETURN n"}, idb.TxConfig{Mode: idb.ReadMode})
 		assertBoltState(t, bolt5Failed, bolt)
 		AssertError(t, err)
+	})
+
+	outer.Run("Updates connection idle date on every response", func(inner *testing.T) {
+		ctx := context.Background()
+		testStart := time.Now()
+
+		callbacks := []struct {
+			scenario string
+			server   func(*testing.T, *bolt5server)
+			client   func(*testing.T, *bolt5)
+		}{
+			{
+				scenario: "after HELLO",
+				server:   func(t *testing.T, srv *bolt5server) {},
+				client: func(t *testing.T, cli *bolt5) {
+					AssertAfter(t, cli.IdleDate(), testStart)
+				},
+			},
+			{
+				scenario: "after successful RESET",
+				server: func(t *testing.T, srv *bolt5server) {
+					srv.waitForReset()
+					srv.sendSuccess(map[string]interface{}{})
+				},
+				client: func(t *testing.T, cli *bolt5) {
+					idleDate := cli.IdleDate()
+					cli.ForceReset(ctx)
+					AssertAfter(t, cli.IdleDate(), idleDate)
+				},
+			},
+			{
+				scenario: "after failed RESET",
+				server: func(t *testing.T, srv *bolt5server) {
+					srv.waitForReset()
+					srv.sendFailureMsg("o.o.p.s", "reset failed")
+				},
+				client: func(t *testing.T, cli *bolt5) {
+					idleDate := cli.IdleDate()
+					cli.ForceReset(ctx)
+					AssertAfter(t, cli.IdleDate(), idleDate)
+				},
+			},
+			{
+				scenario: "not after error on RESET",
+				server: func(t *testing.T, srv *bolt5server) {
+					srv.waitForReset()
+					srv.closeConnection()
+				},
+				client: func(t *testing.T, cli *bolt5) {
+					idleDate := cli.IdleDate()
+					cli.ForceReset(ctx)
+					AssertDeepEquals(t, cli.IdleDate(), idleDate)
+				},
+			},
+			{
+				scenario: "after successful RUN/PULLALL",
+				server: func(t *testing.T, srv *bolt5server) {
+					srv.waitForRun(nil)
+					srv.sendSuccess(map[string]interface{}{})
+					srv.waitForPullN(1000)
+					srv.sendSuccess(map[string]interface{}{})
+				},
+				client: func(t *testing.T, cli *bolt5) {
+					idleDate := cli.IdleDate()
+					_, _ = cli.Run(ctx, idb.Command{Cypher: "RETURN 42"}, idb.TxConfig{})
+					AssertAfter(t, cli.IdleDate(), idleDate)
+				},
+			},
+			{
+				scenario: "after failed RUN",
+				server: func(t *testing.T, srv *bolt5server) {
+					srv.waitForRun(nil)
+					srv.sendFailureMsg("o.o.p.s", "run failed")
+				},
+				client: func(t *testing.T, cli *bolt5) {
+					idleDate := cli.IdleDate()
+					_, _ = cli.Run(ctx, idb.Command{Cypher: "RETURN 42"}, idb.TxConfig{})
+					AssertAfter(t, cli.IdleDate(), idleDate)
+				},
+			},
+			{
+				scenario: "not after errored RUN",
+				server: func(t *testing.T, srv *bolt5server) {
+					srv.waitForRun(nil)
+					srv.closeConnection()
+				},
+				client: func(t *testing.T, cli *bolt5) {
+					idleDate := cli.IdleDate()
+					_, _ = cli.Run(ctx, idb.Command{Cypher: "RETURN 42"}, idb.TxConfig{})
+					AssertDeepEquals(t, cli.IdleDate(), idleDate)
+				},
+			},
+			{
+				scenario: "after failed PULLALL",
+				server: func(t *testing.T, srv *bolt5server) {
+					srv.waitForRun(nil)
+					srv.sendSuccess(map[string]interface{}{})
+					srv.waitForPullN(1000)
+					srv.sendFailureMsg("o.o.p.s", "pull all failed")
+				},
+				client: func(t *testing.T, cli *bolt5) {
+					idleDate := cli.IdleDate()
+					_, _ = cli.Run(ctx, idb.Command{Cypher: "RETURN 42"}, idb.TxConfig{})
+					AssertAfter(t, cli.IdleDate(), idleDate)
+				},
+			},
+			{
+				scenario: "after successful BEGIN",
+				server: func(t *testing.T, srv *bolt5server) {
+					srv.waitForTxBegin()
+					srv.sendSuccess(map[string]interface{}{})
+				},
+				client: func(t *testing.T, cli *bolt5) {
+					idleDate := cli.IdleDate()
+					_, _ = cli.TxBegin(ctx, idb.TxConfig{})
+					AssertAfter(t, cli.IdleDate(), idleDate)
+				},
+			},
+			{
+				scenario: "after failed BEGIN",
+				server: func(t *testing.T, srv *bolt5server) {
+					srv.waitForTxBegin()
+					srv.sendFailureMsg("o.o.p.s", "begin failed")
+				},
+				client: func(t *testing.T, cli *bolt5) {
+					idleDate := cli.IdleDate()
+					_, _ = cli.TxBegin(ctx, idb.TxConfig{})
+					AssertAfter(t, cli.IdleDate(), idleDate)
+				},
+			},
+			{
+				scenario: "not after errored BEGIN",
+				server: func(t *testing.T, srv *bolt5server) {
+					srv.waitForTxBegin()
+					srv.closeConnection()
+				},
+				client: func(t *testing.T, cli *bolt5) {
+					idleDate := cli.IdleDate()
+					_, _ = cli.TxBegin(ctx, idb.TxConfig{})
+					AssertDeepEquals(t, cli.IdleDate(), idleDate)
+				},
+			},
+			{
+				scenario: "after successful COMMIT",
+				server: func(t *testing.T, srv *bolt5server) {
+					srv.waitForTxBegin()
+					srv.sendSuccess(map[string]interface{}{})
+					srv.waitForTxCommit()
+					srv.sendSuccess(map[string]interface{}{})
+				},
+				client: func(t *testing.T, cli *bolt5) {
+					tx, _ := cli.TxBegin(ctx, idb.TxConfig{})
+					idleDate := cli.IdleDate()
+					_ = cli.TxCommit(ctx, tx)
+					AssertAfter(t, cli.IdleDate(), idleDate)
+				},
+			},
+			{
+				scenario: "after failed COMMIT",
+				server: func(t *testing.T, srv *bolt5server) {
+					srv.waitForTxBegin()
+					srv.sendSuccess(map[string]interface{}{})
+					srv.waitForTxCommit()
+					srv.sendFailureMsg("o.o.p.s", "commit failed")
+				},
+				client: func(t *testing.T, cli *bolt5) {
+					tx, _ := cli.TxBegin(ctx, idb.TxConfig{})
+					idleDate := cli.IdleDate()
+					_ = cli.TxCommit(ctx, tx)
+					AssertAfter(t, cli.IdleDate(), idleDate)
+				},
+			},
+			{
+				scenario: "not after errored COMMIT",
+				server: func(t *testing.T, srv *bolt5server) {
+					srv.waitForTxBegin()
+					srv.sendSuccess(map[string]interface{}{})
+					srv.waitForTxCommit()
+					srv.closeConnection()
+				},
+				client: func(t *testing.T, cli *bolt5) {
+					tx, _ := cli.TxBegin(ctx, idb.TxConfig{})
+					idleDate := cli.IdleDate()
+					_ = cli.TxCommit(ctx, tx)
+					AssertDeepEquals(t, cli.IdleDate(), idleDate)
+				},
+			},
+			{
+				scenario: "after successful ROLLBACK",
+				server: func(t *testing.T, srv *bolt5server) {
+					srv.waitForTxBegin()
+					srv.sendSuccess(map[string]interface{}{})
+					srv.waitForTxRollback()
+					srv.sendSuccess(map[string]interface{}{})
+				},
+				client: func(t *testing.T, cli *bolt5) {
+					tx, _ := cli.TxBegin(ctx, idb.TxConfig{})
+					idleDate := cli.IdleDate()
+					_ = cli.TxRollback(ctx, tx)
+					AssertAfter(t, cli.IdleDate(), idleDate)
+				},
+			},
+			{
+				scenario: "after failed ROLLBACK",
+				server: func(t *testing.T, srv *bolt5server) {
+					srv.waitForTxBegin()
+					srv.sendSuccess(map[string]interface{}{})
+					srv.waitForTxRollback()
+					srv.sendFailureMsg("o.o.p.s", "rollback failed")
+				},
+				client: func(t *testing.T, cli *bolt5) {
+					tx, _ := cli.TxBegin(ctx, idb.TxConfig{})
+					idleDate := cli.IdleDate()
+					_ = cli.TxRollback(ctx, tx)
+					AssertAfter(t, cli.IdleDate(), idleDate)
+				},
+			},
+			{
+				scenario: "not after errored ROLLBACK",
+				server: func(t *testing.T, srv *bolt5server) {
+					srv.waitForTxBegin()
+					srv.sendSuccess(map[string]interface{}{})
+					srv.waitForTxRollback()
+					srv.closeConnection()
+				},
+				client: func(t *testing.T, cli *bolt5) {
+					tx, _ := cli.TxBegin(ctx, idb.TxConfig{})
+					idleDate := cli.IdleDate()
+					_ = cli.TxRollback(ctx, tx)
+					AssertDeepEquals(t, cli.IdleDate(), idleDate)
+				},
+			},
+		}
+
+		for _, callback := range callbacks {
+			inner.Run(callback.scenario, func(t *testing.T) {
+				bolt, cleanup := connectToServer(inner, func(srv *bolt5server) {
+					srv.accept(5)
+					callback.server(t, srv)
+				})
+				defer cleanup()
+				defer bolt.Close(ctx)
+
+				callback.client(t, bolt)
+			})
+		}
+
 	})
 }

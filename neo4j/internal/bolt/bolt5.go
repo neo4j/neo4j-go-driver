@@ -97,14 +97,17 @@ type bolt5 struct {
 	err           error // Last fatal error
 	minor         int
 	lastQid       int64 // Last seen qid
+	idleDate      time.Time
 }
 
 func NewBolt5(serverName string, conn net.Conn, logger log.Logger, boltLog log.BoltLogger) *bolt5 {
+	now := time.Now()
 	b := &bolt5{
 		state:      bolt5Unauthorized,
 		conn:       conn,
 		serverName: serverName,
-		birthDate:  time.Now(),
+		birthDate:  now,
+		idleDate:   now,
 		log:        logger,
 		streams:    openstreams{},
 		in: incoming{
@@ -192,6 +195,9 @@ func (b *bolt5) receiveMsg(ctx context.Context) interface{} {
 
 	msg, err := b.in.next(ctx, b.conn)
 	b.setError(err, true)
+	if err == nil {
+		b.idleDate = time.Now()
+	}
 	return msg
 }
 
@@ -798,6 +804,10 @@ func (b *bolt5) Birthdate() time.Time {
 	return b.birthDate
 }
 
+func (b *bolt5) IdleDate() time.Time {
+	return b.idleDate
+}
+
 func (b *bolt5) Reset(ctx context.Context) {
 	defer func() {
 		b.log.Debugf(log.Bolt5, b.logId, "Resetting connection internal state")
@@ -809,8 +819,16 @@ func (b *bolt5) Reset(ctx context.Context) {
 		b.streams.reset()
 	}()
 
-	if b.state == bolt5Ready || b.state == bolt5Dead {
+	if b.state == bolt5Ready {
 		// No need for reset
+		return
+	}
+
+	b.ForceReset(ctx)
+}
+
+func (b *bolt5) ForceReset(ctx context.Context) {
+	if b.state == bolt5Dead {
 		return
 	}
 
@@ -888,6 +906,13 @@ func (b *bolt5) SelectDatabase(database string) {
 func (b *bolt5) SetBoltLogger(boltLogger log.BoltLogger) {
 	b.in.hyd.boltLogger = boltLogger
 	b.out.boltLogger = boltLogger
+}
+
+func (b *bolt5) Version() db.ProtocolVersion {
+	return db.ProtocolVersion{
+		Major: 5,
+		Minor: b.minor,
+	}
 }
 
 func (b *bolt5) initializeReadTimeoutHint(hints map[string]interface{}) {

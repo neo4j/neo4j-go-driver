@@ -22,7 +22,8 @@ package neo4j
 import (
 	"context"
 	"fmt"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
+	idb "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/pool"
 	"math"
 	"time"
 
@@ -60,6 +61,7 @@ type SessionWithContext interface {
 	Close(ctx context.Context) error
 
 	legacy() Session
+	getServerInfo(ctx context.Context) (ServerInfo, error)
 }
 
 // SessionConfig is used to configure a new session, its zero value uses safe defaults.
@@ -106,26 +108,26 @@ type SessionConfig struct {
 	ImpersonatedUser string
 }
 
-// Turns off fetching records in batches.
+// FetchAll turns off fetching records in batches.
 const FetchAll = -1
 
-// Lets the driver decide fetch size
+// FetchDefault lets the driver decide fetch size
 const FetchDefault = 0
 
 // Connection pool as seen by the session.
 type sessionPool interface {
-	Borrow(ctx context.Context, serverNames []string, wait bool, boltLogger log.BoltLogger) (db.Connection, error)
-	Return(ctx context.Context, c db.Connection)
+	Borrow(ctx context.Context, serverNames []string, wait bool, boltLogger log.BoltLogger, livenessCheckThreshold time.Duration) (idb.Connection, error)
+	Return(ctx context.Context, c idb.Connection)
 	CleanUp(ctx context.Context)
 }
 
 type sessionWithContext struct {
 	config           *Config
-	defaultMode      db.AccessMode
+	defaultMode      idb.AccessMode
 	bookmarks        []string
 	databaseName     string
 	impersonatedUser string
-	getDefaultDbName bool
+	resolveHomeDb    bool
 	pool             sessionPool
 	router           sessionRouter
 	explicitTx       *explicitTransaction
@@ -176,11 +178,11 @@ func newSessionWithContext(config *Config, sessConfig SessionConfig, router sess
 		config:           config,
 		router:           router,
 		pool:             pool,
-		defaultMode:      db.AccessMode(sessConfig.AccessMode),
+		defaultMode:      idb.AccessMode(sessConfig.AccessMode),
 		bookmarks:        cleanupBookmarks(sessConfig.Bookmarks),
 		databaseName:     sessConfig.DatabaseName,
 		impersonatedUser: sessConfig.ImpersonatedUser,
-		getDefaultDbName: sessConfig.DatabaseName == "",
+		resolveHomeDb:    sessConfig.DatabaseName == "",
 		sleep:            time.Sleep,
 		now:              time.Now,
 		log:              logger,
@@ -237,14 +239,14 @@ func (s *sessionWithContext) BeginTransaction(ctx context.Context, configurers .
 	}
 
 	// Get a connection from the pool. This could fail in clustered environment.
-	conn, err := s.getConnection(ctx, s.defaultMode)
+	conn, err := s.getConnection(ctx, s.defaultMode, pool.DefaultLivenessCheckThreshold)
 	if err != nil {
 		return nil, err
 	}
 
 	// Begin transaction
 	txHandle, err := conn.TxBegin(ctx,
-		db.TxConfig{
+		idb.TxConfig{
 			Mode:             s.defaultMode,
 			Bookmarks:        s.bookmarks,
 			Timeout:          config.Timeout,
@@ -275,18 +277,18 @@ func (s *sessionWithContext) BeginTransaction(ctx context.Context, configurers .
 func (s *sessionWithContext) ExecuteRead(ctx context.Context,
 	work ManagedTransactionWork, configurers ...func(*TransactionConfig)) (interface{}, error) {
 
-	return s.runRetriable(ctx, db.ReadMode, work, configurers...)
+	return s.runRetriable(ctx, idb.ReadMode, work, configurers...)
 }
 
 func (s *sessionWithContext) ExecuteWrite(ctx context.Context,
 	work ManagedTransactionWork, configurers ...func(*TransactionConfig)) (interface{}, error) {
 
-	return s.runRetriable(ctx, db.WriteMode, work, configurers...)
+	return s.runRetriable(ctx, idb.WriteMode, work, configurers...)
 }
 
 func (s *sessionWithContext) runRetriable(
 	ctx context.Context,
-	mode db.AccessMode,
+	mode idb.AccessMode,
 	work ManagedTransactionWork, configurers ...func(*TransactionConfig)) (interface{}, error) {
 
 	// Guard for more than one transaction per session
@@ -319,7 +321,7 @@ func (s *sessionWithContext) runRetriable(
 		Router:                  s.router,
 		DatabaseName:            s.databaseName,
 		OnDeadConnection: func(server string) {
-			if mode == db.WriteMode {
+			if mode == idb.WriteMode {
 				s.router.InvalidateWriter(s.databaseName, server)
 			} else {
 				s.router.InvalidateReader(s.databaseName, server)
@@ -352,12 +354,12 @@ func (s *sessionWithContext) runRetriable(
 
 func (s *sessionWithContext) executeTransactionFunction(
 	ctx context.Context,
-	mode db.AccessMode,
+	mode idb.AccessMode,
 	config TransactionConfig,
 	state *retry.State,
 	work ManagedTransactionWork) (bool, any) {
 
-	conn, err := s.getConnection(ctx, mode)
+	conn, err := s.getConnection(ctx, mode, pool.DefaultLivenessCheckThreshold)
 	if err != nil {
 		state.OnFailure(conn, err, false)
 		return true, nil
@@ -367,7 +369,7 @@ func (s *sessionWithContext) executeTransactionFunction(
 	defer s.pool.Return(ctx, conn)
 
 	txHandle, err := conn.TxBegin(ctx,
-		db.TxConfig{
+		idb.TxConfig{
 			Mode:             mode,
 			Bookmarks:        s.bookmarks,
 			Timeout:          config.Timeout,
@@ -400,15 +402,15 @@ func (s *sessionWithContext) executeTransactionFunction(
 	return false, x
 }
 
-func (s *sessionWithContext) getServers(ctx context.Context, mode db.AccessMode) ([]string, error) {
-	if mode == db.ReadMode {
+func (s *sessionWithContext) getServers(ctx context.Context, mode idb.AccessMode) ([]string, error) {
+	if mode == idb.ReadMode {
 		return s.router.Readers(ctx, s.bookmarks, s.databaseName, s.boltLogger)
 	} else {
 		return s.router.Writers(ctx, s.bookmarks, s.databaseName, s.boltLogger)
 	}
 }
 
-func (s *sessionWithContext) getConnection(ctx context.Context, mode db.AccessMode) (db.Connection, error) {
+func (s *sessionWithContext) getConnection(ctx context.Context, mode idb.AccessMode, livenessCheckThreshold time.Duration) (idb.Connection, error) {
 	if s.config.ConnectionAcquisitionTimeout > 0 {
 		var cancel context.CancelFunc
 		ctx, cancel = context.WithTimeout(ctx, s.config.ConnectionAcquisitionTimeout)
@@ -422,30 +424,23 @@ func (s *sessionWithContext) getConnection(ctx context.Context, mode db.AccessMo
 				deadline.String())
 		}
 	}
-	// If client requested user impersonation but provided no database we need to retrieve
-	// the name of the configured default database for that user before asking for a connection
-	if s.getDefaultDbName {
-		defaultDb, err := s.router.GetNameOfDefaultDatabase(ctx, s.bookmarks, s.impersonatedUser, s.boltLogger)
-		if err != nil {
-			return nil, wrapError(err)
-		}
-		s.log.Debugf(log.Session, s.logId, "Retrieved default database for impersonated user, uses db '%s'", defaultDb)
-		s.databaseName = defaultDb
-		s.getDefaultDbName = false
+
+	if err := s.resolveHomeDatabase(ctx); err != nil {
+		return nil, wrapError(err)
 	}
 	servers, err := s.getServers(ctx, mode)
 	if err != nil {
 		return nil, wrapError(err)
 	}
 
-	conn, err := s.pool.Borrow(ctx, servers, s.config.ConnectionAcquisitionTimeout != 0, s.boltLogger)
+	conn, err := s.pool.Borrow(ctx, servers, s.config.ConnectionAcquisitionTimeout != 0, s.boltLogger, livenessCheckThreshold)
 	if err != nil {
 		return nil, wrapError(err)
 	}
 
 	// Select database on server
-	if s.databaseName != db.DefaultDatabase {
-		dbSelector, ok := conn.(db.DatabaseSelector)
+	if s.databaseName != idb.DefaultDatabase {
+		dbSelector, ok := conn.(idb.DatabaseSelector)
 		if !ok {
 			s.pool.Return(ctx, conn)
 			return nil, &UsageError{Message: "Database does not support multi-database"}
@@ -456,7 +451,7 @@ func (s *sessionWithContext) getConnection(ctx context.Context, mode db.AccessMo
 	return conn, nil
 }
 
-func (s *sessionWithContext) retrieveBookmarks(conn db.Connection) {
+func (s *sessionWithContext) retrieveBookmarks(conn idb.Connection) {
 	if conn == nil {
 		return
 	}
@@ -487,19 +482,19 @@ func (s *sessionWithContext) Run(ctx context.Context,
 		return nil, err
 	}
 
-	conn, err := s.getConnection(ctx, s.defaultMode)
+	conn, err := s.getConnection(ctx, s.defaultMode, pool.DefaultLivenessCheckThreshold)
 	if err != nil {
 		return nil, err
 	}
 
 	stream, err := conn.Run(
 		ctx,
-		db.Command{
+		idb.Command{
 			Cypher:    cypher,
 			Params:    params,
 			FetchSize: s.fetchSize,
 		},
-		db.TxConfig{
+		idb.TxConfig{
 			Mode:             s.defaultMode,
 			Bookmarks:        s.bookmarks,
 			Timeout:          config.Timeout,
@@ -549,6 +544,40 @@ func (s *sessionWithContext) legacy() Session {
 	return &session{delegate: s}
 }
 
+func (s *sessionWithContext) getServerInfo(ctx context.Context) (ServerInfo, error) {
+	if err := s.resolveHomeDatabase(ctx); err != nil {
+		return nil, wrapError(err)
+	}
+	servers, err := s.getServers(ctx, idb.ReadMode)
+	if err != nil {
+		return nil, wrapError(err)
+	}
+	conn, err := s.pool.Borrow(ctx, servers, s.config.ConnectionAcquisitionTimeout != 0, s.boltLogger, 0)
+	if err != nil {
+		return nil, wrapError(err)
+	}
+	defer s.pool.Return(ctx, conn)
+	return &simpleServerInfo{
+		address:         conn.ServerName(),
+		agent:           conn.ServerVersion(),
+		protocolVersion: conn.Version(),
+	}, nil
+}
+
+func (s *sessionWithContext) resolveHomeDatabase(ctx context.Context) error {
+	if !s.resolveHomeDb {
+		return nil
+	}
+	defaultDb, err := s.router.GetNameOfDefaultDatabase(ctx, s.bookmarks, s.impersonatedUser, s.boltLogger)
+	if err != nil {
+		return err
+	}
+	s.log.Debugf(log.Session, s.logId, "Resolved home database, uses db '%s'", defaultDb)
+	s.databaseName = defaultDb
+	s.resolveHomeDb = false
+	return nil
+}
+
 type erroredSessionWithContext struct {
 	err error
 }
@@ -577,6 +606,9 @@ func (s *erroredSessionWithContext) Close(context.Context) error {
 }
 func (s *erroredSessionWithContext) legacy() Session {
 	return &erroredSession{err: s.err}
+}
+func (s *erroredSessionWithContext) getServerInfo(context.Context) (ServerInfo, error) {
+	return nil, s.err
 }
 
 func defaultTransactionConfig() TransactionConfig {

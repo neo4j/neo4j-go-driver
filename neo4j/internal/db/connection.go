@@ -96,9 +96,14 @@ type Connection interface {
 	HasFailed() bool
 	// Birthdate returns the point in time when this connection was established.
 	Birthdate() time.Time
-	// Reset resets connection to same state as directly after a connect.
+	// IdleDate returns the point in time since which the connection is idle
+	IdleDate() time.Time
+	// Reset resets connection to same state as directly after a connection.
 	// Active streams will be discarded and the bookmark will be lost.
 	Reset(ctx context.Context)
+	// ForceReset behaves like Reset except it also resets connections in the
+	// ready state (while Reset does not)
+	ForceReset(ctx context.Context)
 	// Close closes the database connection as well as any underlying connection.
 	// The instance should not be used after being closed.
 	Close(ctx context.Context)
@@ -112,6 +117,8 @@ type Connection interface {
 	GetRoutingTable(ctx context.Context, context map[string]string, bookmarks []string, database, impersonatedUser string) (*RoutingTable, error)
 	// SetBoltLogger sets Bolt message logger on already initialized connections
 	SetBoltLogger(boltLogger log.BoltLogger)
+	// Version returns the protocol version of the connection
+	Version() db.ProtocolVersion
 }
 
 type RoutingTable struct {
