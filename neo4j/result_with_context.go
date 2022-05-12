@@ -28,17 +28,17 @@ import (
 type ResultWithContext interface {
 	// Keys returns the keys available on the result set.
 	Keys() ([]string, error)
-	// Next returns true only if there is a record to be processed.
-	Next(ctx context.Context) bool
-	// Peek returns true only if there is a record after the current one to be processed without advancing the record
-	// stream
-	Peek(ctx context.Context) bool
 	// NextRecord returns true if there is a record to be processed, record parameter is set
 	// to point to current record.
 	NextRecord(ctx context.Context, record **Record) bool
+	// Next returns true only if there is a record to be processed.
+	Next(ctx context.Context) bool
 	// PeekRecord returns true if there is a record after the current one to be processed without advancing the record
 	// stream, record parameter is set to point to that record if present.
 	PeekRecord(ctx context.Context, record **Record) bool
+	// Peek returns true only if there is a record after the current one to be processed without advancing the record
+	// stream
+	Peek(ctx context.Context) bool
 	// Err returns the latest error that caused this Next to return false.
 	Err() error
 	// Record returns the current record.
@@ -85,6 +85,14 @@ func (r *resultWithContext) Keys() ([]string, error) {
 	return r.conn.Keys(r.streamHandle)
 }
 
+func (r *resultWithContext) NextRecord(ctx context.Context, out **Record) bool {
+	hasNext := r.Next(ctx)
+	if out != nil {
+		*out = r.record
+	}
+	return hasNext
+}
+
 func (r *resultWithContext) Next(ctx context.Context) bool {
 	r.checkOpen()
 	if r.err != nil {
@@ -94,36 +102,20 @@ func (r *resultWithContext) Next(ctx context.Context) bool {
 	return r.record != nil
 }
 
+func (r *resultWithContext) PeekRecord(ctx context.Context, out **Record) bool {
+	hasNext := r.Peek(ctx)
+	if out != nil {
+		*out = r.peekedRecord
+	}
+	return hasNext
+}
+
 func (r *resultWithContext) Peek(ctx context.Context) bool {
 	r.checkOpen()
 	if r.err != nil {
 		return false
 	}
 	r.peek(ctx)
-	return r.peekedRecord != nil
-}
-
-func (r *resultWithContext) NextRecord(ctx context.Context, out **Record) bool {
-	r.checkOpen()
-	if r.err != nil {
-		return false
-	}
-	r.advance(ctx)
-	if out != nil {
-		*out = r.record
-	}
-	return r.record != nil
-}
-
-func (r *resultWithContext) PeekRecord(ctx context.Context, out **Record) bool {
-	r.checkOpen()
-	if r.err != nil {
-		return false
-	}
-	r.peek(ctx)
-	if out != nil {
-		*out = r.peekedRecord
-	}
 	return r.peekedRecord != nil
 }
 
