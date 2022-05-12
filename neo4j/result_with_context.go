@@ -30,6 +30,9 @@ type ResultWithContext interface {
 	Keys() ([]string, error)
 	// Next returns true only if there is a record to be processed.
 	Next(ctx context.Context) bool
+	// Peek returns true only if there is a record after the current one to be processed without advancing the record
+	// stream
+	Peek(ctx context.Context) bool
 	// NextRecord returns true if there is a record to be processed, record parameter is set
 	// to point to current record.
 	NextRecord(ctx context.Context, record **Record) bool
@@ -91,6 +94,15 @@ func (r *resultWithContext) Next(ctx context.Context) bool {
 	return r.record != nil
 }
 
+func (r *resultWithContext) Peek(ctx context.Context) bool {
+	r.checkOpen()
+	if r.err != nil {
+		return false
+	}
+	r.peek(ctx)
+	return r.peekedRecord != nil
+}
+
 func (r *resultWithContext) NextRecord(ctx context.Context, out **Record) bool {
 	r.checkOpen()
 	if r.err != nil {
@@ -120,6 +132,9 @@ func (r *resultWithContext) Err() error {
 }
 
 func (r *resultWithContext) Record() *Record {
+	if r.peekedRecord != nil {
+		return r.peekedRecord
+	}
 	return r.record
 }
 

@@ -145,7 +145,7 @@ func TestResult(outer *testing.T) {
 	}
 
 	// PeekRecord
-	outer.Run("Peeks records", func(t *testing.T) {
+	outer.Run("Peeks records and allocates", func(t *testing.T) {
 		var peekedFirst *Record
 		var peekedSecond *Record
 		var nextFirst *Record
@@ -163,6 +163,23 @@ func TestResult(outer *testing.T) {
 		AssertNil(t, peekedAfterNextFirst)
 		AssertFalse(t, result.NextRecord(ctx, &nextSecond))
 		AssertNil(t, nextSecond)
+	})
+
+	// Peek
+	outer.Run("Peeks records", func(t *testing.T) {
+		record := recs[0]
+		conn := &ConnFake{Nexts: []Next{{Record: record}}}
+
+		result := newResultWithContext(conn, streamHandle, cypher, params)
+
+		AssertTrue(t, result.Peek(ctx))
+		AssertDeepEquals(t, record, result.Record())
+		AssertTrue(t, result.Next(ctx))
+		AssertDeepEquals(t, record, result.Record())
+		AssertFalse(t, result.Peek(ctx))
+		AssertDeepEquals(t, record, result.Record())
+		AssertFalse(t, result.Next(ctx))
+		AssertNil(t, result.Record())
 	})
 
 	// Consume
@@ -377,6 +394,21 @@ func TestResult(outer *testing.T) {
 				callback: func(t *testing.T, result *resultWithContext) error {
 					AssertFalse(t, result.Next(ctx))
 					AssertFalse(t, result.Next(ctx))
+					return result.Err()
+				},
+			},
+			{
+				scenario: "with Peek and Err",
+				callback: func(t *testing.T, result *resultWithContext) error {
+					AssertFalse(t, result.Peek(ctx))
+					return result.Err()
+				},
+			},
+			{
+				scenario: "with several Peek calls and Err",
+				callback: func(t *testing.T, result *resultWithContext) error {
+					AssertFalse(t, result.Peek(ctx))
+					AssertFalse(t, result.Peek(ctx))
 					return result.Err()
 				},
 			},
