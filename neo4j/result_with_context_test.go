@@ -352,6 +352,14 @@ func TestResult(outer *testing.T) {
 		AssertNotNil(t, res.Err())
 	})
 
+	outer.Run("IsOpen", func(t *testing.T) {
+		openResult := &resultWithContext{summary: nil}
+		closedResult := &resultWithContext{summary: &db.Summary{}}
+
+		AssertTrue(t, openResult.IsOpen())
+		AssertFalse(t, closedResult.IsOpen())
+	})
+
 	outer.Run("Consuming closed result fails", func(inner *testing.T) {
 		testCases := []struct {
 			scenario string

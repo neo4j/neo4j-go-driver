@@ -48,6 +48,8 @@ type ResultWithContext interface {
 	// Consume discards all remaining records and returns the summary information
 	// about the statement execution.
 	Consume(ctx context.Context) (ResultSummary, error)
+	// IsOpen determines whether this result cursor is available
+	IsOpen() bool
 	legacy() *result
 }
 
@@ -186,6 +188,10 @@ func (r *resultWithContext) Consume(ctx context.Context) (ResultSummary, error) 
 	return r.toResultSummary(), nil
 }
 
+func (r *resultWithContext) IsOpen() bool {
+	return r.isOpen()
+}
+
 func (r *resultWithContext) legacy() *result {
 	return &result{delegate: r}
 }
@@ -221,7 +227,11 @@ func (r *resultWithContext) peek(ctx context.Context) {
 
 func (r *resultWithContext) checkOpen() {
 	alreadyChecked := r.err != nil && r.err.Error() == consumedResultError
-	if r.summary != nil && !alreadyChecked {
+	if !alreadyChecked && !r.isOpen() {
 		r.err = &UsageError{Message: consumedResultError}
 	}
+}
+
+func (r *resultWithContext) isOpen() bool {
+	return r.summary == nil
 }
