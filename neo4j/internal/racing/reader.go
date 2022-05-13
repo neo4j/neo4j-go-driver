@@ -17,7 +17,7 @@
  * limitations under the License.
  */
 
-package racingio
+package racing
 
 import (
 	"context"

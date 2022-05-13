@@ -1,8 +1,8 @@
-package racingio_test
+package racing_test
 
 import (
 	"context"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/racingio"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/racing"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/testutil"
 	"sync"
 	"testing"
@@ -13,7 +13,7 @@ func TestMutex(outer *testing.T) {
 	backgroundCtx := context.Background()
 
 	outer.Run("locks successfully without deadline", func(t *testing.T) {
-		mutex := racingio.NewMutex()
+		mutex := racing.NewMutex()
 
 		result := mutex.TryLock(backgroundCtx)
 
@@ -22,7 +22,7 @@ func TestMutex(outer *testing.T) {
 
 	outer.Run("locks successfully without deadline after first unlocking", func(t *testing.T) {
 		lockedSecondTime := false
-		mutex := racingio.NewMutex()
+		mutex := racing.NewMutex()
 		var wait sync.WaitGroup
 		wait.Add(1)
 
@@ -41,7 +41,7 @@ func TestMutex(outer *testing.T) {
 		delay := 20 * time.Millisecond
 		timeout, cancelFunc := context.WithTimeout(backgroundCtx, delay)
 		defer cancelFunc()
-		mutex := racingio.NewMutex()
+		mutex := racing.NewMutex()
 		time.Sleep(2 * delay)
 
 		result := mutex.TryLock(timeout)

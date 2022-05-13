@@ -17,13 +17,13 @@
  * limitations under the License.
  */
 
-package racingio_test
+package racing_test
 
 import (
 	"bytes"
 	"context"
 	"fmt"
-	rio "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/racingio"
+	rio "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/racing"
 	. "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/testutil"
 	"net"
 	"reflect"

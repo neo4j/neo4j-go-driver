@@ -1,4 +1,4 @@
-package racingio
+package racing
 
 import (
 	"context"

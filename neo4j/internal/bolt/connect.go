@@ -25,7 +25,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/racingio"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/racing"
 	"net"
 
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/log"
@@ -61,14 +61,14 @@ func Connect(ctx context.Context, serverName string, conn net.Conn, auth map[str
 		boltLog.LogClientMessage("", "<MAGIC> %#010X", handshake[0:4])
 		boltLog.LogClientMessage("", "<HANDSHAKE> %#010X %#010X %#010X %#010X", handshake[4:8], handshake[8:12], handshake[12:16], handshake[16:20])
 	}
-	_, err := racingio.NewRacingWriter(conn).Write(ctx, handshake)
+	_, err := racing.NewRacingWriter(conn).Write(ctx, handshake)
 	if err != nil {
 		return nil, err
 	}
 
 	// Receive accepted server version
 	buf := make([]byte, 4)
-	_, err = racingio.NewRacingReader(conn).ReadFull(ctx, buf)
+	_, err = racing.NewRacingReader(conn).ReadFull(ctx, buf)
 	if err != nil {
 		return nil, err
 	}
