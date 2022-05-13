@@ -20,3 +20,6 @@ if __name__ == "__main__":
         cmd = cmd + ["-v", "-json"]
 
     run(cmd + ["-buildvcs=false", "-short", "./..."])
+
+    # Repeat racing tests
+    run(cmd + ["-buildvcs=false", "-count", "50", "./neo4j/internal/racing"])

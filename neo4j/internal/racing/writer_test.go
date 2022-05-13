@@ -70,9 +70,9 @@ func TestRacingWriter(outer *testing.T) {
 	})
 
 	outer.Run("completes before write occurs", func(t *testing.T) {
-		writer := &slowFailingWriter{sleep: 2 * time.Minute}
+		writer := &slowFailingWriter{sleep: 50 * time.Millisecond}
 		racingWriter := rio.NewRacingWriter(writer)
-		ctx, cancelFunc := context.WithTimeout(context.Background(), 200*time.Millisecond)
+		ctx, cancelFunc := context.WithTimeout(context.Background(), 10*time.Millisecond)
 		defer cancelFunc()
 
 		n, err := racingWriter.Write(ctx, payload)
@@ -86,7 +86,7 @@ func TestRacingWriter(outer *testing.T) {
 	})
 
 	outer.Run("connection write times out after 1 successful write", func(t *testing.T) {
-		timeout := 400 * time.Millisecond
+		timeout := 100 * time.Millisecond
 		server, client := net.Pipe()
 		defer closePipe(t, server, client)
 		go func() {
