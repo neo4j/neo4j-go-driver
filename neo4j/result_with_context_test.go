@@ -145,7 +145,7 @@ func TestResult(outer *testing.T) {
 	}
 
 	// PeekRecord
-	outer.Run("Peeks records", func(t *testing.T) {
+	outer.Run("Peeks records and allocates", func(t *testing.T) {
 		var peekedFirst *Record
 		var peekedSecond *Record
 		var nextFirst *Record
@@ -163,6 +163,43 @@ func TestResult(outer *testing.T) {
 		AssertNil(t, peekedAfterNextFirst)
 		AssertFalse(t, result.NextRecord(ctx, &nextSecond))
 		AssertNil(t, nextSecond)
+	})
+
+	// Peek
+	outer.Run("Peeks records", func(inner *testing.T) {
+		record1 := recs[0]
+		record2 := recs[1]
+
+		inner.Run("peeks single record", func(t *testing.T) {
+			conn := &ConnFake{Nexts: []Next{{Record: record1}}}
+
+			result := newResultWithContext(conn, streamHandle, cypher, params)
+
+			AssertTrue(t, result.Peek(ctx))
+			AssertDeepEquals(t, record1, result.Record())
+			AssertTrue(t, result.Next(ctx))
+			AssertDeepEquals(t, record1, result.Record())
+			AssertFalse(t, result.Peek(ctx))
+			AssertDeepEquals(t, record1, result.Record())
+			AssertFalse(t, result.Next(ctx))
+			AssertNil(t, result.Record())
+		})
+
+		inner.Run("peeks once and fetches subsequent records", func(t *testing.T) {
+			conn := &ConnFake{Nexts: []Next{{Record: record1}, {Record: record2}}}
+
+			result := newResultWithContext(conn, streamHandle, cypher, params)
+
+			AssertTrue(t, result.Peek(ctx))
+			AssertDeepEquals(t, record1, result.Record())
+			AssertTrue(t, result.Next(ctx))
+			AssertDeepEquals(t, record1, result.Record())
+			AssertTrue(t, result.Next(ctx))
+			AssertDeepEquals(t, record2, result.Record())
+			AssertFalse(t, result.Peek(ctx))
+			AssertFalse(t, result.Next(ctx))
+		})
+
 	})
 
 	// Consume
@@ -377,6 +414,21 @@ func TestResult(outer *testing.T) {
 				callback: func(t *testing.T, result *resultWithContext) error {
 					AssertFalse(t, result.Next(ctx))
 					AssertFalse(t, result.Next(ctx))
+					return result.Err()
+				},
+			},
+			{
+				scenario: "with Peek and Err",
+				callback: func(t *testing.T, result *resultWithContext) error {
+					AssertFalse(t, result.Peek(ctx))
+					return result.Err()
+				},
+			},
+			{
+				scenario: "with several Peek calls and Err",
+				callback: func(t *testing.T, result *resultWithContext) error {
+					AssertFalse(t, result.Peek(ctx))
+					AssertFalse(t, result.Peek(ctx))
 					return result.Err()
 				},
 			},
