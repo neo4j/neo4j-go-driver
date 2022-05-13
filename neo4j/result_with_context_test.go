@@ -166,20 +166,40 @@ func TestResult(outer *testing.T) {
 	})
 
 	// Peek
-	outer.Run("Peeks records", func(t *testing.T) {
-		record := recs[0]
-		conn := &ConnFake{Nexts: []Next{{Record: record}}}
+	outer.Run("Peeks records", func(inner *testing.T) {
+		record1 := recs[0]
+		record2 := recs[1]
 
-		result := newResultWithContext(conn, streamHandle, cypher, params)
+		inner.Run("peeks single record", func(t *testing.T) {
+			conn := &ConnFake{Nexts: []Next{{Record: record1}}}
 
-		AssertTrue(t, result.Peek(ctx))
-		AssertDeepEquals(t, record, result.Record())
-		AssertTrue(t, result.Next(ctx))
-		AssertDeepEquals(t, record, result.Record())
-		AssertFalse(t, result.Peek(ctx))
-		AssertDeepEquals(t, record, result.Record())
-		AssertFalse(t, result.Next(ctx))
-		AssertNil(t, result.Record())
+			result := newResultWithContext(conn, streamHandle, cypher, params)
+
+			AssertTrue(t, result.Peek(ctx))
+			AssertDeepEquals(t, record1, result.Record())
+			AssertTrue(t, result.Next(ctx))
+			AssertDeepEquals(t, record1, result.Record())
+			AssertFalse(t, result.Peek(ctx))
+			AssertDeepEquals(t, record1, result.Record())
+			AssertFalse(t, result.Next(ctx))
+			AssertNil(t, result.Record())
+		})
+
+		inner.Run("peeks once and fetches subsequent records", func(t *testing.T) {
+			conn := &ConnFake{Nexts: []Next{{Record: record1}, {Record: record2}}}
+
+			result := newResultWithContext(conn, streamHandle, cypher, params)
+
+			AssertTrue(t, result.Peek(ctx))
+			AssertDeepEquals(t, record1, result.Record())
+			AssertTrue(t, result.Next(ctx))
+			AssertDeepEquals(t, record1, result.Record())
+			AssertTrue(t, result.Next(ctx))
+			AssertDeepEquals(t, record2, result.Record())
+			AssertFalse(t, result.Peek(ctx))
+			AssertFalse(t, result.Next(ctx))
+		})
+
 	})
 
 	// Consume
