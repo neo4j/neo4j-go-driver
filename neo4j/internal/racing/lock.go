@@ -28,7 +28,7 @@ func (c *contextLock) TryLock(ctx context.Context) bool {
 		c.ch <- struct{}{}
 		return true
 	} else if deadline.Before(time.Now()) {
-		// if the channel is already done and the lock is free
+		// if the context is already done and the lock is available
 		// select will pick any of the case at random
 		return false
 	}
