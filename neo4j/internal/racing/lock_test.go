@@ -4,7 +4,6 @@ import (
 	"context"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/racing"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/testutil"
-	"sync"
 	"testing"
 	"time"
 )
@@ -21,20 +20,16 @@ func TestMutex(outer *testing.T) {
 	})
 
 	outer.Run("locks successfully without deadline after first unlocking", func(t *testing.T) {
-		lockedSecondTime := false
 		mutex := racing.NewMutex()
-		var wait sync.WaitGroup
-		wait.Add(1)
+		result := make(chan bool, 1)
 
 		mutex.TryLock(backgroundCtx)
 		go func() {
-			defer wait.Done()
-			lockedSecondTime = mutex.TryLock(backgroundCtx)
+			result <- mutex.TryLock(backgroundCtx)
 		}()
 		mutex.Unlock()
-		wait.Wait()
 
-		testutil.AssertTrue(t, lockedSecondTime)
+		testutil.AssertTrue(t, <-result)
 	})
 
 	outer.Run("fails to lock after deadline reached", func(t *testing.T) {
@@ -47,5 +42,22 @@ func TestMutex(outer *testing.T) {
 		result := mutex.TryLock(timeout)
 
 		testutil.AssertFalse(t, result)
+	})
+
+	outer.Run("fails to lock when other routine unlocks it after deadline", func(t *testing.T) {
+		mutex := racing.NewMutex()
+		result := make(chan bool, 1)
+		delay := 20 * time.Millisecond
+
+		mutex.TryLock(backgroundCtx)
+		go func() {
+			timeout, cancelFunc := context.WithTimeout(backgroundCtx, delay)
+			defer cancelFunc()
+			result <- mutex.TryLock(timeout)
+		}()
+		time.Sleep(2 * delay)
+		mutex.Unlock()
+
+		testutil.AssertFalse(t, <-result)
 	})
 }
