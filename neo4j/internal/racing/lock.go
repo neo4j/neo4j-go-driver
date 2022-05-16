@@ -10,8 +10,9 @@ type Mutex interface {
 	// If the context does not define a deadline, TryLock will block until the lock is acquired
 	// Returns true if the lock is acquired in time, false otherwise
 	TryLock(ctx context.Context) bool
-	// Unlock frees this lock. This should only be called if TryLock is successful.
-	Unlock()
+	// Unlock frees this lock.
+	// Returns true if this is currently locked, false otherwise.
+	Unlock() bool
 }
 
 type contextLock struct {
@@ -39,6 +40,12 @@ func (c *contextLock) TryLock(ctx context.Context) bool {
 	}
 }
 
-func (c *contextLock) Unlock() {
-	<-c.ch
+func (c *contextLock) Unlock() bool {
+	select {
+	case <-c.ch:
+		return true
+	default:
+		return false
+	}
+
 }
