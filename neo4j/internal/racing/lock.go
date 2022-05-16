@@ -8,10 +8,10 @@ import (
 type Mutex interface {
 	// TryLock attempts to acquire the lock before the deadline set by the provided context
 	// If the context does not define a deadline, TryLock will block until the lock is acquired
-	// Returns true if the lock is acquired in time, false otherwise
+	// Returns true if the lock is acquired, false otherwise
 	TryLock(ctx context.Context) bool
-	// Unlock frees this lock.
-	// Returns true if this is currently locked, false otherwise.
+	// Unlock frees this lock, if locked
+	// Returns true after successful unloking, false otherwise.
 	Unlock() bool
 }
 
