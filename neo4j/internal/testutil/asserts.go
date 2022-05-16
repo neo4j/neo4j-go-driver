@@ -221,3 +221,13 @@ func AssertAfter(t *testing.T, t1, t2 time.Time) {
 
 	}
 }
+
+func AssertPanics(t *testing.T, f func()) {
+	t.Helper()
+	defer func() {
+		if err := recover(); err == nil {
+			t.Errorf("Expected to function to panic, but did not or emitted a nil value")
+		}
+	}()
+	f()
+}

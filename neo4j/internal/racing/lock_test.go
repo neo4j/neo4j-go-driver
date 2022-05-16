@@ -13,21 +13,19 @@ func TestMutex(outer *testing.T) {
 
 	backgroundCtx := context.Background()
 
-	outer.Run("does not unlock unlocked lock", func(t *testing.T) {
+	outer.Run("panics when unlocking unlocked lock", func(t *testing.T) {
 		mutex := racing.NewMutex()
 
-		result := mutex.Unlock()
-
-		testutil.AssertFalse(t, result)
+		testutil.AssertPanics(t, mutex.Unlock)
 	})
 
 	outer.Run("locks and unlocks successfully without deadline", func(t *testing.T) {
 		mutex := racing.NewMutex()
 
 		result := mutex.TryLock(backgroundCtx)
+		mutex.Unlock()
 
 		testutil.AssertTrue(t, result)
-		testutil.AssertTrue(t, mutex.Unlock())
 	})
 
 	outer.Run("locks and unlocks successfully without deadline after first unlocking", func(t *testing.T) {
@@ -38,13 +36,13 @@ func TestMutex(outer *testing.T) {
 		go func() {
 			result <- mutex.TryLock(backgroundCtx)
 		}()
+		mutex.Unlock()
 
-		testutil.AssertTrue(t, mutex.Unlock())
 		testutil.AssertTrue(t, <-result)
-		testutil.AssertTrue(t, mutex.Unlock())
+		mutex.Unlock()
 	})
 
-	outer.Run("fails to lock and unlock after deadline reached", func(t *testing.T) {
+	outer.Run("fails to lock and panics when unlocking after deadline reached", func(t *testing.T) {
 		delay := 20 * time.Millisecond
 		timeout, cancelFunc := context.WithTimeout(backgroundCtx, delay)
 		defer cancelFunc()
@@ -54,10 +52,10 @@ func TestMutex(outer *testing.T) {
 		result := mutex.TryLock(timeout)
 
 		testutil.AssertFalse(t, result)
-		testutil.AssertFalse(t, mutex.Unlock())
+		testutil.AssertPanics(t, mutex.Unlock)
 	})
 
-	outer.Run("fails to lock and unlock when other routine unlocks it after deadline", func(t *testing.T) {
+	outer.Run("fails to lock and panics when unlocking after another routine unlocks the lock after deadline", func(t *testing.T) {
 		mutex := racing.NewMutex()
 		result := make(chan bool, 1)
 		delay := 20 * time.Millisecond
@@ -70,8 +68,8 @@ func TestMutex(outer *testing.T) {
 		}()
 		time.Sleep(2 * delay)
 
-		testutil.AssertTrue(t, mutex.Unlock())
+		mutex.Unlock()
 		testutil.AssertFalse(t, <-result)
-		testutil.AssertFalse(t, mutex.Unlock())
+		testutil.AssertPanics(t, mutex.Unlock)
 	})
 }

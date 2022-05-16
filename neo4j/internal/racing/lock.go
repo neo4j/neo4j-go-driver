@@ -11,8 +11,8 @@ type Mutex interface {
 	// Returns true if the lock is acquired, false otherwise
 	TryLock(ctx context.Context) bool
 	// Unlock frees this lock, if locked
-	// Returns true after successful unloking, false otherwise.
-	Unlock() bool
+	// It is a run-time error if the lock is not locked on entry to Unlock.
+	Unlock()
 }
 
 type contextLock struct {
@@ -40,12 +40,12 @@ func (c *contextLock) TryLock(ctx context.Context) bool {
 	}
 }
 
-func (c *contextLock) Unlock() bool {
+func (c *contextLock) Unlock() {
 	select {
 	case <-c.ch:
-		return true
+		return
 	default:
-		return false
+		panic("Lock is not locked")
 	}
 
 }
