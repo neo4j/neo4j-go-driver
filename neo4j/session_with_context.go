@@ -117,8 +117,8 @@ const FetchDefault = 0
 // Connection pool as seen by the session.
 type sessionPool interface {
 	Borrow(ctx context.Context, serverNames []string, wait bool, boltLogger log.BoltLogger, livenessCheckThreshold time.Duration) (idb.Connection, error)
-	Return(ctx context.Context, c idb.Connection)
-	CleanUp(ctx context.Context)
+	Return(ctx context.Context, c idb.Connection) error
+	CleanUp(ctx context.Context) error
 }
 
 type sessionWithContext struct {
@@ -320,12 +320,17 @@ func (s *sessionWithContext) runRetriable(
 		MaxDeadConnections:      s.config.MaxConnectionPoolSize,
 		Router:                  s.router,
 		DatabaseName:            s.databaseName,
-		OnDeadConnection: func(server string) {
+		OnDeadConnection: func(server string) error {
 			if mode == idb.WriteMode {
-				s.router.InvalidateWriter(s.databaseName, server)
+				if err := s.router.InvalidateWriter(ctx, s.databaseName, server); err != nil {
+					return err
+				}
 			} else {
-				s.router.InvalidateReader(s.databaseName, server)
+				if err := s.router.InvalidateReader(ctx, s.databaseName, server); err != nil {
+					return err
+				}
 			}
+			return nil
 		},
 	}
 	for state.Continue() {
@@ -361,7 +366,7 @@ func (s *sessionWithContext) executeTransactionFunction(
 
 	conn, err := s.getConnection(ctx, mode, pool.DefaultLivenessCheckThreshold)
 	if err != nil {
-		state.OnFailure(conn, err, false)
+		state.OnFailure(ctx, conn, err, false)
 		return true, nil
 	}
 
@@ -377,7 +382,7 @@ func (s *sessionWithContext) executeTransactionFunction(
 			ImpersonatedUser: s.impersonatedUser,
 		})
 	if err != nil {
-		state.OnFailure(conn, err, false)
+		state.OnFailure(ctx, conn, err, false)
 		return true, nil
 	}
 
@@ -388,13 +393,13 @@ func (s *sessionWithContext) executeTransactionFunction(
 		// client wants to rollback. We don't do an explicit rollback here
 		// but instead rely on the pool invoking reset on the connection,
 		// that will do an implicit rollback.
-		state.OnFailure(conn, err, false)
+		state.OnFailure(ctx, conn, err, false)
 		return true, nil
 	}
 
 	err = conn.TxCommit(ctx, txHandle)
 	if err != nil {
-		state.OnFailure(conn, err, true)
+		state.OnFailure(ctx, conn, err, true)
 		return true, nil
 	}
 
@@ -520,24 +525,25 @@ func (s *sessionWithContext) Run(ctx context.Context,
 }
 
 func (s *sessionWithContext) Close(ctx context.Context) error {
-	var err error
-
+	var txErr error
 	if s.explicitTx != nil {
-		err = s.explicitTx.Close(ctx)
+		txErr = s.explicitTx.Close(ctx)
 	}
 
 	if s.autocommitTx != nil {
 		s.autocommitTx.discard(ctx)
 	}
 
-	s.log.Debugf(log.Session, s.logId, "Closed")
-
-	// Schedule cleanups
+	defer s.log.Debugf(log.Session, s.logId, "Closed")
+	poolErrChan := make(chan error, 1)
+	routerErrChan := make(chan error, 1)
 	go func() {
-		s.pool.CleanUp(ctx)
-		s.router.CleanUp()
+		poolErrChan <- s.pool.CleanUp(ctx)
 	}()
-	return err
+	go func() {
+		routerErrChan <- s.router.CleanUp(ctx)
+	}()
+	return combineAllErrors(txErr, <-poolErrChan, <-routerErrChan)
 }
 
 func (s *sessionWithContext) legacy() Session {

@@ -36,6 +36,7 @@ func (p *poolFake) Borrow(_ context.Context, servers []string, _ bool, logger lo
 	return p.borrow(servers, p.cancel, logger)
 }
 
-func (p *poolFake) Return(_ context.Context, c db.Connection) {
+func (p *poolFake) Return(_ context.Context, c db.Connection) error {
 	p.returned = append(p.returned, c)
+	return nil
 }

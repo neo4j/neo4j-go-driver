@@ -44,14 +44,16 @@ func (p *PoolFake) Borrow(context.Context, []string, bool, log.BoltLogger, time.
 	return p.BorrowConn, p.BorrowErr
 }
 
-func (p *PoolFake) Return(context.Context, db.Connection) {
+func (p *PoolFake) Return(context.Context, db.Connection) error {
 	if p.ReturnHook != nil {
 		p.ReturnHook()
 	}
+	return nil
 }
 
-func (p *PoolFake) CleanUp(context.Context) {
+func (p *PoolFake) CleanUp(context.Context) error {
 	if p.CleanUpHook != nil {
 		p.CleanUpHook()
 	}
+	return nil
 }

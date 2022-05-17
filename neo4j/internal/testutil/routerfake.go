@@ -37,17 +37,22 @@ type RouterFake struct {
 	InvalidatedServer      string
 }
 
-func (r *RouterFake) InvalidateReader(database string, server string) {
-	r.Invalidate(database)
+func (r *RouterFake) InvalidateReader(ctx context.Context, database string, server string) error {
+	if err := r.Invalidate(ctx, database); err != nil {
+		return err
+	}
 	r.InvalidatedServer = server
+	return nil
 }
 
-func (r *RouterFake) InvalidateWriter(string, string) {
+func (r *RouterFake) InvalidateWriter(context.Context, string, string) error {
+	return nil
 }
 
-func (r *RouterFake) Invalidate(database string) {
+func (r *RouterFake) Invalidate(ctx context.Context, database string) error {
 	r.InvalidatedDb = database
 	r.Invalidated = true
+	return nil
 }
 
 func (r *RouterFake) Readers(ctx context.Context, bookmarks []string, database string, log log.BoltLogger) ([]string, error) {
@@ -71,8 +76,9 @@ func (r *RouterFake) GetNameOfDefaultDatabase(ctx context.Context, bookmarks []s
 	return "", nil
 }
 
-func (r *RouterFake) CleanUp() {
+func (r *RouterFake) CleanUp(ctx context.Context) error {
 	if r.CleanUpHook != nil {
 		r.CleanUpHook()
 	}
+	return nil
 }

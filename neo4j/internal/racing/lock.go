@@ -5,6 +5,12 @@ import (
 	"time"
 )
 
+type LockTimeoutError string
+
+func (l LockTimeoutError) Error() string {
+	return string(l)
+}
+
 type Mutex interface {
 	// TryLock attempts to acquire the lock before the deadline set by the provided context
 	// If the context does not define a deadline, TryLock will block until the lock is acquired

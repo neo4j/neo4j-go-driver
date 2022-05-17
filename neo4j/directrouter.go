@@ -30,26 +30,30 @@ type directRouter struct {
 	address string
 }
 
-func (r *directRouter) InvalidateWriter(string, string) {
+func (r *directRouter) InvalidateWriter(context.Context, string, string) error {
+	return nil
 }
 
-func (r *directRouter) InvalidateReader(string, string) {
+func (r *directRouter) InvalidateReader(context.Context, string, string) error {
+	return nil
 }
 
-func (r *directRouter) Readers(ctx context.Context, bookmarks []string, database string, boltLogger log.BoltLogger) ([]string, error) {
+func (r *directRouter) Readers(context.Context, []string, string, log.BoltLogger) ([]string, error) {
 	return []string{r.address}, nil
 }
 
-func (r *directRouter) Writers(ctx context.Context, bookmarks []string, database string, boltLogger log.BoltLogger) ([]string, error) {
+func (r *directRouter) Writers(context.Context, []string, string, log.BoltLogger) ([]string, error) {
 	return []string{r.address}, nil
 }
 
-func (r *directRouter) GetNameOfDefaultDatabase(ctx context.Context, bookmarks []string, user string, boltLogger log.BoltLogger) (string, error) {
+func (r *directRouter) GetNameOfDefaultDatabase(context.Context, []string, string, log.BoltLogger) (string, error) {
 	return db.DefaultDatabase, nil
 }
 
-func (r *directRouter) Invalidate(database string) {
+func (r *directRouter) Invalidate(context.Context, string) error {
+	return nil
 }
 
-func (r *directRouter) CleanUp() {
+func (r *directRouter) CleanUp(context.Context) error {
+	return nil
 }

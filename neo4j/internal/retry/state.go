@@ -21,6 +21,7 @@
 package retry
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	idb "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
@@ -31,7 +32,7 @@ import (
 )
 
 type Router interface {
-	Invalidate(database string)
+	Invalidate(ctx context.Context, database string) error
 }
 
 type CommitFailedDeadError struct {
@@ -63,10 +64,10 @@ type State struct {
 	cause            string
 	deadErrors       int
 	skipSleep        bool
-	OnDeadConnection func(server string)
+	OnDeadConnection func(server string) error
 }
 
-func (s *State) OnFailure(conn idb.Connection, err error, isCommitting bool) {
+func (s *State) OnFailure(ctx context.Context, conn idb.Connection, err error, isCommitting bool) {
 	s.LastErr = err
 	s.cause = ""
 	s.skipSleep = false
@@ -120,7 +121,10 @@ func (s *State) OnFailure(conn idb.Connection, err error, isCommitting bool) {
 	if dbErr, isDbErr := err.(*db.Neo4jError); isDbErr {
 		if dbErr.IsRetriableCluster() {
 			// Force routing tables to be updated before trying again
-			s.Router.Invalidate(s.DatabaseName)
+			if err := s.Router.Invalidate(ctx, s.DatabaseName); err != nil {
+				s.stop = true
+				s.LastErr = err
+			}
 			s.cause = "Cluster error"
 			return
 		}

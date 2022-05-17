@@ -177,12 +177,30 @@ type ctxCloser interface {
 }
 
 func deferredClose(ctx context.Context, closer ctxCloser, prevErr error) error {
-	err := closer.Close(ctx)
-	if err == nil {
-		return prevErr
+	return combineErrors(prevErr, closer.Close(ctx))
+}
+
+func combineAllErrors(errs ...error) error {
+	count := len(errs)
+	if count == 0 {
+		return nil
 	}
-	if prevErr == nil {
+	err := errs[0]
+	if count == 1 {
 		return err
 	}
-	return fmt.Errorf("close error %v after previous error %w", err, prevErr)
+	for i := 1; i < count; i++ {
+		err = combineErrors(err, errs[i])
+	}
+	return err
+}
+
+func combineErrors(err1, err2 error) error {
+	if err2 == nil {
+		return err1
+	}
+	if err1 == nil {
+		return err2
+	}
+	return fmt.Errorf("error %v occurred after previous error %w", err2, err1)
 }

@@ -483,7 +483,7 @@ func (b *backend) handleRequest(req map[string]interface{}) {
 		if data["impersonatedUser"] != nil {
 			sessionConfig.ImpersonatedUser = data["impersonatedUser"].(string)
 		}
-		session := driver.NewSession(sessionConfig)
+		session := driver.NewSession(ctx, sessionConfig)
 		idKey := b.nextId()
 		b.sessionStates[idKey] = &sessionState{session: session}
 		b.writeResponse("Session", map[string]interface{}{"id": idKey})
@@ -682,7 +682,7 @@ func (b *backend) handleRequest(req map[string]interface{}) {
 
 	case "CheckMultiDBSupport":
 		driver := b.drivers[data["driverId"].(string)]
-		session := driver.NewSession(neo4j.SessionConfig{
+		session := driver.NewSession(ctx, neo4j.SessionConfig{
 			BoltLogger: neo4j.ConsoleBoltLogger(),
 		})
 		result, err := session.Run(ctx, "RETURN 42", nil)

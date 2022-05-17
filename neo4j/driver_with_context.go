@@ -24,11 +24,10 @@ import (
 	"context"
 	"fmt"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/racing"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/log"
 	"net/url"
 	"strings"
-	"sync"
-
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/log"
 
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/connector"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/pool"
@@ -52,7 +51,7 @@ type DriverWithContext interface {
 	// Target returns the url this driver is bootstrapped
 	Target() url.URL
 	// NewSession creates a new session based on the specified session configuration.
-	NewSession(config SessionConfig) SessionWithContext
+	NewSession(ctx context.Context, config SessionConfig) SessionWithContext
 	// VerifyConnectivity checks that the driver can connect to a remote server or cluster by
 	// establishing a network connection with the remote. Returns nil if successful
 	// or error describing the problem.
@@ -89,7 +88,7 @@ func NewDriverWithContext(target string, auth AuthToken, configurers ...func(*Co
 		return nil, err
 	}
 
-	d := driverWithContext{target: parsed}
+	d := driverWithContext{target: parsed, mut: racing.NewMutex()}
 
 	routing := true
 	d.connector.Network = "tcp"
@@ -168,7 +167,7 @@ func NewDriverWithContext(target string, auth AuthToken, configurers ...func(*Co
 	d.connector.Auth = auth.tokens
 	d.connector.RoutingContext = routingContext
 
-	// Let the pool use the same logid as the driver to simplify log reading.
+	// Let the pool use the same log ID as the driver to simplify log reading.
 	d.pool = pool.New(d.config.MaxConnectionPoolSize, d.config.MaxConnectionLifetime, d.connector.Connect, d.log, d.logId)
 
 	if !routing {
@@ -186,7 +185,7 @@ func NewDriverWithContext(target string, auth AuthToken, configurers ...func(*Co
 				return servers
 			}
 		}
-		// Let the router use the same logid as the driver to simplify log reading.
+		// Let the router use the same log ID as the driver to simplify log reading.
 		d.router = router.New(address, routersResolver, routingContext, d.pool, d.log, d.logId)
 	}
 
@@ -237,17 +236,17 @@ type sessionRouter interface {
 	// GetNameOfDefaultDatabase returns the name of the default database for the specified user.
 	// The correct database name is needed when requesting readers or writers.
 	GetNameOfDefaultDatabase(ctx context.Context, bookmarks []string, user string, boltLogger log.BoltLogger) (string, error)
-	Invalidate(database string)
-	CleanUp()
-	InvalidateWriter(name string, server string)
-	InvalidateReader(name string, server string)
+	Invalidate(ctx context.Context, database string) error
+	CleanUp(ctx context.Context) error
+	InvalidateWriter(ctx context.Context, name string, server string) error
+	InvalidateReader(ctx context.Context, name string, server string) error
 }
 
 type driverWithContext struct {
 	target    *url.URL
 	config    *Config
 	pool      *pool.Pool
-	mut       sync.Mutex
+	mut       racing.Mutex
 	connector connector.Connector
 	router    sessionRouter
 	logId     string
@@ -258,12 +257,15 @@ func (d *driverWithContext) Target() url.URL {
 	return *d.target
 }
 
-func (d *driverWithContext) NewSession(config SessionConfig) SessionWithContext {
+func (d *driverWithContext) NewSession(ctx context.Context, config SessionConfig) SessionWithContext {
 	if config.DatabaseName == "" {
 		config.DatabaseName = db.DefaultDatabase
 	}
 
-	d.mut.Lock()
+	if !d.mut.TryLock(ctx) {
+		return &erroredSessionWithContext{
+			err: racing.LockTimeoutError("could not acquire lock in time when creating session")}
+	}
 	defer d.mut.Unlock()
 	if d.pool == nil {
 		return &erroredSessionWithContext{
@@ -282,7 +284,7 @@ func (d *driverWithContext) IsEncrypted() bool {
 }
 
 func (d *driverWithContext) GetServerInfo(ctx context.Context) (_ ServerInfo, err error) {
-	session := d.NewSession(SessionConfig{})
+	session := d.NewSession(ctx, SessionConfig{})
 	defer func() {
 		err = deferredClose(ctx, session, err)
 	}()
@@ -290,11 +292,15 @@ func (d *driverWithContext) GetServerInfo(ctx context.Context) (_ ServerInfo, er
 }
 
 func (d *driverWithContext) Close(ctx context.Context) error {
-	d.mut.Lock()
+	if !d.mut.TryLock(ctx) {
+		return racing.LockTimeoutError("could not acquire lock in time when closing driver")
+	}
 	defer d.mut.Unlock()
 	// Safeguard against closing more than once
 	if d.pool != nil {
-		d.pool.Close(ctx)
+		if err := d.pool.Close(ctx); err != nil {
+			return err
+		}
 	}
 	d.pool = nil
 	d.log.Infof(log.Driver, d.logId, "Closed")
