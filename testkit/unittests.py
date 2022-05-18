@@ -22,4 +22,4 @@ if __name__ == "__main__":
     run(cmd + ["-buildvcs=false", "-short", "./..."])
 
     # Repeat racing tests
-    run(cmd + ["-buildvcs=false", "-count", "50", "./neo4j/internal/racing"])
+    run(cmd + ["-buildvcs=false", "-race", "-count", "50", "./neo4j/internal/racing"])
