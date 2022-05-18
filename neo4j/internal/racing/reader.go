@@ -22,6 +22,7 @@ package racing
 import (
 	"context"
 	"io"
+	"time"
 )
 
 type RacingReader interface {
@@ -46,7 +47,12 @@ func (rr *racingReader) ReadFull(ctx context.Context, bytes []byte) (int, error)
 }
 
 func (rr *racingReader) race(ctx context.Context, bytes []byte, readFn func(io.Reader, []byte) (int, error)) (int, error) {
-	if err := ctx.Err(); err != nil {
+	deadline, hasDeadline := ctx.Deadline()
+	err := ctx.Err()
+	switch {
+	case !hasDeadline && err == nil:
+		return readFn(rr.reader, bytes)
+	case deadline.Before(time.Now()) || err != nil:
 		return 0, err
 	}
 	resultChan := make(chan *ioResult, 1)

@@ -22,6 +22,7 @@ package racing
 import (
 	"context"
 	"io"
+	"time"
 )
 
 type RacingWriter interface {
@@ -42,7 +43,12 @@ type ioResult struct {
 }
 
 func (rw *racingWriter) Write(ctx context.Context, bytes []byte) (int, error) {
-	if err := ctx.Err(); err != nil {
+	deadline, hasDeadline := ctx.Deadline()
+	err := ctx.Err()
+	switch {
+	case !hasDeadline && err == nil:
+		return rw.writer.Write(bytes)
+	case deadline.Before(time.Now()) || err != nil:
 		return 0, err
 	}
 	resultChan := make(chan *ioResult, 1)

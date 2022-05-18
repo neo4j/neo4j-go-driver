@@ -42,6 +42,15 @@ func TestMutex(outer *testing.T) {
 		mutex.Unlock()
 	})
 
+	outer.Run("fails to lock and panics when unlocking with a canceled context", func(t *testing.T) {
+		mutex := racing.NewMutex()
+
+		result := mutex.TryLock(canceledContext())
+
+		testutil.AssertFalse(t, result)
+		testutil.AssertPanics(t, mutex.Unlock)
+	})
+
 	outer.Run("fails to lock and panics when unlocking after deadline reached", func(t *testing.T) {
 		delay := 20 * time.Millisecond
 		timeout, cancelFunc := context.WithTimeout(backgroundCtx, delay)

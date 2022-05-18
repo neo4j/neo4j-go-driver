@@ -30,14 +30,16 @@ func NewMutex() Mutex {
 }
 
 func (c *contextLock) TryLock(ctx context.Context) bool {
-	if deadline, hasDeadline := ctx.Deadline(); !hasDeadline {
+	deadline, hasDeadline := ctx.Deadline()
+	err := ctx.Err()
+	switch {
+	case !hasDeadline && err == nil:
 		c.ch <- struct{}{}
 		return true
-	} else if deadline.Before(time.Now()) {
-		// if the context is already done and the lock is available
-		// select will pick any of the case at random
+	case deadline.Before(time.Now()) || err != nil:
 		return false
 	}
+
 	select {
 	case c.ch <- struct{}{}:
 		return true
