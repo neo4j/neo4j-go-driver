@@ -85,10 +85,10 @@ func TestRacingReader(outer *testing.T) {
 		})
 
 		outer.Run(fmt.Sprintf(`[%s] completes before read occurs`, testCase.qualifier), func(t *testing.T) {
-			reader := &slowFailingReader{sleep: 2 * time.Minute}
+			reader := &slowFailingReader{sleep: 50 * time.Millisecond}
 			racingReader := rio.NewRacingReader(reader)
 			result := make([]byte, 2)
-			ctx, cancelFunc := context.WithTimeout(context.Background(), 200*time.Millisecond)
+			ctx, cancelFunc := context.WithTimeout(context.Background(), 10*time.Millisecond)
 			defer cancelFunc()
 
 			n, err := testCase.readOperation(racingReader)(ctx, result)
@@ -102,7 +102,7 @@ func TestRacingReader(outer *testing.T) {
 		})
 
 		outer.Run("connection read times out after 1 successful read", func(t *testing.T) {
-			timeout := 400 * time.Millisecond
+			timeout := 100 * time.Millisecond
 			server, client := net.Pipe()
 			defer closePipe(t, server, client)
 			go func() {
