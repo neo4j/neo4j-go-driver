@@ -50,6 +50,8 @@ type Config struct {
 	// The MinVersion attribute is always set to VersionTLS11
 	// The InsecureSkipVerify attribute of TlsConfig is always derived from the initial URI scheme.
 	// The ServerName attribute of TlsConfig is always derived from the initial URI host.
+	//
+	// This is considered an advanced setting, use it at your own risk.
 	TlsConfig *tls.Config
 
 	// Logging target the driver will send its log outputs
