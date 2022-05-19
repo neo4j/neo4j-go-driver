@@ -259,56 +259,9 @@ func (s *session) runRetriable(
 		DatabaseName:            s.databaseName,
 	}
 	for state.Continue() {
-		// Establish new connection
-		conn, err := s.getConnection(mode)
-		if err != nil {
-			state.OnFailure(conn, err, false)
-			continue
+		if workResult := s.tryRun(&state, mode, &config, work); workResult != nil {
+			return workResult, nil
 		}
-
-		// Begin transaction
-		txHandle, err := conn.TxBegin(db.TxConfig{
-			Mode:      mode,
-			Bookmarks: s.bookmarks,
-			Timeout:   config.Timeout,
-			Meta:      config.Metadata,
-		})
-		if err != nil {
-			state.OnFailure(conn, err, false)
-			s.pool.Return(conn)
-			continue
-		}
-
-		// Construct a transaction like thing for client to execute stuff on
-		// and invoke the client work function.
-		tx := retryableTransaction{conn: conn, fetchSize: s.fetchSize, txHandle: txHandle}
-		x, err := work(&tx)
-		// Evaluate the returned error from all the work for retryable, this means
-		// that client can mess up the error handling.
-		if err != nil {
-			// If the client returns a client specific error that means that
-			// client wants to rollback. We don't do an explicit rollback here
-			// but instead realy on pool invoking reset on the connection, that
-			// will do an implicit rollback.
-			state.OnFailure(conn, err, false)
-			s.pool.Return(conn)
-			continue
-		}
-
-		// Commit transaction
-		err = conn.TxCommit(txHandle)
-		if err != nil {
-			state.OnFailure(conn, err, true)
-			s.pool.Return(conn)
-			continue
-		}
-
-		// Collect bookmark and return connection to pool
-		s.retrieveBookmarks(conn)
-		s.pool.Return(conn)
-
-		// All well
-		return x, nil
 	}
 
 	// When retries has occured wrap the error, the last error is always added but
@@ -337,6 +290,48 @@ func (s *session) WriteTransaction(
 	work TransactionWork, configurers ...func(*TransactionConfig)) (interface{}, error) {
 
 	return s.runRetriable(db.WriteMode, work, configurers...)
+}
+
+func (s *session) tryRun(state *retry.State, mode db.AccessMode, config *TransactionConfig, work TransactionWork) interface{} {
+	// Establish new connection
+	conn, err := s.getConnection(mode)
+	if err != nil {
+		state.OnFailure(conn, err, false)
+		return nil
+	}
+	defer s.pool.Return(conn)
+	txHandle, err := conn.TxBegin(db.TxConfig{
+		Mode:      mode,
+		Bookmarks: s.bookmarks,
+		Timeout:   config.Timeout,
+		Meta:      config.Metadata,
+	})
+	if err != nil {
+		state.OnFailure(conn, err, false)
+		return nil
+	}
+
+	tx := retryableTransaction{conn: conn, fetchSize: s.fetchSize, txHandle: txHandle}
+	x, err := work(&tx)
+	// Evaluate the returned error from all the work for retryable, this means
+	// that client can mess up the error handling.
+	if err != nil {
+		// If the client returns a client specific error that means that
+		// client wants to rollback. We don't do an explicit rollback here
+		// but instead rely on pool invoking reset on the connection, that
+		// will do an implicit rollback.
+		state.OnFailure(conn, err, false)
+		return nil
+	}
+
+	err = conn.TxCommit(txHandle)
+	if err != nil {
+		state.OnFailure(conn, err, true)
+		return nil
+	}
+
+	s.retrieveBookmarks(conn)
+	return x
 }
 
 func (s *session) getServers(ctx context.Context, mode db.AccessMode) ([]string, error) {
