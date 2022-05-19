@@ -52,15 +52,9 @@ func (rr *racingReader) race(ctx context.Context, bytes []byte, readFn func(io.R
 		return 0, wrapRaceError(err)
 	}
 	resultChan := make(chan *ioResult, 1)
-	defer close(resultChan)
 	go func() {
+		defer close(resultChan)
 		n, err := readFn(rr.reader, bytes)
-		defer func() {
-			// When the read operation completes, the outer function may have returned already.
-			// In that situation, the channel will have been closed and the result emission will crash.
-			// Let's just swallow the panic that may happen and ignore it
-			_ = recover()
-		}()
 		resultChan <- &ioResult{
 			n:   n,
 			err: err,

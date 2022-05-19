@@ -21,3 +21,5 @@ if __name__ == "__main__":
 
     run(cmd + ["./neo4j"])
     run(cmd + ["./neo4j/internal/..."])
+    # Repeat racing tests
+    run(cmd + ["-race", "-count", "50", "./neo4j/internal/racingio"])
