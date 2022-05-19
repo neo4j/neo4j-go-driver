@@ -162,6 +162,29 @@ func TestSession(st *testing.T) {
 			AssertStringEqual(t, mydb, conn.DatabaseName)
 			AssertIntEqual(t, numDefaultDbLookups, 1)
 		})
+
+		rt.Run("tx function panic returns conn to pool and bubbles up", func(t *testing.T) {
+			connectionIsReturned := false
+			_, pool, newSession := createSession()
+			pool.BorrowConn = &ConnFake{Alive: true}
+			pool.ReturnHook = func() {
+				connectionIsReturned = true
+			}
+			transactionFunction := func(Transaction) (interface{}, error) {
+				panic("oopsie")
+			}
+
+			defer func() {
+				err := recover()
+				if err != "oopsie" {
+					t.Errorf("expected panic to bubble up")
+				}
+				if !connectionIsReturned {
+					t.Errorf("expected connection to return to pool")
+				}
+			}()
+			_, _ = newSession.WriteTransaction(transactionFunction)
+		})
 	})
 
 	st.Run("Bookmarking", func(bt *testing.T) {
