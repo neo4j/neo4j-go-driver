@@ -152,6 +152,22 @@ func TestSession(st *testing.T) {
 			}()
 			_, _ = newSession.WriteTransaction(transactionFunction)
 		})
+
+		rt.Run("tx function panic returns conn to pool and bubbles up", func(t *testing.T) {
+			_, pool, newSession := createSession()
+			pool.BorrowConn = &ConnFake{Alive: true}
+			transactionFunction := func(Transaction) (interface{}, error) {
+				return nil, nil
+			}
+
+			result, err := newSession.WriteTransaction(transactionFunction)
+			if result != nil {
+				t.Errorf("expected nil result")
+			}
+			if err != nil {
+				t.Errorf("expected nil error")
+			}
+		})
 	})
 
 	st.Run("Bookmarking", func(bt *testing.T) {
