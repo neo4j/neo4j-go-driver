@@ -266,6 +266,7 @@ func (p *Pool) Borrow(ctx context.Context, serverNames []string, wait bool, bolt
 	// so check again to avoid potentially starving this thread.
 	conn, err = p.tryAnyIdle(ctx, serverNames, idlenessThreshold)
 	if err != nil {
+		p.queueMut.Unlock()
 		return nil, err
 	}
 	if conn != nil {
