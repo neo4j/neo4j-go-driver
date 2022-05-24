@@ -189,18 +189,18 @@ func TestPoolBorrowReturn(outer *testing.T) {
 		p := New(1, maxAge, succeedingConnect, logger, "pool id")
 		p.now = func() time.Time { return birthdate }
 		c1, _ := p.Borrow(ctx, []string{"A"}, true, nil, DefaultLivenessCheckThreshold)
-		ctx, cancel := context.WithCancel(ctx)
+		cancelableCtx, cancel := context.WithCancel(ctx)
 		wg := sync.WaitGroup{}
 		var err error
 		wg.Add(1)
 		go func() {
-			_, err = p.Borrow(ctx, []string{"A"}, true, nil, DefaultLivenessCheckThreshold)
+			_, err = p.Borrow(cancelableCtx, []string{"A"}, true, nil, DefaultLivenessCheckThreshold)
 			wg.Done()
 		}()
 
 		// Wait until entered queue
 		for {
-			if size, err := p.queueSize(ctx); err != nil {
+			if size, err := p.queueSize(cancelableCtx); err != nil {
 				t.Errorf("should not fail computing queue size, got: %v", err)
 			} else if size > 0 {
 				break
