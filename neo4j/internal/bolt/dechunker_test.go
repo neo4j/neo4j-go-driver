@@ -108,12 +108,13 @@ func TestDechunker(t *testing.T) {
 	}
 }
 
-func TestDechunkerWithTimeout(ot *testing.T) {
-	timeout := time.Millisecond * 600
+func TestDechunkerWithTimeout(outer *testing.T) {
+	outer.Parallel()
+	timeout := time.Millisecond * 30
 
-	ot.Run("Resets connection deadline upon successful reads", func(t *testing.T) {
+	outer.Run("Resets connection deadline upon successful reads", func(t *testing.T) {
 		serv, cli := net.Pipe()
-		defer closePipe(ot, serv, cli)
+		defer closePipe(outer, serv, cli)
 		go func() {
 			time.Sleep(timeout / 2)
 			AssertWriteSucceeds(t, cli, []byte{0x00, 0x00})
@@ -128,9 +129,9 @@ func TestDechunkerWithTimeout(ot *testing.T) {
 		AssertTrue(t, reflect.DeepEqual(buffer, []byte{0xCA, 0xFE}))
 	})
 
-	ot.Run("Fails when connection deadline is reached", func(t *testing.T) {
+	outer.Run("Fails when connection deadline is reached", func(t *testing.T) {
 		serv, cli := net.Pipe()
-		defer closePipe(ot, serv, cli)
+		defer closePipe(outer, serv, cli)
 
 		_, _, err := dechunkMessage(context.Background(), serv, nil, timeout, log.Void{}, "", "")
 
@@ -138,9 +139,9 @@ func TestDechunkerWithTimeout(ot *testing.T) {
 		AssertStringContain(t, err.Error(), "context deadline exceeded")
 	})
 
-	ot.Run("Fails when connection deadline is reached via context", func(t *testing.T) {
+	outer.Run("Fails when connection deadline is reached via context", func(t *testing.T) {
 		serv, cli := net.Pipe()
-		defer closePipe(ot, serv, cli)
+		defer closePipe(outer, serv, cli)
 		ctx, cancelFunc := context.WithTimeout(context.Background(), timeout)
 		defer cancelFunc()
 
