@@ -17,11 +17,12 @@
  * limitations under the License.
  */
 
-package racingio
+package racing
 
 import (
 	"context"
 	"io"
+	"time"
 )
 
 type RacingReader interface {
@@ -46,19 +47,18 @@ func (rr *racingReader) ReadFull(ctx context.Context, bytes []byte) (int, error)
 }
 
 func (rr *racingReader) race(ctx context.Context, bytes []byte, readFn func(io.Reader, []byte) (int, error)) (int, error) {
-	if err := ctx.Err(); err != nil {
+	deadline, hasDeadline := ctx.Deadline()
+	err := ctx.Err()
+	switch {
+	case !hasDeadline && err == nil:
+		return readFn(rr.reader, bytes)
+	case deadline.Before(time.Now()) || err != nil:
 		return 0, err
 	}
 	resultChan := make(chan *ioResult, 1)
-	defer close(resultChan)
 	go func() {
+		defer close(resultChan)
 		n, err := readFn(rr.reader, bytes)
-		defer func() {
-			// When the read operation completes, the outer function may have returned already.
-			// In that situation, the channel will have been closed and the result emission will crash.
-			// Let's just swallow the panic that may happen and ignore it
-			_ = recover()
-		}()
 		resultChan <- &ioResult{
 			n:   n,
 			err: err,

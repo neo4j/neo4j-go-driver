@@ -20,6 +20,7 @@
 package pool
 
 import (
+	"context"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
 	"testing"
 )
@@ -43,17 +44,24 @@ func assertNoConnection(t *testing.T, c db.Connection, err error) {
 	}
 }
 
-func assertNumberOfServers(t *testing.T, p *Pool, expectedNum int) {
+func assertNumberOfServers(t *testing.T, ctx context.Context, p *Pool, expectedNum int) {
 	t.Helper()
-	actualNum := len(p.getServers())
+	servers, err := p.getServers(ctx)
+	if err != nil {
+		t.Fatalf("Expected nil error, got: %v", err)
+	}
+	actualNum := len(servers)
 	if actualNum != expectedNum {
 		t.Fatalf("Expected number of servers to be %d but was %d", expectedNum, actualNum)
 	}
 }
 
-func assertNumberOfIdle(t *testing.T, p *Pool, serverName string, expectedNum int) {
+func assertNumberOfIdle(t *testing.T, ctx context.Context, p *Pool, serverName string, expectedNum int) {
 	t.Helper()
-	servers := p.getServers()
+	servers, err := p.getServers(ctx)
+	if err != nil {
+		t.Fatalf("Expected nil error, got: %v", err)
+	}
 	server := servers[serverName]
 	if server == nil {
 		t.Fatalf("Server %s not found", serverName)

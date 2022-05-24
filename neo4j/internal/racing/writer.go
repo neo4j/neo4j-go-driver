@@ -17,11 +17,12 @@
  * limitations under the License.
  */
 
-package racingio
+package racing
 
 import (
 	"context"
 	"io"
+	"time"
 )
 
 type RacingWriter interface {
@@ -42,19 +43,18 @@ type ioResult struct {
 }
 
 func (rw *racingWriter) Write(ctx context.Context, bytes []byte) (int, error) {
-	if err := ctx.Err(); err != nil {
+	deadline, hasDeadline := ctx.Deadline()
+	err := ctx.Err()
+	switch {
+	case !hasDeadline && err == nil:
+		return rw.writer.Write(bytes)
+	case deadline.Before(time.Now()) || err != nil:
 		return 0, err
 	}
 	resultChan := make(chan *ioResult, 1)
-	defer close(resultChan)
 	go func() {
+		defer close(resultChan)
 		n, err := rw.writer.Write(bytes)
-		defer func() {
-			// When the write operation completes, the outer function may have returned already.
-			// In that situation, the channel will have been closed and the result emission will crash.
-			// Let's just swallow the panic that may happen and ignore it
-			_ = recover()
-		}()
 		resultChan <- &ioResult{
 			n:   n,
 			err: err,

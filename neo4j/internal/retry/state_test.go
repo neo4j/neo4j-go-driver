@@ -20,6 +20,7 @@
 package retry
 
 import (
+	"context"
 	"errors"
 	idb "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
 	"io"
@@ -137,6 +138,7 @@ func TestState(outer *testing.T) {
 		},
 	}
 
+	ctx := context.Background()
 	for i, testCase := range testCases {
 		outer.Run(i, func(t *testing.T) {
 			now := baseTime
@@ -157,11 +159,11 @@ func TestState(outer *testing.T) {
 				}
 				router := &testutil.RouterFake{}
 				state.Router = router
-				state.OnDeadConnection = func(server string) {
-					router.InvalidateReader(dbName, server)
+				state.OnDeadConnection = func(server string) error {
+					return router.InvalidateReader(ctx, dbName, server)
 				}
 
-				state.OnFailure(invocation.conn, invocation.err, invocation.isCommitting)
+				state.OnFailure(ctx, invocation.conn, invocation.err, invocation.isCommitting)
 				continued := state.Continue()
 				if continued != invocation.expectContinued {
 					t.Errorf("Expected continue to return %v but returned %v", invocation.expectContinued, continued)

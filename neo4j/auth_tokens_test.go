@@ -109,12 +109,11 @@ func TestKerberosAuth(t *testing.T) {
 	}
 }
 
-func TestCustomAuthWithNilParamters(t *testing.T) {
+func TestCustomAuthWithNilParameters(t *testing.T) {
 	scheme := "custom_scheme"
 	userName := "user"
 	password := "password"
 	realm := "test"
-	//parameters := map[string]interface{}{}
 
 	token := CustomAuth(scheme, userName, password, realm, nil)
 

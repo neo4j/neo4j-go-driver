@@ -22,7 +22,7 @@ package bolt
 import (
 	"context"
 	"encoding/binary"
-	rio "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/racingio"
+	rio "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/racing"
 	"io"
 )
 

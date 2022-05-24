@@ -36,10 +36,10 @@ import (
 var logger = &log.Void{}
 
 // Verifies that concurrent access works as expected relying on the race detector to
-// report supicious behavior.
+// report suspicious behavior.
 func TestMultithreading(t *testing.T) {
 
-	// Setup a router that needs to read the routing table essentially on every access to
+	// Set up a router that needs to read the routing table essentially on every access to
 	// stress threading a bit more.
 	num := 0
 	table := &db.RoutingTable{Readers: []string{"rd1", "rd2"}, Writers: []string{"wr"}, TimeToLive: 1}
@@ -114,30 +114,43 @@ func TestRespectsTimeToLiveAndInvalidate(t *testing.T) {
 	dbName := "dbname"
 
 	// First access should trigger initial table read
-	router.Readers(context.Background(), nil, dbName, nil)
+	ctx := context.Background()
+	if _, err := router.Readers(ctx, nil, dbName, nil); err != nil {
+		testutil.AssertNoError(t, err)
+	}
 	assertNum(t, numfetch, 1, "Should have fetched initial")
 
 	// Second access with time set to same should not trigger a read
-	router.Readers(context.Background(), nil, dbName, nil)
+	if _, err := router.Readers(ctx, nil, dbName, nil); err != nil {
+		testutil.AssertNoError(t, err)
+	}
 	assertNum(t, numfetch, 1, "Should not have have fetched")
 
 	// Third access with time passed table due should trigger fetch
 	n = n.Add(2 * time.Second)
-	router.Readers(context.Background(), nil, dbName, nil)
+	if _, err := router.Readers(ctx, nil, dbName, nil); err != nil {
+		testutil.AssertNoError(t, err)
+	}
 	assertNum(t, numfetch, 2, "Should have have fetched")
 
 	// Just another one to make sure we're cached
-	router.Readers(context.Background(), nil, dbName, nil)
+	if _, err := router.Readers(ctx, nil, dbName, nil); err != nil {
+		testutil.AssertNoError(t, err)
+	}
 	assertNum(t, numfetch, 2, "Should not have have fetched")
 
 	// Invalidate should force fetching
-	router.Invalidate(dbName)
-	router.Readers(context.Background(), nil, dbName, nil)
+	if err := router.Invalidate(ctx, dbName); err != nil {
+		testutil.AssertNoError(t, err)
+	}
+	if _, err := router.Readers(ctx, nil, dbName, nil); err != nil {
+		testutil.AssertNoError(t, err)
+	}
 	assertNum(t, numfetch, 3, "Should have have fetched")
 }
 
 func TestUsesRootRouterWhenPreviousRoutersFails(t *testing.T) {
-	borrows := [][]string{}
+	var borrows [][]string
 
 	conn := &testutil.ConnFake{Table: &db.RoutingTable{
 		TimeToLive: 1,
@@ -160,13 +173,17 @@ func TestUsesRootRouterWhenPreviousRoutersFails(t *testing.T) {
 	dbName := "dbname"
 
 	// First access should trigger initial table read from root router
-	router.Readers(context.Background(), nil, dbName, nil)
+	if _, err := router.Readers(context.Background(), nil, dbName, nil); err != nil {
+		testutil.AssertNoError(t, err)
+	}
 	if borrows[0][0] != "rootRouter" {
 		t.Errorf("Should have connected to root upon first router request")
 	}
 	// Next access should go to otherRouter
 	n = n.Add(2 * time.Second)
-	router.Readers(context.Background(), nil, dbName, nil)
+	if _, err := router.Readers(context.Background(), nil, dbName, nil); err != nil {
+		testutil.AssertNoError(t, err)
+	}
 	if borrows[1][0] != "otherRouter" {
 		t.Errorf("Should have queried other router")
 	}
@@ -178,7 +195,7 @@ func TestUsesRootRouterWhenPreviousRoutersFails(t *testing.T) {
 		if !requestedOther {
 			if names[0] != "otherRouter" {
 				t.Errorf("Expected request for otherRouter")
-				return nil, errors.New("Wrong")
+				return nil, errors.New("wrong")
 			}
 			requestedOther = true
 			return nil, errors.New("some err")
@@ -206,7 +223,7 @@ func TestUsesRootRouterWhenPreviousRoutersFails(t *testing.T) {
 // Verify that when the routing table can not be retrieved from the root router, a callback
 // should be invoked to get backup routers.
 func TestUseGetRoutersHookWhenInitialRouterFails(t *testing.T) {
-	tried := []string{}
+	var tried []string
 	pool := &poolFake{
 		borrow: func(names []string, cancel context.CancelFunc, _ log.BoltLogger) (db.Connection, error) {
 			tried = append(tried, names...)
@@ -219,7 +236,8 @@ func TestUseGetRoutersHookWhenInitialRouterFails(t *testing.T) {
 	dbName := "dbname"
 
 	// Trigger read of routing table
-	router.Readers(context.Background(), nil, dbName, nil)
+	_, err := router.Readers(context.Background(), nil, dbName, nil)
+	testutil.AssertStringContain(t, err.Error(), "Unable to retrieve routing table")
 
 	expected := []string{rootRouter}
 	expected = append(expected, backupRouters...)
@@ -351,8 +369,13 @@ func TestCleanUp(t *testing.T) {
 	router := New("router", func() []string { return []string{} }, nil, pool, logger, "routerid")
 	router.now = func() time.Time { return now }
 
-	router.Readers(context.Background(), nil, "db1", nil)
-	router.Readers(context.Background(), nil, "db2", nil)
+	ctx := context.Background()
+	if _, err := router.Readers(ctx, nil, "db1", nil); err != nil {
+		testutil.AssertNoError(t, err)
+	}
+	if _, err := router.Readers(ctx, nil, "db2", nil); err != nil {
+		testutil.AssertNoError(t, err)
+	}
 
 	// Should be a router for each requested database
 	if len(router.dbRouters) != 2 {
@@ -360,13 +383,17 @@ func TestCleanUp(t *testing.T) {
 	}
 
 	// Should not remove these since they still have time to live
-	router.CleanUp()
+	if err := router.CleanUp(ctx); err != nil {
+		testutil.AssertNoError(t, err)
+	}
 	if len(router.dbRouters) != 2 {
 		t.Fatal("Should not have removed routing tables")
 	}
 
 	router.now = func() time.Time { return now.Add(1 * time.Minute) }
-	router.CleanUp()
+	if err := router.CleanUp(ctx); err != nil {
+		testutil.AssertNoError(t, err)
+	}
 	if len(router.dbRouters) != 0 {
 		t.Fatal("Should have cleaned up")
 	}
