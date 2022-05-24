@@ -42,10 +42,10 @@ func TestDechunker(t *testing.T) {
 	}{
 		{size: 3, max: 0xffff},
 		{size: 1021, max: 0x7},
-		{size: 0xffff78, max: 0x30},
+		{size: 0xffff, max: 0x30},
 		{size: 3, max: 0xffff},
 		{size: 1021, max: 0xff90},
-		{size: 0xffff78, max: 0xff90},
+		{size: 0xffff, max: 0xff90},
 	}
 	for msgi, msg := range messages {
 		// Prepare message
