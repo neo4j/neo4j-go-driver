@@ -92,15 +92,7 @@ func (e *Neo4jError) IsAuthenticationFailed() bool {
 
 func (e *Neo4jError) IsRetriableTransient() bool {
 	e.parse()
-	if e.classification != "TransientError" {
-		return false
-	}
-	switch e.Code {
-	// Happens when client aborts transaction, should not retry
-	case "Neo.TransientError.Transaction.Terminated", "Neo.TransientError.Transaction.LockClientStopped":
-		return false
-	}
-	return true
+	return e.classification == "TransientError"
 }
 
 func (e *Neo4jError) IsRetriableCluster() bool {
