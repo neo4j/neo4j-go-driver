@@ -25,7 +25,7 @@ import (
 	"strings"
 )
 
-// Database server failed to fulfill request.
+// Neo4jError is created when the database server failed to fulfill request.
 type Neo4jError struct {
 	Code           string
 	Msg            string
@@ -54,16 +54,17 @@ func (e *Neo4jError) Title() string {
 	return e.title
 }
 
-// parse parses code from Neo4j into usable parts.
+// parse code from Neo4j into usable parts.
 // Code Neo.ClientError.General.ForbiddenReadOnlyDatabase is split into:
 //   Classification: ClientError
 //   Category: General
-//   Title: ForbiddernReadOnlyDatabase
+//   Title: ForbiddenReadOnlyDatabase
 func (e *Neo4jError) parse() {
 	if e.parsed {
 		return
 	}
 	e.parsed = true
+	e.reclassify()
 	parts := strings.Split(e.Code, ".")
 	if len(parts) != 4 {
 		return
@@ -73,21 +74,25 @@ func (e *Neo4jError) parse() {
 	e.title = parts[3]
 }
 
+// reclassify classifies specific errors coming from pre-5.x servers into their
+// 5.x classifications
+// this function can be removed once support for pre-5.x servers is dropped
+func (e *Neo4jError) reclassify() {
+	switch e.Code {
+	case "Neo.TransientError.Transaction.LockClientStopped":
+		e.Code = "Neo.ClientError.Transaction.LockClientStopped"
+	case "Neo.TransientError.Transaction.Terminated":
+		e.Code = "Neo.ClientError.Transaction.Terminated"
+	}
+}
+
 func (e *Neo4jError) IsAuthenticationFailed() bool {
 	return e.Code == "Neo.ClientError.Security.Unauthorized"
 }
 
 func (e *Neo4jError) IsRetriableTransient() bool {
 	e.parse()
-	if e.classification != "TransientError" {
-		return false
-	}
-	switch e.Code {
-	// Happens when client aborts transaction, should not retry
-	case "Neo.TransientError.Transaction.Terminated", "Neo.TransientError.Transaction.LockClientStopped":
-		return false
-	}
-	return true
+	return e.classification == "TransientError"
 }
 
 func (e *Neo4jError) IsRetriableCluster() bool {
