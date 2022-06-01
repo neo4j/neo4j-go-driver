@@ -22,9 +22,10 @@ package bolt
 import (
 	"errors"
 	"fmt"
+	"time"
+
 	idb "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/log"
-	"time"
 
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/db"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/dbtype"
@@ -533,7 +534,7 @@ func (h *hydrator) nodeWithElementId(num uint32) interface{} {
 	}
 	n := dbtype.Node{}
 	h.unp.Next()
-	n.Id = h.unp.IntOrDefault(defaultForMissingId)
+	n.Id = h.unp.Int()
 	h.unp.Next()
 	n.Labels = h.strings()
 	h.unp.Next()
@@ -572,11 +573,11 @@ func (h *hydrator) relationshipWithElementId(n uint32) interface{} {
 	}
 	r := dbtype.Relationship{}
 	h.unp.Next()
-	r.Id = h.unp.IntOrDefault(defaultForMissingId)
+	r.Id = h.unp.Int()
 	h.unp.Next()
-	r.StartId = h.unp.IntOrDefault(defaultForMissingId)
+	r.StartId = h.unp.Int()
 	h.unp.Next()
-	r.EndId = h.unp.IntOrDefault(defaultForMissingId)
+	r.EndId = h.unp.Int()
 	h.unp.Next()
 	r.Type = h.unp.String()
 	h.unp.Next()
@@ -613,7 +614,7 @@ func (h *hydrator) relationnodeWithElementId(n uint32) interface{} {
 	}
 	r := relNode{}
 	h.unp.Next()
-	r.id = h.unp.IntOrDefault(defaultForMissingId)
+	r.id = h.unp.Int()
 	h.unp.Next()
 	r.name = h.unp.String()
 	h.unp.Next()
