@@ -366,3 +366,25 @@ Starting with 5.0:
 are all internal to the driver.
 This should have 0 impact as they were internal utilities unreachable from
 the public APIs.
+
+### Behavior changes
+
+#### `ResultSummary#ContainUpdates`
+
+The function has been revised in 5.0 to behave in the same way as other 
+drivers. In 4.x, it used to return true if any summary counters were 
+strictly positive. It now returns true only if at least a deletion or 
+creation of the following happened:
+
+ - constraint
+ - index
+ - node
+ - relationship
+ - label
+ - property
+
+#### Transaction commit and rollback
+
+Explicit transactions can now be committed once, or rolled back once.
+Any further call to commit / roll back will cause an `UsageError` to be 
+returned.
