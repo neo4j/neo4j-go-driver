@@ -320,3 +320,49 @@ return err
 records, err := result.Collect()
 session.Close()
 ```
+
+## 5.0 breaking changes
+
+### 4.4 deprecation removals
+
+Every deprecated element in 4.4 has been removed from 5.0.
+This includes:
+
+ - the `Driver#Session` function, use `Driver#NewSession` instead
+ - the `ResultSummary#Statement` function, use `ResultSummary#Query` instead
+ - the `Query#Params` function, use `Query#Parameters` instead
+ - the `ServerInfo#Version` function, use `ServerInfo#Agent` and 
+   `ServerInfo#ProtocolVersion` or call the Cypher procedure `dbms.components`
+ - the `Record#GetByIndex` function, access the `Record#Values` slice instead
+
+### Transaction Timeout value
+
+In 4.x, all timeout values configured with `neo4j.WithTxTimeout` other than 
+0 would be sent to the server and the default timeout value would be 0.
+
+In 5.0:
+ - the default value is now `math.MinInt`
+ - if the timeout has the default value, no timeout are sent to the server 
+   and the server uses the default server-defined timeout
+ - negative values (other than `math.MinInt`) are forbidden and result in a 
+   `UsageError`
+ - a timeout of `0` is now sent to the server and disables the transaction 
+   timeout
+
+### Visibility changes
+
+Starting with 5.0:
+
+ - `db.AccessMode`
+ - `db.TxHandle`
+ - `db.StreamHandle`
+ - `db.Command`
+ - `db.TxConfig`
+ - `db.Connection`
+ - `db.RoutingTable`
+ - `db.DefaultDatabase`
+ - `db.DatabaseSelector`
+
+are all internal to the driver.
+This should have 0 impact as they were internal utilities unreachable from
+the public APIs.
