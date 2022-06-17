@@ -255,13 +255,16 @@ func (b *backend) toTransactionConfigApply(data map[string]interface{}) func(*ne
 	}
 }
 
-func (b *backend) toCypherAndParams(data map[string]interface{}) (string, map[string]interface{}) {
+func (b *backend) toCypherAndParams(data map[string]interface{}) (string, map[string]interface{}, error) {
 	cypher := data["cypher"].(string)
 	params, _ := data["params"].(map[string]interface{})
+	var err error
 	for i, p := range params {
-		params[i] = cypherToNative(p)
+		if params[i], err = cypherToNative(p); err != nil {
+			return "", nil, err
+		}
 	}
-	return cypher, params
+	return cypher, params, nil
 }
 
 func (b *backend) handleTransactionFunc(isRead bool, data map[string]interface{}) {
@@ -499,7 +502,11 @@ func (b *backend) handleRequest(req map[string]interface{}) {
 
 	case "SessionRun":
 		sessionState := b.sessionStates[data["sessionId"].(string)]
-		cypher, params := b.toCypherAndParams(data)
+		cypher, params, err := b.toCypherAndParams(data)
+		if err != nil {
+			b.writeError(err)
+			return
+		}
 		result, err := sessionState.session.Run(ctx, cypher, params, b.toTransactionConfigApply(data))
 		if err != nil {
 			b.writeError(err)
@@ -542,7 +549,11 @@ func (b *backend) handleRequest(req map[string]interface{}) {
 		if tx, found = b.explicitTransactions[transactionId]; !found {
 			tx = b.managedTransactions[transactionId]
 		}
-		cypher, params := b.toCypherAndParams(data)
+		cypher, params, err := b.toCypherAndParams(data)
+		if err != nil {
+			b.writeError(err)
+			return
+		}
 		result, err := tx.Run(ctx, cypher, params)
 		if err != nil {
 			b.writeError(err)
@@ -734,6 +745,7 @@ func (b *backend) handleRequest(req map[string]interface{}) {
 				"Feature:API:Liveness.Check",
 				"Feature:API:Result.List",
 				"Feature:API:Result.Peek",
+				"Feature:API:Type.Temporal",
 				"Feature:Auth:Custom",
 				"Feature:Auth:Bearer",
 				"Feature:Auth:Kerberos",
@@ -743,6 +755,7 @@ func (b *backend) handleRequest(req map[string]interface{}) {
 				"Feature:Bolt:4.3",
 				"Feature:Bolt:4.4",
 				"Feature:Bolt:5.0",
+				"Feature:Bolt:Patch:UTC",
 				"Feature:Impersonation",
 				"Feature:TLS:1.1",
 				"Feature:TLS:1.2",
