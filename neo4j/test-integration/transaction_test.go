@@ -253,7 +253,7 @@ func TestTransaction(outer *testing.T) {
 
 			session2 := driver.NewSession(neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead})
 			defer session2.Close()
-			matched, err := session2.ReadTransaction(listTransactionsAndMatchMetadataWork(metadata))
+			matched, err := session2.ReadTransaction(listTransactionsAndMatchMetadataWork(server.Version, metadata))
 			assertNil(t, err)
 			assertTrue(t, matched.(bool))
 		})

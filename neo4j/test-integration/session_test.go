@@ -490,7 +490,7 @@ func TestSession(outer *testing.T) {
 				t.Skip("Can not use dbms.listTransactions on non-enterprise version")
 			}
 
-			matched, err := session.ReadTransaction(listTransactionsAndMatchMetadataWork(metadata), neo4j.WithTxMetadata(metadata))
+			matched, err := session.ReadTransaction(listTransactionsAndMatchMetadataWork(server.Version, metadata), neo4j.WithTxMetadata(metadata))
 			assertNil(t, err)
 			assertTrue(t, matched.(bool))
 		})
@@ -507,7 +507,7 @@ func TestSession(outer *testing.T) {
 				t.Skip("Can not use dbms.listTransactions on non-enterprise version")
 			}
 
-			matched, err := session.WriteTransaction(listTransactionsAndMatchMetadataWork(metadata), neo4j.WithTxMetadata(metadata))
+			matched, err := session.WriteTransaction(listTransactionsAndMatchMetadataWork(server.Version, metadata), neo4j.WithTxMetadata(metadata))
 			assertNil(t, err)
 			assertTrue(t, matched.(bool))
 		})

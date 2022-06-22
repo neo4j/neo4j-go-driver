@@ -21,6 +21,7 @@ package test_integration
 
 import (
 	"fmt"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/test-integration/dbserver"
 	"reflect"
 	"testing"
 
@@ -133,9 +134,13 @@ func updateNodeWork(t *testing.T, label string, newProps map[string]interface{})
 	}
 }
 
-func listTransactionsAndMatchMetadataWork(metadata map[string]interface{}) neo4j.TransactionWork {
+func listTransactionsAndMatchMetadataWork(version dbserver.Version, metadata map[string]interface{}) neo4j.TransactionWork {
+	query := "CALL dbms.listTransactions()"
+	if version.GreaterThanOrEqual(dbserver.VersionOf("4.4.0")) {
+		query = "SHOW TRANSACTIONS YIELD metaData"
+	}
 	return func(tx neo4j.Transaction) (interface{}, error) {
-		result, err := tx.Run("CALL dbms.listTransactions()", nil)
+		result, err := tx.Run(query, nil)
 		if err != nil {
 			return nil, err
 		}
