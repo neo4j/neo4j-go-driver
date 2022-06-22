@@ -137,7 +137,7 @@ func updateNodeWork(t *testing.T, label string, newProps map[string]interface{})
 func listTransactionsAndMatchMetadataWork(version dbserver.Version, metadata map[string]interface{}) neo4j.TransactionWork {
 	query := "CALL dbms.listTransactions()"
 	if version.GreaterThanOrEqual(dbserver.VersionOf("4.4.0")) {
-		query = "SHOW TRANSACTIONS YIELD metaData"
+		query = "SHOW TRANSACTIONS YIELD metaData RETURN metaData"
 	}
 	return func(tx neo4j.Transaction) (interface{}, error) {
 		result, err := tx.Run(query, nil)

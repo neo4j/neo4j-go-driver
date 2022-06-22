@@ -482,8 +482,7 @@ func TestSession(outer *testing.T) {
 			metadata := map[string]interface{}{
 				"m1": int64(1),
 				"m2": "some string",
-				"m3": []interface{}{"a", "b", "c"},
-				"m4": neo4j.DateOf(time.Now()),
+				"m3": neo4j.DateOf(time.Now()),
 			}
 
 			if !server.IsEnterprise {
@@ -499,8 +498,7 @@ func TestSession(outer *testing.T) {
 			metadata := map[string]interface{}{
 				"m1": true,
 				"m2": []byte{0x00, 0x01, 0x02},
-				"m3": []interface{}{"a", "b", "c"},
-				"m4": neo4j.OffsetTimeOf(time.Now()),
+				"m3": neo4j.OffsetTimeOf(time.Now()),
 			}
 
 			if !server.IsEnterprise {

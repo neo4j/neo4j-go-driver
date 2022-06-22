@@ -226,7 +226,7 @@ func TestTransaction(outer *testing.T) {
 		assertEquals(t, keys, []string{"N", "M"})
 	})
 
-	outer.Run("V3", func(inner *testing.T) {
+	outer.Run("V3+", func(inner *testing.T) {
 
 		if server.Version.LessThan(V350) {
 			inner.Skip("this test is targeted for server version after neo4j 3.5.0")
