@@ -780,7 +780,7 @@ func (h *hydrator) dateTimeNamedZone(n uint32) interface{} {
 		utcTime.Minute(),
 		utcTime.Second(),
 		utcTime.Nanosecond(),
-		l
+		l,
 	)
 }
 
