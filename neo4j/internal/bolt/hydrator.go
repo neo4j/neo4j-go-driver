@@ -772,7 +772,16 @@ func (h *hydrator) dateTimeNamedZone(n uint32) interface{} {
 		})
 		return nil
 	}
-	return time.Date(utcTime.Year(), utcTime.Month(), utcTime.Day(), utcTime.Hour(), utcTime.Minute(), utcTime.Second(), utcTime.Nanosecond(), l)
+	return time.Date(
+		utcTime.Year(),
+		utcTime.Month(),
+		utcTime.Day(),
+		utcTime.Hour(),
+		utcTime.Minute(),
+		utcTime.Second(),
+		utcTime.Nanosecond(),
+		l
+	)
 }
 
 func (h *hydrator) utcDateTimeNamedZone(n uint32) interface{} {
