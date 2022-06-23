@@ -758,7 +758,8 @@ func (h *hydrator) dateTimeNamedZone(n uint32) interface{} {
 	h.unp.Next()
 	nanos := h.unp.Int()
 	h.unp.Next()
-	zone := h.unp.String() // time.Time in local timezone, e.g. 15th of June 2020, 15:30 in Paris (UTC+2h)
+	zone := h.unp.String()
+	// time.Time in local timezone, e.g. 15th of June 2020, 15:30 in Paris (UTC+2h)
 	unixTime := time.Unix(seconds, nanos)
 	// time.Time computed in UTC timezone, e.g. 15th of June 2020, 13:30 in UTC
 	utcTime := unixTime.UTC()
