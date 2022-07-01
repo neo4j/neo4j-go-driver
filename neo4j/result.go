@@ -57,7 +57,7 @@ type result struct {
 }
 
 // deprecated: use newResultWithContext instead
-func newResult(conn db.Connection, str db.StreamHandle, cypher string, params map[string]interface{}) *result {
+func newResult(conn db.Connection, str db.StreamHandle, cypher string, params map[string]interface{}) Result {
 	return newResultWithContext(conn, str, cypher, params).legacy()
 }
 
