@@ -160,7 +160,7 @@ func (tx *managedTransaction) legacy() Transaction {
 // Does not implement the ExplicitTransaction nor the ManagedTransaction interface.
 type autocommitTransaction struct {
 	conn     db.Connection
-	res      *resultWithContext
+	res      ResultWithContext
 	closed   bool
 	onClosed func()
 }

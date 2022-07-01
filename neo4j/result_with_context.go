@@ -53,7 +53,8 @@ type ResultWithContext interface {
 	Consume(ctx context.Context) (ResultSummary, error)
 	// IsOpen determines whether this result cursor is available
 	IsOpen() bool
-	legacy() *result
+	buffer(ctx context.Context)
+	legacy() Result
 }
 
 const consumedResultError = "result cursor is not available anymore"
@@ -72,7 +73,7 @@ type resultWithContext struct {
 }
 
 func newResultWithContext(conn idb.Connection, str idb.StreamHandle,
-	cypher string, params map[string]interface{}) *resultWithContext {
+	cypher string, params map[string]interface{}) ResultWithContext {
 	return &resultWithContext{
 		conn:         conn,
 		streamHandle: str,
@@ -199,7 +200,7 @@ func (r *resultWithContext) IsOpen() bool {
 	return r.isOpen()
 }
 
-func (r *resultWithContext) legacy() *result {
+func (r *resultWithContext) legacy() Result {
 	return &result{delegate: r}
 }
 
