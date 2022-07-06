@@ -76,13 +76,6 @@ func (u *Unpacker) Len() uint32 {
 	return u.readlen(uint32(u.mrk.numlenbytes))
 }
 
-func (u *Unpacker) IntOrDefault(defaultValue int64) int64 {
-	if u.Curr == PackedNil {
-		return defaultValue
-	}
-	return u.Int()
-}
-
 func (u *Unpacker) Int() int64 {
 	n := u.mrk.numlenbytes
 	if n == 0 {
