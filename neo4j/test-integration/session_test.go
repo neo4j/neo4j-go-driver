@@ -21,7 +21,6 @@ package test_integration
 
 import (
 	"fmt"
-	"reflect"
 	"testing"
 	"time"
 
@@ -421,10 +420,8 @@ func TestSession(outer *testing.T) {
 
 	outer.Run("V3", func(inner *testing.T) {
 		var (
-			err     error
 			driver  neo4j.Driver
 			session neo4j.Session
-			result  neo4j.Result
 		)
 
 		driver = server.Driver()
@@ -456,26 +453,13 @@ func TestSession(outer *testing.T) {
 			}
 
 			if !server.IsEnterprise {
-				t.Skip("Can not use dbms.listTransactions on non-enterprise version")
+				t.Skip("Can not list transactions on non-enterprise version")
 			}
 
-			result, err = session.Run("CALL dbms.listTransactions()", nil, neo4j.WithTxMetadata(metadata))
+			matched, err := session.ReadTransaction(listTransactionsAndMatchMetadataWork(server.Version, metadata), neo4j.WithTxMetadata(metadata))
+
 			assertNil(t, err)
-
-			matched := false
-			for result.Next() {
-				if txMetadataInt, ok := result.Record().Get("metaData"); ok {
-					if txMetadata, ok := txMetadataInt.(map[string]interface{}); ok {
-						if reflect.DeepEqual(metadata, txMetadata) {
-							matched = true
-							break
-						}
-					}
-				}
-			}
-			assertNil(t, result.Err())
-
-			assertTrue(t, matched)
+			assertTrue(t, matched.(bool))
 		})
 
 		inner.Run("should set transaction metadata on ExecuteRead", func(t *testing.T) {
@@ -486,7 +470,7 @@ func TestSession(outer *testing.T) {
 			}
 
 			if !server.IsEnterprise {
-				t.Skip("Can not use dbms.listTransactions on non-enterprise version")
+				t.Skip("Can not list transactions on non-enterprise version")
 			}
 
 			matched, err := session.ReadTransaction(listTransactionsAndMatchMetadataWork(server.Version, metadata), neo4j.WithTxMetadata(metadata))
@@ -502,7 +486,7 @@ func TestSession(outer *testing.T) {
 			}
 
 			if !server.IsEnterprise {
-				t.Skip("Can not use dbms.listTransactions on non-enterprise version")
+				t.Skip("Can not list transactions on non-enterprise version")
 			}
 
 			matched, err := session.WriteTransaction(listTransactionsAndMatchMetadataWork(server.Version, metadata), neo4j.WithTxMetadata(metadata))

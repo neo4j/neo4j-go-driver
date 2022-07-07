@@ -248,7 +248,7 @@ func TestTransaction(outer *testing.T) {
 			assertEquals(t, number, 1)
 
 			if !server.IsEnterprise {
-				t.Skip("Can not use dbms.listTransactions on non-enterprise version")
+				t.Skip("Can not list transactions on non-enterprise version")
 			}
 
 			session2 := driver.NewSession(neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead})
