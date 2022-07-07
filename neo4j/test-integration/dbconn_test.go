@@ -763,10 +763,10 @@ func TestConnectionConformance(outer *testing.T) {
 		// Connect to system database and create a test databases
 		selector.SelectDatabase("system")
 		boltConn.Run(context.Background(),
-			idb.Command{Cypher: "DROP DATABASE test1 IF EXISTS"},
+			idb.Command{Cypher: server.DropDatabaseQuery("test1")},
 			idb.TxConfig{Mode: idb.WriteMode})
 		_, err := boltConn.Run(context.Background(),
-			idb.Command{Cypher: "CREATE DATABASE test1"},
+			idb.Command{Cypher: server.CreateDatabaseQuery("test1")},
 			idb.TxConfig{Mode: idb.WriteMode})
 		if err != nil {
 			dbErr, _ := err.(*db.Neo4jError)

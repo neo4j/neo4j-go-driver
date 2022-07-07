@@ -38,7 +38,7 @@ func TestMultidatabase(outer *testing.T) {
 
 	// Need > 4.0 for database support
 	if server.Version.LessThan(V4) {
-		outer.Skip("Versions prior to 4.0 does not support multidatabase")
+		outer.Skip("Versions prior to 4.0 do not support multidatabase")
 	}
 
 	if !server.IsEnterprise {
@@ -49,9 +49,9 @@ func TestMultidatabase(outer *testing.T) {
 	func() {
 		sysSess := driver.NewSession(neo4j.SessionConfig{DatabaseName: "system"})
 		defer sysSess.Close()
-		_, err := sysSess.Run("DROP DATABASE testdb IF EXISTS", nil)
+		_, err := sysSess.Run(server.DropDatabaseQuery("testdb"), nil)
 		assertNil(outer, err)
-		_, err = sysSess.Run("CREATE DATABASE testdb", nil)
+		_, err = sysSess.Run(server.CreateDatabaseQuery("testdb"), nil)
 		assertNil(outer, err)
 	}()
 
@@ -71,4 +71,5 @@ func TestMultidatabase(outer *testing.T) {
 		assertRandomNode(t, testSess, randId)
 		testSess.Close()
 	})
+
 }

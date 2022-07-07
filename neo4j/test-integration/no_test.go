@@ -40,6 +40,7 @@ var (
 	V340 = dbserver.VersionOf("3.4.0")
 	V350 = dbserver.VersionOf("3.5.0")
 	V4   = dbserver.VersionOf("4.0.0")
+	V42  = dbserver.VersionOf("4.2.0")
 )
 
 func assertCloses(t *testing.T, closer io.Closer) {
