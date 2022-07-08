@@ -1,7 +1,6 @@
 package test_integration
 
 import (
-	"fmt"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/test-integration/dbserver"
 	"testing"
@@ -53,7 +52,7 @@ func TestResultSummary(outer *testing.T) {
 
 		session := driver.NewSession(neo4j.SessionConfig{DatabaseName: "system", BoltLogger: neo4j.ConsoleBoltLogger()})
 		defer assertCloses(inner, session)
-		res, err := session.Run(fmt.Sprintf("CREATE DATABASE %s", extraDatabase), map[string]interface{}{})
+		res, err := session.Run(server.CreateDatabaseQuery(extraDatabase), map[string]interface{}{})
 		assertNil(inner, err)
 		_, err = res.Consume() // consume result to obtain bookmark
 		assertNil(inner, err)
@@ -64,7 +63,9 @@ func TestResultSummary(outer *testing.T) {
 		defer func() {
 			session := driver.NewSession(neo4j.SessionConfig{DatabaseName: "system", Bookmarks: neo4j.BookmarksFromRawValues(bookmark)})
 			defer assertCloses(inner, session)
-			_, err := session.Run(fmt.Sprintf("DROP DATABASE %s", extraDatabase), map[string]interface{}{})
+			res, err := session.Run(server.DropDatabaseQuery(extraDatabase), map[string]interface{}{})
+			assertNil(inner, err)
+			_, err = res.Consume()
 			assertNil(inner, err)
 			bookmark = ""
 		}()
