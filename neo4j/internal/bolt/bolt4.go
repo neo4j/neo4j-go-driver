@@ -324,7 +324,7 @@ func (b *bolt4) TxBegin(ctx context.Context, txConfig idb.TxConfig) (idb.TxHandl
 // misuse from clients that stick to their connections when they shouldn't.
 func (b *bolt4) assertTxHandle(h1, h2 idb.TxHandle) error {
 	if h1 != h2 {
-		err := errors.New("Invalid transaction handle")
+		err := errors.New(InvalidTransactionError)
 		b.log.Error(log.Bolt4, b.logId, err)
 		return err
 	}

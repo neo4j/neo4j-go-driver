@@ -146,3 +146,23 @@ func (s DbServer) Driver(configurers ...func(*neo4j.Config)) neo4j.Driver {
 func (s DbServer) ConfigFunc() func(*neo4j.Config) {
 	return func(*neo4j.Config) {}
 }
+
+func (s DbServer) CreateDatabaseQuery(db string) string {
+	v := s.Version
+	if s.isV42OrLater(v) {
+		return fmt.Sprintf("CREATE DATABASE %s WAIT", db)
+	}
+	return fmt.Sprintf("CREATE DATABASE %s", db)
+}
+
+func (s DbServer) DropDatabaseQuery(db string) string {
+	v := s.Version
+	if s.isV42OrLater(v) {
+		return fmt.Sprintf("DROP DATABASE %s IF EXISTS WAIT", db)
+	}
+	return fmt.Sprintf("DROP DATABASE %s IF EXISTS", db)
+}
+
+func (s DbServer) isV42OrLater(v Version) bool {
+	return (v.major == 4 && v.minor >= 2) || v.major > 4
+}

@@ -226,7 +226,7 @@ func TestTransaction(outer *testing.T) {
 		assertEquals(t, keys, []string{"N", "M"})
 	})
 
-	outer.Run("V3", func(inner *testing.T) {
+	outer.Run("V3+", func(inner *testing.T) {
 
 		if server.Version.LessThan(V350) {
 			inner.Skip("this test is targeted for server version after neo4j 3.5.0")
@@ -248,12 +248,12 @@ func TestTransaction(outer *testing.T) {
 			assertEquals(t, number, 1)
 
 			if !server.IsEnterprise {
-				t.Skip("Can not use dbms.listTransactions on non-enterprise version")
+				t.Skip("Can not list transactions on non-enterprise version")
 			}
 
 			session2 := driver.NewSession(neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead})
 			defer session2.Close()
-			matched, err := session2.ReadTransaction(listTransactionsAndMatchMetadataWork(metadata))
+			matched, err := session2.ReadTransaction(listTransactionsAndMatchMetadataWork(server.Version, metadata))
 			assertNil(t, err)
 			assertTrue(t, matched.(bool))
 		})

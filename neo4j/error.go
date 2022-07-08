@@ -169,6 +169,9 @@ func wrapError(err error) error {
 			return &TokenExpiredError{Code: e.Code, Message: e.Msg}
 		}
 	}
+	if err != nil && err.Error() == bolt.InvalidTransactionError {
+		return &UsageError{Message: bolt.InvalidTransactionError}
+	}
 	return err
 }
 

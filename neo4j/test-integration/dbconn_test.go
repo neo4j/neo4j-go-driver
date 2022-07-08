@@ -747,7 +747,6 @@ func TestConnectionConformance(outer *testing.T) {
 		})
 	})
 
-	// Enterprise feature
 	outer.Run("Multidatabase", func(tt *testing.T) {
 		selector, supportsMultidatabase := boltConn.(idb.DatabaseSelector)
 		if !supportsMultidatabase {
@@ -760,48 +759,52 @@ func TestConnectionConformance(outer *testing.T) {
 
 		// Should always reset before selecting a database
 		boltConn.Reset(context.Background())
-		// Connect to system database and create a test databases
 		selector.SelectDatabase("system")
-		boltConn.Run(context.Background(),
-			idb.Command{Cypher: "DROP DATABASE test1 IF EXISTS"},
-			idb.TxConfig{Mode: idb.WriteMode})
-		_, err := boltConn.Run(context.Background(),
-			idb.Command{Cypher: "CREATE DATABASE test1"},
-			idb.TxConfig{Mode: idb.WriteMode})
-		if err != nil {
-			dbErr, _ := err.(*db.Neo4jError)
-			if dbErr == nil || dbErr.Code != "Neo.ClientError.Database.ExistingDatabaseFound" {
-				tt.Fatal(err)
-			}
-		}
-		boltConn.Reset(context.Background())
+		assertRunsQuery(tt, boltConn, server.DropDatabaseQuery("test1"), nil, idb.WriteMode)
+		assertRunsQuery(tt, boltConn, server.CreateDatabaseQuery("test1"), nil, idb.WriteMode)
+
 		// Use test database to create a random node
 		selector.SelectDatabase("test1")
 		r := randInt()
-		_, err = boltConn.Run(context.Background(),
-			idb.Command{Cypher: "CREATE (n:MdbRand {x: $x}) RETURN n",
-				Params: map[string]interface{}{"x": r}},
-			idb.TxConfig{Mode: idb.WriteMode})
-		AssertNoError(tt, err)
+		assertRunsQuery(tt, boltConn, "CREATE (n:MdbRand {x: $x}) RETURN n", map[string]interface{}{"x": r}, idb.WriteMode)
 		boltConn.Reset(context.Background())
+
 		// Connect to standard database and make sure we can't see the node
-		s, err := boltConn.Run(context.Background(),
+		streamHandle, err := boltConn.Run(context.Background(),
 			idb.Command{Cypher: "MATCH (n:MdbRand {x: $x}) RETURN n",
 				Params: map[string]interface{}{"x": r}},
 			idb.TxConfig{Mode: idb.ReadMode})
 		AssertNoError(tt, err)
-		rec, sum, err := boltConn.Next(context.Background(), s)
+		rec, sum, err := boltConn.Next(context.Background(), streamHandle)
 		AssertNextOnlySummary(tt, rec, sum, err)
-		boltConn.Reset(context.Background())
+		assertConsumes(tt, boltConn, streamHandle)
 		// Connect to test database and make sure we can see the node
 		selector.SelectDatabase("test1")
-		s, err = boltConn.Run(context.Background(),
+		streamHandle, err = boltConn.Run(context.Background(),
 			idb.Command{Cypher: "MATCH (n:MdbRand {x: $x}) RETURN n",
 				Params: map[string]interface{}{"x": r}},
 			idb.TxConfig{Mode: idb.ReadMode})
 		AssertNoError(tt, err)
-		rec, sum, err = boltConn.Next(context.Background(), s)
+		rec, sum, err = boltConn.Next(context.Background(), streamHandle)
 		AssertNextOnlyRecord(tt, rec, sum, err)
-		boltConn.Reset(context.Background())
+		assertConsumes(tt, boltConn, streamHandle)
 	})
+}
+
+func assertRunsQuery(t *testing.T, connection idb.Connection, query string, params map[string]any, mode idb.AccessMode) {
+	t.Helper()
+	ctx := context.Background()
+	streamHandle, err := connection.Run(ctx,
+		idb.Command{Cypher: query, Params: params},
+		idb.TxConfig{Mode: mode},
+	)
+	AssertNoError(t, err)
+	assertConsumes(t, connection, streamHandle)
+}
+
+func assertConsumes(t *testing.T, connection idb.Connection, streamHandle idb.StreamHandle) {
+	t.Helper()
+	ctx := context.Background()
+	_, err := connection.Consume(ctx, streamHandle)
+	AssertNoError(t, err)
 }

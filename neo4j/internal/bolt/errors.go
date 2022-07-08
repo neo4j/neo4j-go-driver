@@ -6,6 +6,8 @@ import (
 	"time"
 )
 
+const InvalidTransactionError = "invalid transaction handle"
+
 type ConnectionReadTimeout struct {
 	userContext context.Context
 	readTimeout time.Duration
