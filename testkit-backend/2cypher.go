@@ -53,9 +53,13 @@ func nativeToCypher(v interface{}) map[string]interface{} {
 			"utc_offset_s": offset,
 		}
 		if tzName != "Offset" {
-			values["timezone_id"] = tzName
+			values["timezone_id"] = x.Location().String()
 		}
-		return valueResponse("CypherList", values)
+		return map[string]interface{}{
+			"name": "CypherDateTime",
+			"data": values,
+		}
+
 	case []interface{}:
 		values := make([]interface{}, len(x))
 		for i, y := range x {
