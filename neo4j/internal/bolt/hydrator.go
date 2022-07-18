@@ -35,8 +35,6 @@ import (
 const containsSystemUpdatesKey = "contains-system-updates"
 const containsUpdatesKey = "contains-updates"
 
-const defaultForMissingId = -1
-
 type ignored struct{}
 type success struct {
 	fields             []string
