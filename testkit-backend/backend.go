@@ -793,6 +793,13 @@ func (b *backend) writeRecord(result neo4j.ResultWithContext, record *neo4j.Reco
 	}
 
 	if record != nil {
+		if invalidValue := firstRecordInvalidValue(record); invalidValue != nil {
+			b.writeError(&db.ProtocolError{
+				MessageType: invalidValue.Message,
+				Err:         invalidValue.Err.Error(),
+			})
+			return
+		}
 		b.writeResponse("Record", serializeRecord(record))
 	} else {
 		err := result.Err()
@@ -921,6 +928,18 @@ func serializeParameters(parameters map[string]interface{}) map[string]interface
 		result[k] = nativeToCypher(parameter)
 	}
 	return result
+}
+
+func firstRecordInvalidValue(record *db.Record) *neo4j.InvalidValue {
+	if record == nil {
+		return nil
+	}
+	for _, value := range record.Values {
+		if result, ok := value.(*neo4j.InvalidValue); ok {
+			return result
+		}
+	}
+	return nil
 }
 
 // you can use '*' as wildcards anywhere in the qualified test name (useful to exclude a whole class e.g.)

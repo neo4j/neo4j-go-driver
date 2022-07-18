@@ -684,6 +684,40 @@ func TestHydrator(outer *testing.T) {
 				time.Date(1999, 12, 31, 23, 59, 59, 1, timeZone),
 			}},
 		},
+		{
+			name: "Record of UTC datetime with invalid timezone name",
+			build: func() {
+				packer.StructHeader(byte(msgRecord), 1)
+				packer.ArrayHeader(1)
+				packer.StructHeader('i', 3)
+				packer.Int64(42)
+				packer.Int64(42)
+				packer.String("LA/Confidential")
+			},
+			x: &db.Record{Values: []interface{}{
+				&dbtype.InvalidValue{
+					Message: "utcDateTimeNamedZone",
+					Err:     fmt.Errorf("unknown time zone LA/Confidential"),
+				},
+			}},
+		},
+		{
+			name: "Record of datetime with invalid timezone name",
+			build: func() {
+				packer.StructHeader(byte(msgRecord), 1)
+				packer.ArrayHeader(1)
+				packer.StructHeader('f', 3)
+				packer.Int64(42)
+				packer.Int64(42)
+				packer.String("LA/Confidential")
+			},
+			x: &db.Record{Values: []interface{}{
+				&dbtype.InvalidValue{
+					Message: "dateTimeNamedZone",
+					Err:     fmt.Errorf("unknown time zone LA/Confidential"),
+				},
+			}},
+		},
 	}
 
 	// Shared among calls in real usage so we do the same while testing it.

@@ -766,12 +766,10 @@ func (h *hydrator) dateTimeNamedZone(n uint32) interface{} {
 	// time.Time **copied** as-is in the target timezone, e.g. 15th of June 2020, 13:30 in target tz
 	l, err := time.LoadLocation(zone)
 	if err != nil {
-		h.setErr(&db.ProtocolError{
-			MessageType: "dateTimeNamedZone",
-			Field:       "location",
-			Err:         err.Error(),
-		})
-		return nil
+		return &dbtype.InvalidValue{
+			Message: "dateTimeNamedZone",
+			Err:     err,
+		}
 	}
 	return time.Date(
 		utcTime.Year(),
@@ -794,12 +792,10 @@ func (h *hydrator) utcDateTimeNamedZone(n uint32) interface{} {
 	zone := h.unp.String()
 	timeZone, err := time.LoadLocation(zone)
 	if err != nil {
-		h.setErr(&db.ProtocolError{
-			MessageType: "dateTimeNamedZone",
-			Field:       "location",
-			Err:         err.Error(),
-		})
-		return nil
+		return &dbtype.InvalidValue{
+			Message: "utcDateTimeNamedZone",
+			Err:     err,
+		}
 	}
 	return time.Unix(secs, nans).In(timeZone)
 }
