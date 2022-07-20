@@ -774,6 +774,19 @@ func (b *backend) handleRequest(req map[string]interface{}) {
 			b.writeResponse("SkipTest", map[string]interface{}{"reason": reason})
 			return
 		}
+		if strings.Contains(testName, "test_should_echo_all_timezone_ids") {
+			b.writeResponse("RunSubTests", nil)
+			return
+		}
+		b.writeResponse("RunTest", nil)
+
+	case "StartSubTest":
+		testName := data["testName"].(string)
+		arguments := data["subtestArguments"].(map[string]interface{})
+		if reason, ok := mustSkipSubTest(testName, arguments); ok {
+			b.writeResponse("SkipTest", map[string]interface{}{"reason": reason})
+			return
+		}
 		b.writeResponse("RunTest", nil)
 
 	default:
@@ -817,6 +830,13 @@ func mustSkip(testName string) (string, bool) {
 		if matches(testPattern, testName) {
 			return exclusionReason, true
 		}
+	}
+	return "", false
+}
+
+func mustSkipSubTest(testName string, arguments map[string]interface{}) (string, bool) {
+	if strings.Contains(testName, "test_should_echo_all_timezone_ids") {
+		return mustSkipTimeZoneSubTest(arguments)
 	}
 	return "", false
 }
@@ -970,4 +990,31 @@ func testSkips() map[string]string {
 		"stub.connectivity_check.test_verify_connectivity.TestVerifyConnectivity.test_routing_fail_when_no_reader_are_available":            "Won't fix - Go driver retries routing table when no readers are available",
 		"stub.driver_parameters.test_connection_acquisition_timeout_ms.TestConnectionAcquisitionTimeoutMs.test_does_not_encompass_router_*": "Won't fix - ConnectionAcquisitionTimeout spans the whole process including db resolution, RT updates, connection acquisition from the pool, and creation of new connections.",
 	}
+}
+
+func mustSkipTimeZoneSubTest(arguments map[string]interface{}) (string, bool) {
+	rawDateTime := arguments["dt"].(map[string]interface{})
+	dateTimeData := rawDateTime["data"].(map[string]interface{})
+	timeZoneName := dateTimeData["timezone_id"].(string)
+	location, err := time.LoadLocation(timeZoneName)
+	if err != nil {
+		return fmt.Sprintf("time zone not supported: %s", err), true
+	}
+	dateTime := time.Date(
+		int(dateTimeData["year"].(float64)),
+		time.Month(dateTimeData["month"].(float64)),
+		int(dateTimeData["day"].(float64)),
+		int(dateTimeData["hour"].(float64)),
+		int(dateTimeData["minute"].(float64)),
+		int(dateTimeData["second"].(float64)),
+		int(dateTimeData["nanosecond"].(float64)),
+		location,
+	)
+	expectedOffset := int(dateTimeData["utc_offset_s"].(float64))
+	if _, actualOffset := dateTime.Zone(); actualOffset != expectedOffset {
+		return fmt.Sprintf("Expected offset %d for timezone %s and time %s, got offset %d instead",
+				expectedOffset, timeZoneName, dateTime.String(), actualOffset),
+			true
+	}
+	return "", false
 }
