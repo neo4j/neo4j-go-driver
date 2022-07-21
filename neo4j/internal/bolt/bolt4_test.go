@@ -138,6 +138,7 @@ func TestBolt4(ot *testing.T) {
 		AssertStringEqual(t, bolt.ServerName(), "serverName")
 		AssertTrue(t, bolt.IsAlive())
 		AssertTrue(t, reflect.DeepEqual(bolt.in.connReadTimeout, time.Duration(-1)))
+		AssertFalse(t, bolt.out.useUtcDateTime)
 	})
 
 	ot.Run("Connect success with timeout hint", func(t *testing.T) {
@@ -152,6 +153,36 @@ func TestBolt4(ot *testing.T) {
 
 		AssertTrue(t, reflect.DeepEqual(bolt.in.connReadTimeout, 42*time.Second))
 	})
+
+	for _, version := range [][]byte{{4, 3}, {4, 4}} {
+		major := version[0]
+		minor := version[1]
+		ot.Run(fmt.Sprintf("[%d.%d] Connect success with UTC patch", major, minor), func(t *testing.T) {
+			bolt, cleanup := connectToServer(t, func(srv *bolt4server) {
+				srv.waitForHandshake()
+				srv.acceptVersion(major, minor)
+				srv.waitForHelloWithPatches([]interface{}{"utc"})
+				srv.acceptHelloWithPatches([]interface{}{"utc"})
+			})
+			defer cleanup()
+			defer bolt.Close()
+
+			AssertTrue(t, bolt.out.useUtcDateTime)
+		})
+
+		ot.Run(fmt.Sprintf("[%d.%d] Connect success with unknown patch", major, minor), func(t *testing.T) {
+			bolt, cleanup := connectToServer(t, func(srv *bolt4server) {
+				srv.waitForHandshake()
+				srv.acceptVersion(major, minor)
+				srv.waitForHelloWithPatches([]interface{}{"utc"})
+				srv.acceptHelloWithPatches([]interface{}{"some-unknown-patch"})
+			})
+			defer cleanup()
+			defer bolt.Close()
+
+			AssertFalse(t, bolt.out.useUtcDateTime)
+		})
+	}
 
 	invalidValues := []interface{}{4.2, "42", -42}
 	for _, value := range invalidValues {

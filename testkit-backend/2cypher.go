@@ -21,6 +21,7 @@ package main
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/neo4j/neo4j-go-driver/v4/neo4j"
 )
@@ -39,6 +40,26 @@ func nativeToCypher(v interface{}) map[string]interface{} {
 		return valueResponse("CypherBool", x)
 	case float64:
 		return valueResponse("CypherFloat", x)
+	case time.Time:
+		tzName, offset := x.Zone()
+		values := map[string]interface{}{
+			"year":         x.Year(),
+			"month":        x.Month(),
+			"day":          x.Day(),
+			"hour":         x.Hour(),
+			"minute":       x.Minute(),
+			"second":       x.Second(),
+			"nanosecond":   x.Nanosecond(),
+			"utc_offset_s": offset,
+		}
+		if tzName != "Offset" {
+			values["timezone_id"] = x.Location().String()
+		}
+		return map[string]interface{}{
+			"name": "CypherDateTime",
+			"data": values,
+		}
+
 	case []interface{}:
 		values := make([]interface{}, len(x))
 		for i, y := range x {
@@ -87,7 +108,7 @@ func nativeToCypher(v interface{}) map[string]interface{} {
 		return map[string]interface{}{
 			"name": "Path",
 			"data": map[string]interface{}{
-				"nodes": nativeToCypher(nodes),
+				"nodes":         nativeToCypher(nodes),
 				"relationships": nativeToCypher(rels),
 			},
 		}

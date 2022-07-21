@@ -246,13 +246,16 @@ func (b *backend) toTransactionConfigApply(data map[string]interface{}) func(*ne
 	}
 }
 
-func (b *backend) toCypherAndParams(data map[string]interface{}) (string, map[string]interface{}) {
+func (b *backend) toCypherAndParams(data map[string]interface{}) (string, map[string]interface{}, error) {
 	cypher := data["cypher"].(string)
 	params, _ := data["params"].(map[string]interface{})
+	var err error
 	for i, p := range params {
-		params[i] = cypherToNative(p)
+		if params[i], err = cypherToNative(p); err != nil {
+			return "", nil, err
+		}
 	}
-	return cypher, params
+	return cypher, params, nil
 }
 
 func (b *backend) handleTransactionFunc(isRead bool, data map[string]interface{}) {
@@ -475,7 +478,11 @@ func (b *backend) handleRequest(req map[string]interface{}) {
 
 	case "SessionRun":
 		sessionState := b.sessionStates[data["sessionId"].(string)]
-		cypher, params := b.toCypherAndParams(data)
+		cypher, params, err := b.toCypherAndParams(data)
+		if err != nil {
+			b.writeError(err)
+			return
+		}
 		result, err := sessionState.session.Run(cypher, params, b.toTransactionConfigApply(data))
 		if err != nil {
 			b.writeError(err)
@@ -515,7 +522,11 @@ func (b *backend) handleRequest(req map[string]interface{}) {
 
 	case "TransactionRun":
 		tx := b.transactions[data["txId"].(string)]
-		cypher, params := b.toCypherAndParams(data)
+		cypher, params, err := b.toCypherAndParams(data)
+		if err != nil {
+			b.writeError(err)
+			return
+		}
 		result, err := tx.Run(cypher, params)
 		if err != nil {
 			b.writeError(err)
@@ -680,6 +691,7 @@ func (b *backend) handleRequest(req map[string]interface{}) {
 			"features": []string{
 				"ConfHint:connection.recv_timeout_seconds",
 				"Feature:API:Liveness.Check",
+				"Feature:API:Type.Temporal",
 				"Feature:Auth:Custom",
 				"Feature:Auth:Bearer",
 				"Feature:Auth:Kerberos",
@@ -689,6 +701,7 @@ func (b *backend) handleRequest(req map[string]interface{}) {
 				"Feature:Bolt:4.2",
 				"Feature:Bolt:4.3",
 				"Feature:Bolt:4.4",
+				"Feature:Bolt:Patch:UTC",
 				"Feature:Impersonation",
 				"Feature:TLS:1.1",
 				"Feature:TLS:1.2",
@@ -705,10 +718,46 @@ func (b *backend) handleRequest(req map[string]interface{}) {
 			b.writeResponse("SkipTest", map[string]interface{}{"reason": reason})
 			return
 		}
+		if strings.Contains(testName, "test_should_echo_all_timezone_ids") {
+			b.writeResponse("RunSubTests", nil)
+			return
+		}
+		b.writeResponse("RunTest", nil)
+
+	case "StartSubTest":
+		testName := data["testName"].(string)
+		arguments := data["subtestArguments"].(map[string]interface{})
+		if reason, ok := mustSkipSubTest(testName, arguments); ok {
+			b.writeResponse("SkipTest", map[string]interface{}{"reason": reason})
+			return
+		}
 		b.writeResponse("RunTest", nil)
 
 	default:
 		b.writeError(errors.New("Unknown request: " + name))
+	}
+}
+
+func (b *backend) writeRecord(result neo4j.Result, record *neo4j.Record, expectRecord bool) {
+	if expectRecord && record == nil {
+		b.writeResponse("BackendError", map[string]interface{}{
+			"msg": "Found no record where one was expected.",
+		})
+	} else if !expectRecord && record != nil {
+		b.writeResponse("BackendError", map[string]interface{}{
+			"msg": "Found a record where none was expected.",
+		})
+	}
+
+	if record != nil {
+		b.writeResponse("Record", serializeRecord(record))
+	} else {
+		err := result.Err()
+		if err != nil && err.Error() != "result cursor is not available anymore" {
+			b.writeError(err)
+			return
+		}
+		b.writeResponse("NullRecord", nil)
 	}
 }
 
@@ -718,6 +767,13 @@ func mustSkip(testName string) (string, bool) {
 		if matches(testPattern, testName) {
 			return exclusionReason, true
 		}
+	}
+	return "", false
+}
+
+func mustSkipSubTest(testName string, arguments map[string]interface{}) (string, bool) {
+	if strings.Contains(testName, "test_should_echo_all_timezone_ids") {
+		return mustSkipTimeZoneSubTest(arguments)
 	}
 	return "", false
 }
@@ -821,6 +877,16 @@ func serializeParameters(parameters map[string]interface{}) map[string]interface
 	return result
 }
 
+func serializeRecord(record *neo4j.Record) map[string]interface{} {
+	values := record.Values
+	cypherValues := make([]interface{}, len(values))
+	for i, v := range values {
+		cypherValues[i] = nativeToCypher(v)
+	}
+	data := map[string]interface{}{"values": cypherValues}
+	return data
+}
+
 // you can use '*' as wildcards anywhere in the qualified test name (useful to exclude a whole class e.g.)
 func testSkips() map[string]string {
 	return map[string]string{
@@ -852,4 +918,31 @@ func testSkips() map[string]string {
 		"neo4j.test_summary.TestSummary.test_contains_time_information":                                                                     "Strange behavior with Neo4j 3.5 EE",
 		"stub.driver_parameters.test_connection_acquisition_timeout_ms.TestConnectionAcquisitionTimeoutMs.test_does_not_encompass_router_*": "Won't fix - ConnectionAcquisitionTimeout spans the whole process including db resolution, RT updates, connection acquisition from the pool, and creation of new connections.",
 	}
+}
+
+func mustSkipTimeZoneSubTest(arguments map[string]interface{}) (string, bool) {
+	rawDateTime := arguments["dt"].(map[string]interface{})
+	dateTimeData := rawDateTime["data"].(map[string]interface{})
+	timeZoneName := dateTimeData["timezone_id"].(string)
+	location, err := time.LoadLocation(timeZoneName)
+	if err != nil {
+		return fmt.Sprintf("time zone not supported: %s", err), true
+	}
+	dateTime := time.Date(
+		int(dateTimeData["year"].(float64)),
+		time.Month(dateTimeData["month"].(float64)),
+		int(dateTimeData["day"].(float64)),
+		int(dateTimeData["hour"].(float64)),
+		int(dateTimeData["minute"].(float64)),
+		int(dateTimeData["second"].(float64)),
+		int(dateTimeData["nanosecond"].(float64)),
+		location,
+	)
+	expectedOffset := int(dateTimeData["utc_offset_s"].(float64))
+	if _, actualOffset := dateTime.Zone(); actualOffset != expectedOffset {
+		return fmt.Sprintf("Expected offset %d for timezone %s and time %s, got offset %d instead",
+				expectedOffset, timeZoneName, dateTime.String(), actualOffset),
+			true
+	}
+	return "", false
 }
