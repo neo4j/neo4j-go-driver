@@ -48,6 +48,7 @@ type backend struct {
 	resolvedAddresses map[string][]interface{}
 	id                int // Id to use for next object created by frontend
 	wrLock            sync.Mutex
+	logCypher         bool
 }
 
 // To implement transactional functions a bit of extra state is needed on the
@@ -75,6 +76,7 @@ func newBackend(rd *bufio.Reader, wr io.Writer) *backend {
 		recordedErrors:    make(map[string]error),
 		resolvedAddresses: make(map[string][]interface{}),
 		id:                0,
+		logCypher:         true,
 	}
 }
 
@@ -349,8 +351,8 @@ func (s serverAddress) Port() string {
 func (b *backend) handleRequest(req map[string]interface{}) {
 	name := req["name"].(string)
 	data := req["data"].(map[string]interface{})
+	b.logRequest(name, data)
 
-	fmt.Printf("REQ: %s (data: %+v)\n", name, data)
 	switch name {
 
 	case "ResolverResolutionCompleted":
@@ -433,7 +435,9 @@ func (b *backend) handleRequest(req map[string]interface{}) {
 	case "NewSession":
 		driver := b.drivers[data["driverId"].(string)]
 		sessionConfig := neo4j.SessionConfig{}
-		sessionConfig.BoltLogger = neo4j.ConsoleBoltLogger()
+		if b.logCypher {
+			sessionConfig.BoltLogger = neo4j.ConsoleBoltLogger()
+		}
 		switch data["accessMode"].(string) {
 		case "r":
 			sessionConfig.AccessMode = neo4j.AccessModeRead
@@ -722,6 +726,7 @@ func (b *backend) handleRequest(req map[string]interface{}) {
 			b.writeResponse("RunSubTests", nil)
 			return
 		}
+		b.logCypher = strings.Contains(testName, "test_long_string")
 		b.writeResponse("RunTest", nil)
 
 	case "StartSubTest":
@@ -736,6 +741,17 @@ func (b *backend) handleRequest(req map[string]interface{}) {
 	default:
 		b.writeError(errors.New("Unknown request: " + name))
 	}
+}
+
+func (b *backend) logRequest(name string, data map[string]interface{}) {
+	cypher, hasCypher := data["cypher"]
+	if hasCypher && !b.logCypher {
+		data["cypher"] = "<omitted for brevity>"
+		defer func() {
+			data["cypher"] = cypher
+		}()
+	}
+	fmt.Printf("REQ: %s (data: %+v)\n", name, data)
 }
 
 func (b *backend) writeRecord(result neo4j.Result, record *neo4j.Record, expectRecord bool) {
