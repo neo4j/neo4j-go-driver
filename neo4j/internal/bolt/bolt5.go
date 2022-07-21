@@ -123,10 +123,11 @@ func NewBolt5(serverName string, conn net.Conn, logger log.Logger, boltLog log.B
 		lastQid: -1,
 	}
 	b.out = outgoing{
-		chunker:    newChunker(),
-		packer:     packstream.Packer{},
-		onErr:      func(err error) { b.setError(err, true) },
-		boltLogger: boltLog,
+		chunker:        newChunker(),
+		packer:         packstream.Packer{},
+		onErr:          func(err error) { b.setError(err, true) },
+		boltLogger:     boltLog,
+		useUtcDateTime: true,
 	}
 
 	return b

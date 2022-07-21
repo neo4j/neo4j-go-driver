@@ -110,6 +110,9 @@ func TestBolt5(outer *testing.T) {
 
 		bolt := c.(*bolt5)
 		assertBoltState(t, bolt5Ready, bolt)
+		if !bolt.out.useUtcDateTime {
+			t.Fatalf("Bolt 5+ connections must always send and receive UTC datetimes")
+		}
 		return bolt, cleanup
 	}
 

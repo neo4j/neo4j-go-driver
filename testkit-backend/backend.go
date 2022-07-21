@@ -255,13 +255,16 @@ func (b *backend) toTransactionConfigApply(data map[string]interface{}) func(*ne
 	}
 }
 
-func (b *backend) toCypherAndParams(data map[string]interface{}) (string, map[string]interface{}) {
+func (b *backend) toCypherAndParams(data map[string]interface{}) (string, map[string]interface{}, error) {
 	cypher := data["cypher"].(string)
 	params, _ := data["params"].(map[string]interface{})
+	var err error
 	for i, p := range params {
-		params[i] = cypherToNative(p)
+		if params[i], err = cypherToNative(p); err != nil {
+			return "", nil, err
+		}
 	}
-	return cypher, params
+	return cypher, params, nil
 }
 
 func (b *backend) handleTransactionFunc(isRead bool, data map[string]interface{}) {
@@ -499,7 +502,11 @@ func (b *backend) handleRequest(req map[string]interface{}) {
 
 	case "SessionRun":
 		sessionState := b.sessionStates[data["sessionId"].(string)]
-		cypher, params := b.toCypherAndParams(data)
+		cypher, params, err := b.toCypherAndParams(data)
+		if err != nil {
+			b.writeError(err)
+			return
+		}
 		result, err := sessionState.session.Run(ctx, cypher, params, b.toTransactionConfigApply(data))
 		if err != nil {
 			b.writeError(err)
@@ -542,7 +549,11 @@ func (b *backend) handleRequest(req map[string]interface{}) {
 		if tx, found = b.explicitTransactions[transactionId]; !found {
 			tx = b.managedTransactions[transactionId]
 		}
-		cypher, params := b.toCypherAndParams(data)
+		cypher, params, err := b.toCypherAndParams(data)
+		if err != nil {
+			b.writeError(err)
+			return
+		}
 		result, err := tx.Run(ctx, cypher, params)
 		if err != nil {
 			b.writeError(err)
@@ -734,6 +745,7 @@ func (b *backend) handleRequest(req map[string]interface{}) {
 				"Feature:API:Liveness.Check",
 				"Feature:API:Result.List",
 				"Feature:API:Result.Peek",
+				"Feature:API:Type.Temporal",
 				"Feature:Auth:Custom",
 				"Feature:Auth:Bearer",
 				"Feature:Auth:Kerberos",
@@ -743,6 +755,7 @@ func (b *backend) handleRequest(req map[string]interface{}) {
 				"Feature:Bolt:4.3",
 				"Feature:Bolt:4.4",
 				"Feature:Bolt:5.0",
+				"Feature:Bolt:Patch:UTC",
 				"Feature:Impersonation",
 				"Feature:TLS:1.1",
 				"Feature:TLS:1.2",
@@ -758,6 +771,19 @@ func (b *backend) handleRequest(req map[string]interface{}) {
 	case "StartTest":
 		testName := data["testName"].(string)
 		if reason, ok := mustSkip(testName); ok {
+			b.writeResponse("SkipTest", map[string]interface{}{"reason": reason})
+			return
+		}
+		if strings.Contains(testName, "test_should_echo_all_timezone_ids") {
+			b.writeResponse("RunSubTests", nil)
+			return
+		}
+		b.writeResponse("RunTest", nil)
+
+	case "StartSubTest":
+		testName := data["testName"].(string)
+		arguments := data["subtestArguments"].(map[string]interface{})
+		if reason, ok := mustSkipSubTest(testName, arguments); ok {
 			b.writeResponse("SkipTest", map[string]interface{}{"reason": reason})
 			return
 		}
@@ -780,6 +806,13 @@ func (b *backend) writeRecord(result neo4j.ResultWithContext, record *neo4j.Reco
 	}
 
 	if record != nil {
+		if invalidValue := firstRecordInvalidValue(record); invalidValue != nil {
+			b.writeError(&db.ProtocolError{
+				MessageType: invalidValue.Message,
+				Err:         invalidValue.Err.Error(),
+			})
+			return
+		}
 		b.writeResponse("Record", serializeRecord(record))
 	} else {
 		err := result.Err()
@@ -797,6 +830,13 @@ func mustSkip(testName string) (string, bool) {
 		if matches(testPattern, testName) {
 			return exclusionReason, true
 		}
+	}
+	return "", false
+}
+
+func mustSkipSubTest(testName string, arguments map[string]interface{}) (string, bool) {
+	if strings.Contains(testName, "test_should_echo_all_timezone_ids") {
+		return mustSkipTimeZoneSubTest(arguments)
 	}
 	return "", false
 }
@@ -910,6 +950,18 @@ func serializeParameters(parameters map[string]interface{}) map[string]interface
 	return result
 }
 
+func firstRecordInvalidValue(record *db.Record) *neo4j.InvalidValue {
+	if record == nil {
+		return nil
+	}
+	for _, value := range record.Values {
+		if result, ok := value.(*neo4j.InvalidValue); ok {
+			return result
+		}
+	}
+	return nil
+}
+
 // you can use '*' as wildcards anywhere in the qualified test name (useful to exclude a whole class e.g.)
 func testSkips() map[string]string {
 	return map[string]string{
@@ -938,4 +990,31 @@ func testSkips() map[string]string {
 		"stub.connectivity_check.test_verify_connectivity.TestVerifyConnectivity.test_routing_fail_when_no_reader_are_available":            "Won't fix - Go driver retries routing table when no readers are available",
 		"stub.driver_parameters.test_connection_acquisition_timeout_ms.TestConnectionAcquisitionTimeoutMs.test_does_not_encompass_router_*": "Won't fix - ConnectionAcquisitionTimeout spans the whole process including db resolution, RT updates, connection acquisition from the pool, and creation of new connections.",
 	}
+}
+
+func mustSkipTimeZoneSubTest(arguments map[string]interface{}) (string, bool) {
+	rawDateTime := arguments["dt"].(map[string]interface{})
+	dateTimeData := rawDateTime["data"].(map[string]interface{})
+	timeZoneName := dateTimeData["timezone_id"].(string)
+	location, err := time.LoadLocation(timeZoneName)
+	if err != nil {
+		return fmt.Sprintf("time zone not supported: %s", err), true
+	}
+	dateTime := time.Date(
+		int(dateTimeData["year"].(float64)),
+		time.Month(dateTimeData["month"].(float64)),
+		int(dateTimeData["day"].(float64)),
+		int(dateTimeData["hour"].(float64)),
+		int(dateTimeData["minute"].(float64)),
+		int(dateTimeData["second"].(float64)),
+		int(dateTimeData["nanosecond"].(float64)),
+		location,
+	)
+	expectedOffset := int(dateTimeData["utc_offset_s"].(float64))
+	if _, actualOffset := dateTime.Zone(); actualOffset != expectedOffset {
+		return fmt.Sprintf("Expected offset %d for timezone %s and time %s, got offset %d instead",
+				expectedOffset, timeZoneName, dateTime.String(), actualOffset),
+			true
+	}
+	return "", false
 }

@@ -87,7 +87,7 @@ func unpack(u *packstream.Unpacker) interface{} {
 func TestOutgoing(ot *testing.T) {
 	var err error
 	// Utility to unpack through dechunking and a custom build func
-	dechunkAndUnpack := func(t *testing.T, build func(outgoing *outgoing)) interface{} {
+	dechunkAndUnpack := func(t *testing.T, build func(*testing.T, *outgoing)) interface{} {
 		out := &outgoing{
 			chunker: newChunker(),
 			packer:  packstream.Packer{},
@@ -103,7 +103,7 @@ func TestOutgoing(ot *testing.T) {
 			}
 		}()
 		err = nil
-		build(out)
+		build(t, out)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -129,12 +129,12 @@ func TestOutgoing(ot *testing.T) {
 	// tests for top level appending and sending outgoing messages
 	cases := []struct {
 		name   string
-		build  func(outgoing *outgoing)
+		build  func(t *testing.T, outgoing *outgoing)
 		expect interface{}
 	}{
 		{
 			name: "hello",
-			build: func(out *outgoing) {
+			build: func(t *testing.T, out *outgoing) {
 				out.appendHello(nil)
 			},
 			expect: &testStruct{
@@ -144,7 +144,7 @@ func TestOutgoing(ot *testing.T) {
 		},
 		{
 			name: "begin",
-			build: func(out *outgoing) {
+			build: func(t *testing.T, out *outgoing) {
 				out.appendBegin(map[string]interface{}{"mode": "r"})
 			},
 			expect: &testStruct{
@@ -154,7 +154,7 @@ func TestOutgoing(ot *testing.T) {
 		},
 		{
 			name: "commit",
-			build: func(out *outgoing) {
+			build: func(t *testing.T, out *outgoing) {
 				out.appendCommit()
 			},
 			expect: &testStruct{
@@ -163,7 +163,7 @@ func TestOutgoing(ot *testing.T) {
 		},
 		{
 			name: "rollback",
-			build: func(out *outgoing) {
+			build: func(t *testing.T, out *outgoing) {
 				out.appendRollback()
 			},
 			expect: &testStruct{
@@ -172,7 +172,7 @@ func TestOutgoing(ot *testing.T) {
 		},
 		{
 			name: "goodbye",
-			build: func(out *outgoing) {
+			build: func(t *testing.T, out *outgoing) {
 				out.appendGoodbye()
 			},
 			expect: &testStruct{
@@ -181,7 +181,7 @@ func TestOutgoing(ot *testing.T) {
 		},
 		{
 			name: "reset",
-			build: func(out *outgoing) {
+			build: func(t *testing.T, out *outgoing) {
 				out.appendReset()
 			},
 			expect: &testStruct{
@@ -190,7 +190,7 @@ func TestOutgoing(ot *testing.T) {
 		},
 		{
 			name: "pull all",
-			build: func(out *outgoing) {
+			build: func(t *testing.T, out *outgoing) {
 				out.appendPullAll()
 			},
 			expect: &testStruct{
@@ -199,7 +199,7 @@ func TestOutgoing(ot *testing.T) {
 		},
 		{
 			name: "pull n",
-			build: func(out *outgoing) {
+			build: func(t *testing.T, out *outgoing) {
 				out.appendPullN(7)
 			},
 			expect: &testStruct{
@@ -209,7 +209,7 @@ func TestOutgoing(ot *testing.T) {
 		},
 		{
 			name: "pull n+qid",
-			build: func(out *outgoing) {
+			build: func(t *testing.T, out *outgoing) {
 				out.appendPullNQid(7, 10000)
 			},
 			expect: &testStruct{
@@ -219,7 +219,7 @@ func TestOutgoing(ot *testing.T) {
 		},
 		{
 			name: "discard n+qid",
-			build: func(out *outgoing) {
+			build: func(t *testing.T, out *outgoing) {
 				out.appendDiscardNQid(7, 10000)
 			},
 			expect: &testStruct{
@@ -229,7 +229,7 @@ func TestOutgoing(ot *testing.T) {
 		},
 		{
 			name: "run, no params, no meta",
-			build: func(out *outgoing) {
+			build: func(t *testing.T, out *outgoing) {
 				out.appendRun("cypher", nil, nil)
 			},
 			expect: &testStruct{
@@ -239,7 +239,7 @@ func TestOutgoing(ot *testing.T) {
 		},
 		{
 			name: "run, no params, meta",
-			build: func(out *outgoing) {
+			build: func(t *testing.T, out *outgoing) {
 				out.appendRun("cypher", nil, map[string]interface{}{"mode": "r"})
 			},
 			expect: &testStruct{
@@ -249,7 +249,7 @@ func TestOutgoing(ot *testing.T) {
 		},
 		{
 			name: "run, params, meta",
-			build: func(out *outgoing) {
+			build: func(t *testing.T, out *outgoing) {
 				out.appendRun("cypher", map[string]interface{}{"x": 1, "y": "2"}, map[string]interface{}{"mode": "r"})
 			},
 			expect: &testStruct{
@@ -259,7 +259,7 @@ func TestOutgoing(ot *testing.T) {
 		},
 		{
 			name: "run, params, meta",
-			build: func(out *outgoing) {
+			build: func(t *testing.T, out *outgoing) {
 				out.appendRun("cypher", map[string]interface{}{"x": 1, "y": "2"}, map[string]interface{}{"mode": "r"})
 			},
 			expect: &testStruct{
@@ -269,7 +269,7 @@ func TestOutgoing(ot *testing.T) {
 		},
 		{
 			name: "route v43",
-			build: func(out *outgoing) {
+			build: func(t *testing.T, out *outgoing) {
 				out.appendRouteToV43(map[string]string{"key1": "val1", "key2": "val2"}, []string{"deutsch-mark", "mark-twain"}, "adb")
 			},
 			expect: &testStruct{
@@ -279,7 +279,7 @@ func TestOutgoing(ot *testing.T) {
 		},
 		{
 			name: "route, default database v43",
-			build: func(out *outgoing) {
+			build: func(t *testing.T, out *outgoing) {
 				out.appendRouteToV43(map[string]string{"key1": "val1",
 					"key2": "val2"}, []string{"deutsch-mark", "mark-twain"}, idb.DefaultDatabase)
 			},
@@ -290,7 +290,7 @@ func TestOutgoing(ot *testing.T) {
 		},
 		{
 			name: "route, default bookmarks v43",
-			build: func(out *outgoing) {
+			build: func(t *testing.T, out *outgoing) {
 				out.appendRouteToV43(map[string]string{"key1": "val1", "key2": "val2"}, nil, "adb")
 			},
 			expect: &testStruct{
@@ -300,7 +300,7 @@ func TestOutgoing(ot *testing.T) {
 		},
 		{
 			name: "route, default bookmarks and database v43",
-			build: func(out *outgoing) {
+			build: func(t *testing.T, out *outgoing) {
 				out.appendRouteToV43(map[string]string{"key1": "val1",
 					"key2": "val2"}, nil, idb.DefaultDatabase)
 			},
@@ -311,7 +311,7 @@ func TestOutgoing(ot *testing.T) {
 		},
 		{
 			name: "route",
-			build: func(out *outgoing) {
+			build: func(t *testing.T, out *outgoing) {
 				out.appendRoute(map[string]string{"key1": "val1", "key2": "val2"}, []string{"deutsch-mark", "mark-twain"}, map[string]interface{}{"db": "adb"})
 			},
 			expect: &testStruct{
@@ -324,7 +324,7 @@ func TestOutgoing(ot *testing.T) {
 		},
 		{
 			name: "route, default database",
-			build: func(out *outgoing) {
+			build: func(t *testing.T, out *outgoing) {
 				out.appendRoute(map[string]string{"key1": "val1", "key2": "val2"}, []string{"deutsch-mark", "mark-twain"}, map[string]interface{}{})
 			},
 			expect: &testStruct{
@@ -337,7 +337,7 @@ func TestOutgoing(ot *testing.T) {
 		},
 		{
 			name: "route, default bookmarks",
-			build: func(out *outgoing) {
+			build: func(t *testing.T, out *outgoing) {
 				out.appendRoute(map[string]string{"key1": "val1", "key2": "val2"}, nil, map[string]interface{}{"db": "adb"})
 			},
 			expect: &testStruct{
@@ -350,7 +350,7 @@ func TestOutgoing(ot *testing.T) {
 		},
 		{
 			name: "route, default bookmarks and database",
-			build: func(out *outgoing) {
+			build: func(t *testing.T, out *outgoing) {
 				out.appendRoute(map[string]string{"key1": "val1", "key2": "val2"}, nil, map[string]interface{}{})
 			},
 			expect: &testStruct{
@@ -359,6 +359,58 @@ func TestOutgoing(ot *testing.T) {
 					map[string]interface{}{"key1": "val1", "key2": "val2"},
 					[]interface{}{},
 					map[string]interface{}{}},
+			},
+		},
+		{
+			name: "UTC datetime struct, with timezone offset",
+			build: func(t *testing.T, out *outgoing) {
+				defer func() {
+					out.useUtcDateTime = false
+				}()
+				out.useUtcDateTime = true
+				minusTwoHours := -2 * 60 * 60
+				tz := time.FixedZone("Offset", minusTwoHours)
+				out.begin()
+				// June 15, 2020 12:30:00 in "Offset"
+				// aka June 15, 2020 14:30:00 UTC
+				// aka 1592231400 seconds since Unix epoch
+				out.packStruct(time.Date(2020, 6, 15, 12, 30, 0, 42, tz))
+				out.end()
+			},
+			expect: &testStruct{
+				tag: 'I',
+				fields: []interface{}{
+					int64(1592231400),
+					int64(42),
+					int64(-2 * 60 * 60),
+				},
+			},
+		},
+		{
+			name: "UTC datetime struct, with timezone name",
+			build: func(t *testing.T, out *outgoing) {
+				defer func() {
+					out.useUtcDateTime = false
+				}()
+				out.useUtcDateTime = true
+				tz, err := time.LoadLocation("Pacific/Honolulu")
+				if err != nil {
+					t.Fatal(err)
+				}
+				out.begin()
+				// June 15, 2020 04:30:00 in "Pacific/Honolulu"
+				// aka June 15, 2020 14:30:00 UTC
+				// aka 1592231400 seconds since Unix epoch
+				out.packStruct(time.Date(2020, 6, 15, 4, 30, 0, 42, tz))
+				out.end()
+			},
+			expect: &testStruct{
+				tag: 'i',
+				fields: []interface{}{
+					int64(1592231400),
+					int64(42),
+					"Pacific/Honolulu",
+				},
 			},
 		},
 	}
@@ -486,7 +538,7 @@ func TestOutgoing(ot *testing.T) {
 
 	for _, c := range paramCases {
 		ot.Run(c.name, func(t *testing.T) {
-			x := dechunkAndUnpack(t, func(out *outgoing) {
+			x := dechunkAndUnpack(t, func(t *testing.T, out *outgoing) {
 				out.begin()
 				out.packMap(c.inp)
 				out.end()
