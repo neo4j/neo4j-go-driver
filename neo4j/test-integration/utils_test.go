@@ -23,6 +23,7 @@ import (
 	"fmt"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/test-integration/dbserver"
 	"reflect"
+	"sort"
 	"testing"
 
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
@@ -162,4 +163,15 @@ func listTransactionsAndMatchMetadataWork(version dbserver.Version, metadata map
 
 		return matched, nil
 	}
+}
+
+func sortedKeys(m map[string]interface{}) []string {
+	result := make([]string, len(m))
+	i := 0
+	for k := range m {
+		result[i] = k
+		i++
+	}
+	sort.Strings(result)
+	return result
 }

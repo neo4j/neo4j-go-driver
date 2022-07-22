@@ -27,13 +27,11 @@ import (
 	"math/big"
 	"net"
 	"net/url"
-	"reflect"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/db"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/dbtype"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/bolt"
 	. "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/testutil"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/log"
@@ -281,7 +279,7 @@ func TestConnectionConformance(outer *testing.T) {
 			name: "Next passed the summary",
 			fun: func(t *testing.T, c idb.Connection) {
 				s, err := boltConn.Run(context.Background(),
-					idb.Command{Cypher: "RETURN datetime()"},
+					idb.Command{Cypher: "RETURN 42"},
 					idb.TxConfig{Mode: idb.ReadMode})
 				AssertNoError(t, err)
 				rec, sum, err := c.Next(context.Background(), s)
@@ -452,7 +450,7 @@ func TestConnectionConformance(outer *testing.T) {
 			boltConn.Reset(context.Background())
 			// Should be working now
 			s, err := boltConn.Run(context.Background(),
-				idb.Command{Cypher: "RETURN datetime()"},
+				idb.Command{Cypher: "RETURN 42"},
 				idb.TxConfig{Mode: idb.ReadMode})
 			AssertNoError(t, err)
 			if s == nil {
@@ -514,165 +512,6 @@ func TestConnectionConformance(outer *testing.T) {
 		if recS != bigBuilder.String() {
 			t.Errorf("Strings differ")
 		}
-	})
-
-	assertTime := func(t *testing.T, t1, t2 time.Time) {
-		t.Helper()
-		if t1.Hour() != t2.Hour() || t1.Minute() != t2.Minute() ||
-			t1.Second() != t2.Second() || t1.Nanosecond() != t2.Nanosecond() {
-			t.Errorf("Time %+v vs %+v", t1, t1)
-		}
-	}
-
-	assertTimeOffset := func(t *testing.T, t1, t2 time.Time) {
-		t.Helper()
-
-		_, off1 := t1.Zone()
-		_, off2 := t2.Zone()
-
-		if off1 != off2 {
-			t.Errorf("Offset %d vs %d", off1, off2)
-		}
-	}
-
-	assertTimeZone := func(t *testing.T, t1, t2 time.Time) {
-		t.Helper()
-
-		z1, _ := t1.Zone()
-		z2, _ := t2.Zone()
-
-		if z1 != z2 {
-			t.Errorf("Zone %s vs %s", z1, z2)
-		}
-	}
-
-	assertDate := func(t *testing.T, t1, t2 time.Time) {
-		t.Helper()
-		if t1.Year() != t2.Year() || t1.Month() != t2.Month() || t1.Day() != t2.Day() {
-			t.Errorf("Date %s vs %s", t1, t2)
-		}
-	}
-
-	assertDuration := func(t *testing.T, dur1, dur2 dbtype.Duration) {
-		t.Helper()
-		if !reflect.DeepEqual(dur1, dur2) {
-			t.Errorf("Duration %+v vs %+v", dur1, dur2)
-		}
-	}
-
-	// Temporal types
-	outer.Run("Temporal types", func(tt *testing.T) {
-		london, _ := time.LoadLocation("Europe/London")
-
-		// In Cypher
-		cTime := "time({ hour: 23, minute: 49, second: 59, nanosecond: 999999999, timezone:'+03:00' })"
-		cDate := "date({ year: 1994, month: 11, day: 15 })"
-		cDateTimeO := "datetime({ year: 1859, month: 5, day: 31, hour: 23, minute: 49, second: 59, nanosecond: 999999999, timezone:'+02:30' })"
-		cDateTimeZ := "datetime({ year: 1959, month: 5, day: 31, hour: 23, minute: 49, second: 59, nanosecond: 999999999, timezone:'Europe/London' })"
-		cLocalTime := "localtime({ hour: 23, minute: 49, second: 59, nanosecond: 999999999 })"
-		cLocalDateTime := "localdatetime({ year: 1859, month: 5, day: 31, hour: 23, minute: 49, second: 59, nanosecond: 999999999 })"
-		cDuration := "duration({ months: 16, days: 45, seconds: 120, nanoseconds: 187309812 })"
-		// Same as above in time.Time
-		tTime := time.Date(0, 0, 0, 23, 49, 59, 999999999, time.FixedZone("Offset", 3*60*60))
-		tDate := time.Date(1994, 11, 15, 0, 0, 0, 0, time.Local)
-		tDateTimeO := time.Date(1859, 5, 31, 23, 49, 59, 999999999, time.FixedZone("Offset", 150*60))
-		tDateTimeZ := time.Date(1959, 5, 31, 23, 49, 59, 999999999, london)
-		tLocalTime := time.Date(0, 0, 0, 23, 49, 59, 999999999, time.Local)
-		tLocalDateTime := time.Date(1859, 5, 31, 23, 49, 59, 999999999, time.Local)
-		tDuration := dbtype.Duration{Months: 16, Days: 45, Seconds: 120, Nanos: 187309812}
-
-		tt.Run("Reading", func(t *testing.T) {
-			query := "RETURN " +
-				cTime + ", " + cDate + ", " + cDateTimeO + ", " + cDateTimeZ + ", " + cLocalTime + ", " + cLocalDateTime + ", " + cDuration
-			stream, err := boltConn.Run(context.Background(),
-				idb.Command{Cypher: query}, idb.TxConfig{Mode: idb.ReadMode})
-			AssertNoError(t, err)
-			rec, sum, err := boltConn.Next(context.Background(), stream)
-			if rec == nil || err != nil || sum != nil {
-				t.Fatalf("Should be a record, %+v, %+v, %+v", rec, sum, err)
-			}
-
-			// Verify each temporal type
-			// Time
-			gotTime := time.Time(rec.Values[0].(dbtype.Time))
-			assertTime(t, gotTime, tTime)
-			assertTimeOffset(t, gotTime, tTime)
-			// Date
-			gotDate := time.Time(rec.Values[1].(dbtype.Date))
-			assertDate(t, gotDate, tDate)
-			// DateTime, offset
-			gotDateTime := time.Time(rec.Values[2].(time.Time))
-			assertDate(t, time.Time(gotDateTime), tDateTimeO)
-			assertTime(t, gotDateTime, tDateTimeO)
-			assertTimeOffset(t, gotDateTime, tDateTimeO)
-			// DateTime, zone
-			gotDateTime = time.Time(rec.Values[3].(time.Time))
-			assertDate(t, time.Time(gotDateTime), tDateTimeZ)
-			assertTime(t, gotDateTime, tDateTimeZ)
-			assertTimeZone(t, gotDateTime, tDateTimeZ)
-			// Local time
-			gotTime = time.Time(rec.Values[4].(dbtype.LocalTime))
-			assertTime(t, gotTime, tLocalTime)
-			// Local DateTime
-			gotDateTime = time.Time(rec.Values[5].(dbtype.LocalDateTime))
-			assertDate(t, time.Time(gotDateTime), tLocalDateTime)
-			assertTime(t, gotDateTime, tLocalDateTime)
-			// Duration
-			gotDuration := rec.Values[6].(dbtype.Duration)
-			assertDuration(t, gotDuration, tDuration)
-		})
-
-		tt.Run("Writing", func(t *testing.T) {
-			// Make a node with all temporal types as parameters and make sure that we can interpret
-			// it the same way again.
-			r := randInt()
-			stream, _ := boltConn.Run(context.Background(), idb.Command{
-				Cypher: "CREATE (n:Rand {" +
-					"val: $r, time: $time, date: $date, dateTimeO: $dateTimeO, " +
-					"dateTimeZ: $dateTimeZ, localTime: $localTime, localDateTime: $localDateTime}) " +
-					"RETURN n",
-				Params: map[string]interface{}{
-					"r":             r,
-					"time":          dbtype.Time(tTime),
-					"date":          dbtype.Date(tDate),
-					"dateTimeO":     tDateTimeO,
-					"dateTimeZ":     tDateTimeZ,
-					"localTime":     dbtype.LocalTime(tLocalTime),
-					"localDateTime": dbtype.LocalDateTime(tLocalDateTime),
-				}}, idb.TxConfig{Mode: idb.WriteMode})
-			rec, sum, err := boltConn.Next(context.Background(), stream)
-			if rec == nil || err != nil || sum != nil {
-				t.Fatalf("Should be a record, %+v, %+v, %+v", rec, sum, err)
-			}
-
-			// Verify all temporal instances as when reading (as long as that test passes, the
-			// errors here should be due to writing).
-			node := rec.Values[0].(dbtype.Node)
-			// Time
-			gotTime := time.Time(node.Props["time"].(dbtype.Time))
-			assertTime(t, gotTime, tTime)
-			assertTimeOffset(t, gotTime, tTime)
-			// Date
-			gotDate := time.Time(node.Props["date"].(dbtype.Date))
-			assertDate(t, gotDate, tDate)
-			// DateTime, offset
-			gotDateTime := time.Time(node.Props["dateTimeO"].(time.Time))
-			assertDate(t, time.Time(gotDateTime), tDateTimeO)
-			assertTime(t, gotDateTime, tDateTimeO)
-			assertTimeOffset(t, gotDateTime, tDateTimeO)
-			// DateTime, zone
-			gotDateTime = time.Time(node.Props["dateTimeZ"].(time.Time))
-			assertDate(t, time.Time(gotDateTime), tDateTimeZ)
-			assertTime(t, gotDateTime, tDateTimeZ)
-			assertTimeZone(t, gotDateTime, tDateTimeZ)
-			// Local time
-			gotTime = time.Time(node.Props["localTime"].(dbtype.LocalTime))
-			assertTime(t, gotTime, tLocalTime)
-			// Local DateTime
-			gotDateTime = time.Time(node.Props["localDateTime"].(dbtype.LocalDateTime))
-			assertDate(t, time.Time(gotDateTime), tLocalDateTime)
-			assertTime(t, gotDateTime, tLocalDateTime)
-		})
 	})
 
 	// Bookmark tests
