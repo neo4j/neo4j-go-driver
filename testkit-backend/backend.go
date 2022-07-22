@@ -228,7 +228,9 @@ func (b *backend) writeResponse(name string, data interface{}) {
 
 func (b *backend) toRequest(s string) map[string]interface{} {
 	req := map[string]interface{}{}
-	err := json.Unmarshal([]byte(s), &req)
+	decoder := json.NewDecoder(strings.NewReader(s))
+	decoder.UseNumber()
+	err := decoder.Decode(&req)
 	if err != nil {
 		panic(fmt.Sprintf("Unable to parse: '%s' as a request: %s", s, err))
 	}
@@ -239,11 +241,15 @@ func (b *backend) toTransactionConfigApply(data map[string]interface{}) func(*ne
 	txConfig := neo4j.TransactionConfig{Timeout: math.MinInt}
 	// Optional transaction meta data
 	if data["txMeta"] != nil {
-		txConfig.Metadata = data["txMeta"].(map[string]interface{})
+		txMetadata := data["txMeta"].(map[string]interface{})
+		if err := patchNumbersInMap(txMetadata); err != nil {
+			panic(err)
+		}
+		txConfig.Metadata = txMetadata
 	}
 	// Optional timeout in milliseconds
 	if data["timeout"] != nil {
-		txConfig.Timeout = time.Millisecond * time.Duration(data["timeout"].(float64))
+		txConfig.Timeout = time.Millisecond * time.Duration(asInt64(data["timeout"].(json.Number)))
 	}
 	return func(conf *neo4j.TransactionConfig) {
 		if txConfig.Metadata != nil {
@@ -385,12 +391,17 @@ func (b *backend) handleRequest(req map[string]interface{}) {
 		case "bearer":
 			authToken = neo4j.BearerAuth(authTokenMap["credentials"].(string))
 		default:
+			parameters := authTokenMap["parameters"].(map[string]interface{})
+			if err := patchNumbersInMap(parameters); err != nil {
+				b.writeError(err)
+				return
+			}
 			authToken = neo4j.CustomAuth(
 				authTokenMap["scheme"].(string),
 				authTokenMap["principal"].(string),
 				authTokenMap["credentials"].(string),
 				authTokenMap["realm"].(string),
-				authTokenMap["parameters"].(map[string]interface{}))
+				parameters)
 		}
 		// Parse URI (or rather type cast)
 		uri := data["uri"].(string)
@@ -406,19 +417,19 @@ func (b *backend) handleRequest(req map[string]interface{}) {
 				c.AddressResolver = b.customAddressResolverFunction()
 			}
 			if data["connectionAcquisitionTimeoutMs"] != nil {
-				c.ConnectionAcquisitionTimeout = time.Millisecond * time.Duration(data["connectionAcquisitionTimeoutMs"].(float64))
+				c.ConnectionAcquisitionTimeout = time.Millisecond * time.Duration(asInt64(data["connectionAcquisitionTimeoutMs"].(json.Number)))
 			}
 			if data["maxConnectionPoolSize"] != nil {
-				c.MaxConnectionPoolSize = int(data["maxConnectionPoolSize"].(float64))
+				c.MaxConnectionPoolSize = asInt(data["maxConnectionPoolSize"].(json.Number))
 			}
 			if data["fetchSize"] != nil {
-				c.FetchSize = int(data["fetchSize"].(float64))
+				c.FetchSize = asInt(data["fetchSize"].(json.Number))
 			}
 			if data["maxTxRetryTimeMs"] != nil {
-				c.MaxTransactionRetryTime = time.Millisecond * time.Duration(data["maxTxRetryTimeMs"].(float64))
+				c.MaxTransactionRetryTime = time.Millisecond * time.Duration(asInt64(data["maxTxRetryTimeMs"].(json.Number)))
 			}
 			if data["connectionTimeoutMs"] != nil {
-				c.SocketConnectTimeout = time.Millisecond * time.Duration(data["connectionTimeoutMs"].(float64))
+				c.SocketConnectTimeout = time.Millisecond * time.Duration(asInt64(data["connectionTimeoutMs"].(json.Number)))
 			}
 		})
 		if err != nil {
@@ -480,7 +491,7 @@ func (b *backend) handleRequest(req map[string]interface{}) {
 			sessionConfig.DatabaseName = data["database"].(string)
 		}
 		if data["fetchSize"] != nil {
-			sessionConfig.FetchSize = int(data["fetchSize"].(float64))
+			sessionConfig.FetchSize = asInt(data["fetchSize"].(json.Number))
 		}
 		if data["impersonatedUser"] != nil {
 			sessionConfig.ImpersonatedUser = data["impersonatedUser"].(string)
@@ -774,7 +785,8 @@ func (b *backend) handleRequest(req map[string]interface{}) {
 			b.writeResponse("SkipTest", map[string]interface{}{"reason": reason})
 			return
 		}
-		if strings.Contains(testName, "test_should_echo_all_timezone_ids") {
+		if strings.Contains(testName, "test_should_echo_all_timezone_ids") ||
+			strings.Contains(testName, "test_date_time_cypher_created_tz_id") {
 			b.writeResponse("RunSubTests", nil)
 			return
 		}
@@ -1001,20 +1013,38 @@ func mustSkipTimeZoneSubTest(arguments map[string]interface{}) (string, bool) {
 		return fmt.Sprintf("time zone not supported: %s", err), true
 	}
 	dateTime := time.Date(
-		int(dateTimeData["year"].(float64)),
-		time.Month(dateTimeData["month"].(float64)),
-		int(dateTimeData["day"].(float64)),
-		int(dateTimeData["hour"].(float64)),
-		int(dateTimeData["minute"].(float64)),
-		int(dateTimeData["second"].(float64)),
-		int(dateTimeData["nanosecond"].(float64)),
+		asInt(dateTimeData["year"].(json.Number)),
+		time.Month(asInt(dateTimeData["month"].(json.Number))),
+		asInt(dateTimeData["day"].(json.Number)),
+		asInt(dateTimeData["hour"].(json.Number)),
+		asInt(dateTimeData["minute"].(json.Number)),
+		asInt(dateTimeData["second"].(json.Number)),
+		asInt(dateTimeData["nanosecond"].(json.Number)),
 		location,
 	)
-	expectedOffset := int(dateTimeData["utc_offset_s"].(float64))
+	expectedOffset := asInt(dateTimeData["utc_offset_s"].(json.Number))
 	if _, actualOffset := dateTime.Zone(); actualOffset != expectedOffset {
 		return fmt.Sprintf("Expected offset %d for timezone %s and time %s, got offset %d instead",
 				expectedOffset, timeZoneName, dateTime.String(), actualOffset),
 			true
 	}
 	return "", false
+}
+
+// some TestKit tests send large integer values which require to configure
+// the JSON deserializer to use json.Number instead of float64 (lossy conversions
+// would happen otherwise)
+// however, some specific dictionaries (like transaction metadata and custom
+// auth parameters) are better off relying on numbers being treated as float64
+func patchNumbersInMap(dictionary map[string]interface{}) error {
+	for key, value := range dictionary {
+		if number, ok := value.(json.Number); ok {
+			floatingPointValue, err := number.Float64()
+			if err != nil {
+				return fmt.Errorf("could not deserialize number %v in map %v: %w", number, dictionary, err)
+			}
+			dictionary[key] = floatingPointValue
+		}
+	}
+	return nil
 }
