@@ -117,6 +117,7 @@ type hydrator struct {
 	boltLogger    log.BoltLogger
 	logId         string
 	boltMajor     int
+	useUtc        bool
 }
 
 func (h *hydrator) setErr(err error) {
@@ -468,12 +469,24 @@ func (h *hydrator) value() interface{} {
 		case 'Y':
 			return h.point3d(n)
 		case 'F':
+			if h.useUtc {
+				return h.unknownStructError(t)
+			}
 			return h.dateTimeOffset(n)
 		case 'I':
+			if !h.useUtc {
+				return h.unknownStructError(t)
+			}
 			return h.utcDateTimeOffset(n)
 		case 'f':
+			if h.useUtc {
+				return h.unknownStructError(t)
+			}
 			return h.dateTimeNamedZone(n)
 		case 'i':
+			if !h.useUtc {
+				return h.unknownStructError(t)
+			}
 			return h.utcDateTimeNamedZone(n)
 		case 'd':
 			return h.localDateTime(n)
@@ -486,10 +499,7 @@ func (h *hydrator) value() interface{} {
 		case 'E':
 			return h.duration(n)
 		default:
-			h.setErr(&db.ProtocolError{
-				Err: fmt.Sprintf("Received unknown struct tag: %d", t),
-			})
-			return nil
+			return h.unknownStructError(t)
 		}
 	case packstream.PackedByteArray:
 		return h.unp.ByteArray()
@@ -955,4 +965,11 @@ func parseNotification(m map[string]interface{}) db.Notification {
 	}
 
 	return n
+}
+
+func (h *hydrator) unknownStructError(t byte) interface{} {
+	h.setErr(&db.ProtocolError{
+		Err: fmt.Sprintf("Received unknown struct tag: %d", t),
+	})
+	return nil
 }

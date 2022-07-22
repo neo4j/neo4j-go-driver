@@ -33,12 +33,12 @@ import (
 )
 
 type outgoing struct {
-	chunker        chunker
-	packer         packstream.Packer
-	onErr          func(err error)
-	boltLogger     log.BoltLogger
-	logId          string
-	useUtcDateTime bool
+	chunker    chunker
+	packer     packstream.Packer
+	onErr      func(err error)
+	boltLogger log.BoltLogger
+	logId      string
+	useUtc     bool
 }
 
 func (o *outgoing) begin() {
@@ -277,7 +277,7 @@ func (o *outgoing) packStruct(x interface{}) {
 		o.packer.Float64(v.Y)
 		o.packer.Float64(v.Z)
 	case time.Time:
-		if o.useUtcDateTime {
+		if o.useUtc {
 			if zone, _ := v.Zone(); zone == "Offset" {
 				o.packUtcDateTimeWithTzOffset(v)
 			} else {

@@ -141,7 +141,7 @@ func TestBolt4(outer *testing.T) {
 		AssertStringEqual(t, bolt.ServerName(), "serverName")
 		AssertTrue(t, bolt.IsAlive())
 		AssertTrue(t, reflect.DeepEqual(bolt.in.connReadTimeout, time.Duration(-1)))
-		AssertFalse(t, bolt.out.useUtcDateTime)
+		AssertFalse(t, bolt.out.useUtc)
 	})
 
 	outer.Run("Connect success with timeout hint", func(t *testing.T) {
@@ -170,7 +170,7 @@ func TestBolt4(outer *testing.T) {
 			defer cleanup()
 			defer bolt.Close(context.Background())
 
-			AssertTrue(t, bolt.out.useUtcDateTime)
+			AssertTrue(t, bolt.out.useUtc)
 		})
 
 		outer.Run(fmt.Sprintf("[%d.%d] Connect success with unknown patch", major, minor), func(t *testing.T) {
@@ -183,7 +183,7 @@ func TestBolt4(outer *testing.T) {
 			defer cleanup()
 			defer bolt.Close(context.Background())
 
-			AssertFalse(t, bolt.out.useUtcDateTime)
+			AssertFalse(t, bolt.out.useUtc)
 		})
 	}
 

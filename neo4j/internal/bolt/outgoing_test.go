@@ -365,9 +365,9 @@ func TestOutgoing(ot *testing.T) {
 			name: "UTC datetime struct, with timezone offset",
 			build: func(t *testing.T, out *outgoing) {
 				defer func() {
-					out.useUtcDateTime = false
+					out.useUtc = false
 				}()
-				out.useUtcDateTime = true
+				out.useUtc = true
 				minusTwoHours := -2 * 60 * 60
 				tz := time.FixedZone("Offset", minusTwoHours)
 				out.begin()
@@ -390,9 +390,9 @@ func TestOutgoing(ot *testing.T) {
 			name: "UTC datetime struct, with timezone name",
 			build: func(t *testing.T, out *outgoing) {
 				defer func() {
-					out.useUtcDateTime = false
+					out.useUtc = false
 				}()
-				out.useUtcDateTime = true
+				out.useUtc = true
 				tz, err := time.LoadLocation("Pacific/Honolulu")
 				if err != nil {
 					t.Fatal(err)

@@ -33,10 +33,11 @@ import (
 )
 
 type hydratorTestCase struct {
-	name  string
-	build func()      // Builds/encodes stream same was as server would
-	x     interface{} // Expected hydrated
-	err   error
+	name   string
+	build  func()      // Builds/encodes stream same was as server would
+	x      interface{} // Expected hydrated
+	err    error
+	useUtc bool
 }
 
 func TestHydrator(outer *testing.T) {
@@ -650,9 +651,9 @@ func TestHydrator(outer *testing.T) {
 					}},
 			}},
 		},
-
 		{
-			name: "Record of UTC datetime with timezone offset",
+			name:   "Record of UTC datetime with explicit offset with UTC support enabled",
+			useUtc: true,
 			build: func() {
 				tz := time.FixedZone("Offset", 3)
 				datetime := time.Date(1999, 12, 31, 23, 59, 59, 1, tz)
@@ -669,7 +670,40 @@ func TestHydrator(outer *testing.T) {
 			}},
 		},
 		{
-			name: "Record of UTC datetime with timezone name",
+			name:   "Record of UTC datetime with explicit offset with UTC support disabled",
+			useUtc: false,
+			build: func() {
+				tz := time.FixedZone("Offset", 3)
+				datetime := time.Date(1999, 12, 31, 23, 59, 59, 1, tz)
+				packer.StructHeader(byte(msgRecord), 1)
+				packer.ArrayHeader(1)
+				// UTC Datetime with explicit time zone offset
+				packer.StructHeader('I', 3)
+				packer.Int64(datetime.Unix())
+				packer.Int64(datetime.UnixNano() - (datetime.Unix() * int64(time.Second)))
+				packer.Int(3)
+			},
+			err: &db.ProtocolError{Err: "Received unknown struct tag: 73"},
+		},
+		{
+			name:   "Record of legacy datetime with explicit offset with UTC support enabled",
+			useUtc: true,
+			build: func() {
+				tz := time.FixedZone("Offset", 3)
+				datetime := time.Date(1999, 12, 31, 23, 59, 59, 1, tz)
+				packer.StructHeader(byte(msgRecord), 1)
+				packer.ArrayHeader(1)
+				// Datetime with explicit time zone offset
+				packer.StructHeader('F', 3)
+				packer.Int64(datetime.Unix())
+				packer.Int64(datetime.UnixNano() - (datetime.Unix() * int64(time.Second)))
+				packer.Int(3)
+			},
+			err: &db.ProtocolError{Err: "Received unknown struct tag: 70"},
+		},
+		{
+			name:   "Record of UTC datetime with timezone name with UTC support enabled",
+			useUtc: true,
 			build: func() {
 				datetime := time.Date(1999, 12, 31, 23, 59, 59, 1, timeZone)
 				packer.StructHeader(byte(msgRecord), 1)
@@ -685,7 +719,38 @@ func TestHydrator(outer *testing.T) {
 			}},
 		},
 		{
-			name: "Record of UTC datetime with invalid timezone name",
+			name:   "Record of UTC datetime with timezone name with UTC support disabled",
+			useUtc: false,
+			build: func() {
+				datetime := time.Date(1999, 12, 31, 23, 59, 59, 1, timeZone)
+				packer.StructHeader(byte(msgRecord), 1)
+				packer.ArrayHeader(1)
+				// UTC Datetime with time zone name
+				packer.StructHeader('i', 3)
+				packer.Int64(datetime.Unix())
+				packer.Int64(datetime.UnixNano() - (datetime.Unix() * int64(time.Second)))
+				packer.String(zoneName)
+			},
+			err: &db.ProtocolError{Err: "Received unknown struct tag: 105"},
+		},
+		{
+			name:   "Record of legacy datetime with timezone name with UTC support enabled",
+			useUtc: true,
+			build: func() {
+				datetime := time.Date(1999, 12, 31, 23, 59, 59, 1, timeZone)
+				packer.StructHeader(byte(msgRecord), 1)
+				packer.ArrayHeader(1)
+				// UTC Datetime with time zone name
+				packer.StructHeader('f', 3)
+				packer.Int64(datetime.Unix())
+				packer.Int64(datetime.UnixNano() - (datetime.Unix() * int64(time.Second)))
+				packer.String(zoneName)
+			},
+			err: &db.ProtocolError{Err: "Received unknown struct tag: 102"},
+		},
+		{
+			name:   "Record of UTC datetime with invalid timezone name with UTC support enabled",
+			useUtc: true,
 			build: func() {
 				packer.StructHeader(byte(msgRecord), 1)
 				packer.ArrayHeader(1)
@@ -702,7 +767,7 @@ func TestHydrator(outer *testing.T) {
 			}},
 		},
 		{
-			name: "Record of datetime with invalid timezone name",
+			name: "Record of legacy datetime with invalid timezone name with UTC support disabled",
 			build: func() {
 				packer.StructHeader(byte(msgRecord), 1)
 				packer.ArrayHeader(1)
@@ -727,6 +792,7 @@ func TestHydrator(outer *testing.T) {
 			defer func() {
 				hydrator.err = nil
 			}()
+			hydrator.useUtc = c.useUtc
 			if (c.x != nil) == (c.err != nil) {
 				t.Fatalf("test case needs to define either expected result or error (xor)")
 			}
@@ -894,7 +960,7 @@ func TestHydratorBolt5(outer *testing.T) {
 		},
 	}
 
-	hydrator := hydrator{boltMajor: 5}
+	hydrator := hydrator{boltMajor: 5, useUtc: true}
 	for _, c := range cases {
 		outer.Run(c.name, func(t *testing.T) {
 			defer func() {
@@ -932,7 +998,7 @@ func TestUtcDateTime(outer *testing.T) {
 	// Thu Jun 16 2022 13:00:00 UTC
 	secondsSinceEpoch := int64(1655384400)
 
-	hydrator := &hydrator{}
+	hydrator := &hydrator{useUtc: true}
 
 	outer.Run("UTC Datetime with offset in seconds", func(t *testing.T) {
 		offsetInSeconds := 2*60*60 + 30*60 // UTC+2h30

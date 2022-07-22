@@ -116,8 +116,8 @@ func NewBolt3(serverName string, conn net.Conn, logger log.Logger, boltLog log.B
 			}
 			b.state = bolt3_dead
 		},
-		boltLogger:     boltLog,
-		useUtcDateTime: false,
+		boltLogger: boltLog,
+		useUtc:     false,
 	}
 	return b
 }

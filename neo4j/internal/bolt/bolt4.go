@@ -264,7 +264,9 @@ func (b *bolt4) Connect(ctx context.Context, minor int, auth map[string]interfac
 	b.connId = succ.connectionId
 	b.serverVersion = succ.server
 	if checkUtcPatch {
-		b.out.useUtcDateTime = slices.Contains(succ.patches, "utc")
+		useUtc := slices.Contains(succ.patches, "utc")
+		b.in.hyd.useUtc = useUtc
+		b.out.useUtc = useUtc
 	}
 
 	// Construct log identity
