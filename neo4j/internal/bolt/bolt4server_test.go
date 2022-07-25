@@ -23,6 +23,7 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"reflect"
 	"testing"
 
 	"github.com/neo4j/neo4j-go-driver/v4/neo4j/internal/packstream"
@@ -74,6 +75,15 @@ func (s *bolt4server) sendFailureMsg(code, msg string) {
 
 func (s *bolt4server) sendIgnoredMsg() {
 	s.send(msgIgnored)
+}
+
+func (s *bolt4server) waitForHelloWithPatches(patches []interface{}) map[string]interface{} {
+	m := s.waitForHello()
+	actualPatches := m["patch_bolt"]
+	if !reflect.DeepEqual(actualPatches, patches) {
+		s.sendFailureMsg("?", fmt.Sprintf("Expected %v patches, got %v", patches, actualPatches))
+	}
+	return m
 }
 
 // Returns the first hello field
@@ -243,6 +253,14 @@ func (s *bolt4server) acceptHelloWithHints(hints map[string]interface{}) {
 		"connection_id": "cid",
 		"server":        "fake/4.5",
 		"hints":         hints,
+	})
+}
+
+func (s *bolt4server) acceptHelloWithPatches(patches []interface{}) {
+	s.send(msgSuccess, map[string]interface{}{
+		"connection_id": "cid",
+		"server":        "fake/4.5",
+		"patch_bolt":    patches,
 	})
 }
 

@@ -51,6 +51,7 @@ type success struct {
 	routingTable       *db.RoutingTable
 	num                uint32
 	configurationHints map[string]interface{}
+	patches            []string
 }
 
 func (s *success) String() string {
@@ -111,6 +112,7 @@ type hydrator struct {
 	cachedSuccess success
 	boltLogger    log.BoltLogger
 	logId         string
+	useUtc        bool
 }
 
 func (h *hydrator) setErr(err error) {
@@ -274,6 +276,9 @@ func (h *hydrator) success(n uint32) *success {
 		case "hints":
 			hints := h.amap()
 			succ.configurationHints = hints
+		case "patch_bolt":
+			patches := h.strings()
+			succ.patches = patches
 		default:
 			// Unknown key, waste it
 			h.trash()
@@ -448,9 +453,25 @@ func (h *hydrator) value() interface{} {
 		case 'Y':
 			return h.point3d(n)
 		case 'F':
+			if h.useUtc {
+				return h.unknownStructError(t)
+			}
 			return h.dateTimeOffset(n)
+		case 'I':
+			if !h.useUtc {
+				return h.unknownStructError(t)
+			}
+			return h.utcDateTimeOffset(n)
 		case 'f':
+			if h.useUtc {
+				return h.unknownStructError(t)
+			}
 			return h.dateTimeNamedZone(n)
+		case 'i':
+			if !h.useUtc {
+				return h.unknownStructError(t)
+			}
+			return h.utcDateTimeNamedZone(n)
 		case 'd':
 			return h.localDateTime(n)
 		case 'D':
@@ -462,10 +483,7 @@ func (h *hydrator) value() interface{} {
 		case 'E':
 			return h.duration(n)
 		default:
-			h.setErr(&db.ProtocolError{
-				Err: fmt.Sprintf("Received unknown struct tag: %d", t),
-			})
-			return nil
+			return h.unknownStructError(t)
 		}
 	case packstream.PackedByteArray:
 		return h.unp.ByteArray()
@@ -628,24 +646,52 @@ func (h *hydrator) point3d(n uint32) interface{} {
 
 func (h *hydrator) dateTimeOffset(n uint32) interface{} {
 	h.unp.Next()
-	secs := h.unp.Int()
+	seconds := h.unp.Int()
 	h.unp.Next()
-	nans := h.unp.Int()
+	nanos := h.unp.Int()
 	h.unp.Next()
-	offs := h.unp.Int()
-	t := time.Unix(secs, nans).UTC()
-	l := time.FixedZone("Offset", int(offs))
-	return time.Date(t.Year(), t.Month(), t.Day(), t.Hour(), t.Minute(), t.Second(), t.Nanosecond(), l)
+	offset := h.unp.Int()
+	// time.Time in local timezone, e.g. 15th of June 2020, 15:30 in Paris (UTC+2h)
+	unixTime := time.Unix(seconds, nanos)
+	// time.Time computed in UTC timezone, e.g. 15th of June 2020, 13:30 in UTC
+	utcTime := unixTime.UTC()
+	// time.Time **copied** as-is in the target timezone, e.g. 15th of June 2020, 13:30 in target tz
+	timeZone := time.FixedZone("Offset", int(offset))
+	return time.Date(
+		utcTime.Year(),
+		utcTime.Month(),
+		utcTime.Day(),
+		utcTime.Hour(),
+		utcTime.Minute(),
+		utcTime.Second(),
+		utcTime.Nanosecond(),
+		timeZone,
+	)
+}
+
+func (h *hydrator) utcDateTimeOffset(n uint32) interface{} {
+	h.unp.Next()
+	seconds := h.unp.Int()
+	h.unp.Next()
+	nanos := h.unp.Int()
+	h.unp.Next()
+	offset := h.unp.Int()
+	timeZone := time.FixedZone("Offset", int(offset))
+	return time.Unix(seconds, nanos).In(timeZone)
 }
 
 func (h *hydrator) dateTimeNamedZone(n uint32) interface{} {
 	h.unp.Next()
-	secs := h.unp.Int()
+	seconds := h.unp.Int()
 	h.unp.Next()
-	nans := h.unp.Int()
+	nanos := h.unp.Int()
 	h.unp.Next()
 	zone := h.unp.String()
-	t := time.Unix(secs, nans).UTC()
+	// time.Time in local timezone, e.g. 15th of June 2020, 15:30 in Paris (UTC+2h)
+	unixTime := time.Unix(seconds, nanos)
+	// time.Time computed in UTC timezone, e.g. 15th of June 2020, 13:30 in UTC
+	utcTime := unixTime.UTC()
+	// time.Time **copied** as-is in the target timezone, e.g. 15th of June 2020, 13:30 in target tz
 	l, err := time.LoadLocation(zone)
 	if err != nil {
 		h.setErr(&db.ProtocolError{
@@ -655,7 +701,35 @@ func (h *hydrator) dateTimeNamedZone(n uint32) interface{} {
 		})
 		return nil
 	}
-	return time.Date(t.Year(), t.Month(), t.Day(), t.Hour(), t.Minute(), t.Second(), t.Nanosecond(), l)
+	return time.Date(
+		utcTime.Year(),
+		utcTime.Month(),
+		utcTime.Day(),
+		utcTime.Hour(),
+		utcTime.Minute(),
+		utcTime.Second(),
+		utcTime.Nanosecond(),
+		l,
+	)
+}
+
+func (h *hydrator) utcDateTimeNamedZone(n uint32) interface{} {
+	h.unp.Next()
+	secs := h.unp.Int()
+	h.unp.Next()
+	nans := h.unp.Int()
+	h.unp.Next()
+	zone := h.unp.String()
+	timeZone, err := time.LoadLocation(zone)
+	if err != nil {
+		h.setErr(&db.ProtocolError{
+			MessageType: "utcDateTimeNamedZone",
+			Field:       "location",
+			Err:         err.Error(),
+		})
+		return nil
+	}
+	return time.Unix(secs, nans).In(timeZone)
 }
 
 func (h *hydrator) localDateTime(n uint32) interface{} {
@@ -815,4 +889,11 @@ func parseNotification(m map[string]interface{}) db.Notification {
 	}
 
 	return n
+}
+
+func (h *hydrator) unknownStructError(t byte) interface{} {
+	h.setErr(&db.ProtocolError{
+		Err: fmt.Sprintf("Received unknown struct tag: %d", t),
+	})
+	return nil
 }

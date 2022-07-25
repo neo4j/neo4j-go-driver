@@ -233,6 +233,10 @@ func (b *bolt4) connect(minor int, auth map[string]interface{}, userAgent string
 			hello["routing"] = routingContext
 		}
 	}
+	checkUtcPatch := minor >= 3
+	if checkUtcPatch {
+		hello["patch_bolt"] = []string{"utc"}
+	}
 	// Merge authentication keys into hello, avoid overwriting existing keys
 	for k, v := range auth {
 		_, exists := hello[k]
@@ -251,6 +255,17 @@ func (b *bolt4) connect(minor int, auth map[string]interface{}, userAgent string
 
 	b.connId = succ.connectionId
 	b.serverVersion = succ.server
+	if checkUtcPatch {
+		useUtc := false
+		for _, patch := range succ.patches {
+			if patch == "utc" {
+				useUtc = true
+				break
+			}
+		}
+		b.in.hyd.useUtc = useUtc
+		b.out.useUtc = useUtc
+	}
 
 	// Construct log identity
 	connectionLogId := fmt.Sprintf("%s@%s", b.connId, b.serverName)

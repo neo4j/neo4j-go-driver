@@ -21,10 +21,9 @@ package test_integration
 
 import (
 	"fmt"
-	"reflect"
-
 	"github.com/neo4j/neo4j-go-driver/v4/neo4j"
 	"github.com/onsi/ginkgo"
+	"reflect"
 
 	. "github.com/onsi/gomega"
 )
