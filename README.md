@@ -406,5 +406,4 @@ To run test against some Neo4j version:
 python3 main.py
 ```
 
-More details about how to use Testkit can be found on [its repository]
-(https://github.com/neo4j-drivers/testkit/)
+More details about how to use Testkit can be found on [its repository](https://github.com/neo4j-drivers/testkit/)
