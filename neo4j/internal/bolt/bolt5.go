@@ -115,6 +115,7 @@ func NewBolt5(serverName string, conn net.Conn, logger log.Logger, boltLog log.B
 			hyd: hydrator{
 				boltLogger: boltLog,
 				boltMajor:  5,
+				useUtc:     true,
 			},
 			connReadTimeout: -1,
 			logger:          logger,
@@ -127,6 +128,7 @@ func NewBolt5(serverName string, conn net.Conn, logger log.Logger, boltLog log.B
 		packer:     packstream.Packer{},
 		onErr:      func(err error) { b.setError(err, true) },
 		boltLogger: boltLog,
+		useUtc:     true,
 	}
 
 	return b

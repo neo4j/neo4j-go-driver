@@ -24,6 +24,7 @@ import (
 	"errors"
 	"fmt"
 	idb "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/slices"
 	"net"
 	"time"
 
@@ -240,6 +241,10 @@ func (b *bolt4) Connect(ctx context.Context, minor int, auth map[string]interfac
 			hello["routing"] = routingContext
 		}
 	}
+	checkUtcPatch := minor >= 3
+	if checkUtcPatch {
+		hello["patch_bolt"] = []string{"utc"}
+	}
 	// Merge authentication keys into hello, avoid overwriting existing keys
 	for k, v := range auth {
 		_, exists := hello[k]
@@ -258,6 +263,11 @@ func (b *bolt4) Connect(ctx context.Context, minor int, auth map[string]interfac
 
 	b.connId = succ.connectionId
 	b.serverVersion = succ.server
+	if checkUtcPatch {
+		useUtc := slices.Contains(succ.patches, "utc")
+		b.in.hyd.useUtc = useUtc
+		b.out.useUtc = useUtc
+	}
 
 	// Construct log identity
 	connectionLogId := fmt.Sprintf("%s@%s", b.connId, b.serverName)

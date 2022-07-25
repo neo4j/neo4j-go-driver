@@ -91,6 +91,12 @@ func (s *State) OnFailure(ctx context.Context, conn idb.Connection, err error, i
 		return
 	}
 
+	if _, ok := err.(*db.ProtocolError); ok {
+		s.cause = "Protocol error detected"
+		s.stop = true
+		return
+	}
+
 	// Failed to connect
 	if conn == nil {
 		s.LastErrWasRetryable = true

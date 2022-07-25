@@ -33,15 +33,16 @@ import (
 )
 
 type hydratorTestCase struct {
-	name  string
-	build func()      // Builds/encodes stream same was as server would
-	x     interface{} // Expected hydrated
-	err   error
+	name   string
+	build  func()      // Builds/encodes stream same was as server would
+	x      interface{} // Expected hydrated
+	err    error
+	useUtc bool
 }
 
-func TestHydrator(ot *testing.T) {
-	zone := "America/New_York"
-	loc, err := time.LoadLocation(zone)
+func TestHydrator(outer *testing.T) {
+	zoneName := "America/New_York"
+	timeZone, err := time.LoadLocation(zoneName)
 	if err != nil {
 		panic(err)
 	}
@@ -499,7 +500,7 @@ func TestHydrator(ot *testing.T) {
 				t = time.Date(1999, 12, 31, 23, 59, 59, 1, time.UTC)
 				packer.Int64(t.Unix())
 				packer.Int64(t.UnixNano() - (t.Unix() * int64(time.Second)))
-				packer.String(zone)
+				packer.String(zoneName)
 				// Datetime, offset zone
 				packer.StructHeader('F', 3)
 				t = time.Date(1999, 12, 31, 23, 59, 59, 1, time.UTC)
@@ -518,7 +519,7 @@ func TestHydrator(ot *testing.T) {
 				dbtype.LocalTime(time.Date(0, 0, 0, 1, 2, 3, 4, time.Local)),
 				dbtype.Date(time.Date(1999, 12, 31, 0, 0, 0, 0, time.UTC)),
 				dbtype.LocalDateTime(time.Date(1999, 12, 31, 23, 59, 59, 1, time.Local)),
-				time.Date(1999, 12, 31, 23, 59, 59, 1, loc),
+				time.Date(1999, 12, 31, 23, 59, 59, 1, timeZone),
 				time.Date(1999, 12, 31, 23, 59, 59, 1, time.FixedZone("Offset", 3)),
 				dbtype.Duration{Months: 12, Days: 31, Seconds: 59, Nanos: 10001},
 			}},
@@ -650,15 +651,148 @@ func TestHydrator(ot *testing.T) {
 					}},
 			}},
 		},
+		{
+			name:   "Record of UTC datetime with explicit offset with UTC support enabled",
+			useUtc: true,
+			build: func() {
+				tz := time.FixedZone("Offset", 3)
+				datetime := time.Date(1999, 12, 31, 23, 59, 59, 1, tz)
+				packer.StructHeader(byte(msgRecord), 1)
+				packer.ArrayHeader(1)
+				// UTC Datetime with explicit time zone offset
+				packer.StructHeader('I', 3)
+				packer.Int64(datetime.Unix())
+				packer.Int64(datetime.UnixNano() - (datetime.Unix() * int64(time.Second)))
+				packer.Int(3)
+			},
+			x: &db.Record{Values: []interface{}{
+				time.Date(1999, 12, 31, 23, 59, 59, 1, time.FixedZone("Offset", 3)),
+			}},
+		},
+		{
+			name:   "Record of UTC datetime with explicit offset with UTC support disabled",
+			useUtc: false,
+			build: func() {
+				tz := time.FixedZone("Offset", 3)
+				datetime := time.Date(1999, 12, 31, 23, 59, 59, 1, tz)
+				packer.StructHeader(byte(msgRecord), 1)
+				packer.ArrayHeader(1)
+				// UTC Datetime with explicit time zone offset
+				packer.StructHeader('I', 3)
+				packer.Int64(datetime.Unix())
+				packer.Int64(datetime.UnixNano() - (datetime.Unix() * int64(time.Second)))
+				packer.Int(3)
+			},
+			err: &db.ProtocolError{Err: "Received unknown struct tag: 73"},
+		},
+		{
+			name:   "Record of legacy datetime with explicit offset with UTC support enabled",
+			useUtc: true,
+			build: func() {
+				tz := time.FixedZone("Offset", 3)
+				datetime := time.Date(1999, 12, 31, 23, 59, 59, 1, tz)
+				packer.StructHeader(byte(msgRecord), 1)
+				packer.ArrayHeader(1)
+				// Datetime with explicit time zone offset
+				packer.StructHeader('F', 3)
+				packer.Int64(datetime.Unix())
+				packer.Int64(datetime.UnixNano() - (datetime.Unix() * int64(time.Second)))
+				packer.Int(3)
+			},
+			err: &db.ProtocolError{Err: "Received unknown struct tag: 70"},
+		},
+		{
+			name:   "Record of UTC datetime with timezone name with UTC support enabled",
+			useUtc: true,
+			build: func() {
+				datetime := time.Date(1999, 12, 31, 23, 59, 59, 1, timeZone)
+				packer.StructHeader(byte(msgRecord), 1)
+				packer.ArrayHeader(1)
+				// UTC Datetime with time zone name
+				packer.StructHeader('i', 3)
+				packer.Int64(datetime.Unix())
+				packer.Int64(datetime.UnixNano() - (datetime.Unix() * int64(time.Second)))
+				packer.String(zoneName)
+			},
+			x: &db.Record{Values: []interface{}{
+				time.Date(1999, 12, 31, 23, 59, 59, 1, timeZone),
+			}},
+		},
+		{
+			name:   "Record of UTC datetime with timezone name with UTC support disabled",
+			useUtc: false,
+			build: func() {
+				datetime := time.Date(1999, 12, 31, 23, 59, 59, 1, timeZone)
+				packer.StructHeader(byte(msgRecord), 1)
+				packer.ArrayHeader(1)
+				// UTC Datetime with time zone name
+				packer.StructHeader('i', 3)
+				packer.Int64(datetime.Unix())
+				packer.Int64(datetime.UnixNano() - (datetime.Unix() * int64(time.Second)))
+				packer.String(zoneName)
+			},
+			err: &db.ProtocolError{Err: "Received unknown struct tag: 105"},
+		},
+		{
+			name:   "Record of legacy datetime with timezone name with UTC support enabled",
+			useUtc: true,
+			build: func() {
+				datetime := time.Date(1999, 12, 31, 23, 59, 59, 1, timeZone)
+				packer.StructHeader(byte(msgRecord), 1)
+				packer.ArrayHeader(1)
+				// UTC Datetime with time zone name
+				packer.StructHeader('f', 3)
+				packer.Int64(datetime.Unix())
+				packer.Int64(datetime.UnixNano() - (datetime.Unix() * int64(time.Second)))
+				packer.String(zoneName)
+			},
+			err: &db.ProtocolError{Err: "Received unknown struct tag: 102"},
+		},
+		{
+			name:   "Record of UTC datetime with invalid timezone name with UTC support enabled",
+			useUtc: true,
+			build: func() {
+				packer.StructHeader(byte(msgRecord), 1)
+				packer.ArrayHeader(1)
+				packer.StructHeader('i', 3)
+				packer.Int64(42)
+				packer.Int64(42)
+				packer.String("LA/Confidential")
+			},
+			x: &db.Record{Values: []interface{}{
+				&dbtype.InvalidValue{
+					Message: "utcDateTimeNamedZone",
+					Err:     fmt.Errorf("unknown time zone LA/Confidential"),
+				},
+			}},
+		},
+		{
+			name: "Record of legacy datetime with invalid timezone name with UTC support disabled",
+			build: func() {
+				packer.StructHeader(byte(msgRecord), 1)
+				packer.ArrayHeader(1)
+				packer.StructHeader('f', 3)
+				packer.Int64(42)
+				packer.Int64(42)
+				packer.String("LA/Confidential")
+			},
+			x: &db.Record{Values: []interface{}{
+				&dbtype.InvalidValue{
+					Message: "dateTimeNamedZone",
+					Err:     fmt.Errorf("unknown time zone LA/Confidential"),
+				},
+			}},
+		},
 	}
 
 	// Shared among calls in real usage so we do the same while testing it.
 	hydrator := hydrator{}
 	for _, c := range cases {
-		ot.Run(c.name, func(t *testing.T) {
+		outer.Run(c.name, func(t *testing.T) {
 			defer func() {
 				hydrator.err = nil
 			}()
+			hydrator.useUtc = c.useUtc
 			if (c.x != nil) == (c.err != nil) {
 				t.Fatalf("test case needs to define either expected result or error (xor)")
 			}
@@ -687,7 +821,7 @@ func TestHydrator(ot *testing.T) {
 	}
 }
 
-func TestHydratorBolt5(ot *testing.T) {
+func TestHydratorBolt5(outer *testing.T) {
 	packer := packstream.Packer{}
 	cases := []hydratorTestCase{
 		{
@@ -826,9 +960,9 @@ func TestHydratorBolt5(ot *testing.T) {
 		},
 	}
 
-	hydrator := hydrator{boltMajor: 5}
+	hydrator := hydrator{boltMajor: 5, useUtc: true}
 	for _, c := range cases {
-		ot.Run(c.name, func(t *testing.T) {
+		outer.Run(c.name, func(t *testing.T) {
 			defer func() {
 				hydrator.err = nil
 			}()
@@ -858,4 +992,135 @@ func TestHydratorBolt5(ot *testing.T) {
 			}
 		})
 	}
+}
+
+func TestUtcDateTime(outer *testing.T) {
+	// Thu Jun 16 2022 13:00:00 UTC
+	secondsSinceEpoch := int64(1655384400)
+
+	hydrator := &hydrator{useUtc: true}
+
+	outer.Run("UTC Datetime with offset in seconds", func(t *testing.T) {
+		offsetInSeconds := 2*60*60 + 30*60 // UTC+2h30
+		bytes := recordOfUtcDateTimeWithOffset(t, secondsSinceEpoch, offsetInSeconds)
+
+		rawRecord, err := hydrator.hydrate(bytes)
+
+		if err != nil {
+			t.Fatal(err)
+		}
+		record := rawRecord.(*db.Record)
+		rawDatetime := record.Values[0]
+		datetime := rawDatetime.(time.Time)
+		_, offset := datetime.Zone()
+		if offset != 2*60*60+30*60 {
+			t.Fatalf("Expected offset of +2 hours (7200 seconds), got %d", offset)
+		}
+		year := datetime.Year()
+		if year != 2022 {
+			t.Errorf("Expected year 2022, got %d", year)
+		}
+		month := datetime.Month()
+		if month != 6 {
+			t.Errorf("Expected month of June (6), got %d", month)
+		}
+		day := datetime.Day()
+		if day != 16 {
+			t.Errorf("Expected day 16, got %d", day)
+		}
+		hour := datetime.Hour()
+		if hour != 15 {
+			t.Errorf("Expected hour 15, got %d", hour)
+		}
+		minutes := datetime.Minute()
+		if minutes != 30 {
+			t.Errorf("Expected minute 30, got %d", minutes)
+		}
+		seconds := datetime.Second()
+		if seconds != 0 {
+			t.Errorf("Expected second 0, got %d", seconds)
+		}
+		nanos := datetime.Nanosecond()
+		if nanos != 0 {
+			t.Errorf("Expected nanosecond 0, got %d", nanos)
+		}
+	})
+
+	outer.Run("UTC Datetime with named timezone", func(t *testing.T) {
+		timeZone := "Australia/Eucla" // UTC+8h45 in that point in time
+		bytes := recordOfUtcDateTimeWithTimeZoneName(t, secondsSinceEpoch, timeZone)
+
+		rawRecord, err := hydrator.hydrate(bytes)
+
+		if err != nil {
+			t.Fatal(err)
+		}
+		record := rawRecord.(*db.Record)
+		rawDatetime := record.Values[0]
+		datetime := rawDatetime.(time.Time)
+		_, offset := datetime.Zone() // "Australia/Eucla" is normalized to sth else
+		if offset != 8*60*60+45*60 {
+			t.Fatalf("Expected +8h45 offset (31500 seconds), got %d", offset)
+		}
+		year := datetime.Year()
+		if year != 2022 {
+			t.Errorf("Expected year 2022, got %d", year)
+		}
+		month := datetime.Month()
+		if month != 6 {
+			t.Errorf("Expected month of June (6), got %d", month)
+		}
+		day := datetime.Day()
+		if day != 16 {
+			t.Errorf("Expected day 16, got %d", day)
+		}
+		hour := datetime.Hour()
+		if hour != 21 {
+			t.Errorf("Expected hour 21, got %d", hour)
+		}
+		minutes := datetime.Minute()
+		if minutes != 45 {
+			t.Errorf("Expected minute 45, got %d", minutes)
+		}
+		seconds := datetime.Second()
+		if seconds != 0 {
+			t.Errorf("Expected second 0, got %d", seconds)
+		}
+		nanos := datetime.Nanosecond()
+		if nanos != 0 {
+			t.Errorf("Expected nanosecond 0, got %d", nanos)
+		}
+	})
+}
+
+func recordOfUtcDateTimeWithOffset(t *testing.T, secondsSinceEpoch int64, utcOffsetInSeconds int) []byte {
+	packer := packstream.Packer{}
+	packer.Begin([]byte{})
+	packer.StructHeader(msgRecord, 1)
+	packer.ArrayHeader(1)
+	packer.StructHeader('I', 3)
+	packer.Int64(secondsSinceEpoch)
+	packer.Int64(0)
+	packer.Int(utcOffsetInSeconds)
+	result, err := packer.End()
+	if err != nil {
+		t.Fatal("Build error")
+	}
+	return result
+}
+
+func recordOfUtcDateTimeWithTimeZoneName(t *testing.T, secondsSinceEpoch int64, tzName string) []byte {
+	packer := packstream.Packer{}
+	packer.Begin([]byte{})
+	packer.StructHeader(msgRecord, 1)
+	packer.ArrayHeader(1)
+	packer.StructHeader('i', 3)
+	packer.Int64(secondsSinceEpoch)
+	packer.Int64(0)
+	packer.String(tzName)
+	result, err := packer.End()
+	if err != nil {
+		t.Fatal("Build error")
+	}
+	return result
 }

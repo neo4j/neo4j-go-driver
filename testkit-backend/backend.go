@@ -228,7 +228,9 @@ func (b *backend) writeResponse(name string, data interface{}) {
 
 func (b *backend) toRequest(s string) map[string]interface{} {
 	req := map[string]interface{}{}
-	err := json.Unmarshal([]byte(s), &req)
+	decoder := json.NewDecoder(strings.NewReader(s))
+	decoder.UseNumber()
+	err := decoder.Decode(&req)
 	if err != nil {
 		panic(fmt.Sprintf("Unable to parse: '%s' as a request: %s", s, err))
 	}
@@ -239,11 +241,15 @@ func (b *backend) toTransactionConfigApply(data map[string]interface{}) func(*ne
 	txConfig := neo4j.TransactionConfig{Timeout: math.MinInt}
 	// Optional transaction meta data
 	if data["txMeta"] != nil {
-		txConfig.Metadata = data["txMeta"].(map[string]interface{})
+		txMetadata := data["txMeta"].(map[string]interface{})
+		if err := patchNumbersInMap(txMetadata); err != nil {
+			panic(err)
+		}
+		txConfig.Metadata = txMetadata
 	}
 	// Optional timeout in milliseconds
 	if data["timeout"] != nil {
-		txConfig.Timeout = time.Millisecond * time.Duration(data["timeout"].(float64))
+		txConfig.Timeout = time.Millisecond * time.Duration(asInt64(data["timeout"].(json.Number)))
 	}
 	return func(conf *neo4j.TransactionConfig) {
 		if txConfig.Metadata != nil {
@@ -255,13 +261,16 @@ func (b *backend) toTransactionConfigApply(data map[string]interface{}) func(*ne
 	}
 }
 
-func (b *backend) toCypherAndParams(data map[string]interface{}) (string, map[string]interface{}) {
+func (b *backend) toCypherAndParams(data map[string]interface{}) (string, map[string]interface{}, error) {
 	cypher := data["cypher"].(string)
 	params, _ := data["params"].(map[string]interface{})
+	var err error
 	for i, p := range params {
-		params[i] = cypherToNative(p)
+		if params[i], err = cypherToNative(p); err != nil {
+			return "", nil, err
+		}
 	}
-	return cypher, params
+	return cypher, params, nil
 }
 
 func (b *backend) handleTransactionFunc(isRead bool, data map[string]interface{}) {
@@ -382,12 +391,17 @@ func (b *backend) handleRequest(req map[string]interface{}) {
 		case "bearer":
 			authToken = neo4j.BearerAuth(authTokenMap["credentials"].(string))
 		default:
+			parameters := authTokenMap["parameters"].(map[string]interface{})
+			if err := patchNumbersInMap(parameters); err != nil {
+				b.writeError(err)
+				return
+			}
 			authToken = neo4j.CustomAuth(
 				authTokenMap["scheme"].(string),
 				authTokenMap["principal"].(string),
 				authTokenMap["credentials"].(string),
 				authTokenMap["realm"].(string),
-				authTokenMap["parameters"].(map[string]interface{}))
+				parameters)
 		}
 		// Parse URI (or rather type cast)
 		uri := data["uri"].(string)
@@ -403,19 +417,19 @@ func (b *backend) handleRequest(req map[string]interface{}) {
 				c.AddressResolver = b.customAddressResolverFunction()
 			}
 			if data["connectionAcquisitionTimeoutMs"] != nil {
-				c.ConnectionAcquisitionTimeout = time.Millisecond * time.Duration(data["connectionAcquisitionTimeoutMs"].(float64))
+				c.ConnectionAcquisitionTimeout = time.Millisecond * time.Duration(asInt64(data["connectionAcquisitionTimeoutMs"].(json.Number)))
 			}
 			if data["maxConnectionPoolSize"] != nil {
-				c.MaxConnectionPoolSize = int(data["maxConnectionPoolSize"].(float64))
+				c.MaxConnectionPoolSize = asInt(data["maxConnectionPoolSize"].(json.Number))
 			}
 			if data["fetchSize"] != nil {
-				c.FetchSize = int(data["fetchSize"].(float64))
+				c.FetchSize = asInt(data["fetchSize"].(json.Number))
 			}
 			if data["maxTxRetryTimeMs"] != nil {
-				c.MaxTransactionRetryTime = time.Millisecond * time.Duration(data["maxTxRetryTimeMs"].(float64))
+				c.MaxTransactionRetryTime = time.Millisecond * time.Duration(asInt64(data["maxTxRetryTimeMs"].(json.Number)))
 			}
 			if data["connectionTimeoutMs"] != nil {
-				c.SocketConnectTimeout = time.Millisecond * time.Duration(data["connectionTimeoutMs"].(float64))
+				c.SocketConnectTimeout = time.Millisecond * time.Duration(asInt64(data["connectionTimeoutMs"].(json.Number)))
 			}
 		})
 		if err != nil {
@@ -477,7 +491,7 @@ func (b *backend) handleRequest(req map[string]interface{}) {
 			sessionConfig.DatabaseName = data["database"].(string)
 		}
 		if data["fetchSize"] != nil {
-			sessionConfig.FetchSize = int(data["fetchSize"].(float64))
+			sessionConfig.FetchSize = asInt(data["fetchSize"].(json.Number))
 		}
 		if data["impersonatedUser"] != nil {
 			sessionConfig.ImpersonatedUser = data["impersonatedUser"].(string)
@@ -499,7 +513,11 @@ func (b *backend) handleRequest(req map[string]interface{}) {
 
 	case "SessionRun":
 		sessionState := b.sessionStates[data["sessionId"].(string)]
-		cypher, params := b.toCypherAndParams(data)
+		cypher, params, err := b.toCypherAndParams(data)
+		if err != nil {
+			b.writeError(err)
+			return
+		}
 		result, err := sessionState.session.Run(ctx, cypher, params, b.toTransactionConfigApply(data))
 		if err != nil {
 			b.writeError(err)
@@ -542,7 +560,11 @@ func (b *backend) handleRequest(req map[string]interface{}) {
 		if tx, found = b.explicitTransactions[transactionId]; !found {
 			tx = b.managedTransactions[transactionId]
 		}
-		cypher, params := b.toCypherAndParams(data)
+		cypher, params, err := b.toCypherAndParams(data)
+		if err != nil {
+			b.writeError(err)
+			return
+		}
 		result, err := tx.Run(ctx, cypher, params)
 		if err != nil {
 			b.writeError(err)
@@ -734,6 +756,7 @@ func (b *backend) handleRequest(req map[string]interface{}) {
 				"Feature:API:Liveness.Check",
 				"Feature:API:Result.List",
 				"Feature:API:Result.Peek",
+				"Feature:API:Type.Temporal",
 				"Feature:Auth:Custom",
 				"Feature:Auth:Bearer",
 				"Feature:Auth:Kerberos",
@@ -743,6 +766,7 @@ func (b *backend) handleRequest(req map[string]interface{}) {
 				"Feature:Bolt:4.3",
 				"Feature:Bolt:4.4",
 				"Feature:Bolt:5.0",
+				"Feature:Bolt:Patch:UTC",
 				"Feature:Impersonation",
 				"Feature:TLS:1.1",
 				"Feature:TLS:1.2",
@@ -758,6 +782,20 @@ func (b *backend) handleRequest(req map[string]interface{}) {
 	case "StartTest":
 		testName := data["testName"].(string)
 		if reason, ok := mustSkip(testName); ok {
+			b.writeResponse("SkipTest", map[string]interface{}{"reason": reason})
+			return
+		}
+		if strings.Contains(testName, "test_should_echo_all_timezone_ids") ||
+			strings.Contains(testName, "test_date_time_cypher_created_tz_id") {
+			b.writeResponse("RunSubTests", nil)
+			return
+		}
+		b.writeResponse("RunTest", nil)
+
+	case "StartSubTest":
+		testName := data["testName"].(string)
+		arguments := data["subtestArguments"].(map[string]interface{})
+		if reason, ok := mustSkipSubTest(testName, arguments); ok {
 			b.writeResponse("SkipTest", map[string]interface{}{"reason": reason})
 			return
 		}
@@ -780,6 +818,13 @@ func (b *backend) writeRecord(result neo4j.ResultWithContext, record *neo4j.Reco
 	}
 
 	if record != nil {
+		if invalidValue := firstRecordInvalidValue(record); invalidValue != nil {
+			b.writeError(&db.ProtocolError{
+				MessageType: invalidValue.Message,
+				Err:         invalidValue.Err.Error(),
+			})
+			return
+		}
 		b.writeResponse("Record", serializeRecord(record))
 	} else {
 		err := result.Err()
@@ -797,6 +842,13 @@ func mustSkip(testName string) (string, bool) {
 		if matches(testPattern, testName) {
 			return exclusionReason, true
 		}
+	}
+	return "", false
+}
+
+func mustSkipSubTest(testName string, arguments map[string]interface{}) (string, bool) {
+	if strings.Contains(testName, "test_should_echo_all_timezone_ids") {
+		return mustSkipTimeZoneSubTest(arguments)
 	}
 	return "", false
 }
@@ -910,6 +962,18 @@ func serializeParameters(parameters map[string]interface{}) map[string]interface
 	return result
 }
 
+func firstRecordInvalidValue(record *db.Record) *neo4j.InvalidValue {
+	if record == nil {
+		return nil
+	}
+	for _, value := range record.Values {
+		if result, ok := value.(*neo4j.InvalidValue); ok {
+			return result
+		}
+	}
+	return nil
+}
+
 // you can use '*' as wildcards anywhere in the qualified test name (useful to exclude a whole class e.g.)
 func testSkips() map[string]string {
 	return map[string]string{
@@ -938,4 +1002,49 @@ func testSkips() map[string]string {
 		"stub.connectivity_check.test_verify_connectivity.TestVerifyConnectivity.test_routing_fail_when_no_reader_are_available":            "Won't fix - Go driver retries routing table when no readers are available",
 		"stub.driver_parameters.test_connection_acquisition_timeout_ms.TestConnectionAcquisitionTimeoutMs.test_does_not_encompass_router_*": "Won't fix - ConnectionAcquisitionTimeout spans the whole process including db resolution, RT updates, connection acquisition from the pool, and creation of new connections.",
 	}
+}
+
+func mustSkipTimeZoneSubTest(arguments map[string]interface{}) (string, bool) {
+	rawDateTime := arguments["dt"].(map[string]interface{})
+	dateTimeData := rawDateTime["data"].(map[string]interface{})
+	timeZoneName := dateTimeData["timezone_id"].(string)
+	location, err := time.LoadLocation(timeZoneName)
+	if err != nil {
+		return fmt.Sprintf("time zone not supported: %s", err), true
+	}
+	dateTime := time.Date(
+		asInt(dateTimeData["year"].(json.Number)),
+		time.Month(asInt(dateTimeData["month"].(json.Number))),
+		asInt(dateTimeData["day"].(json.Number)),
+		asInt(dateTimeData["hour"].(json.Number)),
+		asInt(dateTimeData["minute"].(json.Number)),
+		asInt(dateTimeData["second"].(json.Number)),
+		asInt(dateTimeData["nanosecond"].(json.Number)),
+		location,
+	)
+	expectedOffset := asInt(dateTimeData["utc_offset_s"].(json.Number))
+	if _, actualOffset := dateTime.Zone(); actualOffset != expectedOffset {
+		return fmt.Sprintf("Expected offset %d for timezone %s and time %s, got offset %d instead",
+				expectedOffset, timeZoneName, dateTime.String(), actualOffset),
+			true
+	}
+	return "", false
+}
+
+// some TestKit tests send large integer values which require to configure
+// the JSON deserializer to use json.Number instead of float64 (lossy conversions
+// would happen otherwise)
+// however, some specific dictionaries (like transaction metadata and custom
+// auth parameters) are better off relying on numbers being treated as float64
+func patchNumbersInMap(dictionary map[string]interface{}) error {
+	for key, value := range dictionary {
+		if number, ok := value.(json.Number); ok {
+			floatingPointValue, err := number.Float64()
+			if err != nil {
+				return fmt.Errorf("could not deserialize number %v in map %v: %w", number, dictionary, err)
+			}
+			dictionary[key] = floatingPointValue
+		}
+	}
+	return nil
 }

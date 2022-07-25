@@ -45,6 +45,7 @@ type (
 	Relationship  = dbtype.Relationship
 	Path          = dbtype.Path
 	Record        = db.Record
+	InvalidValue  = dbtype.InvalidValue
 )
 
 // DateOf creates a neo4j.Date from time.Time.
