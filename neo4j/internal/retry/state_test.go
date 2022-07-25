@@ -136,6 +136,16 @@ func TestState(outer *testing.T) {
 			{conn: nil, err: authErr, expectContinued: false,
 				expectLastErrWasRetryable: false},
 		},
+		"Does not retry on protocol errors": {
+			{
+				conn: &testutil.ConnFake{Alive: true},
+				err: &db.ProtocolError{
+					MessageType: "dateTimeNamedZone",
+					Field:       "location",
+					Err:         "unknown time zone wat/wat",
+				},
+				expectContinued: false, expectLastErrWasRetryable: false},
+		},
 	}
 
 	ctx := context.Background()
