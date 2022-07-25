@@ -35,6 +35,7 @@ type outgoing struct {
 	onErr      func(err error)
 	boltLogger log.BoltLogger
 	logId      string
+	useUtc     bool
 }
 
 func (o *outgoing) begin() {
@@ -273,19 +274,18 @@ func (o *outgoing) packStruct(x interface{}) {
 		o.packer.Float64(v.Y)
 		o.packer.Float64(v.Z)
 	case time.Time:
-		zone, offset := v.Zone()
-		secs := v.Unix() + int64(offset)
-		nanos := v.Nanosecond()
-		if zone == "Offset" {
-			o.packer.StructHeader('F', 3)
-			o.packer.Int64(secs)
-			o.packer.Int(nanos)
-			o.packer.Int(offset)
+		if o.useUtc {
+			if zone, _ := v.Zone(); zone == "Offset" {
+				o.packUtcDateTimeWithTzOffset(v)
+			} else {
+				o.packUtcDateTimeWithTzName(v)
+			}
+			break
+		}
+		if zone, _ := v.Zone(); zone == "Offset" {
+			o.packLegacyDateTimeWithTzOffset(v)
 		} else {
-			o.packer.StructHeader('f', 3)
-			o.packer.Int64(secs)
-			o.packer.Int(nanos)
-			o.packer.String(v.Location().String())
+			o.packLegacyDateTimeWithTzName(v)
 		}
 	case dbtype.LocalDateTime:
 		t := time.Time(v)
@@ -407,4 +407,37 @@ func (o *outgoing) packX(x interface{}) {
 	default:
 		o.onErr(&db.UnsupportedTypeError{Type: reflect.TypeOf(x)})
 	}
+}
+
+// deprecated: remove once 4.x Neo4j all reach EOL
+func (o *outgoing) packLegacyDateTimeWithTzOffset(dateTime time.Time) {
+	_, offset := dateTime.Zone()
+	o.packer.StructHeader('F', 3)
+	o.packer.Int64(dateTime.Unix() + int64(offset))
+	o.packer.Int(dateTime.Nanosecond())
+	o.packer.Int(offset)
+}
+
+// deprecated: remove once 4.x Neo4j all reach EOL
+func (o *outgoing) packLegacyDateTimeWithTzName(dateTime time.Time) {
+	_, offset := dateTime.Zone()
+	o.packer.StructHeader('f', 3)
+	o.packer.Int64(dateTime.Unix() + int64(offset))
+	o.packer.Int(dateTime.Nanosecond())
+	o.packer.String(dateTime.Location().String())
+}
+
+func (o *outgoing) packUtcDateTimeWithTzOffset(dateTime time.Time) {
+	_, offset := dateTime.Zone()
+	o.packer.StructHeader('I', 3)
+	o.packer.Int64(dateTime.Unix())
+	o.packer.Int(dateTime.Nanosecond())
+	o.packer.Int(offset)
+}
+
+func (o *outgoing) packUtcDateTimeWithTzName(dateTime time.Time) {
+	o.packer.StructHeader('i', 3)
+	o.packer.Int64(dateTime.Unix())
+	o.packer.Int(dateTime.Nanosecond())
+	o.packer.String(dateTime.Location().String())
 }

@@ -21,6 +21,8 @@ package main
 
 import (
 	"fmt"
+	"github.com/neo4j/neo4j-go-driver/v4/neo4j/dbtype"
+	"time"
 
 	"github.com/neo4j/neo4j-go-driver/v4/neo4j"
 )
@@ -39,6 +41,89 @@ func nativeToCypher(v interface{}) map[string]interface{} {
 		return valueResponse("CypherBool", x)
 	case float64:
 		return valueResponse("CypherFloat", x)
+	case dbtype.Date:
+		date := x.Time()
+		values := map[string]interface{}{
+			"year":  date.Year(),
+			"month": date.Month(),
+			"day":   date.Day(),
+		}
+		return map[string]interface{}{
+			"name": "CypherDate",
+			"data": values,
+		}
+	case dbtype.LocalDateTime:
+		localDateTime := x.Time()
+		values := map[string]interface{}{
+			"year":       localDateTime.Year(),
+			"month":      localDateTime.Month(),
+			"day":        localDateTime.Day(),
+			"hour":       localDateTime.Hour(),
+			"minute":     localDateTime.Minute(),
+			"second":     localDateTime.Second(),
+			"nanosecond": localDateTime.Nanosecond(),
+		}
+		return map[string]interface{}{
+			"name": "CypherDateTime",
+			"data": values,
+		}
+	case dbtype.Duration:
+		values := map[string]interface{}{
+			"months":      x.Months,
+			"days":        x.Days,
+			"seconds":     x.Seconds,
+			"nanoseconds": x.Nanos,
+		}
+		return map[string]interface{}{
+			"name": "CypherDuration",
+			"data": values,
+		}
+	case dbtype.Time:
+		time := x.Time()
+		_, offset := time.Zone()
+		values := map[string]interface{}{
+			"hour":         time.Hour(),
+			"minute":       time.Minute(),
+			"second":       time.Second(),
+			"nanosecond":   time.Nanosecond(),
+			"utc_offset_s": offset,
+		}
+		return map[string]interface{}{
+			"name": "CypherTime",
+			"data": values,
+		}
+	case dbtype.LocalTime:
+		localTime := x.Time()
+		values := map[string]interface{}{
+			"hour":       localTime.Hour(),
+			"minute":     localTime.Minute(),
+			"second":     localTime.Second(),
+			"nanosecond": localTime.Nanosecond(),
+		}
+		return map[string]interface{}{
+			"name": "CypherTime",
+			"data": values,
+		}
+	case time.Time:
+		tzName, offset := x.Zone()
+		values := map[string]interface{}{
+			"year":         x.Year(),
+			"month":        x.Month(),
+			"day":          x.Day(),
+			"hour":         x.Hour(),
+			"minute":       x.Minute(),
+			"second":       x.Second(),
+			"nanosecond":   x.Nanosecond(),
+			"utc_offset_s": offset,
+		}
+		if tzName != "Offset" {
+			values["timezone_id"] = x.Location().String()
+		}
+		return map[string]interface{}{
+			"name": "CypherDateTime",
+			"data": values,
+		}
+
 	case []interface{}:
 		values := make([]interface{}, len(x))
 		for i, y := range x {
@@ -87,7 +172,7 @@ func nativeToCypher(v interface{}) map[string]interface{} {
 		return map[string]interface{}{
 			"name": "Path",
 			"data": map[string]interface{}{
-				"nodes": nativeToCypher(nodes),
+				"nodes":         nativeToCypher(nodes),
 				"relationships": nativeToCypher(rels),
 			},
 		}
