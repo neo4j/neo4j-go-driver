@@ -600,24 +600,6 @@ func (b *backend) handleRequest(req map[string]interface{}) {
 		b.writeResponse("FeatureList", map[string]interface{}{
 			"features": []string{
 				"ConfHint:connection.recv_timeout_seconds",
-				"Feature:API:Liveness.Check",
-				"Feature:API:Type.Temporal",
-				"Feature:Auth:Custom",
-				"Feature:Auth:Bearer",
-				"Feature:Auth:Kerberos",
-				"Feature:Bolt:3.0",
-				"Feature:Bolt:4.0",
-				"Feature:Bolt:4.1",
-				"Feature:Bolt:4.2",
-				"Feature:Bolt:4.3",
-				"Feature:Bolt:Patch:UTC",
-				"Feature:Impersonation",
-				"Feature:TLS:1.1",
-				"Feature:TLS:1.2",
-				"Feature:TLS:1.3",
-				"Optimization:ConnectionReuse",
-				"Optimization:ImplicitDefaultArguments",
-				"Optimization:PullPipelining",
 			},
 		})
 
