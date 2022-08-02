@@ -428,7 +428,7 @@ func TestConnectionConformance(ot *testing.T) {
 		if recS != bigBuilder.String() {
 			t.Errorf("Strings differ")
 		}
-		// Run the same thing once again to excerise buffer reuse at connection
+		// Run the same thing once again to exercise buffer reuse at connection
 		// level (there has been a bug caught by this).
 		stream, err = boltConn.Run(db.Command{Cypher: query, Params: map[string]interface{}{"x": bigBuilder.String()}}, db.TxConfig{Mode: db.ReadMode})
 		AssertNoError(t, err)
@@ -438,6 +438,8 @@ func TestConnectionConformance(ot *testing.T) {
 		if recS != bigBuilder.String() {
 			t.Errorf("Strings differ")
 		}
+		_, err = boltConn.Consume(stream)
+		assertNoError(t, err)
 	})
 
 	// Bookmark tests
