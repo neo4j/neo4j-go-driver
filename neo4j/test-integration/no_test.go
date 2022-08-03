@@ -48,7 +48,7 @@ func assertCloses(t *testing.T, closer io.Closer) {
 	assertNil(t, closer.Close())
 }
 
-func assertAssignableToTypeOf(t *testing.T, x, y interface{}) {
+func assertAssignableToTypeOf(t *testing.T, x, y any) {
 	t.Helper()
 	xType := reflect.TypeOf(x)
 	yType := reflect.TypeOf(y)
@@ -57,21 +57,21 @@ func assertAssignableToTypeOf(t *testing.T, x, y interface{}) {
 	}
 }
 
-func assertNil(t *testing.T, v interface{}) {
+func assertNil(t *testing.T, v any) {
 	t.Helper()
 	if !isNil(v) {
 		t.Fatalf("expected nil (or default value), got %+v", v)
 	}
 }
 
-func assertNotNil(t *testing.T, v interface{}) {
+func assertNotNil(t *testing.T, v any) {
 	t.Helper()
 	if isNil(v) {
 		t.Fatalf("expected not nil, got nil")
 	}
 }
 
-func assertEquals(t *testing.T, a, b interface{}) {
+func assertEquals(t *testing.T, a, b any) {
 	t.Helper()
 
 	if reflect.TypeOf(a).Kind() == reflect.Slice && reflect.TypeOf(b).Kind() == reflect.Slice {
@@ -91,7 +91,7 @@ func assertEquals(t *testing.T, a, b interface{}) {
 	}
 }
 
-func assertSliceEquals(t *testing.T, a, b interface{}) {
+func assertSliceEquals(t *testing.T, a, b any) {
 	t.Helper()
 
 	valueA := reflect.ValueOf(a)
@@ -108,7 +108,7 @@ func assertSliceEquals(t *testing.T, a, b interface{}) {
 	}
 }
 
-func assertArrayEquals(t *testing.T, a, b interface{}) {
+func assertArrayEquals(t *testing.T, a, b any) {
 	t.Helper()
 
 	valueA := reflect.ValueOf(a)
@@ -125,7 +125,7 @@ func assertArrayEquals(t *testing.T, a, b interface{}) {
 	}
 }
 
-func assertNotEquals(t *testing.T, a, b interface{}) {
+func assertNotEquals(t *testing.T, a, b any) {
 	t.Helper()
 
 	convertedA := a
@@ -223,7 +223,7 @@ func assertDbError(t *testing.T, rec *db.Record, sum *db.Summary, err error) {
 	}
 }
 
-func assertMapHas(t *testing.T, m map[string]interface{}, k string, v interface{}) {
+func assertMapHas(t *testing.T, m map[string]any, k string, v any) {
 	t.Helper()
 	value, found := m[k]
 	if !found {
@@ -240,8 +240,8 @@ func randomInt() int64 {
 }
 
 func createRandomNode(t *testing.T, sess neo4j.Session) int64 {
-	nodex, err := sess.WriteTransaction(func(tx neo4j.Transaction) (interface{}, error) {
-		res, err := tx.Run("CREATE (n:RandomNode{val: $r}) RETURN n", map[string]interface{}{"r": randomInt()})
+	nodex, err := sess.WriteTransaction(func(tx neo4j.Transaction) (any, error) {
+		res, err := tx.Run("CREATE (n:RandomNode{val: $r}) RETURN n", map[string]any{"r": randomInt()})
 		if err != nil {
 			return nil, err
 		}
@@ -256,8 +256,8 @@ func createRandomNode(t *testing.T, sess neo4j.Session) int64 {
 }
 
 func findRandomNode(t *testing.T, sess neo4j.Session, randomId int64) *neo4j.Node {
-	nodex, err := sess.ReadTransaction(func(tx neo4j.Transaction) (interface{}, error) {
-		res, err := tx.Run("MATCH (n:RandomNode{val: $r}) RETURN n", map[string]interface{}{"r": randomId})
+	nodex, err := sess.ReadTransaction(func(tx neo4j.Transaction) (any, error) {
+		res, err := tx.Run("MATCH (n:RandomNode{val: $r}) RETURN n", map[string]any{"r": randomId})
 		if err != nil {
 			return nil, err
 		}
@@ -291,7 +291,7 @@ func assertNoRandomNode(t *testing.T, sess neo4j.Session, randomId int64) {
 }
 
 // Utility that executes Cypher and retrieves the expected single value from single record.
-func single(t *testing.T, driver neo4j.Driver, cypher string, params map[string]interface{}) interface{} {
+func single(t *testing.T, driver neo4j.Driver, cypher string, params map[string]any) any {
 	t.Helper()
 	session := driver.NewSession(neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
 	defer session.Close()
@@ -311,7 +311,7 @@ func single(t *testing.T, driver neo4j.Driver, cypher string, params map[string]
 }
 
 // from https://github.com/onsi/gomega
-func isNil(a interface{}) bool {
+func isNil(a any) bool {
 	if a == nil {
 		return true
 	}

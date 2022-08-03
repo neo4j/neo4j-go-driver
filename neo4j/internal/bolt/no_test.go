@@ -27,7 +27,7 @@ import (
 
 type testStruct struct {
 	tag    byte
-	fields []interface{}
+	fields []any
 }
 
 func (t *testStruct) String() string {
@@ -42,7 +42,7 @@ func (t *testStruct) String() string {
 }
 
 // Utility to test hydration
-func serverHydrator(unpacker *packstream.Unpacker) interface{} {
+func serverHydrator(unpacker *packstream.Unpacker) any {
 	switch unpacker.Curr {
 	case packstream.PackedInt:
 		return unpacker.Int()
@@ -56,7 +56,7 @@ func serverHydrator(unpacker *packstream.Unpacker) interface{} {
 		return unpacker.ByteArray()
 	case packstream.PackedArray:
 		n := unpacker.Len()
-		a := make([]interface{}, n)
+		a := make([]any, n)
 		for i := range a {
 			unpacker.Next()
 			a[i] = serverHydrator(unpacker)
@@ -64,7 +64,7 @@ func serverHydrator(unpacker *packstream.Unpacker) interface{} {
 		return a
 	case packstream.PackedMap:
 		n := unpacker.Len()
-		m := make(map[string]interface{}, n)
+		m := make(map[string]any, n)
 		for ; n > 0; n-- {
 			unpacker.Next()
 			key := unpacker.String()

@@ -83,7 +83,7 @@ func AssertNoError(t *testing.T, err error) {
 	}
 }
 
-func AssertErrorMessageContains(t *testing.T, err error, msg string, args ...interface{}) {
+func AssertErrorMessageContains(t *testing.T, err error, msg string, args ...any) {
 	AssertError(t, err)
 	AssertStringContain(t, err.Error(), fmt.Sprintf(msg, args...))
 }
@@ -104,14 +104,14 @@ func AssertNeo4jError(t *testing.T, err error) {
 	}
 }
 
-func AssertNil(t *testing.T, x interface{}) {
+func AssertNil(t *testing.T, x any) {
 	t.Helper()
 	if x != nil && !reflect.ValueOf(x).IsNil() {
 		t.Errorf("Expected nil but was %T: %s", x, x)
 	}
 }
 
-func AssertNotNil(t *testing.T, x interface{}) {
+func AssertNotNil(t *testing.T, x any) {
 	t.Helper()
 	if x == nil || reflect.ValueOf(x).IsNil() {
 		t.Fatal("Expected not nil")
@@ -132,7 +132,7 @@ func AssertFalse(t *testing.T, b bool) {
 	}
 }
 
-func AssertLen(t *testing.T, x interface{}, el int) {
+func AssertLen(t *testing.T, x any, el int) {
 	t.Helper()
 	al := reflect.ValueOf(x).Len()
 	if al != el {
@@ -140,7 +140,7 @@ func AssertLen(t *testing.T, x interface{}, el int) {
 	}
 }
 
-func AssertSliceEqual(t *testing.T, x, y interface{}) {
+func AssertSliceEqual(t *testing.T, x, y any) {
 	t.Helper()
 	lenx := reflect.ValueOf(x).Len()
 	leny := reflect.ValueOf(y).Len()
@@ -188,7 +188,7 @@ func AssertIntEqual(t *testing.T, ai, ei int) {
 	}
 }
 
-func AssertSameType(t *testing.T, x, y interface{}) {
+func AssertSameType(t *testing.T, x, y any) {
 	t.Helper()
 	t1 := reflect.TypeOf(x)
 	t2 := reflect.TypeOf(y)
@@ -197,7 +197,7 @@ func AssertSameType(t *testing.T, x, y interface{}) {
 	}
 }
 
-func AssertDeepEquals(t *testing.T, values ...interface{}) {
+func AssertDeepEquals(t *testing.T, values ...any) {
 	t.Helper()
 	count := len(values)
 	if count == 0 {

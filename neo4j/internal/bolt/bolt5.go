@@ -49,13 +49,13 @@ type internalTx5 struct {
 	mode             idb.AccessMode
 	bookmarks        []string
 	timeout          time.Duration
-	txMeta           map[string]interface{}
+	txMeta           map[string]any
 	databaseName     string
 	impersonatedUser string
 }
 
-func (i *internalTx5) toMeta() map[string]interface{} {
-	meta := map[string]interface{}{}
+func (i *internalTx5) toMeta() map[string]any {
+	meta := map[string]any{}
 	if i.mode == idb.ReadMode {
 		meta["mode"] = "r"
 	}
@@ -188,7 +188,7 @@ func (b *bolt5) setError(err error, fatal bool) {
 	}
 }
 
-func (b *bolt5) receiveMsg(ctx context.Context) interface{} {
+func (b *bolt5) receiveMsg(ctx context.Context) any {
 	// Potentially dangerous to receive when an error has occurred, could hang.
 	// Important, a lot of code has been simplified relying on this check.
 	if b.err != nil {
@@ -227,13 +227,13 @@ func (b *bolt5) receiveSuccess(ctx context.Context) *success {
 	}
 }
 
-func (b *bolt5) Connect(ctx context.Context, minor int, auth map[string]interface{}, userAgent string, routingContext map[string]string) error {
+func (b *bolt5) Connect(ctx context.Context, minor int, auth map[string]any, userAgent string, routingContext map[string]string) error {
 	if err := b.assertState(bolt5Unauthorized); err != nil {
 		return err
 	}
 
 	// Prepare hello message
-	hello := map[string]interface{}{
+	hello := map[string]any{
 		"user_agent": userAgent,
 	}
 	if routingContext != nil {
@@ -275,7 +275,7 @@ func (b *bolt5) Connect(ctx context.Context, minor int, auth map[string]interfac
 }
 
 func (b *bolt5) TxBegin(ctx context.Context, txConfig idb.TxConfig) (idb.
-	TxHandle, error) {
+TxHandle, error) {
 	// Ok, to begin transaction while streaming auto-commit, just empty the stream and continue.
 	if b.state == bolt5Streaming {
 		if b.bufferStream(ctx); b.err != nil {
@@ -520,7 +520,7 @@ func (b *bolt5) resumeStream(ctx context.Context, s *stream) {
 	}
 }
 
-func (b *bolt5) run(ctx context.Context, cypher string, params map[string]interface{}, fetchSize int, tx *internalTx5) (*stream, error) {
+func (b *bolt5) run(ctx context.Context, cypher string, params map[string]any, fetchSize int, tx *internalTx5) (*stream, error) {
 	// If already streaming, consume the whole thing first
 	if b.state == bolt5Streaming {
 		if b.bufferStream(ctx); b.err != nil {
@@ -537,7 +537,7 @@ func (b *bolt5) run(ctx context.Context, cypher string, params map[string]interf
 	}
 
 	// Transaction metadata, used either in lazily started transaction or to run message.
-	var meta map[string]interface{}
+	var meta map[string]any
 	if tx != nil {
 		meta = tx.toMeta()
 	}
@@ -873,7 +873,7 @@ func (b *bolt5) GetRoutingTable(ctx context.Context,
 	}
 
 	b.log.Infof(log.Bolt5, b.logId, "Retrieving routing table")
-	extras := map[string]interface{}{}
+	extras := map[string]any{}
 	if database != idb.DefaultDatabase {
 		extras["db"] = database
 	}
@@ -917,7 +917,7 @@ func (b *bolt5) Version() db.ProtocolVersion {
 	}
 }
 
-func (b *bolt5) initializeReadTimeoutHint(hints map[string]interface{}) {
+func (b *bolt5) initializeReadTimeoutHint(hints map[string]any) {
 	readTimeoutHint, ok := hints[readTimeoutHintName]
 	if !ok {
 		return

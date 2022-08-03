@@ -38,12 +38,12 @@ const (
 
 type (
 	TxHandle     uint64
-	StreamHandle interface{}
+	StreamHandle any
 )
 
 type Command struct {
 	Cypher    string
-	Params    map[string]interface{}
+	Params    map[string]any
 	FetchSize int
 }
 
@@ -52,14 +52,14 @@ type TxConfig struct {
 	Bookmarks        []string
 	Timeout          time.Duration
 	ImpersonatedUser string
-	Meta             map[string]interface{}
+	Meta             map[string]any
 }
 
 const DefaultTxConfigTimeout = math.MinInt
 
 // Connection defines an abstract database server connection.
 type Connection interface {
-	Connect(ctx context.Context, minor int, auth map[string]interface{}, userAgent string, routingContext map[string]string) error
+	Connect(ctx context.Context, minor int, auth map[string]any, userAgent string, routingContext map[string]string) error
 
 	TxBegin(ctx context.Context, txConfig TxConfig) (TxHandle, error)
 	TxRollback(ctx context.Context, tx TxHandle) error

@@ -42,11 +42,11 @@ func TestResult(outer *testing.T) {
 	ctx := context.Background()
 	streamHandle := idb.StreamHandle(0)
 	cypher := ""
-	params := map[string]interface{}{}
+	params := map[string]any{}
 	recs := []*db.Record{
-		{Keys: []string{"n"}, Values: []interface{}{42}},
-		{Keys: []string{"n"}, Values: []interface{}{43}},
-		{Keys: []string{"n"}, Values: []interface{}{44}},
+		{Keys: []string{"n"}, Values: []any{42}},
+		{Keys: []string{"n"}, Values: []any{43}},
+		{Keys: []string{"n"}, Values: []any{44}},
 	}
 	sums := []*db.Summary{{}}
 	errs := []error{

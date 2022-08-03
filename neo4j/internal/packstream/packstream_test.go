@@ -30,12 +30,12 @@ import (
 
 type testStruct struct {
 	tag    byte
-	fields []interface{}
+	fields []any
 }
 
 // Utility to simplify testcase writing
 // Also an example of how a "generic" unpack function looks like.
-func unpack(u *Unpacker) interface{} {
+func unpack(u *Unpacker) any {
 	u.Next()
 	switch u.Curr {
 	case PackedInt:
@@ -54,14 +54,14 @@ func unpack(u *Unpacker) interface{} {
 		return false
 	case PackedArray:
 		l := u.Len()
-		a := make([]interface{}, l)
+		a := make([]any, l)
 		for i := range a {
 			a[i] = unpack(u)
 		}
 		return a
 	case PackedMap:
 		l := u.Len()
-		m := make(map[string]interface{}, l)
+		m := make(map[string]any, l)
 		for i := uint32(0); i < l; i++ {
 			u.Next()
 			k := u.String()
@@ -75,7 +75,7 @@ func unpack(u *Unpacker) interface{} {
 		if l == 0 {
 			return &s
 		}
-		s.fields = make([]interface{}, l)
+		s.fields = make([]any, l)
 		for i := range s.fields {
 			s.fields[i] = unpack(u)
 		}
@@ -87,7 +87,7 @@ func unpack(u *Unpacker) interface{} {
 
 // Utility to simplify testcase writing
 // Also an example of how a "generic" pack function looks like.
-func pack(p *Packer, x interface{}) {
+func pack(p *Packer, x any) {
 	if x == nil {
 		p.Nil()
 		return
@@ -121,7 +121,7 @@ func pack(p *Packer, x interface{}) {
 		p.Float32(v)
 	case []byte:
 		p.Bytes(v)
-	case []interface{}:
+	case []any:
 		p.ArrayHeader(len(v))
 		for _, y := range v {
 			pack(p, y)
@@ -169,7 +169,7 @@ func pack(p *Packer, x interface{}) {
 		for _, y := range v {
 			pack(p, y)
 		}
-	case map[string]interface{}:
+	case map[string]any:
 		p.MapHeader(len(v))
 		for s, y := range v {
 			p.String(s)
@@ -266,8 +266,8 @@ func TestPackStream(ot *testing.T) {
 		return b
 	}
 
-	arr16toUnpackedIntSlice := func(a []int16) []interface{} {
-		b := make([]interface{}, len(a))
+	arr16toUnpackedIntSlice := func(a []int16) []any {
+		b := make([]any, len(a))
 		for i, v := range a {
 			b[i] = int64(v)
 		}
@@ -277,18 +277,18 @@ func TestPackStream(ot *testing.T) {
 	emptyStruct := &testStruct{tag: 0x66}
 	maxStruct := &testStruct{
 		tag:    0x67,
-		fields: []interface{}{"1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15"}}
+		fields: []any{"1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15"}}
 	structOfStruct := &testStruct{
 		tag: 0x66,
-		fields: []interface{}{
-			&testStruct{tag: 0x67, fields: []interface{}{"1", "2"}},
-			&testStruct{tag: 0x68, fields: []interface{}{"3", "4"}}}}
+		fields: []any{
+			&testStruct{tag: 0x67, fields: []any{"1", "2"}},
+			&testStruct{tag: 0x68, fields: []any{"3", "4"}}}}
 
 	cases := []struct {
 		name           string
-		value          interface{}
+		value          any
 		expectPacked   []byte
-		expectUnpacked interface{}
+		expectUnpacked any
 		testUnpacked   bool
 	}{
 		// Nil
@@ -437,23 +437,23 @@ func TestPackStream(ot *testing.T) {
 			expectUnpacked: byt65536,
 			expectPacked:   append([]byte{0xce, 0x00, 0x01, 0x00, 0x00}, byt65536...)},
 
-		// Slice of interface{}
-		{name: "[]interface{}, empty", value: []interface{}{},
+		// Slice of any
+		{name: "[]any, empty", value: []any{},
 			expectPacked: []byte{0x90}},
-		{name: "[]interface{}, sample", value: []interface{}{nil, "s", 1},
+		{name: "[]any, sample", value: []any{nil, "s", 1},
 			expectPacked: []byte{0x93, 0xc0, 0x81, 0x73, 0x01}},
 
 		// Slice of strings
 		{name: "[]string, empty", value: []string{}, testUnpacked: true,
-			expectUnpacked: []interface{}{},
+			expectUnpacked: []any{},
 			expectPacked:   []byte{0x90}},
 		{name: "[]string, samples", value: []string{"short", str16}, testUnpacked: true,
-			expectUnpacked: []interface{}{"short", str16},
+			expectUnpacked: []any{"short", str16},
 			expectPacked: []byte{
 				0x92, 0x85, 0x73, 0x68, 0x6f, 0x72, 0x74, 0xd0, 0x10, 0x61, 0x61, 0x61, 0x61, 0x61,
 				0x61, 0x61, 0x61, 0x61, 0x61, 0x61, 0x61, 0x61, 0x61, 0x61, 0x61}},
 		{name: "[]int64, samples", value: []int64{1, posInt24To40 + 1, 0}, testUnpacked: true,
-			expectUnpacked: []interface{}{int64(1), int64(posInt24To40 + 1), int64(0)},
+			expectUnpacked: []any{int64(1), int64(posInt24To40 + 1), int64(0)},
 			expectPacked:   []byte{0x93, 0x01, 0xca, 0x00, 0x00, 0x80, 0x00, 0x00}},
 
 		// Slice sizes
@@ -496,20 +496,20 @@ func TestPackStream(ot *testing.T) {
 
 		// Slice of floats
 		{name: "[]float64, samples", value: []float64{piFloat64}, testUnpacked: true,
-			expectUnpacked: []interface{}{float64(piFloat64)},
+			expectUnpacked: []any{float64(piFloat64)},
 			expectPacked:   []byte{0x91, 0xc1, 0x40, 0x09, 0x1e, 0xb8, 0x51, 0xeb, 0x85, 0x1f}},
 		{name: "[]float32, type", value: []float32{},
 			expectPacked: []byte{0x90}},
 
-		// Map[string] of interface{}, main entry point for sending queries.
-		{name: "map[string]interface{}, empty", value: map[string]interface{}{}, testUnpacked: true,
-			expectUnpacked: map[string]interface{}{},
+		// Map[string] of any, main entry point for sending queries.
+		{name: "map[string]any, empty", value: map[string]any{}, testUnpacked: true,
+			expectUnpacked: map[string]any{},
 			expectPacked:   []byte{0xa0}},
-		{name: "map[string]interface{}, sample", value: map[string]interface{}{"nil": nil}, testUnpacked: true,
-			expectUnpacked: map[string]interface{}{"nil": nil},
+		{name: "map[string]any, sample", value: map[string]any{"nil": nil}, testUnpacked: true,
+			expectUnpacked: map[string]any{"nil": nil},
 			expectPacked:   []byte{0xa1, 0x83, 0x6e, 0x69, 0x6c, 0xc0}},
-		{name: "map[string]interface{}, sample", value: map[string]interface{}{"s": "str"}, testUnpacked: true,
-			expectUnpacked: map[string]interface{}{"s": interface{}("str")},
+		{name: "map[string]any, sample", value: map[string]any{"s": "str"}, testUnpacked: true,
+			expectUnpacked: map[string]any{"s": any("str")},
 			expectPacked:   []byte{0xa1, 0x81, 0x73, 0x83, 0x73, 0x74, 0x72}},
 		{name: "map[string]string, empty", value: map[string]string{},
 			expectPacked: []byte{0xa0}},
@@ -523,8 +523,8 @@ func TestPackStream(ot *testing.T) {
 		{name: "struct, empty", value: emptyStruct, testUnpacked: true,
 			expectUnpacked: emptyStruct,
 			expectPacked:   []byte{0xb0, 0x66}},
-		{name: "struct, one", value: &testStruct{tag: 0x01, fields: []interface{}{1}}, testUnpacked: false,
-			expectUnpacked: &testStruct{tag: 0x01, fields: []interface{}{1}},
+		{name: "struct, one", value: &testStruct{tag: 0x01, fields: []any{1}}, testUnpacked: false,
+			expectUnpacked: &testStruct{tag: 0x01, fields: []any{1}},
 			expectPacked:   []byte{0xb1, 0x01, 0x01}},
 		{name: "struct, max size", value: maxStruct, testUnpacked: true,
 			expectUnpacked: maxStruct,
@@ -607,7 +607,7 @@ func TestPackStream(ot *testing.T) {
 
 	// Packing test cases for map sizes
 	for _, c := range mapSizeCases {
-		m := make(map[string]interface{}, c.size)
+		m := make(map[string]any, c.size)
 		for i := 0; i < c.size; i++ {
 			m[fmt.Sprintf("%d", i)] = i
 		}
@@ -640,7 +640,7 @@ func TestPackStream(ot *testing.T) {
 			u.Reset(buf)
 			ux := unpack(u)
 
-			um, ok := ux.(map[string]interface{})
+			um, ok := ux.(map[string]any)
 			if !ok {
 				t.Errorf("Unpacked is not a map")
 			}
@@ -668,13 +668,13 @@ func TestPackStream(ot *testing.T) {
 	// Packer error cases, things that packer is expected to fail on
 	packerErrorCases := []struct {
 		name        string
-		value       interface{}
-		expectedErr interface{}
+		value       any
+		expectedErr any
 	}{
 		{name: "uin64 overflow", expectedErr: &OverflowError{},
 			value: (uint64(math.MaxInt64) + 1)},
 		{name: "too big struct", expectedErr: &OverflowError{},
-			value: &testStruct{tag: 0x67, fields: []interface{}{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16}}},
+			value: &testStruct{tag: 0x67, fields: []any{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16}}},
 	}
 	for _, c := range packerErrorCases {
 		ot.Run(fmt.Sprintf("Packing error of %s", c.name), func(t *testing.T) {

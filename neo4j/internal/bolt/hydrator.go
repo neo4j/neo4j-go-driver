@@ -47,13 +47,13 @@ type success struct {
 	hasMore            bool
 	tlast              int64
 	qtype              db.StatementType
-	counters           map[string]interface{}
+	counters           map[string]any
 	plan               *db.Plan
 	profile            *db.ProfiledPlan
 	notifications      []db.Notification
 	routingTable       *idb.RoutingTable
 	num                uint32
-	configurationHints map[string]interface{}
+	configurationHints map[string]any
 	patches            []string
 }
 
@@ -86,7 +86,7 @@ func (s *success) summary() *db.Summary {
 	}
 }
 
-func extractIntCounters(counters map[string]interface{}) map[string]int {
+func extractIntCounters(counters map[string]any) map[string]int {
 	result := make(map[string]int, len(counters))
 	for k, v := range counters {
 		if k != containsSystemUpdatesKey && k != containsUpdatesKey {
@@ -96,7 +96,7 @@ func extractIntCounters(counters map[string]interface{}) map[string]int {
 	return result
 }
 
-func extractBoolPointer(counters map[string]interface{}, key string) *bool {
+func extractBoolPointer(counters map[string]any, key string) *bool {
 	result, ok := counters[key]
 	if !ok {
 		return nil
@@ -144,7 +144,7 @@ func (h *hydrator) assertLength(structType string, expected, actual uint32) {
 }
 
 // hydrate hydrates a top-level struct message
-func (h *hydrator) hydrate(buf []byte) (x interface{}, err error) {
+func (h *hydrator) hydrate(buf []byte) (x any, err error) {
 	h.unp = &h.unpacker
 	h.unp.Reset(buf)
 	h.unp.Next()
@@ -297,12 +297,12 @@ func (h *hydrator) success(n uint32) *success {
 	return succ
 }
 
-func (h *hydrator) successStats() map[string]interface{} {
+func (h *hydrator) successStats() map[string]any {
 	n := h.unp.Len()
 	if n == 0 {
 		return nil
 	}
-	counts := make(map[string]interface{}, n)
+	counts := make(map[string]any, n)
 	for ; n > 0; n-- {
 		h.unp.Next()
 		key := h.unp.String()
@@ -313,8 +313,8 @@ func (h *hydrator) successStats() map[string]interface{} {
 	return counts
 }
 
-func (h *hydrator) parseStatValue(key string) interface{} {
-	var val interface{}
+func (h *hydrator) parseStatValue(key string) any {
+	var val any
 	switch key {
 	case containsSystemUpdatesKey, containsUpdatesKey:
 		boolValue := h.unp.Bool()
@@ -393,9 +393,9 @@ func (h *hydrator) strings() []string {
 	return slice
 }
 
-func (h *hydrator) amap() map[string]interface{} {
+func (h *hydrator) amap() map[string]any {
 	n := h.unp.Len()
-	m := make(map[string]interface{}, n)
+	m := make(map[string]any, n)
 	for ; n > 0; n-- {
 		h.unp.Next()
 		key := h.unp.String()
@@ -405,9 +405,9 @@ func (h *hydrator) amap() map[string]interface{} {
 	return m
 }
 
-func (h *hydrator) array() []interface{} {
+func (h *hydrator) array() []any {
 	n := h.unp.Len()
-	a := make([]interface{}, n)
+	a := make([]any, n)
 	for i := range a {
 		h.unp.Next()
 		a[i] = h.value()
@@ -423,7 +423,7 @@ func (h *hydrator) record(n uint32) *db.Record {
 	rec := db.Record{}
 	h.unp.Next() // Detect array
 	n = h.unp.Len()
-	rec.Values = make([]interface{}, n)
+	rec.Values = make([]any, n)
 	for i := range rec.Values {
 		h.unp.Next()
 		rec.Values[i] = h.value()
@@ -434,7 +434,7 @@ func (h *hydrator) record(n uint32) *db.Record {
 	return &rec
 }
 
-func (h *hydrator) value() interface{} {
+func (h *hydrator) value() any {
 	valueType := h.unp.Curr
 	switch valueType {
 	case packstream.PackedInt:
@@ -527,7 +527,7 @@ func (h *hydrator) trash() {
 	h.value()
 }
 
-func (h *hydrator) node(num uint32) interface{} {
+func (h *hydrator) node(num uint32) any {
 	h.assertLength("node", 3, num)
 	if h.getErr() != nil {
 		return nil
@@ -543,7 +543,7 @@ func (h *hydrator) node(num uint32) interface{} {
 	return n
 }
 
-func (h *hydrator) nodeWithElementId(num uint32) interface{} {
+func (h *hydrator) nodeWithElementId(num uint32) any {
 	h.assertLength("node", 4, num)
 	if h.getErr() != nil {
 		return nil
@@ -560,7 +560,7 @@ func (h *hydrator) nodeWithElementId(num uint32) interface{} {
 	return n
 }
 
-func (h *hydrator) relationship(n uint32) interface{} {
+func (h *hydrator) relationship(n uint32) any {
 	h.assertLength("relationship", 5, n)
 	if h.getErr() != nil {
 		return nil
@@ -582,7 +582,7 @@ func (h *hydrator) relationship(n uint32) interface{} {
 	return r
 }
 
-func (h *hydrator) relationshipWithElementId(n uint32) interface{} {
+func (h *hydrator) relationshipWithElementId(n uint32) any {
 	h.assertLength("relationship", 8, n)
 	if h.getErr() != nil {
 		return nil
@@ -607,7 +607,7 @@ func (h *hydrator) relationshipWithElementId(n uint32) interface{} {
 	return r
 }
 
-func (h *hydrator) relationnode(n uint32) interface{} {
+func (h *hydrator) relationnode(n uint32) any {
 	h.assertLength("relationnode", 3, n)
 	if h.getErr() != nil {
 		return nil
@@ -623,7 +623,7 @@ func (h *hydrator) relationnode(n uint32) interface{} {
 	return &r
 }
 
-func (h *hydrator) relationnodeWithElementId(n uint32) interface{} {
+func (h *hydrator) relationnodeWithElementId(n uint32) any {
 	h.assertLength("relationnode", 4, n)
 	if h.getErr() != nil {
 		return nil
@@ -640,7 +640,7 @@ func (h *hydrator) relationnodeWithElementId(n uint32) interface{} {
 	return &r
 }
 
-func (h *hydrator) path(n uint32) interface{} {
+func (h *hydrator) path(n uint32) any {
 	h.assertLength("path", 3, n)
 	if h.getErr() != nil {
 		return nil
@@ -700,7 +700,7 @@ func (h *hydrator) path(n uint32) interface{} {
 	return buildPath(nodes, rnodes, indexes)
 }
 
-func (h *hydrator) point2d(n uint32) interface{} {
+func (h *hydrator) point2d(n uint32) any {
 	p := dbtype.Point2D{}
 	h.unp.Next()
 	p.SpatialRefId = uint32(h.unp.Int())
@@ -711,7 +711,7 @@ func (h *hydrator) point2d(n uint32) interface{} {
 	return p
 }
 
-func (h *hydrator) point3d(n uint32) interface{} {
+func (h *hydrator) point3d(n uint32) any {
 	p := dbtype.Point3D{}
 	h.unp.Next()
 	p.SpatialRefId = uint32(h.unp.Int())
@@ -724,7 +724,7 @@ func (h *hydrator) point3d(n uint32) interface{} {
 	return p
 }
 
-func (h *hydrator) dateTimeOffset(n uint32) interface{} {
+func (h *hydrator) dateTimeOffset(n uint32) any {
 	h.unp.Next()
 	seconds := h.unp.Int()
 	h.unp.Next()
@@ -749,7 +749,7 @@ func (h *hydrator) dateTimeOffset(n uint32) interface{} {
 	)
 }
 
-func (h *hydrator) utcDateTimeOffset(n uint32) interface{} {
+func (h *hydrator) utcDateTimeOffset(n uint32) any {
 	h.unp.Next()
 	seconds := h.unp.Int()
 	h.unp.Next()
@@ -760,7 +760,7 @@ func (h *hydrator) utcDateTimeOffset(n uint32) interface{} {
 	return time.Unix(seconds, nanos).In(timeZone)
 }
 
-func (h *hydrator) dateTimeNamedZone(n uint32) interface{} {
+func (h *hydrator) dateTimeNamedZone(n uint32) any {
 	h.unp.Next()
 	seconds := h.unp.Int()
 	h.unp.Next()
@@ -791,7 +791,7 @@ func (h *hydrator) dateTimeNamedZone(n uint32) interface{} {
 	)
 }
 
-func (h *hydrator) utcDateTimeNamedZone(n uint32) interface{} {
+func (h *hydrator) utcDateTimeNamedZone(n uint32) any {
 	h.unp.Next()
 	secs := h.unp.Int()
 	h.unp.Next()
@@ -808,7 +808,7 @@ func (h *hydrator) utcDateTimeNamedZone(n uint32) interface{} {
 	return time.Unix(secs, nans).In(timeZone)
 }
 
-func (h *hydrator) localDateTime(n uint32) interface{} {
+func (h *hydrator) localDateTime(n uint32) any {
 	h.unp.Next()
 	secs := h.unp.Int()
 	h.unp.Next()
@@ -818,14 +818,14 @@ func (h *hydrator) localDateTime(n uint32) interface{} {
 	return dbtype.LocalDateTime(t)
 }
 
-func (h *hydrator) date(n uint32) interface{} {
+func (h *hydrator) date(n uint32) any {
 	h.unp.Next()
 	days := h.unp.Int()
 	secs := days * 86400
 	return dbtype.Date(time.Unix(secs, 0).UTC())
 }
 
-func (h *hydrator) time(n uint32) interface{} {
+func (h *hydrator) time(n uint32) any {
 	h.unp.Next()
 	nans := h.unp.Int()
 	h.unp.Next()
@@ -837,7 +837,7 @@ func (h *hydrator) time(n uint32) interface{} {
 	return dbtype.Time(t)
 }
 
-func (h *hydrator) localTime(n uint32) interface{} {
+func (h *hydrator) localTime(n uint32) any {
 	h.unp.Next()
 	nans := h.unp.Int()
 	secs := nans / int64(time.Second)
@@ -846,7 +846,7 @@ func (h *hydrator) localTime(n uint32) interface{} {
 	return dbtype.LocalTime(t)
 }
 
-func (h *hydrator) duration(n uint32) interface{} {
+func (h *hydrator) duration(n uint32) any {
 	h.unp.Next()
 	mon := h.unp.Int()
 	h.unp.Next()
@@ -858,12 +858,12 @@ func (h *hydrator) duration(n uint32) interface{} {
 	return dbtype.Duration{Months: mon, Days: day, Seconds: sec, Nanos: int(nan)}
 }
 
-func parseNotifications(notificationsx []interface{}) []db.Notification {
+func parseNotifications(notificationsx []any) []db.Notification {
 	var notifications []db.Notification
 	if notificationsx != nil {
 		notifications = make([]db.Notification, 0, len(notificationsx))
 		for _, x := range notificationsx {
-			notificationx, ok := x.(map[string]interface{})
+			notificationx, ok := x.(map[string]any)
 			if ok {
 				notifications = append(notifications, parseNotification(notificationx))
 			}
@@ -872,22 +872,22 @@ func parseNotifications(notificationsx []interface{}) []db.Notification {
 	return notifications
 }
 
-func parsePlanOpIdArgsChildren(planx map[string]interface{}) (string, []string, map[string]interface{}, []interface{}) {
+func parsePlanOpIdArgsChildren(planx map[string]any) (string, []string, map[string]any, []any) {
 	operator, _ := planx["operatorType"].(string)
-	identifiersx, _ := planx["identifiers"].([]interface{})
-	arguments, _ := planx["args"].(map[string]interface{})
+	identifiersx, _ := planx["identifiers"].([]any)
+	arguments, _ := planx["args"].(map[string]any)
 
 	identifiers := make([]string, len(identifiersx))
 	for i, id := range identifiersx {
 		identifiers[i], _ = id.(string)
 	}
 
-	childrenx, _ := planx["children"].([]interface{})
+	childrenx, _ := planx["children"].([]any)
 
 	return operator, identifiers, arguments, childrenx
 }
 
-func parsePlan(planx map[string]interface{}) *db.Plan {
+func parsePlan(planx map[string]any) *db.Plan {
 	op, ids, args, childrenx := parsePlanOpIdArgsChildren(planx)
 	plan := &db.Plan{
 		Operator:    op,
@@ -897,7 +897,7 @@ func parsePlan(planx map[string]interface{}) *db.Plan {
 
 	plan.Children = make([]db.Plan, 0, len(childrenx))
 	for _, c := range childrenx {
-		childPlanx, _ := c.(map[string]interface{})
+		childPlanx, _ := c.(map[string]any)
 		if len(childPlanx) > 0 {
 			childPlan := parsePlan(childPlanx)
 			if childPlan != nil {
@@ -909,7 +909,7 @@ func parsePlan(planx map[string]interface{}) *db.Plan {
 	return plan
 }
 
-func parseProfile(profilex map[string]interface{}) *db.ProfiledPlan {
+func parseProfile(profilex map[string]any) *db.ProfiledPlan {
 	op, ids, args, childrenx := parsePlanOpIdArgsChildren(profilex)
 	plan := &db.ProfiledPlan{
 		Operator:    op,
@@ -922,7 +922,7 @@ func parseProfile(profilex map[string]interface{}) *db.ProfiledPlan {
 
 	plan.Children = make([]db.ProfiledPlan, 0, len(childrenx))
 	for _, c := range childrenx {
-		childPlanx, _ := c.(map[string]interface{})
+		childPlanx, _ := c.(map[string]any)
 		if len(childPlanx) > 0 {
 			childPlan := parseProfile(childPlanx)
 			if childPlan != nil {
@@ -946,13 +946,13 @@ func parseProfile(profilex map[string]interface{}) *db.ProfiledPlan {
 	return plan
 }
 
-func parseNotification(m map[string]interface{}) db.Notification {
+func parseNotification(m map[string]any) db.Notification {
 	n := db.Notification{}
 	n.Code, _ = m["code"].(string)
 	n.Description = m["description"].(string)
 	n.Severity, _ = m["severity"].(string)
 	n.Title, _ = m["title"].(string)
-	posx, exists := m["position"].(map[string]interface{})
+	posx, exists := m["position"].(map[string]any)
 	if exists {
 		pos := &db.InputPosition{}
 		i, _ := posx["column"].(int64)
@@ -967,7 +967,7 @@ func parseNotification(m map[string]interface{}) db.Notification {
 	return n
 }
 
-func (h *hydrator) unknownStructError(t byte) interface{} {
+func (h *hydrator) unknownStructError(t byte) any {
 	h.setErr(&db.ProtocolError{
 		Err: fmt.Sprintf("Received unknown struct tag: %d", t),
 	})

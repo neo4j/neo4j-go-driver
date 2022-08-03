@@ -52,7 +52,7 @@ func makeRawConnection(logger log.Logger, boltLogger log.BoltLogger) (
 		panic(err)
 	}
 
-	authMap := map[string]interface{}{
+	authMap := map[string]any{
 		"scheme":      "basic",
 		"principal":   server.Username,
 		"credentials": server.Password,
@@ -68,7 +68,7 @@ func makeRawConnection(logger log.Logger, boltLogger log.BoltLogger) (
 func BenchmarkQuery(b *testing.B) {
 	_, conn := makeRawConnection(&log.Console{Debugs: true, Errors: true, Infos: true, Warns: true}, nil)
 	defer conn.Close(context.Background())
-	params := map[string]interface{}{
+	params := map[string]any{
 		"one": 1,
 		"arr": []int{1, 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096, 8192, 16384, 32768, 65536},
 		"str": "bAbOgocy84hxL0UFyAeScQUJQqunrP5a2dxAI54mF9vm4YUfhT0wgrcUQqLsC2QauCuzWRgliXB07kdRIzLZqATHHqQxwZFkVnpB",
@@ -111,7 +111,7 @@ func TestConnectionConformance(outer *testing.T) {
 			fun: func(t *testing.T, c idb.Connection) {
 				s, err := c.Run(context.Background(),
 					idb.Command{Cypher: "CREATE (n:Rand {val: $r}) RETURN n",
-						Params: map[string]interface{}{"r": randInt()}},
+						Params: map[string]any{"r": randInt()}},
 					idb.TxConfig{Mode: idb.WriteMode})
 				AssertNoError(t, err)
 				rec, sum, err := c.Next(context.Background(), s)
@@ -127,12 +127,12 @@ func TestConnectionConformance(outer *testing.T) {
 			fun: func(t *testing.T, c idb.Connection) {
 				_, err := c.Run(context.Background(),
 					idb.Command{Cypher: "CREATE (n:Rand {val: $r})",
-						Params: map[string]interface{}{"r": randInt()}},
+						Params: map[string]any{"r": randInt()}},
 					idb.TxConfig{Mode: idb.WriteMode})
 				AssertNoError(t, err)
 				_, err = c.Run(context.Background(),
 					idb.Command{Cypher: "CREATE (n:Rand {val: $r})",
-						Params: map[string]interface{}{"r": randInt()}},
+						Params: map[string]any{"r": randInt()}},
 					idb.TxConfig{Mode: idb.WriteMode})
 				AssertNoError(t, err)
 			},
@@ -147,7 +147,7 @@ func TestConnectionConformance(outer *testing.T) {
 				AssertNoError(t, err)
 				r := randInt()
 				s, err := c.RunTx(context.Background(), txHandle,
-					idb.Command{Cypher: "CREATE (n:Rand {val: $r}) RETURN n", Params: map[string]interface{}{"r": r}})
+					idb.Command{Cypher: "CREATE (n:Rand {val: $r}) RETURN n", Params: map[string]any{"r": r}})
 				AssertNoError(t, err)
 				rec, sum, err := c.Next(context.Background(), s)
 				AssertNextOnlyRecord(t, rec, sum, err)
@@ -158,7 +158,7 @@ func TestConnectionConformance(outer *testing.T) {
 				// Make sure it's commited
 				s, err = c.Run(context.Background(),
 					idb.Command{Cypher: "MATCH (n:Rand {val: $r}) RETURN n",
-						Params: map[string]interface{}{"r": r}},
+						Params: map[string]any{"r": r}},
 					idb.TxConfig{Mode: idb.ReadMode})
 				AssertNoError(t, err)
 				rec, sum, err = c.Next(context.Background(), s)
@@ -176,14 +176,14 @@ func TestConnectionConformance(outer *testing.T) {
 				AssertNoError(t, err)
 				r := randInt()
 				s, err := c.RunTx(context.Background(), txHandle,
-					idb.Command{Cypher: "CREATE (n:Rand {val: $r}) RETURN n", Params: map[string]interface{}{"r": r}})
+					idb.Command{Cypher: "CREATE (n:Rand {val: $r}) RETURN n", Params: map[string]any{"r": r}})
 				AssertNoError(t, err)
 				err = c.TxCommit(context.Background(), txHandle)
 				AssertNoError(t, err)
 				// Make sure it's commited
 				s, err = c.Run(context.Background(),
 					idb.Command{Cypher: "MATCH (n:Rand {val: $r}) RETURN n",
-						Params: map[string]interface{}{"r": r}},
+						Params: map[string]any{"r": r}},
 					idb.TxConfig{Mode: idb.ReadMode})
 				AssertNoError(t, err)
 				rec, sum, err := c.Next(context.Background(), s)
@@ -201,7 +201,7 @@ func TestConnectionConformance(outer *testing.T) {
 				AssertNoError(t, err)
 				r := randInt()
 				s, err := c.RunTx(context.Background(), txHandle,
-					idb.Command{Cypher: "CREATE (n:Rand {val: $r}) RETURN n", Params: map[string]interface{}{"r": r}})
+					idb.Command{Cypher: "CREATE (n:Rand {val: $r}) RETURN n", Params: map[string]any{"r": r}})
 				AssertNoError(t, err)
 				rec, sum, err := c.Next(context.Background(), s)
 				AssertNextOnlyRecord(t, rec, sum, err)
@@ -212,7 +212,7 @@ func TestConnectionConformance(outer *testing.T) {
 				// Make sure it's rolled back
 				s, err = c.Run(context.Background(),
 					idb.Command{Cypher: "MATCH (n:Rand {val: $r}) RETURN n",
-						Params: map[string]interface{}{"r": r}},
+						Params: map[string]any{"r": r}},
 					idb.TxConfig{Mode: idb.ReadMode})
 				AssertNoError(t, err)
 				rec, sum, err = c.Next(context.Background(), s)
@@ -229,14 +229,14 @@ func TestConnectionConformance(outer *testing.T) {
 				AssertNoError(t, err)
 				r := randInt()
 				s, err := c.RunTx(context.Background(), txHandle,
-					idb.Command{Cypher: "CREATE (n:Rand {val: $r}) RETURN n", Params: map[string]interface{}{"r": r}})
+					idb.Command{Cypher: "CREATE (n:Rand {val: $r}) RETURN n", Params: map[string]any{"r": r}})
 				AssertNoError(t, err)
 				err = c.TxRollback(context.Background(), txHandle)
 				AssertNoError(t, err)
 				// Make sure it's committed
 				s, err = c.Run(context.Background(),
 					idb.Command{Cypher: "MATCH (n:Rand {val: $r}) RETURN n",
-						Params: map[string]interface{}{"r": r}},
+						Params: map[string]any{"r": r}},
 					idb.TxConfig{Mode: idb.ReadMode})
 				AssertNoError(t, err)
 				rec, sum, err := c.Next(context.Background(), s)
@@ -257,7 +257,7 @@ func TestConnectionConformance(outer *testing.T) {
 				for ; rec != nil; rec, _, _ = c.Next(context.Background(), r1) {
 					n = rec.Values[0].(int64)
 					_, err := c.RunTx(context.Background(), tx,
-						idb.Command{Cypher: "UNWIND RANGE (0, $x) AS x RETURN x", Params: map[string]interface{}{"x": n}})
+						idb.Command{Cypher: "UNWIND RANGE (0, $x) AS x RETURN x", Params: map[string]any{"x": n}})
 					AssertNoError(t, err)
 				}
 				if n != 100 {
@@ -300,7 +300,7 @@ func TestConnectionConformance(outer *testing.T) {
 				defer c.TxRollback(context.Background(), txHandle)
 				s, err := c.Run(context.Background(),
 					idb.Command{Cypher: "CREATE (n:Rand {val: $r})",
-						Params: map[string]interface{}{"r": randInt()}},
+						Params: map[string]any{"r": randInt()}},
 					idb.TxConfig{Mode: idb.WriteMode})
 				if s != nil || err == nil {
 					t.Fatal("Should fail to run auto commit when in transaction")
@@ -365,7 +365,7 @@ func TestConnectionConformance(outer *testing.T) {
 			fun: func(t *testing.T, c idb.Connection) {
 				s, err := c.Run(context.Background(),
 					idb.Command{Cypher: "MATCH (n:Rand {val: $r} ",
-						Params: map[string]interface{}{"r": randInt()}},
+						Params: map[string]any{"r": randInt()}},
 					idb.TxConfig{Mode: idb.ReadMode})
 				if err == nil || s != nil {
 					t.Fatal("Should have received error")
@@ -381,7 +381,7 @@ func TestConnectionConformance(outer *testing.T) {
 			fun: func(t *testing.T, c idb.Connection) {
 				s, err := c.Run(context.Background(),
 					idb.Command{Cypher: "UNWIND [0] AS x RETURN 10 / x",
-						Params: map[string]interface{}{"r": randInt()}},
+						Params: map[string]any{"r": randInt()}},
 					idb.TxConfig{Mode: idb.ReadMode})
 				AssertNoError(t, err)
 				// Should get error while iterating
@@ -490,7 +490,7 @@ func TestConnectionConformance(outer *testing.T) {
 
 		stream, err := boltConn.Run(context.Background(),
 			idb.Command{Cypher: query,
-				Params: map[string]interface{}{"x": bigBuilder.String()}},
+				Params: map[string]any{"x": bigBuilder.String()}},
 			idb.TxConfig{Mode: idb.ReadMode})
 		AssertNoError(t, err)
 		rec, sum, err := boltConn.Next(context.Background(), stream)
@@ -503,7 +503,7 @@ func TestConnectionConformance(outer *testing.T) {
 		// level (there has been a bug caught by this).
 		stream, err = boltConn.Run(context.Background(),
 			idb.Command{Cypher: query,
-				Params: map[string]interface{}{"x": bigBuilder.String()}},
+				Params: map[string]any{"x": bigBuilder.String()}},
 			idb.TxConfig{Mode: idb.ReadMode})
 		AssertNoError(t, err)
 		rec, sum, err = boltConn.Next(context.Background(), stream)
@@ -542,7 +542,7 @@ func TestConnectionConformance(outer *testing.T) {
 		tt.Run("Auto-commit, bookmark by iteration", func(t *testing.T) {
 			s, _ := boltConn.Run(context.Background(), idb.Command{
 				Cypher: "CREATE (n:BmRand {x: $rand}) RETURN n",
-				Params: map[string]interface{}{"rand": randInt()}},
+				Params: map[string]any{"rand": randInt()}},
 				idb.TxConfig{Mode: idb.WriteMode})
 			boltConn.Next(context.Background(), s)
 			boltConn.Next(context.Background(), s)
@@ -551,11 +551,11 @@ func TestConnectionConformance(outer *testing.T) {
 		tt.Run("Auto-commit, bookmark by new auto-commit", func(t *testing.T) {
 			boltConn.Run(context.Background(), idb.Command{
 				Cypher: "CREATE (n:BmRand {x: $rand}) RETURN n",
-				Params: map[string]interface{}{"rand": randInt()}},
+				Params: map[string]any{"rand": randInt()}},
 				idb.TxConfig{Mode: idb.WriteMode})
 			s, _ := boltConn.Run(context.Background(), idb.Command{
 				Cypher: "CREATE (n:BmRand {x: $rand}) RETURN n",
-				Params: map[string]interface{}{"rand": randInt()}},
+				Params: map[string]any{"rand": randInt()}},
 				idb.TxConfig{Mode: idb.WriteMode})
 			assertNewBookmark(t)
 			boltConn.Next(context.Background(), s)
@@ -566,7 +566,7 @@ func TestConnectionConformance(outer *testing.T) {
 			tx, _ := boltConn.TxBegin(context.Background(),
 				idb.TxConfig{Mode: idb.WriteMode})
 			s, _ := boltConn.RunTx(context.Background(), tx, idb.Command{
-				Cypher: "CREATE (n:BmRand {x: $rand}) RETURN n", Params: map[string]interface{}{"rand": randInt()}})
+				Cypher: "CREATE (n:BmRand {x: $rand}) RETURN n", Params: map[string]any{"rand": randInt()}})
 			boltConn.Next(context.Background(), s)
 			boltConn.Next(context.Background(), s)
 			assertNoNewBookmark(t)
@@ -577,7 +577,7 @@ func TestConnectionConformance(outer *testing.T) {
 			tx, _ := boltConn.TxBegin(context.Background(),
 				idb.TxConfig{Mode: idb.WriteMode})
 			s, _ := boltConn.RunTx(context.Background(), tx, idb.Command{
-				Cypher: "CREATE (n:BmRand {x: $rand}) RETURN n", Params: map[string]interface{}{"rand": randInt()}})
+				Cypher: "CREATE (n:BmRand {x: $rand}) RETURN n", Params: map[string]any{"rand": randInt()}})
 			boltConn.Next(context.Background(), s)
 			boltConn.Next(context.Background(), s)
 			assertNoNewBookmark(t)
@@ -605,13 +605,13 @@ func TestConnectionConformance(outer *testing.T) {
 		// Use test database to create a random node
 		selector.SelectDatabase("test1")
 		r := randInt()
-		assertRunsQuery(tt, boltConn, "CREATE (n:MdbRand {x: $x}) RETURN n", map[string]interface{}{"x": r}, idb.WriteMode)
+		assertRunsQuery(tt, boltConn, "CREATE (n:MdbRand {x: $x}) RETURN n", map[string]any{"x": r}, idb.WriteMode)
 		boltConn.Reset(context.Background())
 
 		// Connect to standard database and make sure we can't see the node
 		streamHandle, err := boltConn.Run(context.Background(),
 			idb.Command{Cypher: "MATCH (n:MdbRand {x: $x}) RETURN n",
-				Params: map[string]interface{}{"x": r}},
+				Params: map[string]any{"x": r}},
 			idb.TxConfig{Mode: idb.ReadMode})
 		AssertNoError(tt, err)
 		rec, sum, err := boltConn.Next(context.Background(), streamHandle)
@@ -621,7 +621,7 @@ func TestConnectionConformance(outer *testing.T) {
 		selector.SelectDatabase("test1")
 		streamHandle, err = boltConn.Run(context.Background(),
 			idb.Command{Cypher: "MATCH (n:MdbRand {x: $x}) RETURN n",
-				Params: map[string]interface{}{"x": r}},
+				Params: map[string]any{"x": r}},
 			idb.TxConfig{Mode: idb.ReadMode})
 		AssertNoError(tt, err)
 		rec, sum, err = boltConn.Next(context.Background(), streamHandle)

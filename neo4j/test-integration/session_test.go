@@ -80,7 +80,7 @@ func TestSession(outer *testing.T) {
 
 		inner.Run("when a query is executed, it should run and return summary with correct statement and params", func(t *testing.T) {
 			stmt := "UNWIND RANGE(0, $x) AS n RETURN n"
-			params := map[string]interface{}{"x": 1000}
+			params := map[string]any{"x": 1000}
 			result, err = session.Run(stmt, params)
 			assertNil(t, err)
 			assertNotNil(t, result)
@@ -445,7 +445,7 @@ func TestSession(outer *testing.T) {
 		}()
 
 		inner.Run("should set transaction metadata on Session.Run", func(t *testing.T) {
-			metadata := map[string]interface{}{
+			metadata := map[string]any{
 				"m1": int64(1),
 				"m2": "some string",
 				"m3": 4.0,
@@ -463,7 +463,7 @@ func TestSession(outer *testing.T) {
 		})
 
 		inner.Run("should set transaction metadata on ExecuteRead", func(t *testing.T) {
-			metadata := map[string]interface{}{
+			metadata := map[string]any{
 				"m1": int64(1),
 				"m2": "some string",
 				"m3": neo4j.DateOf(time.Now()),
@@ -479,7 +479,7 @@ func TestSession(outer *testing.T) {
 		})
 
 		inner.Run("should set transaction metadata on ExecuteWrite", func(t *testing.T) {
-			metadata := map[string]interface{}{
+			metadata := map[string]any{
 				"m1": true,
 				"m2": []byte{0x00, 0x01, 0x02},
 				"m3": neo4j.OffsetTimeOf(time.Now()),
@@ -500,7 +500,7 @@ func TestSession(outer *testing.T) {
 			session2, tx2 := newSessionAndTx(t, driver, neo4j.AccessModeWrite)
 			defer session2.Close()
 			defer tx2.Close()
-			updateNodeInTx(t, tx2, "RunTxTimeOut", map[string]interface{}{"id": 1})
+			updateNodeInTx(t, tx2, "RunTxTimeOut", map[string]any{"id": 1})
 
 			session3 := driver.NewSession(neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
 
@@ -527,11 +527,11 @@ func TestSession(outer *testing.T) {
 			session2, tx2 := newSessionAndTx(t, driver, neo4j.AccessModeWrite)
 			defer session2.Close()
 			defer tx2.Close()
-			updateNodeInTx(t, tx2, "WriteTransactionTxTimeOut", map[string]interface{}{"id": 1})
+			updateNodeInTx(t, tx2, "WriteTransactionTxTimeOut", map[string]any{"id": 1})
 
 			session3 := driver.NewSession(neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
 
-			_, err := session3.WriteTransaction(updateNodeWork(t, "WriteTransactionTxTimeOut", map[string]interface{}{"id": 2}), neo4j.WithTxTimeout(1*time.Second))
+			_, err := session3.WriteTransaction(updateNodeWork(t, "WriteTransactionTxTimeOut", map[string]any{"id": 2}), neo4j.WithTxTimeout(1*time.Second))
 			assertNotNil(t, err)
 			dbErr := err.(*db.Neo4jError)
 			assertStringContains(t, dbErr.Msg, "terminated")

@@ -57,7 +57,7 @@ type Plan struct {
 	Operator string
 	// Arguments for the operator.
 	// Many operators have arguments defining their specific behavior. This map contains those arguments.
-	Arguments map[string]interface{}
+	Arguments map[string]any
 	// List of identifiers used by this plan. Identifiers used by this part of the plan.
 	// These can be both identifiers introduced by you, or automatically generated.
 	Identifiers []string
@@ -74,7 +74,7 @@ type ProfiledPlan struct {
 	Operator string
 	// Arguments contains the arguments for the operator used.
 	// Many operators have arguments defining their specific behavior. This map contains those arguments.
-	Arguments map[string]interface{}
+	Arguments map[string]any
 	// Identifiers contains a list of identifiers used by this plan. Identifiers used by this part of the plan.
 	// These can be both identifiers introduced by you, or automatically generated.
 	Identifiers []string

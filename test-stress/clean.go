@@ -27,9 +27,9 @@ func cleanDb(driver neo4j.Driver) {
 	session := driver.NewSession(neo4j.SessionConfig{})
 	batch := 1000
 	for {
-		x, err := session.WriteTransaction(func(tx neo4j.Transaction) (interface{}, error) {
+		x, err := session.WriteTransaction(func(tx neo4j.Transaction) (any, error) {
 			result, err := tx.Run("MATCH (n) WITH n LIMIT $batch DETACH DELETE n RETURN count(n)",
-				map[string]interface{}{"batch": batch})
+				map[string]any{"batch": batch})
 			if err != nil {
 				return nil, err
 			}

@@ -31,7 +31,7 @@ func parseRoutingTableRecord(rec *db.Record) *idb.RoutingTable {
 	if !ok {
 		return nil
 	}
-	listOfX, ok := rec.Values[1].([]interface{})
+	listOfX, ok := rec.Values[1].([]any)
 	if !ok {
 		return nil
 	}
@@ -42,11 +42,11 @@ func parseRoutingTableRecord(rec *db.Record) *idb.RoutingTable {
 
 	for _, x := range listOfX {
 		// Each x should be a map consisting of addresses and the role
-		m, ok := x.(map[string]interface{})
+		m, ok := x.(map[string]any)
 		if !ok {
 			return nil
 		}
-		addressesX, ok := m["addresses"].([]interface{})
+		addressesX, ok := m["addresses"].([]any)
 		if !ok {
 			return nil
 		}

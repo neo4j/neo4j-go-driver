@@ -63,7 +63,7 @@ type resultWithContext struct {
 	conn          idb.Connection
 	streamHandle  idb.StreamHandle
 	cypher        string
-	params        map[string]interface{}
+	params        map[string]any
 	record        *Record
 	summary       *db.Summary
 	err           error
@@ -73,7 +73,7 @@ type resultWithContext struct {
 }
 
 func newResultWithContext(conn idb.Connection, str idb.StreamHandle,
-	cypher string, params map[string]interface{}) ResultWithContext {
+	cypher string, params map[string]any) ResultWithContext {
 	return &resultWithContext{
 		conn:         conn,
 		streamHandle: str,

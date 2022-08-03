@@ -67,7 +67,7 @@ func (s *bolt3server) assertStructType(msg *testStruct, t byte) {
 }
 
 func (s *bolt3server) sendFailureMsg(code, msg string) {
-	s.send(msgFailure, map[string]interface{}{
+	s.send(msgFailure, map[string]any{
 		"code":    code,
 		"message": msg,
 	})
@@ -80,7 +80,7 @@ func (s *bolt3server) sendIgnoredMsg() {
 func (s *bolt3server) waitForHello() {
 	msg := s.receiveMsg()
 	s.assertStructType(msg, msgHello)
-	m := msg.fields[0].(map[string]interface{})
+	m := msg.fields[0].(map[string]any)
 	// Hello should contain some musts
 	_, exists := m["scheme"]
 	if !exists {
@@ -103,7 +103,7 @@ func (s *bolt3server) receiveMsg() *testStruct {
 	n := s.unpacker.Len()
 	t := s.unpacker.StructTag()
 
-	fields := make([]interface{}, n)
+	fields := make([]any, n)
 	for i := uint32(0); i < n; i++ {
 		s.unpacker.Next()
 		fields[i] = serverHydrator(s.unpacker)
@@ -160,24 +160,24 @@ func (s *bolt3server) closeConnection() {
 	s.conn.Close()
 }
 
-func (s *bolt3server) send(tag byte, field ...interface{}) {
+func (s *bolt3server) send(tag byte, field ...any) {
 	s.out.appendX(byte(tag), field...)
 	s.out.send(context.Background(), s.conn)
 }
 
-func (s *bolt3server) sendSuccess(m map[string]interface{}) {
+func (s *bolt3server) sendSuccess(m map[string]any) {
 	s.send(msgSuccess, m)
 }
 
 func (s *bolt3server) acceptHello() {
-	s.send(msgSuccess, map[string]interface{}{
+	s.send(msgSuccess, map[string]any{
 		"connection_id": "cid",
 		"server":        "fake/3.5",
 	})
 }
 
 func (s *bolt3server) rejectHelloUnauthorized() {
-	s.send(msgFailure, map[string]interface{}{
+	s.send(msgFailure, map[string]any{
 		"code":    "Neo.ClientError.Security.Unauthorized",
 		"message": "",
 	})
@@ -202,7 +202,7 @@ func (s *bolt3server) serveRun(stream []testStruct) {
 
 func (s *bolt3server) serveRunTx(stream []testStruct, commit bool, bookmark string) {
 	s.waitForTxBegin()
-	s.send(msgSuccess, map[string]interface{}{})
+	s.send(msgSuccess, map[string]any{})
 	s.waitForRun()
 	s.waitForPullAll()
 	for _, x := range stream {
@@ -210,13 +210,13 @@ func (s *bolt3server) serveRunTx(stream []testStruct, commit bool, bookmark stri
 	}
 	if commit {
 		s.waitForTxCommit()
-		s.out.appendX(byte(msgSuccess), map[string]interface{}{
+		s.out.appendX(byte(msgSuccess), map[string]any{
 			"bookmark": bookmark,
 		})
 		s.out.send(context.Background(), s.conn)
 	} else {
 		s.waitForTxRollback()
-		s.send(msgSuccess, map[string]interface{}{})
+		s.send(msgSuccess, map[string]any{})
 	}
 }
 

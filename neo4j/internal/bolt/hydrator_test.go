@@ -34,8 +34,8 @@ import (
 
 type hydratorTestCase struct {
 	name   string
-	build  func()      // Builds/encodes stream same was as server would
-	x      interface{} // Expected hydrated
+	build  func() // Builds/encodes stream same was as server would
+	x      any    // Expected hydrated
 	err    error
 	useUtc bool
 }
@@ -204,7 +204,7 @@ func TestHydrator(outer *testing.T) {
 			},
 			x: &success{tlast: -1, tfirst: -1, bookmark: "bm", db: "sys", qid: -1, num: 4, plan: &db.Plan{
 				Operator:    "opType",
-				Arguments:   map[string]interface{}{"arg1": int64(1001)},
+				Arguments:   map[string]any{"arg1": int64(1001)},
 				Identifiers: []string{"id1", "id2"},
 				Children: []db.Plan{
 					{Operator: "cop", Identifiers: []string{"cid"}, Children: []db.Plan{}},
@@ -254,7 +254,7 @@ func TestHydrator(outer *testing.T) {
 			x: &success{tlast: -1, tfirst: -1, bookmark: "bm", db: "sys", qid: -1, num: 4,
 				profile: &db.ProfiledPlan{
 					Operator:    "opType",
-					Arguments:   map[string]interface{}{"arg1": int64(1001)},
+					Arguments:   map[string]any{"arg1": int64(1001)},
 					Identifiers: []string{"id1", "id2"},
 					Children: []db.ProfiledPlan{
 						{Operator: "cop", Identifiers: []string{"cid"}, Children: []db.ProfiledPlan{}, DbHits: int64(1), Records: int64(2)},
@@ -453,7 +453,7 @@ func TestHydrator(outer *testing.T) {
 				packer.Int(4)
 				packer.Int(5)
 			},
-			x: &db.Record{Values: []interface{}{int64(1), int64(2), int64(3), int64(4), int64(5)}},
+			x: &db.Record{Values: []any{int64(1), int64(2), int64(3), int64(4), int64(5)}},
 		},
 		{
 			name: "Record of spatials",
@@ -470,7 +470,7 @@ func TestHydrator(outer *testing.T) {
 				packer.Float64(23.71)       //
 				packer.Float64(3.712)       //
 			},
-			x: &db.Record{Values: []interface{}{
+			x: &db.Record{Values: []any{
 				dbtype.Point2D{SpatialRefId: 1, X: 7.123, Y: 123.7},
 				dbtype.Point3D{SpatialRefId: 2, X: 0.123, Y: 23.71, Z: 3.712},
 			}},
@@ -514,7 +514,7 @@ func TestHydrator(outer *testing.T) {
 				packer.Int64(59)
 				packer.Int64(10001)
 			},
-			x: &db.Record{Values: []interface{}{
+			x: &db.Record{Values: []any{
 				dbtype.Time(time.Date(0, 0, 0, 1, 2, 3, 4, time.FixedZone("Offset", 6))),
 				dbtype.LocalTime(time.Date(0, 0, 0, 1, 2, 3, 4, time.Local)),
 				dbtype.Date(time.Date(1999, 12, 31, 0, 0, 0, 0, time.UTC)),
@@ -549,14 +549,14 @@ func TestHydrator(outer *testing.T) {
 				packer.Float64(7.123)       //
 				packer.Float64(123.7)       //
 			},
-			x: &db.Record{Values: []interface{}{
+			x: &db.Record{Values: []any{
 				dbtype.Node{
 					Id:        19000,
 					ElementId: "19000",
 					Labels:    []string{"lbl1", "lbl2", "lbl3"},
-					Props: map[string]interface{}{
+					Props: map[string]any{
 						"key1": int64(7),
-						"key2": []interface{}{
+						"key2": []any{
 							dbtype.Point2D{SpatialRefId: 1, X: 7.123, Y: 123.7},
 							dbtype.Point2D{SpatialRefId: 2, X: 7.123, Y: 123.7},
 						},
@@ -587,7 +587,7 @@ func TestHydrator(outer *testing.T) {
 				packer.Float64(7.123)       //
 				packer.Float64(123.7)       //
 			},
-			x: &db.Record{Values: []interface{}{
+			x: &db.Record{Values: []any{
 				dbtype.Relationship{
 					Id:             19000,
 					ElementId:      "19000",
@@ -596,9 +596,9 @@ func TestHydrator(outer *testing.T) {
 					EndId:          1000,
 					EndElementId:   "1000",
 					Type:           "lbl",
-					Props: map[string]interface{}{
+					Props: map[string]any{
 						"key1": int64(7),
-						"key2": []interface{}{
+						"key2": []any{
 							dbtype.Point2D{SpatialRefId: 1, X: 7.123, Y: 123.7},
 							dbtype.Point2D{SpatialRefId: 2, X: 7.123, Y: 123.7},
 						},
@@ -640,14 +640,14 @@ func TestHydrator(outer *testing.T) {
 				packer.Int(1)
 				packer.Int(1)
 			},
-			x: &db.Record{Values: []interface{}{
+			x: &db.Record{Values: []any{
 				dbtype.Path{
 					Nodes: []dbtype.Node{
-						{Id: 3, ElementId: "3", Labels: []string{"lbl1"}, Props: map[string]interface{}{"key1": int64(7)}},
-						{Id: 7, ElementId: "7", Labels: []string{"lbl2"}, Props: map[string]interface{}{"key2": int64(9)}},
+						{Id: 3, ElementId: "3", Labels: []string{"lbl1"}, Props: map[string]any{"key1": int64(7)}},
+						{Id: 7, ElementId: "7", Labels: []string{"lbl2"}, Props: map[string]any{"key2": int64(9)}},
 					},
 					Relationships: []dbtype.Relationship{
-						{Id: 9, ElementId: "9", StartId: 3, StartElementId: "3", EndId: 7, EndElementId: "7", Type: "x", Props: map[string]interface{}{"akey": "aval"}},
+						{Id: 9, ElementId: "9", StartId: 3, StartElementId: "3", EndId: 7, EndElementId: "7", Type: "x", Props: map[string]any{"akey": "aval"}},
 					}},
 			}},
 		},
@@ -665,7 +665,7 @@ func TestHydrator(outer *testing.T) {
 				packer.Int64(datetime.UnixNano() - (datetime.Unix() * int64(time.Second)))
 				packer.Int(3)
 			},
-			x: &db.Record{Values: []interface{}{
+			x: &db.Record{Values: []any{
 				time.Date(1999, 12, 31, 23, 59, 59, 1, time.FixedZone("Offset", 3)),
 			}},
 		},
@@ -714,7 +714,7 @@ func TestHydrator(outer *testing.T) {
 				packer.Int64(datetime.UnixNano() - (datetime.Unix() * int64(time.Second)))
 				packer.String(zoneName)
 			},
-			x: &db.Record{Values: []interface{}{
+			x: &db.Record{Values: []any{
 				time.Date(1999, 12, 31, 23, 59, 59, 1, timeZone),
 			}},
 		},
@@ -759,7 +759,7 @@ func TestHydrator(outer *testing.T) {
 				packer.Int64(42)
 				packer.String("LA/Confidential")
 			},
-			x: &db.Record{Values: []interface{}{
+			x: &db.Record{Values: []any{
 				&dbtype.InvalidValue{
 					Message: "utcDateTimeNamedZone",
 					Err:     fmt.Errorf("unknown time zone LA/Confidential"),
@@ -776,7 +776,7 @@ func TestHydrator(outer *testing.T) {
 				packer.Int64(42)
 				packer.String("LA/Confidential")
 			},
-			x: &db.Record{Values: []interface{}{
+			x: &db.Record{Values: []any{
 				&dbtype.InvalidValue{
 					Message: "dateTimeNamedZone",
 					Err:     fmt.Errorf("unknown time zone LA/Confidential"),
@@ -850,14 +850,14 @@ func TestHydratorBolt5(outer *testing.T) {
 				packer.Float64(123.7)       //
 				packer.String("19091")
 			},
-			x: &db.Record{Values: []interface{}{
+			x: &db.Record{Values: []any{
 				dbtype.Node{
 					Id:        19000,
 					ElementId: "19091",
 					Labels:    []string{"lbl1", "lbl2", "lbl3"},
-					Props: map[string]interface{}{
+					Props: map[string]any{
 						"key1": int64(7),
-						"key2": []interface{}{
+						"key2": []any{
 							dbtype.Point2D{SpatialRefId: 1, X: 7.123, Y: 123.7},
 							dbtype.Point2D{SpatialRefId: 2, X: 7.123, Y: 123.7},
 						},
@@ -891,7 +891,7 @@ func TestHydratorBolt5(outer *testing.T) {
 				packer.String("19191")      // start element ID
 				packer.String("1001")       // end element ID
 			},
-			x: &db.Record{Values: []interface{}{
+			x: &db.Record{Values: []any{
 				dbtype.Relationship{
 					Id:             19000,
 					ElementId:      "19091",
@@ -900,9 +900,9 @@ func TestHydratorBolt5(outer *testing.T) {
 					EndId:          1000,
 					EndElementId:   "1001",
 					Type:           "lbl",
-					Props: map[string]interface{}{
+					Props: map[string]any{
 						"key1": int64(7),
-						"key2": []interface{}{
+						"key2": []any{
 							dbtype.Point2D{SpatialRefId: 1, X: 7.123, Y: 123.7},
 							dbtype.Point2D{SpatialRefId: 2, X: 7.123, Y: 123.7},
 						},
@@ -947,14 +947,14 @@ func TestHydratorBolt5(outer *testing.T) {
 				packer.Int(1)
 				packer.Int(1)
 			},
-			x: &db.Record{Values: []interface{}{
+			x: &db.Record{Values: []any{
 				dbtype.Path{
 					Nodes: []dbtype.Node{
-						{Id: 3, ElementId: "33", Labels: []string{"lbl1"}, Props: map[string]interface{}{"key1": int64(7)}},
-						{Id: 7, ElementId: "77", Labels: []string{"lbl2"}, Props: map[string]interface{}{"key2": int64(9)}},
+						{Id: 3, ElementId: "33", Labels: []string{"lbl1"}, Props: map[string]any{"key1": int64(7)}},
+						{Id: 7, ElementId: "77", Labels: []string{"lbl2"}, Props: map[string]any{"key2": int64(9)}},
 					},
 					Relationships: []dbtype.Relationship{
-						{Id: 9, ElementId: "99", StartId: 3, StartElementId: "33", EndId: 7, EndElementId: "77", Type: "x", Props: map[string]interface{}{"akey": "aval"}},
+						{Id: 9, ElementId: "99", StartId: 3, StartElementId: "33", EndId: 7, EndElementId: "77", Type: "x", Props: map[string]any{"akey": "aval"}},
 					}},
 			}},
 		},

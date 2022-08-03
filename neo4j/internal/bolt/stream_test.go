@@ -52,7 +52,7 @@ func TestStream(ot *testing.T) {
 		assertNotBuffered(t, buffed, rec, sum, err)
 
 		// Push record, buffered, record received
-		s.push(&db.Record{Values: []interface{}{1}})
+		s.push(&db.Record{Values: []any{1}})
 		buffed, rec, sum, err = s.bufferedNext()
 		assertBuffered(t, buffed, rec, sum, err)
 		AssertNextOnlyRecord(t, rec, sum, err)
@@ -62,7 +62,7 @@ func TestStream(ot *testing.T) {
 		assertNotBuffered(t, buffed, rec, sum, err)
 
 		// Push record and set summary, buffered
-		s.push(&db.Record{Values: []interface{}{1}})
+		s.push(&db.Record{Values: []any{1}})
 		s.sum = &db.Summary{}
 		// Get the record
 		buffed, rec, sum, err = s.bufferedNext()
@@ -80,7 +80,7 @@ func TestStream(ot *testing.T) {
 		// Start of with a new stream that fails
 		s = &stream{}
 		// Push record and set error
-		s.push(&db.Record{Values: []interface{}{1}})
+		s.push(&db.Record{Values: []any{1}})
 		s.err = errors.New("some error")
 		// Get the record
 		buffed, rec, sum, err = s.bufferedNext()

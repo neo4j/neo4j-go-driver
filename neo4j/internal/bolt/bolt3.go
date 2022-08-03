@@ -46,11 +46,11 @@ type internalTx3 struct {
 	mode      idb.AccessMode
 	bookmarks []string
 	timeout   time.Duration
-	txMeta    map[string]interface{}
+	txMeta    map[string]any
 }
 
-func (i *internalTx3) toMeta() map[string]interface{} {
-	meta := map[string]interface{}{}
+func (i *internalTx3) toMeta() map[string]any {
+	meta := map[string]any{}
 	if i.mode == idb.ReadMode {
 		meta["mode"] = "r"
 	}
@@ -131,7 +131,7 @@ func (b *bolt3) ServerVersion() string {
 }
 
 // Sets b.err and b.state on failure
-func (b *bolt3) receiveMsg(ctx context.Context) interface{} {
+func (b *bolt3) receiveMsg(ctx context.Context) any {
 	msg, err := b.in.next(ctx, b.conn)
 	if err != nil {
 		b.err = err
@@ -173,12 +173,12 @@ func (b *bolt3) receiveSuccess(ctx context.Context) *success {
 	}
 }
 
-func (b *bolt3) Connect(ctx context.Context, minor int, auth map[string]interface{}, userAgent string, _ map[string]string) error {
+func (b *bolt3) Connect(ctx context.Context, minor int, auth map[string]any, userAgent string, _ map[string]string) error {
 	if err := b.assertState(bolt3_unauthorized); err != nil {
 		return err
 	}
 
-	hello := map[string]interface{}{
+	hello := map[string]any{
 		"user_agent": userAgent,
 	}
 	// Merge authentication info into hello message
@@ -217,7 +217,7 @@ func (b *bolt3) Connect(ctx context.Context, minor int, auth map[string]interfac
 }
 
 func (b *bolt3) TxBegin(ctx context.Context, txConfig idb.TxConfig) (idb.
-	TxHandle, error) {
+TxHandle, error) {
 	// Ok, to begin transaction while streaming auto-commit, just empty the stream and continue.
 	if b.state == bolt3_streaming {
 		if err := b.bufferStream(ctx); err != nil {
@@ -400,7 +400,7 @@ func (b *bolt3) bufferStream(ctx context.Context) error {
 	return err
 }
 
-func (b *bolt3) run(ctx context.Context, cypher string, params map[string]interface{}, tx *internalTx3) (*stream, error) {
+func (b *bolt3) run(ctx context.Context, cypher string, params map[string]any, tx *internalTx3) (*stream, error) {
 	// If already streaming, finish current stream first
 	if err := b.bufferStream(ctx); err != nil {
 		return nil, err
@@ -410,7 +410,7 @@ func (b *bolt3) run(ctx context.Context, cypher string, params map[string]interf
 		return nil, err
 	}
 
-	var meta map[string]interface{}
+	var meta map[string]any
 	if tx != nil {
 		meta = tx.toMeta()
 	}
@@ -716,7 +716,7 @@ func (b *bolt3) GetRoutingTable(ctx context.Context,
 	// Only available when Neo4j is setup with clustering
 	runCommand := idb.Command{
 		Cypher: "CALL dbms.cluster.routing.getRoutingTable($context)",
-		Params: map[string]interface{}{"context": routingContext},
+		Params: map[string]any{"context": routingContext},
 	}
 	txConfig := idb.TxConfig{Mode: idb.ReadMode, Timeout: idb.DefaultTxConfigTimeout}
 	streamHandle, err := b.Run(ctx, runCommand, txConfig)

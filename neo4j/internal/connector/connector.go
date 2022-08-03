@@ -41,7 +41,7 @@ type Connector struct {
 	RootCAs         *x509.CertPool
 	DialTimeout     time.Duration
 	SocketKeepAlive bool
-	Auth            map[string]interface{}
+	Auth            map[string]any
 	Log             log.Logger
 	UserAgent       string
 	RoutingContext  map[string]string

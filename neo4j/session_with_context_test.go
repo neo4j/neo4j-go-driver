@@ -88,7 +88,7 @@ func TestSession(outer *testing.T) {
 			pool.BorrowConn = conn
 			transientErr := &db.Neo4jError{Code: "Neo.TransientError.General.MemoryPoolOutOfMemoryError"}
 			numRetries := 0
-			_, err := sess.ExecuteWrite(context.Background(), func(tx ManagedTransaction) (interface{}, error) {
+			_, err := sess.ExecuteWrite(context.Background(), func(tx ManagedTransaction) (any, error) {
 				// Previous connection should be returned to pool since it failed
 				if numRetries > 0 && numReturns != numRetries {
 					t.Errorf("Should have returned previous connection to pool")
@@ -114,7 +114,7 @@ func TestSession(outer *testing.T) {
 			causeOfRollbackErr := errors.New("UserErrorFake")
 			pool.BorrowConn = &ConnFake{Alive: true, TxRollbackErr: rollbackErr}
 			numRetries := 0
-			_, err := sess.ExecuteWrite(context.Background(), func(tx ManagedTransaction) (interface{}, error) {
+			_, err := sess.ExecuteWrite(context.Background(), func(tx ManagedTransaction) (any, error) {
 				numRetries++
 				return nil, causeOfRollbackErr
 			})
@@ -130,7 +130,7 @@ func TestSession(outer *testing.T) {
 			_, pool, sess := createSession()
 			pool.BorrowConn = &ConnFake{Alive: false, TxCommitErr: io.EOF}
 			numRetries := 0
-			_, err := sess.ExecuteWrite(context.Background(), func(tx ManagedTransaction) (interface{}, error) {
+			_, err := sess.ExecuteWrite(context.Background(), func(tx ManagedTransaction) (any, error) {
 				numRetries++
 				return nil, nil
 			})
@@ -159,7 +159,7 @@ func TestSession(outer *testing.T) {
 				return []string{"aserver"}, nil
 			}
 
-			sess.ExecuteWrite(context.Background(), func(tx ManagedTransaction) (interface{}, error) {
+			sess.ExecuteWrite(context.Background(), func(tx ManagedTransaction) (any, error) {
 				return nil, nil
 			})
 			_, err := sess.BeginTransaction(context.Background())
@@ -186,7 +186,7 @@ func TestSession(outer *testing.T) {
 					defer func() {
 						panicBubblesUp = recover() != nil
 					}()
-					_, _ = txFuncApi(sess)(context.Background(), func(tx ManagedTransaction) (interface{}, error) {
+					_, _ = txFuncApi(sess)(context.Background(), func(tx ManagedTransaction) (any, error) {
 						panic("oopsie")
 					})
 				}()
@@ -212,10 +212,10 @@ func TestSession(outer *testing.T) {
 
 			sess.Run(context.Background(), "cypher", nil)
 			sess.BeginTransaction(context.Background())
-			sess.ExecuteRead(context.Background(), func(tx ManagedTransaction) (interface{}, error) {
+			sess.ExecuteRead(context.Background(), func(tx ManagedTransaction) (any, error) {
 				return nil, errors.New("something")
 			})
-			sess.ExecuteWrite(context.Background(), func(tx ManagedTransaction) (interface{}, error) {
+			sess.ExecuteWrite(context.Background(), func(tx ManagedTransaction) (any, error) {
 				return nil, errors.New("something")
 			})
 			AssertLen(t, conn.RecordedTxs, 4)
@@ -280,7 +280,7 @@ func TestSession(outer *testing.T) {
 			sess.Run(context.Background(), "cypher", nil)
 			AssertIntEqual(t, bufferCalls, 0)
 			// Run transaction function. assumes code is shared between ExecuteRead/ExecuteWrite
-			sess.ExecuteRead(context.Background(), func(tx ManagedTransaction) (interface{}, error) {
+			sess.ExecuteRead(context.Background(), func(tx ManagedTransaction) (any, error) {
 				return nil, errors.New("somehting")
 			})
 			AssertLen(t, conn.RecordedTxs, 2)
@@ -363,7 +363,7 @@ func TestSession(outer *testing.T) {
 			_, pool, sess := createSession()
 			pool.BorrowErr = tokenExpiredErr
 
-			_, err := sess.Run(context.Background(), "cypher", map[string]interface{}{})
+			_, err := sess.Run(context.Background(), "cypher", map[string]any{})
 
 			assertTokenExpiredError(t, err)
 		})
@@ -373,7 +373,7 @@ func TestSession(outer *testing.T) {
 			conn := &ConnFake{Alive: true, RunErr: tokenExpiredErr}
 			pool.BorrowConn = conn
 
-			_, err := sess.Run(context.Background(), "cypher", map[string]interface{}{})
+			_, err := sess.Run(context.Background(), "cypher", map[string]any{})
 
 			assertTokenExpiredError(t, err)
 		})
@@ -383,7 +383,7 @@ func TestSession(outer *testing.T) {
 			conn := &ConnFake{Alive: true, Nexts: []Next{{Err: tokenExpiredErr}}}
 			pool.BorrowConn = conn
 
-			result, err := sess.Run(context.Background(), "cypher", map[string]interface{}{})
+			result, err := sess.Run(context.Background(), "cypher", map[string]any{})
 			AssertNil(t, err)
 			_, err = result.Collect(context.Background())
 
@@ -395,7 +395,7 @@ func TestSession(outer *testing.T) {
 			conn := &ConnFake{Alive: true, ConsumeErr: tokenExpiredErr}
 			pool.BorrowConn = conn
 
-			result, err := sess.Run(context.Background(), "cypher", map[string]interface{}{})
+			result, err := sess.Run(context.Background(), "cypher", map[string]any{})
 			AssertNil(t, err)
 			_, err = result.Consume(context.Background())
 
@@ -407,7 +407,7 @@ func TestSession(outer *testing.T) {
 			conn := &ConnFake{Alive: true, Nexts: []Next{{Err: tokenExpiredErr}}}
 			pool.BorrowConn = conn
 
-			result, err := sess.Run(context.Background(), "cypher", map[string]interface{}{})
+			result, err := sess.Run(context.Background(), "cypher", map[string]any{})
 			AssertNil(t, err)
 			_ = result.Next(context.Background())
 			err = result.Err()
@@ -420,7 +420,7 @@ func TestSession(outer *testing.T) {
 			conn := &ConnFake{Alive: true, Nexts: []Next{{Err: tokenExpiredErr}}}
 			pool.BorrowConn = conn
 
-			result, err := sess.Run(context.Background(), "cypher", map[string]interface{}{})
+			result, err := sess.Run(context.Background(), "cypher", map[string]any{})
 			AssertNil(t, err)
 			_, err = result.Single(context.Background())
 
@@ -432,7 +432,7 @@ func TestSession(outer *testing.T) {
 			conn := &ConnFake{Alive: true}
 			pool.BorrowConn = conn
 
-			_, err := sess.ExecuteWrite(context.Background(), func(tx ManagedTransaction) (interface{}, error) {
+			_, err := sess.ExecuteWrite(context.Background(), func(tx ManagedTransaction) (any, error) {
 				return nil, tokenExpiredErr
 			})
 
@@ -444,7 +444,7 @@ func TestSession(outer *testing.T) {
 			conn := &ConnFake{Alive: true}
 			pool.BorrowConn = conn
 
-			_, err := sess.ExecuteRead(context.Background(), func(tx ManagedTransaction) (interface{}, error) {
+			_, err := sess.ExecuteRead(context.Background(), func(tx ManagedTransaction) (any, error) {
 				return nil, tokenExpiredErr
 			})
 
@@ -536,7 +536,7 @@ func TestSession(outer *testing.T) {
 
 			tx, err := sess.BeginTransaction(context.Background())
 			AssertNil(t, err)
-			_, err = tx.Run(context.Background(), "cypher", map[string]interface{}{})
+			_, err = tx.Run(context.Background(), "cypher", map[string]any{})
 
 			assertTokenExpiredError(t, err)
 		})
@@ -548,7 +548,7 @@ func TestSession(outer *testing.T) {
 
 			tx, err := sess.BeginTransaction(context.Background())
 			AssertNil(t, err)
-			_, err = tx.Run(context.Background(), "cypher", map[string]interface{}{})
+			_, err = tx.Run(context.Background(), "cypher", map[string]any{})
 			AssertNil(t, err)
 			err = tx.Commit(context.Background())
 
@@ -562,7 +562,7 @@ func TestSession(outer *testing.T) {
 
 			tx, err := sess.BeginTransaction(context.Background())
 			AssertNil(t, err)
-			_, err = tx.Run(context.Background(), "cypher", map[string]interface{}{})
+			_, err = tx.Run(context.Background(), "cypher", map[string]any{})
 			AssertNil(t, err)
 			err = tx.Rollback(context.Background())
 

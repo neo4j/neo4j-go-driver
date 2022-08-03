@@ -32,7 +32,7 @@ var logger = &log.Void{}
 func TestConnect(ot *testing.T) {
 	// TODO: Test connect timeout
 
-	auth := map[string]interface{}{
+	auth := map[string]any{
 		"scheme":      "basic",
 		"principal":   "neo4j",
 		"credentials": "pass",

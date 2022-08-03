@@ -26,7 +26,7 @@ import (
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/dbtype"
 )
 
-func assertKeys(t *testing.T, ekeys []interface{}, keys []string) {
+func assertKeys(t *testing.T, ekeys []any, keys []string) {
 	t.Helper()
 	if len(ekeys) != len(keys) {
 		t.Errorf("Stream key lengths differ")

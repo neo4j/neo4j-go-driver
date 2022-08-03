@@ -124,7 +124,7 @@ type Query interface {
 	// Text returns the statement's text.
 	Text() string
 	// Parameters returns the statement's parameters.
-	Parameters() map[string]interface{}
+	Parameters() map[string]any
 }
 
 // ServerInfo contains basic information of the server.
@@ -169,7 +169,7 @@ type Plan interface {
 	Operator() string
 	// Arguments returns the arguments for the operator used.
 	// Many operators have arguments defining their specific behavior. This map contains those arguments.
-	Arguments() map[string]interface{}
+	Arguments() map[string]any
 	// Identifiers returns a list of identifiers used by this plan. Identifiers used by this part of the plan.
 	// These can be both identifiers introduced by you, or automatically generated.
 	Identifiers() []string
@@ -186,7 +186,7 @@ type ProfiledPlan interface {
 	Operator() string
 	// Arguments returns the arguments for the operator used.
 	// Many operators have arguments defining their specific behavior. This map contains those arguments.
-	Arguments() map[string]interface{}
+	Arguments() map[string]any
 	// Identifiers returns a list of identifiers used by this plan. Identifiers used by this part of the plan.
 	// These can be both identifiers introduced by you, or automatically generated.
 	Identifiers() []string
@@ -233,7 +233,7 @@ type InputPosition interface {
 type resultSummary struct {
 	sum    *db.Summary
 	cypher string
-	params map[string]interface{}
+	params map[string]any
 }
 
 func (s *resultSummary) Agent() string {
@@ -267,7 +267,7 @@ func (s *resultSummary) Text() string {
 	return s.cypher
 }
 
-func (s *resultSummary) Parameters() map[string]interface{} {
+func (s *resultSummary) Parameters() map[string]any {
 	return s.params
 }
 
@@ -388,7 +388,7 @@ func (p *plan) Operator() string {
 	return p.plan.Operator
 }
 
-func (p *plan) Arguments() map[string]interface{} {
+func (p *plan) Arguments() map[string]any {
 	return p.plan.Arguments
 }
 
@@ -423,7 +423,7 @@ func (p *profile) Operator() string {
 	return p.profile.Operator
 }
 
-func (p *profile) Arguments() map[string]interface{} {
+func (p *profile) Arguments() map[string]any {
 	return p.profile.Arguments
 }
 
