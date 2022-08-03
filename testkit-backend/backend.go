@@ -756,6 +756,7 @@ func (b *backend) handleRequest(req map[string]any) {
 				"Feature:API:Liveness.Check",
 				"Feature:API:Result.List",
 				"Feature:API:Result.Peek",
+				"Feature:API:Type.Spatial",
 				"Feature:API:Type.Temporal",
 				"Feature:Auth:Custom",
 				"Feature:Auth:Bearer",

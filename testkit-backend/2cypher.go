@@ -180,6 +180,25 @@ func nativeToCypher(v any) map[string]any {
 				"relationships": nativeToCypher(rels),
 			},
 		}
+	case dbtype.Point2D:
+		return map[string]any{
+			"name": "CypherPoint",
+			"data": map[string]any{
+				"system": spatialReference(x.SpatialRefId),
+				"x":      x.X,
+				"y":      x.Y,
+			},
+		}
+	case dbtype.Point3D:
+		return map[string]any{
+			"name": "CypherPoint",
+			"data": map[string]any{
+				"system": spatialReference(x.SpatialRefId),
+				"x":      x.X,
+				"y":      x.Y,
+				"z":      x.Z,
+			},
+		}
 	}
 	panic(fmt.Sprintf("Don't know how to patch %T", v))
 }
@@ -187,4 +206,19 @@ func nativeToCypher(v any) map[string]any {
 // Helper to wrap proxied "cypher" value into a response
 func valueResponse(name string, v any) map[string]any {
 	return map[string]any{"name": name, "data": map[string]any{"value": v}}
+}
+
+func spatialReference(spatialRefId uint32) string {
+	switch spatialRefId {
+	case 7203:
+		fallthrough
+	case 9157:
+		return "cartesian"
+	case 4326:
+		fallthrough
+	case 4979:
+		return "wgs84"
+	default:
+		panic(fmt.Errorf("unknown spatial reference ID: %d", spatialRefId))
+	}
 }
