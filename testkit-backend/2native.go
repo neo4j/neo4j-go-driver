@@ -109,6 +109,42 @@ func cypherToNative(c any) (any, error) {
 			}
 		}
 		return mn, nil
+	case "CypherPoint":
+		spatialReference := d["system"].(string)
+		is2d := d["z"] == nil
+		x := asFloat64(d["x"].(json.Number))
+		y := asFloat64(d["y"].(json.Number))
+		if spatialReference == "cartesian" {
+			if is2d {
+				return dbtype.Point2D{
+					SpatialRefId: 7203,
+					X:            x,
+					Y:            y,
+				}, nil
+			}
+			return dbtype.Point3D{
+				SpatialRefId: 9157,
+				X:            x,
+				Y:            y,
+				Z:            asFloat64(d["z"].(json.Number)),
+			}, nil
+		}
+		if spatialReference == "wgs84" {
+			if is2d {
+				return dbtype.Point2D{
+					SpatialRefId: 4326,
+					X:            x,
+					Y:            y,
+				}, nil
+			}
+			return dbtype.Point3D{
+				SpatialRefId: 4979,
+				X:            x,
+				Y:            y,
+				Z:            asFloat64(d["z"].(json.Number)),
+			}, nil
+		}
+		panic(fmt.Errorf("unknown spatial reference ID: %s", spatialReference))
 	}
 	panic(fmt.Sprintf("Don't know how to convert %s to native", n))
 }
@@ -145,6 +181,14 @@ func asInt64(number json.Number) int64 {
 	result, err := number.Int64()
 	if err != nil {
 		panic(fmt.Sprintf("could not convert JSON value to int64: %v", err))
+	}
+	return result
+}
+
+func asFloat64(number json.Number) float64 {
+	result, err := number.Float64()
+	if err != nil {
+		panic(fmt.Sprintf("could not convert JSON value to float64: %v", err))
 	}
 	return result
 }
