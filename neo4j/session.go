@@ -44,12 +44,12 @@ type Session interface {
 	BeginTransaction(configurers ...func(*TransactionConfig)) (Transaction, error)
 	// ReadTransaction executes the given unit of work in a AccessModeRead transaction with
 	// retry logic in place
-	ReadTransaction(work TransactionWork, configurers ...func(*TransactionConfig)) (interface{}, error)
+	ReadTransaction(work TransactionWork, configurers ...func(*TransactionConfig)) (any, error)
 	// WriteTransaction executes the given unit of work in a AccessModeWrite transaction with
 	// retry logic in place
-	WriteTransaction(work TransactionWork, configurers ...func(*TransactionConfig)) (interface{}, error)
+	WriteTransaction(work TransactionWork, configurers ...func(*TransactionConfig)) (any, error)
 	// Run executes an auto-commit statement and returns a result
-	Run(cypher string, params map[string]interface{}, configurers ...func(*TransactionConfig)) (Result, error)
+	Run(cypher string, params map[string]any, configurers ...func(*TransactionConfig)) (Result, error)
 	// Close closes any open resources and marks this session as unusable
 	Close() error
 }
@@ -75,7 +75,7 @@ func (s *session) BeginTransaction(configurers ...func(*TransactionConfig)) (Tra
 }
 
 func (s *session) ReadTransaction(
-	work TransactionWork, configurers ...func(*TransactionConfig)) (interface{}, error) {
+	work TransactionWork, configurers ...func(*TransactionConfig)) (any, error) {
 
 	return s.delegate.ExecuteRead(
 		context.Background(),
@@ -85,7 +85,7 @@ func (s *session) ReadTransaction(
 }
 
 func (s *session) WriteTransaction(
-	work TransactionWork, configurers ...func(*TransactionConfig)) (interface{}, error) {
+	work TransactionWork, configurers ...func(*TransactionConfig)) (any, error) {
 
 	return s.delegate.ExecuteWrite(
 		context.Background(),
@@ -95,7 +95,7 @@ func (s *session) WriteTransaction(
 }
 
 func (s *session) Run(
-	cypher string, params map[string]interface{}, configurers ...func(*TransactionConfig)) (Result, error) {
+	cypher string, params map[string]any, configurers ...func(*TransactionConfig)) (Result, error) {
 
 	result, err := s.delegate.Run(context.Background(), cypher, params, configurers...)
 	if err != nil {
@@ -109,7 +109,7 @@ func (s *session) Close() error {
 }
 
 func transactionWorkBridge(work TransactionWork) ManagedTransactionWork {
-	return func(txc ManagedTransaction) (interface{}, error) {
+	return func(txc ManagedTransaction) (any, error) {
 		return work(txc.legacy())
 	}
 }
@@ -129,13 +129,13 @@ func (s *erroredSession) LastBookmarks() Bookmarks {
 func (s *erroredSession) BeginTransaction(...func(*TransactionConfig)) (Transaction, error) {
 	return nil, s.err
 }
-func (s *erroredSession) ReadTransaction(TransactionWork, ...func(*TransactionConfig)) (interface{}, error) {
+func (s *erroredSession) ReadTransaction(TransactionWork, ...func(*TransactionConfig)) (any, error) {
 	return nil, s.err
 }
-func (s *erroredSession) WriteTransaction(TransactionWork, ...func(*TransactionConfig)) (interface{}, error) {
+func (s *erroredSession) WriteTransaction(TransactionWork, ...func(*TransactionConfig)) (any, error) {
 	return nil, s.err
 }
-func (s *erroredSession) Run(string, map[string]interface{}, ...func(*TransactionConfig)) (Result, error) {
+func (s *erroredSession) Run(string, map[string]any, ...func(*TransactionConfig)) (Result, error) {
 	return nil, s.err
 }
 func (s *erroredSession) Close() error {

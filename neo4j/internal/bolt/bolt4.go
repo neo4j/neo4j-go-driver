@@ -50,13 +50,13 @@ type internalTx4 struct {
 	mode             idb.AccessMode
 	bookmarks        []string
 	timeout          time.Duration
-	txMeta           map[string]interface{}
+	txMeta           map[string]any
 	databaseName     string
 	impersonatedUser string
 }
 
-func (i *internalTx4) toMeta() map[string]interface{} {
-	meta := map[string]interface{}{}
+func (i *internalTx4) toMeta() map[string]any {
+	meta := map[string]any{}
 	if i.mode == idb.ReadMode {
 		meta["mode"] = "r"
 	}
@@ -187,7 +187,7 @@ func (b *bolt4) setError(err error, fatal bool) {
 	}
 }
 
-func (b *bolt4) receiveMsg(ctx context.Context) interface{} {
+func (b *bolt4) receiveMsg(ctx context.Context) any {
 	// Potentially dangerous to receive when an error has occurred, could hang.
 	// Important, a lot of code has been simplified relying on this check.
 	if b.err != nil {
@@ -226,13 +226,13 @@ func (b *bolt4) receiveSuccess(ctx context.Context) *success {
 	}
 }
 
-func (b *bolt4) Connect(ctx context.Context, minor int, auth map[string]interface{}, userAgent string, routingContext map[string]string) error {
+func (b *bolt4) Connect(ctx context.Context, minor int, auth map[string]any, userAgent string, routingContext map[string]string) error {
 	if err := b.assertState(bolt4_unauthorized); err != nil {
 		return err
 	}
 
 	// Prepare hello message
-	hello := map[string]interface{}{
+	hello := map[string]any{
 		"user_agent": userAgent,
 	}
 	// On bolt >= 4.1 add routing to enable/disable routing
@@ -541,7 +541,7 @@ func (b *bolt4) resumeStream(ctx context.Context, s *stream) {
 	}
 }
 
-func (b *bolt4) run(ctx context.Context, cypher string, params map[string]interface{}, fetchSize int, tx *internalTx4) (*stream, error) {
+func (b *bolt4) run(ctx context.Context, cypher string, params map[string]any, fetchSize int, tx *internalTx4) (*stream, error) {
 	// If already streaming, consume the whole thing first
 	if b.state == bolt4_streaming {
 		if b.bufferStream(ctx); b.err != nil {
@@ -558,7 +558,7 @@ func (b *bolt4) run(ctx context.Context, cypher string, params map[string]interf
 	}
 
 	// Transaction metadata, used either in lazily started transaction or to run message.
-	var meta map[string]interface{}
+	var meta map[string]any
 	if tx != nil {
 		meta = tx.toMeta()
 	}
@@ -898,7 +898,7 @@ func (b *bolt4) GetRoutingTable(ctx context.Context,
 
 	b.log.Infof(log.Bolt4, b.logId, "Retrieving routing table")
 	if b.minor > 3 {
-		extras := map[string]interface{}{}
+		extras := map[string]any{}
 		if database != idb.DefaultDatabase {
 			extras["db"] = database
 		}
@@ -943,7 +943,7 @@ func (b *bolt4) callGetRoutingTable(ctx context.Context,
 	// Query for the users default database or a specific database
 	runCommand := idb.Command{
 		Cypher:    "CALL dbms.routing.getRoutingTable($context)",
-		Params:    map[string]interface{}{"context": routingContext},
+		Params:    map[string]any{"context": routingContext},
 		FetchSize: -1,
 	}
 	if database != idb.DefaultDatabase {
@@ -1004,7 +1004,7 @@ func (b *bolt4) Version() db.ProtocolVersion {
 
 const readTimeoutHintName = "connection.recv_timeout_seconds"
 
-func (b *bolt4) initializeReadTimeoutHint(hints map[string]interface{}) {
+func (b *bolt4) initializeReadTimeoutHint(hints map[string]any) {
 	readTimeoutHint, ok := hints[readTimeoutHintName]
 	if !ok {
 		return

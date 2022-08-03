@@ -65,7 +65,7 @@ func assertStringsEqual(s1, s2 string) {
 	}
 }
 
-func assertInt64Slice(ints1 []int, ints2 []interface{}) {
+func assertInt64Slice(ints1 []int, ints2 []any) {
 	if len(ints1) != len(ints2) {
 		panic("Int slices length differ")
 	}
@@ -77,7 +77,7 @@ func assertInt64Slice(ints1 []int, ints2 []interface{}) {
 	}
 }
 
-func assertFloatSlice(floats1 []float32, floats2 []interface{}) {
+func assertFloatSlice(floats1 []float32, floats2 []any) {
 	if len(floats1) != len(floats2) {
 		panic("Float slices length differ")
 	}
@@ -89,7 +89,7 @@ func assertFloatSlice(floats1 []float32, floats2 []interface{}) {
 	}
 }
 
-func assertBooleansSlice(bools1 []bool, bools2 []interface{}) {
+func assertBooleansSlice(bools1 []bool, bools2 []any) {
 	if len(bools1) != len(bools2) {
 		panic("Bool slices length differ")
 	}
@@ -108,11 +108,11 @@ func runBigDataThing(driver neo4j.Driver) {
 	// Write nodes
 	session := driver.NewSession(neo4j.SessionConfig{})
 	for index := 0; index < nodeCount; {
-		_, err := session.WriteTransaction(func(tx neo4j.Transaction) (interface{}, error) {
+		_, err := session.WriteTransaction(func(tx neo4j.Transaction) (any, error) {
 			batch := 0
 			for index < nodeCount && batch < batchSize {
-				result, err := tx.Run("CREATE (n:Test:Node) SET n = $props", map[string]interface{}{
-					"props": map[string]interface{}{
+				result, err := tx.Run("CREATE (n:Test:Node) SET n = $props", map[string]any{
+					"props": map[string]any{
 						"index":          index,
 						"name":           fmt.Sprintf("name-%d", index),
 						"surname":        fmt.Sprintf("surname-%d", index),
@@ -141,7 +141,7 @@ func runBigDataThing(driver neo4j.Driver) {
 
 	// Read nodes
 	seen := 0
-	_, err := session.ReadTransaction(func(tx neo4j.Transaction) (interface{}, error) {
+	_, err := session.ReadTransaction(func(tx neo4j.Transaction) (any, error) {
 		seen = 0
 		result, err := tx.Run("MATCH (n:Node) RETURN n", nil)
 		if err != nil {
@@ -159,9 +159,9 @@ func runBigDataThing(driver neo4j.Driver) {
 			index := node.Props["index"].(int64)
 			assertStringsEqual(fmt.Sprintf("name-%d", index), node.Props["name"].(string))
 			assertStringsEqual(fmt.Sprintf("surname-%d", index), node.Props["surname"].(string))
-			assertInt64Slice(nCopiesInt(10, int(index)), node.Props["long-indices"].([]interface{}))
-			assertFloatSlice(nCopiesFloat(10, float32(index)), node.Props["double-indices"].([]interface{}))
-			assertBooleansSlice(nCopiesBool(10, (index%2) == 0), node.Props["booleans"].([]interface{}))
+			assertInt64Slice(nCopiesInt(10, int(index)), node.Props["long-indices"].([]any))
+			assertFloatSlice(nCopiesFloat(10, float32(index)), node.Props["double-indices"].([]any))
+			assertBooleansSlice(nCopiesBool(10, (index%2) == 0), node.Props["booleans"].([]any))
 			seen++
 		}
 		return nil, result.Err()

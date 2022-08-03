@@ -39,7 +39,7 @@ type RecordedTx struct {
 	Mode      idb.AccessMode
 	Bookmarks []string
 	Timeout   time.Duration
-	Meta      map[string]interface{}
+	Meta      map[string]any
 }
 
 type ConnFake struct {
@@ -73,7 +73,7 @@ type ConnFake struct {
 	ForceResetHook     func()
 }
 
-func (c *ConnFake) Connect(context.Context, int, map[string]interface{}, string, map[string]string) error {
+func (c *ConnFake) Connect(context.Context, int, map[string]any, string, map[string]string) error {
 	return nil
 }
 

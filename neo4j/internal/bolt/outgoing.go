@@ -55,7 +55,7 @@ func (o *outgoing) end() {
 	}
 }
 
-func (o *outgoing) appendHello(hello map[string]interface{}) {
+func (o *outgoing) appendHello(hello map[string]any) {
 	if o.boltLogger != nil {
 		o.boltLogger.LogClientMessage(o.logId, "HELLO %s", loggableDictionary(hello))
 	}
@@ -65,7 +65,7 @@ func (o *outgoing) appendHello(hello map[string]interface{}) {
 	o.end()
 }
 
-func (o *outgoing) appendBegin(meta map[string]interface{}) {
+func (o *outgoing) appendBegin(meta map[string]any) {
 	if o.boltLogger != nil {
 		o.boltLogger.LogClientMessage(o.logId, "BEGIN %s", loggableDictionary(meta))
 	}
@@ -93,7 +93,7 @@ func (o *outgoing) appendRollback() {
 	o.end()
 }
 
-func (o *outgoing) appendRun(cypher string, params, meta map[string]interface{}) {
+func (o *outgoing) appendRun(cypher string, params, meta map[string]any) {
 	if o.boltLogger != nil {
 		o.boltLogger.LogClientMessage(o.logId, "RUN %q %s %s", cypher, loggableDictionary(params), loggableDictionary(meta))
 	}
@@ -190,7 +190,7 @@ func (o *outgoing) appendRouteToV43(context map[string]string, bookmarks []strin
 	o.end()
 }
 
-func (o *outgoing) appendRoute(context map[string]string, bookmarks []string, what map[string]interface{}) {
+func (o *outgoing) appendRoute(context map[string]string, bookmarks []string, what map[string]any) {
 	if o.boltLogger != nil {
 		o.boltLogger.LogClientMessage(o.logId, "ROUTE %s %s %s", loggableStringDictionary(context), loggableStringList(bookmarks), loggableDictionary(what))
 	}
@@ -228,7 +228,7 @@ func (o *outgoing) appendGoodbye() {
 }
 
 // For tests
-func (o *outgoing) appendX(tag byte, fields ...interface{}) {
+func (o *outgoing) appendX(tag byte, fields ...any) {
 	o.begin()
 	o.packer.StructHeader(tag, len(fields))
 	for _, f := range fields {
@@ -244,7 +244,7 @@ func (o *outgoing) send(ctx context.Context, wr io.Writer) {
 	}
 }
 
-func (o *outgoing) packMap(m map[string]interface{}) {
+func (o *outgoing) packMap(m map[string]any) {
 	o.packer.MapHeader(len(m))
 	for k, v := range m {
 		o.packer.String(k)
@@ -252,7 +252,7 @@ func (o *outgoing) packMap(m map[string]interface{}) {
 	}
 }
 
-func (o *outgoing) packStruct(x interface{}) {
+func (o *outgoing) packStruct(x any) {
 	switch v := x.(type) {
 	case *dbtype.Point2D:
 		o.packer.StructHeader('X', 3)
@@ -332,7 +332,7 @@ func (o *outgoing) packStruct(x interface{}) {
 	}
 }
 
-func (o *outgoing) packX(x interface{}) {
+func (o *outgoing) packX(x any) {
 	if x == nil {
 		o.packer.Nil()
 		return

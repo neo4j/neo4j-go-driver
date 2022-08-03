@@ -21,7 +21,7 @@ package db
 
 type Record struct {
 	// Values contains all the values in the record.
-	Values []interface{}
+	Values []any
 	// Keys contains names of the values in the record.
 	// Should not be modified. Same instance is used for all records within the same result.
 	Keys []string
@@ -34,7 +34,7 @@ type Record struct {
 // values from Values slice directly or make a key -> index map before iterating. This implementation
 // does not make or use a key -> index map since the overhead of making the map might not be beneficial
 // for small and few records.
-func (r Record) Get(key string) (interface{}, bool) {
+func (r Record) Get(key string) (any, bool) {
 	for i, ckey := range r.Keys {
 		if key == ckey {
 			return r.Values[i], true

@@ -91,7 +91,7 @@ func Collect(result Result, err error) ([]*Record, error) {
 //   records, err := neo4j.AsRecords(session.ExecuteRead(func (tx neo4j.Transaction) {
 //       return neo4j.Collect(tx.Run(...))
 //   }))
-func AsRecords(from interface{}, err error) ([]*Record, error) {
+func AsRecords(from any, err error) ([]*Record, error) {
 	if err != nil {
 		return nil, err
 	}
@@ -109,7 +109,7 @@ func AsRecords(from interface{}, err error) ([]*Record, error) {
 //   record, err := neo4j.AsRecord(session.ExecuteRead(func (tx neo4j.Transaction) {
 //       return neo4j.Single(tx.Run(...))
 //   }))
-func AsRecord(from interface{}, err error) (*Record, error) {
+func AsRecord(from any, err error) (*Record, error) {
 	if err != nil {
 		return nil, err
 	}

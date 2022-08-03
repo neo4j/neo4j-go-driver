@@ -48,7 +48,7 @@ type backend struct {
 	managedTransactions  map[string]neo4j.ManagedTransaction
 	explicitTransactions map[string]neo4j.ExplicitTransaction
 	recordedErrors       map[string]error
-	resolvedAddresses    map[string][]interface{}
+	resolvedAddresses    map[string][]any
 	id                   int // ID to use for next object created by frontend
 	wrLock               sync.Mutex
 }
@@ -79,7 +79,7 @@ func newBackend(rd *bufio.Reader, wr io.Writer) *backend {
 		managedTransactions:  make(map[string]neo4j.ManagedTransaction),
 		explicitTransactions: make(map[string]neo4j.ExplicitTransaction),
 		recordedErrors:       make(map[string]error),
-		resolvedAddresses:    make(map[string][]interface{}),
+		resolvedAddresses:    make(map[string][]any),
 		id:                   0,
 	}
 }
@@ -139,7 +139,7 @@ func (b *backend) writeError(err error) {
 
 	if isDriverError {
 		id := b.setError(err)
-		b.writeResponse("DriverError", map[string]interface{}{
+		b.writeResponse("DriverError", map[string]any{
 			"id":        id,
 			"errorType": strings.Split(err.Error(), ":")[0],
 			"msg":       err.Error(),
@@ -150,7 +150,7 @@ func (b *backend) writeError(err error) {
 	// This is an error that originated in frontend
 	frontendErr, isFrontendErr := err.(*frontendError)
 	if isFrontendErr {
-		b.writeResponse("FrontendError", map[string]interface{}{"msg": frontendErr.msg})
+		b.writeResponse("FrontendError", map[string]any{"msg": frontendErr.msg})
 		return
 	}
 
@@ -160,7 +160,7 @@ func (b *backend) writeError(err error) {
 	// Report this to frontend and close the connection
 	// This simplifies debugging errors from the frontend perspective, it will also make sure
 	// that the frontend doesn't hang when backend suddenly disappears.
-	b.writeResponse("BackendError", map[string]interface{}{"msg": err.Error()})
+	b.writeResponse("BackendError", map[string]any{"msg": err.Error()})
 }
 
 func (b *backend) nextId() string {
@@ -202,8 +202,8 @@ func (b *backend) process() bool {
 	}
 }
 
-func (b *backend) writeResponse(name string, data interface{}) {
-	response := map[string]interface{}{"name": name, "data": data}
+func (b *backend) writeResponse(name string, data any) {
+	response := map[string]any{"name": name, "data": data}
 	responseJson, err := json.Marshal(response)
 	fmt.Printf("RES: %s\n", name) //string(responseJson))
 	if err != nil {
@@ -226,8 +226,8 @@ func (b *backend) writeResponse(name string, data interface{}) {
 	}
 }
 
-func (b *backend) toRequest(s string) map[string]interface{} {
-	req := map[string]interface{}{}
+func (b *backend) toRequest(s string) map[string]any {
+	req := map[string]any{}
 	decoder := json.NewDecoder(strings.NewReader(s))
 	decoder.UseNumber()
 	err := decoder.Decode(&req)
@@ -237,11 +237,11 @@ func (b *backend) toRequest(s string) map[string]interface{} {
 	return req
 }
 
-func (b *backend) toTransactionConfigApply(data map[string]interface{}) func(*neo4j.TransactionConfig) {
+func (b *backend) toTransactionConfigApply(data map[string]any) func(*neo4j.TransactionConfig) {
 	txConfig := neo4j.TransactionConfig{Timeout: math.MinInt}
 	// Optional transaction meta data
 	if data["txMeta"] != nil {
-		txMetadata := data["txMeta"].(map[string]interface{})
+		txMetadata := data["txMeta"].(map[string]any)
 		if err := patchNumbersInMap(txMetadata); err != nil {
 			panic(err)
 		}
@@ -261,9 +261,9 @@ func (b *backend) toTransactionConfigApply(data map[string]interface{}) func(*ne
 	}
 }
 
-func (b *backend) toCypherAndParams(data map[string]interface{}) (string, map[string]interface{}, error) {
+func (b *backend) toCypherAndParams(data map[string]any) (string, map[string]any, error) {
 	cypher := data["cypher"].(string)
-	params, _ := data["params"].(map[string]interface{})
+	params, _ := data["params"].(map[string]any)
 	var err error
 	for i, p := range params {
 		if params[i], err = cypherToNative(p); err != nil {
@@ -273,15 +273,15 @@ func (b *backend) toCypherAndParams(data map[string]interface{}) (string, map[st
 	return cypher, params, nil
 }
 
-func (b *backend) handleTransactionFunc(isRead bool, data map[string]interface{}) {
+func (b *backend) handleTransactionFunc(isRead bool, data map[string]any) {
 	sid := data["sessionId"].(string)
 	sessionState := b.sessionStates[sid]
-	blockingRetry := func(tx neo4j.ManagedTransaction) (interface{}, error) {
+	blockingRetry := func(tx neo4j.ManagedTransaction) (any, error) {
 		sessionState.retryableState = retryableNothing
 		// Instruct client to start doing its work
 		txId := b.nextId()
 		b.managedTransactions[txId] = tx
-		b.writeResponse("RetryableTry", map[string]interface{}{"id": txId})
+		b.writeResponse("RetryableTry", map[string]any{"id": txId})
 		// Process all things that the client might do within the transaction
 		for {
 			b.process()
@@ -311,7 +311,7 @@ func (b *backend) handleTransactionFunc(isRead bool, data map[string]interface{}
 	if err != nil {
 		b.writeError(err)
 	} else {
-		b.writeResponse("RetryableDone", map[string]interface{}{})
+		b.writeResponse("RetryableDone", map[string]any{})
 	}
 }
 
@@ -360,22 +360,22 @@ func (s serverAddress) Port() string {
 	return s.port
 }
 
-func (b *backend) handleRequest(req map[string]interface{}) {
+func (b *backend) handleRequest(req map[string]any) {
 	name := req["name"].(string)
-	data := req["data"].(map[string]interface{})
+	data := req["data"].(map[string]any)
 
 	fmt.Printf("REQ: %s\n", name)
 	switch name {
 
 	case "ResolverResolutionCompleted":
 		requestId := data["requestId"].(string)
-		addresses := data["addresses"].([]interface{})
+		addresses := data["addresses"].([]any)
 		b.resolvedAddresses[requestId] = addresses
 
 	case "NewDriver":
 		// Parse authorization token
 		var authToken neo4j.AuthToken
-		authTokenMap := data["authorizationToken"].(map[string]interface{})["data"].(map[string]interface{})
+		authTokenMap := data["authorizationToken"].(map[string]any)["data"].(map[string]any)
 		switch authTokenMap["scheme"] {
 		case "basic":
 			realm, ok := authTokenMap["realm"].(string)
@@ -391,7 +391,7 @@ func (b *backend) handleRequest(req map[string]interface{}) {
 		case "bearer":
 			authToken = neo4j.BearerAuth(authTokenMap["credentials"].(string))
 		default:
-			parameters := authTokenMap["parameters"].(map[string]interface{})
+			parameters := authTokenMap["parameters"].(map[string]any)
 			if err := patchNumbersInMap(parameters); err != nil {
 				b.writeError(err)
 				return
@@ -438,7 +438,7 @@ func (b *backend) handleRequest(req map[string]interface{}) {
 		}
 		idKey := b.nextId()
 		b.drivers[idKey] = driver
-		b.writeResponse("Driver", map[string]interface{}{"id": idKey})
+		b.writeResponse("Driver", map[string]any{"id": idKey})
 
 	case "DriverClose":
 		driverId := data["driverId"].(string)
@@ -448,7 +448,7 @@ func (b *backend) handleRequest(req map[string]interface{}) {
 			b.writeError(err)
 			return
 		}
-		b.writeResponse("Driver", map[string]interface{}{"id": driverId})
+		b.writeResponse("Driver", map[string]any{"id": driverId})
 
 	case "GetServerInfo":
 		driverId := data["driverId"].(string)
@@ -459,7 +459,7 @@ func (b *backend) handleRequest(req map[string]interface{}) {
 			return
 		}
 		protocolVersion := serverInfo.ProtocolVersion()
-		b.writeResponse("ServerInfo", map[string]interface{}{
+		b.writeResponse("ServerInfo", map[string]any{
 			"address":         serverInfo.Address(),
 			"agent":           serverInfo.Agent(),
 			"protocolVersion": fmt.Sprintf("%d.%d", protocolVersion.Major, protocolVersion.Minor),
@@ -480,7 +480,7 @@ func (b *backend) handleRequest(req map[string]interface{}) {
 			return
 		}
 		if data["bookmarks"] != nil {
-			rawBookmarks := data["bookmarks"].([]interface{})
+			rawBookmarks := data["bookmarks"].([]any)
 			bookmarks := make([]string, len(rawBookmarks))
 			for i, x := range rawBookmarks {
 				bookmarks[i] = x.(string)
@@ -499,7 +499,7 @@ func (b *backend) handleRequest(req map[string]interface{}) {
 		session := driver.NewSession(ctx, sessionConfig)
 		idKey := b.nextId()
 		b.sessionStates[idKey] = &sessionState{session: session}
-		b.writeResponse("Session", map[string]interface{}{"id": idKey})
+		b.writeResponse("Session", map[string]any{"id": idKey})
 
 	case "SessionClose":
 		sessionId := data["sessionId"].(string)
@@ -509,7 +509,7 @@ func (b *backend) handleRequest(req map[string]interface{}) {
 			b.writeError(err)
 			return
 		}
-		b.writeResponse("Session", map[string]interface{}{"id": sessionId})
+		b.writeResponse("Session", map[string]any{"id": sessionId})
 
 	case "SessionRun":
 		sessionState := b.sessionStates[data["sessionId"].(string)]
@@ -530,7 +530,7 @@ func (b *backend) handleRequest(req map[string]interface{}) {
 		}
 		idKey := b.nextId()
 		b.results[idKey] = result
-		b.writeResponse("Result", map[string]interface{}{"id": idKey, "keys": keys})
+		b.writeResponse("Result", map[string]any{"id": idKey, "keys": keys})
 
 	case "SessionBeginTransaction":
 		sessionState := b.sessionStates[data["sessionId"].(string)]
@@ -541,7 +541,7 @@ func (b *backend) handleRequest(req map[string]interface{}) {
 		}
 		idKey := b.nextId()
 		b.explicitTransactions[idKey] = tx
-		b.writeResponse("Transaction", map[string]interface{}{"id": idKey})
+		b.writeResponse("Transaction", map[string]any{"id": idKey})
 
 	case "SessionLastBookmarks":
 		sessionState := b.sessionStates[data["sessionId"].(string)]
@@ -549,7 +549,7 @@ func (b *backend) handleRequest(req map[string]interface{}) {
 		if bookmarks == nil {
 			bookmarks = []string{}
 		}
-		b.writeResponse("Bookmarks", map[string]interface{}{"bookmarks": bookmarks})
+		b.writeResponse("Bookmarks", map[string]any{"bookmarks": bookmarks})
 
 	case "TransactionRun":
 		// ManagedTransaction is compatible with ExplicitTransaction
@@ -577,7 +577,7 @@ func (b *backend) handleRequest(req map[string]interface{}) {
 		}
 		idKey := b.nextId()
 		b.results[idKey] = result
-		b.writeResponse("Result", map[string]interface{}{"id": idKey, "keys": keys})
+		b.writeResponse("Result", map[string]any{"id": idKey, "keys": keys})
 
 	case "TransactionCommit":
 		txId := data["txId"].(string)
@@ -587,7 +587,7 @@ func (b *backend) handleRequest(req map[string]interface{}) {
 			b.writeError(err)
 			return
 		}
-		b.writeResponse("Transaction", map[string]interface{}{"id": txId})
+		b.writeResponse("Transaction", map[string]any{"id": txId})
 
 	case "TransactionRollback":
 		txId := data["txId"].(string)
@@ -597,7 +597,7 @@ func (b *backend) handleRequest(req map[string]interface{}) {
 			b.writeError(err)
 			return
 		}
-		b.writeResponse("Transaction", map[string]interface{}{"id": txId})
+		b.writeResponse("Transaction", map[string]any{"id": txId})
 
 	case "TransactionClose":
 		txId := data["txId"].(string)
@@ -607,7 +607,7 @@ func (b *backend) handleRequest(req map[string]interface{}) {
 			b.writeError(err)
 			return
 		}
-		b.writeResponse("Transaction", map[string]interface{}{"id": txId})
+		b.writeResponse("Transaction", map[string]any{"id": txId})
 
 	case "SessionReadTransaction":
 		b.handleTransactionFunc(true, data)
@@ -640,11 +640,11 @@ func (b *backend) handleRequest(req map[string]interface{}) {
 			b.writeError(err)
 			return
 		}
-		response := make([]interface{}, len(records))
+		response := make([]any, len(records))
 		for i, record := range records {
 			response[i] = serializeRecord(record)
 		}
-		b.writeResponse("RecordList", map[string]interface{}{
+		b.writeResponse("RecordList", map[string]any{
 			"records": response,
 		})
 	case "ResultConsume":
@@ -657,13 +657,13 @@ func (b *backend) handleRequest(req map[string]interface{}) {
 		serverInfo := summary.Server()
 		counters := summary.Counters()
 		protocolVersion := serverInfo.ProtocolVersion()
-		response := map[string]interface{}{
-			"serverInfo": map[string]interface{}{
+		response := map[string]any{
+			"serverInfo": map[string]any{
 				"protocolVersion": fmt.Sprintf("%d.%d", protocolVersion.Major, protocolVersion.Minor),
 				"agent":           serverInfo.Agent(),
 				"address":         serverInfo.Address(),
 			},
-			"counters": map[string]interface{}{
+			"counters": map[string]any{
 				"constraintsAdded":      counters.ConstraintsAdded(),
 				"constraintsRemoved":    counters.ConstraintsRemoved(),
 				"containsSystemUpdates": counters.ContainsSystemUpdates(),
@@ -679,7 +679,7 @@ func (b *backend) handleRequest(req map[string]interface{}) {
 				"relationshipsDeleted":  counters.RelationshipsDeleted(),
 				"systemUpdates":         counters.SystemUpdates(),
 			},
-			"query": map[string]interface{}{
+			"query": map[string]any{
 				"text":       summary.Query().Text(),
 				"parameters": serializeParameters(summary.Query().Parameters()),
 			},
@@ -725,14 +725,14 @@ func (b *backend) handleRequest(req map[string]interface{}) {
 
 		server := summary.Server()
 		isMultiTenant := server.ProtocolVersion().Major >= 4
-		b.writeResponse("MultiDBSupport", map[string]interface{}{
+		b.writeResponse("MultiDBSupport", map[string]any{
 			"id":        b.nextId(),
 			"available": isMultiTenant,
 		})
 
 	case "CheckDriverIsEncrypted":
 		driver := b.drivers[data["driverId"].(string)]
-		b.writeResponse("DriverIsEncrypted", map[string]interface{}{
+		b.writeResponse("DriverIsEncrypted", map[string]any{
 			"encrypted": driver.IsEncrypted(),
 		})
 
@@ -742,10 +742,10 @@ func (b *backend) handleRequest(req map[string]interface{}) {
 			b.writeError(err)
 			return
 		}
-		b.writeResponse("Driver", map[string]interface{}{"id": driverId})
+		b.writeResponse("Driver", map[string]any{"id": driverId})
 
 	case "GetFeatures":
-		b.writeResponse("FeatureList", map[string]interface{}{
+		b.writeResponse("FeatureList", map[string]any{
 			"features": []string{
 				"ConfHint:connection.recv_timeout_seconds",
 				"Detail:ClosedDriverIsEncrypted",
@@ -782,7 +782,7 @@ func (b *backend) handleRequest(req map[string]interface{}) {
 	case "StartTest":
 		testName := data["testName"].(string)
 		if reason, ok := mustSkip(testName); ok {
-			b.writeResponse("SkipTest", map[string]interface{}{"reason": reason})
+			b.writeResponse("SkipTest", map[string]any{"reason": reason})
 			return
 		}
 		if strings.Contains(testName, "test_should_echo_all_timezone_ids") ||
@@ -794,9 +794,9 @@ func (b *backend) handleRequest(req map[string]interface{}) {
 
 	case "StartSubTest":
 		testName := data["testName"].(string)
-		arguments := data["subtestArguments"].(map[string]interface{})
+		arguments := data["subtestArguments"].(map[string]any)
 		if reason, ok := mustSkipSubTest(testName, arguments); ok {
-			b.writeResponse("SkipTest", map[string]interface{}{"reason": reason})
+			b.writeResponse("SkipTest", map[string]any{"reason": reason})
 			return
 		}
 		b.writeResponse("RunTest", nil)
@@ -808,11 +808,11 @@ func (b *backend) handleRequest(req map[string]interface{}) {
 
 func (b *backend) writeRecord(result neo4j.ResultWithContext, record *neo4j.Record, expectRecord bool) {
 	if expectRecord && record == nil {
-		b.writeResponse("BackendError", map[string]interface{}{
+		b.writeResponse("BackendError", map[string]any{
 			"msg": "Found no record where one was expected.",
 		})
 	} else if !expectRecord && record != nil {
-		b.writeResponse("BackendError", map[string]interface{}{
+		b.writeResponse("BackendError", map[string]any{
 			"msg": "Found a record where none was expected.",
 		})
 	}
@@ -846,7 +846,7 @@ func mustSkip(testName string) (string, bool) {
 	return "", false
 }
 
-func mustSkipSubTest(testName string, arguments map[string]interface{}) (string, bool) {
+func mustSkipSubTest(testName string, arguments map[string]any) (string, bool) {
 	if strings.Contains(testName, "test_should_echo_all_timezone_ids") {
 		return mustSkipTimeZoneSubTest(arguments)
 	}
@@ -870,33 +870,33 @@ func asRegex(rawPattern string) *regexp.Regexp {
 	return regexp.MustCompile(pattern)
 }
 
-func serializeRecord(record *neo4j.Record) map[string]interface{} {
+func serializeRecord(record *neo4j.Record) map[string]any {
 	values := record.Values
-	cypherValues := make([]interface{}, len(values))
+	cypherValues := make([]any, len(values))
 	for i, v := range values {
 		cypherValues[i] = nativeToCypher(v)
 	}
-	data := map[string]interface{}{"values": cypherValues}
+	data := map[string]any{"values": cypherValues}
 	return data
 }
 
-func serializeNotifications(slice []neo4j.Notification) []map[string]interface{} {
+func serializeNotifications(slice []neo4j.Notification) []map[string]any {
 	if slice == nil {
 		return nil
 	}
 	if len(slice) == 0 {
-		return []map[string]interface{}{}
+		return []map[string]any{}
 	}
-	var res []map[string]interface{}
+	var res []map[string]any
 	for i, notification := range slice {
-		res = append(res, map[string]interface{}{
+		res = append(res, map[string]any{
 			"code":        notification.Code(),
 			"title":       notification.Title(),
 			"description": notification.Description(),
 			"severity":    notification.Severity(),
 		})
 		if notification.Position() != nil {
-			res[i]["position"] = map[string]interface{}{
+			res[i]["position"] = map[string]any{
 				"offset": notification.Position().Offset(),
 				"line":   notification.Position().Line(),
 				"column": notification.Position().Column(),
@@ -906,11 +906,11 @@ func serializeNotifications(slice []neo4j.Notification) []map[string]interface{}
 	return res
 }
 
-func serializePlan(plan neo4j.Plan) map[string]interface{} {
+func serializePlan(plan neo4j.Plan) map[string]any {
 	if plan == nil {
 		return nil
 	}
-	return map[string]interface{}{
+	return map[string]any{
 		"args":         plan.Arguments(),
 		"operatorType": plan.Operator(),
 		"children":     serializePlans(plan.Children()),
@@ -918,19 +918,19 @@ func serializePlan(plan neo4j.Plan) map[string]interface{} {
 	}
 }
 
-func serializePlans(children []neo4j.Plan) []map[string]interface{} {
-	result := make([]map[string]interface{}, len(children))
+func serializePlans(children []neo4j.Plan) []map[string]any {
+	result := make([]map[string]any, len(children))
 	for i, child := range children {
 		result[i] = serializePlan(child)
 	}
 	return result
 }
 
-func serializeProfile(profile neo4j.ProfiledPlan) map[string]interface{} {
+func serializeProfile(profile neo4j.ProfiledPlan) map[string]any {
 	if profile == nil {
 		return nil
 	}
-	result := map[string]interface{}{
+	result := map[string]any{
 		"args":         profile.Arguments(),
 		"children":     serializeProfiles(profile.Children()),
 		"dbHits":       profile.DbHits(),
@@ -941,8 +941,8 @@ func serializeProfile(profile neo4j.ProfiledPlan) map[string]interface{} {
 	return result
 }
 
-func serializeProfiles(children []neo4j.ProfiledPlan) []map[string]interface{} {
-	result := make([]map[string]interface{}, len(children))
+func serializeProfiles(children []neo4j.ProfiledPlan) []map[string]any {
+	result := make([]map[string]any, len(children))
 	for i, child := range children {
 		childProfile := serializeProfile(child)
 		childProfile["pageCacheMisses"] = child.PageCacheMisses()
@@ -954,8 +954,8 @@ func serializeProfiles(children []neo4j.ProfiledPlan) []map[string]interface{} {
 	return result
 }
 
-func serializeParameters(parameters map[string]interface{}) map[string]interface{} {
-	result := make(map[string]interface{}, len(parameters))
+func serializeParameters(parameters map[string]any) map[string]any {
+	result := make(map[string]any, len(parameters))
 	for k, parameter := range parameters {
 		result[k] = nativeToCypher(parameter)
 	}
@@ -1005,9 +1005,9 @@ func testSkips() map[string]string {
 	}
 }
 
-func mustSkipTimeZoneSubTest(arguments map[string]interface{}) (string, bool) {
-	rawDateTime := arguments["dt"].(map[string]interface{})
-	dateTimeData := rawDateTime["data"].(map[string]interface{})
+func mustSkipTimeZoneSubTest(arguments map[string]any) (string, bool) {
+	rawDateTime := arguments["dt"].(map[string]any)
+	dateTimeData := rawDateTime["data"].(map[string]any)
 	timeZoneName := dateTimeData["timezone_id"].(string)
 	location, err := time.LoadLocation(timeZoneName)
 	if err != nil {
@@ -1037,7 +1037,7 @@ func mustSkipTimeZoneSubTest(arguments map[string]interface{}) (string, bool) {
 // would happen otherwise)
 // however, some specific dictionaries (like transaction metadata and custom
 // auth parameters) are better off relying on numbers being treated as float64
-func patchNumbersInMap(dictionary map[string]interface{}) error {
+func patchNumbersInMap(dictionary map[string]any) error {
 	for key, value := range dictionary {
 		if number, ok := value.(json.Number); ok {
 			floatingPointValue, err := number.Float64()

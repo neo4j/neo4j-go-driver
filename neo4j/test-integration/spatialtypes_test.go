@@ -46,7 +46,7 @@ func TestSpatialTypes(outer *testing.T) {
 	}
 
 	// Returns a random 2D/3D point (depending on seq) with random values for X, Y and Z when applicable.
-	randomPoint := func(seq int) interface{} {
+	randomPoint := func(seq int) any {
 		random := func() float64 {
 			return float64(rand.Intn(360)-180) + rand.Float64()
 		}
@@ -69,16 +69,16 @@ func TestSpatialTypes(outer *testing.T) {
 		}
 	}
 
-	randomPoints := func(seq, num int) []interface{} {
-		points := make([]interface{}, num)
+	randomPoints := func(seq, num int) []any {
+		points := make([]any, num)
 		for i, _ := range points {
 			points[i] = randomPoint(seq)
 		}
 		return points
 	}
 
-	sendAndReceive := func(t *testing.T, p interface{}) interface{} {
-		return single(t, driver, "CREATE (n:POI { x: $p}) RETURN n.x", map[string]interface{}{"p": p})
+	sendAndReceive := func(t *testing.T, p any) any {
+		return single(t, driver, "CREATE (n:POI { x: $p}) RETURN n.x", map[string]any{"p": p})
 	}
 
 	assertPoint2D := func(t *testing.T, p1, p2 neo4j.Point2D) {
@@ -95,7 +95,7 @@ func TestSpatialTypes(outer *testing.T) {
 		}
 	}
 
-	assertPoint := func(t *testing.T, p1, p2 interface{}) {
+	assertPoint := func(t *testing.T, p1, p2 any) {
 		_, ok := p1.(neo4j.Point2D)
 		if ok {
 			// Let it panic if p2 is not 2D
@@ -156,7 +156,7 @@ func TestSpatialTypes(outer *testing.T) {
 			num := 100
 			for i := 0; i < 10; i++ {
 				points1 := randomPoints(i, num)
-				points2 := sendAndReceive(t, points1).([]interface{})
+				points2 := sendAndReceive(t, points1).([]any)
 				if len(points2) != num {
 					t.Fatalf("Too few points in list, expected %d but was %d", len(points1), len(points2))
 				}

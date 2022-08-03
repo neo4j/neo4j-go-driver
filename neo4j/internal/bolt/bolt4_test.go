@@ -35,14 +35,14 @@ import (
 func TestBolt4(outer *testing.T) {
 	// Test streams
 	// Faked returns from a server
-	runKeys := []interface{}{"f1", "f2"}
+	runKeys := []any{"f1", "f2"}
 	runBookmark := "bm"
 	runQid := 7
 	runResponse := []testStruct{
 		{
 			tag: msgSuccess,
-			fields: []interface{}{
-				map[string]interface{}{
+			fields: []any{
+				map[string]any{
 					"fields":  runKeys,
 					"t_first": int64(1),
 					"qid":     int64(runQid),
@@ -51,23 +51,23 @@ func TestBolt4(outer *testing.T) {
 		},
 		{
 			tag:    msgRecord,
-			fields: []interface{}{[]interface{}{"1v1", "1v2"}},
+			fields: []any{[]any{"1v1", "1v2"}},
 		},
 		{
 			tag:    msgRecord,
-			fields: []interface{}{[]interface{}{"2v1", "2v2"}},
+			fields: []any{[]any{"2v1", "2v2"}},
 		},
 		{
 			tag:    msgRecord,
-			fields: []interface{}{[]interface{}{"3v1", "3v2"}},
+			fields: []any{[]any{"3v1", "3v2"}},
 		},
 		{
 			tag:    msgSuccess,
-			fields: []interface{}{map[string]interface{}{"bookmark": runBookmark, "type": "r"}},
+			fields: []any{map[string]any{"bookmark": runBookmark, "type": "r"}},
 		},
 	}
 
-	auth := map[string]interface{}{
+	auth := map[string]any{
 		"scheme":      "basic",
 		"principal":   "neo4j",
 		"credentials": "pass",
@@ -149,7 +149,7 @@ func TestBolt4(outer *testing.T) {
 			srv.waitForHandshake()
 			srv.acceptVersion(4, 0)
 			srv.waitForHello()
-			srv.acceptHelloWithHints(map[string]interface{}{"connection.recv_timeout_seconds": 42})
+			srv.acceptHelloWithHints(map[string]any{"connection.recv_timeout_seconds": 42})
 		})
 		defer cleanup()
 		defer bolt.Close(context.Background())
@@ -187,14 +187,14 @@ func TestBolt4(outer *testing.T) {
 		})
 	}
 
-	invalidValues := []interface{}{4.2, "42", -42}
+	invalidValues := []any{4.2, "42", -42}
 	for _, value := range invalidValues {
 		outer.Run(fmt.Sprintf("Connect success with ignored invalid timeout hint %v", value), func(t *testing.T) {
 			bolt, cleanup := connectToServer(t, func(srv *bolt4server) {
 				srv.waitForHandshake()
 				srv.acceptVersion(4, 0)
 				srv.waitForHello()
-				srv.acceptHelloWithHints(map[string]interface{}{"connection.recv_timeout_seconds": value})
+				srv.acceptHelloWithHints(map[string]any{"connection.recv_timeout_seconds": value})
 			})
 			defer cleanup()
 			defer bolt.Close(context.Background())
@@ -211,7 +211,7 @@ func TestBolt4(outer *testing.T) {
 			srv.waitForHandshake()
 			srv.acceptVersion(4, 1)
 			hmap := srv.waitForHello()
-			helloRoutingContext := hmap["routing"].(map[string]interface{})
+			helloRoutingContext := hmap["routing"].(map[string]any)
 			if len(helloRoutingContext) != len(routingContext) {
 				panic("Routing contexts differ")
 			}
@@ -229,7 +229,7 @@ func TestBolt4(outer *testing.T) {
 			srv.waitForHandshake()
 			srv.acceptVersion(4, 1)
 			hmap := srv.waitForHello()
-			_, exists := hmap["routing"].(map[string]interface{})
+			_, exists := hmap["routing"].(map[string]any)
 			if exists {
 				panic("Should be no routing entry")
 			}
@@ -248,7 +248,7 @@ func TestBolt4(outer *testing.T) {
 			srv.waitForHandshake()
 			srv.acceptVersion(4, 0)
 			hmap := srv.waitForHello()
-			_, exists := hmap["routing"].(map[string]interface{})
+			_, exists := hmap["routing"].(map[string]any)
 			if exists {
 				panic("Should be no routing entry")
 			}
@@ -286,10 +286,10 @@ func TestBolt4(outer *testing.T) {
 		theDb := "thedb"
 		bolt, cleanup := connectToServer(t, func(srv *bolt4server) {
 			srv.accept(4)
-			srv.serveRun(runResponse, func(fields []interface{}) {
+			srv.serveRun(runResponse, func(fields []any) {
 				// fields consist of cypher text, cypher params, meta
 				AssertStringEqual(t, fields[0].(string), cypherText)
-				meta := fields[2].(map[string]interface{})
+				meta := fields[2].(map[string]any)
 				AssertStringEqual(t, meta["db"].(string), theDb)
 			})
 		})
@@ -315,10 +315,10 @@ func TestBolt4(outer *testing.T) {
 		bolt, cleanup := connectToServer(t, func(srv *bolt4server) {
 			srv.acceptWithMinor(4, 4)
 			// Make sure that impersonation id is sent
-			srv.serveRun(runResponse, func(fields []interface{}) {
+			srv.serveRun(runResponse, func(fields []any) {
 				// fields consist of cypher text, cypher params, meta
 				AssertStringEqual(t, fields[0].(string), cypherText)
-				meta := fields[2].(map[string]interface{})
+				meta := fields[2].(map[string]any)
 				AssertStringEqual(t, meta["db"].(string), theDb)
 				AssertStringEqual(t, meta["imp_user"].(string), impersonatedUser)
 			})
@@ -347,7 +347,7 @@ func TestBolt4(outer *testing.T) {
 			srv.send(runResponse[0].tag, runResponse[0].fields...)
 			srv.send(runResponse[1].tag, runResponse[1].fields...)
 			srv.send(runResponse[2].tag, runResponse[2].fields...)
-			srv.send(msgSuccess, map[string]interface{}{"has_more": true})
+			srv.send(msgSuccess, map[string]any{"has_more": true})
 			srv.waitForPullN(2)
 			srv.send(runResponse[3].tag, runResponse[3].fields...)
 			srv.send(runResponse[4].tag, runResponse[4].fields...)
@@ -401,22 +401,22 @@ func TestBolt4(outer *testing.T) {
 		bolt, cleanup := connectToServer(t, func(srv *bolt4server) {
 			srv.accept(4)
 			srv.waitForTxBegin()
-			srv.send(msgSuccess, map[string]interface{}{})
+			srv.send(msgSuccess, map[string]any{})
 			srv.waitForRun(nil)
 			srv.waitForPullN(1)
 			// Send Pull response
-			srv.send(msgSuccess, map[string]interface{}{"fields": []interface{}{"k"}, "t_first": int64(1), "qid": qid})
+			srv.send(msgSuccess, map[string]any{"fields": []any{"k"}, "t_first": int64(1), "qid": qid})
 			// ... and the record
-			srv.send(msgRecord, []interface{}{"v1"})
+			srv.send(msgRecord, []any{"v1"})
 			// ... and the batch summary
-			srv.send(msgSuccess, map[string]interface{}{"has_more": true})
+			srv.send(msgSuccess, map[string]any{"has_more": true})
 			// Wait for the discard message (no need for qid since the last executed query is discarded)
 			srv.waitForDiscardN(-1)
 			// Respond to discard with has more to indicate that there are more records
-			srv.send(msgSuccess, map[string]interface{}{"has_more": true})
+			srv.send(msgSuccess, map[string]any{"has_more": true})
 			// Wait for the commit
 			srv.waitForTxCommit()
-			srv.send(msgSuccess, map[string]interface{}{"bookmark": "x"})
+			srv.send(msgSuccess, map[string]any{"bookmark": "x"})
 		})
 		defer cleanup()
 		defer bolt.Close(context.Background())
@@ -440,25 +440,25 @@ func TestBolt4(outer *testing.T) {
 		bolt, cleanup := connectToServer(t, func(srv *bolt4server) {
 			srv.accept(4)
 			srv.waitForTxBegin()
-			srv.send(msgSuccess, map[string]interface{}{})
+			srv.send(msgSuccess, map[string]any{})
 			// First RunTx
 			srv.waitForRun(nil)
 			srv.waitForPullN(1)
 			// Send Pull response
-			srv.send(msgSuccess, map[string]interface{}{"fields": []interface{}{"k"}, "t_first": int64(1), "qid": qid})
+			srv.send(msgSuccess, map[string]any{"fields": []any{"k"}, "t_first": int64(1), "qid": qid})
 			// Driver should discard this stream which is small
-			srv.send(msgRecord, []interface{}{"v1"})
-			srv.send(msgSuccess, map[string]interface{}{"has_more": false})
+			srv.send(msgRecord, []any{"v1"})
+			srv.send(msgSuccess, map[string]any{"has_more": false})
 			// Second RunTx
 			srv.waitForRun(nil)
 			srv.waitForPullN(1)
-			srv.send(msgSuccess, map[string]interface{}{"fields": []interface{}{"k"}, "t_first": int64(1), "qid": qid})
+			srv.send(msgSuccess, map[string]any{"fields": []any{"k"}, "t_first": int64(1), "qid": qid})
 			// Driver should discard this stream, which is small
-			srv.send(msgRecord, []interface{}{"v1"})
-			srv.send(msgSuccess, map[string]interface{}{"has_more": false})
+			srv.send(msgRecord, []any{"v1"})
+			srv.send(msgSuccess, map[string]any{"has_more": false})
 			// Wait for the commit
 			srv.waitForTxCommit()
-			srv.send(msgSuccess, map[string]interface{}{"bookmark": "x"})
+			srv.send(msgSuccess, map[string]any{"bookmark": "x"})
 		})
 		defer cleanup()
 		defer bolt.Close(context.Background())
@@ -552,11 +552,11 @@ func TestBolt4(outer *testing.T) {
 			srv.waitForRun(nil)
 			srv.waitForPullN(bolt4_fetchsize)
 			// Send response to run and first record as response to pull
-			srv.send(msgSuccess, map[string]interface{}{
+			srv.send(msgSuccess, map[string]any{
 				"fields":  runKeys,
 				"t_first": int64(1),
 			})
-			srv.send(msgRecord, []interface{}{"1v1", "1v2"})
+			srv.send(msgRecord, []any{"1v1", "1v2"})
 			// Pretty nice towards bolt, a full message is written
 			srv.closeConnection()
 		})
@@ -587,7 +587,7 @@ func TestBolt4(outer *testing.T) {
 			srv.sendFailureMsg("code", "msg") // RUN failed
 			srv.waitForReset()
 			srv.sendIgnoredMsg() // PULL Ignored
-			srv.sendSuccess(map[string]interface{}{})
+			srv.sendSuccess(map[string]any{})
 		})
 		defer cleanup()
 		defer bolt.Close(context.Background())
@@ -635,7 +635,7 @@ func TestBolt4(outer *testing.T) {
 			}
 			srv.waitForReset()
 			// Acknowledge reset, no fields
-			srv.sendSuccess(map[string]interface{}{})
+			srv.sendSuccess(map[string]any{})
 		})
 		defer cleanup()
 		defer bolt.Close(context.Background())
@@ -699,21 +699,21 @@ func TestBolt4(outer *testing.T) {
 	})
 
 	outer.Run("Buffer stream with fetch size", func(t *testing.T) {
-		keys := []interface{}{"k1"}
+		keys := []any{"k1"}
 		bookmark := "x"
 		bolt, cleanup := connectToServer(t, func(srv *bolt4server) {
 			srv.accept(4)
 			srv.waitForRun(nil)
 			srv.waitForPullN(3)
-			srv.send(msgSuccess, map[string]interface{}{"fields": keys})
-			srv.send(msgRecord, []interface{}{"1"})
-			srv.send(msgRecord, []interface{}{"2"})
-			srv.send(msgRecord, []interface{}{"3"})
-			srv.send(msgSuccess, map[string]interface{}{"has_more": true})
+			srv.send(msgSuccess, map[string]any{"fields": keys})
+			srv.send(msgRecord, []any{"1"})
+			srv.send(msgRecord, []any{"2"})
+			srv.send(msgRecord, []any{"3"})
+			srv.send(msgSuccess, map[string]any{"has_more": true})
 			srv.waitForPullN(-1)
-			srv.send(msgRecord, []interface{}{"4"})
-			srv.send(msgRecord, []interface{}{"5"})
-			srv.send(msgSuccess, map[string]interface{}{"bookmark": bookmark, "type": "r"})
+			srv.send(msgRecord, []any{"4"})
+			srv.send(msgRecord, []any{"5"})
+			srv.send(msgSuccess, map[string]any{"bookmark": bookmark, "type": "r"})
 		})
 		defer cleanup()
 		defer bolt.Close(context.Background())
@@ -749,11 +749,11 @@ func TestBolt4(outer *testing.T) {
 			srv.waitForRun(nil)
 			srv.waitForPullN(bolt4_fetchsize)
 			// Send response to run and first record as response to pull
-			srv.send(msgSuccess, map[string]interface{}{
+			srv.send(msgSuccess, map[string]any{
 				"fields":  runKeys,
 				"t_first": int64(1),
 			})
-			srv.send(msgRecord, []interface{}{"1v1", "1v2"})
+			srv.send(msgRecord, []any{"1v1", "1v2"})
 			srv.sendFailureMsg("thecode", "themessage")
 		})
 		defer cleanup()
@@ -819,19 +819,19 @@ func TestBolt4(outer *testing.T) {
 
 	outer.Run("Consume stream with fetch size", func(t *testing.T) {
 		qid := 3
-		keys := []interface{}{"k1"}
+		keys := []any{"k1"}
 		bookmark := "x"
 		bolt, cleanup := connectToServer(t, func(srv *bolt4server) {
 			srv.accept(4)
 			srv.waitForRun(nil)
 			srv.waitForPullN(3)
-			srv.send(msgSuccess, map[string]interface{}{"fields": keys, "qid": int64(qid)})
-			srv.send(msgRecord, []interface{}{"1"})
-			srv.send(msgRecord, []interface{}{"2"})
-			srv.send(msgRecord, []interface{}{"3"})
-			srv.send(msgSuccess, map[string]interface{}{"has_more": true, "qid": int64(qid)})
+			srv.send(msgSuccess, map[string]any{"fields": keys, "qid": int64(qid)})
+			srv.send(msgRecord, []any{"1"})
+			srv.send(msgRecord, []any{"2"})
+			srv.send(msgRecord, []any{"3"})
+			srv.send(msgSuccess, map[string]any{"has_more": true, "qid": int64(qid)})
 			srv.waitForDiscardN(-1)
-			srv.send(msgSuccess, map[string]interface{}{"bookmark": bookmark, "type": "r"})
+			srv.send(msgSuccess, map[string]any{"bookmark": bookmark, "type": "r"})
 		})
 		defer cleanup()
 		defer bolt.Close(context.Background())
@@ -868,11 +868,11 @@ func TestBolt4(outer *testing.T) {
 			srv.waitForRun(nil)
 			srv.waitForPullN(bolt4_fetchsize)
 			// Send response to run and first record as response to pull
-			srv.send(msgSuccess, map[string]interface{}{
+			srv.send(msgSuccess, map[string]any{
 				"fields":  runKeys,
 				"t_first": int64(1),
 			})
-			srv.send(msgRecord, []interface{}{"1v1", "1v2"})
+			srv.send(msgRecord, []any{"1v1", "1v2"})
 			srv.sendFailureMsg("thecode", "themessage")
 		})
 		defer cleanup()
@@ -908,19 +908,19 @@ func TestBolt4(outer *testing.T) {
 		theDb := "theDb"
 		bolt, cleanup := connectToServer(t, func(srv *bolt4server) {
 			srv.acceptWithMinor(4, 3)
-			srv.waitForRoute(func(fields []interface{}) {
+			srv.waitForRoute(func(fields []any) {
 				// Fields contains context(map), bookmarks ([]string), database name(string or nil)
 
 				// No database selected, should be nil
 				AssertStringEqual(t, fields[2].(string), theDb)
 			})
-			srv.sendSuccess(map[string]interface{}{
-				"rt": map[string]interface{}{
+			srv.sendSuccess(map[string]any{
+				"rt": map[string]any{
 					"ttl": 1000,
-					"servers": []interface{}{
-						map[string]interface{}{
+					"servers": []any{
+						map[string]any{
 							"role":      "ROUTE",
-							"addresses": []interface{}{"router1"},
+							"addresses": []any{"router1"},
 						},
 					},
 				},
@@ -941,17 +941,17 @@ func TestBolt4(outer *testing.T) {
 	outer.Run("GetRoutingTable using ROUTE message", func(t *testing.T) {
 		bolt, cleanup := connectToServer(t, func(srv *bolt4server) {
 			srv.acceptWithMinor(4, 4)
-			srv.waitForRoute(func(fields []interface{}) {
+			srv.waitForRoute(func(fields []any) {
 				// Fields contains context(map), bookmarks([]string), extras(map)
 			})
-			srv.sendSuccess(map[string]interface{}{
-				"rt": map[string]interface{}{
+			srv.sendSuccess(map[string]any{
+				"rt": map[string]any{
 					"ttl": 1000,
 					"db":  "thedb",
-					"servers": []interface{}{
-						map[string]interface{}{
+					"servers": []any{
+						map[string]any{
 							"role":      "ROUTE",
-							"addresses": []interface{}{"router1"},
+							"addresses": []any{"router1"},
 						},
 					},
 				},
@@ -1029,7 +1029,7 @@ func TestBolt4(outer *testing.T) {
 				scenario: "after successful RESET",
 				server: func(t *testing.T, srv *bolt4server) {
 					srv.waitForReset()
-					srv.sendSuccess(map[string]interface{}{})
+					srv.sendSuccess(map[string]any{})
 				},
 				client: func(t *testing.T, cli *bolt4) {
 					idleDate := cli.IdleDate()
@@ -1065,9 +1065,9 @@ func TestBolt4(outer *testing.T) {
 				scenario: "after successful RUN/PULLALL",
 				server: func(t *testing.T, srv *bolt4server) {
 					srv.waitForRun(nil)
-					srv.sendSuccess(map[string]interface{}{})
+					srv.sendSuccess(map[string]any{})
 					srv.waitForPullN(1000)
-					srv.sendSuccess(map[string]interface{}{})
+					srv.sendSuccess(map[string]any{})
 				},
 				client: func(t *testing.T, cli *bolt4) {
 					idleDate := cli.IdleDate()
@@ -1103,7 +1103,7 @@ func TestBolt4(outer *testing.T) {
 				scenario: "after failed PULLALL",
 				server: func(t *testing.T, srv *bolt4server) {
 					srv.waitForRun(nil)
-					srv.sendSuccess(map[string]interface{}{})
+					srv.sendSuccess(map[string]any{})
 					srv.waitForPullN(1000)
 					srv.sendFailureMsg("o.o.p.s", "pull all failed")
 				},
@@ -1117,7 +1117,7 @@ func TestBolt4(outer *testing.T) {
 				scenario: "after successful BEGIN",
 				server: func(t *testing.T, srv *bolt4server) {
 					srv.waitForTxBegin()
-					srv.sendSuccess(map[string]interface{}{})
+					srv.sendSuccess(map[string]any{})
 				},
 				client: func(t *testing.T, cli *bolt4) {
 					idleDate := cli.IdleDate()
@@ -1153,9 +1153,9 @@ func TestBolt4(outer *testing.T) {
 				scenario: "after successful COMMIT",
 				server: func(t *testing.T, srv *bolt4server) {
 					srv.waitForTxBegin()
-					srv.sendSuccess(map[string]interface{}{})
+					srv.sendSuccess(map[string]any{})
 					srv.waitForTxCommit()
-					srv.sendSuccess(map[string]interface{}{})
+					srv.sendSuccess(map[string]any{})
 				},
 				client: func(t *testing.T, cli *bolt4) {
 					tx, _ := cli.TxBegin(ctx, idb.TxConfig{})
@@ -1168,7 +1168,7 @@ func TestBolt4(outer *testing.T) {
 				scenario: "after failed COMMIT",
 				server: func(t *testing.T, srv *bolt4server) {
 					srv.waitForTxBegin()
-					srv.sendSuccess(map[string]interface{}{})
+					srv.sendSuccess(map[string]any{})
 					srv.waitForTxCommit()
 					srv.sendFailureMsg("o.o.p.s", "commit failed")
 				},
@@ -1183,7 +1183,7 @@ func TestBolt4(outer *testing.T) {
 				scenario: "not after errored COMMIT",
 				server: func(t *testing.T, srv *bolt4server) {
 					srv.waitForTxBegin()
-					srv.sendSuccess(map[string]interface{}{})
+					srv.sendSuccess(map[string]any{})
 					srv.waitForTxCommit()
 					srv.closeConnection()
 				},
@@ -1198,9 +1198,9 @@ func TestBolt4(outer *testing.T) {
 				scenario: "after successful ROLLBACK",
 				server: func(t *testing.T, srv *bolt4server) {
 					srv.waitForTxBegin()
-					srv.sendSuccess(map[string]interface{}{})
+					srv.sendSuccess(map[string]any{})
 					srv.waitForTxRollback()
-					srv.sendSuccess(map[string]interface{}{})
+					srv.sendSuccess(map[string]any{})
 				},
 				client: func(t *testing.T, cli *bolt4) {
 					tx, _ := cli.TxBegin(ctx, idb.TxConfig{})
@@ -1213,7 +1213,7 @@ func TestBolt4(outer *testing.T) {
 				scenario: "after failed ROLLBACK",
 				server: func(t *testing.T, srv *bolt4server) {
 					srv.waitForTxBegin()
-					srv.sendSuccess(map[string]interface{}{})
+					srv.sendSuccess(map[string]any{})
 					srv.waitForTxRollback()
 					srv.sendFailureMsg("o.o.p.s", "rollback failed")
 				},
@@ -1228,7 +1228,7 @@ func TestBolt4(outer *testing.T) {
 				scenario: "not after errored ROLLBACK",
 				server: func(t *testing.T, srv *bolt4server) {
 					srv.waitForTxBegin()
-					srv.sendSuccess(map[string]interface{}{})
+					srv.sendSuccess(map[string]any{})
 					srv.waitForTxRollback()
 					srv.closeConnection()
 				},

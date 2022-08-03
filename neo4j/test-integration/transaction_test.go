@@ -55,7 +55,7 @@ func TestTransaction(outer *testing.T) {
 
 		inner.Run("should work on ExecuteWrite", func(t *testing.T) {
 			times := 0
-			_, err = session.WriteTransaction(func(transaction neo4j.Transaction) (interface{}, error) {
+			_, err = session.WriteTransaction(func(transaction neo4j.Transaction) (any, error) {
 				times++
 				time.Sleep(1 * time.Second)
 				return nil, transientError
@@ -67,7 +67,7 @@ func TestTransaction(outer *testing.T) {
 
 		inner.Run("should work on ExecuteRead", func(t *testing.T) {
 			times := 0
-			_, err = session.ReadTransaction(func(transaction neo4j.Transaction) (interface{}, error) {
+			_, err = session.ReadTransaction(func(transaction neo4j.Transaction) (any, error) {
 				times++
 				time.Sleep(1 * time.Second)
 				return nil, transientError
@@ -88,7 +88,7 @@ func TestTransaction(outer *testing.T) {
 
 	outer.Run("should rollback if work function returns error", func(t *testing.T) {
 		createWork := intReturningWork(t, "CREATE (n:Person2) RETURN count(n)", nil)
-		createResult, err := session.WriteTransaction(func(tx neo4j.Transaction) (interface{}, error) {
+		createResult, err := session.WriteTransaction(func(tx neo4j.Transaction) (any, error) {
 			innerResult, err := createWork(tx)
 			assertNil(t, err)
 			assertEquals(t, innerResult, 1)
@@ -233,7 +233,7 @@ func TestTransaction(outer *testing.T) {
 		}
 
 		inner.Run("should set transaction metadata", func(t *testing.T) {
-			metadata := map[string]interface{}{
+			metadata := map[string]any{
 				"m1": int64(1),
 				"m2": "some string",
 				"m3": 4.0,
@@ -244,7 +244,7 @@ func TestTransaction(outer *testing.T) {
 			assertNil(t, err)
 			defer tx.Close()
 
-			number := transactionWithIntWork(t, tx, intReturningWork(t, "RETURN $x", map[string]interface{}{"x": 1}))
+			number := transactionWithIntWork(t, tx, intReturningWork(t, "RETURN $x", map[string]any{"x": 1}))
 			assertEquals(t, number, 1)
 
 			if !server.IsEnterprise {
@@ -265,13 +265,13 @@ func TestTransaction(outer *testing.T) {
 			defer session2.Close()
 			defer tx2.Close()
 
-			updateNodeInTx(t, tx2, "TxTimeOut", map[string]interface{}{"id": 1})
+			updateNodeInTx(t, tx2, "TxTimeOut", map[string]any{"id": 1})
 
 			session3, tx3 := newSessionAndTx(t, driver, neo4j.AccessModeWrite, neo4j.WithTxTimeout(1*time.Second))
 			defer session3.Close()
 			defer tx3.Close()
 
-			_, err := updateNodeWork(t, "TxTimeOut", map[string]interface{}{"id": 2})(tx3)
+			_, err := updateNodeWork(t, "TxTimeOut", map[string]any{"id": 2})(tx3)
 			assertNotNil(t, err)
 		})
 
@@ -288,7 +288,7 @@ func TestTransaction(outer *testing.T) {
 		})
 
 		t.Run("should fail when transaction metadata is set for Session.BeginTransaction", func(t *testing.T) {
-			_, err := session.BeginTransaction(neo4j.WithTxMetadata(map[string]interface{}{"x": 1}))
+			_, err := session.BeginTransaction(neo4j.WithTxMetadata(map[string]any{"x": 1}))
 			assertNotNil(t, err)
 		})
 	})

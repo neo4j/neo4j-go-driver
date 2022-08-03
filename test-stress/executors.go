@@ -31,13 +31,13 @@ func ExpectNoError(err error) {
 	}
 }
 
-func ExpectNotNil(x interface{}) {
+func ExpectNotNil(x any) {
 	if x == nil {
 		panic("Expected not nil")
 	}
 }
 
-func ExpectNil(x interface{}) {
+func ExpectNil(x any) {
 	if x != nil {
 		panic(fmt.Sprintf("Expected nil but was %+v (%T)", x, x))
 	}
@@ -142,7 +142,7 @@ func ReadQueryWithReadTransactionExecutor(driver neo4j.Driver, useBookmark bool)
 		session := newStressSession(driver, useBookmark, neo4j.AccessModeRead, ctx)
 		defer session.Close()
 
-		summary, err := session.ReadTransaction(func(tx neo4j.Transaction) (interface{}, error) {
+		summary, err := session.ReadTransaction(func(tx neo4j.Transaction) (any, error) {
 			result, err := tx.Run("MATCH (n) RETURN n LIMIT 1", nil)
 			if err != nil {
 				return nil, err
@@ -217,7 +217,7 @@ func WriteQueryWithWriteTransactionExecutor(driver neo4j.Driver, useBookmark boo
 		session := newStressSession(driver, useBookmark, neo4j.AccessModeWrite, ctx)
 		defer session.Close()
 
-		summary, err := session.WriteTransaction(func(tx neo4j.Transaction) (interface{}, error) {
+		summary, err := session.WriteTransaction(func(tx neo4j.Transaction) (any, error) {
 			result, err := tx.Run("CREATE ()", nil)
 			if err != nil {
 				return nil, err
@@ -300,7 +300,7 @@ func FailingQueryWithReadTransactionExecutor(driver neo4j.Driver, useBookmark bo
 		session := newStressSession(driver, useBookmark, neo4j.AccessModeRead, ctx)
 		defer session.Close()
 
-		summary, err := session.ReadTransaction(func(tx neo4j.Transaction) (interface{}, error) {
+		summary, err := session.ReadTransaction(func(tx neo4j.Transaction) (any, error) {
 			result, err := tx.Run("UNWIND [10, 5, 0] AS x RETURN 10 / x", nil)
 			if err != nil {
 				return nil, err
@@ -322,7 +322,7 @@ func FailingQueryWithWriteTransactionExecutor(driver neo4j.Driver, useBookmark b
 		session := newStressSession(driver, useBookmark, neo4j.AccessModeRead, ctx)
 		defer session.Close()
 
-		summary, err := session.WriteTransaction(func(tx neo4j.Transaction) (interface{}, error) {
+		summary, err := session.WriteTransaction(func(tx neo4j.Transaction) (any, error) {
 			result, err := tx.Run("UNWIND [10, 5, 0] AS x RETURN 10 / x", nil)
 			if err != nil {
 				return nil, err

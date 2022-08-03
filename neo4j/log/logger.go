@@ -44,9 +44,9 @@ type Logger interface {
 	// exported type. The same root cause of an error might be reported
 	// more than once by different components using same or different err types.
 	Error(name string, id string, err error)
-	Warnf(name string, id string, msg string, args ...interface{})
-	Infof(name string, id string, msg string, args ...interface{})
-	Debugf(name string, id string, msg string, args ...interface{})
+	Warnf(name string, id string, msg string, args ...any)
+	Infof(name string, id string, msg string, args ...any)
+	Debugf(name string, id string, msg string, args ...any)
 }
 
 // List of component names used as parameter to logger functions.

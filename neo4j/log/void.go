@@ -25,11 +25,11 @@ type Void struct{}
 func (l Void) Error(name, id string, err error) {
 }
 
-func (l Void) Infof(name, id string, msg string, args ...interface{}) {
+func (l Void) Infof(name, id string, msg string, args ...any) {
 }
 
-func (l Void) Warnf(name, id string, msg string, args ...interface{}) {
+func (l Void) Warnf(name, id string, msg string, args ...any) {
 }
 
-func (l Void) Debugf(name, id string, msg string, args ...interface{}) {
+func (l Void) Debugf(name, id string, msg string, args ...any) {
 }

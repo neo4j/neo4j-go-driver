@@ -27,7 +27,7 @@ import (
 // ManagedTransaction represents a transaction managed by the driver and operated on by the user, via transaction functions
 type ManagedTransaction interface {
 	// Run executes a statement on this transaction and returns a result
-	Run(ctx context.Context, cypher string, params map[string]interface{}) (ResultWithContext, error)
+	Run(ctx context.Context, cypher string, params map[string]any) (ResultWithContext, error)
 
 	legacy() Transaction
 }
@@ -35,7 +35,7 @@ type ManagedTransaction interface {
 // ExplicitTransaction represents a transaction in the Neo4j database
 type ExplicitTransaction interface {
 	// Run executes a statement on this transaction and returns a result
-	Run(ctx context.Context, cypher string, params map[string]interface{}) (ResultWithContext, error)
+	Run(ctx context.Context, cypher string, params map[string]any) (ResultWithContext, error)
 	// Commit commits the transaction
 	Commit(ctx context.Context) error
 	// Rollback rolls back the transaction
@@ -61,7 +61,7 @@ type explicitTransaction struct {
 }
 
 func (tx *explicitTransaction) Run(ctx context.Context, cypher string,
-	params map[string]interface{}) (ResultWithContext, error) {
+	params map[string]any) (ResultWithContext, error) {
 	stream, err := tx.conn.RunTx(ctx, tx.txHandle, db.Command{Cypher: cypher, Params: params, FetchSize: tx.fetchSize})
 	if err != nil {
 		tx.err = err
@@ -126,7 +126,7 @@ type managedTransaction struct {
 	txHandle  db.TxHandle
 }
 
-func (tx *managedTransaction) Run(ctx context.Context, cypher string, params map[string]interface{}) (ResultWithContext, error) {
+func (tx *managedTransaction) Run(ctx context.Context, cypher string, params map[string]any) (ResultWithContext, error) {
 	stream, err := tx.conn.RunTx(ctx, tx.txHandle, db.Command{Cypher: cypher, Params: params, FetchSize: tx.fetchSize})
 	if err != nil {
 		return nil, wrapError(err)

@@ -44,7 +44,7 @@ func (l *Console) Error(name, id string, err error) {
 	fmt.Fprintf(os.Stderr, "%s  ERROR  [%s %s] %s\n", now.Format(timeFormat), name, id, err.Error())
 }
 
-func (l *Console) Infof(name, id string, msg string, args ...interface{}) {
+func (l *Console) Infof(name, id string, msg string, args ...any) {
 	if !l.Infos {
 		return
 	}
@@ -52,7 +52,7 @@ func (l *Console) Infof(name, id string, msg string, args ...interface{}) {
 	fmt.Fprintf(os.Stdout, "%s   INFO  [%s %s] %s\n", now.Format(timeFormat), name, id, fmt.Sprintf(msg, args...))
 }
 
-func (l *Console) Warnf(name, id string, msg string, args ...interface{}) {
+func (l *Console) Warnf(name, id string, msg string, args ...any) {
 	if !l.Warns {
 		return
 	}
@@ -60,7 +60,7 @@ func (l *Console) Warnf(name, id string, msg string, args ...interface{}) {
 	fmt.Fprintf(os.Stdout, "%s   WARN  [%s %s] %s\n", now.Format(timeFormat), name, id, fmt.Sprintf(msg, args...))
 }
 
-func (l *Console) Debugf(name, id string, msg string, args ...interface{}) {
+func (l *Console) Debugf(name, id string, msg string, args ...any) {
 	if !l.Debugs {
 		return
 	}

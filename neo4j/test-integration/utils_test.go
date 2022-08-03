@@ -29,8 +29,8 @@ import (
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
 )
 
-func intReturningWork(t *testing.T, query string, params map[string]interface{}) neo4j.TransactionWork {
-	return func(tx neo4j.Transaction) (interface{}, error) {
+func intReturningWork(t *testing.T, query string, params map[string]any) neo4j.TransactionWork {
+	return func(tx neo4j.Transaction) (any, error) {
 		create, err := tx.Run(query, params)
 		assertNil(t, err)
 
@@ -75,7 +75,7 @@ func newSessionAndTx(t *testing.T, driver neo4j.Driver, mode neo4j.AccessMode, c
 	return session, tx
 }
 
-func createNode(t *testing.T, session neo4j.Session, label string, props map[string]interface{}) {
+func createNode(t *testing.T, session neo4j.Session, label string, props map[string]any) {
 	var (
 		err     error
 		result  neo4j.Result
@@ -83,7 +83,7 @@ func createNode(t *testing.T, session neo4j.Session, label string, props map[str
 	)
 
 	if len(props) > 0 {
-		result, err = session.Run(fmt.Sprintf("CREATE (n:%s) SET n = $props", label), map[string]interface{}{"props": props})
+		result, err = session.Run(fmt.Sprintf("CREATE (n:%s) SET n = $props", label), map[string]any{"props": props})
 	} else {
 		result, err = session.Run(fmt.Sprintf("CREATE (n:%s)", label), nil)
 	}
@@ -95,7 +95,7 @@ func createNode(t *testing.T, session neo4j.Session, label string, props map[str
 	assertEquals(t, summary.Counters().NodesCreated(), 1)
 }
 
-func updateNodeInTx(t *testing.T, tx neo4j.Transaction, label string, newProps map[string]interface{}) {
+func updateNodeInTx(t *testing.T, tx neo4j.Transaction, label string, newProps map[string]any) {
 	var (
 		err     error
 		result  neo4j.Result
@@ -106,7 +106,7 @@ func updateNodeInTx(t *testing.T, tx neo4j.Transaction, label string, newProps m
 		t.Fatal("newProps is empty")
 	}
 
-	result, err = tx.Run(fmt.Sprintf("MATCH (n:%s) SET n = $props", label), map[string]interface{}{"props": newProps})
+	result, err = tx.Run(fmt.Sprintf("MATCH (n:%s) SET n = $props", label), map[string]any{"props": newProps})
 	assertNil(t, err)
 
 	summary, err = result.Consume()
@@ -115,8 +115,8 @@ func updateNodeInTx(t *testing.T, tx neo4j.Transaction, label string, newProps m
 	assertTrue(t, summary.Counters().ContainsUpdates())
 }
 
-func updateNodeWork(t *testing.T, label string, newProps map[string]interface{}) neo4j.TransactionWork {
-	return func(tx neo4j.Transaction) (interface{}, error) {
+func updateNodeWork(t *testing.T, label string, newProps map[string]any) neo4j.TransactionWork {
+	return func(tx neo4j.Transaction) (any, error) {
 		var (
 			err    error
 			result neo4j.Result
@@ -126,7 +126,7 @@ func updateNodeWork(t *testing.T, label string, newProps map[string]interface{})
 			t.Fatal("newProps is empty")
 		}
 
-		result, err = tx.Run(fmt.Sprintf("MATCH (n:%s) SET n = $props", label), map[string]interface{}{"props": newProps})
+		result, err = tx.Run(fmt.Sprintf("MATCH (n:%s) SET n = $props", label), map[string]any{"props": newProps})
 		if err != nil {
 			return nil, err
 		}
@@ -135,12 +135,12 @@ func updateNodeWork(t *testing.T, label string, newProps map[string]interface{})
 	}
 }
 
-func listTransactionsAndMatchMetadataWork(version dbserver.Version, metadata map[string]interface{}) neo4j.TransactionWork {
+func listTransactionsAndMatchMetadataWork(version dbserver.Version, metadata map[string]any) neo4j.TransactionWork {
 	query := "CALL dbms.listTransactions()"
 	if version.GreaterThanOrEqual(dbserver.VersionOf("4.4.0")) {
 		query = "SHOW TRANSACTIONS YIELD metaData RETURN metaData"
 	}
-	return func(tx neo4j.Transaction) (interface{}, error) {
+	return func(tx neo4j.Transaction) (any, error) {
 		result, err := tx.Run(query, nil)
 		if err != nil {
 			return nil, err
@@ -149,7 +149,7 @@ func listTransactionsAndMatchMetadataWork(version dbserver.Version, metadata map
 		var matched = false
 		for result.Next() {
 			if txMetadataInt, ok := result.Record().Get("metaData"); ok {
-				if txMetadata, ok := txMetadataInt.(map[string]interface{}); ok {
+				if txMetadata, ok := txMetadataInt.(map[string]any); ok {
 					if reflect.DeepEqual(metadata, txMetadata) {
 						matched = true
 						break
@@ -165,7 +165,7 @@ func listTransactionsAndMatchMetadataWork(version dbserver.Version, metadata map
 	}
 }
 
-func sortedKeys(m map[string]interface{}) []string {
+func sortedKeys(m map[string]any) []string {
 	result := make([]string, len(m))
 	i := 0
 	for k := range m {

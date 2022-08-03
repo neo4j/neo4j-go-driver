@@ -35,7 +35,7 @@ type incoming struct {
 	logId           string
 }
 
-func (i *incoming) next(ctx context.Context, rd net.Conn) (interface{}, error) {
+func (i *incoming) next(ctx context.Context, rd net.Conn) (any, error) {
 	// Get next message from transport layer
 	var err error
 	var msg []byte

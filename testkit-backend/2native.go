@@ -27,9 +27,9 @@ import (
 )
 
 // Converts received proxied "cypher" types to Go native types.
-func cypherToNative(c interface{}) (any, error) {
-	m := c.(map[string]interface{})
-	d := m["data"].(map[string]interface{})
+func cypherToNative(c any) (any, error) {
+	m := c.(map[string]any)
+	d := m["data"].(map[string]any)
 	n := m["name"]
 	switch n {
 	case "CypherDateTime":
@@ -90,8 +90,8 @@ func cypherToNative(c interface{}) (any, error) {
 	case "CypherNull":
 		return nil, nil
 	case "CypherList":
-		lc := d["value"].([]interface{})
-		ln := make([]interface{}, len(lc))
+		lc := d["value"].([]any)
+		ln := make([]any, len(lc))
 		var err error
 		for i, x := range lc {
 			if ln[i], err = cypherToNative(x); err != nil {
@@ -100,8 +100,8 @@ func cypherToNative(c interface{}) (any, error) {
 		}
 		return ln, nil
 	case "CypherMap":
-		mc := d["value"].(map[string]interface{})
-		mn := make(map[string]interface{})
+		mc := d["value"].(map[string]any)
+		mn := make(map[string]any)
 		var err error
 		for k, x := range mc {
 			if mn[k], err = cypherToNative(x); err != nil {
@@ -113,7 +113,7 @@ func cypherToNative(c interface{}) (any, error) {
 	panic(fmt.Sprintf("Don't know how to convert %s to native", n))
 }
 
-func loadTimezone(data map[string]interface{}) (*time.Location, int, error) {
+func loadTimezone(data map[string]any) (*time.Location, int, error) {
 	offset, foundOffset := readOffset(data)
 	rawTimezoneId := data["timezone_id"]
 	if rawTimezoneId != nil {
@@ -130,7 +130,7 @@ func loadTimezone(data map[string]interface{}) (*time.Location, int, error) {
 	return time.FixedZone("Offset", offset), offset, nil
 }
 
-func readOffset(data map[string]interface{}) (int, bool) {
+func readOffset(data map[string]any) (int, bool) {
 	if rawOffset := data["utc_offset_s"]; rawOffset != nil {
 		return asInt(rawOffset.(json.Number)), true
 	}

@@ -143,7 +143,7 @@ func TestCustomAuthWithEmptyParameters(t *testing.T) {
 	userName := "user"
 	password := "password"
 	realm := "test"
-	parameters := map[string]interface{}{}
+	parameters := map[string]any{}
 
 	token := CustomAuth(scheme, userName, password, realm, parameters)
 
@@ -173,7 +173,7 @@ func TestCustomAuthWithParameters(t *testing.T) {
 	userName := "user"
 	password := "password"
 	realm := "test"
-	parameters := map[string]interface{}{
+	parameters := map[string]any{
 		"user_id":     "1234",
 		"user_emails": []string{"a@b.com", "b@c.com"},
 	}

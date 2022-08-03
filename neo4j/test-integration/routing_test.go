@@ -69,14 +69,14 @@ func TestRouting(outer *testing.T) {
 		if !server.IsCluster {
 			t.Skip("Needs cluster")
 		}
-		var readCount, writeCount interface{}
+		var readCount, writeCount any
 
 		driver := getDriver(server.URI())
 		assertNil(t, err)
 
 		session = driver.NewSession(neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
 
-		writeCount, err = session.WriteTransaction(func(tx neo4j.Transaction) (interface{}, error) {
+		writeCount, err = session.WriteTransaction(func(tx neo4j.Transaction) (any, error) {
 			writeResult, err := tx.Run("MERGE (n:Person {name: 'John'}) RETURN 1", nil)
 			if err != nil {
 				return nil, err
@@ -95,7 +95,7 @@ func TestRouting(outer *testing.T) {
 		assertNil(t, err)
 		assertTrue(t, writeCount == 1)
 
-		readCount, err = session.ReadTransaction(func(tx neo4j.Transaction) (interface{}, error) {
+		readCount, err = session.ReadTransaction(func(tx neo4j.Transaction) (any, error) {
 			readResult, err := tx.Run("MATCH (n:Person {name: 'John'}) RETURN COUNT(*) AS count", nil)
 			if err != nil {
 				return nil, err

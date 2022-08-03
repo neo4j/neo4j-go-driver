@@ -23,10 +23,10 @@ package dbtype
 // Node represents a node in the neo4j graph database
 type Node struct {
 	// Deprecated: Id is deprecated and will be removed in 6.0. Use ElementId instead.
-	Id        int64                  // Id of this Node.
-	ElementId string                 // ElementId of this Node.
-	Labels    []string               // Labels attached to this Node.
-	Props     map[string]interface{} // Properties of this Node.
+	Id        int64          // Id of this Node.
+	ElementId string         // ElementId of this Node.
+	Labels    []string       // Labels attached to this Node.
+	Props     map[string]any // Properties of this Node.
 }
 
 // Relationship represents a relationship in the neo4j graph database
@@ -38,10 +38,10 @@ type Relationship struct {
 	StartId        int64  // Id of the start Node of this Relationship.
 	StartElementId string // ElementId of the start Node of this Relationship.
 	// Deprecated: EndId is deprecated and will be removed in 6.0. Use EndElementId instead.
-	EndId        int64                  // Id of the end Node of this Relationship.
-	EndElementId string                 // ElementId of the end Node of this Relationship.
-	Type         string                 // Type of this Relationship.
-	Props        map[string]interface{} // Properties of this Relationship.
+	EndId        int64          // Id of the end Node of this Relationship.
+	EndElementId string         // ElementId of the end Node of this Relationship.
+	Type         string         // Type of this Relationship.
+	Props        map[string]any // Properties of this Relationship.
 }
 
 // Path represents a directed sequence of relationships between two nodes.

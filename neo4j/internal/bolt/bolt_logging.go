@@ -7,7 +7,7 @@ import (
 	"strings"
 )
 
-type loggableDictionary map[string]interface{}
+type loggableDictionary map[string]any
 
 func (d loggableDictionary) String() string {
 	if credentials, ok := d["credentials"]; ok {
@@ -31,7 +31,7 @@ func (sd loggableStringDictionary) String() string {
 	return serializeTrace(sd)
 }
 
-type loggableList []interface{}
+type loggableList []any
 
 func (l loggableList) String() string {
 	return serializeTrace(l)
@@ -104,13 +104,13 @@ func formatOmittingZero(i int64) string {
 type loggableFailure db.Neo4jError
 
 func (f loggableFailure) String() string {
-	return serializeTrace(map[string]interface{}{
+	return serializeTrace(map[string]any{
 		"code":    f.Code,
 		"message": f.Msg,
 	})
 }
 
-func serializeTrace(v interface{}) string {
+func serializeTrace(v any) string {
 	builder := strings.Builder{}
 	encoder := json.NewEncoder(&builder)
 	encoder.SetEscapeHTML(false)

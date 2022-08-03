@@ -31,7 +31,7 @@ import (
 // Transaction will be removed in 6.0.
 type Transaction interface {
 	// Run executes a statement on this transaction and returns a result
-	Run(cypher string, params map[string]interface{}) (Result, error)
+	Run(cypher string, params map[string]any) (Result, error)
 	// Commit commits the transaction
 	Commit() error
 	// Rollback rolls back the transaction
@@ -46,7 +46,7 @@ type transaction struct {
 	delegate ExplicitTransaction
 }
 
-func (tx *transaction) Run(cypher string, params map[string]interface{}) (Result, error) {
+func (tx *transaction) Run(cypher string, params map[string]any) (Result, error) {
 	result, err := tx.delegate.Run(context.Background(), cypher, params)
 	if err != nil {
 		return nil, err

@@ -36,7 +36,7 @@ func TestDehydrateHydrate(ot *testing.T) {
 
 	// A bit of white box testing, uses "internal" APIs to shortcut
 	// hydration/dehydration circuit.
-	dehydrateAndHydrate := func(t *testing.T, xi interface{}) interface{} {
+	dehydrateAndHydrate := func(t *testing.T, xi any) any {
 		out := &outgoing{
 			chunker: newChunker(),
 			packer:  packstream.Packer{},
@@ -54,7 +54,7 @@ func TestDehydrateHydrate(ot *testing.T) {
 			}
 		}()
 		// format data in a record to avoid confusing the hydrator
-		out.appendX(msgRecord, []interface{}{xi})
+		out.appendX(msgRecord, []any{xi})
 		go func() {
 			out.send(context.Background(), cli)
 		}()

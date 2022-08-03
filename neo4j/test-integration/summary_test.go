@@ -16,7 +16,7 @@ func TestResultSummary(outer *testing.T) {
 	var server dbserver.DbServer
 	var driver neo4j.Driver
 	var bookmark string
-	noParams := map[string]interface{}{}
+	noParams := map[string]any{}
 
 	server = dbserver.GetDbServer()
 	driver = server.Driver(func(config *neo4j.Config) {
@@ -52,7 +52,7 @@ func TestResultSummary(outer *testing.T) {
 
 		session := driver.NewSession(neo4j.SessionConfig{DatabaseName: "system", BoltLogger: neo4j.ConsoleBoltLogger()})
 		defer assertCloses(inner, session)
-		res, err := session.Run(server.CreateDatabaseQuery(extraDatabase), map[string]interface{}{})
+		res, err := session.Run(server.CreateDatabaseQuery(extraDatabase), map[string]any{})
 		assertNil(inner, err)
 		_, err = res.Consume() // consume result to obtain bookmark
 		assertNil(inner, err)
@@ -63,7 +63,7 @@ func TestResultSummary(outer *testing.T) {
 		defer func() {
 			session := driver.NewSession(neo4j.SessionConfig{DatabaseName: "system", Bookmarks: neo4j.BookmarksFromRawValues(bookmark)})
 			defer assertCloses(inner, session)
-			res, err := session.Run(server.DropDatabaseQuery(extraDatabase), map[string]interface{}{})
+			res, err := session.Run(server.DropDatabaseQuery(extraDatabase), map[string]any{})
 			assertNil(inner, err)
 			_, err = res.Consume()
 			assertNil(inner, err)

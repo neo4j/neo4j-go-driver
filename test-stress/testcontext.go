@@ -103,7 +103,7 @@ func (ctx *TestContext) PrintStats() {
 	fmt.Printf("\tNodes Read: %d\n", ctx.readNodeCount)
 	fmt.Printf("\tRead Counts By Server:\n")
 
-	ctx.readNodeCountsByServer.Range(func(key, value interface{}) bool {
+	ctx.readNodeCountsByServer.Range(func(key, value any) bool {
 		fmt.Printf("\t\t%s: %d\n", key.(string), *(value.(*int32)))
 		return true
 	})

@@ -37,7 +37,7 @@ func TestBookmark(outer *testing.T) {
 		session := driver.NewSession(neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
 		defer session.Close()
 
-		_, err := session.WriteTransaction(func(tx neo4j.Transaction) (interface{}, error) {
+		_, err := session.WriteTransaction(func(tx neo4j.Transaction) (any, error) {
 			result, err := tx.Run("CREATE ()", nil)
 			assertNil(outer, err)
 
@@ -126,7 +126,7 @@ func TestBookmark(outer *testing.T) {
 			driver, session := setUp()
 			defer tearDown(session, driver)
 
-			result, err := session.WriteTransaction(func(tx neo4j.Transaction) (interface{}, error) {
+			result, err := session.WriteTransaction(func(tx neo4j.Transaction) (any, error) {
 				result, err := tx.Run("CREATE (p:Person { name: 'Test'})", nil)
 				assertNil(t, err)
 
@@ -146,7 +146,7 @@ func TestBookmark(outer *testing.T) {
 			defer tearDown(session, driver)
 
 			failWith := errors.New("some error")
-			result, err := session.WriteTransaction(func(tx neo4j.Transaction) (interface{}, error) {
+			result, err := session.WriteTransaction(func(tx neo4j.Transaction) (any, error) {
 				result, err := tx.Run("CREATE (p:Person { name: 'Test'})", nil)
 				assertNil(t, err)
 
@@ -165,7 +165,7 @@ func TestBookmark(outer *testing.T) {
 			driver, session := setUp()
 			defer tearDown(session, driver)
 
-			result, err := session.ReadTransaction(func(tx neo4j.Transaction) (interface{}, error) {
+			result, err := session.ReadTransaction(func(tx neo4j.Transaction) (any, error) {
 				result, err := tx.Run("MATCH (p:Person) RETURN count(p)", nil)
 				assertNil(t, err)
 
@@ -188,7 +188,7 @@ func TestBookmark(outer *testing.T) {
 			defer tearDown(session, driver)
 
 			failWith := errors.New("some error")
-			result, err := session.ReadTransaction(func(tx neo4j.Transaction) (interface{}, error) {
+			result, err := session.ReadTransaction(func(tx neo4j.Transaction) (any, error) {
 				result, err := tx.Run("MATCH (p:Person) RETURN count(p)", nil)
 				assertNil(t, err)
 

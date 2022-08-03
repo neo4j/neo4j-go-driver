@@ -33,11 +33,11 @@ import (
 
 // TransactionWork represents a unit of work that will be executed against the provided
 // transaction
-type TransactionWork func(tx Transaction) (interface{}, error)
+type TransactionWork func(tx Transaction) (any, error)
 
 // ManagedTransactionWork represents a unit of work that will be executed against the provided
 // transaction
-type ManagedTransactionWork func(tx ManagedTransaction) (interface{}, error)
+type ManagedTransactionWork func(tx ManagedTransaction) (any, error)
 
 // SessionWithContext represents a logical connection (which is not tied to a physical connection)
 // to the server
@@ -51,12 +51,12 @@ type SessionWithContext interface {
 	BeginTransaction(ctx context.Context, configurers ...func(*TransactionConfig)) (ExplicitTransaction, error)
 	// ExecuteRead executes the given unit of work in a AccessModeRead transaction with
 	// retry logic in place
-	ExecuteRead(ctx context.Context, work ManagedTransactionWork, configurers ...func(*TransactionConfig)) (interface{}, error)
+	ExecuteRead(ctx context.Context, work ManagedTransactionWork, configurers ...func(*TransactionConfig)) (any, error)
 	// ExecuteWrite executes the given unit of work in a AccessModeWrite transaction with
 	// retry logic in place
-	ExecuteWrite(ctx context.Context, work ManagedTransactionWork, configurers ...func(*TransactionConfig)) (interface{}, error)
+	ExecuteWrite(ctx context.Context, work ManagedTransactionWork, configurers ...func(*TransactionConfig)) (any, error)
 	// Run executes an auto-commit statement and returns a result
-	Run(ctx context.Context, cypher string, params map[string]interface{}, configurers ...func(*TransactionConfig)) (ResultWithContext, error)
+	Run(ctx context.Context, cypher string, params map[string]any, configurers ...func(*TransactionConfig)) (ResultWithContext, error)
 	// Close closes any open resources and marks this session as unusable
 	Close(ctx context.Context) error
 
@@ -275,13 +275,13 @@ func (s *sessionWithContext) BeginTransaction(ctx context.Context, configurers .
 }
 
 func (s *sessionWithContext) ExecuteRead(ctx context.Context,
-	work ManagedTransactionWork, configurers ...func(*TransactionConfig)) (interface{}, error) {
+	work ManagedTransactionWork, configurers ...func(*TransactionConfig)) (any, error) {
 
 	return s.runRetriable(ctx, idb.ReadMode, work, configurers...)
 }
 
 func (s *sessionWithContext) ExecuteWrite(ctx context.Context,
-	work ManagedTransactionWork, configurers ...func(*TransactionConfig)) (interface{}, error) {
+	work ManagedTransactionWork, configurers ...func(*TransactionConfig)) (any, error) {
 
 	return s.runRetriable(ctx, idb.WriteMode, work, configurers...)
 }
@@ -289,7 +289,7 @@ func (s *sessionWithContext) ExecuteWrite(ctx context.Context,
 func (s *sessionWithContext) runRetriable(
 	ctx context.Context,
 	mode idb.AccessMode,
-	work ManagedTransactionWork, configurers ...func(*TransactionConfig)) (interface{}, error) {
+	work ManagedTransactionWork, configurers ...func(*TransactionConfig)) (any, error) {
 
 	// Guard for more than one transaction per session
 	if s.explicitTx != nil {
@@ -467,7 +467,7 @@ func (s *sessionWithContext) retrieveBookmarks(conn idb.Connection) {
 }
 
 func (s *sessionWithContext) Run(ctx context.Context,
-	cypher string, params map[string]interface{}, configurers ...func(*TransactionConfig)) (ResultWithContext, error) {
+	cypher string, params map[string]any, configurers ...func(*TransactionConfig)) (ResultWithContext, error) {
 
 	if s.explicitTx != nil {
 		err := &UsageError{Message: "Trying to run auto-commit transaction while in explicit transaction"}
@@ -598,13 +598,13 @@ func (s *erroredSessionWithContext) lastBookmark() string {
 func (s *erroredSessionWithContext) BeginTransaction(context.Context, ...func(*TransactionConfig)) (ExplicitTransaction, error) {
 	return nil, s.err
 }
-func (s *erroredSessionWithContext) ExecuteRead(context.Context, ManagedTransactionWork, ...func(*TransactionConfig)) (interface{}, error) {
+func (s *erroredSessionWithContext) ExecuteRead(context.Context, ManagedTransactionWork, ...func(*TransactionConfig)) (any, error) {
 	return nil, s.err
 }
-func (s *erroredSessionWithContext) ExecuteWrite(context.Context, ManagedTransactionWork, ...func(*TransactionConfig)) (interface{}, error) {
+func (s *erroredSessionWithContext) ExecuteWrite(context.Context, ManagedTransactionWork, ...func(*TransactionConfig)) (any, error) {
 	return nil, s.err
 }
-func (s *erroredSessionWithContext) Run(context.Context, string, map[string]interface{}, ...func(*TransactionConfig)) (ResultWithContext, error) {
+func (s *erroredSessionWithContext) Run(context.Context, string, map[string]any, ...func(*TransactionConfig)) (ResultWithContext, error) {
 	return nil, s.err
 }
 func (s *erroredSessionWithContext) Close(context.Context) error {

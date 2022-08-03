@@ -34,7 +34,7 @@ import (
 )
 
 // Utility to dehydrate/unpack
-func unpack(u *packstream.Unpacker) interface{} {
+func unpack(u *packstream.Unpacker) any {
 	u.Next()
 	switch u.Curr {
 	case packstream.PackedInt:
@@ -53,14 +53,14 @@ func unpack(u *packstream.Unpacker) interface{} {
 		return false
 	case packstream.PackedArray:
 		l := u.Len()
-		a := make([]interface{}, l)
+		a := make([]any, l)
 		for i := range a {
 			a[i] = unpack(u)
 		}
 		return a
 	case packstream.PackedMap:
 		l := u.Len()
-		m := make(map[string]interface{}, l)
+		m := make(map[string]any, l)
 		for i := uint32(0); i < l; i++ {
 			u.Next()
 			k := u.String()
@@ -74,7 +74,7 @@ func unpack(u *packstream.Unpacker) interface{} {
 		if l == 0 {
 			return &s
 		}
-		s.fields = make([]interface{}, l)
+		s.fields = make([]any, l)
 		for i := range s.fields {
 			s.fields[i] = unpack(u)
 		}
@@ -87,7 +87,7 @@ func unpack(u *packstream.Unpacker) interface{} {
 func TestOutgoing(ot *testing.T) {
 	var err error
 	// Utility to unpack through dechunking and a custom build func
-	dechunkAndUnpack := func(t *testing.T, build func(*testing.T, *outgoing)) interface{} {
+	dechunkAndUnpack := func(t *testing.T, build func(*testing.T, *outgoing)) any {
 		out := &outgoing{
 			chunker: newChunker(),
 			packer:  packstream.Packer{},
@@ -130,7 +130,7 @@ func TestOutgoing(ot *testing.T) {
 	cases := []struct {
 		name   string
 		build  func(t *testing.T, outgoing *outgoing)
-		expect interface{}
+		expect any
 	}{
 		{
 			name: "hello",
@@ -139,17 +139,17 @@ func TestOutgoing(ot *testing.T) {
 			},
 			expect: &testStruct{
 				tag:    byte(msgHello),
-				fields: []interface{}{map[string]interface{}{}},
+				fields: []any{map[string]any{}},
 			},
 		},
 		{
 			name: "begin",
 			build: func(t *testing.T, out *outgoing) {
-				out.appendBegin(map[string]interface{}{"mode": "r"})
+				out.appendBegin(map[string]any{"mode": "r"})
 			},
 			expect: &testStruct{
 				tag:    byte(msgBegin),
-				fields: []interface{}{map[string]interface{}{"mode": "r"}},
+				fields: []any{map[string]any{"mode": "r"}},
 			},
 		},
 		{
@@ -204,7 +204,7 @@ func TestOutgoing(ot *testing.T) {
 			},
 			expect: &testStruct{
 				tag:    byte(msgPullN),
-				fields: []interface{}{map[string]interface{}{"n": int64(7)}},
+				fields: []any{map[string]any{"n": int64(7)}},
 			},
 		},
 		{
@@ -214,7 +214,7 @@ func TestOutgoing(ot *testing.T) {
 			},
 			expect: &testStruct{
 				tag:    byte(msgPullN),
-				fields: []interface{}{map[string]interface{}{"n": int64(7), "qid": int64(10000)}},
+				fields: []any{map[string]any{"n": int64(7), "qid": int64(10000)}},
 			},
 		},
 		{
@@ -224,7 +224,7 @@ func TestOutgoing(ot *testing.T) {
 			},
 			expect: &testStruct{
 				tag:    byte(msgDiscardN),
-				fields: []interface{}{map[string]interface{}{"n": int64(7), "qid": int64(10000)}},
+				fields: []any{map[string]any{"n": int64(7), "qid": int64(10000)}},
 			},
 		},
 		{
@@ -234,37 +234,37 @@ func TestOutgoing(ot *testing.T) {
 			},
 			expect: &testStruct{
 				tag:    byte(msgRun),
-				fields: []interface{}{"cypher", map[string]interface{}{}, map[string]interface{}{}},
+				fields: []any{"cypher", map[string]any{}, map[string]any{}},
 			},
 		},
 		{
 			name: "run, no params, meta",
 			build: func(t *testing.T, out *outgoing) {
-				out.appendRun("cypher", nil, map[string]interface{}{"mode": "r"})
+				out.appendRun("cypher", nil, map[string]any{"mode": "r"})
 			},
 			expect: &testStruct{
 				tag:    byte(msgRun),
-				fields: []interface{}{"cypher", map[string]interface{}{}, map[string]interface{}{"mode": "r"}},
+				fields: []any{"cypher", map[string]any{}, map[string]any{"mode": "r"}},
 			},
 		},
 		{
 			name: "run, params, meta",
 			build: func(t *testing.T, out *outgoing) {
-				out.appendRun("cypher", map[string]interface{}{"x": 1, "y": "2"}, map[string]interface{}{"mode": "r"})
+				out.appendRun("cypher", map[string]any{"x": 1, "y": "2"}, map[string]any{"mode": "r"})
 			},
 			expect: &testStruct{
 				tag:    byte(msgRun),
-				fields: []interface{}{"cypher", map[string]interface{}{"x": int64(1), "y": "2"}, map[string]interface{}{"mode": "r"}},
+				fields: []any{"cypher", map[string]any{"x": int64(1), "y": "2"}, map[string]any{"mode": "r"}},
 			},
 		},
 		{
 			name: "run, params, meta",
 			build: func(t *testing.T, out *outgoing) {
-				out.appendRun("cypher", map[string]interface{}{"x": 1, "y": "2"}, map[string]interface{}{"mode": "r"})
+				out.appendRun("cypher", map[string]any{"x": 1, "y": "2"}, map[string]any{"mode": "r"})
 			},
 			expect: &testStruct{
 				tag:    byte(msgRun),
-				fields: []interface{}{"cypher", map[string]interface{}{"x": int64(1), "y": "2"}, map[string]interface{}{"mode": "r"}},
+				fields: []any{"cypher", map[string]any{"x": int64(1), "y": "2"}, map[string]any{"mode": "r"}},
 			},
 		},
 		{
@@ -274,7 +274,7 @@ func TestOutgoing(ot *testing.T) {
 			},
 			expect: &testStruct{
 				tag:    byte(msgRoute),
-				fields: []interface{}{map[string]interface{}{"key1": "val1", "key2": "val2"}, []interface{}{"deutsch-mark", "mark-twain"}, "adb"},
+				fields: []any{map[string]any{"key1": "val1", "key2": "val2"}, []any{"deutsch-mark", "mark-twain"}, "adb"},
 			},
 		},
 		{
@@ -285,7 +285,7 @@ func TestOutgoing(ot *testing.T) {
 			},
 			expect: &testStruct{
 				tag:    byte(msgRoute),
-				fields: []interface{}{map[string]interface{}{"key1": "val1", "key2": "val2"}, []interface{}{"deutsch-mark", "mark-twain"}, nil},
+				fields: []any{map[string]any{"key1": "val1", "key2": "val2"}, []any{"deutsch-mark", "mark-twain"}, nil},
 			},
 		},
 		{
@@ -295,7 +295,7 @@ func TestOutgoing(ot *testing.T) {
 			},
 			expect: &testStruct{
 				tag:    byte(msgRoute),
-				fields: []interface{}{map[string]interface{}{"key1": "val1", "key2": "val2"}, []interface{}{}, "adb"},
+				fields: []any{map[string]any{"key1": "val1", "key2": "val2"}, []any{}, "adb"},
 			},
 		},
 		{
@@ -306,59 +306,59 @@ func TestOutgoing(ot *testing.T) {
 			},
 			expect: &testStruct{
 				tag:    byte(msgRoute),
-				fields: []interface{}{map[string]interface{}{"key1": "val1", "key2": "val2"}, []interface{}{}, nil},
+				fields: []any{map[string]any{"key1": "val1", "key2": "val2"}, []any{}, nil},
 			},
 		},
 		{
 			name: "route",
 			build: func(t *testing.T, out *outgoing) {
-				out.appendRoute(map[string]string{"key1": "val1", "key2": "val2"}, []string{"deutsch-mark", "mark-twain"}, map[string]interface{}{"db": "adb"})
+				out.appendRoute(map[string]string{"key1": "val1", "key2": "val2"}, []string{"deutsch-mark", "mark-twain"}, map[string]any{"db": "adb"})
 			},
 			expect: &testStruct{
 				tag: byte(msgRoute),
-				fields: []interface{}{
-					map[string]interface{}{"key1": "val1", "key2": "val2"},
-					[]interface{}{"deutsch-mark", "mark-twain"},
-					map[string]interface{}{"db": "adb"}},
+				fields: []any{
+					map[string]any{"key1": "val1", "key2": "val2"},
+					[]any{"deutsch-mark", "mark-twain"},
+					map[string]any{"db": "adb"}},
 			},
 		},
 		{
 			name: "route, default database",
 			build: func(t *testing.T, out *outgoing) {
-				out.appendRoute(map[string]string{"key1": "val1", "key2": "val2"}, []string{"deutsch-mark", "mark-twain"}, map[string]interface{}{})
+				out.appendRoute(map[string]string{"key1": "val1", "key2": "val2"}, []string{"deutsch-mark", "mark-twain"}, map[string]any{})
 			},
 			expect: &testStruct{
 				tag: byte(msgRoute),
-				fields: []interface{}{
-					map[string]interface{}{"key1": "val1", "key2": "val2"},
-					[]interface{}{"deutsch-mark", "mark-twain"},
-					map[string]interface{}{}},
+				fields: []any{
+					map[string]any{"key1": "val1", "key2": "val2"},
+					[]any{"deutsch-mark", "mark-twain"},
+					map[string]any{}},
 			},
 		},
 		{
 			name: "route, default bookmarks",
 			build: func(t *testing.T, out *outgoing) {
-				out.appendRoute(map[string]string{"key1": "val1", "key2": "val2"}, nil, map[string]interface{}{"db": "adb"})
+				out.appendRoute(map[string]string{"key1": "val1", "key2": "val2"}, nil, map[string]any{"db": "adb"})
 			},
 			expect: &testStruct{
 				tag: byte(msgRoute),
-				fields: []interface{}{
-					map[string]interface{}{"key1": "val1", "key2": "val2"},
-					[]interface{}{},
-					map[string]interface{}{"db": "adb"}},
+				fields: []any{
+					map[string]any{"key1": "val1", "key2": "val2"},
+					[]any{},
+					map[string]any{"db": "adb"}},
 			},
 		},
 		{
 			name: "route, default bookmarks and database",
 			build: func(t *testing.T, out *outgoing) {
-				out.appendRoute(map[string]string{"key1": "val1", "key2": "val2"}, nil, map[string]interface{}{})
+				out.appendRoute(map[string]string{"key1": "val1", "key2": "val2"}, nil, map[string]any{})
 			},
 			expect: &testStruct{
 				tag: byte(msgRoute),
-				fields: []interface{}{
-					map[string]interface{}{"key1": "val1", "key2": "val2"},
-					[]interface{}{},
-					map[string]interface{}{}},
+				fields: []any{
+					map[string]any{"key1": "val1", "key2": "val2"},
+					[]any{},
+					map[string]any{}},
 			},
 		},
 		{
@@ -379,7 +379,7 @@ func TestOutgoing(ot *testing.T) {
 			},
 			expect: &testStruct{
 				tag: 'I',
-				fields: []interface{}{
+				fields: []any{
 					int64(1592231400),
 					int64(42),
 					int64(-2 * 60 * 60),
@@ -406,7 +406,7 @@ func TestOutgoing(ot *testing.T) {
 			},
 			expect: &testStruct{
 				tag: 'i',
-				fields: []interface{}{
+				fields: []any{
 					int64(1592231400),
 					int64(42),
 					"Pacific/Honolulu",
@@ -438,51 +438,51 @@ func TestOutgoing(ot *testing.T) {
 	// tests for top level appending and sending outgoing messages
 	paramCases := []struct {
 		name   string
-		inp    map[string]interface{}
-		expect map[string]interface{}
+		inp    map[string]any
+		expect map[string]any
 	}{
 		{
 			name: "map of maps",
-			inp: map[string]interface{}{
-				"map":    map[string]interface{}{"k1": "v1"},
+			inp: map[string]any{
+				"map":    map[string]any{"k1": "v1"},
 				"int":    map[string]int{"k2": 1},
 				"[]int":  map[string][]int{"k3": {1, 2, 3}},
 				"[]bool": map[string]bool{"t": true, "f": false},
 			},
-			expect: map[string]interface{}{
-				"map":    map[string]interface{}{"k1": "v1"},
-				"int":    map[string]interface{}{"k2": int64(1)},
-				"[]int":  map[string]interface{}{"k3": []interface{}{int64(1), int64(2), int64(3)}},
-				"[]bool": map[string]interface{}{"t": true, "f": false},
+			expect: map[string]any{
+				"map":    map[string]any{"k1": "v1"},
+				"int":    map[string]any{"k2": int64(1)},
+				"[]int":  map[string]any{"k3": []any{int64(1), int64(2), int64(3)}},
+				"[]bool": map[string]any{"t": true, "f": false},
 			},
 		},
 		{
 			name: "map of spatial",
-			inp: map[string]interface{}{
+			inp: map[string]any{
 				"p1": dbtype.Point2D{SpatialRefId: 1, X: 2, Y: 3},
 				"p2": dbtype.Point3D{SpatialRefId: 4, X: 5, Y: 6, Z: 7},
 				"ps": []dbtype.Point3D{{SpatialRefId: 4, X: 5, Y: 6, Z: 7}},
 			},
-			expect: map[string]interface{}{
-				"p1": &testStruct{tag: 'X', fields: []interface{}{int64(1), float64(2), float64(3)}},
-				"p2": &testStruct{tag: 'Y', fields: []interface{}{int64(4), float64(5), float64(6), float64(7)}},
-				"ps": []interface{}{&testStruct{tag: 'Y', fields: []interface{}{int64(4), float64(5), float64(6), float64(7)}}},
+			expect: map[string]any{
+				"p1": &testStruct{tag: 'X', fields: []any{int64(1), float64(2), float64(3)}},
+				"p2": &testStruct{tag: 'Y', fields: []any{int64(4), float64(5), float64(6), float64(7)}},
+				"ps": []any{&testStruct{tag: 'Y', fields: []any{int64(4), float64(5), float64(6), float64(7)}}},
 			},
 		},
 		{
 			name: "map of spatial pointers",
-			inp: map[string]interface{}{
+			inp: map[string]any{
 				"p1": &dbtype.Point2D{SpatialRefId: 1, X: 2, Y: 3},
 				"p2": &dbtype.Point3D{SpatialRefId: 4, X: 5, Y: 6, Z: 7},
 			},
-			expect: map[string]interface{}{
-				"p1": &testStruct{tag: 'X', fields: []interface{}{int64(1), float64(2), float64(3)}},
-				"p2": &testStruct{tag: 'Y', fields: []interface{}{int64(4), float64(5), float64(6), float64(7)}},
+			expect: map[string]any{
+				"p1": &testStruct{tag: 'X', fields: []any{int64(1), float64(2), float64(3)}},
+				"p2": &testStruct{tag: 'Y', fields: []any{int64(4), float64(5), float64(6), float64(7)}},
 			},
 		},
 		{
 			name: "map of temporals",
-			inp: map[string]interface{}{
+			inp: map[string]any{
 				"time.Time UTC":    time.Unix(1, 2).UTC(),
 				"time.Time offset": time.Unix(1, 2).In(offsetZone),
 				"LocalDateTime":    dbtype.LocalDateTime(time.Unix(1, 2).UTC()),
@@ -491,19 +491,19 @@ func TestOutgoing(ot *testing.T) {
 				"LocalTime":        dbtype.LocalTime(time.Unix(1, 2).UTC()),
 				"Duration":         dbtype.Duration{Months: 1, Days: 2, Seconds: 3, Nanos: 4},
 			},
-			expect: map[string]interface{}{
-				"time.Time UTC":    &testStruct{tag: 'f', fields: []interface{}{int64(1), int64(2), "UTC"}},
-				"time.Time offset": &testStruct{tag: 'F', fields: []interface{}{int64(101), int64(2), int64(100)}},
-				"LocalDateTime":    &testStruct{tag: 'd', fields: []interface{}{int64(1), int64(2)}},
-				"Date":             &testStruct{tag: 'D', fields: []interface{}{int64(8735)}},
-				"Time":             &testStruct{tag: 'T', fields: []interface{}{int64(101*time.Second + 2), int64(100)}},
-				"LocalTime":        &testStruct{tag: 't', fields: []interface{}{int64(1*time.Second + 2)}},
-				"Duration":         &testStruct{tag: 'E', fields: []interface{}{int64(1), int64(2), int64(3), int64(4)}},
+			expect: map[string]any{
+				"time.Time UTC":    &testStruct{tag: 'f', fields: []any{int64(1), int64(2), "UTC"}},
+				"time.Time offset": &testStruct{tag: 'F', fields: []any{int64(101), int64(2), int64(100)}},
+				"LocalDateTime":    &testStruct{tag: 'd', fields: []any{int64(1), int64(2)}},
+				"Date":             &testStruct{tag: 'D', fields: []any{int64(8735)}},
+				"Time":             &testStruct{tag: 'T', fields: []any{int64(101*time.Second + 2), int64(100)}},
+				"LocalTime":        &testStruct{tag: 't', fields: []any{int64(1*time.Second + 2)}},
+				"Duration":         &testStruct{tag: 'E', fields: []any{int64(1), int64(2), int64(3), int64(4)}},
 			},
 		},
 		{
 			name: "map of custom native types",
-			inp: map[string]interface{}{
+			inp: map[string]any{
 				"custom bool":         customBool(true),
 				"custom float":        customFloat(3.14),
 				"custom int":          customInt(12345),
@@ -512,26 +512,26 @@ func TestOutgoing(ot *testing.T) {
 				"custom string slice": customStringSlice([]string{"hello", "again"}),
 				"custom map of ints":  customMapOfInts(map[string]int{"l": 1}),
 			},
-			expect: map[string]interface{}{
+			expect: map[string]any{
 				"custom bool":   true,
 				"custom float":  3.14,
 				"custom int":    int64(12345),
 				"custom string": "Hello",
-				// Custom will cause []byte to come back as []interface{}, could be handled but maybe not worth it
-				"custom byte slice":   []interface{}{int64(1), int64(2), int64(3)},
-				"custom string slice": []interface{}{"hello", "again"},
-				"custom map of ints":  map[string]interface{}{"l": int64(1)},
+				// Custom will cause []byte to come back as []any, could be handled but maybe not worth it
+				"custom byte slice":   []any{int64(1), int64(2), int64(3)},
+				"custom string slice": []any{"hello", "again"},
+				"custom map of ints":  map[string]any{"l": int64(1)},
 			},
 		},
 		{
 			name: "map of pointer types",
-			inp: map[string]interface{}{
+			inp: map[string]any{
 				"*[]int":             &([]int{3}),
 				"*map[string]string": &(map[string]string{"x": "y"}),
 			},
-			expect: map[string]interface{}{
-				"*[]int":             []interface{}{int64(3)},
-				"*map[string]string": map[string]interface{}{"x": "y"},
+			expect: map[string]any{
+				"*[]int":             []any{int64(3)},
+				"*map[string]string": map[string]any{"x": "y"},
 			},
 		},
 	}
@@ -554,26 +554,26 @@ func TestOutgoing(ot *testing.T) {
 	// Test packing of stuff that is expected to give an error
 	paramErrorCases := []struct {
 		name string
-		inp  map[string]interface{}
+		inp  map[string]any
 		err  error
 	}{
 		{
 			name: "map with non string key",
-			inp: map[string]interface{}{
+			inp: map[string]any{
 				"m": map[int]string{1: "y"},
 			},
 			err: &db.UnsupportedTypeError{},
 		},
 		{
 			name: "a random struct",
-			inp: map[string]interface{}{
+			inp: map[string]any{
 				"m": aStruct{},
 			},
 			err: &db.UnsupportedTypeError{},
 		},
 		{
 			name: "a random *struct",
-			inp: map[string]interface{}{
+			inp: map[string]any{
 				"m": &aStruct{},
 			},
 			err: &db.UnsupportedTypeError{},

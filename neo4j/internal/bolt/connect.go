@@ -47,7 +47,7 @@ var versions = [4]protocolVersion{
 
 // Connect initiates the negotiation of the Bolt protocol version.
 // Returns the instance of bolt protocol implementing the low-level Connection interface.
-func Connect(ctx context.Context, serverName string, conn net.Conn, auth map[string]interface{}, userAgent string, routingContext map[string]string, logger log.Logger, boltLog log.BoltLogger) (db.Connection, error) {
+func Connect(ctx context.Context, serverName string, conn net.Conn, auth map[string]any, userAgent string, routingContext map[string]string, logger log.Logger, boltLog log.BoltLogger) (db.Connection, error) {
 	// Perform Bolt handshake to negotiate version
 	// Send handshake to server
 	handshake := []byte{

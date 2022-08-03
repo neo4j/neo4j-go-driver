@@ -29,7 +29,7 @@ type relNode struct {
 	id        int64
 	elementId string
 	name      string
-	props     map[string]interface{}
+	props     map[string]any
 }
 
 // buildPath builds a path from Bolt representation

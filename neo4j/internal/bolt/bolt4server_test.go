@@ -68,7 +68,7 @@ func (s *bolt4server) assertStructType(msg *testStruct, t byte) {
 }
 
 func (s *bolt4server) sendFailureMsg(code, msg string) {
-	f := map[string]interface{}{
+	f := map[string]any{
 		"code":    code,
 		"message": msg,
 	}
@@ -79,7 +79,7 @@ func (s *bolt4server) sendIgnoredMsg() {
 	s.send(msgIgnored)
 }
 
-func (s *bolt4server) waitForHelloWithPatches(patches []any) map[string]interface{} {
+func (s *bolt4server) waitForHelloWithPatches(patches []any) map[string]any {
 	m := s.waitForHello()
 	actualPatches := m["patch_bolt"]
 	if !reflect.DeepEqual(actualPatches, patches) {
@@ -89,10 +89,10 @@ func (s *bolt4server) waitForHelloWithPatches(patches []any) map[string]interfac
 }
 
 // Returns the first hello field
-func (s *bolt4server) waitForHello() map[string]interface{} {
+func (s *bolt4server) waitForHello() map[string]any {
 	msg := s.receiveMsg()
 	s.assertStructType(msg, msgHello)
-	m := msg.fields[0].(map[string]interface{})
+	m := msg.fields[0].(map[string]any)
 	// Hello should contain some musts
 	_, exists := m["scheme"]
 	if !exists {
@@ -115,7 +115,7 @@ func (s *bolt4server) receiveMsg() *testStruct {
 	n := s.unpacker.Len()
 	t := s.unpacker.StructTag()
 
-	fields := make([]interface{}, n)
+	fields := make([]any, n)
 	for i := uint32(0); i < n; i++ {
 		s.unpacker.Next()
 		fields[i] = serverHydrator(s.unpacker)
@@ -123,7 +123,7 @@ func (s *bolt4server) receiveMsg() *testStruct {
 	return &testStruct{tag: t, fields: fields}
 }
 
-func (s *bolt4server) waitForRun(assertFields func(fields []interface{})) {
+func (s *bolt4server) waitForRun(assertFields func(fields []any)) {
 	msg := s.receiveMsg()
 	s.assertStructType(msg, msgRun)
 	if assertFields != nil {
@@ -154,7 +154,7 @@ func (s *bolt4server) waitForTxRollback() {
 func (s *bolt4server) waitForPullN(n int) {
 	msg := s.receiveMsg()
 	s.assertStructType(msg, msgPullN)
-	extra := msg.fields[0].(map[string]interface{})
+	extra := msg.fields[0].(map[string]any)
 	sentN := int(extra["n"].(int64))
 	if sentN != n {
 		panic(fmt.Sprintf("Expected PULL n:%d but got PULL %d", n, sentN))
@@ -168,7 +168,7 @@ func (s *bolt4server) waitForPullN(n int) {
 func (s *bolt4server) waitForPullNandQid(n, qid int) {
 	msg := s.receiveMsg()
 	s.assertStructType(msg, msgPullN)
-	extra := msg.fields[0].(map[string]interface{})
+	extra := msg.fields[0].(map[string]any)
 	sentN := int(extra["n"].(int64))
 	if sentN != n {
 		panic(fmt.Sprintf("Expected PULL n:%d but got PULL %d", n, sentN))
@@ -182,7 +182,7 @@ func (s *bolt4server) waitForPullNandQid(n, qid int) {
 func (s *bolt4server) waitForDiscardNAndQid(n, qid int) {
 	msg := s.receiveMsg()
 	s.assertStructType(msg, msgDiscardN)
-	extra := msg.fields[0].(map[string]interface{})
+	extra := msg.fields[0].(map[string]any)
 	sentN := int(extra["n"].(int64))
 	if sentN != n {
 		panic(fmt.Sprintf("Expected DISCARD n:%d but got DISCARD %d", n, sentN))
@@ -196,7 +196,7 @@ func (s *bolt4server) waitForDiscardNAndQid(n, qid int) {
 func (s *bolt4server) waitForDiscardN(n int) {
 	msg := s.receiveMsg()
 	s.assertStructType(msg, msgDiscardN)
-	extra := msg.fields[0].(map[string]interface{})
+	extra := msg.fields[0].(map[string]any)
 	sentN := int(extra["n"].(int64))
 	if sentN != n {
 		panic(fmt.Sprintf("Expected DISCARD n:%d but got DISCARD %d", n, sentN))
@@ -207,7 +207,7 @@ func (s *bolt4server) waitForDiscardN(n int) {
 	}
 }
 
-func (s *bolt4server) waitForRoute(assertRoute func(fields []interface{})) {
+func (s *bolt4server) waitForRoute(assertRoute func(fields []any)) {
 	msg := s.receiveMsg()
 	s.assertStructType(msg, msgRoute)
 	if assertRoute != nil {
@@ -234,24 +234,24 @@ func (s *bolt4server) closeConnection() {
 	s.conn.Close()
 }
 
-func (s *bolt4server) send(tag byte, field ...interface{}) {
+func (s *bolt4server) send(tag byte, field ...any) {
 	s.out.appendX(tag, field...)
 	s.out.send(context.Background(), s.conn)
 }
 
-func (s *bolt4server) sendSuccess(m map[string]interface{}) {
+func (s *bolt4server) sendSuccess(m map[string]any) {
 	s.send(msgSuccess, m)
 }
 
 func (s *bolt4server) acceptHello() {
-	s.send(msgSuccess, map[string]interface{}{
+	s.send(msgSuccess, map[string]any{
 		"connection_id": "cid",
 		"server":        "fake/4.5",
 	})
 }
 
-func (s *bolt4server) acceptHelloWithHints(hints map[string]interface{}) {
-	s.send(msgSuccess, map[string]interface{}{
+func (s *bolt4server) acceptHelloWithHints(hints map[string]any) {
+	s.send(msgSuccess, map[string]any{
 		"connection_id": "cid",
 		"server":        "fake/4.5",
 		"hints":         hints,
@@ -259,7 +259,7 @@ func (s *bolt4server) acceptHelloWithHints(hints map[string]interface{}) {
 }
 
 func (s *bolt4server) acceptHelloWithPatches(patches []any) {
-	s.send(msgSuccess, map[string]interface{}{
+	s.send(msgSuccess, map[string]any{
 		"connection_id": "cid",
 		"server":        "fake/4.5",
 		"patch_bolt":    patches,
@@ -267,7 +267,7 @@ func (s *bolt4server) acceptHelloWithPatches(patches []any) {
 }
 
 func (s *bolt4server) rejectHelloUnauthorized() {
-	s.send(msgFailure, map[string]interface{}{
+	s.send(msgFailure, map[string]any{
 		"code":    "Neo.ClientError.Security.Unauthorized",
 		"message": "",
 	})
@@ -289,7 +289,7 @@ func (s *bolt4server) acceptWithMinor(major, minor byte) {
 }
 
 // Utility to wait and serve a auto commit query
-func (s *bolt4server) serveRun(stream []testStruct, assertRun func([]interface{})) {
+func (s *bolt4server) serveRun(stream []testStruct, assertRun func([]any)) {
 	s.waitForRun(assertRun)
 	s.waitForPullN(bolt4_fetchsize)
 	for _, x := range stream {
@@ -299,7 +299,7 @@ func (s *bolt4server) serveRun(stream []testStruct, assertRun func([]interface{}
 
 func (s *bolt4server) serveRunTx(stream []testStruct, commit bool, bookmark string) {
 	s.waitForTxBegin()
-	s.send(msgSuccess, map[string]interface{}{})
+	s.send(msgSuccess, map[string]any{})
 	s.waitForRun(nil)
 	s.waitForPullN(bolt4_fetchsize)
 	for _, x := range stream {
@@ -307,12 +307,12 @@ func (s *bolt4server) serveRunTx(stream []testStruct, commit bool, bookmark stri
 	}
 	if commit {
 		s.waitForTxCommit()
-		s.send(msgSuccess, map[string]interface{}{
+		s.send(msgSuccess, map[string]any{
 			"bookmark": bookmark,
 		})
 	} else {
 		s.waitForTxRollback()
-		s.send(msgSuccess, map[string]interface{}{})
+		s.send(msgSuccess, map[string]any{})
 	}
 }
 

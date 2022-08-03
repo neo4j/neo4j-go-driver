@@ -28,9 +28,9 @@ import (
 )
 
 // Converts native type to proxied "cypher" to be sent to frontend.
-func nativeToCypher(v interface{}) map[string]interface{} {
+func nativeToCypher(v any) map[string]any {
 	if v == nil {
-		return map[string]interface{}{"name": "CypherNull", "data": nil}
+		return map[string]any{"name": "CypherNull", "data": nil}
 	}
 	switch x := v.(type) {
 	case int64:
@@ -48,7 +48,7 @@ func nativeToCypher(v interface{}) map[string]interface{} {
 			"month": date.Month(),
 			"day":   date.Day(),
 		}
-		return map[string]interface{}{
+		return map[string]any{
 			"name": "CypherDate",
 			"data": values,
 		}
@@ -63,7 +63,7 @@ func nativeToCypher(v interface{}) map[string]interface{} {
 			"second":     localDateTime.Second(),
 			"nanosecond": localDateTime.Nanosecond(),
 		}
-		return map[string]interface{}{
+		return map[string]any{
 			"name": "CypherDateTime",
 			"data": values,
 		}
@@ -74,7 +74,7 @@ func nativeToCypher(v interface{}) map[string]interface{} {
 			"seconds":     x.Seconds,
 			"nanoseconds": x.Nanos,
 		}
-		return map[string]interface{}{
+		return map[string]any{
 			"name": "CypherDuration",
 			"data": values,
 		}
@@ -88,7 +88,7 @@ func nativeToCypher(v interface{}) map[string]interface{} {
 			"nanosecond":   time.Nanosecond(),
 			"utc_offset_s": offset,
 		}
-		return map[string]interface{}{
+		return map[string]any{
 			"name": "CypherTime",
 			"data": values,
 		}
@@ -100,7 +100,7 @@ func nativeToCypher(v interface{}) map[string]interface{} {
 			"second":     localTime.Second(),
 			"nanosecond": localTime.Nanosecond(),
 		}
-		return map[string]interface{}{
+		return map[string]any{
 			"name": "CypherTime",
 			"data": values,
 		}
@@ -119,42 +119,42 @@ func nativeToCypher(v interface{}) map[string]interface{} {
 		if tzName != "Offset" {
 			values["timezone_id"] = x.Location().String()
 		}
-		return map[string]interface{}{
+		return map[string]any{
 			"name": "CypherDateTime",
 			"data": values,
 		}
 
-	case []interface{}:
-		values := make([]interface{}, len(x))
+	case []any:
+		values := make([]any, len(x))
 		for i, y := range x {
 			values[i] = nativeToCypher(y)
 		}
 		return valueResponse("CypherList", values)
 	case []string:
-		values := make([]interface{}, len(x))
+		values := make([]any, len(x))
 		for i, y := range x {
 			values[i] = nativeToCypher(y)
 		}
 		return valueResponse("CypherList", values)
-	case map[string]interface{}:
-		values := make(map[string]interface{})
+	case map[string]any:
+		values := make(map[string]any)
 		for k, v := range x {
 			values[k] = nativeToCypher(v)
 		}
 		return valueResponse("CypherMap", values)
 	case neo4j.Node:
-		return map[string]interface{}{
+		return map[string]any{
 			"name": "Node",
-			"data": map[string]interface{}{
+			"data": map[string]any{
 				"id":        nativeToCypher(x.Id),
 				"elementId": nativeToCypher(x.ElementId),
 				"labels":    nativeToCypher(x.Labels),
 				"props":     nativeToCypher(x.Props),
 			}}
 	case neo4j.Relationship:
-		return map[string]interface{}{
+		return map[string]any{
 			"name": "Relationship",
-			"data": map[string]interface{}{
+			"data": map[string]any{
 				"id":                 nativeToCypher(x.Id),
 				"elementId":          nativeToCypher(x.ElementId),
 				"startNodeId":        nativeToCypher(x.StartId),
@@ -165,17 +165,17 @@ func nativeToCypher(v interface{}) map[string]interface{} {
 				"props":              nativeToCypher(x.Props),
 			}}
 	case neo4j.Path:
-		nodes := make([]interface{}, len(x.Nodes))
+		nodes := make([]any, len(x.Nodes))
 		for i := range x.Nodes {
 			nodes[i] = x.Nodes[i]
 		}
-		rels := make([]interface{}, len(x.Relationships))
+		rels := make([]any, len(x.Relationships))
 		for i := range x.Relationships {
 			rels[i] = x.Relationships[i]
 		}
-		return map[string]interface{}{
+		return map[string]any{
 			"name": "Path",
-			"data": map[string]interface{}{
+			"data": map[string]any{
 				"nodes":         nativeToCypher(nodes),
 				"relationships": nativeToCypher(rels),
 			},
@@ -185,6 +185,6 @@ func nativeToCypher(v interface{}) map[string]interface{} {
 }
 
 // Helper to wrap proxied "cypher" value into a response
-func valueResponse(name string, v interface{}) map[string]interface{} {
-	return map[string]interface{}{"name": name, "data": map[string]interface{}{"value": v}}
+func valueResponse(name string, v any) map[string]any {
+	return map[string]any{"name": name, "data": map[string]any{"value": v}}
 }

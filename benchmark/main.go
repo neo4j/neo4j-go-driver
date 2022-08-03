@@ -87,7 +87,7 @@ func buildSetup(driver neo4j.Driver, setup *neo4j.Node) {
 				x = x + i*i
 				nums[strconv.Itoa(i)] = x
 			}
-			_, err := sess.Run("CREATE (n:IterMxL) SET n = $nums RETURN n", map[string]interface{}{"nums": nums})
+			_, err := sess.Run("CREATE (n:IterMxL) SET n = $nums RETURN n", map[string]any{"nums": nums})
 			if err != nil {
 				panic(err)
 			}
@@ -144,8 +144,8 @@ func iterMxL18(driver neo4j18.Driver) {
 	}
 }
 
-func buildParamsLMap() map[string]interface{} {
-	m := map[string]interface{}{}
+func buildParamsLMap() map[string]any {
+	m := map[string]any{}
 	// Bunch of ints
 	for i := 0; i < 500; i++ {
 		m[fmt.Sprintf("i%d", i)] = i * i
@@ -153,7 +153,7 @@ func buildParamsLMap() map[string]interface{} {
 	return m
 }
 
-func params(driver neo4j.Driver, m map[string]interface{}, n int) {
+func params(driver neo4j.Driver, m map[string]any, n int) {
 	// Use same session for all of n, not part of measurement
 	session := driver.NewSession(neo4j.SessionConfig{})
 	for i := 0; i < n; i++ {
@@ -165,7 +165,7 @@ func params(driver neo4j.Driver, m map[string]interface{}, n int) {
 	session.Close()
 }
 
-func params18(driver neo4j18.Driver, m map[string]interface{}, n int) {
+func params18(driver neo4j18.Driver, m map[string]any, n int) {
 	// Use same session for all of n, not part of measurement
 	session, _ := driver.NewSession(neo4j18.SessionConfig{})
 	for i := 0; i < n; i++ {
@@ -182,8 +182,8 @@ func params18(driver neo4j18.Driver, m map[string]interface{}, n int) {
 func getS(driver neo4j.Driver, n int) {
 	for i := 0; i < n; i++ {
 		session := driver.NewSession(neo4j.SessionConfig{})
-		x, _ := session.ReadTransaction(func(tx neo4j.Transaction) (interface{}, error) {
-			res, err := tx.Run("RETURN $i", map[string]interface{}{"i": i})
+		x, _ := session.ReadTransaction(func(tx neo4j.Transaction) (any, error) {
+			res, err := tx.Run("RETURN $i", map[string]any{"i": i})
 			if err != nil {
 				panic(err)
 			}
@@ -206,8 +206,8 @@ func getS18(driver neo4j18.Driver, n int) {
 		if err != nil {
 			panic(err)
 		}
-		x, _ := session.ReadTransaction(func(tx neo4j18.Transaction) (interface{}, error) {
-			res, err := tx.Run("RETURN $i", map[string]interface{}{"i": i})
+		x, _ := session.ReadTransaction(func(tx neo4j18.Transaction) (any, error) {
+			res, err := tx.Run("RETURN $i", map[string]any{"i": i})
 			if err != nil {
 				panic(err)
 			}

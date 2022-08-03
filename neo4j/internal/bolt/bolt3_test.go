@@ -32,13 +32,13 @@ import (
 func TestBolt3(outer *testing.T) {
 	// Test streams
 	// Faked returns from a server
-	runKeys := []interface{}{"f1", "f2"}
+	runKeys := []any{"f1", "f2"}
 	runBookmark := "bm"
 	runResponse := []testStruct{
 		{
 			tag: msgSuccess,
-			fields: []interface{}{
-				map[string]interface{}{
+			fields: []any{
+				map[string]any{
 					"fields":  runKeys,
 					"t_first": int64(1),
 				},
@@ -46,23 +46,23 @@ func TestBolt3(outer *testing.T) {
 		},
 		{
 			tag:    msgRecord,
-			fields: []interface{}{[]interface{}{"1v1", "1v2"}},
+			fields: []any{[]any{"1v1", "1v2"}},
 		},
 		{
 			tag:    msgRecord,
-			fields: []interface{}{[]interface{}{"2v1", "2v2"}},
+			fields: []any{[]any{"2v1", "2v2"}},
 		},
 		{
 			tag:    msgRecord,
-			fields: []interface{}{[]interface{}{"3v1", "3v2"}},
+			fields: []any{[]any{"3v1", "3v2"}},
 		},
 		{
 			tag:    msgSuccess,
-			fields: []interface{}{map[string]interface{}{"bookmark": runBookmark, "type": "r"}},
+			fields: []any{map[string]any{"bookmark": runBookmark, "type": "r"}},
 		},
 	}
 
-	auth := map[string]interface{}{
+	auth := map[string]any{
 		"scheme":      "basic",
 		"principal":   "neo4j",
 		"credentials": "pass",
@@ -277,11 +277,11 @@ func TestBolt3(outer *testing.T) {
 			srv.waitForRun()
 			srv.waitForPullAll()
 			// Send response to run and first record as response to pull
-			srv.send(msgSuccess, map[string]interface{}{
+			srv.send(msgSuccess, map[string]any{
 				"fields":  runKeys,
 				"t_first": int64(1),
 			})
-			srv.send(msgRecord, []interface{}{"1v1", "1v2"})
+			srv.send(msgRecord, []any{"1v1", "1v2"})
 			// Pretty nice towards bolt, a full message is written
 			srv.closeConnection()
 		})
@@ -313,7 +313,7 @@ func TestBolt3(outer *testing.T) {
 			srv.waitForReset()
 			srv.sendIgnoredMsg()
 			srv.sendIgnoredMsg()
-			srv.sendSuccess(map[string]interface{}{})
+			srv.sendSuccess(map[string]any{})
 		})
 		defer cleanup()
 		defer bolt.Close(context.Background())
@@ -407,11 +407,11 @@ func TestBolt3(outer *testing.T) {
 			srv.waitForRun()
 			srv.waitForPullAll()
 			// Send response to run and first record as response to pull
-			srv.send(msgSuccess, map[string]interface{}{
+			srv.send(msgSuccess, map[string]any{
 				"fields":  runKeys,
 				"t_first": int64(1),
 			})
-			srv.send(msgRecord, []interface{}{"1v1", "1v2"})
+			srv.send(msgRecord, []any{"1v1", "1v2"})
 			srv.sendFailureMsg("thecode", "themessage")
 		})
 		defer cleanup()
@@ -481,11 +481,11 @@ func TestBolt3(outer *testing.T) {
 			srv.waitForRun()
 			srv.waitForPullAll()
 			// Send response to run and first record as response to pull
-			srv.send(msgSuccess, map[string]interface{}{
+			srv.send(msgSuccess, map[string]any{
 				"fields":  runKeys,
 				"t_first": int64(1),
 			})
-			srv.send(msgRecord, []interface{}{"1v1", "1v2"})
+			srv.send(msgRecord, []any{"1v1", "1v2"})
 			srv.sendFailureMsg("thecode", "themessage")
 		})
 		defer cleanup()
@@ -537,7 +537,7 @@ func TestBolt3(outer *testing.T) {
 				scenario: "after successful RESET",
 				server: func(t *testing.T, srv *bolt3server) {
 					srv.waitForReset()
-					srv.sendSuccess(map[string]interface{}{})
+					srv.sendSuccess(map[string]any{})
 				},
 				client: func(t *testing.T, cli *bolt3) {
 					idleDate := cli.IdleDate()
@@ -573,9 +573,9 @@ func TestBolt3(outer *testing.T) {
 				scenario: "after successful RUN/PULLALL",
 				server: func(t *testing.T, srv *bolt3server) {
 					srv.waitForRun()
-					srv.sendSuccess(map[string]interface{}{})
+					srv.sendSuccess(map[string]any{})
 					srv.waitForPullAll()
-					srv.sendSuccess(map[string]interface{}{})
+					srv.sendSuccess(map[string]any{})
 				},
 				client: func(t *testing.T, cli *bolt3) {
 					idleDate := cli.IdleDate()
@@ -611,7 +611,7 @@ func TestBolt3(outer *testing.T) {
 				scenario: "after failed PULLALL",
 				server: func(t *testing.T, srv *bolt3server) {
 					srv.waitForRun()
-					srv.sendSuccess(map[string]interface{}{})
+					srv.sendSuccess(map[string]any{})
 					srv.waitForPullAll()
 					srv.sendFailureMsg("o.o.p.s", "pull all failed")
 				},
@@ -625,7 +625,7 @@ func TestBolt3(outer *testing.T) {
 				scenario: "after successful BEGIN",
 				server: func(t *testing.T, srv *bolt3server) {
 					srv.waitForTxBegin()
-					srv.sendSuccess(map[string]interface{}{})
+					srv.sendSuccess(map[string]any{})
 				},
 				client: func(t *testing.T, cli *bolt3) {
 					idleDate := cli.IdleDate()
@@ -661,9 +661,9 @@ func TestBolt3(outer *testing.T) {
 				scenario: "after successful COMMIT",
 				server: func(t *testing.T, srv *bolt3server) {
 					srv.waitForTxBegin()
-					srv.sendSuccess(map[string]interface{}{})
+					srv.sendSuccess(map[string]any{})
 					srv.waitForTxCommit()
-					srv.sendSuccess(map[string]interface{}{})
+					srv.sendSuccess(map[string]any{})
 				},
 				client: func(t *testing.T, cli *bolt3) {
 					tx, _ := cli.TxBegin(ctx, idb.TxConfig{})
@@ -676,7 +676,7 @@ func TestBolt3(outer *testing.T) {
 				scenario: "after failed COMMIT",
 				server: func(t *testing.T, srv *bolt3server) {
 					srv.waitForTxBegin()
-					srv.sendSuccess(map[string]interface{}{})
+					srv.sendSuccess(map[string]any{})
 					srv.waitForTxCommit()
 					srv.sendFailureMsg("o.o.p.s", "commit failed")
 				},
@@ -691,7 +691,7 @@ func TestBolt3(outer *testing.T) {
 				scenario: "not after errored COMMIT",
 				server: func(t *testing.T, srv *bolt3server) {
 					srv.waitForTxBegin()
-					srv.sendSuccess(map[string]interface{}{})
+					srv.sendSuccess(map[string]any{})
 					srv.waitForTxCommit()
 					srv.closeConnection()
 				},
@@ -706,9 +706,9 @@ func TestBolt3(outer *testing.T) {
 				scenario: "after successful ROLLBACK",
 				server: func(t *testing.T, srv *bolt3server) {
 					srv.waitForTxBegin()
-					srv.sendSuccess(map[string]interface{}{})
+					srv.sendSuccess(map[string]any{})
 					srv.waitForTxRollback()
-					srv.sendSuccess(map[string]interface{}{})
+					srv.sendSuccess(map[string]any{})
 				},
 				client: func(t *testing.T, cli *bolt3) {
 					tx, _ := cli.TxBegin(ctx, idb.TxConfig{})
@@ -721,7 +721,7 @@ func TestBolt3(outer *testing.T) {
 				scenario: "after failed ROLLBACK",
 				server: func(t *testing.T, srv *bolt3server) {
 					srv.waitForTxBegin()
-					srv.sendSuccess(map[string]interface{}{})
+					srv.sendSuccess(map[string]any{})
 					srv.waitForTxRollback()
 					srv.sendFailureMsg("o.o.p.s", "rollback failed")
 				},
@@ -736,7 +736,7 @@ func TestBolt3(outer *testing.T) {
 				scenario: "not after errored ROLLBACK",
 				server: func(t *testing.T, srv *bolt3server) {
 					srv.waitForTxBegin()
-					srv.sendSuccess(map[string]interface{}{})
+					srv.sendSuccess(map[string]any{})
 					srv.waitForTxRollback()
 					srv.closeConnection()
 				},
