@@ -52,6 +52,7 @@ type Config struct {
 	// The ServerName attribute of TlsConfig is always derived from the initial URI host.
 	//
 	// This is considered an advanced setting, use it at your own risk.
+	// Introduced in 5.0.
 	TlsConfig *tls.Config
 
 	// Logging target the driver will send its log outputs
