@@ -107,8 +107,8 @@ func (c *ConnFake) IdleDate() time.Time {
 	return c.Idle
 }
 
-func (c *ConnFake) Bookmark() string {
-	return c.Bookm
+func (c *ConnFake) Bookmark() (string, string) {
+	return c.Bookm, ""
 }
 
 func (c *ConnFake) ServerVersion() string {

@@ -20,12 +20,14 @@
 package neo4j
 
 type sessionBookmarks struct {
-	bookmarks Bookmarks
+	bookmarkManager BookmarkManager
+	bookmarks       Bookmarks
 }
 
-func newSessionBookmarks(bookmarks Bookmarks) *sessionBookmarks {
+func newSessionBookmarks(bookmarkManager BookmarkManager, bookmarks Bookmarks) *sessionBookmarks {
 	return &sessionBookmarks{
-		bookmarks: cleanupBookmarks(bookmarks),
+		bookmarkManager: bookmarkManager,
+		bookmarks:       cleanupBookmarks(bookmarks),
 	}
 }
 
@@ -42,11 +44,35 @@ func (sb *sessionBookmarks) lastBookmark() string {
 	return bookmarks[count-1]
 }
 
-func (sb *sessionBookmarks) replaceBookmarks(bookmark string) {
-	if len(bookmark) == 0 {
+func (sb *sessionBookmarks) replaceBookmarks(database string, previousBookmarks []string, newBookmark string) {
+	if len(newBookmark) == 0 {
 		return
 	}
-	sb.bookmarks = []string{bookmark}
+	if sb.bookmarkManager != nil {
+		sb.bookmarkManager.UpdateBookmarks(database, previousBookmarks, []string{newBookmark})
+	}
+	sb.replaceSessionBookmarks(newBookmark)
+}
+
+func (sb *sessionBookmarks) replaceSessionBookmarks(newBookmark string) {
+	if len(newBookmark) == 0 {
+		return
+	}
+	sb.bookmarks = []string{newBookmark}
+}
+
+func (sb *sessionBookmarks) bookmarksOfDatabase(db string) Bookmarks {
+	if sb.bookmarkManager == nil {
+		return nil
+	}
+	return sb.bookmarkManager.GetBookmarks(db)
+}
+
+func (sb *sessionBookmarks) allBookmarks() Bookmarks {
+	if sb.bookmarkManager == nil {
+		return nil
+	}
+	return sb.bookmarkManager.GetAllBookmarks()
 }
 
 // Remove empty string bookmarks to check for "bad" callers

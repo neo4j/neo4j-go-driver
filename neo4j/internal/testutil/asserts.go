@@ -24,6 +24,7 @@ import (
 	"fmt"
 	"io"
 	"reflect"
+	"sort"
 	"strings"
 	"testing"
 	"time"
@@ -230,4 +231,18 @@ func AssertPanics(t *testing.T, f func()) {
 		}
 	}()
 	f()
+}
+
+func AssertEqualsInAnyOrder(t *testing.T, actual []string, expected []string) {
+	t.Helper()
+	if len(actual) != len(expected) {
+		t.Errorf("Expected actual slice %v and expected slice %v to have same length", actual, expected)
+		return
+	}
+	actual = actual[0:len(actual):len(actual)]
+	sort.Strings(actual)
+	sort.Strings(expected)
+	if !reflect.DeepEqual(actual, expected) {
+		t.Errorf("Expected actual slice %v and expected slice %v to have same elements", actual, expected)
+	}
 }

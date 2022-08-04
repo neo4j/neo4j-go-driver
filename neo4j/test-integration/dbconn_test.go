@@ -265,7 +265,8 @@ func TestConnectionConformance(outer *testing.T) {
 				}
 				err = c.TxCommit(context.Background(), tx)
 				AssertNoError(t, err)
-				AssertStringNotEmpty(t, c.Bookmark())
+				bookmark, _ := c.Bookmark()
+				AssertStringNotEmpty(t, bookmark)
 			},
 		},
 		{
@@ -517,11 +518,11 @@ func TestConnectionConformance(outer *testing.T) {
 	// Bookmark tests
 	outer.Run("Bookmarks", func(tt *testing.T) {
 		boltConn.Reset(context.Background())
-		lastBookmark := boltConn.Bookmark()
+		lastBookmark, _ := boltConn.Bookmark()
 
 		assertNewBookmark := func(t *testing.T) {
 			t.Helper()
-			bookmark := boltConn.Bookmark()
+			bookmark, _ := boltConn.Bookmark()
 			if len(bookmark) == 0 {
 				t.Fatal("No bookmark")
 			}
@@ -533,7 +534,7 @@ func TestConnectionConformance(outer *testing.T) {
 
 		assertNoNewBookmark := func(t *testing.T) {
 			t.Helper()
-			bookmark := boltConn.Bookmark()
+			bookmark, _ := boltConn.Bookmark()
 			if bookmark != lastBookmark {
 				t.Fatal("New bookmark")
 			}

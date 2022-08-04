@@ -154,7 +154,7 @@ func TestSession(outer *testing.T) {
 				numDefaultDbLookups++
 				return mydb, nil
 			}
-			router.WritersHook = func(bookmarks []string, database string) ([]string, error) {
+			router.WritersHook = func(bookmarks func() []string, database string) ([]string, error) {
 				AssertStringEqual(t, mydb, database)
 				return []string{"aserver"}, nil
 			}
@@ -220,9 +220,7 @@ func TestSession(outer *testing.T) {
 			})
 			AssertLen(t, conn.RecordedTxs, 4)
 			for _, rtx := range conn.RecordedTxs {
-				if !reflect.DeepEqual(cleanBookmarks, rtx.Bookmarks) {
-					t.Errorf("Using unclean or no bookmarks: %+v", rtx)
-				}
+				AssertEqualsInAnyOrder(t, rtx.Bookmarks, cleanBookmarks)
 			}
 		})
 
@@ -242,11 +240,11 @@ func TestSession(outer *testing.T) {
 			conn := &ConnFake{Alive: true}
 			conn.BufferHook = func() {
 				bufferCalls++
-				conn.Bookm = fmt.Sprintf("%d", bufferCalls)
+				conn.Bookm = fmt.Sprintf("buffer-%d", bufferCalls)
 			}
 			conn.ConsumeHook = func() {
 				consumeCalls++
-				conn.Bookm = fmt.Sprintf("%d", consumeCalls)
+				conn.Bookm = fmt.Sprintf("consume-%d", consumeCalls)
 				conn.ConsumeSum = &db.Summary{}
 			}
 			pool.BorrowConn = conn
@@ -257,13 +255,13 @@ func TestSession(outer *testing.T) {
 			// Should call Buffer on connection to ensure that first Run is buffered and
 			// it's bookmark retrieved
 			sess.Run(context.Background(), "cypher", nil)
-			AssertDeepEquals(t, BookmarksToRawValues(sess.LastBookmarks()), []string{"1"})
+			AssertDeepEquals(t, BookmarksToRawValues(sess.LastBookmarks()), []string{"buffer-1"})
 			result, _ := sess.Run(context.Background(), "cypher", nil)
-			AssertDeepEquals(t, BookmarksToRawValues(sess.LastBookmarks()), []string{"2"})
+			AssertDeepEquals(t, BookmarksToRawValues(sess.LastBookmarks()), []string{"buffer-2"})
 			// And finally consuming the last result should give a new bookmark
 			AssertIntEqual(t, consumeCalls, 0)
 			result.Consume(context.Background())
-			AssertDeepEquals(t, BookmarksToRawValues(sess.LastBookmarks()), []string{"1"})
+			AssertDeepEquals(t, BookmarksToRawValues(sess.LastBookmarks()), []string{"consume-1"})
 		})
 
 		inner.Run("Pending and invoke tx function", func(t *testing.T) {
@@ -339,7 +337,7 @@ func TestSession(outer *testing.T) {
 				numDefaultDbLookups++
 				return mydb, nil
 			}
-			router.ReadersHook = func(bookmarks []string, database string) ([]string, error) {
+			router.ReadersHook = func(bookmarks func() []string, database string) ([]string, error) {
 				AssertStringEqual(t, mydb, database)
 				return []string{"aserver"}, nil
 			}
@@ -507,7 +505,7 @@ func TestSession(outer *testing.T) {
 				numDefaultDbLookups++
 				return mydb, nil
 			}
-			router.ReadersHook = func(bookmarks []string, database string) ([]string, error) {
+			router.ReadersHook = func(bookmarks func() []string, database string) ([]string, error) {
 				AssertStringEqual(t, mydb, database)
 				return []string{"aserver"}, nil
 			}
@@ -623,7 +621,7 @@ func TestSession(outer *testing.T) {
 			router, _, session := createSession()
 			defer session.Close(ctx)
 			expectedErr := fmt.Errorf("server retrieval err")
-			router.ReadersHook = func([]string, string) ([]string, error) {
+			router.ReadersHook = func(func() []string, string) ([]string, error) {
 				return nil, expectedErr
 			}
 
@@ -670,6 +668,7 @@ func TestSession(outer *testing.T) {
 }
 
 func assertTokenExpiredError(t *testing.T, err error) {
+	t.Helper()
 	AssertSameType(t, err, &TokenExpiredError{})
 	AssertErrorMessageContains(t, err, "Neo.ClientError.Security.TokenExpired")
 	AssertErrorMessageContains(t, err, "oopsie whoopsie")

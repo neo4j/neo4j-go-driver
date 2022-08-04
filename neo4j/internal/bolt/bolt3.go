@@ -617,8 +617,8 @@ func (b *bolt3) receiveNext(ctx context.Context) (*db.Record, *db.Summary, error
 	}
 }
 
-func (b *bolt3) Bookmark() string {
-	return b.bookmark
+func (b *bolt3) Bookmark() (string, string) {
+	return b.bookmark, ""
 }
 
 func (b *bolt3) IsAlive() bool {
