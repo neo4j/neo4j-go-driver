@@ -124,7 +124,7 @@ type sessionPool interface {
 type sessionWithContext struct {
 	config           *Config
 	defaultMode      idb.AccessMode
-	bookmarks        []string
+	bookmarks        *sessionBookmarks
 	databaseName     string
 	impersonatedUser string
 	resolveHomeDb    bool
@@ -141,30 +141,6 @@ type sessionWithContext struct {
 	boltLogger       log.BoltLogger
 }
 
-// Remove empty string bookmarks to check for "bad" callers
-// To avoid allocating, first check if this is a problem
-func cleanupBookmarks(bookmarks []string) []string {
-	hasBad := false
-	for _, b := range bookmarks {
-		if len(b) == 0 {
-			hasBad = true
-			break
-		}
-	}
-
-	if !hasBad {
-		return bookmarks
-	}
-
-	cleaned := make([]string, 0, len(bookmarks)-1)
-	for _, b := range bookmarks {
-		if len(b) > 0 {
-			cleaned = append(cleaned, b)
-		}
-	}
-	return cleaned
-}
-
 func newSessionWithContext(config *Config, sessConfig SessionConfig, router sessionRouter, pool sessionPool, logger log.Logger) *sessionWithContext {
 	logId := log.NewId()
 	logger.Debugf(log.Session, logId, "Created with context")
@@ -179,7 +155,7 @@ func newSessionWithContext(config *Config, sessConfig SessionConfig, router sess
 		router:           router,
 		pool:             pool,
 		defaultMode:      idb.AccessMode(sessConfig.AccessMode),
-		bookmarks:        cleanupBookmarks(sessConfig.Bookmarks),
+		bookmarks:        newSessionBookmarks(sessConfig.Bookmarks),
 		databaseName:     sessConfig.DatabaseName,
 		impersonatedUser: sessConfig.ImpersonatedUser,
 		resolveHomeDb:    sessConfig.DatabaseName == "",
@@ -200,7 +176,7 @@ func (s *sessionWithContext) LastBookmarks() Bookmarks {
 	}
 
 	// Report bookmarks from previously closed connection or from initial set
-	return s.bookmarks
+	return s.bookmarks.currentBookmarks()
 }
 
 func (s *sessionWithContext) lastBookmark() string {
@@ -210,11 +186,7 @@ func (s *sessionWithContext) lastBookmark() string {
 	}
 
 	// Report bookmark from previously closed connection or from initial set
-	if len(s.bookmarks) > 0 {
-		return s.bookmarks[len(s.bookmarks)-1]
-	}
-
-	return ""
+	return s.bookmarks.lastBookmark()
 }
 
 func (s *sessionWithContext) BeginTransaction(ctx context.Context, configurers ...func(*TransactionConfig)) (ExplicitTransaction, error) {
@@ -248,7 +220,7 @@ func (s *sessionWithContext) BeginTransaction(ctx context.Context, configurers .
 	txHandle, err := conn.TxBegin(ctx,
 		idb.TxConfig{
 			Mode:             s.defaultMode,
-			Bookmarks:        s.bookmarks,
+			Bookmarks:        s.bookmarks.currentBookmarks(),
 			Timeout:          config.Timeout,
 			Meta:             config.Metadata,
 			ImpersonatedUser: s.impersonatedUser,
@@ -376,7 +348,7 @@ func (s *sessionWithContext) executeTransactionFunction(
 	txHandle, err := conn.TxBegin(ctx,
 		idb.TxConfig{
 			Mode:             mode,
-			Bookmarks:        s.bookmarks,
+			Bookmarks:        s.bookmarks.currentBookmarks(),
 			Timeout:          config.Timeout,
 			Meta:             config.Metadata,
 			ImpersonatedUser: s.impersonatedUser,
@@ -408,10 +380,11 @@ func (s *sessionWithContext) executeTransactionFunction(
 }
 
 func (s *sessionWithContext) getServers(ctx context.Context, mode idb.AccessMode) ([]string, error) {
+	bookmarks := s.bookmarks.currentBookmarks()
 	if mode == idb.ReadMode {
-		return s.router.Readers(ctx, s.bookmarks, s.databaseName, s.boltLogger)
+		return s.router.Readers(ctx, bookmarks, s.databaseName, s.boltLogger)
 	} else {
-		return s.router.Writers(ctx, s.bookmarks, s.databaseName, s.boltLogger)
+		return s.router.Writers(ctx, bookmarks, s.databaseName, s.boltLogger)
 	}
 }
 
@@ -460,10 +433,7 @@ func (s *sessionWithContext) retrieveBookmarks(conn idb.Connection) {
 	if conn == nil {
 		return
 	}
-	bookmark := conn.Bookmark()
-	if len(bookmark) > 0 {
-		s.bookmarks = []string{bookmark}
-	}
+	s.bookmarks.replaceBookmarks(conn.Bookmark())
 }
 
 func (s *sessionWithContext) Run(ctx context.Context,
@@ -501,7 +471,7 @@ func (s *sessionWithContext) Run(ctx context.Context,
 		},
 		idb.TxConfig{
 			Mode:             s.defaultMode,
-			Bookmarks:        s.bookmarks,
+			Bookmarks:        s.bookmarks.currentBookmarks(),
 			Timeout:          config.Timeout,
 			Meta:             config.Metadata,
 			ImpersonatedUser: s.impersonatedUser,
@@ -574,7 +544,7 @@ func (s *sessionWithContext) resolveHomeDatabase(ctx context.Context) error {
 	if !s.resolveHomeDb {
 		return nil
 	}
-	defaultDb, err := s.router.GetNameOfDefaultDatabase(ctx, s.bookmarks, s.impersonatedUser, s.boltLogger)
+	defaultDb, err := s.router.GetNameOfDefaultDatabase(ctx, s.bookmarks.currentBookmarks(), s.impersonatedUser, s.boltLogger)
 	if err != nil {
 		return err
 	}
