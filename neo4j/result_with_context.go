@@ -60,25 +60,26 @@ type ResultWithContext interface {
 const consumedResultError = "result cursor is not available anymore"
 
 type resultWithContext struct {
-	conn          idb.Connection
-	streamHandle  idb.StreamHandle
-	cypher        string
-	params        map[string]any
-	record        *Record
-	summary       *db.Summary
-	err           error
-	peekedRecord  *Record
-	peekedSummary *db.Summary
-	peeked        bool
+	conn                           idb.Connection
+	streamHandle                   idb.StreamHandle
+	cypher                         string
+	params                         map[string]any
+	record                         *Record
+	summary                        *db.Summary
+	err                            error
+	peekedRecord                   *Record
+	peekedSummary                  *db.Summary
+	peeked                         bool
+	afterAutocommitConsumptionHook func()
 }
 
-func newResultWithContext(conn idb.Connection, str idb.StreamHandle,
-	cypher string, params map[string]any) ResultWithContext {
+func newResultWithContext(connection idb.Connection, stream idb.StreamHandle, cypher string, params map[string]any, afterConsumptionHook func()) ResultWithContext {
 	return &resultWithContext{
-		conn:         conn,
-		streamHandle: str,
-		cypher:       cypher,
-		params:       params,
+		conn:                           connection,
+		streamHandle:                   stream,
+		cypher:                         cypher,
+		params:                         params,
+		afterAutocommitConsumptionHook: afterConsumptionHook,
 	}
 }
 
@@ -100,6 +101,9 @@ func (r *resultWithContext) Next(ctx context.Context) bool {
 		return false
 	}
 	r.advance(ctx)
+	if r.summary != nil {
+		r.callAutocommitConsumptionHook()
+	}
 	return r.record != nil
 }
 
@@ -142,6 +146,7 @@ func (r *resultWithContext) Collect(ctx context.Context) ([]*Record, error) {
 	if r.err != nil {
 		return nil, wrapError(r.err)
 	}
+	r.callAutocommitConsumptionHook()
 	return recs, nil
 }
 
@@ -177,6 +182,7 @@ func (r *resultWithContext) Single(ctx context.Context) (*Record, error) {
 	// We got the expected summary
 	// r.record contains the single record and r.summary the summary.
 	r.record = single
+	r.callAutocommitConsumptionHook()
 	return single, nil
 }
 
@@ -193,6 +199,7 @@ func (r *resultWithContext) Consume(ctx context.Context) (ResultSummary, error) 
 	if r.err != nil {
 		return nil, wrapError(r.err)
 	}
+	r.callAutocommitConsumptionHook()
 	return r.toResultSummary(), nil
 }
 
@@ -205,7 +212,9 @@ func (r *resultWithContext) legacy() Result {
 }
 
 func (r *resultWithContext) buffer(ctx context.Context) {
-	r.err = r.conn.Buffer(ctx, r.streamHandle)
+	if r.err = r.conn.Buffer(ctx, r.streamHandle); r.err == nil {
+		r.callAutocommitConsumptionHook()
+	}
 }
 
 func (r *resultWithContext) toResultSummary() ResultSummary {
@@ -242,4 +251,12 @@ func (r *resultWithContext) checkOpen() {
 
 func (r *resultWithContext) isOpen() bool {
 	return r.summary == nil
+}
+
+func (r *resultWithContext) callAutocommitConsumptionHook() {
+	if r.afterAutocommitConsumptionHook == nil {
+		return
+	}
+	r.afterAutocommitConsumptionHook()
+	r.afterAutocommitConsumptionHook = nil
 }

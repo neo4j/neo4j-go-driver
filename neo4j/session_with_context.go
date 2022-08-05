@@ -483,9 +483,10 @@ func (s *sessionWithContext) Run(ctx context.Context,
 
 	s.autocommitTx = &autocommitTransaction{
 		conn: conn,
-		res:  newResultWithContext(conn, stream, cypher, params),
-		onClosed: func() {
+		res: newResultWithContext(conn, stream, cypher, params, func() {
 			s.retrieveBookmarks(conn)
+		}),
+		onClosed: func() {
 			s.pool.Return(ctx, conn)
 			s.autocommitTx = nil
 		},

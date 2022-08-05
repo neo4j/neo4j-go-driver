@@ -69,7 +69,8 @@ func (tx *explicitTransaction) Run(ctx context.Context, cypher string,
 		tx.onClosed()
 		return nil, wrapError(tx.err)
 	}
-	return newResultWithContext(tx.conn, stream, cypher, params), nil
+	// no result consumption hook here since bookmarks are sent after commit, not after pulling results
+	return newResultWithContext(tx.conn, stream, cypher, params, nil), nil
 }
 
 func (tx *explicitTransaction) Commit(ctx context.Context) error {
@@ -131,7 +132,8 @@ func (tx *managedTransaction) Run(ctx context.Context, cypher string, params map
 	if err != nil {
 		return nil, wrapError(err)
 	}
-	return newResultWithContext(tx.conn, stream, cypher, params), nil
+	// no result consumption hook here since bookmarks are sent after commit, not after pulling results
+	return newResultWithContext(tx.conn, stream, cypher, params, nil), nil
 }
 
 // legacy interop only - remove in 6.0
