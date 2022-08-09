@@ -20,6 +20,7 @@
 package neo4j
 
 import (
+	idb "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
 	"time"
 
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/db"
@@ -46,6 +47,7 @@ type (
 	Path          = dbtype.Path
 	Record        = db.Record
 	InvalidValue  = dbtype.InvalidValue
+	RoutingTable  = idb.RoutingTable
 )
 
 // DateOf creates a neo4j.Date from time.Time.

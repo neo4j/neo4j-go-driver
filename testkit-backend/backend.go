@@ -28,6 +28,7 @@ import (
 	"io"
 	"math"
 	"net/url"
+	"reflect"
 	"regexp"
 	"strings"
 	"sync"
@@ -779,6 +780,33 @@ func (b *backend) handleRequest(req map[string]any) {
 			"encrypted": driver.IsEncrypted(),
 		})
 
+	case "GetRoutingTable": // trigger warning: the below code is super hacky
+		driverId := data["driverId"].(string)
+		database := ""
+		if rawDatabase := data["database"]; rawDatabase != nil {
+			database = rawDatabase.(string)
+		}
+		driver := reflect.ValueOf(b.drivers[driverId])
+		method := driver.
+			MethodByName("GetRoutingTable")
+		results := method.
+			Call([]reflect.Value{
+				reflect.ValueOf(ctx),
+				reflect.ValueOf(database),
+			})
+		if err := results[1]; !err.IsNil() {
+			b.writeError(err.Interface().(error))
+			return
+		}
+		routingTable := results[0].Interface().(*neo4j.RoutingTable)
+		b.writeResponse("RoutingTable", map[string]any{
+			"database": routingTable.DatabaseName,
+			"ttl":      routingTable.TimeToLive,
+			"routers":  routingTable.Routers,
+			"readers":  routingTable.Readers,
+			"writers":  routingTable.Writers,
+		})
+
 	case "VerifyConnectivity":
 		driverId := data["driverId"].(string)
 		if err := b.drivers[driverId].VerifyConnectivity(ctx); err != nil {
@@ -790,6 +818,7 @@ func (b *backend) handleRequest(req map[string]any) {
 	case "GetFeatures":
 		b.writeResponse("FeatureList", map[string]any{
 			"features": []string{
+				"Backend:RTFetch",
 				"ConfHint:connection.recv_timeout_seconds",
 				"Detail:ClosedDriverIsEncrypted",
 				"Feature:API:BookmarkManager",
@@ -1034,7 +1063,6 @@ func testSkips() map[string]string {
 		"stub.routing.test_routing_v4x3.RoutingV4x3.test_should_revert_to_initial_router_if_known_router_throws_protocol_errors": "It needs investigation - custom resolver does not seem to be called",
 		"stub.routing.test_routing_v4x4.RoutingV4x4.test_should_revert_to_initial_router_if_known_router_throws_protocol_errors": "It needs investigation - custom resolver does not seem to be called",
 		"stub.routing.test_routing_v5x0.RoutingV5x0.test_should_revert_to_initial_router_if_known_router_throws_protocol_errors": "It needs investigation - custom resolver does not seem to be called",
-		"stub.configuration_hints.test_connection_recv_timeout_seconds.TestRoutingConnectionRecvTimeout.*":                       "No GetRoutingTable support - too tricky to implement in Go",
 		"stub.homedb.test_homedb.TestHomeDb.test_session_should_cache_home_db_despite_new_rt":                                    "Driver does not remove servers from RT when connection breaks.",
 		"stub.iteration.test_result_scope.TestResultScope.*":                                                                     "Results are always valid but don't return records when out of scope",
 		"stub.*.test_0_timeout":        "Driver omits 0 as tx timeout value",

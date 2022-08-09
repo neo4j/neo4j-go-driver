@@ -21,6 +21,7 @@ package testutil
 
 import (
 	"context"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/log"
 )
 
@@ -81,4 +82,8 @@ func (r *RouterFake) CleanUp(ctx context.Context) error {
 		r.CleanUpHook()
 	}
 	return nil
+}
+
+func (r *RouterFake) GetRoutingTable(context.Context, string) (*db.RoutingTable, error) {
+	return nil, nil
 }

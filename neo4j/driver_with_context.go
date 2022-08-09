@@ -248,6 +248,8 @@ type sessionRouter interface {
 	CleanUp(ctx context.Context) error
 	InvalidateWriter(ctx context.Context, name string, server string) error
 	InvalidateReader(ctx context.Context, name string, server string) error
+	// GetRoutingTable is only defined for TestKit
+	GetRoutingTable(ctx context.Context, database string) (*db.RoutingTable, error)
 }
 
 type driverWithContext struct {
@@ -313,4 +315,9 @@ func (d *driverWithContext) Close(ctx context.Context) error {
 	d.pool = nil
 	d.log.Infof(log.Driver, d.logId, "Closed")
 	return nil
+}
+
+// defined only for TestKit
+func (d *driverWithContext) GetRoutingTable(ctx context.Context, database string) (*db.RoutingTable, error) {
+	return d.router.GetRoutingTable(ctx, database)
 }

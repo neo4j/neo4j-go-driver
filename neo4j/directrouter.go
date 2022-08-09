@@ -57,3 +57,7 @@ func (r *directRouter) Invalidate(context.Context, string) error {
 func (r *directRouter) CleanUp(context.Context) error {
 	return nil
 }
+
+func (r *directRouter) GetRoutingTable(context.Context, string) (*db.RoutingTable, error) {
+	return nil, nil
+}

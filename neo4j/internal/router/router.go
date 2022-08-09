@@ -290,6 +290,14 @@ func (r *Router) CleanUp(ctx context.Context) error {
 	return nil
 }
 
+func (r *Router) GetRoutingTable(_ context.Context, database string) (*db.RoutingTable, error) {
+	router := r.dbRouters[database]
+	if router == nil {
+		return nil, nil
+	}
+	return router.table, nil
+}
+
 func (r *Router) storeRoutingTable(database string, table *db.RoutingTable, now time.Time) {
 	r.dbRouters[database] = &databaseRouter{
 		table:   table,
