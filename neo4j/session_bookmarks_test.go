@@ -25,11 +25,12 @@ import (
 )
 
 func TestSessionBookmarks(outer *testing.T) {
-	sessionBookmarks := newSessionBookmarks([]string{
-		"", "bookmark", "", "deutschmark", "",
-	})
+	outer.Parallel()
 
 	outer.Run("initial set bookmarks are cleaned up", func(t *testing.T) {
+		sessionBookmarks := newSessionBookmarks([]string{
+			"", "bookmark", "", "deutschmark", "",
+		})
 		expectedBookmarks := []string{"bookmark", "deutschmark"}
 
 		currentBookmarks := sessionBookmarks.currentBookmarks()
@@ -39,22 +40,47 @@ func TestSessionBookmarks(outer *testing.T) {
 		}
 		lastBookmark := sessionBookmarks.lastBookmark()
 		if lastBookmark != "deutschmark" {
-			t.Errorf(`expected last bookmark "deutschmark"", but got %q`, lastBookmark)
+			t.Errorf(`expected last bookmark "deutschmark", but got %q`, lastBookmark)
 		}
 	})
 
-	outer.Run("replaces set bookmarks with new non-empty one", func(t *testing.T) {
-		localSessionBookmarks := *sessionBookmarks
+	outer.Run("replaces set bookmarks with new one", func(t *testing.T) {
+		sessionBookmarks := newSessionBookmarks([]string{"book marking"})
 
-		localSessionBookmarks.replaceBookmarks("booking mark")
+		sessionBookmarks.replaceBookmarks("booking mark")
 
-		currentBookmarks := localSessionBookmarks.currentBookmarks()
+		currentBookmarks := sessionBookmarks.currentBookmarks()
 		if !reflect.DeepEqual(currentBookmarks, []string{"booking mark"}) {
 			t.Errorf(`expected bookmarks ["booking mark"], got %v`, currentBookmarks)
 		}
-		lastBookmark := localSessionBookmarks.lastBookmark()
+		lastBookmark := sessionBookmarks.lastBookmark()
 		if lastBookmark != "booking mark" {
-			t.Errorf(`expected last bookmark "booking mark"", but got %q`, lastBookmark)
+			t.Errorf(`expected last bookmark "booking mark", but got %q`, lastBookmark)
+		}
+	})
+
+	outer.Run("does not replace set bookmarks when new bookmark is empty", func(t *testing.T) {
+		sessionBookmarks := newSessionBookmarks([]string{"book marking"})
+
+		sessionBookmarks.replaceBookmarks("")
+
+		currentBookmarks := sessionBookmarks.currentBookmarks()
+		if !reflect.DeepEqual(currentBookmarks, []string{"book marking"}) {
+			t.Errorf(`expected bookmarks ["book marking"], got %v`, currentBookmarks)
+		}
+		lastBookmark := sessionBookmarks.lastBookmark()
+		if lastBookmark != "book marking" {
+			t.Errorf(`expected last bookmark "book marking", but got %q`, lastBookmark)
+		}
+	})
+
+	outer.Run("last bookmark returns empty string when no bookmarks were previously set", func(t *testing.T) {
+		sessionBookmarks := newSessionBookmarks(nil)
+
+		lastBookmark := sessionBookmarks.lastBookmark()
+
+		if lastBookmark != "" {
+			t.Errorf(`expected empty last bookmark, but got %q`, lastBookmark)
 		}
 	})
 }
