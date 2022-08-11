@@ -535,7 +535,7 @@ func TestResult(outer *testing.T) {
 					conn: &ConnFake{
 						Nexts: []Next{{Record: record1}, {Summary: sums[0]}},
 					},
-					afterAutocommitConsumptionHook: func() {
+					afterConsumptionHook: func() {
 						count++
 					}}
 
