@@ -21,7 +21,6 @@ package neo4j
 
 import (
 	"context"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
 )
 
 // Deprecated: use ResultWithContext instead.
@@ -54,11 +53,6 @@ type Result interface {
 // deprecated: use resultWithContext instead
 type result struct {
 	delegate ResultWithContext
-}
-
-// deprecated: use newResultWithContext instead
-func newResult(conn db.Connection, str db.StreamHandle, cypher string, params map[string]any) Result {
-	return newResultWithContext(conn, str, cypher, params).legacy()
 }
 
 func (r *result) Keys() ([]string, error) {
