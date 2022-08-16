@@ -1082,10 +1082,12 @@ func (b *backend) bookmarkManagerConfig(config map[string]any) neo4j.BookmarkMan
 		initialBookmarks = convertInitialBookmarks(config["initialBookmarks"].(map[string]any))
 	}
 	result := neo4j.BookmarkManagerConfig{InitialBookmarks: initialBookmarks}
-	if config["bookmarksSupplierRegistered"].(bool) {
+	supplierRegistered := config["bookmarksSupplierRegistered"]
+	if supplierRegistered != nil && supplierRegistered.(bool) {
 		result.BookmarkSupplier = &testkitBookmarkSupplier{supplierFn: b.supplyBookmarks}
 	}
-	if config["bookmarksConsumerRegistered"].(bool) {
+	consumerRegistered := config["bookmarksConsumerRegistered"]
+	if consumerRegistered != nil && consumerRegistered.(bool) {
 		result.BookmarkUpdateNotifier = b.consumeBookmarks
 	}
 	return result
