@@ -117,7 +117,7 @@ func (r *Router) readTable(ctx context.Context, dbRouter *databaseRouter, bookma
 	return table, nil
 }
 
-func (r *Router) getOrReadTable(ctx context.Context, bookmarks []string, database string, boltLogger log.BoltLogger) (*db.RoutingTable, error) {
+func (r *Router) getOrReadTable(ctx context.Context, bookmarksFn func() []string, database string, boltLogger log.BoltLogger) (*db.RoutingTable, error) {
 	now := r.now()
 
 	if !r.dbRoutersMut.TryLock(ctx) {
@@ -130,22 +130,17 @@ func (r *Router) getOrReadTable(ctx context.Context, bookmarks []string, databas
 		return dbRouter.table, nil
 	}
 
-	table, err := r.readTable(ctx, dbRouter, bookmarks, database, "", boltLogger)
+	table, err := r.readTable(ctx, dbRouter, bookmarksFn(), database, "", boltLogger)
 	if err != nil {
 		return nil, err
 	}
 
-	// Store the routing table
-	r.dbRouters[database] = &databaseRouter{
-		table:   table,
-		dueUnix: now.Add(time.Duration(table.TimeToLive) * time.Second).Unix(),
-	}
-	r.log.Debugf(log.Router, r.logId, "New routing table for '%s', TTL %d", database, table.TimeToLive)
+	r.storeRoutingTable(database, table, now)
 
 	return table, nil
 }
 
-func (r *Router) Readers(ctx context.Context, bookmarks []string, database string, boltLogger log.BoltLogger) ([]string, error) {
+func (r *Router) Readers(ctx context.Context, bookmarks func() []string, database string, boltLogger log.BoltLogger) ([]string, error) {
 	table, err := r.getOrReadTable(ctx, bookmarks, database, boltLogger)
 	if err != nil {
 		return nil, err
@@ -175,7 +170,7 @@ func (r *Router) Readers(ctx context.Context, bookmarks []string, database strin
 	return table.Readers, nil
 }
 
-func (r *Router) Writers(ctx context.Context, bookmarks []string, database string, boltLogger log.BoltLogger) ([]string, error) {
+func (r *Router) Writers(ctx context.Context, bookmarks func() []string, database string, boltLogger log.BoltLogger) ([]string, error) {
 	table, err := r.getOrReadTable(ctx, bookmarks, database, boltLogger)
 	if err != nil {
 		return nil, err
@@ -216,12 +211,7 @@ func (r *Router) GetNameOfDefaultDatabase(ctx context.Context, bookmarks []strin
 		return "", racing.LockTimeoutError("could not acquire router lock in time when resolving home database")
 	}
 	defer r.dbRoutersMut.Unlock()
-	r.dbRouters[table.DatabaseName] = &databaseRouter{
-		table:   table,
-		dueUnix: now.Add(time.Duration(table.TimeToLive) * time.Second).Unix(),
-	}
-	r.log.Debugf(log.Router, r.logId, "New routing table when resolving home database: '%s', TTL %d", table.DatabaseName, table.TimeToLive)
-
+	r.storeRoutingTable(table.DatabaseName, table, now)
 	return table.DatabaseName, err
 }
 
@@ -298,4 +288,12 @@ func (r *Router) CleanUp(ctx context.Context) error {
 		}
 	}
 	return nil
+}
+
+func (r *Router) storeRoutingTable(database string, table *db.RoutingTable, now time.Time) {
+	r.dbRouters[database] = &databaseRouter{
+		table:   table,
+		dueUnix: now.Add(time.Duration(table.TimeToLive) * time.Second).Unix(),
+	}
+	r.log.Debugf(log.Router, r.logId, "New routing table for '%s', TTL %d", database, table.TimeToLive)
 }

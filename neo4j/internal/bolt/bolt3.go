@@ -217,7 +217,7 @@ func (b *bolt3) Connect(ctx context.Context, minor int, auth map[string]any, use
 }
 
 func (b *bolt3) TxBegin(ctx context.Context, txConfig idb.TxConfig) (idb.
-TxHandle, error) {
+	TxHandle, error) {
 	// Ok, to begin transaction while streaming auto-commit, just empty the stream and continue.
 	if b.state == bolt3_streaming {
 		if err := b.bufferStream(ctx); err != nil {
@@ -617,8 +617,11 @@ func (b *bolt3) receiveNext(ctx context.Context) (*db.Record, *db.Summary, error
 	}
 }
 
-func (b *bolt3) Bookmark() string {
-	return b.bookmark
+func (b *bolt3) Bookmark() (string, string) {
+	// the bookmark database is empty here since multi-tenancy (aka multi-database)
+	// is a Neo4j 4.x EE feature
+	// only Bolt 4.0+ connections may return a non-empty value
+	return b.bookmark, ""
 }
 
 func (b *bolt3) IsAlive() bool {

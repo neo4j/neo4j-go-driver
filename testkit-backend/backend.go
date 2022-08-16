@@ -51,6 +51,8 @@ type backend struct {
 	resolvedAddresses    map[string][]any
 	id                   int // ID to use for next object created by frontend
 	wrLock               sync.Mutex
+	suppliedBookmarks    map[string]neo4j.Bookmarks
+	consumedBookmarks    map[string]struct{}
 }
 
 // To implement transactional functions a bit of extra state is needed on the
@@ -81,6 +83,8 @@ func newBackend(rd *bufio.Reader, wr io.Writer) *backend {
 		recordedErrors:       make(map[string]error),
 		resolvedAddresses:    make(map[string][]any),
 		id:                   0,
+		suppliedBookmarks:    make(map[string]neo4j.Bookmarks),
+		consumedBookmarks:    make(map[string]struct{}),
 	}
 }
 
@@ -372,6 +376,19 @@ func (b *backend) handleRequest(req map[string]any) {
 		addresses := data["addresses"].([]any)
 		b.resolvedAddresses[requestId] = addresses
 
+	case "BookmarksSupplierCompleted":
+		requestId := data["requestId"].(string)
+		rawBookmarks := data["bookmarks"].([]any)
+		bookmarks := make(neo4j.Bookmarks, len(rawBookmarks), len(rawBookmarks))
+		for i, bookmark := range rawBookmarks {
+			bookmarks[i] = bookmark.(string)
+		}
+		b.suppliedBookmarks[requestId] = bookmarks
+
+	case "BookmarksConsumerCompleted":
+		requestId := data["requestId"].(string)
+		b.consumedBookmarks[requestId] = struct{}{}
+
 	case "NewDriver":
 		// Parse authorization token
 		var authToken neo4j.AuthToken
@@ -430,6 +447,9 @@ func (b *backend) handleRequest(req map[string]any) {
 			}
 			if data["connectionTimeoutMs"] != nil {
 				c.SocketConnectTimeout = time.Millisecond * time.Duration(asInt64(data["connectionTimeoutMs"].(json.Number)))
+			}
+			if data["bookmarkManager"] != nil {
+				c.BookmarkManager = neo4j.NewBookmarkManager(b.bookmarkManagerConfig(data["bookmarkManager"].(map[string]any)))
 			}
 		})
 		if err != nil {
@@ -495,6 +515,9 @@ func (b *backend) handleRequest(req map[string]any) {
 		}
 		if data["impersonatedUser"] != nil {
 			sessionConfig.ImpersonatedUser = data["impersonatedUser"].(string)
+		}
+		if data["ignoreBookmarkManager"] != nil {
+			sessionConfig.IgnoreBookmarkManager = data["ignoreBookmarkManager"].(bool)
 		}
 		session := driver.NewSession(ctx, sessionConfig)
 		idKey := b.nextId()
@@ -749,6 +772,7 @@ func (b *backend) handleRequest(req map[string]any) {
 			"features": []string{
 				"ConfHint:connection.recv_timeout_seconds",
 				"Detail:ClosedDriverIsEncrypted",
+				"Feature:API:BookmarkManager",
 				"Feature:API:ConnectionAcquisitionTimeout",
 				"Feature:API:Driver:GetServerInfo",
 				"Feature:API:Driver.IsEncrypted",
@@ -775,6 +799,7 @@ func (b *backend) handleRequest(req map[string]any) {
 				"Optimization:ConnectionReuse",
 				"Optimization:EagerTransactionBegin",
 				"Optimization:ImplicitDefaultArguments",
+				"Optimization:MinimalBookmarksSet",
 				"Optimization:MinimalResets",
 				"Optimization:PullPipelining",
 			},
@@ -1049,4 +1074,77 @@ func patchNumbersInMap(dictionary map[string]any) error {
 		}
 	}
 	return nil
+}
+
+func (b *backend) bookmarkManagerConfig(config map[string]any) neo4j.BookmarkManagerConfig {
+	var initialBookmarks map[string]neo4j.Bookmarks
+	if config["initialBookmarks"] != nil {
+		initialBookmarks = convertInitialBookmarks(config["initialBookmarks"].(map[string]any))
+	}
+	result := neo4j.BookmarkManagerConfig{InitialBookmarks: initialBookmarks}
+	supplierRegistered := config["bookmarksSupplierRegistered"]
+	if supplierRegistered != nil && supplierRegistered.(bool) {
+		result.BookmarkSupplier = &testkitBookmarkSupplier{supplierFn: b.supplyBookmarks}
+	}
+	consumerRegistered := config["bookmarksConsumerRegistered"]
+	if consumerRegistered != nil && consumerRegistered.(bool) {
+		result.BookmarkUpdateNotifier = b.consumeBookmarks
+	}
+	return result
+}
+
+func (b *backend) supplyBookmarks(databases ...string) neo4j.Bookmarks {
+	if len(databases) > 1 {
+		panic("at most 1 database should be specified")
+	}
+	id := b.nextId()
+	msg := map[string]any{"id": id}
+	if len(databases) == 1 {
+		msg["database"] = databases[0]
+	}
+	b.writeResponse("BookmarksSupplierRequest", msg)
+	for {
+		b.process()
+		return b.suppliedBookmarks[id]
+	}
+}
+
+func (b *backend) consumeBookmarks(database string, bookmarks neo4j.Bookmarks) {
+	id := b.nextId()
+	b.writeResponse("BookmarksConsumerRequest", map[string]any{
+		"id":        id,
+		"database":  database,
+		"bookmarks": bookmarks,
+	})
+	for {
+		b.process()
+		if _, found := b.consumedBookmarks[id]; found {
+			return
+		}
+	}
+}
+
+type testkitBookmarkSupplier struct {
+	supplierFn func(...string) neo4j.Bookmarks
+}
+
+func (t *testkitBookmarkSupplier) GetAllBookmarks() neo4j.Bookmarks {
+	return t.supplierFn()
+}
+
+func (t *testkitBookmarkSupplier) GetBookmarks(database string) neo4j.Bookmarks {
+	return t.supplierFn(database)
+}
+
+func convertInitialBookmarks(bookmarks map[string]any) map[string]neo4j.Bookmarks {
+	result := make(map[string]neo4j.Bookmarks, len(bookmarks))
+	for db, rawBookmarks := range bookmarks {
+		bookmarks := rawBookmarks.([]any)
+		storedBookmarks := make(neo4j.Bookmarks, len(bookmarks), len(bookmarks))
+		for i, bookmark := range bookmarks {
+			storedBookmarks[i] = bookmark.(string)
+		}
+		result[db] = storedBookmarks
+	}
+	return result
 }

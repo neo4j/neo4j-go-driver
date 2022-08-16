@@ -22,6 +22,7 @@ package neo4j
 import (
 	"context"
 	"fmt"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/collection"
 	idb "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/pool"
 	"math"
@@ -106,6 +107,12 @@ type SessionConfig struct {
 	// to the correct cluster member (different databases may have different
 	// leaders).
 	ImpersonatedUser string
+	// IgnoreBookmarkManager allows specific sessions to ignore the
+	// globally-configured bookmark manager
+	// Sessions with this setting will handle bookmarks as before the bookmark
+	// manager was introduced
+	// Since 5.0
+	IgnoreBookmarkManager bool
 }
 
 // FetchAll turns off fetching records in batches.
@@ -150,12 +157,16 @@ func newSessionWithContext(config *Config, sessConfig SessionConfig, router sess
 		fetchSize = sessConfig.FetchSize
 	}
 
+	configuredBookmarkManager := config.BookmarkManager
+	if sessConfig.IgnoreBookmarkManager {
+		configuredBookmarkManager = nil
+	}
 	return &sessionWithContext{
 		config:           config,
 		router:           router,
 		pool:             pool,
 		defaultMode:      idb.AccessMode(sessConfig.AccessMode),
-		bookmarks:        newSessionBookmarks(sessConfig.Bookmarks),
+		bookmarks:        newSessionBookmarks(configuredBookmarkManager, sessConfig.Bookmarks),
 		databaseName:     sessConfig.DatabaseName,
 		impersonatedUser: sessConfig.ImpersonatedUser,
 		resolveHomeDb:    sessConfig.DatabaseName == "",
@@ -169,24 +180,38 @@ func newSessionWithContext(config *Config, sessConfig SessionConfig, router sess
 	}
 }
 
-func (s *sessionWithContext) LastBookmarks() Bookmarks {
-	// Pick up bookmark from pending auto-commit if there is a bookmark on it
-	if s.autocommitTx != nil {
-		s.retrieveBookmarks(s.autocommitTx.conn)
-	}
-
-	// Report bookmarks from previously closed connection or from initial set
-	return s.bookmarks.currentBookmarks()
-}
-
 func (s *sessionWithContext) lastBookmark() string {
 	// Pick up bookmark from pending auto-commit if there is a bookmark on it
+	// Note: the bookmark manager should not be notified here because:
+	//  - the results of the autocommit transaction may have not been consumed
+	// 	yet, in which case, the underlying connection may have an outdated
+	//	cached bookmark value
+	//  - moreover, the bookmark manager may already hold newer bookmarks
+	// 	because other sessions for the same DB have completed some work in
+	//	parallel
 	if s.autocommitTx != nil {
-		s.retrieveBookmarks(s.autocommitTx.conn)
+		s.retrieveSessionBookmarks(s.autocommitTx.conn)
 	}
 
 	// Report bookmark from previously closed connection or from initial set
 	return s.bookmarks.lastBookmark()
+}
+
+func (s *sessionWithContext) LastBookmarks() Bookmarks {
+	// Pick up bookmark from pending auto-commit if there is a bookmark on it
+	// Note: the bookmark manager should not be notified here because:
+	//  - the results of the autocommit transaction may have not been consumed
+	// 	yet, in which case, the underlying connection may have an outdated
+	//	cached bookmark value
+	//  - moreover, the bookmark manager may already hold newer bookmarks
+	// 	because other sessions for the same DB have completed some work in
+	//	parallel
+	if s.autocommitTx != nil {
+		s.retrieveSessionBookmarks(s.autocommitTx.conn)
+	}
+
+	// Report bookmarks from previously closed connection or from initial set
+	return s.bookmarks.currentBookmarks()
 }
 
 func (s *sessionWithContext) BeginTransaction(ctx context.Context, configurers ...func(*TransactionConfig)) (ExplicitTransaction, error) {
@@ -217,10 +242,11 @@ func (s *sessionWithContext) BeginTransaction(ctx context.Context, configurers .
 	}
 
 	// Begin transaction
+	beginBookmarks := s.transactionBookmarks()
 	txHandle, err := conn.TxBegin(ctx,
 		idb.TxConfig{
 			Mode:             s.defaultMode,
-			Bookmarks:        s.bookmarks.currentBookmarks(),
+			Bookmarks:        beginBookmarks,
 			Timeout:          config.Timeout,
 			Meta:             config.Metadata,
 			ImpersonatedUser: s.impersonatedUser,
@@ -237,7 +263,7 @@ func (s *sessionWithContext) BeginTransaction(ctx context.Context, configurers .
 		txHandle:  txHandle,
 		onClosed: func() {
 			// On transaction closed (rolled back or committed)
-			s.retrieveBookmarks(conn)
+			s.retrieveBookmarks(conn, beginBookmarks)
 			s.pool.Return(ctx, conn)
 			s.explicitTx = nil
 		},
@@ -345,10 +371,11 @@ func (s *sessionWithContext) executeTransactionFunction(
 	// handle transaction function panic as well
 	defer s.pool.Return(ctx, conn)
 
+	beginBookmarks := s.transactionBookmarks()
 	txHandle, err := conn.TxBegin(ctx,
 		idb.TxConfig{
 			Mode:             mode,
-			Bookmarks:        s.bookmarks.currentBookmarks(),
+			Bookmarks:        beginBookmarks,
 			Timeout:          config.Timeout,
 			Meta:             config.Metadata,
 			ImpersonatedUser: s.impersonatedUser,
@@ -375,16 +402,16 @@ func (s *sessionWithContext) executeTransactionFunction(
 		return true, nil
 	}
 
-	s.retrieveBookmarks(conn)
+	s.retrieveBookmarks(conn, beginBookmarks)
 	return false, x
 }
 
 func (s *sessionWithContext) getServers(ctx context.Context, mode idb.AccessMode) ([]string, error) {
-	bookmarks := s.bookmarks.currentBookmarks()
+	bookmarksFn := s.routingBookmarks
 	if mode == idb.ReadMode {
-		return s.router.Readers(ctx, bookmarks, s.databaseName, s.boltLogger)
+		return s.router.Readers(ctx, bookmarksFn, s.databaseName, s.boltLogger)
 	} else {
-		return s.router.Writers(ctx, bookmarks, s.databaseName, s.boltLogger)
+		return s.router.Writers(ctx, bookmarksFn, s.databaseName, s.boltLogger)
 	}
 }
 
@@ -429,11 +456,24 @@ func (s *sessionWithContext) getConnection(ctx context.Context, mode idb.AccessM
 	return conn, nil
 }
 
-func (s *sessionWithContext) retrieveBookmarks(conn idb.Connection) {
+func (s *sessionWithContext) retrieveBookmarks(conn idb.Connection, sentBookmarks Bookmarks) {
 	if conn == nil {
 		return
 	}
-	s.bookmarks.replaceBookmarks(conn.Bookmark())
+	bookmark, bookmarkDatabase := conn.Bookmark()
+	db := s.databaseName
+	if bookmarkDatabase != "" {
+		db = bookmarkDatabase
+	}
+	s.bookmarks.replaceBookmarks(db, sentBookmarks, bookmark)
+}
+
+func (s *sessionWithContext) retrieveSessionBookmarks(conn idb.Connection) {
+	if conn == nil {
+		return
+	}
+	bookmark, _ := conn.Bookmark()
+	s.bookmarks.replaceSessionBookmarks(bookmark)
 }
 
 func (s *sessionWithContext) Run(ctx context.Context,
@@ -462,6 +502,7 @@ func (s *sessionWithContext) Run(ctx context.Context,
 		return nil, err
 	}
 
+	runBookmarks := s.transactionBookmarks()
 	stream, err := conn.Run(
 		ctx,
 		idb.Command{
@@ -471,7 +512,7 @@ func (s *sessionWithContext) Run(ctx context.Context,
 		},
 		idb.TxConfig{
 			Mode:             s.defaultMode,
-			Bookmarks:        s.bookmarks.currentBookmarks(),
+			Bookmarks:        runBookmarks,
 			Timeout:          config.Timeout,
 			Meta:             config.Metadata,
 			ImpersonatedUser: s.impersonatedUser,
@@ -484,7 +525,7 @@ func (s *sessionWithContext) Run(ctx context.Context,
 	s.autocommitTx = &autocommitTransaction{
 		conn: conn,
 		res: newResultWithContext(conn, stream, cypher, params, func() {
-			s.retrieveBookmarks(conn)
+			s.retrieveBookmarks(conn, runBookmarks)
 		}),
 		onClosed: func() {
 			s.pool.Return(ctx, conn)
@@ -545,7 +586,10 @@ func (s *sessionWithContext) resolveHomeDatabase(ctx context.Context) error {
 	if !s.resolveHomeDb {
 		return nil
 	}
-	defaultDb, err := s.router.GetNameOfDefaultDatabase(ctx, s.bookmarks.currentBookmarks(), s.impersonatedUser, s.boltLogger)
+
+	// the actual database may not be known yet so the session initial bookmarks might actually belong to system
+	bookmarks := s.routingBookmarks()
+	defaultDb, err := s.router.GetNameOfDefaultDatabase(ctx, bookmarks, s.impersonatedUser, s.boltLogger)
 	if err != nil {
 		return err
 	}
@@ -553,6 +597,20 @@ func (s *sessionWithContext) resolveHomeDatabase(ctx context.Context) error {
 	s.databaseName = defaultDb
 	s.resolveHomeDb = false
 	return nil
+}
+
+func (s *sessionWithContext) transactionBookmarks() Bookmarks {
+	result := collection.NewSet(s.bookmarks.allBookmarks())
+	result.AddAll(s.bookmarks.currentBookmarks())
+	return result.Values()
+}
+
+func (s *sessionWithContext) routingBookmarks() Bookmarks {
+	systemBookmarks := s.bookmarks.bookmarksOfDatabase("system")
+	sessionBookmarks := s.bookmarks.currentBookmarks()
+	bookmarks := collection.NewSet(systemBookmarks)
+	bookmarks.AddAll(sessionBookmarks)
+	return bookmarks.Values()
 }
 
 type erroredSessionWithContext struct {

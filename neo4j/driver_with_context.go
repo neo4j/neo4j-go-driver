@@ -72,16 +72,19 @@ type DriverWithContext interface {
 // token as parameters and can also take optional configuration function(s) as variadic parameters.
 //
 // In order to connect to a single instance database, you need to pass a URI with scheme 'bolt', 'bolt+s' or 'bolt+ssc'.
+//
 //	driver, err = NewDriverWithContext("bolt://db.server:7687", BasicAuth(username, password))
 //
 // In order to connect to a causal cluster database, you need to pass a URI with scheme 'neo4j', 'neo4j+s' or 'neo4j+ssc'
 // and its host part set to be one of the core cluster members.
+//
 //	driver, err = NewDriverWithContext("neo4j://core.db.server:7687", BasicAuth(username, password))
 //
 // You can override default configuration options by providing a configuration function(s)
+//
 //	driver, err = NewDriverWithContext(uri, BasicAuth(username, password), function (config *Config) {
-// 		config.MaxConnectionPoolSize = 10
-// 	})
+//		config.MaxConnectionPoolSize = 10
+//	})
 func NewDriverWithContext(target string, auth AuthToken, configurers ...func(*Config)) (DriverWithContext, error) {
 	parsed, err := url.Parse(target)
 	if err != nil {
@@ -230,11 +233,16 @@ func routingContextFromUrl(useRouting bool, u *url.URL) (map[string]string, erro
 
 type sessionRouter interface {
 	// Readers returns the list of servers that can serve reads on the requested database.
-	Readers(ctx context.Context, bookmarks []string, database string, boltLogger log.BoltLogger) ([]string, error)
+	// note: bookmarks are lazily supplied, only when a new routing table needs to be fetched
+	// this is needed because custom bookmark managers may provide bookmarks from external systems
+	// they should not be called when it is not needed (e.g. when a routing table is cached)
+	Readers(ctx context.Context, bookmarks func() []string, database string, boltLogger log.BoltLogger) ([]string, error)
 	// Writers returns the list of servers that can serve writes on the requested database.
-	Writers(ctx context.Context, bookmarks []string, database string, boltLogger log.BoltLogger) ([]string, error)
+	// note: bookmarks are lazily supplied, see Readers documentation to learn why
+	Writers(ctx context.Context, bookmarks func() []string, database string, boltLogger log.BoltLogger) ([]string, error)
 	// GetNameOfDefaultDatabase returns the name of the default database for the specified user.
 	// The correct database name is needed when requesting readers or writers.
+	// the bookmarks are eagerly provided since this method always fetches a new routing table
 	GetNameOfDefaultDatabase(ctx context.Context, bookmarks []string, user string, boltLogger log.BoltLogger) (string, error)
 	Invalidate(ctx context.Context, database string) error
 	CleanUp(ctx context.Context) error

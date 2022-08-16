@@ -79,11 +79,12 @@ type Connection interface {
 	// streams are created and the server doesn't support multiple streams. Use Buffer to force
 	// buffering before calling Reset to get all records and the bookmark.
 	Buffer(ctx context.Context, streamHandle StreamHandle) error
-	// Bookmark returns the bookmark from last committed transaction or last finished auto-commit transaction.
+	// Bookmark returns the bookmark and optionally its database from last committed transaction or last finished auto-commit transaction.
+	// The returned database is relevant for queries executed with the USE clause, since the returned database may be different from the session's database.
 	// Note that if there is an ongoing auto-commit transaction (stream active) the bookmark
 	// from that is not included, use Buffer or Consume to end the stream with a bookmark.
 	// Empty string if no bookmark.
-	Bookmark() string
+	Bookmark() (string, string)
 	// ServerName returns the name of the remote server
 	ServerName() string
 	// ServerVersion returns the server version on pattern Neo4j/1.2.3

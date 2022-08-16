@@ -28,9 +28,9 @@ type RouterFake struct {
 	Invalidated            bool
 	InvalidatedDb          string
 	ReadersRet             []string
-	ReadersHook            func(bookmarks []string, database string) ([]string, error)
+	ReadersHook            func(bookmarks func() []string, database string) ([]string, error)
 	WritersRet             []string
-	WritersHook            func(bookmarks []string, database string) ([]string, error)
+	WritersHook            func(bookmarks func() []string, database string) ([]string, error)
 	Err                    error
 	CleanUpHook            func()
 	GetNameOfDefaultDbHook func(user string) (string, error)
@@ -55,16 +55,16 @@ func (r *RouterFake) Invalidate(ctx context.Context, database string) error {
 	return nil
 }
 
-func (r *RouterFake) Readers(ctx context.Context, bookmarks []string, database string, log log.BoltLogger) ([]string, error) {
+func (r *RouterFake) Readers(ctx context.Context, bookmarksFn func() []string, database string, log log.BoltLogger) ([]string, error) {
 	if r.ReadersHook != nil {
-		return r.ReadersHook(bookmarks, database)
+		return r.ReadersHook(bookmarksFn, database)
 	}
 	return r.ReadersRet, r.Err
 }
 
-func (r *RouterFake) Writers(ctx context.Context, bookmarks []string, database string, log log.BoltLogger) ([]string, error) {
+func (r *RouterFake) Writers(ctx context.Context, bookmarksFn func() []string, database string, log log.BoltLogger) ([]string, error) {
 	if r.WritersHook != nil {
-		return r.WritersHook(bookmarks, database)
+		return r.WritersHook(bookmarksFn, database)
 	}
 	return r.WritersRet, r.Err
 }

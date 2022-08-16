@@ -344,7 +344,8 @@ func TestBolt5(outer *testing.T) {
 
 		_ = bolt.TxCommit(context.Background(), tx)
 		assertBoltState(t, bolt5Ready, bolt)
-		AssertStringEqual(t, committedBookmark, bolt.Bookmark())
+		bookmark, _ := bolt.Bookmark()
+		AssertStringEqual(t, committedBookmark, bookmark)
 	})
 
 	// Verifies that current stream is discarded correctly even if it is larger
@@ -453,7 +454,8 @@ func TestBolt5(outer *testing.T) {
 		assertBoltState(t, bolt5StreamingTx, bolt)
 		_ = bolt.TxCommit(context.Background(), tx)
 		assertBoltState(t, bolt5Ready, bolt)
-		AssertStringEqual(t, committedBookmark, bolt.Bookmark())
+		bookmark, _ := bolt.Bookmark()
+		AssertStringEqual(t, committedBookmark, bookmark)
 	})
 
 	outer.Run("Begin transaction with bookmark failure", func(t *testing.T) {
@@ -469,7 +471,8 @@ func TestBolt5(outer *testing.T) {
 			idb.TxConfig{Mode: idb.ReadMode, Bookmarks: []string{"bm1"}})
 		assertBoltState(t, bolt5Failed, bolt)
 		AssertError(t, err)
-		AssertStringEqual(t, "", bolt.Bookmark())
+		bookmark, _ := bolt.Bookmark()
+		AssertStringEqual(t, "", bookmark)
 	})
 
 	outer.Run("Run transactional rollback", func(t *testing.T) {
@@ -633,7 +636,8 @@ func TestBolt5(outer *testing.T) {
 		err := bolt.Buffer(context.Background(), stream)
 		AssertNoError(t, err)
 		// The bookmark should be set
-		AssertStringEqual(t, bolt.Bookmark(), runBookmark)
+		bookmark, _ := bolt.Bookmark()
+		AssertStringEqual(t, bookmark, runBookmark)
 
 		// Server closed connection and bolt will go into failed state
 		_, err = bolt.Run(context.Background(),
@@ -681,7 +685,8 @@ func TestBolt5(outer *testing.T) {
 		err = bolt.Buffer(context.Background(), stream)
 		AssertNoError(t, err)
 		// The bookmark should be set
-		AssertStringEqual(t, bolt.Bookmark(), bookmark)
+		bookmark, _ = bolt.Bookmark()
+		AssertStringEqual(t, bookmark, bookmark)
 
 		for i := 0; i < 4; i++ {
 			rec, sum, err = bolt.Next(context.Background(), stream)
@@ -726,7 +731,8 @@ func TestBolt5(outer *testing.T) {
 		rec, sum, err = bolt.Next(context.Background(), stream)
 		AssertNextOnlyError(t, rec, sum, err)
 		// Should be no bookmark since we failed
-		AssertStringEqual(t, bolt.Bookmark(), "")
+		bookmark, _ := bolt.Bookmark()
+		AssertStringEqual(t, bookmark, "")
 	})
 
 	outer.Run("Buffer stream with invalid handle", func(t *testing.T) {
@@ -757,7 +763,8 @@ func TestBolt5(outer *testing.T) {
 		AssertNotNil(t, sum)
 		assertBoltState(t, bolt5Ready, bolt)
 		// The bookmark should be set
-		AssertStringEqual(t, bolt.Bookmark(), runBookmark)
+		bookmark, _ := bolt.Bookmark()
+		AssertStringEqual(t, bookmark, runBookmark)
 		AssertStringEqual(t, sum.Bookmark, runBookmark)
 
 		// Should only get the summary from the stream since we consumed everything
@@ -802,7 +809,8 @@ func TestBolt5(outer *testing.T) {
 		assertBoltState(t, bolt5Ready, bolt)
 
 		// The bookmark should be set
-		AssertStringEqual(t, bolt.Bookmark(), bookmark)
+		bookmark, _ = bolt.Bookmark()
+		AssertStringEqual(t, bookmark, bookmark)
 		AssertStringEqual(t, sum.Bookmark, bookmark)
 
 		// Should only get the summary from the stream since we consumed everything
@@ -837,7 +845,8 @@ func TestBolt5(outer *testing.T) {
 		sum, err := bolt.Consume(context.Background(), stream)
 		AssertNeo4jError(t, err)
 		AssertNil(t, sum)
-		AssertStringEqual(t, bolt.Bookmark(), "")
+		bookmark, _ := bolt.Bookmark()
+		AssertStringEqual(t, bookmark, "")
 
 		// Should not get the summary since there was an error
 		rec, sum, err := bolt.Next(context.Background(), stream)
