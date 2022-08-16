@@ -80,7 +80,7 @@ type Connection interface {
 	// buffering before calling Reset to get all records and the bookmark.
 	Buffer(ctx context.Context, streamHandle StreamHandle) error
 	// Bookmark returns the bookmark and optionally its database from last committed transaction or last finished auto-commit transaction.
-	// The database is only populated if queries are executed with the USE clause.
+	// The returned database is relevant for queries executed with the USE clause, since the returned database may be different from the session's database.
 	// Note that if there is an ongoing auto-commit transaction (stream active) the bookmark
 	// from that is not included, use Buffer or Consume to end the stream with a bookmark.
 	// Empty string if no bookmark.
