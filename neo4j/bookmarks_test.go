@@ -197,6 +197,42 @@ func TestBookmarkManager(outer *testing.T) {
 			t.Errorf("notify hook should have been called")
 		}
 	})
+
+	outer.Run("forgets bookmarks of specified databases", func(t *testing.T) {
+		bookmarkManager := neo4j.NewBookmarkManager(neo4j.BookmarkManagerConfig{
+			InitialBookmarks: map[string]neo4j.Bookmarks{
+				"db":  {"z", "cooper"},
+				"foo": {"bar", "fighters"},
+				"par": {"rot", "don my French"},
+			},
+		})
+
+		bookmarkManager.Forget("db", "par")
+
+		allBookmarks := bookmarkManager.GetAllBookmarks()
+		AssertEqualsInAnyOrder(t, allBookmarks, []string{"bar", "fighters"})
+		AssertIntEqual(t, len(bookmarkManager.GetBookmarks("db")), 0)
+		AssertEqualsInAnyOrder(t, bookmarkManager.GetBookmarks("foo"),
+			[]string{"bar", "fighters"})
+		AssertIntEqual(t, len(bookmarkManager.GetBookmarks("par")), 0)
+	})
+
+	outer.Run("can forget untracked databases", func(t *testing.T) {
+		bookmarkManager := neo4j.NewBookmarkManager(neo4j.BookmarkManagerConfig{
+			InitialBookmarks: map[string]neo4j.Bookmarks{
+				"db": {"z", "cooper"},
+			},
+		})
+
+		bookmarkManager.Forget("wat", "nope")
+
+		allBookmarks := bookmarkManager.GetAllBookmarks()
+		AssertEqualsInAnyOrder(t, allBookmarks, []string{"z", "cooper"})
+		AssertEqualsInAnyOrder(t, bookmarkManager.GetBookmarks("db"),
+			[]string{"z", "cooper"})
+		AssertIntEqual(t, len(bookmarkManager.GetBookmarks("wat")), 0)
+		AssertIntEqual(t, len(bookmarkManager.GetBookmarks("nope")), 0)
+	})
 }
 
 type simpleBookmarkSupplier struct {
