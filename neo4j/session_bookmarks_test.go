@@ -153,6 +153,9 @@ func (f *fakeBookmarkManager) GetAllBookmarks() Bookmarks {
 	return nil
 }
 
+func (f *fakeBookmarkManager) Forget(...string) {
+}
+
 func (f *fakeBookmarkManager) called(times int, function string, args ...any) bool {
 	count := 0
 	for _, call := range f.recordedCalls {

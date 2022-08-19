@@ -43,6 +43,10 @@ type BookmarkManager interface {
 	// GetBookmarks returns all the bookmarks associated with the specified database
 	// Note: the order of the returned bookmark slice does not need to be deterministic
 	GetBookmarks(database string) Bookmarks
+
+	// Forget removes all databases' bookmarks
+	// Note: it is the driver user's responsibility to call this
+	Forget(databases ...string)
 }
 
 type BookmarkManagerConfig struct {
@@ -116,6 +120,12 @@ func (b *bookmarkManager) GetBookmarks(database string) Bookmarks {
 	}
 	bookmarks.AddAll(extraBookmarks)
 	return bookmarks.Values()
+}
+
+func (b *bookmarkManager) Forget(databases ...string) {
+	for _, db := range databases {
+		b.bookmarks.Delete(db)
+	}
 }
 
 func NewBookmarkManager(config BookmarkManagerConfig) BookmarkManager {
