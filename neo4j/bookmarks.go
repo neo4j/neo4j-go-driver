@@ -101,7 +101,7 @@ func (b *bookmarkManager) GetAllBookmarks() Bookmarks {
 		allBookmarks.AddAll(b.supplier.GetAllBookmarks())
 	}
 	b.bookmarks.Range(func(db, rawBookmarks any) bool {
-		bookmarks := rawBookmarks.(collection.Set[string]).Copy()
+		bookmarks := rawBookmarks.(collection.Set[string])
 		allBookmarks.Union(bookmarks)
 		return true
 	})
