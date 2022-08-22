@@ -77,6 +77,9 @@ type bookmarkManager struct {
 }
 
 func (b *bookmarkManager) UpdateBookmarks(database string, previousBookmarks, newBookmarks Bookmarks) {
+	if len(newBookmarks) == 0 {
+		return
+	}
 	var bookmarksToNotify Bookmarks
 	storedNewBookmarks := collection.NewSet(newBookmarks)
 	if rawCurrentBookmarks, loaded := b.bookmarks.LoadOrStore(database, storedNewBookmarks); !loaded {
@@ -98,7 +101,7 @@ func (b *bookmarkManager) GetAllBookmarks() Bookmarks {
 		allBookmarks.AddAll(b.supplier.GetAllBookmarks())
 	}
 	b.bookmarks.Range(func(db, rawBookmarks any) bool {
-		bookmarks := rawBookmarks.(collection.Set[string]).Copy()
+		bookmarks := rawBookmarks.(collection.Set[string])
 		allBookmarks.Union(bookmarks)
 		return true
 	})

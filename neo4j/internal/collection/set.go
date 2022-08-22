@@ -59,7 +59,7 @@ func (set Set[T]) Values() []T {
 	}
 	result := make([]T, len(set), len(set))
 	i := 0
-	for value, _ := range set {
+	for value := range set {
 		result[i] = value
 		i++
 	}
