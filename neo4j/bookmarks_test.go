@@ -152,6 +152,21 @@ func TestBookmarkManager(outer *testing.T) {
 		}
 	})
 
+	outer.Run("does not notify updated bookmarks when empty", func(t *testing.T) {
+		initialBookmarks := []string{"a", "b"}
+		bookmarkManager := neo4j.NewBookmarkManager(neo4j.BookmarkManagerConfig{
+			InitialBookmarks: map[string]neo4j.Bookmarks{"db1": initialBookmarks},
+			BookmarkUpdateNotifier: func(db string, bookmarks neo4j.Bookmarks) {
+				t.Error("I must not be called")
+			},
+		})
+
+		bookmarkManager.UpdateBookmarks("db1", initialBookmarks, nil)
+
+		actualBookmarks := bookmarkManager.GetBookmarks("db1")
+		AssertEqualsInAnyOrder(t, actualBookmarks, initialBookmarks)
+	})
+
 	outer.Run("notifies updated bookmarks for existing DB without bookmarks", func(t *testing.T) {
 		notifyHookCalled := false
 		expectedBookmarks := []string{"a", "d"}

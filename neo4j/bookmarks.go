@@ -77,6 +77,9 @@ type bookmarkManager struct {
 }
 
 func (b *bookmarkManager) UpdateBookmarks(database string, previousBookmarks, newBookmarks Bookmarks) {
+	if len(newBookmarks) == 0 {
+		return
+	}
 	var bookmarksToNotify Bookmarks
 	storedNewBookmarks := collection.NewSet(newBookmarks)
 	if rawCurrentBookmarks, loaded := b.bookmarks.LoadOrStore(database, storedNewBookmarks); !loaded {
