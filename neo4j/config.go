@@ -140,11 +140,6 @@ type Config struct {
 	// If a single large result is to be retrieved, this is the most performant
 	// setting.
 	FetchSize int
-	// BookmarkManager defines a central point to externally supply bookmarks
-	// and be notified of bookmark updates per database
-	// Since 5.0
-	// default: nil (no-op)
-	BookmarkManager BookmarkManager
 }
 
 func defaultConfig() *Config {
@@ -159,7 +154,6 @@ func defaultConfig() *Config {
 		RootCAs:                      nil,
 		UserAgent:                    UserAgent,
 		FetchSize:                    FetchDefault,
-		BookmarkManager:              nil,
 	}
 }
 

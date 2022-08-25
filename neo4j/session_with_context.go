@@ -107,12 +107,12 @@ type SessionConfig struct {
 	// to the correct cluster member (different databases may have different
 	// leaders).
 	ImpersonatedUser string
-	// IgnoreBookmarkManager allows specific sessions to ignore the
-	// globally-configured bookmark manager
-	// Sessions with this setting will handle bookmarks as before the bookmark
-	// manager was introduced
+	// BookmarkManager defines a central point to externally supply bookmarks
+	// and be notified of bookmark updates per database
+	// This is experimental and may be changed or removed without prior notice
 	// Since 5.0
-	IgnoreBookmarkManager bool
+	// default: nil (no-op)
+	BookmarkManager BookmarkManager
 }
 
 // FetchAll turns off fetching records in batches.
@@ -157,16 +157,12 @@ func newSessionWithContext(config *Config, sessConfig SessionConfig, router sess
 		fetchSize = sessConfig.FetchSize
 	}
 
-	configuredBookmarkManager := config.BookmarkManager
-	if sessConfig.IgnoreBookmarkManager {
-		configuredBookmarkManager = nil
-	}
 	return &sessionWithContext{
 		config:           config,
 		router:           router,
 		pool:             pool,
 		defaultMode:      idb.AccessMode(sessConfig.AccessMode),
-		bookmarks:        newSessionBookmarks(configuredBookmarkManager, sessConfig.Bookmarks),
+		bookmarks:        newSessionBookmarks(sessConfig.BookmarkManager, sessConfig.Bookmarks),
 		databaseName:     sessConfig.DatabaseName,
 		impersonatedUser: sessConfig.ImpersonatedUser,
 		resolveHomeDb:    sessConfig.DatabaseName == "",
