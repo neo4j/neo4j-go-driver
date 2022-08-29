@@ -537,6 +537,13 @@ func (b *backend) handleRequest(req map[string]any) {
 			"id": bookmarkManagerId,
 		})
 
+	case "BookmarkManagerClose":
+		bookmarkManagerId := data["id"].(string)
+		delete(b.bookmarkManagers, bookmarkManagerId)
+		b.writeResponse("BookmarkManager", map[string]any{
+			"id": bookmarkManagerId,
+		})
+
 	case "SessionClose":
 		sessionId := data["sessionId"].(string)
 		sessionState := b.sessionStates[sessionId]
