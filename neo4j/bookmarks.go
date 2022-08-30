@@ -49,6 +49,8 @@ type BookmarkManager interface {
 	Forget(databases ...string)
 }
 
+// BookmarkManagerConfig is an experimental API and may be changed or removed
+// without prior notice
 type BookmarkManagerConfig struct {
 	// Initial bookmarks per database
 	InitialBookmarks map[string]Bookmarks
