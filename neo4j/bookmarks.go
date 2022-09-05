@@ -31,6 +31,8 @@ import (
 // from raw values and BookmarksToRawValues for accessing the raw values.
 type Bookmarks = []string
 
+// BookmarkManager centralizes bookmark manager supply and notification
+// This API is experimental and may be changed or removed without prior notice
 type BookmarkManager interface {
 	// UpdateBookmarks updates the bookmark for the specified database
 	// previousBookmarks are the initial bookmarks of the bookmark holder (like a Session)
