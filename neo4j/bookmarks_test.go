@@ -137,7 +137,7 @@ func TestBookmarkManager(outer *testing.T) {
 		notifyHookCalled := false
 		expectedBookmarks := []string{"a", "d"}
 		bookmarkManager := neo4j.NewBookmarkManager(neo4j.BookmarkManagerConfig{
-			BookmarkUpdateNotifier: func(_ context.Context, db string, bookmarks neo4j.Bookmarks) {
+			BookmarkConsumerFn: func(_ context.Context, db string, bookmarks neo4j.Bookmarks) {
 				notifyHookCalled = true
 				if db != "db1" {
 					t.Errorf("expected to receive notifications for DB db1 but received notifications for %s", db)
@@ -159,7 +159,7 @@ func TestBookmarkManager(outer *testing.T) {
 		initialBookmarks := []string{"a", "b"}
 		bookmarkManager := neo4j.NewBookmarkManager(neo4j.BookmarkManagerConfig{
 			InitialBookmarks: map[string]neo4j.Bookmarks{"db1": initialBookmarks},
-			BookmarkUpdateNotifier: func(_ context.Context, db string, bookmarks neo4j.Bookmarks) {
+			BookmarkConsumerFn: func(_ context.Context, db string, bookmarks neo4j.Bookmarks) {
 				t.Error("I must not be called")
 			},
 		})
@@ -175,7 +175,7 @@ func TestBookmarkManager(outer *testing.T) {
 		expectedBookmarks := []string{"a", "d"}
 		bookmarkManager := neo4j.NewBookmarkManager(neo4j.BookmarkManagerConfig{
 			InitialBookmarks: map[string]neo4j.Bookmarks{"db1": {}},
-			BookmarkUpdateNotifier: func(_ context.Context, db string, bookmarks neo4j.Bookmarks) {
+			BookmarkConsumerFn: func(_ context.Context, db string, bookmarks neo4j.Bookmarks) {
 				notifyHookCalled = true
 				if db != "db1" {
 					t.Errorf("expected to receive notifications for DB db1 but received notifications for %s", db)
@@ -198,7 +198,7 @@ func TestBookmarkManager(outer *testing.T) {
 		expectedBookmarks := []string{"a", "d"}
 		bookmarkManager := neo4j.NewBookmarkManager(neo4j.BookmarkManagerConfig{
 			InitialBookmarks: map[string]neo4j.Bookmarks{"db1": {"a", "b", "c"}},
-			BookmarkUpdateNotifier: func(_ context.Context, db string, bookmarks neo4j.Bookmarks) {
+			BookmarkConsumerFn: func(_ context.Context, db string, bookmarks neo4j.Bookmarks) {
 				notifyHookCalled = true
 				if db != "db1" {
 					t.Errorf("expected to receive notifications for DB db1 but received notifications for %s", db)

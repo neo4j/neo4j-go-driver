@@ -1112,7 +1112,7 @@ func (b *backend) bookmarkManagerConfig(bookmarkManagerId string,
 	}
 	consumerRegistered := config["bookmarksConsumerRegistered"]
 	if consumerRegistered != nil && consumerRegistered.(bool) {
-		result.BookmarkUpdateNotifier = b.consumeBookmarks(bookmarkManagerId)
+		result.BookmarkConsumerFn = b.consumeBookmarks(bookmarkManagerId)
 	}
 	return result
 }
