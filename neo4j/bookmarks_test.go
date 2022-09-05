@@ -166,7 +166,7 @@ func TestBookmarkManager(outer *testing.T) {
 		notifyHookCalled := false
 		expectedBookmarks := []string{"a", "d"}
 		bookmarkManager := neo4j.NewBookmarkManager(neo4j.BookmarkManagerConfig{
-			BookmarkConsumerFn: func(_ context.Context, db string, bookmarks neo4j.Bookmarks) error {
+			BookmarkConsumer: func(_ context.Context, db string, bookmarks neo4j.Bookmarks) error {
 				notifyHookCalled = true
 				if db != "db1" {
 					t.Errorf("expected to receive notifications for DB db1 but received notifications for %s", db)
@@ -195,7 +195,7 @@ func TestBookmarkManager(outer *testing.T) {
 		initialBookmarks := []string{"a", "b"}
 		bookmarkManager := neo4j.NewBookmarkManager(neo4j.BookmarkManagerConfig{
 			InitialBookmarks: map[string]neo4j.Bookmarks{"db1": initialBookmarks},
-			BookmarkConsumerFn: func(_ context.Context, db string, bookmarks neo4j.Bookmarks) error {
+			BookmarkConsumer: func(_ context.Context, db string, bookmarks neo4j.Bookmarks) error {
 				t.Error("I must not be called")
 				return nil
 			},
@@ -218,7 +218,7 @@ func TestBookmarkManager(outer *testing.T) {
 		expectedBookmarks := []string{"a", "d"}
 		bookmarkManager := neo4j.NewBookmarkManager(neo4j.BookmarkManagerConfig{
 			InitialBookmarks: map[string]neo4j.Bookmarks{"db1": {}},
-			BookmarkConsumerFn: func(_ context.Context, db string, bookmarks neo4j.Bookmarks) error {
+			BookmarkConsumer: func(_ context.Context, db string, bookmarks neo4j.Bookmarks) error {
 				notifyHookCalled = true
 				if db != "db1" {
 					t.Errorf("expected to receive notifications for DB db1 but received notifications for %s", db)
@@ -248,7 +248,7 @@ func TestBookmarkManager(outer *testing.T) {
 		expectedBookmarks := []string{"a", "d"}
 		bookmarkManager := neo4j.NewBookmarkManager(neo4j.BookmarkManagerConfig{
 			InitialBookmarks: map[string]neo4j.Bookmarks{"db1": {"a", "b", "c"}},
-			BookmarkConsumerFn: func(_ context.Context, db string, bookmarks neo4j.Bookmarks) error {
+			BookmarkConsumer: func(_ context.Context, db string, bookmarks neo4j.Bookmarks) error {
 				notifyHookCalled = true
 				if db != "db1" {
 					t.Errorf("expected to receive notifications for DB db1 but received notifications for %s", db)
@@ -317,7 +317,7 @@ func TestBookmarkManager(outer *testing.T) {
 		})
 
 		err := bookmarkManager.Forget(ctx, "wat", "nope")
-		
+
 		if err != nil {
 			t.Errorf("expected nil error, got %v", err)
 		}

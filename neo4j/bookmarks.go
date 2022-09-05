@@ -64,7 +64,7 @@ type BookmarkManagerConfig struct {
 	// Hook called whenever bookmarks for a given database get updated
 	// The hook is called with the database and the new bookmarks
 	// Note: the order of the supplied bookmark slice is not guaranteed
-	BookmarkConsumerFn func(ctx context.Context, database string, bookmarks Bookmarks) error
+	BookmarkConsumer func(ctx context.Context, database string, bookmarks Bookmarks) error
 }
 
 type BookmarkSupplier interface {
@@ -76,9 +76,9 @@ type BookmarkSupplier interface {
 }
 
 type bookmarkManager struct {
-	bookmarks  *sync.Map
-	supplier   BookmarkSupplier
-	consumerFn func(context.Context, string, Bookmarks) error
+	bookmarks *sync.Map
+	supplier  BookmarkSupplier
+	consumer  func(context.Context, string, Bookmarks) error
 }
 
 func (b *bookmarkManager) UpdateBookmarks(ctx context.Context, database string, previousBookmarks, newBookmarks Bookmarks) error {
@@ -95,8 +95,8 @@ func (b *bookmarkManager) UpdateBookmarks(ctx context.Context, database string, 
 		currentBookmarks.AddAll(newBookmarks)
 		bookmarksToNotify = currentBookmarks.Values()
 	}
-	if b.consumerFn != nil {
-		return b.consumerFn(ctx, database, bookmarksToNotify)
+	if b.consumer != nil {
+		return b.consumer(ctx, database, bookmarksToNotify)
 	}
 	return nil
 }
@@ -148,9 +148,9 @@ func (b *bookmarkManager) Forget(ctx context.Context, databases ...string) error
 
 func NewBookmarkManager(config BookmarkManagerConfig) BookmarkManager {
 	return &bookmarkManager{
-		bookmarks:  initializeBookmarks(config.InitialBookmarks),
-		supplier:   config.BookmarkSupplier,
-		consumerFn: config.BookmarkConsumerFn,
+		bookmarks: initializeBookmarks(config.InitialBookmarks),
+		supplier:  config.BookmarkSupplier,
+		consumer:  config.BookmarkConsumer,
 	}
 }
 
