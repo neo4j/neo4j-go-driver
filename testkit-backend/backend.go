@@ -1117,8 +1117,8 @@ func (b *backend) bookmarkManagerConfig(bookmarkManagerId string,
 	return result
 }
 
-func (b *backend) supplyBookmarks(bookmarkManagerId string) func(...string) neo4j.Bookmarks {
-	return func(databases ...string) neo4j.Bookmarks {
+func (b *backend) supplyBookmarks(bookmarkManagerId string) func(...string) (neo4j.Bookmarks, error) {
+	return func(databases ...string) (neo4j.Bookmarks, error) {
 		if len(databases) > 1 {
 			panic("at most 1 database should be specified")
 		}
@@ -1130,13 +1130,13 @@ func (b *backend) supplyBookmarks(bookmarkManagerId string) func(...string) neo4
 		b.writeResponse("BookmarksSupplierRequest", msg)
 		for {
 			b.process()
-			return b.suppliedBookmarks[id]
+			return b.suppliedBookmarks[id], nil
 		}
 	}
 }
 
-func (b *backend) consumeBookmarks(bookmarkManagerId string) func(context.Context, string, neo4j.Bookmarks) {
-	return func(_ context.Context, database string, bookmarks neo4j.Bookmarks) {
+func (b *backend) consumeBookmarks(bookmarkManagerId string) func(context.Context, string, neo4j.Bookmarks) error {
+	return func(_ context.Context, database string, bookmarks neo4j.Bookmarks) error {
 		id := b.nextId()
 		b.writeResponse("BookmarksConsumerRequest", map[string]any{
 			"id":                id,
@@ -1147,21 +1147,21 @@ func (b *backend) consumeBookmarks(bookmarkManagerId string) func(context.Contex
 		for {
 			b.process()
 			if _, found := b.consumedBookmarks[id]; found {
-				return
+				return nil
 			}
 		}
 	}
 }
 
 type testkitBookmarkSupplier struct {
-	supplierFn func(...string) neo4j.Bookmarks
+	supplierFn func(...string) (neo4j.Bookmarks, error)
 }
 
-func (t *testkitBookmarkSupplier) GetAllBookmarks(context.Context) neo4j.Bookmarks {
+func (t *testkitBookmarkSupplier) GetAllBookmarks(context.Context) (neo4j.Bookmarks, error) {
 	return t.supplierFn()
 }
 
-func (t *testkitBookmarkSupplier) GetBookmarks(_ context.Context, database string) neo4j.Bookmarks {
+func (t *testkitBookmarkSupplier) GetBookmarks(_ context.Context, database string) (neo4j.Bookmarks, error) {
 	return t.supplierFn(database)
 }
 

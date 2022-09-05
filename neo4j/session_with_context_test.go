@@ -154,7 +154,7 @@ func TestSession(outer *testing.T) {
 				numDefaultDbLookups++
 				return mydb, nil
 			}
-			router.WritersHook = func(bookmarks func(context.Context) []string, database string) ([]string, error) {
+			router.WritersHook = func(_ func(context.Context) ([]string, error), database string) ([]string, error) {
 				AssertStringEqual(t, mydb, database)
 				return []string{"aserver"}, nil
 			}
@@ -337,7 +337,7 @@ func TestSession(outer *testing.T) {
 				numDefaultDbLookups++
 				return mydb, nil
 			}
-			router.ReadersHook = func(bookmarks func(context.Context) []string, database string) ([]string, error) {
+			router.ReadersHook = func(_ func(context.Context) ([]string, error), database string) ([]string, error) {
 				AssertStringEqual(t, mydb, database)
 				return []string{"aserver"}, nil
 			}
@@ -505,7 +505,7 @@ func TestSession(outer *testing.T) {
 				numDefaultDbLookups++
 				return mydb, nil
 			}
-			router.ReadersHook = func(bookmarks func(context.Context) []string, database string) ([]string, error) {
+			router.ReadersHook = func(_ func(context.Context) ([]string, error), database string) ([]string, error) {
 				AssertStringEqual(t, mydb, database)
 				return []string{"aserver"}, nil
 			}
@@ -621,7 +621,7 @@ func TestSession(outer *testing.T) {
 			router, _, session := createSession()
 			defer session.Close(ctx)
 			expectedErr := fmt.Errorf("server retrieval err")
-			router.ReadersHook = func(func(context.Context) []string, string) ([]string, error) {
+			router.ReadersHook = func(func(context.Context) ([]string, error), string) ([]string, error) {
 				return nil, expectedErr
 			}
 

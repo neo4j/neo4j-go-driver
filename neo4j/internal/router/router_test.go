@@ -399,4 +399,4 @@ func TestCleanUp(t *testing.T) {
 	}
 }
 
-func nilBookmarks(context.Context) []string { return nil }
+func nilBookmarks(context.Context) ([]string, error) { return nil, nil }

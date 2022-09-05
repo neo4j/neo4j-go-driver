@@ -117,7 +117,7 @@ func (r *Router) readTable(ctx context.Context, dbRouter *databaseRouter, bookma
 	return table, nil
 }
 
-func (r *Router) getOrReadTable(ctx context.Context, bookmarksFn func(context.Context) []string, database string, boltLogger log.BoltLogger) (*db.RoutingTable, error) {
+func (r *Router) getOrReadTable(ctx context.Context, bookmarksFn func(context.Context) ([]string, error), database string, boltLogger log.BoltLogger) (*db.RoutingTable, error) {
 	now := r.now()
 
 	if !r.dbRoutersMut.TryLock(ctx) {
@@ -130,7 +130,11 @@ func (r *Router) getOrReadTable(ctx context.Context, bookmarksFn func(context.Co
 		return dbRouter.table, nil
 	}
 
-	table, err := r.readTable(ctx, dbRouter, bookmarksFn(ctx), database, "", boltLogger)
+	bookmarks, err := bookmarksFn(ctx)
+	if err != nil {
+		return nil, err
+	}
+	table, err := r.readTable(ctx, dbRouter, bookmarks, database, "", boltLogger)
 	if err != nil {
 		return nil, err
 	}
@@ -140,7 +144,7 @@ func (r *Router) getOrReadTable(ctx context.Context, bookmarksFn func(context.Co
 	return table, nil
 }
 
-func (r *Router) Readers(ctx context.Context, bookmarks func(context.Context) []string, database string, boltLogger log.BoltLogger) ([]string, error) {
+func (r *Router) Readers(ctx context.Context, bookmarks func(context.Context) ([]string, error), database string, boltLogger log.BoltLogger) ([]string, error) {
 	table, err := r.getOrReadTable(ctx, bookmarks, database, boltLogger)
 	if err != nil {
 		return nil, err
@@ -170,7 +174,7 @@ func (r *Router) Readers(ctx context.Context, bookmarks func(context.Context) []
 	return table.Readers, nil
 }
 
-func (r *Router) Writers(ctx context.Context, bookmarks func(context.Context) []string, database string, boltLogger log.BoltLogger) ([]string, error) {
+func (r *Router) Writers(ctx context.Context, bookmarks func(context.Context) ([]string, error), database string, boltLogger log.BoltLogger) ([]string, error) {
 	table, err := r.getOrReadTable(ctx, bookmarks, database, boltLogger)
 	if err != nil {
 		return nil, err

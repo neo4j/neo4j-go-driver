@@ -52,8 +52,11 @@ func TestSessionBookmarks(outer *testing.T) {
 			"", "bookmark", "", "deutschmark", "",
 		})
 
-		sessionBookmarks.replaceBookmarks(ctx, "db", nil, "booking mark")
+		err := sessionBookmarks.replaceBookmarks(ctx, "db", nil, "booking mark")
 
+		if err != nil {
+			t.Errorf("expected nil error, got: %v", err)
+		}
 		currentBookmarks := sessionBookmarks.currentBookmarks()
 		if !reflect.DeepEqual(currentBookmarks, []string{"booking mark"}) {
 			t.Errorf(`expected bookmarks ["booking mark"], got %v`, currentBookmarks)
@@ -67,8 +70,11 @@ func TestSessionBookmarks(outer *testing.T) {
 	outer.Run("does not replace set bookmarks when new bookmark is empty", func(t *testing.T) {
 		sessionBookmarks := newSessionBookmarks(nil, []string{"book marking"})
 
-		sessionBookmarks.replaceBookmarks(ctx, "db", nil, "")
+		err := sessionBookmarks.replaceBookmarks(ctx, "db", nil, "")
 
+		if err != nil {
+			t.Errorf("expected nil error, got: %v", err)
+		}
 		currentBookmarks := sessionBookmarks.currentBookmarks()
 		if !reflect.DeepEqual(currentBookmarks, []string{"book marking"}) {
 			t.Errorf(`expected bookmarks ["book marking"], got %v`, currentBookmarks)
@@ -94,8 +100,11 @@ func TestSessionBookmarks(outer *testing.T) {
 			bookmarkManager := &fakeBookmarkManager{}
 			sessionBookmarks := newSessionBookmarks(bookmarkManager, nil)
 
-			sessionBookmarks.replaceBookmarks(ctx, "dbz", []string{"b1", "b2"}, "b3")
+			err := sessionBookmarks.replaceBookmarks(ctx, "dbz", []string{"b1", "b2"}, "b3")
 
+			if err != nil {
+				t.Errorf("expected nil error, got: %v", err)
+			}
 			if !bookmarkManager.called(1, "UpdateBookmarks", ctx, "dbz", []string{"b1", "b2"}, []string{"b3"}) {
 				t.Errorf("Expected UpdateBookmarks to be called once but was not")
 			}
@@ -105,7 +114,7 @@ func TestSessionBookmarks(outer *testing.T) {
 			bookmarkManager := &fakeBookmarkManager{}
 			sessionBookmarks := newSessionBookmarks(bookmarkManager, nil)
 
-			sessionBookmarks.bookmarksOfDatabase(ctx, "dbz")
+			_, _ = sessionBookmarks.bookmarksOfDatabase(ctx, "dbz")
 
 			if !bookmarkManager.called(1, "GetBookmarks", ctx, "dbz") {
 				t.Errorf("Expected GetBookmarks to be called once but was not")
@@ -116,7 +125,7 @@ func TestSessionBookmarks(outer *testing.T) {
 			bookmarkManager := &fakeBookmarkManager{}
 			sessionBookmarks := newSessionBookmarks(bookmarkManager, nil)
 
-			sessionBookmarks.allBookmarks(ctx)
+			_, _ = sessionBookmarks.allBookmarks(ctx)
 
 			if !bookmarkManager.called(1, "GetAllBookmarks", ctx) {
 				t.Errorf("Expected GetBookmarks with the provided arguments to be called once but was not")
@@ -134,30 +143,32 @@ type fakeBookmarkManager struct {
 	recordedCalls []invocation
 }
 
-func (f *fakeBookmarkManager) UpdateBookmarks(ctx context.Context, database string, previousBookmarks, newBookmarks Bookmarks) {
+func (f *fakeBookmarkManager) UpdateBookmarks(ctx context.Context, database string, previousBookmarks, newBookmarks Bookmarks) error {
 	f.recordedCalls = append(f.recordedCalls, invocation{
 		function:  "UpdateBookmarks",
 		arguments: []any{ctx, database, previousBookmarks, newBookmarks},
 	})
+	return nil
 }
 
-func (f *fakeBookmarkManager) GetBookmarks(ctx context.Context, database string) Bookmarks {
+func (f *fakeBookmarkManager) GetBookmarks(ctx context.Context, database string) (Bookmarks, error) {
 	f.recordedCalls = append(f.recordedCalls, invocation{
 		function:  "GetBookmarks",
 		arguments: []any{ctx, database},
 	})
-	return nil
+	return nil, nil
 }
 
-func (f *fakeBookmarkManager) GetAllBookmarks(ctx context.Context) Bookmarks {
+func (f *fakeBookmarkManager) GetAllBookmarks(ctx context.Context) (Bookmarks, error) {
 	f.recordedCalls = append(f.recordedCalls, invocation{
 		function:  "GetAllBookmarks",
 		arguments: []any{ctx},
 	})
-	return nil
+	return nil, nil
 }
 
-func (f *fakeBookmarkManager) Forget(context.Context, ...string) {
+func (f *fakeBookmarkManager) Forget(context.Context, ...string) error {
+	return nil
 }
 
 func (f *fakeBookmarkManager) called(times int, function string, args ...any) bool {
