@@ -117,7 +117,7 @@ func (r *Router) readTable(ctx context.Context, dbRouter *databaseRouter, bookma
 	return table, nil
 }
 
-func (r *Router) getOrReadTable(ctx context.Context, bookmarksFn func() []string, database string, boltLogger log.BoltLogger) (*db.RoutingTable, error) {
+func (r *Router) getOrReadTable(ctx context.Context, bookmarksFn func(context.Context) []string, database string, boltLogger log.BoltLogger) (*db.RoutingTable, error) {
 	now := r.now()
 
 	if !r.dbRoutersMut.TryLock(ctx) {
@@ -130,7 +130,7 @@ func (r *Router) getOrReadTable(ctx context.Context, bookmarksFn func() []string
 		return dbRouter.table, nil
 	}
 
-	table, err := r.readTable(ctx, dbRouter, bookmarksFn(), database, "", boltLogger)
+	table, err := r.readTable(ctx, dbRouter, bookmarksFn(ctx), database, "", boltLogger)
 	if err != nil {
 		return nil, err
 	}
@@ -140,7 +140,7 @@ func (r *Router) getOrReadTable(ctx context.Context, bookmarksFn func() []string
 	return table, nil
 }
 
-func (r *Router) Readers(ctx context.Context, bookmarks func() []string, database string, boltLogger log.BoltLogger) ([]string, error) {
+func (r *Router) Readers(ctx context.Context, bookmarks func(context.Context) []string, database string, boltLogger log.BoltLogger) ([]string, error) {
 	table, err := r.getOrReadTable(ctx, bookmarks, database, boltLogger)
 	if err != nil {
 		return nil, err
@@ -170,7 +170,7 @@ func (r *Router) Readers(ctx context.Context, bookmarks func() []string, databas
 	return table.Readers, nil
 }
 
-func (r *Router) Writers(ctx context.Context, bookmarks func() []string, database string, boltLogger log.BoltLogger) ([]string, error) {
+func (r *Router) Writers(ctx context.Context, bookmarks func(context.Context) []string, database string, boltLogger log.BoltLogger) ([]string, error) {
 	table, err := r.getOrReadTable(ctx, bookmarks, database, boltLogger)
 	if err != nil {
 		return nil, err

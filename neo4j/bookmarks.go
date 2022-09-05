@@ -20,6 +20,7 @@
 package neo4j
 
 import (
+	"context"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/collection"
 	"sync"
 )
@@ -34,19 +35,19 @@ type BookmarkManager interface {
 	// UpdateBookmarks updates the bookmark for the specified database
 	// previousBookmarks are the initial bookmarks of the bookmark holder (like a Session)
 	// newBookmarks are the bookmarks that are received after completion of the bookmark holder operation (like the end of a Session)
-	UpdateBookmarks(database string, previousBookmarks, newBookmarks Bookmarks)
+	UpdateBookmarks(ctx context.Context, database string, previousBookmarks, newBookmarks Bookmarks)
 
 	// GetAllBookmarks returns all the bookmarks tracked by this bookmark manager
 	// Note: the order of the returned bookmark slice is not guaranteed
-	GetAllBookmarks() Bookmarks
+	GetAllBookmarks(ctx context.Context) Bookmarks
 
 	// GetBookmarks returns all the bookmarks associated with the specified database
 	// Note: the order of the returned bookmark slice does not need to be deterministic
-	GetBookmarks(database string) Bookmarks
+	GetBookmarks(ctx context.Context, database string) Bookmarks
 
 	// Forget removes all databases' bookmarks
 	// Note: it is the driver user's responsibility to call this
-	Forget(databases ...string)
+	Forget(ctx context.Context, databases ...string)
 }
 
 // BookmarkManagerConfig is an experimental API and may be changed or removed
@@ -61,24 +62,24 @@ type BookmarkManagerConfig struct {
 	// Hook called whenever bookmarks for a given database get updated
 	// The hook is called with the database and the new bookmarks
 	// Note: the order of the supplied bookmark slice is not guaranteed
-	BookmarkUpdateNotifier func(string, Bookmarks)
+	BookmarkUpdateNotifier func(context.Context, string, Bookmarks)
 }
 
 type BookmarkSupplier interface {
 	// GetAllBookmarks returns all known bookmarks to the bookmark manager
-	GetAllBookmarks() Bookmarks
+	GetAllBookmarks(ctx context.Context) Bookmarks
 
 	// GetBookmarks returns all the bookmarks of the specified database to the bookmark manager
-	GetBookmarks(database string) Bookmarks
+	GetBookmarks(ctx context.Context, database string) Bookmarks
 }
 
 type bookmarkManager struct {
 	bookmarks       *sync.Map
 	supplier        BookmarkSupplier
-	notifyUpdatesFn func(string, Bookmarks)
+	notifyUpdatesFn func(context.Context, string, Bookmarks)
 }
 
-func (b *bookmarkManager) UpdateBookmarks(database string, previousBookmarks, newBookmarks Bookmarks) {
+func (b *bookmarkManager) UpdateBookmarks(ctx context.Context, database string, previousBookmarks, newBookmarks Bookmarks) {
 	if len(newBookmarks) == 0 {
 		return
 	}
@@ -93,14 +94,14 @@ func (b *bookmarkManager) UpdateBookmarks(database string, previousBookmarks, ne
 		bookmarksToNotify = currentBookmarks.Values()
 	}
 	if b.notifyUpdatesFn != nil {
-		b.notifyUpdatesFn(database, bookmarksToNotify)
+		b.notifyUpdatesFn(ctx, database, bookmarksToNotify)
 	}
 }
 
-func (b *bookmarkManager) GetAllBookmarks() Bookmarks {
+func (b *bookmarkManager) GetAllBookmarks(ctx context.Context) Bookmarks {
 	allBookmarks := collection.NewSet([]string{})
 	if b.supplier != nil {
-		allBookmarks.AddAll(b.supplier.GetAllBookmarks())
+		allBookmarks.AddAll(b.supplier.GetAllBookmarks(ctx))
 	}
 	b.bookmarks.Range(func(db, rawBookmarks any) bool {
 		bookmarks := rawBookmarks.(collection.Set[string])
@@ -110,10 +111,10 @@ func (b *bookmarkManager) GetAllBookmarks() Bookmarks {
 	return allBookmarks.Values()
 }
 
-func (b *bookmarkManager) GetBookmarks(database string) Bookmarks {
+func (b *bookmarkManager) GetBookmarks(ctx context.Context, database string) Bookmarks {
 	var extraBookmarks Bookmarks
 	if b.supplier != nil {
-		extraBookmarks = b.supplier.GetBookmarks(database)
+		extraBookmarks = b.supplier.GetBookmarks(ctx, database)
 	}
 	rawBookmarks, found := b.bookmarks.Load(database)
 	if !found {
@@ -127,7 +128,7 @@ func (b *bookmarkManager) GetBookmarks(database string) Bookmarks {
 	return bookmarks.Values()
 }
 
-func (b *bookmarkManager) Forget(databases ...string) {
+func (b *bookmarkManager) Forget(ctx context.Context, databases ...string) {
 	for _, db := range databases {
 		b.bookmarks.Delete(db)
 	}

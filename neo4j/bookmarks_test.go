@@ -1,6 +1,7 @@
 package neo4j_test
 
 import (
+	"context"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
 	. "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/testutil"
 	"testing"
@@ -34,6 +35,8 @@ func TestCombineBookmarks(t *testing.T) {
 }
 
 func TestBookmarkManager(outer *testing.T) {
+	ctx := context.Background()
+
 	outer.Parallel()
 
 	outer.Run("deduplicates initial bookmarks", func(t *testing.T) {
@@ -44,11 +47,11 @@ func TestBookmarkManager(outer *testing.T) {
 			},
 		})
 
-		bookmarks1 := bookmarkManager.GetBookmarks("db1")
+		bookmarks1 := bookmarkManager.GetBookmarks(ctx, "db1")
 		expected1 := []string{"a", "b"}
 		AssertEqualsInAnyOrder(t, bookmarks1, expected1)
 
-		bookmarks2 := bookmarkManager.GetBookmarks("db2")
+		bookmarks2 := bookmarkManager.GetBookmarks(ctx, "db2")
 		expected2 := []string{"b", "c"}
 		AssertEqualsInAnyOrder(t, bookmarks2, expected2)
 	})
@@ -56,7 +59,7 @@ func TestBookmarkManager(outer *testing.T) {
 	outer.Run("gets no bookmarks by default", func(t *testing.T) {
 		bookmarkManager := neo4j.NewBookmarkManager(neo4j.BookmarkManagerConfig{})
 		getBookmarks := func(db string) bool {
-			return bookmarkManager.GetBookmarks(db) == nil
+			return bookmarkManager.GetBookmarks(ctx, db) == nil
 		}
 
 		if err := quick.Check(getBookmarks, nil); err != nil {
@@ -76,7 +79,7 @@ func TestBookmarkManager(outer *testing.T) {
 			}},
 		})
 
-		actualBookmarks := bookmarkManager.GetBookmarks("db1")
+		actualBookmarks := bookmarkManager.GetBookmarks(ctx, "db1")
 
 		AssertEqualsInAnyOrder(t, actualBookmarks, expectedBookmarks)
 	})
@@ -97,8 +100,8 @@ func TestBookmarkManager(outer *testing.T) {
 			}},
 		})
 
-		_ = bookmarkManager.GetBookmarks("db1")
-		actualBookmarks := bookmarkManager.GetBookmarks("db1")
+		_ = bookmarkManager.GetBookmarks(ctx, "db1")
+		actualBookmarks := bookmarkManager.GetBookmarks(ctx, "db1")
 
 		AssertEqualsInAnyOrder(t, actualBookmarks, expectedBookmarks)
 	})
@@ -108,10 +111,10 @@ func TestBookmarkManager(outer *testing.T) {
 		bookmarkManager := neo4j.NewBookmarkManager(neo4j.BookmarkManagerConfig{
 			InitialBookmarks: map[string]neo4j.Bookmarks{"db1": {"a"}},
 		})
-		bookmarks := bookmarkManager.GetBookmarks("db1")
+		bookmarks := bookmarkManager.GetBookmarks(ctx, "db1")
 		bookmarks[0] = "changed"
 
-		bookmarks = bookmarkManager.GetBookmarks("db1")
+		bookmarks = bookmarkManager.GetBookmarks(ctx, "db1")
 
 		AssertEqualsInAnyOrder(t, bookmarks, expectedBookmarks)
 	})
@@ -123,10 +126,10 @@ func TestBookmarkManager(outer *testing.T) {
 			},
 		})
 
-		bookmarkManager.UpdateBookmarks("db1", []string{"b", "c"}, []string{"d", "a"})
+		bookmarkManager.UpdateBookmarks(ctx, "db1", []string{"b", "c"}, []string{"d", "a"})
 
 		expectedBookmarks := []string{"a", "d"}
-		actualBookmarks := bookmarkManager.GetBookmarks("db1")
+		actualBookmarks := bookmarkManager.GetBookmarks(ctx, "db1")
 		AssertEqualsInAnyOrder(t, actualBookmarks, expectedBookmarks)
 	})
 
@@ -134,7 +137,7 @@ func TestBookmarkManager(outer *testing.T) {
 		notifyHookCalled := false
 		expectedBookmarks := []string{"a", "d"}
 		bookmarkManager := neo4j.NewBookmarkManager(neo4j.BookmarkManagerConfig{
-			BookmarkUpdateNotifier: func(db string, bookmarks neo4j.Bookmarks) {
+			BookmarkUpdateNotifier: func(_ context.Context, db string, bookmarks neo4j.Bookmarks) {
 				notifyHookCalled = true
 				if db != "db1" {
 					t.Errorf("expected to receive notifications for DB db1 but received notifications for %s", db)
@@ -143,9 +146,9 @@ func TestBookmarkManager(outer *testing.T) {
 			},
 		})
 
-		bookmarkManager.UpdateBookmarks("db1", nil, []string{"d", "a"})
+		bookmarkManager.UpdateBookmarks(ctx, "db1", nil, []string{"d", "a"})
 
-		actualBookmarks := bookmarkManager.GetBookmarks("db1")
+		actualBookmarks := bookmarkManager.GetBookmarks(ctx, "db1")
 		AssertEqualsInAnyOrder(t, actualBookmarks, expectedBookmarks)
 		if !notifyHookCalled {
 			t.Errorf("notify hook should have been called")
@@ -156,14 +159,14 @@ func TestBookmarkManager(outer *testing.T) {
 		initialBookmarks := []string{"a", "b"}
 		bookmarkManager := neo4j.NewBookmarkManager(neo4j.BookmarkManagerConfig{
 			InitialBookmarks: map[string]neo4j.Bookmarks{"db1": initialBookmarks},
-			BookmarkUpdateNotifier: func(db string, bookmarks neo4j.Bookmarks) {
+			BookmarkUpdateNotifier: func(_ context.Context, db string, bookmarks neo4j.Bookmarks) {
 				t.Error("I must not be called")
 			},
 		})
 
-		bookmarkManager.UpdateBookmarks("db1", initialBookmarks, nil)
+		bookmarkManager.UpdateBookmarks(ctx, "db1", initialBookmarks, nil)
 
-		actualBookmarks := bookmarkManager.GetBookmarks("db1")
+		actualBookmarks := bookmarkManager.GetBookmarks(ctx, "db1")
 		AssertEqualsInAnyOrder(t, actualBookmarks, initialBookmarks)
 	})
 
@@ -172,7 +175,7 @@ func TestBookmarkManager(outer *testing.T) {
 		expectedBookmarks := []string{"a", "d"}
 		bookmarkManager := neo4j.NewBookmarkManager(neo4j.BookmarkManagerConfig{
 			InitialBookmarks: map[string]neo4j.Bookmarks{"db1": {}},
-			BookmarkUpdateNotifier: func(db string, bookmarks neo4j.Bookmarks) {
+			BookmarkUpdateNotifier: func(_ context.Context, db string, bookmarks neo4j.Bookmarks) {
 				notifyHookCalled = true
 				if db != "db1" {
 					t.Errorf("expected to receive notifications for DB db1 but received notifications for %s", db)
@@ -181,9 +184,9 @@ func TestBookmarkManager(outer *testing.T) {
 			},
 		})
 
-		bookmarkManager.UpdateBookmarks("db1", nil, []string{"d", "a"})
+		bookmarkManager.UpdateBookmarks(ctx, "db1", nil, []string{"d", "a"})
 
-		actualBookmarks := bookmarkManager.GetBookmarks("db1")
+		actualBookmarks := bookmarkManager.GetBookmarks(ctx, "db1")
 		AssertEqualsInAnyOrder(t, actualBookmarks, expectedBookmarks)
 		if !notifyHookCalled {
 			t.Errorf("notify hook should have been called")
@@ -195,7 +198,7 @@ func TestBookmarkManager(outer *testing.T) {
 		expectedBookmarks := []string{"a", "d"}
 		bookmarkManager := neo4j.NewBookmarkManager(neo4j.BookmarkManagerConfig{
 			InitialBookmarks: map[string]neo4j.Bookmarks{"db1": {"a", "b", "c"}},
-			BookmarkUpdateNotifier: func(db string, bookmarks neo4j.Bookmarks) {
+			BookmarkUpdateNotifier: func(_ context.Context, db string, bookmarks neo4j.Bookmarks) {
 				notifyHookCalled = true
 				if db != "db1" {
 					t.Errorf("expected to receive notifications for DB db1 but received notifications for %s", db)
@@ -204,9 +207,9 @@ func TestBookmarkManager(outer *testing.T) {
 			},
 		})
 
-		bookmarkManager.UpdateBookmarks("db1", []string{"b", "c"}, []string{"d", "a"})
+		bookmarkManager.UpdateBookmarks(ctx, "db1", []string{"b", "c"}, []string{"d", "a"})
 
-		actualBookmarks := bookmarkManager.GetBookmarks("db1")
+		actualBookmarks := bookmarkManager.GetBookmarks(ctx, "db1")
 		AssertEqualsInAnyOrder(t, actualBookmarks, expectedBookmarks)
 		if !notifyHookCalled {
 			t.Errorf("notify hook should have been called")
@@ -222,14 +225,14 @@ func TestBookmarkManager(outer *testing.T) {
 			},
 		})
 
-		bookmarkManager.Forget("db", "par")
+		bookmarkManager.Forget(ctx, "db", "par")
 
-		allBookmarks := bookmarkManager.GetAllBookmarks()
+		allBookmarks := bookmarkManager.GetAllBookmarks(ctx)
 		AssertEqualsInAnyOrder(t, allBookmarks, []string{"bar", "fighters"})
-		AssertIntEqual(t, len(bookmarkManager.GetBookmarks("db")), 0)
-		AssertEqualsInAnyOrder(t, bookmarkManager.GetBookmarks("foo"),
+		AssertIntEqual(t, len(bookmarkManager.GetBookmarks(ctx, "db")), 0)
+		AssertEqualsInAnyOrder(t, bookmarkManager.GetBookmarks(ctx, "foo"),
 			[]string{"bar", "fighters"})
-		AssertIntEqual(t, len(bookmarkManager.GetBookmarks("par")), 0)
+		AssertIntEqual(t, len(bookmarkManager.GetBookmarks(ctx, "par")), 0)
 	})
 
 	outer.Run("can forget untracked databases", func(t *testing.T) {
@@ -239,14 +242,14 @@ func TestBookmarkManager(outer *testing.T) {
 			},
 		})
 
-		bookmarkManager.Forget("wat", "nope")
+		bookmarkManager.Forget(ctx, "wat", "nope")
 
-		allBookmarks := bookmarkManager.GetAllBookmarks()
+		allBookmarks := bookmarkManager.GetAllBookmarks(ctx)
 		AssertEqualsInAnyOrder(t, allBookmarks, []string{"z", "cooper"})
-		AssertEqualsInAnyOrder(t, bookmarkManager.GetBookmarks("db"),
+		AssertEqualsInAnyOrder(t, bookmarkManager.GetBookmarks(ctx, "db"),
 			[]string{"z", "cooper"})
-		AssertIntEqual(t, len(bookmarkManager.GetBookmarks("wat")), 0)
-		AssertIntEqual(t, len(bookmarkManager.GetBookmarks("nope")), 0)
+		AssertIntEqual(t, len(bookmarkManager.GetBookmarks(ctx, "wat")), 0)
+		AssertIntEqual(t, len(bookmarkManager.GetBookmarks(ctx, "nope")), 0)
 	})
 }
 
@@ -255,10 +258,10 @@ type simpleBookmarkSupplier struct {
 	databaseBookmarks func(string) neo4j.Bookmarks
 }
 
-func (s *simpleBookmarkSupplier) GetAllBookmarks() neo4j.Bookmarks {
+func (s *simpleBookmarkSupplier) GetAllBookmarks(context.Context) neo4j.Bookmarks {
 	return s.allBookmarks()
 }
 
-func (s *simpleBookmarkSupplier) GetBookmarks(db string) neo4j.Bookmarks {
+func (s *simpleBookmarkSupplier) GetBookmarks(_ context.Context, db string) neo4j.Bookmarks {
 	return s.databaseBookmarks(db)
 }

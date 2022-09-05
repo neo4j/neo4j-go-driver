@@ -19,6 +19,8 @@
 
 package neo4j
 
+import "context"
+
 type sessionBookmarks struct {
 	bookmarkManager BookmarkManager
 	bookmarks       Bookmarks
@@ -44,12 +46,12 @@ func (sb *sessionBookmarks) lastBookmark() string {
 	return bookmarks[count-1]
 }
 
-func (sb *sessionBookmarks) replaceBookmarks(database string, previousBookmarks []string, newBookmark string) {
+func (sb *sessionBookmarks) replaceBookmarks(ctx context.Context, database string, previousBookmarks []string, newBookmark string) {
 	if len(newBookmark) == 0 {
 		return
 	}
 	if sb.bookmarkManager != nil {
-		sb.bookmarkManager.UpdateBookmarks(database, previousBookmarks, []string{newBookmark})
+		sb.bookmarkManager.UpdateBookmarks(ctx, database, previousBookmarks, []string{newBookmark})
 	}
 	sb.replaceSessionBookmarks(newBookmark)
 }
@@ -61,18 +63,18 @@ func (sb *sessionBookmarks) replaceSessionBookmarks(newBookmark string) {
 	sb.bookmarks = []string{newBookmark}
 }
 
-func (sb *sessionBookmarks) bookmarksOfDatabase(db string) Bookmarks {
+func (sb *sessionBookmarks) bookmarksOfDatabase(ctx context.Context, db string) Bookmarks {
 	if sb.bookmarkManager == nil {
 		return nil
 	}
-	return sb.bookmarkManager.GetBookmarks(db)
+	return sb.bookmarkManager.GetBookmarks(ctx, db)
 }
 
-func (sb *sessionBookmarks) allBookmarks() Bookmarks {
+func (sb *sessionBookmarks) allBookmarks(ctx context.Context) Bookmarks {
 	if sb.bookmarkManager == nil {
 		return nil
 	}
-	return sb.bookmarkManager.GetAllBookmarks()
+	return sb.bookmarkManager.GetAllBookmarks(ctx)
 }
 
 // Remove empty string bookmarks to check for "bad" callers

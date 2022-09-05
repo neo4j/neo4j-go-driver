@@ -1135,8 +1135,8 @@ func (b *backend) supplyBookmarks(bookmarkManagerId string) func(...string) neo4
 	}
 }
 
-func (b *backend) consumeBookmarks(bookmarkManagerId string) func(string, neo4j.Bookmarks) {
-	return func(database string, bookmarks neo4j.Bookmarks) {
+func (b *backend) consumeBookmarks(bookmarkManagerId string) func(context.Context, string, neo4j.Bookmarks) {
+	return func(_ context.Context, database string, bookmarks neo4j.Bookmarks) {
 		id := b.nextId()
 		b.writeResponse("BookmarksConsumerRequest", map[string]any{
 			"id":                id,
@@ -1157,11 +1157,11 @@ type testkitBookmarkSupplier struct {
 	supplierFn func(...string) neo4j.Bookmarks
 }
 
-func (t *testkitBookmarkSupplier) GetAllBookmarks() neo4j.Bookmarks {
+func (t *testkitBookmarkSupplier) GetAllBookmarks(context.Context) neo4j.Bookmarks {
 	return t.supplierFn()
 }
 
-func (t *testkitBookmarkSupplier) GetBookmarks(database string) neo4j.Bookmarks {
+func (t *testkitBookmarkSupplier) GetBookmarks(_ context.Context, database string) neo4j.Bookmarks {
 	return t.supplierFn(database)
 }
 

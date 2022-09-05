@@ -238,7 +238,7 @@ func (s *sessionWithContext) BeginTransaction(ctx context.Context, configurers .
 	}
 
 	// Begin transaction
-	beginBookmarks := s.transactionBookmarks()
+	beginBookmarks := s.transactionBookmarks(ctx)
 	txHandle, err := conn.TxBegin(ctx,
 		idb.TxConfig{
 			Mode:             s.defaultMode,
@@ -259,7 +259,7 @@ func (s *sessionWithContext) BeginTransaction(ctx context.Context, configurers .
 		txHandle:  txHandle,
 		onClosed: func() {
 			// On transaction closed (rolled back or committed)
-			s.retrieveBookmarks(conn, beginBookmarks)
+			s.retrieveBookmarks(ctx, conn, beginBookmarks)
 			s.pool.Return(ctx, conn)
 			s.explicitTx = nil
 		},
@@ -367,7 +367,7 @@ func (s *sessionWithContext) executeTransactionFunction(
 	// handle transaction function panic as well
 	defer s.pool.Return(ctx, conn)
 
-	beginBookmarks := s.transactionBookmarks()
+	beginBookmarks := s.transactionBookmarks(ctx)
 	txHandle, err := conn.TxBegin(ctx,
 		idb.TxConfig{
 			Mode:             mode,
@@ -398,7 +398,7 @@ func (s *sessionWithContext) executeTransactionFunction(
 		return true, nil
 	}
 
-	s.retrieveBookmarks(conn, beginBookmarks)
+	s.retrieveBookmarks(nil, conn, beginBookmarks)
 	return false, x
 }
 
@@ -452,7 +452,7 @@ func (s *sessionWithContext) getConnection(ctx context.Context, mode idb.AccessM
 	return conn, nil
 }
 
-func (s *sessionWithContext) retrieveBookmarks(conn idb.Connection, sentBookmarks Bookmarks) {
+func (s *sessionWithContext) retrieveBookmarks(ctx context.Context, conn idb.Connection, sentBookmarks Bookmarks) {
 	if conn == nil {
 		return
 	}
@@ -461,7 +461,7 @@ func (s *sessionWithContext) retrieveBookmarks(conn idb.Connection, sentBookmark
 	if bookmarkDatabase != "" {
 		db = bookmarkDatabase
 	}
-	s.bookmarks.replaceBookmarks(db, sentBookmarks, bookmark)
+	s.bookmarks.replaceBookmarks(ctx, db, sentBookmarks, bookmark)
 }
 
 func (s *sessionWithContext) retrieveSessionBookmarks(conn idb.Connection) {
@@ -498,7 +498,7 @@ func (s *sessionWithContext) Run(ctx context.Context,
 		return nil, err
 	}
 
-	runBookmarks := s.transactionBookmarks()
+	runBookmarks := s.transactionBookmarks(ctx)
 	stream, err := conn.Run(
 		ctx,
 		idb.Command{
@@ -521,7 +521,7 @@ func (s *sessionWithContext) Run(ctx context.Context,
 	s.autocommitTx = &autocommitTransaction{
 		conn: conn,
 		res: newResultWithContext(conn, stream, cypher, params, func() {
-			s.retrieveBookmarks(conn, runBookmarks)
+			s.retrieveBookmarks(nil, conn, runBookmarks)
 		}),
 		onClosed: func() {
 			s.pool.Return(ctx, conn)
@@ -584,7 +584,7 @@ func (s *sessionWithContext) resolveHomeDatabase(ctx context.Context) error {
 	}
 
 	// the actual database may not be known yet so the session initial bookmarks might actually belong to system
-	bookmarks := s.routingBookmarks()
+	bookmarks := s.routingBookmarks(ctx)
 	defaultDb, err := s.router.GetNameOfDefaultDatabase(ctx, bookmarks, s.impersonatedUser, s.boltLogger)
 	if err != nil {
 		return err
@@ -595,14 +595,14 @@ func (s *sessionWithContext) resolveHomeDatabase(ctx context.Context) error {
 	return nil
 }
 
-func (s *sessionWithContext) transactionBookmarks() Bookmarks {
-	result := collection.NewSet(s.bookmarks.allBookmarks())
+func (s *sessionWithContext) transactionBookmarks(ctx context.Context) Bookmarks {
+	result := collection.NewSet(s.bookmarks.allBookmarks(ctx))
 	result.AddAll(s.bookmarks.currentBookmarks())
 	return result.Values()
 }
 
-func (s *sessionWithContext) routingBookmarks() Bookmarks {
-	systemBookmarks := s.bookmarks.bookmarksOfDatabase("system")
+func (s *sessionWithContext) routingBookmarks(ctx context.Context) Bookmarks {
+	systemBookmarks := s.bookmarks.bookmarksOfDatabase(ctx, "system")
 	sessionBookmarks := s.bookmarks.currentBookmarks()
 	bookmarks := collection.NewSet(systemBookmarks)
 	bookmarks.AddAll(sessionBookmarks)
