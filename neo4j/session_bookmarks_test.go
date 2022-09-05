@@ -26,6 +26,8 @@ import (
 )
 
 func TestSessionBookmarks(outer *testing.T) {
+	ctx := context.Background()
+
 	outer.Parallel()
 
 	outer.Run("initial set bookmarks are cleaned up", func(t *testing.T) {
@@ -50,7 +52,7 @@ func TestSessionBookmarks(outer *testing.T) {
 			"", "bookmark", "", "deutschmark", "",
 		})
 
-		sessionBookmarks.replaceBookmarks(context.Background(), "db", nil, "booking mark")
+		sessionBookmarks.replaceBookmarks(ctx, "db", nil, "booking mark")
 
 		currentBookmarks := sessionBookmarks.currentBookmarks()
 		if !reflect.DeepEqual(currentBookmarks, []string{"booking mark"}) {
@@ -65,7 +67,7 @@ func TestSessionBookmarks(outer *testing.T) {
 	outer.Run("does not replace set bookmarks when new bookmark is empty", func(t *testing.T) {
 		sessionBookmarks := newSessionBookmarks(nil, []string{"book marking"})
 
-		sessionBookmarks.replaceBookmarks(context.Background(), "db", nil, "")
+		sessionBookmarks.replaceBookmarks(ctx, "db", nil, "")
 
 		currentBookmarks := sessionBookmarks.currentBookmarks()
 		if !reflect.DeepEqual(currentBookmarks, []string{"book marking"}) {
@@ -92,9 +94,9 @@ func TestSessionBookmarks(outer *testing.T) {
 			bookmarkManager := &fakeBookmarkManager{}
 			sessionBookmarks := newSessionBookmarks(bookmarkManager, nil)
 
-			sessionBookmarks.replaceBookmarks(context.Background(), "dbz", []string{"b1", "b2"}, "b3")
+			sessionBookmarks.replaceBookmarks(ctx, "dbz", []string{"b1", "b2"}, "b3")
 
-			if !bookmarkManager.called(1, "UpdateBookmarks", "dbz", []string{"b1", "b2"}, []string{"b3"}) {
+			if !bookmarkManager.called(1, "UpdateBookmarks", ctx, "dbz", []string{"b1", "b2"}, []string{"b3"}) {
 				t.Errorf("Expected UpdateBookmarks to be called once but was not")
 			}
 		})
@@ -103,9 +105,9 @@ func TestSessionBookmarks(outer *testing.T) {
 			bookmarkManager := &fakeBookmarkManager{}
 			sessionBookmarks := newSessionBookmarks(bookmarkManager, nil)
 
-			sessionBookmarks.bookmarksOfDatabase(context.Background(), "dbz")
+			sessionBookmarks.bookmarksOfDatabase(ctx, "dbz")
 
-			if !bookmarkManager.called(1, "GetBookmarks", "dbz") {
+			if !bookmarkManager.called(1, "GetBookmarks", ctx, "dbz") {
 				t.Errorf("Expected GetBookmarks to be called once but was not")
 			}
 		})
@@ -114,9 +116,9 @@ func TestSessionBookmarks(outer *testing.T) {
 			bookmarkManager := &fakeBookmarkManager{}
 			sessionBookmarks := newSessionBookmarks(bookmarkManager, nil)
 
-			sessionBookmarks.allBookmarks(context.Background())
+			sessionBookmarks.allBookmarks(ctx)
 
-			if !bookmarkManager.called(1, "GetAllBookmarks") {
+			if !bookmarkManager.called(1, "GetAllBookmarks", ctx) {
 				t.Errorf("Expected GetBookmarks with the provided arguments to be called once but was not")
 			}
 		})
@@ -132,24 +134,25 @@ type fakeBookmarkManager struct {
 	recordedCalls []invocation
 }
 
-func (f *fakeBookmarkManager) UpdateBookmarks(_ context.Context, database string, previousBookmarks, newBookmarks Bookmarks) {
+func (f *fakeBookmarkManager) UpdateBookmarks(ctx context.Context, database string, previousBookmarks, newBookmarks Bookmarks) {
 	f.recordedCalls = append(f.recordedCalls, invocation{
 		function:  "UpdateBookmarks",
-		arguments: []any{database, previousBookmarks, newBookmarks},
+		arguments: []any{ctx, database, previousBookmarks, newBookmarks},
 	})
 }
 
-func (f *fakeBookmarkManager) GetBookmarks(_ context.Context, database string) Bookmarks {
+func (f *fakeBookmarkManager) GetBookmarks(ctx context.Context, database string) Bookmarks {
 	f.recordedCalls = append(f.recordedCalls, invocation{
 		function:  "GetBookmarks",
-		arguments: []any{database},
+		arguments: []any{ctx, database},
 	})
 	return nil
 }
 
-func (f *fakeBookmarkManager) GetAllBookmarks(context.Context) Bookmarks {
+func (f *fakeBookmarkManager) GetAllBookmarks(ctx context.Context) Bookmarks {
 	f.recordedCalls = append(f.recordedCalls, invocation{
-		function: "GetAllBookmarks",
+		function:  "GetAllBookmarks",
+		arguments: []any{ctx},
 	})
 	return nil
 }
