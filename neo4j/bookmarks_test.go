@@ -48,16 +48,12 @@ func TestBookmarkManager(outer *testing.T) {
 		})
 
 		bookmarks1, err := bookmarkManager.GetBookmarks(ctx, "db1")
-		if err != nil {
-			t.Errorf("expected nil error, got %v", err)
-		}
+		AssertNoError(t, err)
 		expected1 := []string{"a", "b"}
 		AssertEqualsInAnyOrder(t, bookmarks1, expected1)
 
 		bookmarks2, err := bookmarkManager.GetBookmarks(ctx, "db2")
-		if err != nil {
-			t.Errorf("expected nil error, got %v", err)
-		}
+		AssertNoError(t, err)
 		expected2 := []string{"b", "c"}
 		AssertEqualsInAnyOrder(t, bookmarks2, expected2)
 	})
@@ -66,9 +62,7 @@ func TestBookmarkManager(outer *testing.T) {
 		bookmarkManager := neo4j.NewBookmarkManager(neo4j.BookmarkManagerConfig{})
 		getBookmarks := func(db string) bool {
 			bookmarks, err := bookmarkManager.GetBookmarks(ctx, db)
-			if err != nil {
-				t.Errorf("expected nil error, got %v", err)
-			}
+			AssertNoError(t, err)
 			return bookmarks == nil
 		}
 
@@ -90,9 +84,7 @@ func TestBookmarkManager(outer *testing.T) {
 		})
 
 		actualBookmarks, err := bookmarkManager.GetBookmarks(ctx, "db1")
-		if err != nil {
-			t.Errorf("expected nil error, got %v", err)
-		}
+		AssertNoError(t, err)
 		AssertEqualsInAnyOrder(t, actualBookmarks, expectedBookmarks)
 	})
 
@@ -113,13 +105,9 @@ func TestBookmarkManager(outer *testing.T) {
 		})
 
 		_, err := bookmarkManager.GetBookmarks(ctx, "db1")
-		if err != nil {
-			t.Errorf("expected nil error, got %v", err)
-		}
+		AssertNoError(t, err)
 		actualBookmarks, err := bookmarkManager.GetBookmarks(ctx, "db1")
-		if err != nil {
-			t.Errorf("expected nil error, got %v", err)
-		}
+		AssertNoError(t, err)
 		AssertEqualsInAnyOrder(t, actualBookmarks, expectedBookmarks)
 	})
 
@@ -129,15 +117,11 @@ func TestBookmarkManager(outer *testing.T) {
 			InitialBookmarks: map[string]neo4j.Bookmarks{"db1": {"a"}},
 		})
 		bookmarks, err := bookmarkManager.GetBookmarks(ctx, "db1")
-		if err != nil {
-			t.Errorf("expected nil error, got %v", err)
-		}
+		AssertNoError(t, err)
 		bookmarks[0] = "changed"
 
 		bookmarks, err = bookmarkManager.GetBookmarks(ctx, "db1")
-		if err != nil {
-			t.Errorf("expected nil error, got %v", err)
-		}
+		AssertNoError(t, err)
 
 		AssertEqualsInAnyOrder(t, bookmarks, expectedBookmarks)
 	})
@@ -151,14 +135,10 @@ func TestBookmarkManager(outer *testing.T) {
 
 		err := bookmarkManager.UpdateBookmarks(ctx, "db1", []string{"b", "c"}, []string{"d", "a"})
 
-		if err != nil {
-			t.Errorf("expected nil error, got %v", err)
-		}
+		AssertNoError(t, err)
 		expectedBookmarks := []string{"a", "d"}
 		actualBookmarks, err := bookmarkManager.GetBookmarks(ctx, "db1")
-		if err != nil {
-			t.Errorf("expected nil error, got %v", err)
-		}
+		AssertNoError(t, err)
 		AssertEqualsInAnyOrder(t, actualBookmarks, expectedBookmarks)
 	})
 
@@ -178,13 +158,9 @@ func TestBookmarkManager(outer *testing.T) {
 
 		err := bookmarkManager.UpdateBookmarks(ctx, "db1", nil, []string{"d", "a"})
 
-		if err != nil {
-			t.Errorf("expected nil error, got %v", err)
-		}
+		AssertNoError(t, err)
 		actualBookmarks, err := bookmarkManager.GetBookmarks(ctx, "db1")
-		if err != nil {
-			t.Errorf("expected nil error, got %v", err)
-		}
+		AssertNoError(t, err)
 		AssertEqualsInAnyOrder(t, actualBookmarks, expectedBookmarks)
 		if !notifyHookCalled {
 			t.Errorf("notify hook should have been called")
@@ -203,13 +179,9 @@ func TestBookmarkManager(outer *testing.T) {
 
 		err := bookmarkManager.UpdateBookmarks(ctx, "db1", initialBookmarks, nil)
 
-		if err != nil {
-			t.Errorf("expected nil error, got %v", err)
-		}
+		AssertNoError(t, err)
 		actualBookmarks, err := bookmarkManager.GetBookmarks(ctx, "db1")
-		if err != nil {
-			t.Errorf("expected nil error, got %v", err)
-		}
+		AssertNoError(t, err)
 		AssertEqualsInAnyOrder(t, actualBookmarks, initialBookmarks)
 	})
 
@@ -230,13 +202,9 @@ func TestBookmarkManager(outer *testing.T) {
 
 		err := bookmarkManager.UpdateBookmarks(ctx, "db1", nil, []string{"d", "a"})
 
-		if err != nil {
-			t.Errorf("expected nil error, got %v", err)
-		}
+		AssertNoError(t, err)
 		actualBookmarks, err := bookmarkManager.GetBookmarks(ctx, "db1")
-		if err != nil {
-			t.Errorf("expected nil error, got %v", err)
-		}
+		AssertNoError(t, err)
 		AssertEqualsInAnyOrder(t, actualBookmarks, expectedBookmarks)
 		if !notifyHookCalled {
 			t.Errorf("notify hook should have been called")
@@ -260,13 +228,9 @@ func TestBookmarkManager(outer *testing.T) {
 
 		err := bookmarkManager.UpdateBookmarks(ctx, "db1", []string{"b", "c"}, []string{"d", "a"})
 
-		if err != nil {
-			t.Errorf("expected nil error, got %v", err)
-		}
+		AssertNoError(t, err)
 		actualBookmarks, err := bookmarkManager.GetBookmarks(ctx, "db1")
-		if err != nil {
-			t.Errorf("expected nil error, got %v", err)
-		}
+		AssertNoError(t, err)
 		AssertEqualsInAnyOrder(t, actualBookmarks, expectedBookmarks)
 		if !notifyHookCalled {
 			t.Errorf("notify hook should have been called")
@@ -284,28 +248,18 @@ func TestBookmarkManager(outer *testing.T) {
 
 		err := bookmarkManager.Forget(ctx, "db", "par")
 
-		if err != nil {
-			t.Errorf("expected nil error, got %v", err)
-		}
+		AssertNoError(t, err)
 		allBookmarks, err := bookmarkManager.GetAllBookmarks(ctx)
-		if err != nil {
-			t.Errorf("expected nil error, got %v", err)
-		}
+		AssertNoError(t, err)
 		AssertEqualsInAnyOrder(t, allBookmarks, []string{"bar", "fighters"})
 		bookmarks, err := bookmarkManager.GetBookmarks(ctx, "db")
-		if err != nil {
-			t.Errorf("expected nil error, got %v", err)
-		}
+		AssertNoError(t, err)
 		AssertIntEqual(t, len(bookmarks), 0)
 		bookmarks, err = bookmarkManager.GetBookmarks(ctx, "foo")
-		if err != nil {
-			t.Errorf("expected nil error, got %v", err)
-		}
+		AssertNoError(t, err)
 		AssertEqualsInAnyOrder(t, bookmarks, []string{"bar", "fighters"})
 		bookmarks, err = bookmarkManager.GetBookmarks(ctx, "par")
-		if err != nil {
-			t.Errorf("expected nil error, got %v", err)
-		}
+		AssertNoError(t, err)
 		AssertIntEqual(t, len(bookmarks), 0)
 	})
 
@@ -318,28 +272,18 @@ func TestBookmarkManager(outer *testing.T) {
 
 		err := bookmarkManager.Forget(ctx, "wat", "nope")
 
-		if err != nil {
-			t.Errorf("expected nil error, got %v", err)
-		}
+		AssertNoError(t, err)
 		allBookmarks, err := bookmarkManager.GetAllBookmarks(ctx)
-		if err != nil {
-			t.Errorf("expected nil error, got %v", err)
-		}
+		AssertNoError(t, err)
 		AssertEqualsInAnyOrder(t, allBookmarks, []string{"z", "cooper"})
 		bookmarks, err := bookmarkManager.GetBookmarks(ctx, "db")
-		if err != nil {
-			t.Errorf("expected nil error, got %v", err)
-		}
+		AssertNoError(t, err)
 		AssertEqualsInAnyOrder(t, bookmarks, []string{"z", "cooper"})
 		bookmarks, err = bookmarkManager.GetBookmarks(ctx, "wat")
-		if err != nil {
-			t.Errorf("expected nil error, got %v", err)
-		}
+		AssertNoError(t, err)
 		AssertIntEqual(t, len(bookmarks), 0)
 		bookmarks, err = bookmarkManager.GetBookmarks(ctx, "nope")
-		if err != nil {
-			t.Errorf("expected nil error, got %v", err)
-		}
+		AssertNoError(t, err)
 		AssertIntEqual(t, len(bookmarks), 0)
 	})
 }
