@@ -19,6 +19,8 @@
 
 package neo4j
 
+import "context"
+
 type sessionBookmarks struct {
 	bookmarkManager BookmarkManager
 	bookmarks       Bookmarks
@@ -44,14 +46,17 @@ func (sb *sessionBookmarks) lastBookmark() string {
 	return bookmarks[count-1]
 }
 
-func (sb *sessionBookmarks) replaceBookmarks(database string, previousBookmarks []string, newBookmark string) {
+func (sb *sessionBookmarks) replaceBookmarks(ctx context.Context, database string, previousBookmarks []string, newBookmark string) error {
 	if len(newBookmark) == 0 {
-		return
+		return nil
 	}
 	if sb.bookmarkManager != nil {
-		sb.bookmarkManager.UpdateBookmarks(database, previousBookmarks, []string{newBookmark})
+		if err := sb.bookmarkManager.UpdateBookmarks(ctx, database, previousBookmarks, []string{newBookmark}); err != nil {
+			return err
+		}
 	}
 	sb.replaceSessionBookmarks(newBookmark)
+	return nil
 }
 
 func (sb *sessionBookmarks) replaceSessionBookmarks(newBookmark string) {
@@ -61,18 +66,18 @@ func (sb *sessionBookmarks) replaceSessionBookmarks(newBookmark string) {
 	sb.bookmarks = []string{newBookmark}
 }
 
-func (sb *sessionBookmarks) bookmarksOfDatabase(db string) Bookmarks {
+func (sb *sessionBookmarks) bookmarksOfDatabase(ctx context.Context, db string) (Bookmarks, error) {
 	if sb.bookmarkManager == nil {
-		return nil
+		return nil, nil
 	}
-	return sb.bookmarkManager.GetBookmarks(db)
+	return sb.bookmarkManager.GetBookmarks(ctx, db)
 }
 
-func (sb *sessionBookmarks) allBookmarks() Bookmarks {
+func (sb *sessionBookmarks) allBookmarks(ctx context.Context) (Bookmarks, error) {
 	if sb.bookmarkManager == nil {
-		return nil
+		return nil, nil
 	}
-	return sb.bookmarkManager.GetAllBookmarks()
+	return sb.bookmarkManager.GetAllBookmarks(ctx)
 }
 
 // Remove empty string bookmarks to check for "bad" callers

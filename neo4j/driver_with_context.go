@@ -236,10 +236,10 @@ type sessionRouter interface {
 	// note: bookmarks are lazily supplied, only when a new routing table needs to be fetched
 	// this is needed because custom bookmark managers may provide bookmarks from external systems
 	// they should not be called when it is not needed (e.g. when a routing table is cached)
-	Readers(ctx context.Context, bookmarks func() []string, database string, boltLogger log.BoltLogger) ([]string, error)
+	Readers(ctx context.Context, bookmarks func(context.Context) ([]string, error), database string, boltLogger log.BoltLogger) ([]string, error)
 	// Writers returns the list of servers that can serve writes on the requested database.
 	// note: bookmarks are lazily supplied, see Readers documentation to learn why
-	Writers(ctx context.Context, bookmarks func() []string, database string, boltLogger log.BoltLogger) ([]string, error)
+	Writers(ctx context.Context, bookmarks func(context.Context) ([]string, error), database string, boltLogger log.BoltLogger) ([]string, error)
 	// GetNameOfDefaultDatabase returns the name of the default database for the specified user.
 	// The correct database name is needed when requesting readers or writers.
 	// the bookmarks are eagerly provided since this method always fetches a new routing table

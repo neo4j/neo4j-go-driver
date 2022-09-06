@@ -57,7 +57,7 @@ type explicitTransaction struct {
 	done      bool
 	runFailed bool
 	err       error
-	onClosed  func()
+	onClosed  func(*explicitTransaction)
 }
 
 func (tx *explicitTransaction) Run(ctx context.Context, cypher string,
@@ -66,7 +66,7 @@ func (tx *explicitTransaction) Run(ctx context.Context, cypher string,
 	if err != nil {
 		tx.err = err
 		tx.runFailed = true
-		tx.onClosed()
+		tx.onClosed(tx)
 		return nil, wrapError(tx.err)
 	}
 	// no result consumption hook here since bookmarks are sent after commit, not after pulling results
@@ -83,7 +83,7 @@ func (tx *explicitTransaction) Commit(ctx context.Context) error {
 	}
 	tx.err = tx.conn.TxCommit(ctx, tx.txHandle)
 	tx.done = true
-	tx.onClosed()
+	tx.onClosed(tx)
 	return wrapError(tx.err)
 }
 
@@ -110,7 +110,7 @@ func (tx *explicitTransaction) Rollback(ctx context.Context) error {
 		tx.err = tx.conn.TxRollback(ctx, tx.txHandle)
 	}
 	tx.done = true
-	tx.onClosed()
+	tx.onClosed(tx)
 	return wrapError(tx.err)
 }
 

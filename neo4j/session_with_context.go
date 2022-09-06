@@ -24,6 +24,7 @@ import (
 	"fmt"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/collection"
 	idb "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/errorutil"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/pool"
 	"math"
 	"time"
@@ -238,7 +239,11 @@ func (s *sessionWithContext) BeginTransaction(ctx context.Context, configurers .
 	}
 
 	// Begin transaction
-	beginBookmarks := s.transactionBookmarks()
+	beginBookmarks, err := s.transactionBookmarks(ctx)
+	if err != nil {
+		s.pool.Return(ctx, conn)
+		return nil, wrapError(err)
+	}
 	txHandle, err := conn.TxBegin(ctx,
 		idb.TxConfig{
 			Mode:             s.defaultMode,
@@ -257,10 +262,11 @@ func (s *sessionWithContext) BeginTransaction(ctx context.Context, configurers .
 		conn:      conn,
 		fetchSize: s.fetchSize,
 		txHandle:  txHandle,
-		onClosed: func() {
+		onClosed: func(tx *explicitTransaction) {
 			// On transaction closed (rolled back or committed)
-			s.retrieveBookmarks(conn, beginBookmarks)
-			s.pool.Return(ctx, conn)
+			bookmarkErr := s.retrieveBookmarks(ctx, conn, beginBookmarks)
+			poolErr := s.pool.Return(ctx, conn)
+			tx.err = errorutil.CombineAllErrors(tx.err, bookmarkErr, poolErr)
 			s.explicitTx = nil
 		},
 	}
@@ -367,7 +373,11 @@ func (s *sessionWithContext) executeTransactionFunction(
 	// handle transaction function panic as well
 	defer s.pool.Return(ctx, conn)
 
-	beginBookmarks := s.transactionBookmarks()
+	beginBookmarks, err := s.transactionBookmarks(ctx)
+	if err != nil {
+		state.OnFailure(ctx, conn, err, false)
+		return true, nil
+	}
 	txHandle, err := conn.TxBegin(ctx,
 		idb.TxConfig{
 			Mode:             mode,
@@ -398,7 +408,11 @@ func (s *sessionWithContext) executeTransactionFunction(
 		return true, nil
 	}
 
-	s.retrieveBookmarks(conn, beginBookmarks)
+	// transaction has been committed so let's ignore (ie just log) the error
+	if err = s.retrieveBookmarks(ctx, conn, beginBookmarks); err != nil {
+		s.log.Warnf(log.Session, s.logId, "could not retrieve bookmarks after successful commit: %s\n"+
+			"the results of this transaction may not be visible to subsequent operations", err.Error())
+	}
 	return false, x
 }
 
@@ -452,16 +466,16 @@ func (s *sessionWithContext) getConnection(ctx context.Context, mode idb.AccessM
 	return conn, nil
 }
 
-func (s *sessionWithContext) retrieveBookmarks(conn idb.Connection, sentBookmarks Bookmarks) {
+func (s *sessionWithContext) retrieveBookmarks(ctx context.Context, conn idb.Connection, sentBookmarks Bookmarks) error {
 	if conn == nil {
-		return
+		return nil
 	}
 	bookmark, bookmarkDatabase := conn.Bookmark()
 	db := s.databaseName
 	if bookmarkDatabase != "" {
 		db = bookmarkDatabase
 	}
-	s.bookmarks.replaceBookmarks(db, sentBookmarks, bookmark)
+	return s.bookmarks.replaceBookmarks(ctx, db, sentBookmarks, bookmark)
 }
 
 func (s *sessionWithContext) retrieveSessionBookmarks(conn idb.Connection) {
@@ -498,7 +512,11 @@ func (s *sessionWithContext) Run(ctx context.Context,
 		return nil, err
 	}
 
-	runBookmarks := s.transactionBookmarks()
+	runBookmarks, err := s.transactionBookmarks(ctx)
+	if err != nil {
+		s.pool.Return(ctx, conn)
+		return nil, wrapError(err)
+	}
 	stream, err := conn.Run(
 		ctx,
 		idb.Command{
@@ -521,7 +539,10 @@ func (s *sessionWithContext) Run(ctx context.Context,
 	s.autocommitTx = &autocommitTransaction{
 		conn: conn,
 		res: newResultWithContext(conn, stream, cypher, params, func() {
-			s.retrieveBookmarks(conn, runBookmarks)
+			if err := s.retrieveBookmarks(ctx, conn, runBookmarks); err != nil {
+				s.log.Warnf(log.Session, s.logId, "could not retrieve bookmarks after result consumption: %s\n"+
+					"the result of the initiating auto-commit transaction may not be visible to subsequent operations", err.Error())
+			}
 		}),
 		onClosed: func() {
 			s.pool.Return(ctx, conn)
@@ -551,7 +572,7 @@ func (s *sessionWithContext) Close(ctx context.Context) error {
 	go func() {
 		routerErrChan <- s.router.CleanUp(ctx)
 	}()
-	return combineAllErrors(txErr, <-poolErrChan, <-routerErrChan)
+	return errorutil.CombineAllErrors(txErr, <-poolErrChan, <-routerErrChan)
 }
 
 func (s *sessionWithContext) legacy() Session {
@@ -584,7 +605,10 @@ func (s *sessionWithContext) resolveHomeDatabase(ctx context.Context) error {
 	}
 
 	// the actual database may not be known yet so the session initial bookmarks might actually belong to system
-	bookmarks := s.routingBookmarks()
+	bookmarks, err := s.routingBookmarks(ctx)
+	if err != nil {
+		return err
+	}
 	defaultDb, err := s.router.GetNameOfDefaultDatabase(ctx, bookmarks, s.impersonatedUser, s.boltLogger)
 	if err != nil {
 		return err
@@ -595,18 +619,25 @@ func (s *sessionWithContext) resolveHomeDatabase(ctx context.Context) error {
 	return nil
 }
 
-func (s *sessionWithContext) transactionBookmarks() Bookmarks {
-	result := collection.NewSet(s.bookmarks.allBookmarks())
+func (s *sessionWithContext) transactionBookmarks(ctx context.Context) (Bookmarks, error) {
+	bookmarks, err := s.bookmarks.allBookmarks(ctx)
+	if err != nil {
+		return nil, err
+	}
+	result := collection.NewSet(bookmarks)
 	result.AddAll(s.bookmarks.currentBookmarks())
-	return result.Values()
+	return result.Values(), nil
 }
 
-func (s *sessionWithContext) routingBookmarks() Bookmarks {
-	systemBookmarks := s.bookmarks.bookmarksOfDatabase("system")
+func (s *sessionWithContext) routingBookmarks(ctx context.Context) (Bookmarks, error) {
+	systemBookmarks, err := s.bookmarks.bookmarksOfDatabase(ctx, "system")
+	if err != nil {
+		return nil, err
+	}
 	sessionBookmarks := s.bookmarks.currentBookmarks()
 	bookmarks := collection.NewSet(systemBookmarks)
 	bookmarks.AddAll(sessionBookmarks)
-	return bookmarks.Values()
+	return bookmarks.Values(), nil
 }
 
 type erroredSessionWithContext struct {

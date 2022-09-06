@@ -1107,18 +1107,18 @@ func (b *backend) bookmarkManagerConfig(bookmarkManagerId string,
 	supplierRegistered := config["bookmarksSupplierRegistered"]
 	if supplierRegistered != nil && supplierRegistered.(bool) {
 		result.BookmarkSupplier = &testkitBookmarkSupplier{
-			supplierFn: b.supplyBookmarks(bookmarkManagerId),
+			supplier: b.supplyBookmarks(bookmarkManagerId),
 		}
 	}
 	consumerRegistered := config["bookmarksConsumerRegistered"]
 	if consumerRegistered != nil && consumerRegistered.(bool) {
-		result.BookmarkUpdateNotifier = b.consumeBookmarks(bookmarkManagerId)
+		result.BookmarkConsumer = b.consumeBookmarks(bookmarkManagerId)
 	}
 	return result
 }
 
-func (b *backend) supplyBookmarks(bookmarkManagerId string) func(...string) neo4j.Bookmarks {
-	return func(databases ...string) neo4j.Bookmarks {
+func (b *backend) supplyBookmarks(bookmarkManagerId string) func(...string) (neo4j.Bookmarks, error) {
+	return func(databases ...string) (neo4j.Bookmarks, error) {
 		if len(databases) > 1 {
 			panic("at most 1 database should be specified")
 		}
@@ -1130,13 +1130,13 @@ func (b *backend) supplyBookmarks(bookmarkManagerId string) func(...string) neo4
 		b.writeResponse("BookmarksSupplierRequest", msg)
 		for {
 			b.process()
-			return b.suppliedBookmarks[id]
+			return b.suppliedBookmarks[id], nil
 		}
 	}
 }
 
-func (b *backend) consumeBookmarks(bookmarkManagerId string) func(string, neo4j.Bookmarks) {
-	return func(database string, bookmarks neo4j.Bookmarks) {
+func (b *backend) consumeBookmarks(bookmarkManagerId string) func(context.Context, string, neo4j.Bookmarks) error {
+	return func(_ context.Context, database string, bookmarks neo4j.Bookmarks) error {
 		id := b.nextId()
 		b.writeResponse("BookmarksConsumerRequest", map[string]any{
 			"id":                id,
@@ -1147,22 +1147,22 @@ func (b *backend) consumeBookmarks(bookmarkManagerId string) func(string, neo4j.
 		for {
 			b.process()
 			if _, found := b.consumedBookmarks[id]; found {
-				return
+				return nil
 			}
 		}
 	}
 }
 
 type testkitBookmarkSupplier struct {
-	supplierFn func(...string) neo4j.Bookmarks
+	supplier func(...string) (neo4j.Bookmarks, error)
 }
 
-func (t *testkitBookmarkSupplier) GetAllBookmarks() neo4j.Bookmarks {
-	return t.supplierFn()
+func (t *testkitBookmarkSupplier) GetAllBookmarks(context.Context) (neo4j.Bookmarks, error) {
+	return t.supplier()
 }
 
-func (t *testkitBookmarkSupplier) GetBookmarks(database string) neo4j.Bookmarks {
-	return t.supplierFn(database)
+func (t *testkitBookmarkSupplier) GetBookmarks(_ context.Context, database string) (neo4j.Bookmarks, error) {
+	return t.supplier(database)
 }
 
 func convertInitialBookmarks(bookmarks map[string]any) map[string]neo4j.Bookmarks {
