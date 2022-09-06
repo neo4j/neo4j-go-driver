@@ -26,6 +26,56 @@ import (
 	"testing"
 )
 
+func TestCombineErrors(outer *testing.T) {
+
+	type testCase struct {
+		description string
+		input1      error
+		input2      error
+		output      error
+	}
+
+	err1 := fmt.Errorf("1")
+	err2 := fmt.Errorf("2")
+
+	testCases := []testCase{
+		{
+			description: "first non-nil",
+			input1:      err1,
+			input2:      nil,
+			output:      err1,
+		},
+		{
+			description: "second non-nil",
+			input1:      nil,
+			input2:      err2,
+			output:      err2,
+		},
+		{
+			description: "all nil",
+			input1:      nil,
+			input2:      nil,
+			output:      nil,
+		},
+		{
+			description: "all non-nil",
+			input1:      err1,
+			input2:      err2,
+			output:      fmt.Errorf("error 2 occurred after previous error %w", err1),
+		},
+	}
+
+	for _, testCase := range testCases {
+		outer.Run(testCase.description, func(t *testing.T) {
+			output := errorutil.CombineErrors(testCase.input1, testCase.input2)
+
+			if !reflect.DeepEqual(testCase.output, output) {
+				t.Errorf("expected %v, got %v", testCase.output, output)
+			}
+		})
+	}
+}
+
 func TestCombineAllErrors(outer *testing.T) {
 
 	type testCase struct {
