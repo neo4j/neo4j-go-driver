@@ -410,7 +410,8 @@ func (s *sessionWithContext) executeTransactionFunction(
 
 	// transaction has been committed so let's ignore (ie just log) the error
 	if err = s.retrieveBookmarks(ctx, conn, beginBookmarks); err != nil {
-		s.log.Warnf(log.Session, s.logId, "could not retrieve bookmarks after successful commit: %s", err.Error())
+		s.log.Warnf(log.Session, s.logId, "could not retrieve bookmarks after successful commit: %s\n"+
+			"the results of this transaction may not be visible to subsequent operations", err.Error())
 	}
 	return false, x
 }
@@ -539,7 +540,8 @@ func (s *sessionWithContext) Run(ctx context.Context,
 		conn: conn,
 		res: newResultWithContext(conn, stream, cypher, params, func() {
 			if err := s.retrieveBookmarks(ctx, conn, runBookmarks); err != nil {
-				s.log.Warnf(log.Session, s.logId, "could not retrieve bookmarks after result consumption: %s", err.Error())
+				s.log.Warnf(log.Session, s.logId, "could not retrieve bookmarks after result consumption: %s\n"+
+					"the result of the initiating auto-commit transaction may not be visible to subsequent operations", err.Error())
 			}
 		}),
 		onClosed: func() {
