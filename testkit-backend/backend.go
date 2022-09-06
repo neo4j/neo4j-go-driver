@@ -1107,7 +1107,7 @@ func (b *backend) bookmarkManagerConfig(bookmarkManagerId string,
 	supplierRegistered := config["bookmarksSupplierRegistered"]
 	if supplierRegistered != nil && supplierRegistered.(bool) {
 		result.BookmarkSupplier = &testkitBookmarkSupplier{
-			supplierFn: b.supplyBookmarks(bookmarkManagerId),
+			supplier: b.supplyBookmarks(bookmarkManagerId),
 		}
 	}
 	consumerRegistered := config["bookmarksConsumerRegistered"]
@@ -1154,15 +1154,15 @@ func (b *backend) consumeBookmarks(bookmarkManagerId string) func(context.Contex
 }
 
 type testkitBookmarkSupplier struct {
-	supplierFn func(...string) (neo4j.Bookmarks, error)
+	supplier func(...string) (neo4j.Bookmarks, error)
 }
 
 func (t *testkitBookmarkSupplier) GetAllBookmarks(context.Context) (neo4j.Bookmarks, error) {
-	return t.supplierFn()
+	return t.supplier()
 }
 
 func (t *testkitBookmarkSupplier) GetBookmarks(_ context.Context, database string) (neo4j.Bookmarks, error) {
-	return t.supplierFn(database)
+	return t.supplier(database)
 }
 
 func convertInitialBookmarks(bookmarks map[string]any) map[string]neo4j.Bookmarks {

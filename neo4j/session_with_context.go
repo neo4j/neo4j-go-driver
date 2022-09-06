@@ -408,7 +408,10 @@ func (s *sessionWithContext) executeTransactionFunction(
 		return true, nil
 	}
 
-	s.retrieveBookmarks(nil, conn, beginBookmarks)
+	// transaction has been committed so let's ignore (ie just log) the error
+	if err = s.retrieveBookmarks(ctx, conn, beginBookmarks); err != nil {
+		s.log.Warnf(log.Session, s.logId, "could not retrieve bookmarks after successful commit: %s", err.Error())
+	}
 	return false, x
 }
 
@@ -535,7 +538,9 @@ func (s *sessionWithContext) Run(ctx context.Context,
 	s.autocommitTx = &autocommitTransaction{
 		conn: conn,
 		res: newResultWithContext(conn, stream, cypher, params, func() {
-			s.retrieveBookmarks(nil, conn, runBookmarks)
+			if err := s.retrieveBookmarks(ctx, conn, runBookmarks); err != nil {
+				s.log.Warnf(log.Session, s.logId, "could not retrieve bookmarks after result consumption: %s", err.Error())
+			}
 		}),
 		onClosed: func() {
 			s.pool.Return(ctx, conn)
