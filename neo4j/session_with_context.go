@@ -235,7 +235,7 @@ func (s *sessionWithContext) BeginTransaction(ctx context.Context, configurers .
 	// Get a connection from the pool. This could fail in clustered environment.
 	conn, err := s.getConnection(ctx, s.defaultMode, pool.DefaultLivenessCheckThreshold)
 	if err != nil {
-		return nil, err
+		return nil, wrapError(err)
 	}
 
 	// Begin transaction
@@ -509,7 +509,7 @@ func (s *sessionWithContext) Run(ctx context.Context,
 
 	conn, err := s.getConnection(ctx, s.defaultMode, pool.DefaultLivenessCheckThreshold)
 	if err != nil {
-		return nil, err
+		return nil, wrapError(err)
 	}
 
 	runBookmarks, err := s.transactionBookmarks(ctx)

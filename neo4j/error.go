@@ -153,6 +153,8 @@ func wrapError(err error) error {
 		// Usage of a type not supported by database network protocol or feature
 		// not supported by current version or edition.
 		return &UsageError{Message: err.Error()}
+	case *pool.PoolClosed:
+		return &UsageError{Message: err.Error()}
 	case *connector.TlsError, net.Error:
 		return &ConnectivityError{inner: err}
 	case *pool.PoolTimeout, *pool.PoolFull:
