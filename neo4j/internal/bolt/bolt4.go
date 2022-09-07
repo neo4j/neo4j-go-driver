@@ -1030,7 +1030,18 @@ func (b *bolt4) initializeReadTimeoutHint(hints map[string]any) {
 	b.in.connReadTimeout = time.Duration(readTimeout) * time.Second
 }
 
+// isFatalError determines whether the error should be considered fatal or not
+// a fatal error causes the connection to be considered dead and later purged from the connection pool as well as
+// older connections to the same server (see Pool#Return)
 func isFatalError(err *db.Neo4jError) bool {
-	// Treat expired auth as fatal so that pool is cleaned up of old connections
-	return err != nil && err.Code == "Status.Security.AuthorizationExpired"
+	if err == nil {
+		return false
+	}
+	switch err.Code {
+	case "Status.Security.AuthorizationExpired":
+		return true
+	case "Neo.TransientError.General.DatabaseUnavailable":
+		return true
+	}
+	return false
 }

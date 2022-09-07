@@ -991,6 +991,19 @@ func TestBolt4(outer *testing.T) {
 		AssertError(t, err)
 	})
 
+	outer.Run("Unavailable database should close connection", func(t *testing.T) {
+		bolt, cleanup := connectToServer(t, func(srv *bolt4server) {
+			srv.accept(4)
+			srv.sendFailureMsg("Neo.TransientError.General.DatabaseUnavailable", "move along, nothing to see here")
+		})
+		defer cleanup()
+
+		_, err := bolt.Run(context.Background(), idb.Command{Cypher: "MATCH (" +
+			"n) RETURN n"}, idb.TxConfig{Mode: idb.ReadMode})
+		assertBoltState(t, bolt4_dead, bolt)
+		AssertError(t, err)
+	})
+
 	outer.Run("Immediately expired authentication token error triggers a connection failure", func(t *testing.T) {
 		bolt, cleanup := connectToServer(t, func(srv *bolt4server) {
 			srv.accept(4)

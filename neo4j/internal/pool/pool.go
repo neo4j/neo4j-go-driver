@@ -398,7 +398,7 @@ func (p *Pool) Return(ctx context.Context, c db.Connection) error {
 	isAlive := c.IsAlive()
 	p.log.Debugf(log.Pool, p.logId, "Returning connection to %s {alive:%t}", serverName, isAlive)
 
-	// If the connection is dead, remove all other idle connections on the same server that older
+	// If the connection is dead, remove all other idle connections on the same server that are older
 	// or of the same age as the dead connection, otherwise perform normal cleanup of old connections
 	maxAge := p.maxAge
 	now := p.now()
