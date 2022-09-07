@@ -45,6 +45,7 @@ type TStateInvocation struct {
 	expectRouterInvalidatedServer string
 	expectLastErrWasRetryable     bool
 	expectLastErrType             error
+	expectedOnDeadConnectionCalls []string
 }
 
 func TestState(outer *testing.T) {
@@ -76,27 +77,53 @@ func TestState(outer *testing.T) {
 				expectLastErrWasRetryable: true},
 		},
 		"Retry dead connection": {
-			{conn: &testutil.ConnFake{Name: serverName, Alive: false},
-				err: errors.New("some error"), expectContinued: true,
-				expectLastErrWasRetryable: true, expectRouterInvalidated: true,
-				expectRouterInvalidatedDb: dbName, expectRouterInvalidatedServer: serverName},
+			{
+				conn:                          &testutil.ConnFake{Name: serverName, Alive: false},
+				err:                           errors.New("some error"),
+				expectContinued:               true,
+				expectLastErrWasRetryable:     true,
+				expectedOnDeadConnectionCalls: []string{serverName},
+			},
 		},
 		"Retry dead connection timeout": {
-			{conn: &testutil.ConnFake{Name: serverName, Alive: false}, err: errors.New("some error 1"), expectContinued: true, now: baseTime,
-				expectLastErrWasRetryable: true, expectRouterInvalidated: true, expectRouterInvalidatedDb: dbName, expectRouterInvalidatedServer: serverName},
-			{conn: &testutil.ConnFake{Alive: false}, err: errors.New("some error 2"), expectContinued: false, now: overTime,
-				expectLastErrWasRetryable: true},
+			{
+				conn:                          &testutil.ConnFake{Name: serverName, Alive: false},
+				err:                           errors.New("some error 1"),
+				expectContinued:               true,
+				now:                           baseTime,
+				expectLastErrWasRetryable:     true,
+				expectedOnDeadConnectionCalls: []string{serverName},
+			},
+			{
+				conn:                      &testutil.ConnFake{Alive: false},
+				err:                       errors.New("some error 2"),
+				expectContinued:           false,
+				now:                       overTime,
+				expectLastErrWasRetryable: true,
+			},
 		},
 		"Retry dead connection max": {
-			{conn: &testutil.ConnFake{Name: serverName, Alive: false}, err: errors.New("some error 1"), expectContinued: true,
-				expectLastErrWasRetryable: true, expectRouterInvalidated: true,
-				expectRouterInvalidatedDb: dbName, expectRouterInvalidatedServer: serverName},
-			{conn: &testutil.ConnFake{Name: serverName, Alive: false}, err: errors.New("some error 2"), expectContinued: true,
-				expectLastErrWasRetryable: true, expectRouterInvalidated: true,
-				expectRouterInvalidatedDb: dbName, expectRouterInvalidatedServer: serverName},
-			{conn: &testutil.ConnFake{Name: serverName, Alive: false}, err: errors.New("some error 3"), expectContinued: false,
-				expectLastErrWasRetryable: true, expectRouterInvalidated: true,
-				expectRouterInvalidatedDb: dbName, expectRouterInvalidatedServer: serverName},
+			{
+				conn:                          &testutil.ConnFake{Name: serverName, Alive: false},
+				err:                           errors.New("some error 1"),
+				expectContinued:               true,
+				expectLastErrWasRetryable:     true,
+				expectedOnDeadConnectionCalls: []string{serverName},
+			},
+			{
+				conn:                          &testutil.ConnFake{Name: serverName, Alive: false},
+				err:                           errors.New("some error 2"),
+				expectContinued:               true,
+				expectLastErrWasRetryable:     true,
+				expectedOnDeadConnectionCalls: []string{serverName},
+			},
+			{
+				conn:                          &testutil.ConnFake{Name: serverName, Alive: false},
+				err:                           errors.New("some error 3"),
+				expectContinued:               false,
+				expectLastErrWasRetryable:     true,
+				expectedOnDeadConnectionCalls: []string{serverName},
+			},
 		},
 		"Cluster error": {
 			{conn: &testutil.ConnFake{Alive: true}, err: clusterErr, expectContinued: true,
@@ -167,16 +194,21 @@ func TestState(outer *testing.T) {
 				if !invocation.now.IsZero() {
 					now = invocation.now
 				}
+				var onDeadConnectionCalls []string
 				router := &testutil.RouterFake{}
 				state.Router = router
 				state.OnDeadConnection = func(server string) error {
-					return router.InvalidateReader(ctx, dbName, server)
+					onDeadConnectionCalls = append(onDeadConnectionCalls, server)
+					return nil
 				}
 
 				state.OnFailure(ctx, invocation.conn, invocation.err, invocation.isCommitting)
 				continued := state.Continue()
 				if continued != invocation.expectContinued {
 					t.Errorf("Expected continue to return %v but returned %v", invocation.expectContinued, continued)
+				}
+				if !reflect.DeepEqual(invocation.expectedOnDeadConnectionCalls, onDeadConnectionCalls) {
+					t.Errorf("Expected onDeadConnection call(s) with: %v, but got: %v", invocation.expectedOnDeadConnectionCalls, onDeadConnectionCalls)
 				}
 				if invocation.expectRouterInvalidated != router.Invalidated ||
 					invocation.expectRouterInvalidatedDb != router.InvalidatedDb ||
