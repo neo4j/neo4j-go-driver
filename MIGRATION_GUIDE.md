@@ -371,7 +371,7 @@ the public APIs.
 
 Both `neo4j.SessionWithContext` and `neo4j.ResultWithContext` define unexported functions.
 These are needed to avoid duplication between the `context.Context`-aware interface and their legacy, pre v5, variants.
-This may however cause issues with code generation-based mocking libraries.
+This may, however, cause issues with mocking libraries based on code generation.
 
 It is possible to mock these interfaces, as explained [here](https://groups.google.com/g/golang-nuts/c/6hpUErAfMHI).
 
