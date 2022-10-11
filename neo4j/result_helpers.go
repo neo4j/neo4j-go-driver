@@ -76,9 +76,7 @@ func Single(result Result, err error) (*Record, error) {
 	return result.Single()
 }
 
-// Collect loops through the result stream, collects records into a slice and returns the
-// resulting slice. Any error passed in or reported while navigating the result stream is
-// returned without any conversion.
+// Collect behaves similarly to CollectWithContext
 //
 //	records, err := neo4j.Collect(session.Run(...))
 //
@@ -91,7 +89,14 @@ func Collect(result Result, err error) ([]*Record, error) {
 	return result.Collect()
 }
 
-// CollectWithContext behaves the same as Collect
+// CollectWithContext loops through the result stream, collects records into a slice and returns the
+// resulting slice. Any error passed in or reported while navigating the result stream is
+// returned without any conversion.
+//
+//	result, err := session.Run(...)
+//	records, err := neo4j.CollectWithContext(ctx, result, err)
+//
+// Note, you cannot write neo4j.CollectWithContext(ctx, session.Run(...)) due to Go limitations
 func CollectWithContext(ctx context.Context, result ResultWithContext, err error) ([]*Record, error) {
 	if err != nil {
 		return nil, err
