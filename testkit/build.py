@@ -25,3 +25,7 @@ if __name__ == "__main__":
 
     print("Vet sources")
     run(["go", "vet", "-buildvcs=false", "./..."])
+
+    print("Statically check sources")
+    run(["go", "install", "honnef.co/go/tools/cmd/staticcheck@latest"])
+    run(["staticcheck", "./..."])
