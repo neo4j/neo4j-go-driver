@@ -67,7 +67,8 @@ func CollectT[T any](result Result, mapper func(*Record) (T, error)) ([]T, error
 // Single returns one and only one record from the result stream. Any error passed in
 // or reported while navigating the result stream is returned without any conversion.
 // If the result stream contains zero or more than one records error is returned.
-//   record, err := neo4j.Single(session.Run(...))
+//
+//	record, err := neo4j.Single(session.Run(...))
 func Single(result Result, err error) (*Record, error) {
 	if err != nil {
 		return nil, err
@@ -78,7 +79,11 @@ func Single(result Result, err error) (*Record, error) {
 // Collect loops through the result stream, collects records into a slice and returns the
 // resulting slice. Any error passed in or reported while navigating the result stream is
 // returned without any conversion.
-//   records, err := neo4j.Collect(session.Run(...))
+//
+//	records, err := neo4j.Collect(session.Run(...))
+//
+// Deprecated: use CollectWithContext instead (the entry point of context-aware
+// APIs is NewDriverWithContext)
 func Collect(result Result, err error) ([]*Record, error) {
 	if err != nil {
 		return nil, err
@@ -86,11 +91,20 @@ func Collect(result Result, err error) ([]*Record, error) {
 	return result.Collect()
 }
 
+// CollectWithContext behaves the same as Collect
+func CollectWithContext(ctx context.Context, result ResultWithContext, err error) ([]*Record, error) {
+	if err != nil {
+		return nil, err
+	}
+	return result.Collect(ctx)
+}
+
 // AsRecords passes any existing error or casts from to a slice of records.
 // Use in combination with Collect and transactional functions:
-//   records, err := neo4j.AsRecords(session.ExecuteRead(func (tx neo4j.Transaction) {
-//       return neo4j.Collect(tx.Run(...))
-//   }))
+//
+//	records, err := neo4j.AsRecords(session.ExecuteRead(func (tx neo4j.Transaction) {
+//	    return neo4j.Collect(tx.Run(...))
+//	}))
 func AsRecords(from any, err error) ([]*Record, error) {
 	if err != nil {
 		return nil, err
@@ -106,9 +120,10 @@ func AsRecords(from any, err error) ([]*Record, error) {
 
 // AsRecord passes any existing error or casts from to a record.
 // Use in combination with Single and transactional functions:
-//   record, err := neo4j.AsRecord(session.ExecuteRead(func (tx neo4j.Transaction) {
-//       return neo4j.Single(tx.Run(...))
-//   }))
+//
+//	record, err := neo4j.AsRecord(session.ExecuteRead(func (tx neo4j.Transaction) {
+//	    return neo4j.Single(tx.Run(...))
+//	}))
 func AsRecord(from any, err error) (*Record, error) {
 	if err != nil {
 		return nil, err
