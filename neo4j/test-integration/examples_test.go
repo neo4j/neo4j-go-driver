@@ -511,17 +511,17 @@ func createDriverWithMaxRetryTime(uri, username, password string) (neo4j.DriverW
 // end::config-max-retry-time[]
 
 // tag::service-unavailable[]
-func createItem(driver neo4j.Driver) error {
-	session := driver.NewSession(neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
-	defer session.Close()
+func createItem(ctx context.Context, driver neo4j.DriverWithContext) error {
+	session := driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
+	defer session.Close(ctx)
 
-	_, err := session.WriteTransaction(func(tx neo4j.Transaction) (any, error) {
-		result, err := tx.Run("CREATE (a:Item)", nil)
+	_, err := session.ExecuteWrite(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+		result, err := tx.Run(ctx, "CREATE (a:Item)", nil)
 		if err != nil {
 			return nil, err
 		}
 
-		return result.Consume()
+		return result.Consume(ctx)
 	})
 
 	return err
@@ -584,17 +584,17 @@ func addPersonInAutoCommitTx(ctx context.Context, driver neo4j.DriverWithContext
 // end::autocommit-transaction[]
 
 // tag::transaction-function[]
-func addPersonInTxFunc(driver neo4j.Driver, name string) error {
-	session := driver.NewSession(neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
-	defer session.Close()
+func addPersonInTxFunc(ctx context.Context, driver neo4j.DriverWithContext, name string) error {
+	session := driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
+	defer session.Close(ctx)
 
-	_, err := session.WriteTransaction(func(tx neo4j.Transaction) (any, error) {
-		result, err := tx.Run("CREATE (a:Person {name: $name})", map[string]any{"name": name})
+	_, err := session.ExecuteWrite(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+		result, err := tx.Run(ctx, "CREATE (a:Person {name: $name})", map[string]any{"name": name})
 		if err != nil {
 			return nil, err
 		}
 
-		return result.Consume()
+		return result.Consume(ctx)
 	})
 
 	return err
@@ -622,17 +622,17 @@ func configTxTimeout(ctx context.Context, driver neo4j.DriverWithContext, name s
 // end::transaction-timeout-config[]
 
 // tag::transaction-metadata-config[]
-func configTxMetadata(driver neo4j.Driver, name string) error {
-	session := driver.NewSession(neo4j.SessionConfig{})
-	defer session.Close()
+func configTxMetadata(ctx context.Context, driver neo4j.DriverWithContext, name string) error {
+	session := driver.NewSession(ctx, neo4j.SessionConfig{})
+	defer session.Close(ctx)
 
-	_, err := session.WriteTransaction(func(tx neo4j.Transaction) (any, error) {
-		result, err := tx.Run("CREATE (a:Person {name: $name})", map[string]any{"name": name})
+	_, err := session.ExecuteWrite(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+		result, err := tx.Run(ctx, "CREATE (a:Person {name: $name})", map[string]any{"name": name})
 		if err != nil {
 			return nil, err
 		}
 
-		return result.Consume()
+		return result.Consume(ctx)
 	}, neo4j.WithTxMetadata(map[string]any{"applicationId": 123}))
 
 	return err
