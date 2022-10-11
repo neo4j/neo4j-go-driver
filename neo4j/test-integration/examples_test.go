@@ -31,6 +31,7 @@ import (
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/test-integration/dbserver"
 )
 
+//lint:file-ignore U1000 Ignore all unused code, it's included in the driver manual
 func TestExamples(outer *testing.T) {
 	if testing.Short() {
 		outer.Skip()
@@ -45,7 +46,7 @@ func TestExamples(outer *testing.T) {
 			password string
 		)
 
-		server := dbserver.GetDbServer()
+		server := dbserver.GetDbServer(ctx)
 
 		uri = server.BoltURI()
 		username = server.Username
@@ -820,12 +821,13 @@ func TestExamplesDatabaseSelection(t *testing.T) {
 		t.Skip()
 	}
 
-	driver := dbserver.GetDbServer().Driver()
-	defer driver.Close()
+	ctx := context.Background()
+	driver := dbserver.GetDbServer(ctx).Driver()
+	defer driver.Close(ctx)
 	// tag::database-selection[]
-	session := driver.NewSession(neo4j.SessionConfig{DatabaseName: "example"})
+	session := driver.NewSession(ctx, neo4j.SessionConfig{DatabaseName: "example"})
 	// end::database-selection[]
-	defer session.Close()
+	defer session.Close(ctx)
 }
 
 // tag::result-consume[]

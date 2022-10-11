@@ -474,7 +474,7 @@ func TestSession(outer *testing.T) {
 			tx.Commit(context.Background())
 			AssertDeepEquals(t, BookmarksToRawValues(sess.LastBookmarks()), []string{bookmark})
 			// The bookmark should be used in next transaction
-			tx, _ = sess.BeginTransaction(context.Background())
+			sess.BeginTransaction(context.Background())
 			AssertLen(t, conn.RecordedTxs, 2)
 			rtx := conn.RecordedTxs[1]
 			if !reflect.DeepEqual([]string{bookmark}, rtx.Bookmarks) {

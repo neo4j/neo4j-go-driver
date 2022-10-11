@@ -78,7 +78,7 @@ type openstreams struct {
 }
 
 var (
-	invalidStream = errors.New("Invalid stream handle")
+	errInvalidStream = errors.New("invalid stream handle")
 )
 
 // Adds a new open stream and sets it as current.
@@ -141,7 +141,7 @@ func (o *openstreams) reset() {
 func (o openstreams) getUnsafe(h idb.StreamHandle) (*stream, error) {
 	stream, ok := h.(*stream)
 	if !ok || stream == nil {
-		return nil, invalidStream
+		return nil, errInvalidStream
 	}
 	return stream, nil
 }
@@ -150,5 +150,5 @@ func (o openstreams) isSafe(s *stream) error {
 	if s.key == o.key {
 		return nil
 	}
-	return invalidStream
+	return errInvalidStream
 }

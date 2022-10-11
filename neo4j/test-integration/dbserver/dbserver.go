@@ -21,6 +21,7 @@
 package dbserver
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"strconv"
@@ -45,7 +46,7 @@ type DbServer struct {
 	Version      Version
 }
 
-func GetDbServer() DbServer {
+func GetDbServer(ctx context.Context) DbServer {
 	mut.Lock()
 	defer mut.Unlock()
 
@@ -89,23 +90,23 @@ func GetDbServer() DbServer {
 			IsEnterprise: vars["TEST_NEO4J_EDITION"] == "enterprise",
 			Version:      VersionOf(vars["TEST_NEO4J_VERSION"]),
 		}
-		server.deleteData()
+		server.deleteData(ctx)
 	}
 	return *server
 }
 
-func (s DbServer) deleteData() {
+func (s DbServer) deleteData(ctx context.Context) {
 	driver := s.Driver()
-	session := driver.NewSession(neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
-	defer session.Close()
+	session := driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
+	defer session.Close(ctx)
 
 	for {
-		result, err := session.Run("MATCH (n) WITH n LIMIT 10000 DETACH DELETE n RETURN count(n)", nil)
+		result, err := session.Run(ctx, "MATCH (n) WITH n LIMIT 10000 DETACH DELETE n RETURN count(n)", nil)
 		if err != nil {
 			panic(err)
 		}
 
-		if result.Next() {
+		if result.Next(ctx) {
 			deleted := result.Record().Values[0].(int64)
 			if deleted == 0 {
 				break
@@ -118,7 +119,7 @@ func (s DbServer) deleteData() {
 	}
 }
 
-// Returns the default URI to connect to the datbase.
+// URI returns the default URI to connect to the datbase.
 // This should be used when tests don't care about the specifics of different URI schemes.
 func (s DbServer) URI() string {
 	return fmt.Sprintf("%s://%s:%d", s.Scheme, s.Hostname, s.Port)
@@ -135,8 +136,8 @@ func (s DbServer) AuthToken() neo4j.AuthToken {
 	return neo4j.BasicAuth(s.Username, s.Password, "")
 }
 
-func (s DbServer) Driver(configurers ...func(*neo4j.Config)) neo4j.Driver {
-	driver, err := neo4j.NewDriver(s.URI(), s.AuthToken(), configurers...)
+func (s DbServer) Driver(configurers ...func(*neo4j.Config)) neo4j.DriverWithContext {
+	driver, err := neo4j.NewDriverWithContext(s.URI(), s.AuthToken(), configurers...)
 	if err != nil {
 		panic(err)
 	}

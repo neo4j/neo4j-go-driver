@@ -20,6 +20,7 @@
 package test_integration
 
 import (
+	"context"
 	"testing"
 	"time"
 
@@ -32,48 +33,50 @@ func TestTimeoutAndLifetime(outer *testing.T) {
 		outer.Skip()
 	}
 
-	server := dbserver.GetDbServer()
+	ctx := context.Background()
+
+	server := dbserver.GetDbServer(ctx)
 
 	outer.Run("should error when ConnectionAcquisitionTimeout is hit", func(t *testing.T) {
 		var err error
-		var driver neo4j.Driver
-		var session1, session2 neo4j.Session
+		var driver neo4j.DriverWithContext
+		var session1, session2 neo4j.SessionWithContext
 
-		driver, err = neo4j.NewDriver(server.BoltURI(), server.AuthToken(), server.ConfigFunc(), func(config *neo4j.Config) {
+		driver, err = neo4j.NewDriverWithContext(server.BoltURI(), server.AuthToken(), server.ConfigFunc(), func(config *neo4j.Config) {
 			config.ConnectionAcquisitionTimeout = 1 * time.Second
 			config.MaxConnectionPoolSize = 1
 		})
 		assertNil(t, err)
 		assertNotNil(t, driver)
-		defer driver.Close()
+		defer driver.Close(ctx)
 
-		session1, _ = newSessionAndTx(t, driver, neo4j.AccessModeRead)
-		defer session1.Close()
+		session1, _ = newSessionAndTx(ctx, t, driver, neo4j.AccessModeRead)
+		defer session1.Close(ctx)
 
-		session2 = driver.NewSession(neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead})
+		session2 = driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead})
 		assertNotNil(t, session2)
-		defer session2.Close()
+		defer session2.Close(ctx)
 
-		_, err = session2.Run("RETURN 1", nil)
+		_, err = session2.Run(ctx, "RETURN 1", nil)
 		assertNotNil(t, err)
 	})
 
 	outer.Run("should timeout connection when SocketConnectTimeout is hit", func(t *testing.T) {
 		var err error
-		var driver neo4j.Driver
-		var session neo4j.Session
+		var driver neo4j.DriverWithContext
+		var session neo4j.SessionWithContext
 
-		driver, err = neo4j.NewDriver("bolt://10.255.255.1:8080", server.AuthToken(), server.ConfigFunc(), func(config *neo4j.Config) {
+		driver, err = neo4j.NewDriverWithContext("bolt://10.255.255.1:8080", server.AuthToken(), server.ConfigFunc(), func(config *neo4j.Config) {
 			config.SocketConnectTimeout = 1 * time.Second
 		})
 		assertNil(t, err)
 		assertNotNil(t, driver)
-		defer driver.Close()
+		defer driver.Close(ctx)
 
-		session = driver.NewSession(neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead})
-		defer session.Close()
+		session = driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead})
+		defer session.Close(ctx)
 
-		_, err = session.BeginTransaction()
+		_, err = session.BeginTransaction(ctx)
 		assertNotNil(t, err)
 	})
 

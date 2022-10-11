@@ -146,6 +146,7 @@ func nativeToCypher(v any) map[string]any {
 		return map[string]any{
 			"name": "Node",
 			"data": map[string]any{
+				//lint:ignore SA1019 Id is supported at least until 6.0
 				"id":        nativeToCypher(x.Id),
 				"elementId": nativeToCypher(x.ElementId),
 				"labels":    nativeToCypher(x.Labels),
@@ -155,14 +156,17 @@ func nativeToCypher(v any) map[string]any {
 		return map[string]any{
 			"name": "Relationship",
 			"data": map[string]any{
-				"id":                 nativeToCypher(x.Id),
-				"elementId":          nativeToCypher(x.ElementId),
+				//lint:ignore SA1019 Id is supported at least until 6.0
+				"id":        nativeToCypher(x.Id),
+				"elementId": nativeToCypher(x.ElementId),
+				//lint:ignore SA1019 StartId is supported at least until 6.0
 				"startNodeId":        nativeToCypher(x.StartId),
 				"startNodeElementId": nativeToCypher(x.StartElementId),
-				"endNodeId":          nativeToCypher(x.EndId),
-				"endNodeElementId":   nativeToCypher(x.EndElementId),
-				"type":               nativeToCypher(x.Type),
-				"props":              nativeToCypher(x.Props),
+				//lint:ignore SA1019 EndId is supported at least until 6.0
+				"endNodeId":        nativeToCypher(x.EndId),
+				"endNodeElementId": nativeToCypher(x.EndElementId),
+				"type":             nativeToCypher(x.Type),
+				"props":            nativeToCypher(x.Props),
 			}}
 	case neo4j.Path:
 		nodes := make([]any, len(x.Nodes))

@@ -381,7 +381,7 @@ func (b *backend) handleRequest(req map[string]any) {
 	case "BookmarksSupplierCompleted":
 		requestId := data["requestId"].(string)
 		rawBookmarks := data["bookmarks"].([]any)
-		bookmarks := make(neo4j.Bookmarks, len(rawBookmarks), len(rawBookmarks))
+		bookmarks := make(neo4j.Bookmarks, len(rawBookmarks))
 		for i, bookmark := range rawBookmarks {
 			bookmarks[i] = bookmark.(string)
 		}
@@ -1169,7 +1169,7 @@ func convertInitialBookmarks(bookmarks map[string]any) map[string]neo4j.Bookmark
 	result := make(map[string]neo4j.Bookmarks, len(bookmarks))
 	for db, rawBookmarks := range bookmarks {
 		bookmarks := rawBookmarks.([]any)
-		storedBookmarks := make(neo4j.Bookmarks, len(bookmarks), len(bookmarks))
+		storedBookmarks := make(neo4j.Bookmarks, len(bookmarks))
 		for i, bookmark := range bookmarks {
 			storedBookmarks[i] = bookmark.(string)
 		}

@@ -55,7 +55,7 @@ func (s *server) getIdle(ctx context.Context, idlenessThreshold time.Duration) (
 	if found {
 		idleConnection := s.idle.Remove(availableConnection)
 		connection := idleConnection.(db.Connection)
-		if time.Now().Sub(connection.IdleDate()) > idlenessThreshold {
+		if time.Since(connection.IdleDate()) > idlenessThreshold {
 			connection.ForceReset(ctx)
 			if !connection.IsAlive() {
 				return nil, found

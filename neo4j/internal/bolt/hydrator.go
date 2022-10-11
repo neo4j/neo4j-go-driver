@@ -150,7 +150,7 @@ func (h *hydrator) hydrate(buf []byte) (x any, err error) {
 	h.unp.Next()
 
 	if h.unp.Curr != packstream.PackedStruct {
-		return nil, errors.New(fmt.Sprintf("Expected struct"))
+		return nil, errors.New("expected struct")
 	}
 
 	n := h.unp.Len()
@@ -165,7 +165,7 @@ func (h *hydrator) hydrate(buf []byte) (x any, err error) {
 	case msgRecord:
 		x = h.record(n)
 	default:
-		return nil, errors.New(fmt.Sprintf("Unexpected tag at top level: %d", t))
+		return nil, fmt.Errorf("unexpected tag at top level: %d", t)
 	}
 	err = h.getErr()
 	return
@@ -534,11 +534,13 @@ func (h *hydrator) node(num uint32) any {
 	}
 	n := dbtype.Node{}
 	h.unp.Next()
+	//lint:ignore SA1019 Id is supported at least until 6.0
 	n.Id = h.unp.Int()
 	h.unp.Next()
 	n.Labels = h.strings()
 	h.unp.Next()
 	n.Props = h.amap()
+	//lint:ignore SA1019 Id is supported at least until 6.0
 	n.ElementId = fmt.Sprintf("%d", n.Id)
 	return n
 }
@@ -550,6 +552,7 @@ func (h *hydrator) nodeWithElementId(num uint32) any {
 	}
 	n := dbtype.Node{}
 	h.unp.Next()
+	//lint:ignore SA1019 Id is supported at least until 6.0
 	n.Id = h.unp.Int()
 	h.unp.Next()
 	n.Labels = h.strings()
@@ -567,17 +570,23 @@ func (h *hydrator) relationship(n uint32) any {
 	}
 	r := dbtype.Relationship{}
 	h.unp.Next()
+	//lint:ignore SA1019 Id is supported at least until 6.0
 	r.Id = h.unp.Int()
 	h.unp.Next()
+	//lint:ignore SA1019 StartId is supported at least until 6.0
 	r.StartId = h.unp.Int()
 	h.unp.Next()
+	//lint:ignore SA1019 EndId is supported at least until 6.0
 	r.EndId = h.unp.Int()
 	h.unp.Next()
 	r.Type = h.unp.String()
 	h.unp.Next()
 	r.Props = h.amap()
+	//lint:ignore SA1019 Id is supported at least until 6.0
 	r.ElementId = fmt.Sprintf("%d", r.Id)
+	//lint:ignore SA1019 StartId is supported at least until 6.0
 	r.StartElementId = fmt.Sprintf("%d", r.StartId)
+	//lint:ignore SA1019 EndId is supported at least until 6.0
 	r.EndElementId = fmt.Sprintf("%d", r.EndId)
 	return r
 }
@@ -589,10 +598,13 @@ func (h *hydrator) relationshipWithElementId(n uint32) any {
 	}
 	r := dbtype.Relationship{}
 	h.unp.Next()
+	//lint:ignore SA1019 Id is supported at least until 6.0
 	r.Id = h.unp.Int()
 	h.unp.Next()
+	//lint:ignore SA1019 StartId is supported at least until 6.0
 	r.StartId = h.unp.Int()
 	h.unp.Next()
+	//lint:ignore SA1019 EndId is supported at least until 6.0
 	r.EndId = h.unp.Int()
 	h.unp.Next()
 	r.Type = h.unp.String()

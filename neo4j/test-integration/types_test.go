@@ -20,6 +20,7 @@
 package test_integration
 
 import (
+	"context"
 	"fmt"
 	"math/rand"
 	"sort"
@@ -34,202 +35,203 @@ func TestTypes(outer *testing.T) {
 		outer.Skip()
 	}
 
-	server := dbserver.GetDbServer()
+	ctx := context.Background()
+	server := dbserver.GetDbServer(ctx)
 	var err error
-	var driver neo4j.Driver
-	var session neo4j.Session
-	var result neo4j.Result
+	var driver neo4j.DriverWithContext
+	var session neo4j.SessionWithContext
+	var result neo4j.ResultWithContext
 
 	driver = server.Driver()
-	session = driver.NewSession(neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
+	session = driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
 	assertNotNil(outer, session)
 
 	defer func() {
 		if session != nil {
-			session.Close()
+			session.Close(ctx)
 		}
 
 		if driver != nil {
-			driver.Close()
+			driver.Close(ctx)
 		}
 	}()
 
 	outer.Run("should be able to send and receive boolean property", func(t *testing.T) {
 		value := true
-		result, err = session.Run("CREATE (n {value: $value}) RETURN n.value", map[string]any{"value": value})
+		result, err = session.Run(ctx, "CREATE (n {value: $value}) RETURN n.value", map[string]any{"value": value})
 		assertNil(t, err)
 
-		assertTrue(t, result.Next())
+		assertTrue(t, result.Next(ctx))
 		assertEquals(t, result.Record().Values[0], value)
-		assertFalse(t, result.Next())
+		assertFalse(t, result.Next(ctx))
 		assertNil(t, result.Err())
 	})
 
 	outer.Run("should be able to send and receive byte property", func(t *testing.T) {
 		value := byte(1)
-		result, err = session.Run("CREATE (n {value: $value}) RETURN n.value", map[string]any{"value": value})
+		result, err = session.Run(ctx, "CREATE (n {value: $value}) RETURN n.value", map[string]any{"value": value})
 		assertNil(t, err)
 
-		assertTrue(t, result.Next())
+		assertTrue(t, result.Next(ctx))
 		assertAssignableToTypeOf(t, result.Record().Values[0], int64(0))
 		assertEquals(t, result.Record().Values[0], int64(value))
-		assertFalse(t, result.Next())
+		assertFalse(t, result.Next(ctx))
 		assertNil(t, result.Err())
 	})
 
 	outer.Run("should be able to send and receive int8 property", func(t *testing.T) {
 		value := int8(2)
-		result, err = session.Run("CREATE (n {value: $value}) RETURN n.value", map[string]any{"value": value})
+		result, err = session.Run(ctx, "CREATE (n {value: $value}) RETURN n.value", map[string]any{"value": value})
 		assertNil(t, err)
 
-		assertTrue(t, result.Next())
+		assertTrue(t, result.Next(ctx))
 		assertAssignableToTypeOf(t, result.Record().Values[0], int64(0))
 		assertEquals(t, result.Record().Values[0], int64(value))
-		assertFalse(t, result.Next())
+		assertFalse(t, result.Next(ctx))
 		assertNil(t, result.Err())
 	})
 
 	outer.Run("should be able to send and receive int16 property", func(t *testing.T) {
 		value := int16(3)
-		result, err = session.Run("CREATE (n {value: $value}) RETURN n.value", map[string]any{"value": value})
+		result, err = session.Run(ctx, "CREATE (n {value: $value}) RETURN n.value", map[string]any{"value": value})
 		assertNil(t, err)
 
-		assertTrue(t, result.Next())
+		assertTrue(t, result.Next(ctx))
 		assertAssignableToTypeOf(t, result.Record().Values[0], int64(0))
 		assertEquals(t, result.Record().Values[0], int64(value))
-		assertFalse(t, result.Next())
+		assertFalse(t, result.Next(ctx))
 		assertNil(t, result.Err())
 	})
 
 	outer.Run("should be able to send and receive int property", func(t *testing.T) {
 		value := int(4)
-		result, err = session.Run("CREATE (n {value: $value}) RETURN n.value", map[string]any{"value": value})
+		result, err = session.Run(ctx, "CREATE (n {value: $value}) RETURN n.value", map[string]any{"value": value})
 		assertNil(t, err)
 
-		assertTrue(t, result.Next())
+		assertTrue(t, result.Next(ctx))
 		assertAssignableToTypeOf(t, result.Record().Values[0], int64(0))
 		assertEquals(t, result.Record().Values[0], int64(value))
-		assertFalse(t, result.Next())
+		assertFalse(t, result.Next(ctx))
 		assertNil(t, result.Err())
 	})
 
 	outer.Run("should be able to send and receive int32 property", func(t *testing.T) {
 		value := int32(5)
-		result, err = session.Run("CREATE (n {value: $value}) RETURN n.value", map[string]any{"value": value})
+		result, err = session.Run(ctx, "CREATE (n {value: $value}) RETURN n.value", map[string]any{"value": value})
 		assertNil(t, err)
 
-		assertTrue(t, result.Next())
+		assertTrue(t, result.Next(ctx))
 		assertAssignableToTypeOf(t, result.Record().Values[0], int64(0))
 		assertEquals(t, result.Record().Values[0], int64(value))
-		assertFalse(t, result.Next())
+		assertFalse(t, result.Next(ctx))
 		assertNil(t, result.Err())
 	})
 
 	outer.Run("should be able to send and receive int64 property", func(t *testing.T) {
 		value := int64(6)
-		result, err = session.Run("CREATE (n {value: $value}) RETURN n.value", map[string]any{"value": value})
+		result, err = session.Run(ctx, "CREATE (n {value: $value}) RETURN n.value", map[string]any{"value": value})
 		assertNil(t, err)
 
-		assertTrue(t, result.Next())
+		assertTrue(t, result.Next(ctx))
 		assertAssignableToTypeOf(t, result.Record().Values[0], int64(0))
 		assertEquals(t, result.Record().Values[0], value)
-		assertFalse(t, result.Next())
+		assertFalse(t, result.Next(ctx))
 		assertNil(t, result.Err())
 	})
 
 	outer.Run("should be able to send and receive float32 property", func(t *testing.T) {
 		value := float32(7.1)
-		result, err = session.Run("CREATE (n {value: $value}) RETURN n.value", map[string]any{"value": value})
+		result, err = session.Run(ctx, "CREATE (n {value: $value}) RETURN n.value", map[string]any{"value": value})
 		assertNil(t, err)
 
-		assertTrue(t, result.Next())
+		assertTrue(t, result.Next(ctx))
 		assertAssignableToTypeOf(t, result.Record().Values[0], float64(0))
 		assertEquals(t, result.Record().Values[0], float64(value))
-		assertFalse(t, result.Next())
+		assertFalse(t, result.Next(ctx))
 		assertNil(t, result.Err())
 	})
 
 	outer.Run("should be able to send and receive float64 property", func(t *testing.T) {
 		value := float64(81.9224)
-		result, err = session.Run("CREATE (n {value: $value}) RETURN n.value", map[string]any{"value": value})
+		result, err = session.Run(ctx, "CREATE (n {value: $value}) RETURN n.value", map[string]any{"value": value})
 		assertNil(t, err)
 
-		assertTrue(t, result.Next())
+		assertTrue(t, result.Next(ctx))
 		assertAssignableToTypeOf(t, result.Record().Values[0], float64(0))
 		assertEquals(t, result.Record().Values[0], value)
-		assertFalse(t, result.Next())
+		assertFalse(t, result.Next(ctx))
 		assertNil(t, result.Err())
 	})
 
 	outer.Run("should be able to send and receive string property", func(t *testing.T) {
 		value := "a string"
-		result, err = session.Run("CREATE (n {value: $value}) RETURN n.value", map[string]any{"value": value})
+		result, err = session.Run(ctx, "CREATE (n {value: $value}) RETURN n.value", map[string]any{"value": value})
 		assertNil(t, err)
 
-		assertTrue(t, result.Next())
+		assertTrue(t, result.Next(ctx))
 		assertAssignableToTypeOf(t, result.Record().Values[0], "")
 		assertEquals(t, result.Record().Values[0], value)
-		assertFalse(t, result.Next())
+		assertFalse(t, result.Next(ctx))
 		assertNil(t, result.Err())
 	})
 
 	outer.Run("should be able to send and receive byte array property", func(t *testing.T) {
 		value := []byte{1, 2, 3, 4, 5}
-		result, err = session.Run("CREATE (n {value: $value}) RETURN n.value", map[string]any{"value": value})
+		result, err = session.Run(ctx, "CREATE (n {value: $value}) RETURN n.value", map[string]any{"value": value})
 		assertNil(t, err)
 
-		assertTrue(t, result.Next())
+		assertTrue(t, result.Next(ctx))
 		assertAssignableToTypeOf(t, result.Record().Values[0], []byte(nil))
 		assertEquals(t, result.Record().Values[0], value)
-		assertFalse(t, result.Next())
+		assertFalse(t, result.Next(ctx))
 		assertNil(t, result.Err())
 	})
 
 	outer.Run("should be able to send and receive boolean array property", func(t *testing.T) {
 		value := []bool{true, false, false, true}
-		result, err = session.Run("CREATE (n {value: $value}) RETURN n.value", map[string]any{"value": value})
+		result, err = session.Run(ctx, "CREATE (n {value: $value}) RETURN n.value", map[string]any{"value": value})
 		assertNil(t, err)
 
-		assertTrue(t, result.Next())
+		assertTrue(t, result.Next(ctx))
 		assertAssignableToTypeOf(t, result.Record().Values[0], []any(nil))
 		assertEquals(t, result.Record().Values[0], []any{value[0], value[1], value[2], value[3]})
-		assertFalse(t, result.Next())
+		assertFalse(t, result.Next(ctx))
 		assertNil(t, result.Err())
 	})
 
 	outer.Run("should be able to send and receive int array property", func(t *testing.T) {
 		value := []int{1, 2, 3, 4, 5}
-		result, err = session.Run("CREATE (n {value: $value}) RETURN n.value", map[string]any{"value": value})
+		result, err = session.Run(ctx, "CREATE (n {value: $value}) RETURN n.value", map[string]any{"value": value})
 		assertNil(t, err)
 
-		assertTrue(t, result.Next())
+		assertTrue(t, result.Next(ctx))
 		assertAssignableToTypeOf(t, result.Record().Values[0], []any(nil))
 		assertEquals(t, result.Record().Values[0], []any{int64(1), int64(2), int64(3), int64(4), int64(5)})
-		assertFalse(t, result.Next())
+		assertFalse(t, result.Next(ctx))
 		assertNil(t, result.Err())
 	})
 
 	outer.Run("should be able to send and receive float64 array property", func(t *testing.T) {
 		value := []float64{1.11, 2.22, 3.33, 4.44, 5.55}
-		result, err = session.Run("CREATE (n {value: $value}) RETURN n.value", map[string]any{"value": value})
+		result, err = session.Run(ctx, "CREATE (n {value: $value}) RETURN n.value", map[string]any{"value": value})
 		assertNil(t, err)
 
-		assertTrue(t, result.Next())
+		assertTrue(t, result.Next(ctx))
 		assertAssignableToTypeOf(t, result.Record().Values[0], []any(nil))
 		assertEquals(t, result.Record().Values[0], []any{1.11, 2.22, 3.33, 4.44, 5.55})
-		assertFalse(t, result.Next())
+		assertFalse(t, result.Next(ctx))
 		assertNil(t, result.Err())
 	})
 
 	outer.Run("should be able to send and receive string array property", func(t *testing.T) {
 		value := []string{"a", "b", "c", "d", "e"}
-		result, err = session.Run("CREATE (n {value: $value}) RETURN n.value", map[string]any{"value": value})
+		result, err = session.Run(ctx, "CREATE (n {value: $value}) RETURN n.value", map[string]any{"value": value})
 		assertNil(t, err)
 
-		assertTrue(t, result.Next())
+		assertTrue(t, result.Next(ctx))
 		assertAssignableToTypeOf(t, result.Record().Values[0], []any(nil))
 		assertEquals(t, result.Record().Values[0], []any{"a", "b", "c", "d", "e"})
-		assertFalse(t, result.Next())
+		assertFalse(t, result.Next(ctx))
 		assertNil(t, result.Err())
 	})
 
@@ -246,24 +248,25 @@ func TestTypes(outer *testing.T) {
 
 		value := randSeq(20 * 1024)
 
-		result, err = session.Run("CREATE (n {value: $value}) RETURN n.value", map[string]any{"value": value})
+		result, err = session.Run(ctx, "CREATE (n {value: $value}) RETURN n.value", map[string]any{"value": value})
 		assertNil(t, err)
 
-		assertTrue(t, result.Next())
+		assertTrue(t, result.Next(ctx))
 		assertAssignableToTypeOf(t, result.Record().Values[0], "")
 		assertEquals(t, result.Record().Values[0], value)
-		assertFalse(t, result.Next())
+		assertFalse(t, result.Next(ctx))
 		assertNil(t, result.Err())
 	})
 
 	outer.Run("should be able to receive a node with properties", func(t *testing.T) {
-		result, err = session.Run("CREATE (n:Person:Manager {id: 1, name: 'a name'}) RETURN n", nil)
+		result, err = session.Run(ctx, "CREATE (n:Person:Manager {id: 1, name: 'a name'}) RETURN n", nil)
 		assertNil(t, err)
 
-		assertTrue(t, result.Next())
+		assertTrue(t, result.Next(ctx))
 		node := result.Record().Values[0].(neo4j.Node)
 
 		assertNotNil(t, node)
+		//lint:ignore SA1019 Id is supported at least until 6.0
 		assertNotNil(t, node.Id)
 		assertEquals(t, len(node.Labels), 2)
 		assertStringsHas(t, node.Labels, "Person")
@@ -271,20 +274,21 @@ func TestTypes(outer *testing.T) {
 		assertEquals(t, len(node.Props), 2)
 		assertMapHas(t, node.Props, "id", int64(1))
 		assertMapHas(t, node.Props, "name", "a name")
-		assertFalse(t, result.Next())
+		assertFalse(t, result.Next(ctx))
 		assertNil(t, result.Err())
 	})
 
 	outer.Run("should be able to receive a relationship with properties", func(t *testing.T) {
-		result, err = session.Run("CREATE (e:Person:Employee {id: 1, name: 'employee 1'})-[w:WORKS_FOR { from: '2017-01-01' }]->(m:Person:Manager {id: 2, name: 'manager 1'}) RETURN e, w, m", nil)
+		result, err = session.Run(ctx, "CREATE (e:Person:Employee {id: 1, name: 'employee 1'})-[w:WORKS_FOR { from: '2017-01-01' }]->(m:Person:Manager {id: 2, name: 'manager 1'}) RETURN e, w, m", nil)
 		assertNil(t, err)
 
-		assertTrue(t, result.Next())
+		assertTrue(t, result.Next(ctx))
 		employee := result.Record().Values[0].(neo4j.Node)
 		worksFor := result.Record().Values[1].(neo4j.Relationship)
 		manager := result.Record().Values[2].(neo4j.Node)
 
 		assertNotNil(t, employee)
+		//lint:ignore SA1019 Id is supported at least until 6.0
 		assertNotNil(t, employee.Id)
 		assertEquals(t, len(employee.Labels), 2)
 		assertStringsHas(t, employee.Labels, "Person")
@@ -294,14 +298,18 @@ func TestTypes(outer *testing.T) {
 		assertMapHas(t, employee.Props, "name", "employee 1")
 
 		assertNotNil(t, worksFor)
+		//lint:ignore SA1019 Id is supported at least until 6.0
 		assertNotNil(t, worksFor.Id)
+		//lint:ignore SA1019 StartId is supported at least until 6.0
 		assertEquals(t, worksFor.StartId, employee.Id)
+		//lint:ignore SA1019 EndId is supported at least until 6.0
 		assertEquals(t, worksFor.EndId, manager.Id)
 		assertEquals(t, worksFor.Type, "WORKS_FOR")
 		assertEquals(t, len(worksFor.Props), 1)
 		assertMapHas(t, worksFor.Props, "from", "2017-01-01")
 
 		assertNotNil(t, manager)
+		//lint:ignore SA1019 Id is supported at least until 6.0
 		assertNotNil(t, manager.Id)
 		assertEquals(t, len(manager.Labels), 2)
 		assertStringsHas(t, manager.Labels, "Person")
@@ -309,14 +317,14 @@ func TestTypes(outer *testing.T) {
 		assertEquals(t, len(manager.Props), 2)
 		assertMapHas(t, manager.Props, "id", int64(2))
 		assertMapHas(t, manager.Props, "name", "manager 1")
-		assertFalse(t, result.Next())
+		assertFalse(t, result.Next(ctx))
 		assertNil(t, result.Err())
 	})
 
 	outer.Run("should be able to receive a path with two nodes and one relationship", func(t *testing.T) {
-		result, err = session.Run("CREATE p=(e:Person:Employee {id: 1, name: 'employee 1'})-[w:WORKS_FOR { from: '2017-01-01' }]->(m:Person:Manager {id: 2, name: 'manager 1'}) RETURN p, e, w, m", nil)
+		result, err = session.Run(ctx, "CREATE p=(e:Person:Employee {id: 1, name: 'employee 1'})-[w:WORKS_FOR { from: '2017-01-01' }]->(m:Person:Manager {id: 2, name: 'manager 1'}) RETURN p, e, w, m", nil)
 		assertNil(t, err)
-		assertTrue(t, result.Next())
+		assertTrue(t, result.Next(ctx))
 		path := result.Record().Values[0].(neo4j.Path)
 		employee := result.Record().Values[1].(neo4j.Node)
 		worksFor := result.Record().Values[2].(neo4j.Relationship)
@@ -328,12 +336,12 @@ func TestTypes(outer *testing.T) {
 		assertNodesHas(t, path.Nodes, manager)
 		assertEquals(t, len(path.Relationships), 1)
 		assertRelationshipsHas(t, path.Relationships, worksFor)
-		assertFalse(t, result.Next())
+		assertFalse(t, result.Next(ctx))
 		assertNil(t, result.Err())
 	})
 
 	outer.Run("should be able to receive a path with three nodes and two relationship", func(t *testing.T) {
-		result, err = session.Run(`CREATE (e1:Person:Employee $employee) 
+		result, err = session.Run(ctx, `CREATE (e1:Person:Employee $employee) 
 				CREATE (l1:Person:Lead $lead) 
 				CREATE (m1:Person:Manager $manager) 
 				CREATE p = (e1)-[r1:LED_BY { from: '2017-01-01' }]->(l1)-[r2:REPORTS_TO { from: '2017-01-01' }]->(m1)
@@ -352,7 +360,7 @@ func TestTypes(outer *testing.T) {
 			},
 		})
 		assertNil(t, err)
-		assertTrue(t, result.Next())
+		assertTrue(t, result.Next(ctx))
 
 		path := result.Record().Values[0].(neo4j.Path)
 		employee := result.Record().Values[1].(neo4j.Node)
@@ -369,7 +377,7 @@ func TestTypes(outer *testing.T) {
 		assertEquals(t, len(path.Relationships), 2)
 		assertRelationshipsHas(t, path.Relationships, ledBy)
 		assertRelationshipsHas(t, path.Relationships, reportsTo)
-		assertFalse(t, result.Next())
+		assertFalse(t, result.Next(ctx))
 		assertNil(t, result.Err())
 	})
 
@@ -409,12 +417,12 @@ func TestTypes(outer *testing.T) {
 
 		for _, k := range sortedKeys(nilPointers) {
 			inner.Run(fmt.Sprintf("with %s type", k), func(t *testing.T) {
-				result, err = session.Run("CREATE (n {value: $value}) RETURN n.value", map[string]any{"value": nilPointers[k]})
+				result, err = session.Run(ctx, "CREATE (n {value: $value}) RETURN n.value", map[string]any{"value": nilPointers[k]})
 				assertNil(t, err)
 
-				assertTrue(t, result.Next())
+				assertTrue(t, result.Next(ctx))
 				assertNil(t, result.Record().Values[0])
-				assertFalse(t, result.Next())
+				assertFalse(t, result.Next(ctx))
 				assertNil(t, result.Err())
 			})
 		}
@@ -427,14 +435,14 @@ func TestTypes(outer *testing.T) {
 
 		inner.Run("Session.Run", func(deepT *testing.T) {
 			deepT.Run("should fail when sending as parameter", func(t *testing.T) {
-				result, err = session.Run("CREATE (n {value: $value}) RETURN n.value", map[string]any{"value": unsupportedType{}})
+				result, err = session.Run(ctx, "CREATE (n {value: $value}) RETURN n.value", map[string]any{"value": unsupportedType{}})
 				assertNotNil(t, err)
 				//Expect(err).To(BeGenericError(ContainSubstring("unable to convert parameter \"value\" to connector value for run message")))
 				assertNil(t, result)
 			})
 
 			deepT.Run("should fail when sending as tx metadata", func(t *testing.T) {
-				result, err = session.Run("CREATE (n)", nil, neo4j.WithTxMetadata(map[string]any{"m1": unsupportedType{}}))
+				result, err = session.Run(ctx, "CREATE (n)", nil, neo4j.WithTxMetadata(map[string]any{"m1": unsupportedType{}}))
 				assertNotNil(t, err)
 				//Expect(err).To(BeGenericError(ContainSubstring("unable to convert tx metadata to connector value for run message")))
 				assertNil(t, result)
@@ -442,15 +450,15 @@ func TestTypes(outer *testing.T) {
 		})
 
 		inner.Run("Transaction.Run", func(deepT *testing.T) {
-			var tx neo4j.Transaction
+			var tx neo4j.ExplicitTransaction
 
 			deepT.Run("should fail when sending as tx metadata", func(t *testing.T) {
-				tx, err = session.BeginTransaction()
-				defer assertCloses(deepT, tx)
+				tx, err = session.BeginTransaction(ctx)
+				defer assertCloses(ctx, deepT, tx)
 				assertNil(t, err)
 				assertNotNil(t, tx)
 
-				result, err = tx.Run("CREATE (n)", map[string]any{"unsupported": unsupportedType{}})
+				result, err = tx.Run(ctx, "CREATE (n)", map[string]any{"unsupported": unsupportedType{}})
 				assertNotNil(t, err)
 				assertNil(t, result)
 			})
@@ -560,12 +568,12 @@ func TestTypes(outer *testing.T) {
 
 			for _, k := range sortedKeys(nilPointers) {
 				deepT.Run(fmt.Sprintf("with %s type", k), func(t *testing.T) {
-					result, err = session.Run("CREATE (n {value: $value}) RETURN n.value", map[string]any{"value": nilPointers[k]})
+					result, err = session.Run(ctx, "CREATE (n {value: $value}) RETURN n.value", map[string]any{"value": nilPointers[k]})
 					assertNil(t, err)
 
-					assertTrue(t, result.Next())
+					assertTrue(t, result.Next(ctx))
 					assertNil(t, result.Record().Values[0])
-					assertFalse(t, result.Next())
+					assertFalse(t, result.Next(ctx))
 					assertNil(t, result.Err())
 				})
 			}
@@ -643,13 +651,12 @@ func TestTypes(outer *testing.T) {
 				deepT.Run(k, func(t *testing.T) {
 					alias := aliases[k]
 
-					result, err = session.Run("CREATE (n {value1: $value1, value2: $value2}) RETURN n.value1, n.value2", map[string]any{"value1": alias.aliased, "value2": alias.value})
+					result, err = session.Run(ctx, "CREATE (n {value1: $value1, value2: $value2}) RETURN n.value1, n.value2", map[string]any{"value1": alias.aliased, "value2": alias.value})
 					assertNil(t, err)
 
-					assertTrue(t, result.Next())
+					assertTrue(t, result.Next(ctx))
 					assertEquals(t, result.Record().Values[0], alias.aliased)
 					assertEquals(t, result.Record().Values[1], alias.value)
-					assertFalse(t, result.Next())
 					assertNil(t, result.Err())
 				})
 			}

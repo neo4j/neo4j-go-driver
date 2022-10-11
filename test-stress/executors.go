@@ -20,6 +20,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
@@ -61,30 +62,30 @@ func ExpectInt(a, b int) {
 	}
 }
 
-func newStressSession(driver neo4j.Driver, useBookmark bool, accessMode neo4j.AccessMode, ctx *TestContext) neo4j.Session {
-	var session neo4j.Session
+func newStressSession(ctx context.Context, driver neo4j.DriverWithContext, useBookmark bool, accessMode neo4j.AccessMode, testContext *TestContext) neo4j.SessionWithContext {
+	var session neo4j.SessionWithContext
 	if useBookmark {
-		session = driver.NewSession(neo4j.SessionConfig{
+		session = driver.NewSession(ctx, neo4j.SessionConfig{
 			AccessMode: accessMode,
-			Bookmarks:  ctx.getBookmarks(),
+			Bookmarks:  testContext.getBookmarks(),
 		})
 	} else {
-		session = driver.NewSession(neo4j.SessionConfig{AccessMode: accessMode})
+		session = driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: accessMode})
 	}
 	ExpectNotNil(session)
 	return session
 }
 
 // ReadQueryExecutor returns a new test executor which reads using Session.Run
-func ReadQueryExecutor(driver neo4j.Driver, useBookmark bool) func(ctx *TestContext) {
-	return func(ctx *TestContext) {
-		session := newStressSession(driver, useBookmark, neo4j.AccessModeRead, ctx)
-		defer session.Close()
+func ReadQueryExecutor(ctx context.Context, driver neo4j.DriverWithContext, useBookmark bool) func(*TestContext) {
+	return func(testContext *TestContext) {
+		session := newStressSession(ctx, driver, useBookmark, neo4j.AccessModeRead, testContext)
+		defer session.Close(ctx)
 
-		result, err := session.Run("MATCH (n) RETURN n LIMIT 1", nil)
+		result, err := session.Run(ctx, "MATCH (n) RETURN n LIMIT 1", nil)
 		ExpectNoError(err)
 
-		if result.Next() {
+		if result.Next(ctx) {
 			nodeInt := result.Record().Values[0]
 			ExpectNotNil(nodeInt)
 
@@ -92,30 +93,30 @@ func ReadQueryExecutor(driver neo4j.Driver, useBookmark bool) func(ctx *TestCont
 			ExpectTrue(ok)
 		}
 		ExpectNil(result.Err())
-		ExpectFalse(result.Next())
+		ExpectFalse(result.Next(ctx))
 
-		summary, err := result.Consume()
+		summary, err := result.Consume(ctx)
 		ExpectNoError(err)
 		ExpectNotNil(summary)
 
-		ctx.processSummary(summary)
+		testContext.processSummary(summary)
 	}
 }
 
 // ReadQueryInTxExecutor returns a new test executor which reads using Transaction.Run
-func ReadQueryInTxExecutor(driver neo4j.Driver, useBookmark bool) func(ctx *TestContext) {
-	return func(ctx *TestContext) {
-		session := newStressSession(driver, useBookmark, neo4j.AccessModeRead, ctx)
-		defer session.Close()
+func ReadQueryInTxExecutor(ctx context.Context, driver neo4j.DriverWithContext, useBookmark bool) func(*TestContext) {
+	return func(testContext *TestContext) {
+		session := newStressSession(ctx, driver, useBookmark, neo4j.AccessModeRead, testContext)
+		defer session.Close(ctx)
 
-		tx, err := session.BeginTransaction()
+		tx, err := session.BeginTransaction(ctx)
 		ExpectNoError(err)
-		defer tx.Close()
+		defer tx.Close(ctx)
 
-		result, err := tx.Run("MATCH (n) RETURN n LIMIT 1", nil)
+		result, err := tx.Run(ctx, "MATCH (n) RETURN n LIMIT 1", nil)
 		ExpectNoError(err)
 
-		if result.Next() {
+		if result.Next(ctx) {
 			nodeInt := result.Record().Values[0]
 			ExpectNotNil(nodeInt)
 
@@ -123,32 +124,32 @@ func ReadQueryInTxExecutor(driver neo4j.Driver, useBookmark bool) func(ctx *Test
 			ExpectTrue(ok)
 		}
 		ExpectNil(result.Err())
-		ExpectFalse(result.Next())
+		ExpectFalse(result.Next(ctx))
 
-		summary, err := result.Consume()
+		summary, err := result.Consume(ctx)
 		ExpectNoError(err)
 		ExpectNotNil(summary)
 
-		err = tx.Commit()
+		err = tx.Commit(ctx)
 		ExpectNoError(err)
 
-		ctx.processSummary(summary)
+		testContext.processSummary(summary)
 	}
 }
 
 // ReadQueryWithReadTransactionExecutor returns a new test executor which reads using Session.ExecuteRead
-func ReadQueryWithReadTransactionExecutor(driver neo4j.Driver, useBookmark bool) func(ctx *TestContext) {
-	return func(ctx *TestContext) {
-		session := newStressSession(driver, useBookmark, neo4j.AccessModeRead, ctx)
-		defer session.Close()
+func ReadQueryWithReadTransactionExecutor(ctx context.Context, driver neo4j.DriverWithContext, useBookmark bool) func(*TestContext) {
+	return func(testContext *TestContext) {
+		session := newStressSession(ctx, driver, useBookmark, neo4j.AccessModeRead, testContext)
+		defer session.Close(ctx)
 
-		summary, err := session.ReadTransaction(func(tx neo4j.Transaction) (any, error) {
-			result, err := tx.Run("MATCH (n) RETURN n LIMIT 1", nil)
+		summary, err := session.ExecuteRead(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+			result, err := tx.Run(ctx, "MATCH (n) RETURN n LIMIT 1", nil)
 			if err != nil {
 				return nil, err
 			}
 
-			if result.Next() {
+			if result.Next(ctx) {
 				nodeInt := result.Record().Values[0]
 				ExpectNotNil(nodeInt)
 
@@ -156,157 +157,155 @@ func ReadQueryWithReadTransactionExecutor(driver neo4j.Driver, useBookmark bool)
 				ExpectTrue(ok)
 			}
 
-			return result.Consume()
+			return result.Consume(ctx)
 		})
 
 		ExpectNoError(err)
 		ExpectNotNil(summary)
 
-		ctx.processSummary(summary.(neo4j.ResultSummary))
+		testContext.processSummary(summary.(neo4j.ResultSummary))
 	}
 }
 
 // WriteQueryExecutor returns a new test executor which writes using Session.Run
-func WriteQueryExecutor(driver neo4j.Driver, useBookmark bool) func(ctx *TestContext) {
-	return func(ctx *TestContext) {
-		session := newStressSession(driver, useBookmark, neo4j.AccessModeWrite, ctx)
-		defer session.Close()
+func WriteQueryExecutor(ctx context.Context, driver neo4j.DriverWithContext, useBookmark bool) func(*TestContext) {
+	return func(testContext *TestContext) {
+		session := newStressSession(ctx, driver, useBookmark, neo4j.AccessModeWrite, testContext)
+		defer session.Close(ctx)
 
-		result, err := session.Run("CREATE ()", nil)
+		result, err := session.Run(ctx, "CREATE ()", nil)
 		ExpectNoError(err)
 
-		summary, err := result.Consume()
+		summary, err := result.Consume(ctx)
 		ExpectNoError(err)
 		ExpectInt(summary.Counters().NodesCreated(), 1)
 
-		ctx.setBookmarks(session.LastBookmarks())
+		testContext.setBookmarks(session.LastBookmarks())
 
-		ctx.addCreated()
+		testContext.addCreated()
 	}
 }
 
 // WriteQueryInTxExecutor returns a new test executor which writes using Transaction.Run
-func WriteQueryInTxExecutor(driver neo4j.Driver, useBookmark bool) func(ctx *TestContext) {
-	return func(ctx *TestContext) {
-		session := newStressSession(driver, useBookmark, neo4j.AccessModeWrite, ctx)
-		defer session.Close()
+func WriteQueryInTxExecutor(ctx context.Context, driver neo4j.DriverWithContext, useBookmark bool) func(*TestContext) {
+	return func(testContext *TestContext) {
+		session := newStressSession(ctx, driver, useBookmark, neo4j.AccessModeWrite, testContext)
+		defer session.Close(ctx)
 
-		tx, err := session.BeginTransaction()
+		tx, err := session.BeginTransaction(ctx)
 		ExpectNoError(err)
-		defer tx.Close()
+		defer tx.Close(ctx)
 
-		result, err := tx.Run("CREATE ()", nil)
+		result, err := tx.Run(ctx, "CREATE ()", nil)
 		ExpectNoError(err)
 
-		summary, err := result.Consume()
+		summary, err := result.Consume(ctx)
 		ExpectNoError(err)
 		ExpectInt(summary.Counters().NodesCreated(), 1)
 
-		err = tx.Commit()
+		err = tx.Commit(ctx)
 		ExpectNoError(err)
 
-		ctx.setBookmarks(session.LastBookmarks())
+		testContext.setBookmarks(session.LastBookmarks())
 
-		ctx.addCreated()
+		testContext.addCreated()
 	}
 }
 
 // WriteQueryWithWriteTransactionExecutor returns a new test executor which writes using Session.ExecuteWrite
-func WriteQueryWithWriteTransactionExecutor(driver neo4j.Driver, useBookmark bool) func(ctx *TestContext) {
-	return func(ctx *TestContext) {
-		session := newStressSession(driver, useBookmark, neo4j.AccessModeWrite, ctx)
-		defer session.Close()
+func WriteQueryWithWriteTransactionExecutor(ctx context.Context, driver neo4j.DriverWithContext, useBookmark bool) func(*TestContext) {
+	return func(testContext *TestContext) {
+		session := newStressSession(ctx, driver, useBookmark, neo4j.AccessModeWrite, testContext)
+		defer session.Close(ctx)
 
-		summary, err := session.WriteTransaction(func(tx neo4j.Transaction) (any, error) {
-			result, err := tx.Run("CREATE ()", nil)
+		summary, err := session.ExecuteWrite(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+			result, err := tx.Run(ctx, "CREATE ()", nil)
 			if err != nil {
 				return nil, err
 			}
-			return result.Consume()
+			return result.Consume(ctx)
 		})
 		ExpectNoError(err)
 		ExpectNotNil(summary)
 		ExpectInt(summary.(neo4j.ResultSummary).Counters().NodesCreated(), 1)
-		ctx.setBookmarks(session.LastBookmarks())
-		ctx.addCreated()
+		testContext.setBookmarks(session.LastBookmarks())
+		testContext.addCreated()
 	}
 }
 
-// WriteQueryInReadSessionExecutor returns a new test executor which tries writes using Session.Run with read access mode
-func WriteQueryInReadSessionExecutor(driver neo4j.Driver, useBookmark bool) func(ctx *TestContext) {
-	return func(ctx *TestContext) {
-		session := newStressSession(driver, useBookmark, neo4j.AccessModeRead, ctx)
-		defer session.Close()
+// WriteQueryInReadSessionExecutor returns a new test executor which tries to perform writes using Session.Run with read access mode
+func WriteQueryInReadSessionExecutor(ctx context.Context, driver neo4j.DriverWithContext, useBookmark bool) func(*TestContext) {
+	return func(testContext *TestContext) {
+		session := newStressSession(ctx, driver, useBookmark, neo4j.AccessModeRead, testContext)
+		defer session.Close(ctx)
 
-		_, err := session.Run("CREATE ()", nil)
+		_, err := session.Run(ctx, "CREATE ()", nil)
 		ExpectNotNil(err)
 	}
 }
 
 // WriteQueryInTxInReadSessionExecutor returns a new test executor which tries writes using Transaction.Run with read access mode
-func WriteQueryInTxInReadSessionExecutor(driver neo4j.Driver, useBookmark bool) func(ctx *TestContext) {
-	return func(ctx *TestContext) {
-		session := newStressSession(driver, useBookmark, neo4j.AccessModeRead, ctx)
-		defer session.Close()
+func WriteQueryInTxInReadSessionExecutor(ctx context.Context, driver neo4j.DriverWithContext, useBookmark bool) func(*TestContext) {
+	return func(testContext *TestContext) {
+		session := newStressSession(ctx, driver, useBookmark, neo4j.AccessModeRead, testContext)
+		defer session.Close(ctx)
 
-		tx, err := session.BeginTransaction()
+		tx, err := session.BeginTransaction(ctx)
 		ExpectNoError(err)
-		defer tx.Close()
+		defer tx.Close(ctx)
 
-		_, err = tx.Run("CREATE ()", nil)
+		_, err = tx.Run(ctx, "CREATE ()", nil)
 		ExpectNotNil(err)
 	}
 }
 
 // FailingQueryExecutor returns a new test executor which fails in streaming using Session.Run
-func FailingQueryExecutor(driver neo4j.Driver, useBookmark bool) func(ctx *TestContext) {
-	return func(ctx *TestContext) {
-		session := newStressSession(driver, useBookmark, neo4j.AccessModeRead, ctx)
-		defer session.Close()
+func FailingQueryExecutor(ctx context.Context, driver neo4j.DriverWithContext, useBookmark bool) func(*TestContext) {
+	return func(testContext *TestContext) {
+		session := newStressSession(ctx, driver, useBookmark, neo4j.AccessModeRead, testContext)
+		defer session.Close(ctx)
 
-		result, err := session.Run("UNWIND [10, 5, 0] AS x RETURN 10 / x", nil)
+		result, err := session.Run(ctx, "UNWIND [10, 5, 0] AS x RETURN 10 / x", nil)
 		ExpectNoError(err)
 
-		summary, err := result.Consume()
+		summary, err := result.Consume(ctx)
 		ExpectNotNil(err)
-		//Expect(err).To(BeArithmeticError())
 		ExpectNil(summary)
 	}
 }
 
 // FailingQueryInTxExecutor returns a new test executor which fails in streaming using Transaction.Run
-func FailingQueryInTxExecutor(driver neo4j.Driver, useBookmark bool) func(ctx *TestContext) {
-	return func(ctx *TestContext) {
-		session := newStressSession(driver, useBookmark, neo4j.AccessModeRead, ctx)
-		defer session.Close()
+func FailingQueryInTxExecutor(ctx context.Context, driver neo4j.DriverWithContext, useBookmark bool) func(*TestContext) {
+	return func(testContext *TestContext) {
+		session := newStressSession(ctx, driver, useBookmark, neo4j.AccessModeRead, testContext)
+		defer session.Close(ctx)
 
-		tx, err := session.BeginTransaction()
+		tx, err := session.BeginTransaction(ctx)
 		ExpectNoError(err)
-		defer tx.Close()
+		defer tx.Close(ctx)
 
-		result, err := tx.Run("UNWIND [10, 5, 0] AS x RETURN 10 / x", nil)
+		result, err := tx.Run(ctx, "UNWIND [10, 5, 0] AS x RETURN 10 / x", nil)
 		ExpectNoError(err)
 
-		summary, err := result.Consume()
+		summary, err := result.Consume(ctx)
 		ExpectNotNil(err)
-		//Expect(err).To(BeArithmeticError())
 		ExpectNil(summary)
 	}
 }
 
 // FailingQueryWithReadTransactionExecutor returns a new test executor which fails in streaming using Session.ExecuteRead
-func FailingQueryWithReadTransactionExecutor(driver neo4j.Driver, useBookmark bool) func(ctx *TestContext) {
-	return func(ctx *TestContext) {
-		session := newStressSession(driver, useBookmark, neo4j.AccessModeRead, ctx)
-		defer session.Close()
+func FailingQueryWithReadTransactionExecutor(ctx context.Context, driver neo4j.DriverWithContext, useBookmark bool) func(*TestContext) {
+	return func(testContext *TestContext) {
+		session := newStressSession(ctx, driver, useBookmark, neo4j.AccessModeRead, testContext)
+		defer session.Close(ctx)
 
-		summary, err := session.ReadTransaction(func(tx neo4j.Transaction) (any, error) {
-			result, err := tx.Run("UNWIND [10, 5, 0] AS x RETURN 10 / x", nil)
+		summary, err := session.ExecuteRead(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+			result, err := tx.Run(ctx, "UNWIND [10, 5, 0] AS x RETURN 10 / x", nil)
 			if err != nil {
 				return nil, err
 			}
 
-			return result.Consume()
+			return result.Consume(ctx)
 		})
 		if !neo4j.IsNeo4jError(err) {
 			panic(err)
@@ -317,18 +316,18 @@ func FailingQueryWithReadTransactionExecutor(driver neo4j.Driver, useBookmark bo
 }
 
 // FailingQueryWithWriteTransactionExecutor returns a new test executor which fails in streaming using Session.ExecuteWrite
-func FailingQueryWithWriteTransactionExecutor(driver neo4j.Driver, useBookmark bool) func(ctx *TestContext) {
-	return func(ctx *TestContext) {
-		session := newStressSession(driver, useBookmark, neo4j.AccessModeRead, ctx)
-		defer session.Close()
+func FailingQueryWithWriteTransactionExecutor(ctx context.Context, driver neo4j.DriverWithContext, useBookmark bool) func(*TestContext) {
+	return func(testContext *TestContext) {
+		session := newStressSession(ctx, driver, useBookmark, neo4j.AccessModeRead, testContext)
+		defer session.Close(ctx)
 
-		summary, err := session.WriteTransaction(func(tx neo4j.Transaction) (any, error) {
-			result, err := tx.Run("UNWIND [10, 5, 0] AS x RETURN 10 / x", nil)
+		summary, err := session.ExecuteWrite(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+			result, err := tx.Run(ctx, "UNWIND [10, 5, 0] AS x RETURN 10 / x", nil)
 			if err != nil {
 				return nil, err
 			}
 
-			return result.Consume()
+			return result.Consume(ctx)
 		})
 
 		if !neo4j.IsNeo4jError(err) {
@@ -340,27 +339,27 @@ func FailingQueryWithWriteTransactionExecutor(driver neo4j.Driver, useBookmark b
 }
 
 // WrongQueryExecutor returns a new test executor which fails using Session.Run
-func WrongQueryExecutor(driver neo4j.Driver) func(ctx *TestContext) {
-	return func(ctx *TestContext) {
-		session := newStressSession(driver, false, neo4j.AccessModeRead, ctx)
-		defer session.Close()
+func WrongQueryExecutor(ctx context.Context, driver neo4j.DriverWithContext) func(*TestContext) {
+	return func(testContext *TestContext) {
+		session := newStressSession(ctx, driver, false, neo4j.AccessModeRead, testContext)
+		defer session.Close(ctx)
 
-		_, err := session.Run("RETURN wrongThing", nil)
+		_, err := session.Run(ctx, "RETURN wrongThing", nil)
 		ExpectNotNil(err)
 	}
 }
 
 // WrongQueryInTxExecutor returns a new test executor which fails using Transaction.Run
-func WrongQueryInTxExecutor(driver neo4j.Driver) func(ctx *TestContext) {
-	return func(ctx *TestContext) {
-		session := newStressSession(driver, false, neo4j.AccessModeWrite, ctx)
-		defer session.Close()
+func WrongQueryInTxExecutor(ctx context.Context, driver neo4j.DriverWithContext) func(*TestContext) {
+	return func(testContext *TestContext) {
+		session := newStressSession(ctx, driver, false, neo4j.AccessModeWrite, testContext)
+		defer session.Close(ctx)
 
-		tx, err := session.BeginTransaction()
+		tx, err := session.BeginTransaction(ctx)
 		ExpectNoError(err)
-		defer tx.Close()
+		defer tx.Close(ctx)
 
-		_, err = tx.Run("RETURN wrongThing", nil)
+		_, err = tx.Run(ctx, "RETURN wrongThing", nil)
 		ExpectNotNil(err)
 	}
 }

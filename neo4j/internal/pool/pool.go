@@ -25,7 +25,6 @@ package pool
 import (
 	"container/list"
 	"context"
-	"errors"
 	"fmt"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/bolt"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
@@ -246,7 +245,7 @@ func (p *Pool) Borrow(ctx context.Context, serverNames []string, wait bool, bolt
 	if !anyConnection {
 		p.log.Warnf(log.Pool, p.logId, "No server connection available to any of %v", serverNames)
 		if err == nil {
-			err = errors.New(fmt.Sprintf("No server connection available to any of %v", serverNames))
+			err = fmt.Errorf("no server connection available to any of %v", serverNames)
 		}
 		// Intentionally return last error from last connection attempt to make it easier to
 		// see connection errors for users.

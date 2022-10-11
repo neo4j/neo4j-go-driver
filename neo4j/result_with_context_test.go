@@ -31,11 +31,10 @@ import (
 )
 
 type iter struct {
-	expectNext   bool
-	expectRec    *db.Record
-	expectSum    *db.Summary
-	expectSumErr error
-	expectErr    error
+	expectNext bool
+	expectRec  *db.Record
+	expectSum  *db.Summary
+	expectErr  error
 }
 
 func TestResult(outer *testing.T) {

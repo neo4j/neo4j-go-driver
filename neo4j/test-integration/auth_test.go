@@ -20,6 +20,7 @@
 package test_integration
 
 import (
+	"context"
 	"testing"
 
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
@@ -30,24 +31,26 @@ func TestAuthentication(outer *testing.T) {
 	if testing.Short() {
 		outer.Skip()
 	}
-	server := dbserver.GetDbServer()
 
-	getDriverAndSession := func(token neo4j.AuthToken) (neo4j.Driver, neo4j.Session) {
-		driver, err := neo4j.NewDriver(server.URI(), token, server.ConfigFunc())
+	ctx := context.Background()
+	server := dbserver.GetDbServer(ctx)
+
+	getDriverAndSession := func(ctx context.Context, token neo4j.AuthToken) (neo4j.DriverWithContext, neo4j.SessionWithContext) {
+		driver, err := neo4j.NewDriverWithContext(server.URI(), token, server.ConfigFunc())
 		if err != nil {
 			panic(err)
 		}
 
-		return driver, driver.NewSession(neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead})
+		return driver, driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead})
 	}
 
 	outer.Run("when wrong credentials are provided, it should fail with authentication error", func(t *testing.T) {
 		token := neo4j.BasicAuth("wrong", "wrong", "")
-		driver, session := getDriverAndSession(token)
-		defer driver.Close()
-		defer session.Close()
+		driver, session := getDriverAndSession(ctx, token)
+		defer driver.Close(ctx)
+		defer session.Close(ctx)
 
-		_, err := session.Run("RETURN 1", nil)
+		_, err := session.Run(ctx, "RETURN 1", nil)
 		if err == nil {
 			t.Fatal("Should NOT be able to connect")
 		}

@@ -541,7 +541,7 @@ func TestPackStream(ot *testing.T) {
 
 	for _, c := range cases {
 		ot.Run(fmt.Sprintf("Packing of %s", c.name), func(t *testing.T) {
-			buf := []byte{}
+			var buf = []byte{}
 			p := Packer{}
 			p.Begin([]byte{})
 			pack(&p, c.value)

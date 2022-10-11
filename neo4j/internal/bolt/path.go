@@ -70,9 +70,11 @@ func buildPath(nodes []dbtype.Node, relNodes []*relNode, indexes []int) dbtype.P
 			Props:     reln.props,
 		}
 		if n1start {
+			//lint:ignore SA1019 Id, StartId and EndId are supported at least until 6.0
 			rel.StartId, rel.EndId = n1.Id, n2.Id
 			rel.StartElementId, rel.EndElementId = n1.ElementId, n2.ElementId
 		} else {
+			//lint:ignore SA1019 Id, StartId and EndId are supported at least until 6.0
 			rel.StartId, rel.EndId = n2.Id, n1.Id
 			rel.StartElementId, rel.EndElementId = n2.ElementId, n1.ElementId
 		}

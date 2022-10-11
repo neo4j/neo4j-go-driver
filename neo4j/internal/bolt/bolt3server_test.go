@@ -149,13 +149,6 @@ func (s *bolt3server) acceptVersion(ver byte) {
 	}
 }
 
-func (s *bolt3server) rejectVersions() {
-	_, err := s.conn.Write([]byte{0x00, 0x00, 0x00, 0x00})
-	if err != nil {
-		panic(err)
-	}
-}
-
 func (s *bolt3server) closeConnection() {
 	s.conn.Close()
 }
@@ -227,7 +220,7 @@ func setupBolt3Pipe(t *testing.T) (net.Conn, *bolt3server, func()) {
 	}
 
 	addr := l.Addr()
-	clientConn, err := net.Dial(addr.Network(), addr.String())
+	clientConn, _ := net.Dial(addr.Network(), addr.String())
 
 	srvConn, err := l.Accept()
 	if err != nil {

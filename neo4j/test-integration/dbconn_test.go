@@ -38,9 +38,9 @@ import (
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/test-integration/dbserver"
 )
 
-func makeRawConnection(logger log.Logger, boltLogger log.BoltLogger) (
+func makeRawConnection(ctx context.Context, logger log.Logger, boltLogger log.BoltLogger) (
 	dbserver.DbServer, idb.Connection) {
-	server := dbserver.GetDbServer()
+	server := dbserver.GetDbServer(ctx)
 	uri := server.BoltURI()
 	parsedUri, err := url.Parse(uri)
 	if err != nil {
@@ -66,7 +66,8 @@ func makeRawConnection(logger log.Logger, boltLogger log.BoltLogger) (
 }
 
 func BenchmarkQuery(b *testing.B) {
-	_, conn := makeRawConnection(&log.Console{Debugs: true, Errors: true, Infos: true, Warns: true}, nil)
+	ctx := context.Background()
+	_, conn := makeRawConnection(ctx, &log.Console{Debugs: true, Errors: true, Infos: true, Warns: true}, nil)
 	defer conn.Close(context.Background())
 	params := map[string]any{
 		"one": 1,
@@ -91,7 +92,8 @@ func TestConnectionConformance(outer *testing.T) {
 	if testing.Short() {
 		outer.Skip()
 	}
-	server, boltConn := makeRawConnection(&log.Console{Errors: true, Infos: true, Warns: true, Debugs: true}, nil)
+	ctx := context.Background()
+	server, boltConn := makeRawConnection(ctx, &log.Console{Errors: true, Infos: true, Warns: true, Debugs: true}, nil)
 	defer boltConn.Close(context.Background())
 
 	randInt := func() int64 {
@@ -175,13 +177,13 @@ func TestConnectionConformance(outer *testing.T) {
 						Timeout: 10 * time.Minute})
 				AssertNoError(t, err)
 				r := randInt()
-				s, err := c.RunTx(context.Background(), txHandle,
+				_, err = c.RunTx(context.Background(), txHandle,
 					idb.Command{Cypher: "CREATE (n:Rand {val: $r}) RETURN n", Params: map[string]any{"r": r}})
 				AssertNoError(t, err)
 				err = c.TxCommit(context.Background(), txHandle)
 				AssertNoError(t, err)
-				// Make sure it's commited
-				s, err = c.Run(context.Background(),
+				// Make sure it's committed
+				s, err := c.Run(context.Background(),
 					idb.Command{Cypher: "MATCH (n:Rand {val: $r}) RETURN n",
 						Params: map[string]any{"r": r}},
 					idb.TxConfig{Mode: idb.ReadMode})
@@ -228,13 +230,13 @@ func TestConnectionConformance(outer *testing.T) {
 						Timeout: 10 * time.Minute})
 				AssertNoError(t, err)
 				r := randInt()
-				s, err := c.RunTx(context.Background(), txHandle,
+				_, err = c.RunTx(context.Background(), txHandle,
 					idb.Command{Cypher: "CREATE (n:Rand {val: $r}) RETURN n", Params: map[string]any{"r": r}})
 				AssertNoError(t, err)
 				err = c.TxRollback(context.Background(), txHandle)
 				AssertNoError(t, err)
 				// Make sure it's committed
-				s, err = c.Run(context.Background(),
+				s, err := c.Run(context.Background(),
 					idb.Command{Cypher: "MATCH (n:Rand {val: $r}) RETURN n",
 						Params: map[string]any{"r": r}},
 					idb.TxConfig{Mode: idb.ReadMode})
@@ -409,9 +411,9 @@ func TestConnectionConformance(outer *testing.T) {
 		{
 			name: "Set connection in transaction mode",
 			fun: func(t *testing.T, c idb.Connection) {
-				tx, err := c.TxBegin(context.Background(),
+				tx, _ := c.TxBegin(context.Background(),
 					idb.TxConfig{Mode: idb.WriteMode})
-				_, err = c.RunTx(context.Background(), tx,
+				_, err := c.RunTx(context.Background(), tx,
 					idb.Command{Cypher: "UNWIND [1] AS n RETURN n"})
 				AssertNoError(t, err)
 			},
@@ -431,9 +433,9 @@ func TestConnectionConformance(outer *testing.T) {
 		{
 			name: "Streaming big stream",
 			fun: func(t *testing.T, c idb.Connection) {
-				tx, err := c.TxBegin(context.Background(),
+				tx, _ := c.TxBegin(context.Background(),
 					idb.TxConfig{Mode: idb.WriteMode})
-				_, err = c.RunTx(context.Background(), tx,
+				_, err := c.RunTx(context.Background(), tx,
 					idb.Command{Cypher: "UNWIND RANGE (0, 1000000) AS n RETURN n"})
 				AssertNoError(t, err)
 				_, err = c.RunTx(context.Background(), tx,

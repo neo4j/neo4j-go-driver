@@ -20,9 +20,9 @@
 package test_integration
 
 import (
+	"context"
 	"crypto/rand"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/dbtype"
-	"io"
 	"math"
 	"math/big"
 	"reflect"
@@ -32,7 +32,6 @@ import (
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/test-integration/dbserver"
 
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/db"
 )
 
 // Not the best place for this...
@@ -43,9 +42,13 @@ var (
 	V42  = dbserver.VersionOf("4.2.0")
 )
 
-func assertCloses(t *testing.T, closer io.Closer) {
+type contextCloser interface {
+	Close(ctx context.Context) error
+}
+
+func assertCloses(ctx context.Context, t *testing.T, closer contextCloser) {
 	t.Helper()
-	assertNil(t, closer.Close())
+	assertNil(t, closer.Close(ctx))
 }
 
 func assertAssignableToTypeOf(t *testing.T, x, y any) {
@@ -202,27 +205,6 @@ func assertStringContains(t *testing.T, s, sub string) {
 	}
 }
 
-func assertDbRecord(t *testing.T, rec *db.Record, sum *db.Summary, err error) {
-	t.Helper()
-	if rec == nil || err != nil || sum != nil {
-		t.Fatalf("Should only be a record, %+v, %+v, %+v", rec, sum, err)
-	}
-}
-
-func assertDbSummary(t *testing.T, rec *db.Record, sum *db.Summary, err error) {
-	t.Helper()
-	if rec != nil || err != nil || sum == nil {
-		t.Fatalf("Should only be a summary, %+v, %+v, %+v", rec, sum, err)
-	}
-}
-
-func assertDbError(t *testing.T, rec *db.Record, sum *db.Summary, err error) {
-	t.Helper()
-	if rec != nil || err == nil || sum != nil {
-		t.Fatalf("Should only be an error, %+v, %+v, %+v", rec, sum, err)
-	}
-}
-
 func assertMapHas(t *testing.T, m map[string]any, k string, v any) {
 	t.Helper()
 	value, found := m[k]
@@ -239,13 +221,13 @@ func randomInt() int64 {
 	return bid.Int64()
 }
 
-func createRandomNode(t *testing.T, sess neo4j.Session) int64 {
-	nodex, err := sess.WriteTransaction(func(tx neo4j.Transaction) (any, error) {
-		res, err := tx.Run("CREATE (n:RandomNode{val: $r}) RETURN n", map[string]any{"r": randomInt()})
+func createRandomNode(ctx context.Context, t *testing.T, sess neo4j.SessionWithContext) int64 {
+	nodex, err := sess.ExecuteWrite(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+		res, err := tx.Run(ctx, "CREATE (n:RandomNode{val: $r}) RETURN n", map[string]any{"r": randomInt()})
 		if err != nil {
 			return nil, err
 		}
-		res.Next()
+		res.Next(ctx)
 		return res.Record().Values[0], nil
 	})
 	if err != nil {
@@ -255,13 +237,13 @@ func createRandomNode(t *testing.T, sess neo4j.Session) int64 {
 	return node.Props["val"].(int64)
 }
 
-func findRandomNode(t *testing.T, sess neo4j.Session, randomId int64) *neo4j.Node {
-	nodex, err := sess.ReadTransaction(func(tx neo4j.Transaction) (any, error) {
-		res, err := tx.Run("MATCH (n:RandomNode{val: $r}) RETURN n", map[string]any{"r": randomId})
+func findRandomNode(ctx context.Context, t *testing.T, sess neo4j.SessionWithContext, randomId int64) *neo4j.Node {
+	nodex, err := sess.ExecuteRead(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+		res, err := tx.Run(ctx, "MATCH (n:RandomNode{val: $r}) RETURN n", map[string]any{"r": randomId})
 		if err != nil {
 			return nil, err
 		}
-		if !res.Next() {
+		if !res.Next(ctx) {
 			return nil, nil
 		}
 		return res.Record().Values[0], nil
@@ -276,38 +258,18 @@ func findRandomNode(t *testing.T, sess neo4j.Session, randomId int64) *neo4j.Nod
 	return &node
 }
 
-func assertRandomNode(t *testing.T, sess neo4j.Session, randomId int64) {
-	node := findRandomNode(t, sess, randomId)
+func assertRandomNode(ctx context.Context, t *testing.T, sess neo4j.SessionWithContext, randomId int64) {
+	node := findRandomNode(ctx, t, sess, randomId)
 	if node == nil {
 		t.Error("Should have found random node but didn't")
 	}
 }
 
-func assertNoRandomNode(t *testing.T, sess neo4j.Session, randomId int64) {
-	node := findRandomNode(t, sess, randomId)
+func assertNoRandomNode(ctx context.Context, t *testing.T, sess neo4j.SessionWithContext, randomId int64) {
+	node := findRandomNode(ctx, t, sess, randomId)
 	if node != nil {
 		t.Error("Shouldn't find random node but did")
 	}
-}
-
-// Utility that executes Cypher and retrieves the expected single value from single record.
-func single(t *testing.T, driver neo4j.Driver, cypher string, params map[string]any) any {
-	t.Helper()
-	session := driver.NewSession(neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
-	defer session.Close()
-	result, err := session.Run(cypher, params)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !result.Next() {
-		t.Fatalf("No result or error retrieving result: %s", result.Err())
-	}
-	val := result.Record().Values[0]
-	_, err = result.Consume()
-	if err != nil {
-		t.Fatal(err)
-	}
-	return val
 }
 
 // from https://github.com/onsi/gomega

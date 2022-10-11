@@ -21,6 +21,7 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"math/rand"
@@ -90,8 +91,9 @@ func main() {
 	flag.BoolVar(&bigDataTest, "big", false, "Big data test")
 	flag.Parse()
 
+	ctx := context.Background()
 	auth := neo4j.BasicAuth(user, password, "")
-	driver, err := neo4j.NewDriver(uri, auth, func(conf *neo4j.Config) {
+	driver, err := neo4j.NewDriverWithContext(uri, auth, func(conf *neo4j.Config) {
 		conf.Log = neo4j.ConsoleLogger(neo4j.WARNING)
 	})
 	if err != nil {
@@ -99,64 +101,64 @@ func main() {
 	}
 
 	fmt.Println("Cleaning up database")
-	cleanDb(driver)
+	cleanDb(ctx, driver)
 
-	ctx := NewTestContext(driver)
+	testContext := NewTestContext(driver)
 
 	successfulQueryExecutors := []func(*TestContext){}
 	failingQueryExecutors := []func(*TestContext){}
 
 	if causalClustering {
 		successfulQueryExecutors = append(successfulQueryExecutors,
-			ReadQueryWithReadTransactionExecutor(driver, true),
-			ReadQueryWithReadTransactionExecutor(driver, false),
-			WriteQueryWithWriteTransactionExecutor(driver, true),
-			WriteQueryWithWriteTransactionExecutor(driver, false),
+			ReadQueryWithReadTransactionExecutor(ctx, driver, true),
+			ReadQueryWithReadTransactionExecutor(ctx, driver, false),
+			WriteQueryWithWriteTransactionExecutor(ctx, driver, true),
+			WriteQueryWithWriteTransactionExecutor(ctx, driver, false),
 		)
 		failingQueryExecutors = append(failingQueryExecutors,
-			FailingQueryWithReadTransactionExecutor(driver, true),
-			FailingQueryWithReadTransactionExecutor(driver, false),
-			FailingQueryWithWriteTransactionExecutor(driver, true),
-			FailingQueryWithWriteTransactionExecutor(driver, false),
-			WrongQueryExecutor(driver),
-			WriteQueryInReadSessionExecutor(driver, true),
-			WriteQueryInReadSessionExecutor(driver, false),
+			FailingQueryWithReadTransactionExecutor(ctx, driver, true),
+			FailingQueryWithReadTransactionExecutor(ctx, driver, false),
+			FailingQueryWithWriteTransactionExecutor(ctx, driver, true),
+			FailingQueryWithWriteTransactionExecutor(ctx, driver, false),
+			WrongQueryExecutor(ctx, driver),
+			WriteQueryInReadSessionExecutor(ctx, driver, true),
+			WriteQueryInReadSessionExecutor(ctx, driver, false),
 		)
 	} else {
 		successfulQueryExecutors = append(successfulQueryExecutors,
-			ReadQueryWithReadTransactionExecutor(driver, true),
-			ReadQueryWithReadTransactionExecutor(driver, false),
-			WriteQueryWithWriteTransactionExecutor(driver, true),
-			WriteQueryWithWriteTransactionExecutor(driver, false),
-			WriteQueryExecutor(driver, true),
-			WriteQueryExecutor(driver, false),
-			ReadQueryExecutor(driver, true),
-			ReadQueryExecutor(driver, false),
-			WriteQueryInTxExecutor(driver, true),
-			WriteQueryInTxExecutor(driver, false),
-			ReadQueryInTxExecutor(driver, true),
-			ReadQueryInTxExecutor(driver, false),
+			ReadQueryWithReadTransactionExecutor(ctx, driver, true),
+			ReadQueryWithReadTransactionExecutor(ctx, driver, false),
+			WriteQueryWithWriteTransactionExecutor(ctx, driver, true),
+			WriteQueryWithWriteTransactionExecutor(ctx, driver, false),
+			WriteQueryExecutor(ctx, driver, true),
+			WriteQueryExecutor(ctx, driver, false),
+			ReadQueryExecutor(ctx, driver, true),
+			ReadQueryExecutor(ctx, driver, false),
+			WriteQueryInTxExecutor(ctx, driver, true),
+			WriteQueryInTxExecutor(ctx, driver, false),
+			ReadQueryInTxExecutor(ctx, driver, true),
+			ReadQueryInTxExecutor(ctx, driver, false),
 		)
 		failingQueryExecutors = append(failingQueryExecutors,
-			FailingQueryWithReadTransactionExecutor(driver, true),
-			FailingQueryWithReadTransactionExecutor(driver, false),
-			FailingQueryWithWriteTransactionExecutor(driver, true),
-			FailingQueryWithWriteTransactionExecutor(driver, false),
-			WrongQueryExecutor(driver),
-			WrongQueryInTxExecutor(driver),
-			FailingQueryExecutor(driver, true),
-			FailingQueryExecutor(driver, false),
-			FailingQueryInTxExecutor(driver, true),
-			FailingQueryInTxExecutor(driver, false),
+			FailingQueryWithReadTransactionExecutor(ctx, driver, true),
+			FailingQueryWithReadTransactionExecutor(ctx, driver, false),
+			FailingQueryWithWriteTransactionExecutor(ctx, driver, true),
+			FailingQueryWithWriteTransactionExecutor(ctx, driver, false),
+			WrongQueryExecutor(ctx, driver),
+			WrongQueryInTxExecutor(ctx, driver),
+			FailingQueryExecutor(ctx, driver, true),
+			FailingQueryExecutor(ctx, driver, false),
+			FailingQueryInTxExecutor(ctx, driver, true),
+			FailingQueryInTxExecutor(ctx, driver, false),
 		)
 	}
 
 	if bigDataTest {
 		fmt.Println("Running big data test")
-		runBigDataThing(driver)
+		runBigDataThing(ctx, driver)
 	}
 
-	stressTest(ctx, time.Duration(seconds)*time.Second,
+	stressTest(testContext, time.Duration(seconds)*time.Second,
 		successfulQueryExecutors, failingQueryExecutors)
-	ctx.PrintStats()
+	testContext.PrintStats()
 }

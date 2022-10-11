@@ -165,34 +165,6 @@ func (s *bolt4server) waitForPullN(n int) {
 	}
 }
 
-func (s *bolt4server) waitForPullNandQid(n, qid int) {
-	msg := s.receiveMsg()
-	s.assertStructType(msg, msgPullN)
-	extra := msg.fields[0].(map[string]any)
-	sentN := int(extra["n"].(int64))
-	if sentN != n {
-		panic(fmt.Sprintf("Expected PULL n:%d but got PULL %d", n, sentN))
-	}
-	sentQid := int(extra["qid"].(int64))
-	if sentQid != qid {
-		panic(fmt.Sprintf("Expected PULL qid:%d but got PULL %d", qid, sentQid))
-	}
-}
-
-func (s *bolt4server) waitForDiscardNAndQid(n, qid int) {
-	msg := s.receiveMsg()
-	s.assertStructType(msg, msgDiscardN)
-	extra := msg.fields[0].(map[string]any)
-	sentN := int(extra["n"].(int64))
-	if sentN != n {
-		panic(fmt.Sprintf("Expected DISCARD n:%d but got DISCARD %d", n, sentN))
-	}
-	sentQid := int(extra["qid"].(int64))
-	if sentQid != qid {
-		panic(fmt.Sprintf("Expected DISCARD qid:%d but got DISCARD %d", qid, sentQid))
-	}
-}
-
 func (s *bolt4server) waitForDiscardN(n int) {
 	msg := s.receiveMsg()
 	s.assertStructType(msg, msgDiscardN)
@@ -323,7 +295,7 @@ func setupBolt4Pipe(t *testing.T) (net.Conn, *bolt4server, func()) {
 	}
 
 	addr := l.Addr()
-	clientConn, err := net.Dial(addr.Network(), addr.String())
+	clientConn, _ := net.Dial(addr.Network(), addr.String())
 
 	srvConn, err := l.Accept()
 	if err != nil {

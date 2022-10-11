@@ -22,7 +22,6 @@ package bolt
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/racing"
@@ -88,9 +87,9 @@ func Connect(ctx context.Context, serverName string, conn net.Conn, auth map[str
 	case 5:
 		boltConn = NewBolt5(serverName, conn, logger, boltLog)
 	case 0:
-		return nil, errors.New(fmt.Sprintf("Server did not accept any of the requested Bolt versions (%#v)", versions))
+		return nil, fmt.Errorf("server did not accept any of the requested Bolt versions (%#v)", versions)
 	default:
-		return nil, errors.New(fmt.Sprintf("Server responded with unsupported version %d.%d", major, minor))
+		return nil, fmt.Errorf("server responded with unsupported version %d.%d", major, minor)
 	}
 	if err = boltConn.Connect(ctx, int(minor), auth, userAgent, routingContext); err != nil {
 		return nil, err

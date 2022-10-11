@@ -51,7 +51,7 @@ type loggedSuccess struct {
 	TFirst       string              `json:"t_first,omitempty"`
 	Bookmark     string              `json:"bookmark,omitempty"`
 	TLast        string              `json:"t_last,omitempty"`
-	HasMore      bool                `json:"has_more,omitempy"`
+	HasMore      bool                `json:"has_more,omitempty"`
 	Db           string              `json:"db,omitempty"`
 	Qid          int64               `json:"qid,omitempty"`
 	ConfigHints  loggableDictionary  `json:"hints,omitempty"`

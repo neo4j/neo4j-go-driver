@@ -20,6 +20,7 @@
 package test_integration
 
 import (
+	"context"
 	"errors"
 	"testing"
 	"time"
@@ -33,21 +34,22 @@ func TestTransaction(outer *testing.T) {
 		outer.Skip()
 	}
 
-	server := dbserver.GetDbServer()
+	ctx := context.Background()
+	server := dbserver.GetDbServer(ctx)
 	var err error
-	var driver neo4j.Driver
-	var session neo4j.Session
-	var tx neo4j.Transaction
-	var result neo4j.Result
+	var driver neo4j.DriverWithContext
+	var session neo4j.SessionWithContext
+	var tx neo4j.ExplicitTransaction
+	var result neo4j.ResultWithContext
 
 	driver = server.Driver()
-	session = driver.NewSession(neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
+	session = driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
 
 	defer func() {
 		if session != nil {
-			session.Close()
+			session.Close(ctx)
 		}
-		driver.Close()
+		driver.Close(ctx)
 	}()
 
 	outer.Run("Retry Mechanism", func(inner *testing.T) {
@@ -55,7 +57,7 @@ func TestTransaction(outer *testing.T) {
 
 		inner.Run("should work on ExecuteWrite", func(t *testing.T) {
 			times := 0
-			_, err = session.WriteTransaction(func(transaction neo4j.Transaction) (any, error) {
+			_, err = session.ExecuteWrite(ctx, func(transaction neo4j.ManagedTransaction) (any, error) {
 				times++
 				time.Sleep(1 * time.Second)
 				return nil, transientError
@@ -67,7 +69,7 @@ func TestTransaction(outer *testing.T) {
 
 		inner.Run("should work on ExecuteRead", func(t *testing.T) {
 			times := 0
-			_, err = session.ReadTransaction(func(transaction neo4j.Transaction) (any, error) {
+			_, err = session.ExecuteRead(ctx, func(transaction neo4j.ManagedTransaction) (any, error) {
 				times++
 				time.Sleep(1 * time.Second)
 				return nil, transientError
@@ -79,16 +81,16 @@ func TestTransaction(outer *testing.T) {
 	})
 
 	outer.Run("should commit if work function doesn't return error", func(t *testing.T) {
-		createResult := writeTransactionWithIntWork(t, session, intReturningWork(t, "CREATE (n:Person1) RETURN count(n)", nil))
+		createResult := writeTransactionWithIntWork(ctx, t, session, intReturningWork(ctx, t, "CREATE (n:Person1) RETURN count(n)", nil))
 		assertEquals(t, createResult, 1)
 
-		matchResult := readTransactionWithIntWork(t, session, intReturningWork(t, "MATCH (n:Person1) RETURN count(n)", nil))
+		matchResult := readTransactionWithIntWork(ctx, t, session, intReturningWork(ctx, t, "MATCH (n:Person1) RETURN count(n)", nil))
 		assertEquals(t, matchResult, 1)
 	})
 
 	outer.Run("should rollback if work function returns error", func(t *testing.T) {
-		createWork := intReturningWork(t, "CREATE (n:Person2) RETURN count(n)", nil)
-		createResult, err := session.WriteTransaction(func(tx neo4j.Transaction) (any, error) {
+		createWork := intReturningWork(ctx, t, "CREATE (n:Person2) RETURN count(n)", nil)
+		createResult, err := session.ExecuteWrite(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
 			innerResult, err := createWork(tx)
 			assertNil(t, err)
 			assertEquals(t, innerResult, 1)
@@ -98,16 +100,16 @@ func TestTransaction(outer *testing.T) {
 		assertNotNil(t, err)
 		assertNil(t, createResult)
 
-		matchResult := readTransactionWithIntWork(t, session, intReturningWork(t, "MATCH (n:Person2) RETURN count(n)", nil))
+		matchResult := readTransactionWithIntWork(ctx, t, session, intReturningWork(ctx, t, "MATCH (n:Person2) RETURN count(n)", nil))
 		assertEquals(t, matchResult, 0)
 	})
 
 	outer.Run("should have keys available after run", func(t *testing.T) {
-		tx, err = session.BeginTransaction()
+		tx, err = session.BeginTransaction(ctx)
 		assertNil(t, err)
-		defer tx.Close()
+		defer tx.Close(ctx)
 
-		result, err = tx.Run("RETURN 1 AS N, 2 AS M", nil)
+		result, err = tx.Run(ctx, "RETURN 1 AS N, 2 AS M", nil)
 		assertNil(t, err)
 
 		keys, err := result.Keys()
@@ -116,18 +118,18 @@ func TestTransaction(outer *testing.T) {
 	})
 
 	outer.Run("should have keys available after run and consume", func(t *testing.T) {
-		tx, err = session.BeginTransaction()
+		tx, err = session.BeginTransaction(ctx)
 		assertNil(t, err)
-		defer tx.Close()
+		defer tx.Close(ctx)
 
-		result, err = tx.Run("RETURN 1 AS N, 2 AS M", nil)
+		result, err = tx.Run(ctx, "RETURN 1 AS N, 2 AS M", nil)
 		assertNil(t, err)
 
 		keys, err := result.Keys()
 		assertNil(t, err)
 		assertEquals(t, keys, []string{"N", "M"})
 
-		_, err = result.Consume()
+		_, err = result.Consume(ctx)
 		assertNil(t, err)
 
 		keys, err = result.Keys()
@@ -136,14 +138,14 @@ func TestTransaction(outer *testing.T) {
 	})
 
 	outer.Run("should have keys available for consecutive runs", func(t *testing.T) {
-		tx, err = session.BeginTransaction()
+		tx, err = session.BeginTransaction(ctx)
 		assertNil(t, err)
-		defer tx.Close()
+		defer tx.Close(ctx)
 
-		result1, err := tx.Run("RETURN 1 AS N, 2 AS M", nil)
+		result1, err := tx.Run(ctx, "RETURN 1 AS N, 2 AS M", nil)
 		assertNil(t, err)
 
-		result2, err := tx.Run("RETURN 1 AS X, 2 AS Y", nil)
+		result2, err := tx.Run(ctx, "RETURN 1 AS X, 2 AS Y", nil)
 		assertNil(t, err)
 
 		keys, err := result1.Keys()
@@ -156,19 +158,19 @@ func TestTransaction(outer *testing.T) {
 	})
 
 	outer.Run("should have keys available for consecutive runs and consumes", func(t *testing.T) {
-		tx, err = session.BeginTransaction()
+		tx, err = session.BeginTransaction(ctx)
 		assertNil(t, err)
-		defer tx.Close()
+		defer tx.Close(ctx)
 
-		result1, err := tx.Run("RETURN 1 AS N, 2 AS M", nil)
-		assertNil(t, err)
-
-		result2, err := tx.Run("RETURN 1 AS X, 2 AS Y", nil)
+		result1, err := tx.Run(ctx, "RETURN 1 AS N, 2 AS M", nil)
 		assertNil(t, err)
 
-		_, err = result1.Consume()
+		result2, err := tx.Run(ctx, "RETURN 1 AS X, 2 AS Y", nil)
 		assertNil(t, err)
-		_, err = result2.Consume()
+
+		_, err = result1.Consume(ctx)
+		assertNil(t, err)
+		_, err = result2.Consume(ctx)
 		assertNil(t, err)
 
 		keys, err := result1.Keys()
@@ -181,14 +183,14 @@ func TestTransaction(outer *testing.T) {
 	})
 
 	outer.Run("should have keys available for consecutive runs independent of order", func(t *testing.T) {
-		tx, err = session.BeginTransaction()
+		tx, err = session.BeginTransaction(ctx)
 		assertNil(t, err)
-		defer tx.Close()
+		defer tx.Close(ctx)
 
-		result1, err := tx.Run("RETURN 1 AS N, 2 AS M", nil)
+		result1, err := tx.Run(ctx, "RETURN 1 AS N, 2 AS M", nil)
 		assertNil(t, err)
 
-		result2, err := tx.Run("RETURN 1 AS X, 2 AS Y", nil)
+		result2, err := tx.Run(ctx, "RETURN 1 AS X, 2 AS Y", nil)
 		assertNil(t, err)
 
 		keys, err := result2.Keys()
@@ -202,19 +204,19 @@ func TestTransaction(outer *testing.T) {
 	})
 
 	outer.Run("should have keys available for consecutive runs and consumes independent of order", func(t *testing.T) {
-		tx, err = session.BeginTransaction()
+		tx, err = session.BeginTransaction(ctx)
 		assertNil(t, err)
-		defer tx.Close()
+		defer tx.Close(ctx)
 
-		result1, err := tx.Run("RETURN 1 AS N, 2 AS M", nil)
-		assertNil(t, err)
-
-		result2, err := tx.Run("RETURN 1 AS X, 2 AS Y", nil)
+		result1, err := tx.Run(ctx, "RETURN 1 AS N, 2 AS M", nil)
 		assertNil(t, err)
 
-		_, err = result1.Consume()
+		result2, err := tx.Run(ctx, "RETURN 1 AS X, 2 AS Y", nil)
 		assertNil(t, err)
-		_, err = result2.Consume()
+
+		_, err = result1.Consume(ctx)
+		assertNil(t, err)
+		_, err = result2.Consume(ctx)
 		assertNil(t, err)
 
 		keys, err := result2.Keys()
@@ -240,38 +242,38 @@ func TestTransaction(outer *testing.T) {
 				"m4": neo4j.LocalDateTimeOf(time.Now()),
 			}
 
-			tx, err = session.BeginTransaction(neo4j.WithTxMetadata(metadata))
+			tx, err = session.BeginTransaction(ctx, neo4j.WithTxMetadata(metadata))
 			assertNil(t, err)
-			defer tx.Close()
+			defer tx.Close(ctx)
 
-			number := transactionWithIntWork(t, tx, intReturningWork(t, "RETURN $x", map[string]any{"x": 1}))
+			number := transactionWithIntWork(t, tx, intReturningWork(ctx, t, "RETURN $x", map[string]any{"x": 1}))
 			assertEquals(t, number, 1)
 
 			if !server.IsEnterprise {
 				t.Skip("Can not list transactions on non-enterprise version")
 			}
 
-			session2 := driver.NewSession(neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead})
-			defer session2.Close()
-			matched, err := session2.ReadTransaction(listTransactionsAndMatchMetadataWork(server.Version, metadata))
+			session2 := driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead})
+			defer session2.Close(ctx)
+			matched, err := session2.ExecuteRead(ctx, listTransactionsAndMatchMetadataWork(ctx, server.Version, metadata))
 			assertNil(t, err)
 			assertTrue(t, matched.(bool))
 		})
 
 		inner.Run("should set transaction timeout", func(t *testing.T) {
-			createNode(t, session, "TxTimeOut", nil)
+			createNode(ctx, t, session, "TxTimeOut", nil)
 
-			session2, tx2 := newSessionAndTx(t, driver, neo4j.AccessModeWrite)
-			defer session2.Close()
-			defer tx2.Close()
+			session2, tx2 := newSessionAndTx(ctx, t, driver, neo4j.AccessModeWrite)
+			defer session2.Close(ctx)
+			defer tx2.Close(ctx)
 
-			updateNodeInTx(t, tx2, "TxTimeOut", map[string]any{"id": 1})
+			updateNodeInTx(ctx, t, tx2, "TxTimeOut", map[string]any{"id": 1})
 
-			session3, tx3 := newSessionAndTx(t, driver, neo4j.AccessModeWrite, neo4j.WithTxTimeout(1*time.Second))
-			defer session3.Close()
-			defer tx3.Close()
+			session3, tx3 := newSessionAndTx(ctx, t, driver, neo4j.AccessModeWrite, neo4j.WithTxTimeout(1*time.Second))
+			defer session3.Close(ctx)
+			defer tx3.Close(ctx)
 
-			_, err := updateNodeWork(t, "TxTimeOut", map[string]any{"id": 2})(tx3)
+			_, err := updateNodeWork(ctx, t, "TxTimeOut", map[string]any{"id": 2})(tx3)
 			assertNotNil(t, err)
 		})
 
@@ -283,12 +285,12 @@ func TestTransaction(outer *testing.T) {
 		}
 
 		t.Run("should fail when transaction timeout is set for Session.BeginTransaction", func(t *testing.T) {
-			_, err := session.BeginTransaction(neo4j.WithTxTimeout(1 * time.Second))
+			_, err := session.BeginTransaction(ctx, neo4j.WithTxTimeout(1*time.Second))
 			assertNotNil(t, err)
 		})
 
 		t.Run("should fail when transaction metadata is set for Session.BeginTransaction", func(t *testing.T) {
-			_, err := session.BeginTransaction(neo4j.WithTxMetadata(map[string]any{"x": 1}))
+			_, err := session.BeginTransaction(ctx, neo4j.WithTxMetadata(map[string]any{"x": 1}))
 			assertNotNil(t, err)
 		})
 	})

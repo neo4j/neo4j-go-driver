@@ -155,34 +155,6 @@ func (s *bolt5server) waitForPullN(n int) {
 	}
 }
 
-func (s *bolt5server) waitForPullNandQid(n, qid int) {
-	msg := s.receiveMsg()
-	s.assertStructType(msg, msgPullN)
-	extra := msg.fields[0].(map[string]any)
-	sentN := int(extra["n"].(int64))
-	if sentN != n {
-		panic(fmt.Sprintf("Expected PULL n:%d but got PULL %d", n, sentN))
-	}
-	sentQid := int(extra["qid"].(int64))
-	if sentQid != qid {
-		panic(fmt.Sprintf("Expected PULL qid:%d but got PULL %d", qid, sentQid))
-	}
-}
-
-func (s *bolt5server) waitForDiscardNAndQid(n, qid int) {
-	msg := s.receiveMsg()
-	s.assertStructType(msg, msgDiscardN)
-	extra := msg.fields[0].(map[string]any)
-	sentN := int(extra["n"].(int64))
-	if sentN != n {
-		panic(fmt.Sprintf("Expected DISCARD n:%d but got DISCARD %d", n, sentN))
-	}
-	sentQid := int(extra["qid"].(int64))
-	if sentQid != qid {
-		panic(fmt.Sprintf("Expected DISCARD qid:%d but got DISCARD %d", qid, sentQid))
-	}
-}
-
 func (s *bolt5server) waitForDiscardN(n int) {
 	msg := s.receiveMsg()
 	s.assertStructType(msg, msgDiscardN)
@@ -208,13 +180,6 @@ func (s *bolt5server) waitForRoute(assertRoute func(fields []any)) {
 func (s *bolt5server) acceptVersion(major, minor byte) {
 	acceptedVer := []byte{0x00, 0x00, minor, major}
 	_, err := s.conn.Write(acceptedVer)
-	if err != nil {
-		panic(err)
-	}
-}
-
-func (s *bolt5server) rejectVersions() {
-	_, err := s.conn.Write([]byte{0x00, 0x00, 0x00, 0x00})
 	if err != nil {
 		panic(err)
 	}
@@ -305,7 +270,7 @@ func setupBolt5Pipe(t *testing.T) (net.Conn, *bolt5server, func()) {
 	}
 
 	addr := l.Addr()
-	clientConn, err := net.Dial(addr.Network(), addr.String())
+	clientConn, _ := net.Dial(addr.Network(), addr.String())
 
 	srvConn, err := l.Accept()
 	if err != nil {
