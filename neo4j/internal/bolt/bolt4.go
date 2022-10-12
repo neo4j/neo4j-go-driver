@@ -222,7 +222,7 @@ func (b *bolt4) receiveSuccess(ctx context.Context) *success {
 		return nil
 	default:
 		// Unexpected message received
-		b.setError(errors.New("Expected success or database error"), true)
+		b.setError(errors.New("expected success or database error"), true)
 		return nil
 	}
 }
@@ -356,7 +356,7 @@ func (b *bolt4) assertState(allowed ...int) error {
 			return nil
 		}
 	}
-	err := errors.New(fmt.Sprintf("Invalid state %d, expected: %+v", b.state, allowed))
+	err := fmt.Errorf("invalid state %d, expected: %+v", b.state, allowed)
 	b.log.Error(log.Bolt4, b.logId, err)
 	return err
 }
@@ -818,7 +818,7 @@ func (b *bolt4) receiveNext(ctx context.Context) (*db.Record, bool, *db.Summary)
 		return nil, false, nil
 	default:
 		// Unknown territory
-		b.setError(errors.New("Unknown response"), true)
+		b.setError(errors.New("unknown response"), true)
 		return nil, false, nil
 	}
 }
@@ -968,14 +968,14 @@ func (b *bolt4) callGetRoutingTable(ctx context.Context,
 		return nil, err
 	}
 	if rec == nil {
-		return nil, errors.New("No routing table record")
+		return nil, errors.New("no routing table record")
 	}
 	// Just empty the stream, ignore the summary should leave the connection in ready state
 	b.Next(ctx, streamHandle)
 
 	table := parseRoutingTableRecord(rec)
 	if table == nil {
-		return nil, errors.New("Unable to parse routing table")
+		return nil, errors.New("unable to parse routing table")
 	}
 	// On this version we will not receive the database name
 	table.DatabaseName = database

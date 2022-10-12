@@ -20,6 +20,7 @@
 package test_integration
 
 import (
+	"context"
 	"testing"
 
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
@@ -30,15 +31,17 @@ func TestRouting(outer *testing.T) {
 	if testing.Short() {
 		outer.Skip()
 	}
-	server := dbserver.GetDbServer()
+	ctx := context.Background()
 
-	var session neo4j.Session
-	var result neo4j.Result
+	server := dbserver.GetDbServer(ctx)
+
+	var session neo4j.SessionWithContext
+	var result neo4j.ResultWithContext
 	var summary neo4j.ResultSummary
 	var err error
 
-	getDriver := func(address string) neo4j.Driver {
-		driver, err := neo4j.NewDriver(address, server.AuthToken(), server.ConfigFunc())
+	getDriver := func(address string) neo4j.DriverWithContext {
+		driver, err := neo4j.NewDriverWithContext(address, server.AuthToken(), server.ConfigFunc())
 		if err != nil {
 			panic(err.Error())
 		}
@@ -52,15 +55,15 @@ func TestRouting(outer *testing.T) {
 		// Rely on address resolving
 		driver := getDriver("neo4j://localhost")
 		assertNil(t, err)
-		defer driver.Close()
+		defer driver.Close(ctx)
 
-		session = driver.NewSession(neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead})
-		defer session.Close()
+		session = driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead})
+		defer session.Close(ctx)
 
-		result, err = session.Run("RETURN 1", nil)
+		result, err = session.Run(ctx, "RETURN 1", nil)
 		assertNil(t, err)
 
-		summary, err = result.Consume()
+		summary, err = result.Consume(ctx)
 		assertNil(t, err)
 		assertNotNil(t, summary)
 	})
@@ -74,15 +77,15 @@ func TestRouting(outer *testing.T) {
 		driver := getDriver(server.URI())
 		assertNil(t, err)
 
-		session = driver.NewSession(neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
+		session = driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
 
-		writeCount, err = session.WriteTransaction(func(tx neo4j.Transaction) (any, error) {
-			writeResult, err := tx.Run("MERGE (n:Person {name: 'John'}) RETURN 1", nil)
+		writeCount, err = session.ExecuteWrite(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+			writeResult, err := tx.Run(ctx, "MERGE (n:Person {name: 'John'}) RETURN 1", nil)
 			if err != nil {
 				return nil, err
 			}
 
-			if writeResult.Next() {
+			if writeResult.Next(ctx) {
 				return writeResult.Record().Values[0], nil
 			}
 
@@ -95,13 +98,13 @@ func TestRouting(outer *testing.T) {
 		assertNil(t, err)
 		assertTrue(t, writeCount == 1)
 
-		readCount, err = session.ReadTransaction(func(tx neo4j.Transaction) (any, error) {
-			readResult, err := tx.Run("MATCH (n:Person {name: 'John'}) RETURN COUNT(*) AS count", nil)
+		readCount, err = session.ExecuteRead(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+			readResult, err := tx.Run(ctx, "MATCH (n:Person {name: 'John'}) RETURN COUNT(*) AS count", nil)
 			if err != nil {
 				return nil, err
 			}
 
-			if readResult.Next() {
+			if readResult.Next(ctx) {
 				return readResult.Record().Values[0], nil
 			}
 

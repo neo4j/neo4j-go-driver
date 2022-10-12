@@ -164,6 +164,7 @@ func NewDriverWithContext(target string, auth AuthToken, configurers ...func(*Co
 	d.connector.DialTimeout = d.config.SocketConnectTimeout
 	d.connector.SocketKeepAlive = d.config.SocketKeepalive
 	d.connector.UserAgent = d.config.UserAgent
+	//lint:ignore SA1019 RootCAs is still supported until 6.0
 	d.connector.RootCAs = d.config.RootCAs
 	d.connector.TlsConfig = d.config.TlsConfig
 	d.connector.Log = d.log

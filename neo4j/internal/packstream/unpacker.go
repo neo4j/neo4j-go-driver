@@ -142,8 +142,6 @@ func (u *Unpacker) Bool() bool {
 func (u *Unpacker) ByteArray() []byte {
 	n := u.Len()
 	buf := u.read(n)
-	if u.Err != nil || n == 0 {
-	}
 	out := make([]byte, n)
 	copy(out, buf)
 	return out

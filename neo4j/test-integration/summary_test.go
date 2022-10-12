@@ -1,6 +1,7 @@
 package test_integration
 
 import (
+	"context"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/test-integration/dbserver"
 	"testing"
@@ -14,11 +15,12 @@ func TestResultSummary(outer *testing.T) {
 	const extraDatabase = "extra"
 
 	var server dbserver.DbServer
-	var driver neo4j.Driver
+	var driver neo4j.DriverWithContext
 	var bookmark string
 	noParams := map[string]any{}
+	ctx := context.Background()
 
-	server = dbserver.GetDbServer()
+	server = dbserver.GetDbServer(ctx)
 	driver = server.Driver(func(config *neo4j.Config) {
 		config.Log = neo4j.ConsoleLogger(neo4j.DEBUG)
 	})
@@ -30,12 +32,12 @@ func TestResultSummary(outer *testing.T) {
 		}
 
 		inner.Run("does not include any database information", func(t *testing.T) {
-			session := driver.NewSession(neo4j.SessionConfig{Bookmarks: neo4j.BookmarksFromRawValues(bookmark)})
-			defer assertCloses(t, session)
-			result, err := session.Run("RETURN 42", noParams)
+			session := driver.NewSession(ctx, neo4j.SessionConfig{Bookmarks: neo4j.BookmarksFromRawValues(bookmark)})
+			defer assertCloses(ctx, t, session)
+			result, err := session.Run(ctx, "RETURN 42", noParams)
 			assertNil(t, err)
 
-			summary, err := result.Consume()
+			summary, err := result.Consume(ctx)
 			assertNil(t, err)
 			if server.Version.GreaterThanOrEqual(V4) {
 				assertEquals(t, summary.Database().Name(), "neo4j")
@@ -50,44 +52,44 @@ func TestResultSummary(outer *testing.T) {
 			inner.Skip("Multi-tenancy is a Neo4j 4+ feature")
 		}
 
-		session := driver.NewSession(neo4j.SessionConfig{DatabaseName: "system", BoltLogger: neo4j.ConsoleBoltLogger()})
-		defer assertCloses(inner, session)
-		res, err := session.Run(server.CreateDatabaseQuery(extraDatabase), map[string]any{})
+		session := driver.NewSession(ctx, neo4j.SessionConfig{DatabaseName: "system", BoltLogger: neo4j.ConsoleBoltLogger()})
+		defer assertCloses(ctx, inner, session)
+		res, err := session.Run(ctx, server.CreateDatabaseQuery(extraDatabase), map[string]any{})
 		assertNil(inner, err)
-		_, err = res.Consume() // consume result to obtain bookmark
+		_, err = res.Consume(ctx) // consume result to obtain bookmark
 		assertNil(inner, err)
 		bookmarks := neo4j.BookmarksToRawValues(session.LastBookmarks())
 		assertEquals(inner, len(bookmarks), 1)
 		bookmark = bookmarks[0]
 
 		defer func() {
-			session := driver.NewSession(neo4j.SessionConfig{DatabaseName: "system", Bookmarks: neo4j.BookmarksFromRawValues(bookmark)})
-			defer assertCloses(inner, session)
-			res, err := session.Run(server.DropDatabaseQuery(extraDatabase), map[string]any{})
+			session := driver.NewSession(ctx, neo4j.SessionConfig{DatabaseName: "system", Bookmarks: neo4j.BookmarksFromRawValues(bookmark)})
+			defer assertCloses(ctx, inner, session)
+			res, err := session.Run(ctx, server.DropDatabaseQuery(extraDatabase), map[string]any{})
 			assertNil(inner, err)
-			_, err = res.Consume()
+			_, err = res.Consume(ctx)
 			assertNil(inner, err)
 			bookmark = ""
 		}()
 
 		inner.Run("includes the default database information", func(t *testing.T) {
-			session := driver.NewSession(neo4j.SessionConfig{Bookmarks: neo4j.BookmarksFromRawValues(bookmark)})
-			defer assertCloses(t, session)
-			result, err := session.Run("RETURN 42", noParams)
+			session := driver.NewSession(ctx, neo4j.SessionConfig{Bookmarks: neo4j.BookmarksFromRawValues(bookmark)})
+			defer assertCloses(ctx, t, session)
+			result, err := session.Run(ctx, "RETURN 42", noParams)
 			assertNil(t, err)
 
-			summary, err := result.Consume()
+			summary, err := result.Consume(ctx)
 			assertNil(t, err)
 			assertEquals(t, summary.Database().Name(), "neo4j")
 		})
 
 		inner.Run("includes the database information, based on session configuration", func(t *testing.T) {
-			session := driver.NewSession(neo4j.SessionConfig{DatabaseName: extraDatabase, Bookmarks: neo4j.BookmarksFromRawValues(bookmark)})
-			defer assertCloses(t, session)
-			result, err := session.Run("RETURN 42", noParams)
+			session := driver.NewSession(ctx, neo4j.SessionConfig{DatabaseName: extraDatabase, Bookmarks: neo4j.BookmarksFromRawValues(bookmark)})
+			defer assertCloses(ctx, t, session)
+			result, err := session.Run(ctx, "RETURN 42", noParams)
 			assertNil(t, err)
 
-			summary, err := result.Consume()
+			summary, err := result.Consume(ctx)
 			assertNil(t, err)
 			assertEquals(t, summary.Database().Name(), extraDatabase)
 		})

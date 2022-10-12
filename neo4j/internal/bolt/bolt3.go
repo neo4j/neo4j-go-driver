@@ -167,7 +167,7 @@ func (b *bolt3) receiveSuccess(ctx context.Context) *success {
 		}
 		// Unexpected message received
 		b.state = bolt3_dead
-		b.err = errors.New("Expected success or database error")
+		b.err = errors.New("expected success or database error")
 		b.log.Error(log.Bolt3, b.logId, b.err)
 		return nil
 	}
@@ -276,7 +276,7 @@ func (b *bolt3) assertState(allowed ...int) error {
 			return nil
 		}
 	}
-	err := errors.New(fmt.Sprintf("Invalid state %d, expected: %+v", b.state, allowed))
+	err := fmt.Errorf("invalid state %d, expected: %+v", b.state, allowed)
 	b.log.Error(log.Bolt3, b.logId, err)
 	return err
 }
@@ -478,7 +478,7 @@ func (b *bolt3) RunTx(ctx context.Context, txh idb.TxHandle, runCommand idb.Comm
 func (b *bolt3) Keys(streamHandle idb.StreamHandle) ([]string, error) {
 	stream, ok := streamHandle.(*stream)
 	if !ok {
-		return nil, errors.New("Invalid stream handle")
+		return nil, errors.New("invalid stream handle")
 	}
 	// Don't care about if the stream is the current or even if it belongs to this connection.
 	return stream.keys, nil
@@ -489,7 +489,7 @@ func (b *bolt3) Next(ctx context.Context, streamHandle idb.StreamHandle) (
 	*db.Record, *db.Summary, error) {
 	stream, ok := streamHandle.(*stream)
 	if !ok {
-		return nil, nil, errors.New("Invalid stream handle")
+		return nil, nil, errors.New("invalid stream handle")
 	}
 
 	// Buffered stream or someone elses stream, doesn't matter...
@@ -501,7 +501,7 @@ func (b *bolt3) Next(ctx context.Context, streamHandle idb.StreamHandle) (
 	// Nothing in the stream buffer, the stream must be the current
 	// one to fetch on it otherwise something is wrong.
 	if stream != b.currStream {
-		return nil, nil, errors.New("Invalid stream handle")
+		return nil, nil, errors.New("invalid stream handle")
 	}
 
 	return b.receiveNext(ctx)
@@ -511,7 +511,7 @@ func (b *bolt3) Consume(ctx context.Context, streamHandle idb.StreamHandle) (
 	*db.Summary, error) {
 	stream, ok := streamHandle.(*stream)
 	if !ok {
-		return nil, errors.New("Invalid stream handle")
+		return nil, errors.New("invalid stream handle")
 	}
 
 	// If the stream isn't current, it should either already be complete
@@ -533,7 +533,7 @@ func (b *bolt3) Buffer(ctx context.Context,
 	streamHandle idb.StreamHandle) error {
 	stream, ok := streamHandle.(*stream)
 	if !ok {
-		return errors.New("Invalid stream handle")
+		return errors.New("invalid stream handle")
 	}
 
 	// If the stream isn't current, it should either already be complete
@@ -571,7 +571,7 @@ func (b *bolt3) receiveNext(ctx context.Context) (*db.Record, *db.Summary, error
 		sum := x.summary()
 		if sum == nil {
 			b.state = bolt3_dead
-			b.err = errors.New("Failed to parse summary")
+			b.err = errors.New("failed to parse summary")
 			b.currStream.err = b.err
 			b.currStream = nil
 			b.log.Error(log.Bolt3, b.logId, b.err)
@@ -609,7 +609,7 @@ func (b *bolt3) receiveNext(ctx context.Context) (*db.Record, *db.Summary, error
 		return nil, nil, x
 	default:
 		b.state = bolt3_dead
-		b.err = errors.New("Unknown response")
+		b.err = errors.New("unknown response")
 		b.currStream.err = b.err
 		b.currStream = nil
 		b.log.Error(log.Bolt3, b.logId, b.err)
@@ -737,14 +737,14 @@ func (b *bolt3) GetRoutingTable(ctx context.Context,
 		return nil, err
 	}
 	if rec == nil {
-		return nil, errors.New("No routing table record")
+		return nil, errors.New("no routing table record")
 	}
 	// Just empty the stream, ignore the summary should leave the connecion in ready state
 	b.Next(ctx, streamHandle)
 
 	table := parseRoutingTableRecord(rec)
 	if table == nil {
-		return nil, errors.New("Unable to parse routing table")
+		return nil, errors.New("unable to parse routing table")
 	}
 	// Just because
 	table.DatabaseName = idb.DefaultDatabase

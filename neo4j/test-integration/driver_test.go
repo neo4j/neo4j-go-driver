@@ -20,6 +20,7 @@
 package test_integration
 
 import (
+	"context"
 	"math"
 	"testing"
 	"time"
@@ -32,40 +33,41 @@ func TestDriver(outer *testing.T) {
 	if testing.Short() {
 		outer.Skip()
 	}
-	server := dbserver.GetDbServer()
+	ctx := context.Background()
+	server := dbserver.GetDbServer(ctx)
 
 	outer.Run("VerifyConnectivity", func(inner *testing.T) {
 		inner.Run("should return nil upon good connection", func(t *testing.T) {
 			driver := server.Driver()
-			defer driver.Close()
-			assertNil(t, driver.VerifyConnectivity())
+			defer driver.Close(ctx)
+			assertNil(t, driver.VerifyConnectivity(ctx))
 		})
 
 		inner.Run("should return error upon bad connection", func(t *testing.T) {
 			auth := neo4j.BasicAuth("bad user", "bad pass", "bad area")
-			driver, err := neo4j.NewDriver(server.BoltURI(), auth, server.ConfigFunc())
+			driver, err := neo4j.NewDriverWithContext(server.BoltURI(), auth, server.ConfigFunc())
 			assertNil(t, err)
-			defer driver.Close()
-			err = driver.VerifyConnectivity()
+			defer driver.Close(ctx)
+			err = driver.VerifyConnectivity(ctx)
 			assertNotNil(t, err)
 		})
 	})
 
 	outer.Run("Direct", func(inner *testing.T) {
 
-		setUp := func() (neo4j.Driver, neo4j.Session) {
+		setUp := func() (neo4j.DriverWithContext, neo4j.SessionWithContext) {
 			driver := server.Driver()
-			session := driver.NewSession(neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
+			session := driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
 			return driver, session
 		}
 
-		tearDown := func(driver neo4j.Driver, session neo4j.Session) {
+		tearDown := func(driver neo4j.DriverWithContext, session neo4j.SessionWithContext) {
 			if session != nil {
-				session.Close()
+				session.Close(ctx)
 			}
 
 			if driver != nil {
-				driver.Close()
+				driver.Close(ctx)
 			}
 		}
 
@@ -73,38 +75,38 @@ func TestDriver(outer *testing.T) {
 			driver, session := setUp()
 			defer tearDown(driver, session)
 
-			result, err := session.Run("RETURN 1", nil)
+			result, err := session.Run(ctx, "RETURN 1", nil)
 			assertNil(t, err)
 
-			if result.Next() {
+			if result.Next(ctx) {
 				assertEquals(t, result.Record().Values[0], int64(1))
 			}
-			assertFalse(t, result.Next())
+			assertFalse(t, result.Next(ctx))
 			assertNil(t, result.Err())
 
-			err = driver.Close()
+			err = driver.Close(ctx)
 			assertNil(t, err)
 
-			_, err = session.Run("RETURN 1", nil)
+			_, err = session.Run(ctx, "RETURN 1", nil)
 			assertNotNil(t, err)
 		})
 
 		inner.Run("it should not allow new sessions, after driver is closed", func(t *testing.T) {
 			driver, session := setUp()
 			defer tearDown(driver, session)
-			result, err := session.Run("RETURN 1", nil)
+			result, err := session.Run(ctx, "RETURN 1", nil)
 			assertNil(t, err)
 
-			if result.Next() {
+			if result.Next(ctx) {
 				assertEquals(t, result.Record().Values[0], int64(1))
 			}
-			assertFalse(t, result.Next())
+			assertFalse(t, result.Next(ctx))
 			assertNil(t, result.Err())
 
-			err = driver.Close()
+			err = driver.Close(ctx)
 			assertNil(t, err)
 
-			_ = driver.NewSession(neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
+			_ = driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
 		})
 
 	})
@@ -112,10 +114,10 @@ func TestDriver(outer *testing.T) {
 	outer.Run("Pooling without Connection Acquisition Timeout", func(inner *testing.T) {
 		var (
 			err    error
-			driver neo4j.Driver
+			driver neo4j.DriverWithContext
 		)
 
-		driver, err = neo4j.NewDriver(server.BoltURI(), server.AuthToken(), server.ConfigFunc(), func(config *neo4j.Config) {
+		driver, err = neo4j.NewDriverWithContext(server.BoltURI(), server.AuthToken(), server.ConfigFunc(), func(config *neo4j.Config) {
 			config.MaxConnectionPoolSize = 2
 			config.ConnectionAcquisitionTimeout = 0
 		})
@@ -123,27 +125,27 @@ func TestDriver(outer *testing.T) {
 
 		defer func() {
 			if driver != nil {
-				driver.Close()
+				driver.Close(ctx)
 			}
 		}()
 
 		inner.Run("should return error when pool is full", func(t *testing.T) {
 			// Open connection 1
-			session1 := driver.NewSession(neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
+			session1 := driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
 
-			_, err = session1.Run("UNWIND RANGE(1, 100) AS N RETURN N", nil)
+			_, err = session1.Run(ctx, "UNWIND RANGE(1, 100) AS N RETURN N", nil)
 			assertNil(t, err)
 
 			// Open connection 2
-			session2 := driver.NewSession(neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
+			session2 := driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
 
-			_, err = session2.Run("UNWIND RANGE(1, 100) AS N RETURN N", nil)
+			_, err = session2.Run(ctx, "UNWIND RANGE(1, 100) AS N RETURN N", nil)
 			assertNil(t, err)
 
 			// Try opening connection 3
-			session3 := driver.NewSession(neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
+			session3 := driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
 
-			_, err = session3.Run("UNWIND RANGE(1, 100) AS N RETURN N", nil)
+			_, err = session3.Run(ctx, "UNWIND RANGE(1, 100) AS N RETURN N", nil)
 			assertTrue(t, neo4j.IsConnectivityError(err))
 		})
 	})
@@ -151,10 +153,10 @@ func TestDriver(outer *testing.T) {
 	outer.Run("Pooling with Connection Acquisition Timeout", func(inner *testing.T) {
 		var (
 			err    error
-			driver neo4j.Driver
+			driver neo4j.DriverWithContext
 		)
 
-		driver, err = neo4j.NewDriver(server.BoltURI(), server.AuthToken(), server.ConfigFunc(), func(config *neo4j.Config) {
+		driver, err = neo4j.NewDriverWithContext(server.BoltURI(), server.AuthToken(), server.ConfigFunc(), func(config *neo4j.Config) {
 			config.MaxConnectionPoolSize = 2
 			config.ConnectionAcquisitionTimeout = 10 * time.Second
 		})
@@ -162,28 +164,28 @@ func TestDriver(outer *testing.T) {
 
 		defer func() {
 			if driver != nil {
-				driver.Close()
+				driver.Close(ctx)
 			}
 		}()
 
 		inner.Run("should return error when pool is full", func(t *testing.T) {
 			// Open connection 1
-			session1 := driver.NewSession(neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
+			session1 := driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
 
-			_, err = session1.Run("UNWIND RANGE(1, 100) AS N RETURN N", nil)
+			_, err = session1.Run(ctx, "UNWIND RANGE(1, 100) AS N RETURN N", nil)
 			assertNil(t, err)
 
 			// Open connection 2
-			session2 := driver.NewSession(neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
+			session2 := driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
 
-			_, err = session2.Run("UNWIND RANGE(1, 100) AS N RETURN N", nil)
+			_, err = session2.Run(ctx, "UNWIND RANGE(1, 100) AS N RETURN N", nil)
 			assertNil(t, err)
 
 			// Try opening connection 3
-			session3 := driver.NewSession(neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
+			session3 := driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
 
 			start := time.Now()
-			_, err = session3.Run("UNWIND RANGE(1, 100) AS N RETURN N", nil)
+			_, err = session3.Run(ctx, "UNWIND RANGE(1, 100) AS N RETURN N", nil)
 			elapsed := time.Since(start)
 			assertTrue(t, neo4j.IsConnectivityError(err))
 			assertTrue(t, math.Round(float64(elapsed/time.Second)) >= 10)

@@ -20,6 +20,7 @@
 package test_integration
 
 import (
+	"context"
 	"errors"
 	"testing"
 
@@ -31,17 +32,18 @@ func TestBookmark(outer *testing.T) {
 	if testing.Short() {
 		outer.Skip()
 	}
-	server := dbserver.GetDbServer()
+	ctx := context.Background()
+	server := dbserver.GetDbServer(ctx)
 
-	createNodeInTx := func(driver neo4j.Driver) string {
-		session := driver.NewSession(neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
-		defer session.Close()
+	createNodeInTx := func(driver neo4j.DriverWithContext) string {
+		session := driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
+		defer session.Close(ctx)
 
-		_, err := session.WriteTransaction(func(tx neo4j.Transaction) (any, error) {
-			result, err := tx.Run("CREATE ()", nil)
+		_, err := session.ExecuteWrite(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+			result, err := tx.Run(ctx, "CREATE ()", nil)
 			assertNil(outer, err)
 
-			summary, err := result.Consume()
+			summary, err := result.Consume(ctx)
 			assertNil(outer, err)
 
 			assertEquals(outer, summary.Counters().NodesCreated(), 1)
@@ -56,19 +58,19 @@ func TestBookmark(outer *testing.T) {
 	}
 
 	outer.Run("session constructed with no bookmarks", func(inner *testing.T) {
-		setUp := func() (neo4j.Driver, neo4j.Session) {
+		setUp := func() (neo4j.DriverWithContext, neo4j.SessionWithContext) {
 			driver := server.Driver()
-			session := driver.NewSession(neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
+			session := driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
 			return driver, session
 		}
 
-		tearDown := func(session neo4j.Session, driver neo4j.Driver) {
+		tearDown := func(session neo4j.SessionWithContext, driver neo4j.DriverWithContext) {
 			if session != nil {
-				session.Close()
+				session.Close(ctx)
 			}
 
 			if driver != nil {
-				driver.Close()
+				driver.Close(ctx)
 			}
 		}
 
@@ -76,9 +78,9 @@ func TestBookmark(outer *testing.T) {
 			driver, session := setUp()
 			defer tearDown(session, driver)
 
-			result, err := session.Run("CREATE (p:Person { name: 'Test'})", nil)
+			result, err := session.Run(ctx, "CREATE (p:Person { name: 'Test'})", nil)
 			assertNil(t, err)
-			_, err = result.Consume()
+			_, err = result.Consume(ctx)
 
 			assertNil(t, err)
 			assertStringsNotEmpty(t, neo4j.BookmarksToRawValues(session.LastBookmarks()))
@@ -88,16 +90,16 @@ func TestBookmark(outer *testing.T) {
 			driver, session := setUp()
 			defer tearDown(session, driver)
 
-			tx, err := session.BeginTransaction()
+			tx, err := session.BeginTransaction(ctx)
 			assertNil(t, err)
 
-			result, err := tx.Run("CREATE (p:Person { name: 'Test'})", nil)
+			result, err := tx.Run(ctx, "CREATE (p:Person { name: 'Test'})", nil)
 			assertNil(t, err)
 
-			_, err = result.Consume()
+			_, err = result.Consume(ctx)
 			assertNil(t, err)
 
-			err = tx.Commit()
+			err = tx.Commit(ctx)
 			assertNil(t, err)
 
 			assertStringsNotEmpty(t, neo4j.BookmarksToRawValues(session.LastBookmarks()))
@@ -107,16 +109,16 @@ func TestBookmark(outer *testing.T) {
 			driver, session := setUp()
 			defer tearDown(session, driver)
 
-			tx, err := session.BeginTransaction()
+			tx, err := session.BeginTransaction(ctx)
 			assertNil(t, err)
 
-			result, err := tx.Run("CREATE (p:Person { name: 'Test'})", nil)
+			result, err := tx.Run(ctx, "CREATE (p:Person { name: 'Test'})", nil)
 			assertNil(t, err)
 
-			_, err = result.Consume()
+			_, err = result.Consume(ctx)
 			assertNil(t, err)
 
-			err = tx.Rollback()
+			err = tx.Rollback(ctx)
 			assertNil(t, err)
 
 			assertStringsEmpty(t, neo4j.BookmarksToRawValues(session.LastBookmarks()))
@@ -126,11 +128,11 @@ func TestBookmark(outer *testing.T) {
 			driver, session := setUp()
 			defer tearDown(session, driver)
 
-			result, err := session.WriteTransaction(func(tx neo4j.Transaction) (any, error) {
-				result, err := tx.Run("CREATE (p:Person { name: 'Test'})", nil)
+			result, err := session.ExecuteWrite(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+				result, err := tx.Run(ctx, "CREATE (p:Person { name: 'Test'})", nil)
 				assertNil(t, err)
 
-				summary, err := result.Consume()
+				summary, err := result.Consume(ctx)
 				assertNil(t, err)
 
 				return summary.Counters().NodesCreated(), nil
@@ -146,11 +148,11 @@ func TestBookmark(outer *testing.T) {
 			defer tearDown(session, driver)
 
 			failWith := errors.New("some error")
-			result, err := session.WriteTransaction(func(tx neo4j.Transaction) (any, error) {
-				result, err := tx.Run("CREATE (p:Person { name: 'Test'})", nil)
+			result, err := session.ExecuteWrite(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+				result, err := tx.Run(ctx, "CREATE (p:Person { name: 'Test'})", nil)
 				assertNil(t, err)
 
-				_, err = result.Consume()
+				_, err = result.Consume(ctx)
 				assertNil(t, err)
 
 				return 0, failWith
@@ -165,12 +167,12 @@ func TestBookmark(outer *testing.T) {
 			driver, session := setUp()
 			defer tearDown(session, driver)
 
-			result, err := session.ReadTransaction(func(tx neo4j.Transaction) (any, error) {
-				result, err := tx.Run("MATCH (p:Person) RETURN count(p)", nil)
+			result, err := session.ExecuteRead(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+				result, err := tx.Run(ctx, "MATCH (p:Person) RETURN count(p)", nil)
 				assertNil(t, err)
 
 				count := 0
-				for result.Next() {
+				for result.Next(ctx) {
 					count++
 				}
 				assertNil(t, result.Err())
@@ -188,12 +190,12 @@ func TestBookmark(outer *testing.T) {
 			defer tearDown(session, driver)
 
 			failWith := errors.New("some error")
-			result, err := session.ReadTransaction(func(tx neo4j.Transaction) (any, error) {
-				result, err := tx.Run("MATCH (p:Person) RETURN count(p)", nil)
+			result, err := session.ExecuteRead(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+				result, err := tx.Run(ctx, "MATCH (p:Person) RETURN count(p)", nil)
 				assertNil(t, err)
 
 				count := 0
-				for result.Next() {
+				for result.Next(ctx) {
 					count++
 				}
 				assertNil(t, result.Err())
@@ -208,23 +210,23 @@ func TestBookmark(outer *testing.T) {
 	})
 
 	outer.Run("session constructed with one bookmark", func(inner *testing.T) {
-		setUp := func() (neo4j.Driver, neo4j.Session, string) {
+		setUp := func() (neo4j.DriverWithContext, neo4j.SessionWithContext, string) {
 			driver := server.Driver()
 			bookmark := createNodeInTx(driver)
-			session := driver.NewSession(neo4j.SessionConfig{
+			session := driver.NewSession(ctx, neo4j.SessionConfig{
 				AccessMode: neo4j.AccessModeWrite,
 				Bookmarks:  neo4j.BookmarksFromRawValues(bookmark),
 			})
 			return driver, session, bookmark
 		}
 
-		tearDown := func(session neo4j.Session, driver neo4j.Driver) {
+		tearDown := func(session neo4j.SessionWithContext, driver neo4j.DriverWithContext) {
 			if session != nil {
-				session.Close()
+				session.Close(ctx)
 			}
 
 			if driver != nil {
-				driver.Close()
+				driver.Close(ctx)
 			}
 		}
 
@@ -232,9 +234,9 @@ func TestBookmark(outer *testing.T) {
 			driver, session, bookmark := setUp()
 			defer tearDown(session, driver)
 
-			tx, err := session.BeginTransaction()
+			tx, err := session.BeginTransaction(ctx)
 			assertNil(t, err)
-			defer tx.Close()
+			defer tx.Close(ctx)
 
 			assertEquals(t, neo4j.BookmarksToRawValues(session.LastBookmarks()), []string{bookmark})
 		})
@@ -243,14 +245,14 @@ func TestBookmark(outer *testing.T) {
 			driver, session, bookmark := setUp()
 			defer tearDown(session, driver)
 
-			tx, err := session.BeginTransaction()
+			tx, err := session.BeginTransaction(ctx)
 			assertNil(t, err)
-			defer tx.Close()
+			defer tx.Close(ctx)
 
-			_, err = tx.Run("CREATE ()", nil)
+			_, err = tx.Run(ctx, "CREATE ()", nil)
 			assertNil(t, err)
 
-			err = tx.Rollback()
+			err = tx.Rollback(ctx)
 			assertNil(t, err)
 
 			assertEquals(t, neo4j.BookmarksToRawValues(session.LastBookmarks()), []string{bookmark})
@@ -260,14 +262,14 @@ func TestBookmark(outer *testing.T) {
 			driver, session, bookmark := setUp()
 			defer tearDown(session, driver)
 
-			tx, err := session.BeginTransaction()
+			tx, err := session.BeginTransaction(ctx)
 			assertNil(t, err)
-			defer tx.Close()
+			defer tx.Close(ctx)
 
-			_, err = tx.Run("RETURN", nil)
+			_, err = tx.Run(ctx, "RETURN", nil)
 			assertNotNil(t, err)
 
-			err = tx.Close()
+			err = tx.Close(ctx)
 			assertNil(t, err)
 			assertEquals(t, neo4j.BookmarksToRawValues(session.LastBookmarks()), []string{bookmark})
 		})
@@ -276,10 +278,10 @@ func TestBookmark(outer *testing.T) {
 			driver, session, bookmark := setUp()
 			defer tearDown(session, driver)
 
-			result, err := session.Run("RETURN 1", nil)
+			result, err := session.Run(ctx, "RETURN 1", nil)
 			assertNil(t, err)
 
-			_, err = result.Consume()
+			_, err = result.Consume(ctx)
 			assertNil(t, err)
 
 			assertEquals(t, neo4j.BookmarksToRawValues(session.LastBookmarks()), []string{bookmark})
@@ -289,7 +291,7 @@ func TestBookmark(outer *testing.T) {
 			driver, session, bookmark := setUp()
 			defer tearDown(session, driver)
 
-			_, err := session.Run("RETURN", nil)
+			_, err := session.Run(ctx, "RETURN", nil)
 			assertNotNil(t, err)
 
 			assertEquals(t, neo4j.BookmarksToRawValues(session.LastBookmarks()), []string{bookmark})
@@ -299,8 +301,8 @@ func TestBookmark(outer *testing.T) {
 
 	outer.Run("session constructed with two sets of bookmarks", func(inner *testing.T) {
 		var (
-			driver    neo4j.Driver
-			session   neo4j.Session
+			driver    neo4j.DriverWithContext
+			session   neo4j.SessionWithContext
 			bookmark1 string
 			bookmark2 string
 		)
@@ -311,42 +313,42 @@ func TestBookmark(outer *testing.T) {
 		bookmark2 = createNodeInTx(driver)
 		assertNotEquals(inner, bookmark1, bookmark2)
 
-		session = driver.NewSession(neo4j.SessionConfig{
+		session = driver.NewSession(ctx, neo4j.SessionConfig{
 			AccessMode: neo4j.AccessModeWrite,
 			Bookmarks:  neo4j.BookmarksFromRawValues(bookmark1, bookmark2),
 		})
 
 		defer func() {
 			if session != nil {
-				session.Close()
+				session.Close(ctx)
 			}
 
 			if driver != nil {
-				driver.Close()
+				driver.Close(ctx)
 			}
 		}()
 
 		inner.Run("all bookmarks should be reported back by the server after BEGIN", func(t *testing.T) {
-			tx, err := session.BeginTransaction()
+			tx, err := session.BeginTransaction(ctx)
 			assertNil(t, err)
-			defer tx.Close()
+			defer tx.Close(ctx)
 
 			assertEquals(t, neo4j.BookmarksToRawValues(session.LastBookmarks()), []string{bookmark1, bookmark2})
 		})
 
 		inner.Run("new bookmark should be reported back by the server after committing", func(t *testing.T) {
-			tx, err := session.BeginTransaction()
+			tx, err := session.BeginTransaction(ctx)
 			assertNil(t, err)
-			defer tx.Close()
+			defer tx.Close(ctx)
 
-			result, err := tx.Run("CREATE ()", nil)
+			result, err := tx.Run(ctx, "CREATE ()", nil)
 			assertNil(t, err)
 
-			summary, err := result.Consume()
+			summary, err := result.Consume(ctx)
 			assertNil(t, err)
 			assertEquals(t, summary.Counters().NodesCreated(), 1)
 
-			err = tx.Commit()
+			err = tx.Commit(ctx)
 			assertNil(t, err)
 
 			assertNotNil(t, neo4j.BookmarksToRawValues(session.LastBookmarks()))
@@ -358,25 +360,25 @@ func TestBookmark(outer *testing.T) {
 
 	outer.Run("session constructed with unreachable bookmark", func(inner *testing.T) {
 
-		setUp := func() (neo4j.Driver, neo4j.Session, string) {
+		setUp := func() (neo4j.DriverWithContext, neo4j.SessionWithContext, string) {
 			driver := server.Driver()
 
 			bookmark := createNodeInTx(driver)
 
-			session := driver.NewSession(neo4j.SessionConfig{
+			session := driver.NewSession(ctx, neo4j.SessionConfig{
 				AccessMode: neo4j.AccessModeWrite,
 				Bookmarks:  neo4j.BookmarksFromRawValues(bookmark + "0"),
 			})
 			return driver, session, bookmark
 		}
 
-		tearDown := func(session neo4j.Session, driver neo4j.Driver) {
+		tearDown := func(session neo4j.SessionWithContext, driver neo4j.DriverWithContext) {
 			if session != nil {
-				session.Close()
+				session.Close(ctx)
 			}
 
 			if driver != nil {
-				driver.Close()
+				driver.Close(ctx)
 			}
 		}
 
@@ -384,7 +386,7 @@ func TestBookmark(outer *testing.T) {
 			driver, session, _ := setUp()
 			defer tearDown(session, driver)
 
-			tx, err := session.BeginTransaction()
+			tx, err := session.BeginTransaction(ctx)
 
 			assertNil(t, tx)
 			neo4jErr := err.(*neo4j.Neo4jError)

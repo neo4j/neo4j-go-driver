@@ -91,7 +91,7 @@ func TestSet(outer *testing.T) {
 		randomInts := rand.Perm(100)
 		ints := collection.NewSet(randomInts)
 		removals := func(rawIndices []int) bool {
-			indices := make([]int, len(rawIndices), len(rawIndices))
+			indices := make([]int, len(rawIndices))
 			for i, rawIndex := range rawIndices {
 				indices[i] = abs(rawIndex) % len(ints)
 			}
@@ -151,7 +151,7 @@ func TestSet(outer *testing.T) {
 
 func containsExactlyOnce[T comparable](values collection.Set[T], search T) bool {
 	count := 0
-	for value, _ := range values {
+	for value := range values {
 		if value == search {
 			count++
 		}

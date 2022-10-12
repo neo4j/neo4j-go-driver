@@ -20,6 +20,7 @@
 package test_integration
 
 import (
+	"context"
 	"fmt"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/test-integration/dbserver"
 	"reflect"
@@ -29,76 +30,76 @@ import (
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
 )
 
-func intReturningWork(t *testing.T, query string, params map[string]any) neo4j.TransactionWork {
-	return func(tx neo4j.Transaction) (any, error) {
-		create, err := tx.Run(query, params)
+func intReturningWork(ctx context.Context, t *testing.T, query string, params map[string]any) neo4j.ManagedTransactionWork {
+	return func(tx neo4j.ManagedTransaction) (any, error) {
+		create, err := tx.Run(ctx, query, params)
 		assertNil(t, err)
 
 		returnValue := int64(0)
-		if create.Next() {
+		if create.Next(ctx) {
 			returnValue = create.Record().Values[0].(int64)
 		}
-		assertFalse(t, create.Next())
+		assertFalse(t, create.Next(ctx))
 		assertNil(t, create.Err())
 
 		return returnValue, nil
 	}
 }
 
-func transactionWithIntWork(t *testing.T, tx neo4j.Transaction, work neo4j.TransactionWork) int64 {
+func transactionWithIntWork(t *testing.T, tx neo4j.ExplicitTransaction, work neo4j.ManagedTransactionWork) int64 {
 	result, err := work(tx)
 	assertNil(t, err)
 
 	return result.(int64)
 }
 
-func readTransactionWithIntWork(t *testing.T, session neo4j.Session, work neo4j.TransactionWork, configurers ...func(*neo4j.TransactionConfig)) int64 {
-	result, err := session.ReadTransaction(work, configurers...)
+func readTransactionWithIntWork(ctx context.Context, t *testing.T, session neo4j.SessionWithContext, work neo4j.ManagedTransactionWork, configurers ...func(*neo4j.TransactionConfig)) int64 {
+	result, err := session.ExecuteRead(ctx, work, configurers...)
 	assertNil(t, err)
 
 	return result.(int64)
 }
 
-func writeTransactionWithIntWork(t *testing.T, session neo4j.Session, work neo4j.TransactionWork, configurers ...func(*neo4j.TransactionConfig)) int64 {
-	result, err := session.WriteTransaction(work, configurers...)
+func writeTransactionWithIntWork(ctx context.Context, t *testing.T, session neo4j.SessionWithContext, work neo4j.ManagedTransactionWork, configurers ...func(*neo4j.TransactionConfig)) int64 {
+	result, err := session.ExecuteWrite(ctx, work, configurers...)
 	assertNil(t, err)
 
 	return result.(int64)
 }
 
-func newSessionAndTx(t *testing.T, driver neo4j.Driver, mode neo4j.AccessMode, configurers ...func(*neo4j.TransactionConfig)) (neo4j.Session, neo4j.Transaction) {
-	session := driver.NewSession(neo4j.SessionConfig{AccessMode: mode})
+func newSessionAndTx(ctx context.Context, t *testing.T, driver neo4j.DriverWithContext, mode neo4j.AccessMode, configurers ...func(*neo4j.TransactionConfig)) (neo4j.SessionWithContext, neo4j.ExplicitTransaction) {
+	session := driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: mode})
 
-	tx, err := session.BeginTransaction(configurers...)
+	tx, err := session.BeginTransaction(ctx, configurers...)
 	assertNil(t, err)
 
 	return session, tx
 }
 
-func createNode(t *testing.T, session neo4j.Session, label string, props map[string]any) {
+func createNode(ctx context.Context, t *testing.T, session neo4j.SessionWithContext, label string, props map[string]any) {
 	var (
 		err     error
-		result  neo4j.Result
+		result  neo4j.ResultWithContext
 		summary neo4j.ResultSummary
 	)
 
 	if len(props) > 0 {
-		result, err = session.Run(fmt.Sprintf("CREATE (n:%s) SET n = $props", label), map[string]any{"props": props})
+		result, err = session.Run(ctx, fmt.Sprintf("CREATE (n:%s) SET n = $props", label), map[string]any{"props": props})
 	} else {
-		result, err = session.Run(fmt.Sprintf("CREATE (n:%s)", label), nil)
+		result, err = session.Run(ctx, fmt.Sprintf("CREATE (n:%s)", label), nil)
 	}
 	assertNil(t, err)
 
-	summary, err = result.Consume()
+	summary, err = result.Consume(ctx)
 	assertNil(t, err)
 
 	assertEquals(t, summary.Counters().NodesCreated(), 1)
 }
 
-func updateNodeInTx(t *testing.T, tx neo4j.Transaction, label string, newProps map[string]any) {
+func updateNodeInTx(ctx context.Context, t *testing.T, tx neo4j.ExplicitTransaction, label string, newProps map[string]any) {
 	var (
 		err     error
-		result  neo4j.Result
+		result  neo4j.ResultWithContext
 		summary neo4j.ResultSummary
 	)
 
@@ -106,48 +107,48 @@ func updateNodeInTx(t *testing.T, tx neo4j.Transaction, label string, newProps m
 		t.Fatal("newProps is empty")
 	}
 
-	result, err = tx.Run(fmt.Sprintf("MATCH (n:%s) SET n = $props", label), map[string]any{"props": newProps})
+	result, err = tx.Run(ctx, fmt.Sprintf("MATCH (n:%s) SET n = $props", label), map[string]any{"props": newProps})
 	assertNil(t, err)
 
-	summary, err = result.Consume()
+	summary, err = result.Consume(ctx)
 	assertNil(t, err)
 
 	assertTrue(t, summary.Counters().ContainsUpdates())
 }
 
-func updateNodeWork(t *testing.T, label string, newProps map[string]any) neo4j.TransactionWork {
-	return func(tx neo4j.Transaction) (any, error) {
+func updateNodeWork(ctx context.Context, t *testing.T, label string, newProps map[string]any) neo4j.ManagedTransactionWork {
+	return func(tx neo4j.ManagedTransaction) (any, error) {
 		var (
 			err    error
-			result neo4j.Result
+			result neo4j.ResultWithContext
 		)
 
 		if len(newProps) == 0 {
 			t.Fatal("newProps is empty")
 		}
 
-		result, err = tx.Run(fmt.Sprintf("MATCH (n:%s) SET n = $props", label), map[string]any{"props": newProps})
+		result, err = tx.Run(ctx, fmt.Sprintf("MATCH (n:%s) SET n = $props", label), map[string]any{"props": newProps})
 		if err != nil {
 			return nil, err
 		}
 
-		return result.Consume()
+		return result.Consume(ctx)
 	}
 }
 
-func listTransactionsAndMatchMetadataWork(version dbserver.Version, metadata map[string]any) neo4j.TransactionWork {
+func listTransactionsAndMatchMetadataWork(ctx context.Context, version dbserver.Version, metadata map[string]any) neo4j.ManagedTransactionWork {
 	query := "CALL dbms.listTransactions()"
 	if version.GreaterThanOrEqual(dbserver.VersionOf("4.4.0")) {
 		query = "SHOW TRANSACTIONS YIELD metaData RETURN metaData"
 	}
-	return func(tx neo4j.Transaction) (any, error) {
-		result, err := tx.Run(query, nil)
+	return func(tx neo4j.ManagedTransaction) (any, error) {
+		result, err := tx.Run(ctx, query, nil)
 		if err != nil {
 			return nil, err
 		}
 
 		var matched = false
-		for result.Next() {
+		for result.Next(ctx) {
 			if txMetadataInt, ok := result.Record().Get("metaData"); ok {
 				if txMetadata, ok := txMetadataInt.(map[string]any); ok {
 					if reflect.DeepEqual(metadata, txMetadata) {

@@ -69,14 +69,14 @@ func TestChunker(ot *testing.T) {
 
 	assertBuf := func(t *testing.T, buf *bytes.Buffer, exp []byte) {
 		t.Helper()
-		if bytes.Compare(exp, buf.Bytes()) != 0 {
+		if !bytes.Equal(exp, buf.Bytes()) {
 			t.Errorf("Chunked output differs")
 		}
 	}
 
 	assertSlices := func(t *testing.T, inp, exp []byte) {
 		t.Helper()
-		if bytes.Compare(exp, inp) != 0 {
+		if !bytes.Equal(exp, inp) {
 			t.Errorf("Dechunked output differs")
 		}
 	}

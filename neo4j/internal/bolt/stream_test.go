@@ -115,7 +115,7 @@ func TestOpenStreams(ot *testing.T) {
 		// Attach and detach a stream with an error, should set error on stream
 		s = &stream{}
 		streams.attach(s)
-		streams.detach(nil, invalidStream)
+		streams.detach(nil, errInvalidStream)
 		AssertNil(t, streams.curr)
 		AssertIntEqual(t, streams.num, 0)
 		AssertNotNil(t, s.err)

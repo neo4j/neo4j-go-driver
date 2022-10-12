@@ -29,19 +29,18 @@ import (
 
 // TestContext provides state data shared across tests
 type TestContext struct {
-	driver    neo4j.Driver
+	driver    neo4j.DriverWithContext
 	stop      int32
 	bookmarks atomic.Value
 
 	readNodeCountsByServer sync.Map
 
-	readNodeCount       int32
-	createdNodeCount    int32
-	failedBookmarkCount int32
+	readNodeCount    int32
+	createdNodeCount int32
 }
 
 // NewTestContext returns a new TestContext
-func NewTestContext(driver neo4j.Driver) *TestContext {
+func NewTestContext(driver neo4j.DriverWithContext) *TestContext {
 	result := &TestContext{
 		driver:                 driver,
 		stop:                   0,

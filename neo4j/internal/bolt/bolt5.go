@@ -334,7 +334,7 @@ func (b *bolt5) assertState(allowed ...int) error {
 			return nil
 		}
 	}
-	err := errors.New(fmt.Sprintf("Invalid state %d, expected: %+v", b.state, allowed))
+	err := fmt.Errorf("invalid state %d, expected: %+v", b.state, allowed)
 	b.log.Error(log.Bolt5, b.logId, err)
 	return err
 }

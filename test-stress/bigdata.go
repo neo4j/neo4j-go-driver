@@ -20,6 +20,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
@@ -101,17 +102,17 @@ func assertBooleansSlice(bools1 []bool, bools2 []any) {
 	}
 }
 
-func runBigDataThing(driver neo4j.Driver) {
+func runBigDataThing(ctx context.Context, driver neo4j.DriverWithContext) {
 	const batchSize = 10000
 	const nodeCount = 30000
 
 	// Write nodes
-	session := driver.NewSession(neo4j.SessionConfig{})
+	session := driver.NewSession(ctx, neo4j.SessionConfig{})
 	for index := 0; index < nodeCount; {
-		_, err := session.WriteTransaction(func(tx neo4j.Transaction) (any, error) {
+		_, err := session.ExecuteWrite(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
 			batch := 0
 			for index < nodeCount && batch < batchSize {
-				result, err := tx.Run("CREATE (n:Test:Node) SET n = $props", map[string]any{
+				result, err := tx.Run(ctx, "CREATE (n:Test:Node) SET n = $props", map[string]any{
 					"props": map[string]any{
 						"index":          index,
 						"name":           fmt.Sprintf("name-%d", index),
@@ -124,7 +125,7 @@ func runBigDataThing(driver neo4j.Driver) {
 				if err != nil {
 					return nil, err
 				}
-				_, err = result.Consume()
+				_, err = result.Consume(ctx)
 				if err != nil {
 					return nil, err
 				}
@@ -141,14 +142,14 @@ func runBigDataThing(driver neo4j.Driver) {
 
 	// Read nodes
 	seen := 0
-	_, err := session.ReadTransaction(func(tx neo4j.Transaction) (any, error) {
+	_, err := session.ExecuteRead(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
 		seen = 0
-		result, err := tx.Run("MATCH (n:Node) RETURN n", nil)
+		result, err := tx.Run(ctx, "MATCH (n:Node) RETURN n", nil)
 		if err != nil {
 			return nil, err
 		}
 		var rec *neo4j.Record
-		for result.NextRecord(&rec) {
+		for result.NextRecord(ctx, &rec) {
 			node := rec.Values[0].(neo4j.Node)
 			// Validate the node
 			assertSliceContains(node.Labels, "Node")
