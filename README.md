@@ -13,7 +13,7 @@ Make sure your application has been set up to use go modules (there should be a 
 Add the driver with:
 
 ```shell
-go get github.com/neo4j/neo4j-go-driver/v5@<the 5.x tag>
+go get github.com/neo4j/neo4j-go-driver/v5
 ```
 
 #### 4.x
@@ -21,7 +21,7 @@ go get github.com/neo4j/neo4j-go-driver/v5@<the 5.x tag>
 Add the driver with:
 
 ```shell
-go get github.com/neo4j/neo4j-go-driver/v4@<the 4.x tag>
+go get github.com/neo4j/neo4j-go-driver/v4
 ```
 
 #### 1.x
@@ -29,7 +29,7 @@ go get github.com/neo4j/neo4j-go-driver/v4@<the 4.x tag>
 For versions 1.x of the driver (notice the absence of `/v4` or `/v5`), run instead the following:
 
 ```shell
-go get github.com/neo4j/neo4j-go-driver@<the 1.x tag>
+go get github.com/neo4j/neo4j-go-driver
 ```
 
 ## Documentation
