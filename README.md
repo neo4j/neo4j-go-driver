@@ -37,12 +37,10 @@ go get github.com/neo4j/neo4j-go-driver
 Drivers manual that describes general driver concepts in depth [here](https://neo4j.com/docs/driver-manual/5.0/).
 Go package API documentation [here](https://pkg.go.dev/github.com/neo4j/neo4j-go-driver/v5).
 
-## Migrating from 1.x and 4.x
+## Migrating from previous versions
 
 See [migration guide](MIGRATION_GUIDE.md) for information on how to migrate 
-from 1.8 (and 1.7) version of the driver.
-
-This also includes a section on how migrate from 4.x to 5.0.
+from previous versions of the driver to the current one.
 
 ## Minimum Viable Snippet
 
