@@ -188,7 +188,8 @@ The records inside the result can be accessed via `Next()`/`Record()` functions 
 ```
 
 ### Accessing Values in a Record
-Values in a `Record` can be accessed either by index or by alias. The return value is an `interface{}` which means you need to convert the interface to the type expected
+Values in a `Record` can be accessed either by index or by alias. The return value is an `any` which means you need
+to convert the interface to the expected type
 
 ```go
 value := record.Values[0]
@@ -313,9 +314,9 @@ The `Log` field of the `neo4j.Config` struct is defined to be of interface `neo4
 ```go
 type Logger interface {
 	Error(name string, id string, err error)
-	Warnf(name string, id string, msg string, args ...interface{})
-	Infof(name string, id string, msg string, args ...interface{})
-	Debugf(name string, id string, msg string, args ...interface{})
+	Warnf(name string, id string, msg string, args ...any)
+	Infof(name string, id string, msg string, args ...any)
+	Debugf(name string, id string, msg string, args ...any)
 }
 ```
 
@@ -344,8 +345,8 @@ The `BoltLogger` field of the `neo4j.SessionConfig` struct is defined to be of i
 
 ```go
 type BoltLogger interface {
-	LogClientMessage(context string, msg string, args ...interface{})
-	LogServerMessage(context string, msg string, args ...interface{})
+	LogClientMessage(context string, msg string, args ...any)
+	LogServerMessage(context string, msg string, args ...any)
 }
 ```
 
