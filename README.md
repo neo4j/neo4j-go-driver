@@ -52,69 +52,77 @@ Make sure to use the configuration in the code that matches the version of Neo4j
 package main
 
 import (
-    "fmt"
-    "github.com/neo4j/neo4j-go-driver/v4/neo4j"
-    "io"
-    "log"
+	"context"
+	"fmt"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
+	"io"
+	"log"
 )
 
 func main() {
 	// Neo4j 4.0, defaults to no TLS therefore use bolt:// or neo4j://
 	// Neo4j 3.5, defaults to self-signed certificates, TLS on, therefore use bolt+ssc:// or neo4j+ssc://
 	dbUri := "neo4j://localhost:7687"
-	driver, err := neo4j.NewDriver(dbUri, neo4j.BasicAuth("username", "password", ""))
+	driver, err := neo4j.NewDriverWithContext(dbUri, neo4j.BasicAuth("username", "password", ""))
 	if err != nil {
 		panic(err)
 	}
+	// Starting with 5.0, you can control the execution of most driver APIs
+	// To keep things simple, we create here a never-cancelling context
+	// Read https://pkg.go.dev/context to learn more about contexts
+	ctx := context.Background()
 	// Handle driver lifetime based on your application lifetime requirements  driver's lifetime is usually
 	// bound by the application lifetime, which usually implies one driver instance per application
-	defer driver.Close()
-	item, err := insertItem(driver)
+	// Make sure to handle errors during deferred calls
+	defer driver.Close(ctx)
+	item, err := insertItem(ctx, driver)
 	if err != nil {
 		panic(err)
 	}
 	fmt.Printf("%v\n", item)
 }
 
-func insertItem(driver neo4j.Driver) (*Item, error) {
-    // Sessions are short-lived, cheap to create and NOT thread safe. Typically create one or more sessions
-    // per request in your web application. Make sure to call Close on the session when done.
-    // For multi-database support, set sessionConfig.DatabaseName to requested database
-    // Session config will default to write mode, if only reads are to be used configure session for
-    // read mode.
-    session := driver.NewSession(neo4j.SessionConfig{})
-    defer session.Close()
-    result, err := session.WriteTransaction(createItemFn)
-    if err != nil {
-        return nil, err
-    }
-    return result.(*Item), nil
+func insertItem(ctx context.Context, driver neo4j.DriverWithContext) (*Item, error) {
+	// Sessions are short-lived, cheap to create and NOT thread safe. Typically create one or more sessions
+	// per request in your web application. Make sure to call Close on the session when done.
+	// For multi-database support, set sessionConfig.DatabaseName to requested database
+	// Session config will default to write mode, if only reads are to be used configure session for
+	// read mode.
+	session := driver.NewSession(ctx, neo4j.SessionConfig{})
+	defer session.Close(ctx)
+	result, err := session.ExecuteWrite(ctx, createItemFn(ctx))
+	if err != nil {
+		return nil, err
+	}
+	return result.(*Item), nil
 }
 
-func createItemFn(tx neo4j.Transaction) (interface{}, error) {
-    records, err := tx.Run("CREATE (n:Item { id: $id, name: $name }) RETURN n.id, n.name", map[string]interface{}{
-        "id":   1,
-        "name": "Item 1",
-    })
-    // In face of driver native errors, make sure to return them directly.
-    // Depending on the error, the driver may try to execute the function again.
-    if err != nil {
-        return nil, err
-    }
-    record, err := records.Single()
-    if err != nil {
-        return nil, err
-    }
-    // You can also retrieve values by name, with e.g. `id, found := record.Get("n.id")`
-    return &Item{
-        Id:   record.Values[0].(int64),
-        Name: record.Values[1].(string),
-    }, nil
+func createItemFn(ctx context.Context) neo4j.ManagedTransactionWork {
+	return func(tx neo4j.ManagedTransaction) (any, error) {
+		records, err := tx.Run(ctx, "CREATE (n:Item { id: $id, name: $name }) RETURN n.id, n.name", map[string]any{
+			"id":   1,
+			"name": "Item 1",
+		})
+		// In face of driver native errors, make sure to return them directly.
+		// Depending on the error, the driver may try to execute the function again.
+		if err != nil {
+			return nil, err
+		}
+		record, err := records.Single(ctx)
+		if err != nil {
+			return nil, err
+		}
+		// You can also retrieve values by name, with e.g. `id, found := record.Get("n.id")`
+		return &Item{
+			Id:   record.Values[0].(int64),
+			Name: record.Values[1].(string),
+		}, nil
+	}
 }
 
 type Item struct {
-    Id int64
-    Name string
+	Id   int64
+	Name string
 }
 ```
 
@@ -147,7 +155,7 @@ The records inside the result can be accessed via `Next()`/`Record()` functions 
 
 ```go
 	// Next returns false upon error
-	for result.Next() {
+	for result.Next(ctx) {
 		record := result.Record()
 		handleRecord(record)
 	}
