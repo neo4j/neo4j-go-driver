@@ -4,6 +4,12 @@ This is the official Neo4j Go Driver.
 
 ## Getting the Driver
 
+### Go version prerequisites
+
+The Go driver only works with actively maintained Go versions.
+
+Read [Go official release policy](https://go.dev/doc/devel/release#policy) to learn more.
+
 ### Module version
 
 Make sure your application has been set up to use go modules (there should be a go.mod file in your application root).
