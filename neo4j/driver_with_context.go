@@ -28,6 +28,7 @@ import (
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/log"
 	"net/url"
 	"strings"
+	"sync"
 
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/connector"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/pool"
@@ -92,6 +93,7 @@ func NewDriverWithContext(target string, auth AuthToken, configurers ...func(*Co
 	}
 
 	d := driverWithContext{target: parsed, mut: racing.NewMutex()}
+	d.newSession = d.NewSession
 
 	routing := true
 	d.connector.Network = "tcp"
@@ -260,6 +262,12 @@ type driverWithContext struct {
 	router    sessionRouter
 	logId     string
 	log       log.Logger
+	// visible for tests
+	newSession              func(context.Context, SessionConfig) SessionWithContext
+	bookmarkManagerInitOnce sync.Once
+	// instance of the bookmark manager only used by default by managed sessions of ExecuteQuery
+	// this is *not* used by default by user-created session (see NewSession)
+	defaultManagedSessionBookmarkManager BookmarkManager
 }
 
 func (d *driverWithContext) Target() url.URL {
@@ -314,4 +322,132 @@ func (d *driverWithContext) Close(ctx context.Context) error {
 	d.pool = nil
 	d.log.Infof(log.Driver, d.logId, "Closed")
 	return nil
+}
+
+func (d *driverWithContext) ExecuteQuery(
+	ctx context.Context,
+	query string,
+	parameters map[string]any,
+	settings ...ExecuteQueryConfigurationOption) (*EagerResult, error) {
+
+	d.bookmarkManagerInitOnce.Do(func() {
+		if d.defaultManagedSessionBookmarkManager == nil { // checked for testing
+			d.defaultManagedSessionBookmarkManager = NewBookmarkManager(BookmarkManagerConfig{})
+		}
+	})
+	configuration := &ExecuteQueryConfiguration{
+		BookmarkManager: d.defaultManagedSessionBookmarkManager,
+	}
+	for _, setter := range settings {
+		setter(configuration)
+	}
+	session := d.newSession(ctx, configuration.toSessionConfig())
+	defer session.Close(ctx)
+	txFunction, err := configuration.selectTxFunctionApi(session)
+	if err != nil {
+		return nil, err
+	}
+	result, err := txFunction(ctx, d.executeQueryCallback(ctx, query, parameters))
+	if err != nil {
+		return nil, err
+	}
+	return result.(*EagerResult), nil
+}
+
+func (d *driverWithContext) executeQueryCallback(ctx context.Context, query string, parameters map[string]any) ManagedTransactionWork {
+	return func(tx ManagedTransaction) (any, error) {
+		cursor, err := tx.Run(ctx, query, parameters)
+		if err != nil {
+			return nil, err
+		}
+		keys, err := cursor.Keys()
+		if err != nil {
+			return nil, err
+		}
+		records, err := cursor.Collect(ctx)
+		if err != nil {
+			return nil, err
+		}
+		summary, err := cursor.Consume(ctx)
+		if err != nil {
+			return nil, err
+		}
+		return &EagerResult{
+			Keys:    keys,
+			Records: records,
+			Summary: summary,
+		}, nil
+	}
+}
+
+type ExecuteQueryConfigurationOption func(*ExecuteQueryConfiguration)
+
+func WithReadersRouting() ExecuteQueryConfigurationOption {
+	return func(configuration *ExecuteQueryConfiguration) {
+		configuration.Routing = Readers
+	}
+}
+
+func WithWritersRouting() ExecuteQueryConfigurationOption {
+	return func(configuration *ExecuteQueryConfiguration) {
+		configuration.Routing = Writers
+	}
+}
+
+func WithImpersonatedUser(user string) ExecuteQueryConfigurationOption {
+	return func(configuration *ExecuteQueryConfiguration) {
+		configuration.ImpersonatedUser = user
+	}
+}
+
+func WithDatabase(db string) ExecuteQueryConfigurationOption {
+	return func(configuration *ExecuteQueryConfiguration) {
+		configuration.Database = db
+	}
+}
+
+func WithBookmarkManager(bookmarkManager BookmarkManager) ExecuteQueryConfigurationOption {
+	return func(configuration *ExecuteQueryConfiguration) {
+		configuration.BookmarkManager = bookmarkManager
+	}
+}
+
+type ExecuteQueryConfiguration struct {
+	Routing          RoutingControl
+	ImpersonatedUser string
+	Database         string
+	BookmarkManager  BookmarkManager
+}
+
+type RoutingControl int
+
+const (
+	Writers RoutingControl = iota
+	Readers
+)
+
+func (c *ExecuteQueryConfiguration) toSessionConfig() SessionConfig {
+	return SessionConfig{
+		ImpersonatedUser: c.ImpersonatedUser,
+		DatabaseName:     c.Database,
+		BookmarkManager:  c.BookmarkManager,
+	}
+}
+
+type transactionFunction func(context.Context, ManagedTransactionWork, ...func(*TransactionConfig)) (any, error)
+
+func (c *ExecuteQueryConfiguration) selectTxFunctionApi(session SessionWithContext) (transactionFunction, error) {
+	switch c.Routing {
+	case Readers:
+		return session.ExecuteRead, nil
+	case Writers:
+		return session.ExecuteWrite, nil
+	}
+	return nil, fmt.Errorf("unsupported routing control, got: %d", c.Routing)
+}
+
+type EagerResult struct {
+	Keys    []string
+	Records []*Record
+	Summary ResultSummary
 }
