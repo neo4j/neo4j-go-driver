@@ -203,31 +203,31 @@ if value, ok := record.Get('field_name'); ok {
 ```
 
 ### Value Types
-The driver exposes values in the record as an `interface{}` type. 
+The driver exposes values in the record as an `any` type. 
 The underlying types of the returned values depend on the corresponding Cypher types.
 
 The mapping between Cypher types and the types used by this driver (to represent the Cypher type):
 
-| Cypher Type | Driver Type
-| ---: | :--- |
-| *null* | nil |
-| List | []interface{} |
-| Map  | map[string]interface{} |
-| Boolean| bool |
-| Integer| int64 |
-| Float| float |
-| String| string |
-| ByteArray| []byte |
-| Node| neo4j.Node |
-| Relationship| neo4j.Relationship |
-| Path| neo4j.Path |
+|  Cypher Type | Driver Type            |
+|-------------:|:-----------------------|
+|       *null* | nil                    |
+|         List | []any          |
+|          Map | map[string]any |
+|      Boolean | bool                   |
+|      Integer | int64                  |
+|        Float | float                  |
+|       String | string                 |
+|    ByteArray | []byte                 |
+|         Node | neo4j.Node             |
+| Relationship | neo4j.Relationship     |
+|         Path | neo4j.Path             |
 
 ### Spatial Types - Point
 
-| Cypher Type | Driver Type
-| ---: | :--- |
-| Point| neo4j.Point2D |
-| Point| neo4j.Point3D |
+| Cypher Type | Driver Type   |
+|------------:|:--------------|
+|       Point | neo4j.Point2D |
+|       Point | neo4j.Point3D |
 
 The temporal types are introduced in Neo4j 3.4 series.
 
@@ -253,14 +253,14 @@ The temporal types are introduced in Neo4j 3.4 series. Given the fact that datab
 
 The mapping among the Cypher temporal types and actual exposed types are as follows:
 
-| Cypher Type | Driver Type |
-| :----------: | :-----------: |
-| Date | neo4j.Date |
-| Time | neo4j.OffsetTime |
-| LocalTime| neo4j.LocalTime |
-| DateTime | time.Time |
+|  Cypher Type  |     Driver Type     |
+|:-------------:|:-------------------:|
+|     Date      |     neo4j.Date      |
+|     Time      |  neo4j.OffsetTime   |
+|   LocalTime   |   neo4j.LocalTime   |
+|   DateTime    |      time.Time      |
 | LocalDateTime | neo4j.LocalDateTime |
-| Duration | neo4j.Duration |
+|   Duration    |   neo4j.Duration    |
 
 
 Receiving a temporal value as driver type:
