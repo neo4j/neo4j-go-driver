@@ -79,6 +79,7 @@ type DriverWithContext interface {
 	// neo4j.SessionWithContext API calls, unless sessions are explicitly configured with the same bookmark manager.
 	// That guarantee may also break if a custom implementation of neo4j.BookmarkManager is provided via for instance
 	// the built-in callback neo4j.WithBookmarkManager.
+	// You can disable bookmark management with neo4j.WithoutBookmarkManager.
 	ExecuteQuery(context.Context, string, map[string]any, ...ExecuteQueryConfigurationOption) (*EagerResult, error)
 	// GetDefaultManagedBookmarkManager returns the bookmark manager instance used by ExecuteQuery by default.
 	// This is useful when ExecuteQuery is called without custom bookmark managers and the lower-level
@@ -458,6 +459,12 @@ func WithDatabase(db string) ExecuteQueryConfigurationOption {
 func WithBookmarkManager(bookmarkManager BookmarkManager) ExecuteQueryConfigurationOption {
 	return func(configuration *ExecuteQueryConfiguration) {
 		configuration.BookmarkManager = bookmarkManager
+	}
+}
+
+func WithoutBookmarkManager() ExecuteQueryConfigurationOption {
+	return func(configuration *ExecuteQueryConfiguration) {
+		configuration.BookmarkManager = nil
 	}
 }
 
