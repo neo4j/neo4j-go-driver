@@ -50,6 +50,47 @@ const (
 // DriverWithContext represents a pool(s) of connections to a neo4j server or cluster. It's
 // safe for concurrent use.
 type DriverWithContext interface {
+	// ExecuteQuery runs the specified query with its parameters and returns results.
+	// 	results, err := driver.ExecuteQuery(ctx, query, params)
+	//
+	// This function runs the query in a single explicit transaction within a session, entirely managed by the driver.
+	//
+	// Specific settings can be configured via configuration callbacks. Built-in callbacks are provided such as:
+	//	neo4j.WithDatabase
+	//	neo4j.WithWritersRouting
+	//  ...
+	// see neo4j.ExecuteQueryConfiguration for all possibilities.
+	//
+	// These built-in can be used and combined as follows:
+	//	driver.ExecuteQuery(ctx, query, params, neo4j.WithDatabase("my-db"), neo4j.WithWritersRouting())
+	//
+	// For complete control over the configuration, you can also define your own callback:
+	//	driver.ExecuteQuery(ctx, query, params, func(config *neo4j.ExecuteQueryConfiguration) {
+	//		config.Database = "my-db"
+	//		config.RoutingControl = neo4j.Writers
+	//	})
+	// ExecuteQuery causal consistency is guaranteed by default across different successful calls to ExecuteQuery
+	// targeting the same database.
+	// In other words, a successful read query run by ExecuteQuery is guaranteed to be able to read results created
+	// from a previous successful write query run by ExecuteQuery on the same database.
+	// This is achieved through the use of a bookmarks, managed by a default neo4j.BookmarkManager instance.
+	// This default BookmarkManager instance can be retrieved with GetDefaultManagedBookmarkManager.
+	// Such a consistency guarantee is not maintained between ExecuteQuery calls and the lower-level
+	// neo4j.SessionWithContext API calls, unless sessions are explicitly configured with the same bookmark manager.
+	// That guarantee may also break if a custom implementation of neo4j.BookmarkManager is provided via for instance
+	// the built-in callback neo4j.WithBookmarkManager.
+	ExecuteQuery(context.Context, string, map[string]any, ...ExecuteQueryConfigurationOption) (*EagerResult, error)
+	// GetDefaultManagedBookmarkManager returns the bookmark manager instance used by ExecuteQuery by default.
+	// This is useful when ExecuteQuery is called without custom bookmark managers and the lower-level
+	// neo4j.SessionWithContext APIs are called as well.
+	// In that case, the recommended approach is as follows:
+	// 	results, err := driver.ExecuteQuery(ctx, query, params)
+	// 	// [...] do something with results and error
+	//	bookmarkManager := driver.GetDefaultManagedBookmarkManager()
+	// 	// maintain consistency with sessions as well
+	//	session := driver.NewSession(ctx, neo4j.SessionConfig {BookmarkManager: bookmarkManager})
+	//	// [...] run something within the session
+	GetDefaultManagedBookmarkManager() BookmarkManager
 	// Target returns the url this driver is bootstrapped
 	Target() url.URL
 	// NewSession creates a new session based on the specified session configuration.

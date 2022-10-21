@@ -12,10 +12,6 @@ import (
 	"unsafe"
 )
 
-// TODO:
-// - define API at interface level
-// - implement TestKit support
-
 func TestDriverExecuteQuery(outer *testing.T) {
 	outer.Parallel()
 
