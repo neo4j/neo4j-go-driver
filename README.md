@@ -4,6 +4,12 @@ This is the official Neo4j Go Driver.
 
 ## Getting the Driver
 
+### Go version prerequisites
+
+The Go driver only works with actively maintained Go versions.
+
+Read [Go official release policy](https://go.dev/doc/devel/release#policy) to learn more.
+
 ### Module version
 
 Make sure your application has been set up to use go modules (there should be a go.mod file in your application root).
@@ -13,7 +19,7 @@ Make sure your application has been set up to use go modules (there should be a 
 Add the driver with:
 
 ```shell
-go get github.com/neo4j/neo4j-go-driver/v5@<the 5.x tag>
+go get github.com/neo4j/neo4j-go-driver/v5
 ```
 
 #### 4.x
@@ -21,7 +27,7 @@ go get github.com/neo4j/neo4j-go-driver/v5@<the 5.x tag>
 Add the driver with:
 
 ```shell
-go get github.com/neo4j/neo4j-go-driver/v4@<the 4.x tag>
+go get github.com/neo4j/neo4j-go-driver/v4
 ```
 
 #### 1.x
@@ -29,7 +35,7 @@ go get github.com/neo4j/neo4j-go-driver/v4@<the 4.x tag>
 For versions 1.x of the driver (notice the absence of `/v4` or `/v5`), run instead the following:
 
 ```shell
-go get github.com/neo4j/neo4j-go-driver@<the 1.x tag>
+go get github.com/neo4j/neo4j-go-driver
 ```
 
 ## Documentation
@@ -37,12 +43,10 @@ go get github.com/neo4j/neo4j-go-driver@<the 1.x tag>
 Drivers manual that describes general driver concepts in depth [here](https://neo4j.com/docs/driver-manual/5.0/).
 Go package API documentation [here](https://pkg.go.dev/github.com/neo4j/neo4j-go-driver/v5).
 
-## Migrating from 1.x and 4.x
+## Migrating from previous versions
 
 See [migration guide](MIGRATION_GUIDE.md) for information on how to migrate 
-from 1.8 (and 1.7) version of the driver.
-
-This also includes a section on how migrate from 4.x to 5.0.
+from previous versions of the driver to the current one.
 
 ## Minimum Viable Snippet
 
@@ -54,77 +58,101 @@ Make sure to use the configuration in the code that matches the version of Neo4j
 package main
 
 import (
-    "fmt"
-    "github.com/neo4j/neo4j-go-driver/v4/neo4j"
-    "io"
-    "log"
+	"context"
+	"fmt"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
+	"io"
+	"log"
 )
 
 func main() {
 	// Neo4j 4.0, defaults to no TLS therefore use bolt:// or neo4j://
 	// Neo4j 3.5, defaults to self-signed certificates, TLS on, therefore use bolt+ssc:// or neo4j+ssc://
 	dbUri := "neo4j://localhost:7687"
-	driver, err := neo4j.NewDriver(dbUri, neo4j.BasicAuth("username", "password", ""))
+	driver, err := neo4j.NewDriverWithContext(dbUri, neo4j.BasicAuth("username", "password", ""))
 	if err != nil {
 		panic(err)
 	}
+	// Starting with 5.0, you can control the execution of most driver APIs
+	// To keep things simple, we create here a never-cancelling context
+	// Read https://pkg.go.dev/context to learn more about contexts
+	ctx := context.Background()
 	// Handle driver lifetime based on your application lifetime requirements  driver's lifetime is usually
 	// bound by the application lifetime, which usually implies one driver instance per application
-	defer driver.Close()
-	item, err := insertItem(driver)
+	// Make sure to handle errors during deferred calls
+	defer driver.Close(ctx)
+	item, err := insertItem(ctx, driver)
 	if err != nil {
 		panic(err)
 	}
 	fmt.Printf("%v\n", item)
 }
 
-func insertItem(driver neo4j.Driver) (*Item, error) {
-    // Sessions are short-lived, cheap to create and NOT thread safe. Typically create one or more sessions
-    // per request in your web application. Make sure to call Close on the session when done.
-    // For multi-database support, set sessionConfig.DatabaseName to requested database
-    // Session config will default to write mode, if only reads are to be used configure session for
-    // read mode.
-    session := driver.NewSession(neo4j.SessionConfig{})
-    defer session.Close()
-    result, err := session.WriteTransaction(createItemFn)
-    if err != nil {
-        return nil, err
-    }
-    return result.(*Item), nil
+func insertItem(ctx context.Context, driver neo4j.DriverWithContext) (*Item, error) {
+	// Sessions are short-lived, cheap to create and NOT thread safe. Typically create one or more sessions
+	// per request in your web application. Make sure to call Close on the session when done.
+	// For multi-database support, set sessionConfig.DatabaseName to requested database
+	// Session config will default to write mode, if only reads are to be used configure session for
+	// read mode.
+	session := driver.NewSession(ctx, neo4j.SessionConfig{})
+	defer session.Close(ctx)
+	result, err := session.ExecuteWrite(ctx, createItemFn(ctx))
+	if err != nil {
+		return nil, err
+	}
+	return result.(*Item), nil
 }
 
-func createItemFn(tx neo4j.Transaction) (interface{}, error) {
-    records, err := tx.Run("CREATE (n:Item { id: $id, name: $name }) RETURN n.id, n.name", map[string]interface{}{
-        "id":   1,
-        "name": "Item 1",
-    })
-    // In face of driver native errors, make sure to return them directly.
-    // Depending on the error, the driver may try to execute the function again.
-    if err != nil {
-        return nil, err
-    }
-    record, err := records.Single()
-    if err != nil {
-        return nil, err
-    }
-    // You can also retrieve values by name, with e.g. `id, found := record.Get("n.id")`
-    return &Item{
-        Id:   record.Values[0].(int64),
-        Name: record.Values[1].(string),
-    }, nil
+func createItemFn(ctx context.Context) neo4j.ManagedTransactionWork {
+	return func(tx neo4j.ManagedTransaction) (any, error) {
+		records, err := tx.Run(ctx, "CREATE (n:Item { id: $id, name: $name }) RETURN n.id, n.name", map[string]any{
+			"id":   1,
+			"name": "Item 1",
+		})
+		// In face of driver native errors, make sure to return them directly.
+		// Depending on the error, the driver may try to execute the function again.
+		if err != nil {
+			return nil, err
+		}
+		record, err := records.Single(ctx)
+		if err != nil {
+			return nil, err
+		}
+		// You can also retrieve values by name, with e.g. `id, found := record.Get("n.id")`
+		return &Item{
+			Id:   record.Values[0].(int64),
+			Name: record.Values[1].(string),
+		}, nil
+	}
 }
 
 type Item struct {
-    Id int64
-    Name string
+	Id   int64
+	Name string
 }
 ```
 
 ## Neo4j and Bolt protocol versions
 
-The driver implements Bolt protocol version 3. This means that either Neo4j server 3.5 or above can be used with the driver.
-
-Neo4j server 4 supports both Bolt protocol version 3 and version 4.
++------------------+-------+-------+-------+-------+-------+-------+-------+-------+
+| Server \\ Driver |  1.7  |  4.0  |  4.1  |  4.2  |  4.3  | *4.4* |  5.0  | *5.1* |
++==================+=======+=======+=======+=======+=======+=======+=======+=======+
+| Neo4j 3.5 (EOL)  |  Yes  |  Yes  | (Yes) | (Yes) | (Yes) | (Yes) | (Yes) | (Yes) |
++------------------+-------+-------+-------+-------+-------+-------+-------+-------+
+| Neo4j 4.0 (EOL)  |  Yes  |  Yes  |  Yes  |  Yes  |  Yes  |  Yes  | (Yes) | (Yes) |
++------------------+-------+-------+-------+-------+-------+-------+-------+-------+
+| Neo4j 4.1 (EOL)  |   ?   |  Yes  |  Yes  |  Yes  |  Yes  |  Yes  | (Yes) | (Yes) |
++------------------+-------+-------+-------+-------+-------+-------+-------+-------+
+| Neo4j 4.2 (EOL)  |   ?   |   ?   |  Yes  |  Yes  |  Yes  |  Yes  | (Yes) | (Yes) |
++------------------+-------+-------+-------+-------+-------+-------+-------+-------+
+| Neo4j 4.3        |   ?   |   ?   |   ?   |  Yes  |  Yes  |  Yes  | (Yes) | (Yes) |
++------------------+-------+-------+-------+-------+-------+-------+-------+-------+
+| Neo4j 4.4 (LTS)  |   ?   |   ?   |   ?   |   ?   |  Yes  |  Yes  |  Yes  |  Yes  |
++------------------+-------+-------+-------+-------+-------+-------+-------+-------+
+| Neo4j 5.0        |   ?   |   ?   |   ?   |   ?   |   ?   |  Yes  |  Yes  |  Yes  |
++------------------+-------+-------+-------+-------+-------+-------+-------+-------+
+| Neo4j 5.1        |   ?   |   ?   |   ?   |   ?   |   ?   |   ?   |  Yes  |  Yes  |
++------------------+-------+-------+-------+-------+-------+-------+-------+-------+
 
 ## Connecting to a causal cluster
 
@@ -149,7 +177,7 @@ The records inside the result can be accessed via `Next()`/`Record()` functions 
 
 ```go
 	// Next returns false upon error
-	for result.Next() {
+	for result.Next(ctx) {
 		record := result.Record()
 		handleRecord(record)
 	}
@@ -160,7 +188,8 @@ The records inside the result can be accessed via `Next()`/`Record()` functions 
 ```
 
 ### Accessing Values in a Record
-Values in a `Record` can be accessed either by index or by alias. The return value is an `interface{}` which means you need to convert the interface to the type expected
+Values in a `Record` can be accessed either by index or by alias. The return value is an `any` which means you need
+to convert the interface to the expected type
 
 ```go
 value := record.Values[0]
@@ -174,31 +203,31 @@ if value, ok := record.Get('field_name'); ok {
 ```
 
 ### Value Types
-The driver exposes values in the record as an `interface{}` type. 
+The driver exposes values in the record as an `any` type. 
 The underlying types of the returned values depend on the corresponding Cypher types.
 
 The mapping between Cypher types and the types used by this driver (to represent the Cypher type):
 
-| Cypher Type | Driver Type
-| ---: | :--- |
-| *null* | nil |
-| List | []interface{} |
-| Map  | map[string]interface{} |
-| Boolean| bool |
-| Integer| int64 |
-| Float| float |
-| String| string |
-| ByteArray| []byte |
-| Node| neo4j.Node |
-| Relationship| neo4j.Relationship |
-| Path| neo4j.Path |
+|  Cypher Type | Driver Type            |
+|-------------:|:-----------------------|
+|       *null* | nil                    |
+|         List | []any          |
+|          Map | map[string]any |
+|      Boolean | bool                   |
+|      Integer | int64                  |
+|        Float | float                  |
+|       String | string                 |
+|    ByteArray | []byte                 |
+|         Node | neo4j.Node             |
+| Relationship | neo4j.Relationship     |
+|         Path | neo4j.Path             |
 
 ### Spatial Types - Point
 
-| Cypher Type | Driver Type
-| ---: | :--- |
-| Point| neo4j.Point2D |
-| Point| neo4j.Point3D |
+| Cypher Type | Driver Type   |
+|------------:|:--------------|
+|       Point | neo4j.Point2D |
+|       Point | neo4j.Point3D |
 
 The temporal types are introduced in Neo4j 3.4 series.
 
@@ -224,14 +253,14 @@ The temporal types are introduced in Neo4j 3.4 series. Given the fact that datab
 
 The mapping among the Cypher temporal types and actual exposed types are as follows:
 
-| Cypher Type | Driver Type |
-| :----------: | :-----------: |
-| Date | neo4j.Date |
-| Time | neo4j.OffsetTime |
-| LocalTime| neo4j.LocalTime |
-| DateTime | time.Time |
+|  Cypher Type  |     Driver Type     |
+|:-------------:|:-------------------:|
+|     Date      |     neo4j.Date      |
+|     Time      |  neo4j.OffsetTime   |
+|   LocalTime   |   neo4j.LocalTime   |
+|   DateTime    |      time.Time      |
 | LocalDateTime | neo4j.LocalDateTime |
-| Duration | neo4j.Duration |
+|   Duration    |   neo4j.Duration    |
 
 
 Receiving a temporal value as driver type:
@@ -285,9 +314,9 @@ The `Log` field of the `neo4j.Config` struct is defined to be of interface `neo4
 ```go
 type Logger interface {
 	Error(name string, id string, err error)
-	Warnf(name string, id string, msg string, args ...interface{})
-	Infof(name string, id string, msg string, args ...interface{})
-	Debugf(name string, id string, msg string, args ...interface{})
+	Warnf(name string, id string, msg string, args ...any)
+	Infof(name string, id string, msg string, args ...any)
+	Debugf(name string, id string, msg string, args ...any)
 }
 ```
 
@@ -316,8 +345,8 @@ The `BoltLogger` field of the `neo4j.SessionConfig` struct is defined to be of i
 
 ```go
 type BoltLogger interface {
-	LogClientMessage(context string, msg string, args ...interface{})
-	LogServerMessage(context string, msg string, args ...interface{})
+	LogClientMessage(context string, msg string, args ...any)
+	LogServerMessage(context string, msg string, args ...any)
 }
 ```
 
