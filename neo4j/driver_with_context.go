@@ -53,7 +53,10 @@ type DriverWithContext interface {
 	// ExecuteQuery runs the specified query with its parameters and returns results.
 	// 	results, err := driver.ExecuteQuery(ctx, query, params)
 	//
-	// This function runs the query in a single explicit transaction within a session, entirely managed by the driver.
+	// This function runs the query in a single explicit, retryable transaction within a session, entirely managed by
+	// the driver.
+	// Because it is an explicit transaction, Cypher queries using "CALL {} IN TRANSACTIONS" or the older
+	// "USING PERIODIC COMMIT" construct will not work (call SessionWithContext#Run for these).
 	//
 	// Specific settings can be configured via configuration callbacks. Built-in callbacks are provided such as:
 	//	neo4j.WithDatabase
