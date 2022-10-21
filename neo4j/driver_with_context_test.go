@@ -24,25 +24,26 @@ func TestDriverExecuteQuery(outer *testing.T) {
 	summary := &fakeSummary{resultAvailableAfter: 42 * time.Millisecond}
 	defaultBookmarkManager := &fakeBookmarkManager{}
 	customBookmarkManager := &fakeBookmarkManager{}
+	defaultSessionConfig := SessionConfig{BookmarkManager: defaultBookmarkManager}
 
 	type testCase struct {
 		description           string
 		configurers           []ExecuteQueryConfigurationOption
-		session               *fakeSession
+		createSession         *fakeSession
 		expectedSessionConfig SessionConfig
 		expectedResult        *EagerResult
 		expectedErr           error
 	}
 	testCases := []testCase{
 		{
-			description:           "returns expected result of assumed write query",
-			expectedSessionConfig: SessionConfig{BookmarkManager: defaultBookmarkManager},
-			session: &fakeSession{
+			description: "returns expected result of assumed write query",
+			createSession: &fakeSession{
 				executeWriteTransactionResult: &fakeResult{
 					keys:    keys,
 					collect: records,
 					summary: summary,
 				}},
+			expectedSessionConfig: defaultSessionConfig,
 			expectedResult: &EagerResult{
 				Keys:    keys,
 				Records: records,
@@ -50,15 +51,15 @@ func TestDriverExecuteQuery(outer *testing.T) {
 			},
 		},
 		{
-			description:           "returns expected result of assumed write query impersonating user",
-			configurers:           []ExecuteQueryConfigurationOption{WithImpersonatedUser("jane")},
+			description: "returns expected result of assumed write query impersonating user",
+			configurers: []ExecuteQueryConfigurationOption{WithImpersonatedUser("jane")},
+			createSession: &fakeSession{
+				executeWriteTransactionResult: &fakeResult{
+					keys:    keys,
+					collect: records,
+					summary: summary,
+				}},
 			expectedSessionConfig: SessionConfig{ImpersonatedUser: "jane", BookmarkManager: defaultBookmarkManager},
-			session: &fakeSession{
-				executeWriteTransactionResult: &fakeResult{
-					keys:    keys,
-					collect: records,
-					summary: summary,
-				}},
 			expectedResult: &EagerResult{
 				Keys:    keys,
 				Records: records,
@@ -66,15 +67,15 @@ func TestDriverExecuteQuery(outer *testing.T) {
 			},
 		},
 		{
-			description:           "returns expected result of assumed write query targeting database",
-			configurers:           []ExecuteQueryConfigurationOption{WithDatabase("imdb")},
+			description: "returns expected result of assumed write query targeting database",
+			configurers: []ExecuteQueryConfigurationOption{WithDatabase("imdb")},
+			createSession: &fakeSession{
+				executeWriteTransactionResult: &fakeResult{
+					keys:    keys,
+					collect: records,
+					summary: summary,
+				}},
 			expectedSessionConfig: SessionConfig{DatabaseName: "imdb", BookmarkManager: defaultBookmarkManager},
-			session: &fakeSession{
-				executeWriteTransactionResult: &fakeResult{
-					keys:    keys,
-					collect: records,
-					summary: summary,
-				}},
 			expectedResult: &EagerResult{
 				Keys:    keys,
 				Records: records,
@@ -82,15 +83,15 @@ func TestDriverExecuteQuery(outer *testing.T) {
 			},
 		},
 		{
-			description:           "returns expected result of assumed write query with custom bookmark manager",
-			configurers:           []ExecuteQueryConfigurationOption{WithBookmarkManager(customBookmarkManager)},
+			description: "returns expected result of assumed write query with custom bookmark manager",
+			configurers: []ExecuteQueryConfigurationOption{WithBookmarkManager(customBookmarkManager)},
+			createSession: &fakeSession{
+				executeWriteTransactionResult: &fakeResult{
+					keys:    keys,
+					collect: records,
+					summary: summary,
+				}},
 			expectedSessionConfig: SessionConfig{BookmarkManager: customBookmarkManager},
-			session: &fakeSession{
-				executeWriteTransactionResult: &fakeResult{
-					keys:    keys,
-					collect: records,
-					summary: summary,
-				}},
 			expectedResult: &EagerResult{
 				Keys:    keys,
 				Records: records,
@@ -98,15 +99,15 @@ func TestDriverExecuteQuery(outer *testing.T) {
 			},
 		},
 		{
-			description:           "returns expected result of explicit write query",
-			configurers:           []ExecuteQueryConfigurationOption{WithWritersRouting()},
-			expectedSessionConfig: SessionConfig{BookmarkManager: defaultBookmarkManager},
-			session: &fakeSession{
+			description: "returns expected result of explicit write query",
+			configurers: []ExecuteQueryConfigurationOption{WithWritersRouting()},
+			createSession: &fakeSession{
 				executeWriteTransactionResult: &fakeResult{
 					keys:    keys,
 					collect: records,
 					summary: summary,
 				}},
+			expectedSessionConfig: defaultSessionConfig,
 			expectedResult: &EagerResult{
 				Keys:    keys,
 				Records: records,
@@ -114,15 +115,15 @@ func TestDriverExecuteQuery(outer *testing.T) {
 			},
 		},
 		{
-			description:           "returns expected result of explicit read query",
-			configurers:           []ExecuteQueryConfigurationOption{WithReadersRouting()},
-			expectedSessionConfig: SessionConfig{BookmarkManager: defaultBookmarkManager},
-			session: &fakeSession{
+			description: "returns expected result of explicit read query",
+			configurers: []ExecuteQueryConfigurationOption{WithReadersRouting()},
+			createSession: &fakeSession{
 				executeReadTransactionResult: &fakeResult{
 					keys:    keys,
 					collect: records,
 					summary: summary,
 				}},
+			expectedSessionConfig: defaultSessionConfig,
 			expectedResult: &EagerResult{
 				Keys:    keys,
 				Records: records,
@@ -130,107 +131,107 @@ func TestDriverExecuteQuery(outer *testing.T) {
 			},
 		},
 		{
-			description:           "returns error when write result keys cannot be retrieved",
-			expectedSessionConfig: SessionConfig{BookmarkManager: defaultBookmarkManager},
-			session: &fakeSession{
+			description: "returns error when write result keys cannot be retrieved",
+			createSession: &fakeSession{
 				executeWriteTransactionResult: &fakeResult{
 					keysErr: fmt.Errorf("dude, where are my keys"),
 				}},
-			expectedErr: fmt.Errorf("dude, where are my keys"),
+			expectedSessionConfig: defaultSessionConfig,
+			expectedErr:           fmt.Errorf("dude, where are my keys"),
 		},
 		{
-			description:           "returns error when write result records cannot be collected",
-			expectedSessionConfig: SessionConfig{BookmarkManager: defaultBookmarkManager},
-			session: &fakeSession{
+			description: "returns error when write result records cannot be collected",
+			createSession: &fakeSession{
 				executeWriteTransactionResult: &fakeResult{
 					keys:       keys,
 					collectErr: fmt.Errorf("one does not simply collect"),
 				}},
-			expectedErr: fmt.Errorf("one does not simply collect"),
+			expectedSessionConfig: defaultSessionConfig,
+			expectedErr:           fmt.Errorf("one does not simply collect"),
 		},
 		{
-			description:           "returns error when write result summary cannot be retrieved",
-			expectedSessionConfig: SessionConfig{BookmarkManager: defaultBookmarkManager},
-			session: &fakeSession{
+			description: "returns error when write result summary cannot be retrieved",
+			createSession: &fakeSession{
 				executeWriteTransactionResult: &fakeResult{
 					keys:       keys,
 					collect:    records,
 					summaryErr: fmt.Errorf("in summary: nope"),
 				}},
-			expectedErr: fmt.Errorf("in summary: nope"),
+			expectedSessionConfig: defaultSessionConfig,
+			expectedErr:           fmt.Errorf("in summary: nope"),
 		},
 		{
-			description:           "returns error when write result summary cannot be retrieved",
-			expectedSessionConfig: SessionConfig{BookmarkManager: defaultBookmarkManager},
-			session: &fakeSession{
+			description: "returns error when write result summary cannot be retrieved",
+			createSession: &fakeSession{
 				executeWriteTransactionResult: &fakeResult{
 					keys:       keys,
 					collect:    records,
 					summaryErr: fmt.Errorf("in summary: nope"),
 				}},
-			expectedErr: fmt.Errorf("in summary: nope"),
+			expectedSessionConfig: defaultSessionConfig,
+			expectedErr:           fmt.Errorf("in summary: nope"),
 		},
 		{
-			description:           "returns error when write execution fails",
-			expectedSessionConfig: SessionConfig{BookmarkManager: defaultBookmarkManager},
-			session: &fakeSession{
+			description: "returns error when write execution fails",
+			createSession: &fakeSession{
 				executeWriteErr: fmt.Errorf("oopsie"),
 			},
-			expectedErr: fmt.Errorf("oopsie"),
+			expectedSessionConfig: defaultSessionConfig,
+			expectedErr:           fmt.Errorf("oopsie"),
 		},
 		{
-			description:           "returns error when read result keys cannot be retrieved",
-			expectedSessionConfig: SessionConfig{BookmarkManager: defaultBookmarkManager},
-			configurers:           []ExecuteQueryConfigurationOption{WithReadersRouting()},
-			session: &fakeSession{
+			description: "returns error when read result keys cannot be retrieved",
+			configurers: []ExecuteQueryConfigurationOption{WithReadersRouting()},
+			createSession: &fakeSession{
 				executeReadTransactionResult: &fakeResult{
 					keysErr: fmt.Errorf("dude, where are my keys"),
 				}},
-			expectedErr: fmt.Errorf("dude, where are my keys"),
+			expectedSessionConfig: defaultSessionConfig,
+			expectedErr:           fmt.Errorf("dude, where are my keys"),
 		},
 		{
-			description:           "returns error when read result records cannot be collected",
-			expectedSessionConfig: SessionConfig{BookmarkManager: defaultBookmarkManager},
-			configurers:           []ExecuteQueryConfigurationOption{WithReadersRouting()},
-			session: &fakeSession{
+			description: "returns error when read result records cannot be collected",
+			configurers: []ExecuteQueryConfigurationOption{WithReadersRouting()},
+			createSession: &fakeSession{
 				executeReadTransactionResult: &fakeResult{
 					keys:       keys,
 					collectErr: fmt.Errorf("one does not simply collect"),
 				}},
-			expectedErr: fmt.Errorf("one does not simply collect"),
+			expectedSessionConfig: defaultSessionConfig,
+			expectedErr:           fmt.Errorf("one does not simply collect"),
 		},
 		{
-			description:           "returns error when read result summary cannot be retrieved",
-			expectedSessionConfig: SessionConfig{BookmarkManager: defaultBookmarkManager},
-			configurers:           []ExecuteQueryConfigurationOption{WithReadersRouting()},
-			session: &fakeSession{
+			description: "returns error when read result summary cannot be retrieved",
+			configurers: []ExecuteQueryConfigurationOption{WithReadersRouting()},
+			createSession: &fakeSession{
 				executeReadTransactionResult: &fakeResult{
 					keys:       keys,
 					collect:    records,
 					summaryErr: fmt.Errorf("in summary: nope"),
 				}},
-			expectedErr: fmt.Errorf("in summary: nope"),
+			expectedSessionConfig: defaultSessionConfig,
+			expectedErr:           fmt.Errorf("in summary: nope"),
 		},
 		{
-			description:           "returns error when read result summary cannot be retrieved",
-			expectedSessionConfig: SessionConfig{BookmarkManager: defaultBookmarkManager},
-			configurers:           []ExecuteQueryConfigurationOption{WithReadersRouting()},
-			session: &fakeSession{
+			description: "returns error when read result summary cannot be retrieved",
+			configurers: []ExecuteQueryConfigurationOption{WithReadersRouting()},
+			createSession: &fakeSession{
 				executeReadTransactionResult: &fakeResult{
 					keys:       keys,
 					collect:    records,
 					summaryErr: fmt.Errorf("in summary: nope"),
 				}},
-			expectedErr: fmt.Errorf("in summary: nope"),
+			expectedSessionConfig: defaultSessionConfig,
+			expectedErr:           fmt.Errorf("in summary: nope"),
 		},
 		{
-			description:           "returns error when read execution fails",
-			expectedSessionConfig: SessionConfig{BookmarkManager: defaultBookmarkManager},
-			configurers:           []ExecuteQueryConfigurationOption{WithReadersRouting()},
-			session: &fakeSession{
+			description: "returns error when read execution fails",
+			configurers: []ExecuteQueryConfigurationOption{WithReadersRouting()},
+			createSession: &fakeSession{
 				executeReadErr: fmt.Errorf("oopsie"),
 			},
-			expectedErr: fmt.Errorf("oopsie"),
+			expectedSessionConfig: defaultSessionConfig,
+			expectedErr:           fmt.Errorf("oopsie"),
 		},
 	}
 
@@ -239,7 +240,7 @@ func TestDriverExecuteQuery(outer *testing.T) {
 			driver := &driverWithContext{
 				newSession: func(_ context.Context, config SessionConfig) SessionWithContext {
 					AssertDeepEquals(t, testCase.expectedSessionConfig, config)
-					return testCase.session
+					return testCase.createSession
 				},
 				defaultManagedSessionBookmarkManager: defaultBookmarkManager,
 			}
