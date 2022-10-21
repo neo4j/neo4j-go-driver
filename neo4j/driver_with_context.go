@@ -24,6 +24,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/errorutil"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/racing"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/log"
 	"net/url"
@@ -328,21 +329,19 @@ func (d *driverWithContext) ExecuteQuery(
 	ctx context.Context,
 	query string,
 	parameters map[string]any,
-	settings ...ExecuteQueryConfigurationOption) (*EagerResult, error) {
+	settings ...ExecuteQueryConfigurationOption) (res *EagerResult, err error) {
 
-	d.bookmarkManagerInitOnce.Do(func() {
-		if d.defaultManagedSessionBookmarkManager == nil { // checked for testing
-			d.defaultManagedSessionBookmarkManager = NewBookmarkManager(BookmarkManagerConfig{})
-		}
-	})
+	bookmarkManager := d.GetDefaultManagedBookmarkManager()
 	configuration := &ExecuteQueryConfiguration{
-		BookmarkManager: d.defaultManagedSessionBookmarkManager,
+		BookmarkManager: bookmarkManager,
 	}
 	for _, setter := range settings {
 		setter(configuration)
 	}
 	session := d.newSession(ctx, configuration.toSessionConfig())
-	defer session.Close(ctx)
+	defer func() {
+		err = errorutil.CombineAllErrors(err, session.Close(ctx))
+	}()
 	txFunction, err := configuration.selectTxFunctionApi(session)
 	if err != nil {
 		return nil, err
@@ -352,6 +351,15 @@ func (d *driverWithContext) ExecuteQuery(
 		return nil, err
 	}
 	return result.(*EagerResult), nil
+}
+
+func (d *driverWithContext) GetDefaultManagedBookmarkManager() BookmarkManager {
+	d.bookmarkManagerInitOnce.Do(func() {
+		if d.defaultManagedSessionBookmarkManager == nil { // this allows tests to init the field themselves
+			d.defaultManagedSessionBookmarkManager = NewBookmarkManager(BookmarkManagerConfig{})
+		}
+	})
+	return d.defaultManagedSessionBookmarkManager
 }
 
 func (d *driverWithContext) executeQueryCallback(ctx context.Context, query string, parameters map[string]any) ManagedTransactionWork {

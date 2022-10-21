@@ -2,14 +2,17 @@ package neo4j
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	. "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/testutil"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
+	"unsafe"
 )
 
 // TODO:
-// - test session.Close error
 // - define API at interface level
 // - implement TestKit support
 
@@ -180,6 +183,36 @@ func TestDriverExecuteQuery(outer *testing.T) {
 			expectedErr:           fmt.Errorf("oopsie"),
 		},
 		{
+			description: "returns error when session close fails",
+			createSession: &fakeSession{
+				executeWriteTransactionResult: &fakeResult{
+					keys:    keys,
+					collect: records,
+					summary: summary,
+				},
+				closeErr: fmt.Errorf("looking closer: it seems close erred 🥁"),
+			},
+			expectedSessionConfig: defaultSessionConfig,
+			expectedErr:           fmt.Errorf("looking closer: it seems close erred 🥁"),
+			// TODO: make the result nil in that case since people should check the error first?
+			expectedResult: &EagerResult{
+				Keys:    keys,
+				Records: records,
+				Summary: summary,
+			},
+		},
+		{
+			description: "returns combined error when a previous error occurred before the session close's'",
+			createSession: &fakeSession{
+				executeWriteErr: fmt.Errorf("he's a pirate writerrrr"),
+				closeErr:        fmt.Errorf("looking closer: it seems close erred 🥁"),
+			},
+			expectedSessionConfig: defaultSessionConfig,
+			expectedErr: fmt.Errorf("error %v occurred after previous error %w",
+				errors.New("looking closer: it seems close erred 🥁"),
+				errors.New(("he's a pirate writerrrr"))),
+		},
+		{
 			description: "returns error when read result keys cannot be retrieved",
 			configurers: []ExecuteQueryConfigurationOption{WithReadersRouting()},
 			createSession: &fakeSession{
@@ -250,6 +283,62 @@ func TestDriverExecuteQuery(outer *testing.T) {
 			AssertDeepEquals(t, testCase.expectedErr, err)
 			AssertDeepEquals(t, testCase.expectedResult, eagerResult)
 		})
+	}
+
+	outer.Run("default bookmark manager is thread-safe", func(t *testing.T) {
+		driver := &driverWithContext{
+			newSession: func(_ context.Context, config SessionConfig) SessionWithContext {
+				return &fakeSession{
+					executeWriteErr: fmt.Errorf("oopsie, write failed"),
+				}
+			},
+		}
+
+		var wait sync.WaitGroup
+		var bookmarkManagerAddresses sync.Map
+		goroutineCount := 50
+		wait.Add(goroutineCount)
+		for i := 0; i < goroutineCount; i++ {
+			go func(i int) {
+				callExecuteQueryOrBookmarkManagerGetter(driver, i)
+				storeBookmarkManagerAddress(
+					&bookmarkManagerAddresses,
+					driver.defaultManagedSessionBookmarkManager.(*bookmarkManager))
+				wait.Done()
+			}(i)
+		}
+		wait.Wait()
+
+		addressCounts := make(map[uintptr]int32, goroutineCount)
+		bookmarkManagerAddresses.Range(func(key, value any) bool {
+			addressCounts[key.(uintptr)] = *(value.(*int32))
+			return true
+		})
+		if len(addressCounts) != 1 {
+			t.Errorf("expected exactly 1 bookmark manager pointer to have been created, got %v", addressCounts)
+		}
+		address := uintptr(unsafe.Pointer(driver.defaultManagedSessionBookmarkManager.(*bookmarkManager)))
+		if count, found := addressCounts[address]; !found || count != int32(goroutineCount) {
+			t.Errorf("expected pointer address %v to be seen %d time(s), got these instead %v", address, count, addressCounts)
+		}
+	})
+}
+
+func callExecuteQueryOrBookmarkManagerGetter(driver *driverWithContext, i int) {
+	if i%2 == 0 {
+		// this lazily initializes the default bookmark manager
+		_ = driver.GetDefaultManagedBookmarkManager()
+	} else {
+		// this as well
+		_, _ = driver.ExecuteQuery(context.Background(), "RETURN 42", nil)
+	}
+}
+
+func storeBookmarkManagerAddress(bookmarkManagerAddresses *sync.Map, bookmarkMgr *bookmarkManager) {
+	address := uintptr(unsafe.Pointer(bookmarkMgr))
+	defaultCount := int32(1)
+	if count, loaded := bookmarkManagerAddresses.LoadOrStore(address, &defaultCount); loaded {
+		atomic.AddInt32(count.(*int32), 1)
 	}
 }
 
