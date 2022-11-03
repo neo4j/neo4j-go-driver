@@ -79,29 +79,30 @@ func (i *internalTx5) toMeta() map[string]any {
 }
 
 type bolt5 struct {
-	state            int
-	txId             idb.TxHandle
-	streams          openstreams
-	conn             net.Conn
-	serverName       string
-	out              outgoing
-	in               incoming
-	connId           string
-	logId            string
-	serverVersion    string
-	tfirst           int64  // Time that server started streaming
-	bookmark         string // Last bookmark
-	bookmarkDatabase string // Last bookmark's database
-	birthDate        time.Time
-	log              log.Logger
-	databaseName     string
-	err              error // Last fatal error
-	minor            int
-	lastQid          int64 // Last seen qid
-	idleDate         time.Time
+	state               int
+	txId                idb.TxHandle
+	streams             openstreams
+	conn                net.Conn
+	serverName          string
+	out                 outgoing
+	in                  incoming
+	connId              string
+	logId               string
+	serverVersion       string
+	tfirst              int64  // Time that server started streaming
+	bookmark            string // Last bookmark
+	bookmarkDatabase    string // Last bookmark's database
+	birthDate           time.Time
+	log                 log.Logger
+	databaseName        string
+	err                 error // Last fatal error
+	minor               int
+	lastQid             int64 // Last seen qid
+	idleDate            time.Time
+	notificationFilters []string
 }
 
-func NewBolt5(serverName string, conn net.Conn, logger log.Logger, boltLog log.BoltLogger) *bolt5 {
+func NewBolt5(serverName string, conn net.Conn, logger log.Logger, boltLog log.BoltLogger, notificationFilters ...string) *bolt5 {
 	now := time.Now()
 	b := &bolt5{
 		state:      bolt5Unauthorized,
@@ -122,7 +123,8 @@ func NewBolt5(serverName string, conn net.Conn, logger log.Logger, boltLog log.B
 			logger:          logger,
 			logName:         log.Bolt5,
 		},
-		lastQid: -1,
+		lastQid:             -1,
+		notificationFilters: notificationFilters,
 	}
 	b.out = outgoing{
 		chunker:    newChunker(),
@@ -240,11 +242,25 @@ func (b *bolt5) Connect(ctx context.Context, minor int, auth map[string]any, use
 	if routingContext != nil {
 		hello["routing"] = routingContext
 	}
-	// Merge authentication keys into hello, avoid overwriting existing keys
-	for k, v := range auth {
-		_, exists := hello[k]
-		if !exists {
-			hello[k] = v
+	// TODO move this to a new appendHello for 5.3+
+	if minor >= 3 {
+		// TODO: still protect from overwrites? (even though they cannot happen anymore?)
+		hello["auth"] = auth
+		sendNotifications := true
+		for _, notificationFilter := range b.notificationFilters {
+			if notificationFilter == "SERVER_DEFAULT" {
+				sendNotifications = false
+			}
+		}
+		if sendNotifications {
+			hello["notifications"] = b.notificationFilters
+		}
+	} else {
+		for k, v := range auth {
+			_, exists := hello[k]
+			if !exists {
+				hello[k] = v
+			}
 		}
 	}
 

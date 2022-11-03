@@ -193,6 +193,48 @@ func TestBolt5(outer *testing.T) {
 		bolt.Close(context.Background())
 	})
 
+	outer.Run("Updated authentication in hello [5.3+]", func(t *testing.T) {
+		conn, srv, cleanup := setupBolt5Pipe(t)
+		defer cleanup()
+		go func() {
+			srv.waitForHandshake()
+			srv.acceptVersion(5, 3)
+			srv.waitForHello53(nil)
+			srv.acceptHello()
+		}()
+		bolt, err := Connect(context.Background(), "serverName", conn, auth, "007", nil, logger, nil)
+		AssertNoError(t, err)
+		bolt.Close(context.Background())
+	})
+
+	outer.Run("Notification filters in hello [5.3+]", func(t *testing.T) {
+		conn, srv, cleanup := setupBolt5Pipe(t)
+		defer cleanup()
+		go func() {
+			srv.waitForHandshake()
+			srv.acceptVersion(5, 3)
+			srv.waitForHello53([]string{"INFORMATION.ALL", "WARNING.UNRECOGNIZED"})
+			srv.acceptHello()
+		}()
+		bolt, err := Connect(context.Background(), "serverName", conn, auth, "007", nil, logger, nil, "INFORMATION.ALL", "WARNING.UNRECOGNIZED")
+		AssertNoError(t, err)
+		bolt.Close(context.Background())
+	})
+
+	outer.Run("Disabling notification filters in hello [5.3+]", func(t *testing.T) {
+		conn, srv, cleanup := setupBolt5Pipe(t)
+		defer cleanup()
+		go func() {
+			srv.waitForHandshake()
+			srv.acceptVersion(5, 3)
+			srv.waitForHello53(nil)
+			srv.acceptHello()
+		}()
+		bolt, err := Connect(context.Background(), "serverName", conn, auth, "007", nil, logger, nil, "ALL.ALL", "SERVER_DEFAULT")
+		AssertNoError(t, err)
+		bolt.Close(context.Background())
+	})
+
 	outer.Run("No routing in hello", func(t *testing.T) {
 		conn, srv, cleanup := setupBolt5Pipe(t)
 		defer cleanup()

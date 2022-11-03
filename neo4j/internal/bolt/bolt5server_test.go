@@ -95,6 +95,44 @@ func (s *bolt5server) waitForHello() map[string]any {
 	return m
 }
 
+func (s *bolt5server) waitForHello53(expectedNotifications []string) map[string]any {
+	msg := s.receiveMsg()
+	s.assertStructType(msg, msgHello)
+	m := msg.fields[0].(map[string]any)
+	// Hello should contain some musts
+	rawAuth, exists := m["auth"]
+	if !exists {
+		s.sendFailureMsg("?", "Missing auth in hello (5.3+)")
+	} else {
+		auth := rawAuth.(map[string]any)
+		_, exists = auth["scheme"]
+		if !exists {
+			s.sendFailureMsg("?", "Missing auth scheme in hello (5.3+)")
+		}
+	}
+	_, exists = m["user_agent"]
+	if !exists {
+		s.sendFailureMsg("?", "Missing user_agent in hello (5.3+)")
+	}
+	rawActualNotifications := m["notifications"]
+	if rawActualNotifications == nil {
+		if len(expectedNotifications) > 0 {
+			s.sendFailureMsg("?", fmt.Sprintf("Notification mismatch (5.3+), expected %d notification(s) but got nothing", len(expectedNotifications)))
+		}
+		return m
+	}
+	actualNotifications := rawActualNotifications.([]any)
+	if len(expectedNotifications) != len(actualNotifications) {
+		s.sendFailureMsg("?", fmt.Sprintf("Notification mismatch (5.3+), expected %d notification(s) but got: %d", len(expectedNotifications), len(actualNotifications)))
+	}
+	for i := range expectedNotifications {
+		if expectedNotifications[i] != actualNotifications[i] {
+			s.sendFailureMsg("?", fmt.Sprintf("Notification mismatch (5.3+), expected %d-th notification to be: %v, but was: %v", i, expectedNotifications, actualNotifications))
+		}
+	}
+	return m
+}
+
 func (s *bolt5server) receiveMsg() *testStruct {
 	_, buf, err := dechunkMessage(context.Background(), s.conn, []byte{}, -1, log.Void{}, "", "")
 	if err != nil {
