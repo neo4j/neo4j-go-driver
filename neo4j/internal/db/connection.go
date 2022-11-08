@@ -48,11 +48,12 @@ type Command struct {
 }
 
 type TxConfig struct {
-	Mode             AccessMode
-	Bookmarks        []string
-	Timeout          time.Duration
-	ImpersonatedUser string
-	Meta             map[string]any
+	Mode                AccessMode
+	Bookmarks           []string
+	Timeout             time.Duration
+	ImpersonatedUser    string
+	Meta                map[string]any
+	NotificationFilters []string
 }
 
 const DefaultTxConfigTimeout = math.MinInt

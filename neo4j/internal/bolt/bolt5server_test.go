@@ -95,11 +95,10 @@ func (s *bolt5server) waitForHello() map[string]any {
 	return m
 }
 
-func (s *bolt5server) waitForHello53(expectedNotifications []string) map[string]any {
+func (s *bolt5server) waitForHello53(assertNotifications assertInExtraMap[string, []string]) map[string]any {
 	msg := s.receiveMsg()
 	s.assertStructType(msg, msgHello)
 	m := msg.fields[0].(map[string]any)
-	// Hello should contain some musts
 	rawAuth, exists := m["auth"]
 	if !exists {
 		s.sendFailureMsg("?", "Missing auth in hello (5.3+)")
@@ -114,22 +113,12 @@ func (s *bolt5server) waitForHello53(expectedNotifications []string) map[string]
 	if !exists {
 		s.sendFailureMsg("?", "Missing user_agent in hello (5.3+)")
 	}
-	rawActualNotifications := m["notifications"]
-	if rawActualNotifications == nil {
-		if len(expectedNotifications) > 0 {
-			s.sendFailureMsg("?", fmt.Sprintf("Notification mismatch (5.3+), expected %d notification(s) but got nothing", len(expectedNotifications)))
-		}
+	actualNotifications, found := m[assertNotifications.key]
+	if found != assertNotifications.found {
+		s.sendFailureMsg("?", fmt.Sprintf("expected inclusion of notifications to be: %t, but was: %t", assertNotifications.found, found))
 		return m
 	}
-	actualNotifications := rawActualNotifications.([]any)
-	if len(expectedNotifications) != len(actualNotifications) {
-		s.sendFailureMsg("?", fmt.Sprintf("Notification mismatch (5.3+), expected %d notification(s) but got: %d", len(expectedNotifications), len(actualNotifications)))
-	}
-	for i := range expectedNotifications {
-		if expectedNotifications[i] != actualNotifications[i] {
-			s.sendFailureMsg("?", fmt.Sprintf("Notification mismatch (5.3+), expected %d-th notification to be: %v, but was: %v", i, expectedNotifications, actualNotifications))
-		}
-	}
+	s.compareNotifications(assertNotifications.value, actualNotifications)
 	return m
 }
 
@@ -167,6 +156,24 @@ func (s *bolt5server) waitForReset() {
 func (s *bolt5server) waitForTxBegin() {
 	msg := s.receiveMsg()
 	s.assertStructType(msg, msgBegin)
+}
+
+func (s *bolt5server) waitForTxBegin53(assertNotifications assertInExtraMap[string, []string]) {
+	msg := s.receiveMsg()
+	s.assertStructType(msg, msgBegin)
+	m := msg.fields[0].(map[string]any)
+	actualNotifications, found := m[assertNotifications.key]
+	if found != assertNotifications.found {
+		s.sendFailureMsg("?", fmt.Sprintf("expected inclusion of notifications to be: %t, but was: %t", assertNotifications.found, found))
+		return
+	}
+	s.compareNotifications(assertNotifications.value, actualNotifications)
+}
+
+type assertInExtraMap[K any, V any] struct {
+	found bool
+	key   K
+	value V
 }
 
 func (s *bolt5server) waitForTxCommit() {
@@ -318,5 +325,24 @@ func setupBolt5Pipe(t *testing.T) (net.Conn, *bolt5server, func()) {
 
 	return clientConn, srv, func() {
 		_ = l.Close()
+	}
+}
+
+func (s *bolt5server) compareNotifications(expectedNotifications []string, rawActualNotifications any) {
+	if rawActualNotifications == nil {
+		if len(expectedNotifications) > 0 {
+			s.sendFailureMsg("?", fmt.Sprintf("Notification mismatch, expected %d notification(s) but got nothing", len(expectedNotifications)))
+		}
+		return
+	}
+	actualNotifications := rawActualNotifications.([]any)
+	if len(expectedNotifications) != len(actualNotifications) {
+		s.sendFailureMsg("?", fmt.Sprintf("Notification mismatch, expected %d notification(s) but got: %d", len(expectedNotifications), len(actualNotifications)))
+		return
+	}
+	for i := range expectedNotifications {
+		if expectedNotifications[i] != actualNotifications[i] {
+			s.sendFailureMsg("?", fmt.Sprintf("Notification mismatch, expected %d-th notification to be: %v, but was: %v", i, expectedNotifications, actualNotifications))
+		}
 	}
 }

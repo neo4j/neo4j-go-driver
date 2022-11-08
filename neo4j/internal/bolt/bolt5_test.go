@@ -193,48 +193,6 @@ func TestBolt5(outer *testing.T) {
 		bolt.Close(context.Background())
 	})
 
-	outer.Run("Updated authentication in hello [5.3+]", func(t *testing.T) {
-		conn, srv, cleanup := setupBolt5Pipe(t)
-		defer cleanup()
-		go func() {
-			srv.waitForHandshake()
-			srv.acceptVersion(5, 3)
-			srv.waitForHello53(nil)
-			srv.acceptHello()
-		}()
-		bolt, err := Connect(context.Background(), "serverName", conn, auth, "007", nil, logger, nil)
-		AssertNoError(t, err)
-		bolt.Close(context.Background())
-	})
-
-	outer.Run("Notification filters in hello [5.3+]", func(t *testing.T) {
-		conn, srv, cleanup := setupBolt5Pipe(t)
-		defer cleanup()
-		go func() {
-			srv.waitForHandshake()
-			srv.acceptVersion(5, 3)
-			srv.waitForHello53([]string{"INFORMATION.ALL", "WARNING.UNRECOGNIZED"})
-			srv.acceptHello()
-		}()
-		bolt, err := Connect(context.Background(), "serverName", conn, auth, "007", nil, logger, nil, "INFORMATION.ALL", "WARNING.UNRECOGNIZED")
-		AssertNoError(t, err)
-		bolt.Close(context.Background())
-	})
-
-	outer.Run("Disabling notification filters in hello [5.3+]", func(t *testing.T) {
-		conn, srv, cleanup := setupBolt5Pipe(t)
-		defer cleanup()
-		go func() {
-			srv.waitForHandshake()
-			srv.acceptVersion(5, 3)
-			srv.waitForHello53(nil)
-			srv.acceptHello()
-		}()
-		bolt, err := Connect(context.Background(), "serverName", conn, auth, "007", nil, logger, nil, "ALL.ALL", "SERVER_DEFAULT")
-		AssertNoError(t, err)
-		bolt.Close(context.Background())
-	})
-
 	outer.Run("No routing in hello", func(t *testing.T) {
 		conn, srv, cleanup := setupBolt5Pipe(t)
 		defer cleanup()
@@ -1224,5 +1182,226 @@ func TestBolt5(outer *testing.T) {
 			})
 		}
 
+	})
+
+	outer.Run("passes configured notification filters", func(inner *testing.T) {
+		ctx := context.Background()
+		noNotifications := assertInExtraMap[string, []string]{
+			key:   "notifications",
+			found: false,
+		}
+		notificationFilters := []string{"WARNING.DEPRECATION", "INFORMATION.QUERY"}
+
+		inner.Run("Updated authentication in hello", func(t *testing.T) {
+			conn, srv, cleanup := setupBolt5Pipe(t)
+			defer cleanup()
+			go func() {
+				srv.waitForHandshake()
+				srv.acceptVersion(5, 3)
+				srv.waitForHello53(noNotifications)
+				srv.acceptHello()
+			}()
+
+			bolt, err := Connect(ctx, "serverName", conn, auth, "007", nil, logger, nil)
+
+			AssertNoError(t, err)
+			bolt.Close(ctx)
+		})
+
+		inner.Run("Notification filters in hello", func(t *testing.T) {
+			conn, srv, cleanup := setupBolt5Pipe(t)
+			defer cleanup()
+			go func() {
+				srv.waitForHandshake()
+				srv.acceptVersion(5, 3)
+				srv.waitForHello53(assertInExtraMap[string, []string]{
+					key:   "notifications",
+					found: true,
+					value: notificationFilters,
+				})
+				srv.acceptHello()
+			}()
+
+			bolt, err := Connect(ctx, "serverName", conn, auth, "007", nil, logger, nil, notificationFilters...)
+
+			AssertNoError(t, err)
+			bolt.Close(ctx)
+		})
+
+		inner.Run("Disabling notification filters in hello", func(t *testing.T) {
+			conn, srv, cleanup := setupBolt5Pipe(t)
+			defer cleanup()
+			go func() {
+				srv.waitForHandshake()
+				srv.acceptVersion(5, 3)
+				srv.waitForHello53(noNotifications)
+				srv.acceptHello()
+			}()
+
+			bolt, err := Connect(ctx, "serverName", conn, auth, "007", nil, logger, nil, "SERVER_DEFAULT")
+
+			AssertNoError(t, err)
+			bolt.Close(ctx)
+		})
+
+		inner.Run("Includes notifications when starting transaction", func(t *testing.T) {
+			conn, srv, cleanup := setupBolt5Pipe(t)
+			defer cleanup()
+			go func() {
+				srv.waitForHandshake()
+				srv.acceptVersion(5, 3)
+				srv.waitForHello53(noNotifications)
+				srv.acceptHello()
+				srv.waitForTxBegin53(assertInExtraMap[string, []string]{
+					key:   "notifications",
+					found: true,
+					value: notificationFilters,
+				})
+				srv.send(msgSuccess, map[string]any{})
+			}()
+
+			bolt, err := Connect(ctx, "serverName", conn, auth, "007", nil, logger, nil)
+
+			AssertNoError(t, err)
+			_, err = bolt.TxBegin(ctx, idb.TxConfig{NotificationFilters: notificationFilters})
+			AssertNoError(t, err)
+			bolt.Close(ctx)
+		})
+
+		inner.Run("When starting transaction, overwrites driver-level notifications to receive the server default ones", func(t *testing.T) {
+			conn, srv, cleanup := setupBolt5Pipe(t)
+			defer cleanup()
+			go func() {
+				srv.waitForHandshake()
+				srv.acceptVersion(5, 3)
+				srv.waitForHello53(assertInExtraMap[string, []string]{
+					key:   "notifications",
+					found: true,
+					value: notificationFilters,
+				})
+				srv.acceptHello()
+				srv.waitForTxBegin53(assertInExtraMap[string, []string]{
+					key:   "notifications",
+					found: true,
+					value: nil,
+				})
+				srv.send(msgSuccess, map[string]any{})
+			}()
+			bolt, err := Connect(ctx, "serverName", conn, auth, "007", nil, logger, nil, "WARNING.DEPRECATION", "INFORMATION.QUERY")
+			AssertNoError(t, err)
+
+			_, err = bolt.TxBegin(ctx, idb.TxConfig{NotificationFilters: []string{"SERVER_DEFAULT"}})
+
+			AssertNoError(t, err)
+			bolt.Close(ctx)
+		})
+
+		inner.Run("When starting transaction, skips session-level notifications to receive the driver-level ones", func(t *testing.T) {
+			conn, srv, cleanup := setupBolt5Pipe(t)
+			defer cleanup()
+			go func() {
+				srv.waitForHandshake()
+				srv.acceptVersion(5, 3)
+				srv.waitForHello53(assertInExtraMap[string, []string]{
+					key:   "notifications",
+					found: true,
+					value: notificationFilters,
+				})
+				srv.acceptHello()
+				srv.waitForTxBegin53(assertInExtraMap[string, []string]{
+					key:   "notifications",
+					found: false,
+				})
+				srv.send(msgSuccess, map[string]any{})
+			}()
+			bolt, err := Connect(ctx, "serverName", conn, auth, "007", nil, logger, nil, "WARNING.DEPRECATION", "INFORMATION.QUERY")
+			AssertNoError(t, err)
+
+			_, err = bolt.TxBegin(ctx, idb.TxConfig{})
+
+			AssertNoError(t, err)
+			bolt.Close(ctx)
+		})
+
+		inner.Run("Includes notifications when running autocommit transaction", func(t *testing.T) {
+			conn, srv, cleanup := setupBolt5Pipe(t)
+			defer cleanup()
+			go func() {
+				srv.waitForHandshake()
+				srv.acceptVersion(5, 3)
+				srv.waitForHello53(noNotifications)
+				srv.acceptHello()
+				srv.waitForRun(func(fields []any) {
+					meta := fields[2].(map[string]any)
+					srv.compareNotifications(notificationFilters, meta["notifications"])
+				})
+				srv.send(msgSuccess, map[string]any{})
+			}()
+			bolt, err := Connect(ctx, "serverName", conn, auth, "007", nil, logger, nil)
+			AssertNoError(t, err)
+
+			_, err = bolt.Run(ctx, idb.Command{Cypher: "RETURN 42"}, idb.TxConfig{NotificationFilters: notificationFilters})
+
+			AssertNoError(t, err)
+			bolt.Close(ctx)
+		})
+
+		inner.Run("When running autocommit, overwrites driver-level notifications to receive the server default ones", func(t *testing.T) {
+			conn, srv, cleanup := setupBolt5Pipe(t)
+			defer cleanup()
+			go func() {
+				srv.waitForHandshake()
+				srv.acceptVersion(5, 3)
+				srv.waitForHello53(assertInExtraMap[string, []string]{
+					key:   "notifications",
+					found: true,
+					value: notificationFilters,
+				})
+				srv.acceptHello()
+				srv.waitForRun(func(fields []any) {
+					meta := fields[2].(map[string]any)
+					if filters, found := meta["notifications"]; !(found && filters == nil) {
+						srv.sendFailureMsg("?", "expected notifications explicitly set to <nil>")
+					}
+				})
+				srv.send(msgSuccess, map[string]any{})
+			}()
+			bolt, err := Connect(ctx, "serverName", conn, auth, "007", nil, logger, nil, "WARNING.DEPRECATION", "INFORMATION.QUERY")
+			AssertNoError(t, err)
+
+			_, err = bolt.Run(ctx, idb.Command{Cypher: "RETURN 42"}, idb.TxConfig{NotificationFilters: []string{"SERVER_DEFAULT"}})
+
+			AssertNoError(t, err)
+			bolt.Close(ctx)
+		})
+
+		inner.Run("When running autocommit, skips session-level notifications to receive the driver-level ones", func(t *testing.T) {
+			conn, srv, cleanup := setupBolt5Pipe(t)
+			defer cleanup()
+			go func() {
+				srv.waitForHandshake()
+				srv.acceptVersion(5, 3)
+				srv.waitForHello53(assertInExtraMap[string, []string]{
+					key:   "notifications",
+					found: true,
+					value: notificationFilters,
+				})
+				srv.acceptHello()
+				srv.waitForRun(func(fields []any) {
+					meta := fields[2].(map[string]any)
+					if _, found := meta["notifications"]; found {
+						srv.sendFailureMsg("?", "expected no notifications")
+					}
+				})
+				srv.send(msgSuccess, map[string]any{})
+			}()
+			bolt, err := Connect(ctx, "serverName", conn, auth, "007", nil, logger, nil, "WARNING.DEPRECATION", "INFORMATION.QUERY")
+			AssertNoError(t, err)
+
+			_, err = bolt.Run(ctx, idb.Command{Cypher: "RETURN 42"}, idb.TxConfig{})
+
+			AssertNoError(t, err)
+			bolt.Close(ctx)
+		})
 	})
 }

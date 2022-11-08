@@ -45,13 +45,16 @@ const (
 // Default fetch size
 const bolt5FetchSize = 1000
 
+const defaultServerNotifications = "SERVER_DEFAULT"
+
 type internalTx5 struct {
-	mode             idb.AccessMode
-	bookmarks        []string
-	timeout          time.Duration
-	txMeta           map[string]any
-	databaseName     string
-	impersonatedUser string
+	mode                idb.AccessMode
+	bookmarks           []string
+	timeout             time.Duration
+	txMeta              map[string]any
+	databaseName        string
+	impersonatedUser    string
+	notificationFilters []string
 }
 
 func (i *internalTx5) toMeta() map[string]any {
@@ -74,6 +77,13 @@ func (i *internalTx5) toMeta() map[string]any {
 	}
 	if i.impersonatedUser != "" {
 		meta["imp_user"] = i.impersonatedUser
+	}
+	if i.notificationFilters != nil {
+		if receiveDefaultServerNotifications(i.notificationFilters) {
+			meta["notifications"] = nil
+		} else {
+			meta["notifications"] = i.notificationFilters
+		}
 	}
 	return meta
 }
@@ -244,15 +254,8 @@ func (b *bolt5) Connect(ctx context.Context, minor int, auth map[string]any, use
 	}
 	// TODO move this to a new appendHello for 5.3+
 	if minor >= 3 {
-		// TODO: still protect from overwrites? (even though they cannot happen anymore?)
 		hello["auth"] = auth
-		sendNotifications := true
-		for _, notificationFilter := range b.notificationFilters {
-			if notificationFilter == "SERVER_DEFAULT" {
-				sendNotifications = false
-			}
-		}
-		if sendNotifications {
+		if b.notificationFilters != nil && !receiveDefaultServerNotifications(b.notificationFilters) {
 			hello["notifications"] = b.notificationFilters
 		}
 	} else {
@@ -305,15 +308,7 @@ func (b *bolt5) TxBegin(ctx context.Context, txConfig idb.TxConfig) (idb.TxHandl
 		return 0, err
 	}
 
-	tx := internalTx5{
-		mode:             txConfig.Mode,
-		bookmarks:        txConfig.Bookmarks,
-		timeout:          txConfig.Timeout,
-		txMeta:           txConfig.Meta,
-		databaseName:     b.databaseName,
-		impersonatedUser: txConfig.ImpersonatedUser,
-	}
-
+	tx := b.newInternalTx(txConfig)
 	b.out.appendBegin(tx.toMeta())
 	b.out.send(ctx, b.conn)
 	b.receiveSuccess(ctx)
@@ -605,14 +600,7 @@ func (b *bolt5) Run(ctx context.Context, cmd idb.Command,
 		return nil, err
 	}
 
-	tx := internalTx5{
-		mode:             txConfig.Mode,
-		bookmarks:        txConfig.Bookmarks,
-		timeout:          txConfig.Timeout,
-		txMeta:           txConfig.Meta,
-		databaseName:     b.databaseName,
-		impersonatedUser: txConfig.ImpersonatedUser,
-	}
+	tx := b.newInternalTx(txConfig)
 	stream, err := b.run(ctx, cmd.Cypher, cmd.Params, cmd.FetchSize, &tx)
 	if err != nil {
 		return nil, err
@@ -955,4 +943,25 @@ func (b *bolt5) initializeReadTimeoutHint(hints map[string]any) {
 		return
 	}
 	b.in.connReadTimeout = time.Duration(readTimeout) * time.Second
+}
+
+func receiveDefaultServerNotifications(notificationFilters []string) bool {
+	for _, notificationFilter := range notificationFilters {
+		if notificationFilter == defaultServerNotifications {
+			return true
+		}
+	}
+	return false
+}
+
+func (b *bolt5) newInternalTx(txConfig idb.TxConfig) internalTx5 {
+	return internalTx5{
+		mode:                txConfig.Mode,
+		bookmarks:           txConfig.Bookmarks,
+		timeout:             txConfig.Timeout,
+		txMeta:              txConfig.Meta,
+		databaseName:        b.databaseName,
+		impersonatedUser:    txConfig.ImpersonatedUser,
+		notificationFilters: txConfig.NotificationFilters,
+	}
 }
