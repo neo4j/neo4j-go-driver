@@ -253,6 +253,7 @@ func (b *bolt5) Connect(ctx context.Context, minor int, auth map[string]any, use
 		hello["routing"] = routingContext
 	}
 	// TODO move this to a new appendHello for protocol version 5.1+ (neo4j servers 5.3+)
+	// TODO: check credentials redaction still works
 	if minor >= 1 {
 		hello["auth"] = auth
 		if b.notificationFilters != nil && !receiveDefaultServerNotifications(b.notificationFilters) {
@@ -955,13 +956,16 @@ func receiveDefaultServerNotifications(notificationFilters []string) bool {
 }
 
 func (b *bolt5) newInternalTx(txConfig idb.TxConfig) internalTx5 {
-	return internalTx5{
-		mode:                txConfig.Mode,
-		bookmarks:           txConfig.Bookmarks,
-		timeout:             txConfig.Timeout,
-		txMeta:              txConfig.Meta,
-		databaseName:        b.databaseName,
-		impersonatedUser:    txConfig.ImpersonatedUser,
-		notificationFilters: txConfig.NotificationFilters,
+	result := internalTx5{
+		mode:             txConfig.Mode,
+		bookmarks:        txConfig.Bookmarks,
+		timeout:          txConfig.Timeout,
+		txMeta:           txConfig.Meta,
+		databaseName:     b.databaseName,
+		impersonatedUser: txConfig.ImpersonatedUser,
 	}
+	if b.minor >= 1 {
+		result.notificationFilters = txConfig.NotificationFilters
+	}
+	return result
 }

@@ -118,6 +118,24 @@ type SessionConfig struct {
 	// Since 5.0
 	// default: nil (no-op)
 	BookmarkManager BookmarkManager
+	// NotificationFilters defines which notifications this ​session should receive upon queries
+	// executed with SessionWithContext.Run, ExplicitTransaction.Run (via SessionWithContext.BeginTransaction) and
+	// ManagedTransaction.Run (via SessionWithContext.ExecuteRead or SessionWithContext.ExecuteWrite).
+	// This is ignored when servers below version 5.3 are targeted.
+	// When set, these filters have higher precedence over the ones configured at the ​driver level.
+	//
+	// It is *highly* recommended to initialize this field with either of these helper functions:
+	//
+	// - neo4j.ServerDefaultNotificationFilters (to receive the server-default notifications)
+	//
+	// - neo4j.NoNotificationFilters (to receive no notifications)
+	//
+	// - neo4j.NewNotificationFilters (to receive notifications filtered by the provided set of neo4j.NotificationFilter)
+	//
+	// Available since 5.3.
+	//
+	// default: nil (only the ​notification filter configured at the ​driver level will be exercised)
+	NotificationFilters any
 }
 
 // FetchAll turns off fetching records in batches.
@@ -134,23 +152,24 @@ type sessionPool interface {
 }
 
 type sessionWithContext struct {
-	config           *Config
-	defaultMode      idb.AccessMode
-	bookmarks        *sessionBookmarks
-	databaseName     string
-	impersonatedUser string
-	resolveHomeDb    bool
-	pool             sessionPool
-	router           sessionRouter
-	explicitTx       *explicitTransaction
-	autocommitTx     *autocommitTransaction
-	sleep            func(d time.Duration)
-	now              func() time.Time
-	logId            string
-	log              log.Logger
-	throttleTime     time.Duration
-	fetchSize        int
-	boltLogger       log.BoltLogger
+	config              *Config
+	defaultMode         idb.AccessMode
+	bookmarks           *sessionBookmarks
+	databaseName        string
+	impersonatedUser    string
+	resolveHomeDb       bool
+	pool                sessionPool
+	router              sessionRouter
+	explicitTx          *explicitTransaction
+	autocommitTx        *autocommitTransaction
+	sleep               func(d time.Duration)
+	now                 func() time.Time
+	logId               string
+	log                 log.Logger
+	throttleTime        time.Duration
+	fetchSize           int
+	boltLogger          log.BoltLogger
+	notificationFilters any
 }
 
 func newSessionWithContext(config *Config, sessConfig SessionConfig, router sessionRouter, pool sessionPool, logger log.Logger) *sessionWithContext {
@@ -163,21 +182,22 @@ func newSessionWithContext(config *Config, sessConfig SessionConfig, router sess
 	}
 
 	return &sessionWithContext{
-		config:           config,
-		router:           router,
-		pool:             pool,
-		defaultMode:      idb.AccessMode(sessConfig.AccessMode),
-		bookmarks:        newSessionBookmarks(sessConfig.BookmarkManager, sessConfig.Bookmarks),
-		databaseName:     sessConfig.DatabaseName,
-		impersonatedUser: sessConfig.ImpersonatedUser,
-		resolveHomeDb:    sessConfig.DatabaseName == "",
-		sleep:            time.Sleep,
-		now:              time.Now,
-		log:              logger,
-		logId:            logId,
-		throttleTime:     time.Second * 1,
-		fetchSize:        fetchSize,
-		boltLogger:       sessConfig.BoltLogger,
+		config:              config,
+		router:              router,
+		pool:                pool,
+		defaultMode:         idb.AccessMode(sessConfig.AccessMode),
+		bookmarks:           newSessionBookmarks(sessConfig.BookmarkManager, sessConfig.Bookmarks),
+		databaseName:        sessConfig.DatabaseName,
+		impersonatedUser:    sessConfig.ImpersonatedUser,
+		resolveHomeDb:       sessConfig.DatabaseName == "",
+		sleep:               time.Sleep,
+		now:                 time.Now,
+		log:                 logger,
+		logId:               logId,
+		throttleTime:        time.Second * 1,
+		fetchSize:           fetchSize,
+		boltLogger:          sessConfig.BoltLogger,
+		notificationFilters: sessConfig.NotificationFilters,
 	}
 }
 
@@ -227,6 +247,11 @@ func (s *sessionWithContext) BeginTransaction(ctx context.Context, configurers .
 		s.autocommitTx.done(ctx)
 	}
 
+	sessionNotificationFilters, err := notificationFilterRawValuesOf(s.notificationFilters)
+	if err != nil {
+		return nil, err
+	}
+
 	// Apply configuration functions
 	config := defaultTransactionConfig()
 	for _, c := range configurers {
@@ -250,11 +275,12 @@ func (s *sessionWithContext) BeginTransaction(ctx context.Context, configurers .
 	}
 	txHandle, err := conn.TxBegin(ctx,
 		idb.TxConfig{
-			Mode:             s.defaultMode,
-			Bookmarks:        beginBookmarks,
-			Timeout:          config.Timeout,
-			Meta:             config.Metadata,
-			ImpersonatedUser: s.impersonatedUser,
+			Mode:                s.defaultMode,
+			Bookmarks:           beginBookmarks,
+			Timeout:             config.Timeout,
+			Meta:                config.Metadata,
+			ImpersonatedUser:    s.impersonatedUser,
+			NotificationFilters: sessionNotificationFilters,
 		})
 	if err != nil {
 		s.pool.Return(ctx, conn)
@@ -305,6 +331,11 @@ func (s *sessionWithContext) runRetriable(
 		s.autocommitTx.done(ctx)
 	}
 
+	sessionNotificationFilters, err := notificationFilterRawValuesOf(s.notificationFilters)
+	if err != nil {
+		return nil, err
+	}
+
 	config := defaultTransactionConfig()
 	for _, c := range configurers {
 		c(&config)
@@ -338,7 +369,7 @@ func (s *sessionWithContext) runRetriable(
 		},
 	}
 	for state.Continue() {
-		if tryAgain, result := s.executeTransactionFunction(ctx, mode, config, &state, work); tryAgain {
+		if tryAgain, result := s.executeTransactionFunction(ctx, mode, config, &state, sessionNotificationFilters, work); tryAgain {
 			continue
 		} else {
 			return result, nil
@@ -353,7 +384,7 @@ func (s *sessionWithContext) runRetriable(
 		return nil, err
 	}
 	// Wrap and log the error if it belongs to the driver
-	err := wrapError(state.LastErr)
+	err = wrapError(state.LastErr)
 	switch err.(type) {
 	case *UsageError, *ConnectivityError:
 		s.log.Error(log.Session, s.logId, err)
@@ -361,12 +392,7 @@ func (s *sessionWithContext) runRetriable(
 	return nil, err
 }
 
-func (s *sessionWithContext) executeTransactionFunction(
-	ctx context.Context,
-	mode idb.AccessMode,
-	config TransactionConfig,
-	state *retry.State,
-	work ManagedTransactionWork) (bool, any) {
+func (s *sessionWithContext) executeTransactionFunction(ctx context.Context, mode idb.AccessMode, config TransactionConfig, state *retry.State, notificationFilters []string, work ManagedTransactionWork) (bool, any) {
 
 	conn, err := s.getConnection(ctx, mode, pool.DefaultLivenessCheckThreshold)
 	if err != nil {
@@ -384,11 +410,12 @@ func (s *sessionWithContext) executeTransactionFunction(
 	}
 	txHandle, err := conn.TxBegin(ctx,
 		idb.TxConfig{
-			Mode:             mode,
-			Bookmarks:        beginBookmarks,
-			Timeout:          config.Timeout,
-			Meta:             config.Metadata,
-			ImpersonatedUser: s.impersonatedUser,
+			Mode:                mode,
+			Bookmarks:           beginBookmarks,
+			Timeout:             config.Timeout,
+			Meta:                config.Metadata,
+			ImpersonatedUser:    s.impersonatedUser,
+			NotificationFilters: notificationFilters,
 		})
 	if err != nil {
 		state.OnFailure(ctx, conn, err, false)
@@ -503,6 +530,11 @@ func (s *sessionWithContext) Run(ctx context.Context,
 		s.autocommitTx.done(ctx)
 	}
 
+	sessionNotificationFilters, err := notificationFilterRawValuesOf(s.notificationFilters)
+	if err != nil {
+		return nil, err
+	}
+
 	config := defaultTransactionConfig()
 	for _, c := range configurers {
 		c(&config)
@@ -529,11 +561,12 @@ func (s *sessionWithContext) Run(ctx context.Context,
 			FetchSize: s.fetchSize,
 		},
 		idb.TxConfig{
-			Mode:             s.defaultMode,
-			Bookmarks:        runBookmarks,
-			Timeout:          config.Timeout,
-			Meta:             config.Metadata,
-			ImpersonatedUser: s.impersonatedUser,
+			Mode:                s.defaultMode,
+			Bookmarks:           runBookmarks,
+			Timeout:             config.Timeout,
+			Meta:                config.Metadata,
+			ImpersonatedUser:    s.impersonatedUser,
+			NotificationFilters: sessionNotificationFilters,
 		})
 	if err != nil {
 		s.pool.Return(ctx, conn)

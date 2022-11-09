@@ -146,7 +146,7 @@ type Config struct {
 	//
 	// Available since 5.3.
 	//
-	// default: nil
+	// default: server-default notifications (see neo4j.ServerDefaultNotificationFilters)
 	notificationFilters any
 }
 
@@ -190,7 +190,7 @@ func defaultConfig() *Config {
 		RootCAs:                      nil,
 		UserAgent:                    UserAgent,
 		FetchSize:                    FetchDefault,
-		notificationFilters:          nil,
+		notificationFilters:          ServerDefaultNotificationFilters(),
 	}
 }
 
