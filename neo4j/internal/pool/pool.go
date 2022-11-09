@@ -40,7 +40,7 @@ import (
 // Liveness checks are performed before a connection is deemed idle enough to be reset
 const DefaultLivenessCheckThreshold = math.MaxInt64
 
-type Connect func(context.Context, string, log.BoltLogger) (db.Connection, error)
+type Connect func(context.Context, string, log.BoltLogger, []string) (db.Connection, error)
 
 type qitem struct {
 	servers []string
@@ -49,17 +49,18 @@ type qitem struct {
 }
 
 type Pool struct {
-	maxSize    int
-	maxAge     time.Duration
-	connect    Connect
-	servers    map[string]*server
-	serversMut racing.Mutex
-	queueMut   racing.Mutex
-	queue      list.List
-	now        func() time.Time
-	closed     bool
-	log        log.Logger
-	logId      string
+	maxSize             int
+	maxAge              time.Duration
+	connect             Connect
+	servers             map[string]*server
+	serversMut          racing.Mutex
+	queueMut            racing.Mutex
+	queue               list.List
+	now                 func() time.Time
+	closed              bool
+	log                 log.Logger
+	logId               string
+	notificationFilters []string
 }
 
 type serverPenalty struct {
@@ -67,22 +68,23 @@ type serverPenalty struct {
 	penalty uint32
 }
 
-func New(maxSize int, maxAge time.Duration, connect Connect, logger log.Logger, logId string) *Pool {
+func New(maxSize int, maxAge time.Duration, connect Connect, logger log.Logger, logId string, notificationFilters []string) *Pool {
 	// Means infinite life, simplifies checking later on
 	if maxAge <= 0 {
 		maxAge = 1<<63 - 1
 	}
 
 	p := &Pool{
-		maxSize:    maxSize,
-		maxAge:     maxAge,
-		connect:    connect,
-		servers:    make(map[string]*server),
-		serversMut: racing.NewMutex(),
-		queueMut:   racing.NewMutex(),
-		now:        time.Now,
-		logId:      logId,
-		log:        logger,
+		maxSize:             maxSize,
+		maxAge:              maxAge,
+		connect:             connect,
+		servers:             make(map[string]*server),
+		serversMut:          racing.NewMutex(),
+		queueMut:            racing.NewMutex(),
+		now:                 time.Now,
+		logId:               logId,
+		log:                 logger,
+		notificationFilters: notificationFilters,
 	}
 	p.log.Infof(log.Pool, p.logId, "Created")
 	return p
@@ -334,7 +336,7 @@ func (p *Pool) tryBorrow(ctx context.Context, serverName string, boltLogger log.
 
 	// No idle connection, try to connect
 	p.log.Infof(log.Pool, p.logId, "Connecting to %s", serverName)
-	c, err := p.connect(ctx, serverName, boltLogger)
+	c, err := p.connect(ctx, serverName, boltLogger, p.notificationFilters)
 	if err != nil {
 		// Failed to connect, keep track that it was bad for a while
 		srv.notifyFailedConnect(p.now())

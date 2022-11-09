@@ -163,10 +163,10 @@ type Config struct {
 //     neo4j.NotificationFilter{Severity: neo4j.SeverityInformation, Category: neo4j.CategoryHint},
 //     )
 //
-//   - a pointer to neo4j.NoNotification, call neo4j.NoNotificationFilters:
+//   - a pointer to neo4j.noNotification, call neo4j.NoNotificationFilters:
 //     filters := neo4j.NewNotificationFilters(neo4j.ServerDefaultNotificationFilters())
 //
-//   - a pointer to neo4j.ServerDefaultNotifications, call neo4j.ServerDefaultNotificationFilters:
+//   - a pointer to neo4j.serverDefaultNotifications, call neo4j.ServerDefaultNotificationFilters:
 //     filters := neo4j.NewNotificationFilters(neo4j.ServerDefaultNotificationFilters())
 //
 // Call neo4j.WithDriverNotificationFilters as follows:

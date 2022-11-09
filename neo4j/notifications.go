@@ -2,6 +2,7 @@ package neo4j
 
 import (
 	"fmt"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/bolt"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/collection"
 )
 
@@ -77,6 +78,38 @@ func (cat NotificationCategory) Valid() bool {
 	return false
 }
 
+func notificationFilterRawValuesOf(rawFilters any) ([]string, error) {
+	if rawFilters == nil {
+		return nil, nil
+	}
+	switch filters := rawFilters.(type) {
+	case notificationFilters:
+		return filters.rawValues(), nil
+	case *noNotification:
+		return filters.rawValues(), nil
+	case *serverDefaultNotifications:
+		return filters.rawValues(), nil
+	default:
+		return nil, fmt.Errorf("unsupported notification filters type: %T", rawFilters)
+	}
+}
+
+type NotificationFilterType interface {
+	notificationFilters | *noNotification | *serverDefaultNotifications
+
+	rawValues() []string
+}
+
+type notificationFilters []NotificationFilter
+
+func (filters notificationFilters) rawValues() []string {
+	result := make([]string, len(filters))
+	for i, filter := range filters {
+		result[i] = filter.String()
+	}
+	return result
+}
+
 type NotificationFilter struct {
 	Severity NotificationSeverity
 	Category NotificationCategory
@@ -90,14 +123,19 @@ func (filter *NotificationFilter) String() string {
 	return fmt.Sprintf("%s.%s", filter.Severity, filter.Category)
 }
 
-type NoNotification struct{}
-type ServerDefaultNotifications struct{}
+type noNotification struct{}
 
-type NotificationFilterType interface {
-	[]NotificationFilter | *NoNotification | *ServerDefaultNotifications
+func (n *noNotification) rawValues() []string {
+	return nil
 }
 
-func NewNotificationFilters(filters ...NotificationFilter) ([]NotificationFilter, error) {
+type serverDefaultNotifications struct{}
+
+func (s *serverDefaultNotifications) rawValues() []string {
+	return []string{bolt.DefaultServerNotifications}
+}
+
+func NewNotificationFilters(filters ...NotificationFilter) (notificationFilters, error) {
 	dedupedFilters := collection.NewSet(filters)
 	result := dedupedFilters.Values()
 	for _, filter := range result {
@@ -108,10 +146,10 @@ func NewNotificationFilters(filters ...NotificationFilter) ([]NotificationFilter
 	return result, nil
 }
 
-func NoNotificationFilters() *NoNotification {
-	return &NoNotification{}
+func NoNotificationFilters() *noNotification {
+	return &noNotification{}
 }
 
-func ServerDefaultNotificationFilters() *ServerDefaultNotifications {
-	return &ServerDefaultNotifications{}
+func ServerDefaultNotificationFilters() *serverDefaultNotifications {
+	return &serverDefaultNotifications{}
 }

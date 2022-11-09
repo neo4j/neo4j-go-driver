@@ -45,7 +45,7 @@ const (
 // Default fetch size
 const bolt5FetchSize = 1000
 
-const defaultServerNotifications = "SERVER_DEFAULT"
+const DefaultServerNotifications = "SERVER_DEFAULT"
 
 type internalTx5 struct {
 	mode                idb.AccessMode
@@ -947,7 +947,7 @@ func (b *bolt5) initializeReadTimeoutHint(hints map[string]any) {
 
 func receiveDefaultServerNotifications(notificationFilters []string) bool {
 	for _, notificationFilter := range notificationFilters {
-		if notificationFilter == defaultServerNotifications {
+		if notificationFilter == DefaultServerNotifications {
 			return true
 		}
 	}

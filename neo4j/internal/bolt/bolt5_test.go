@@ -103,7 +103,7 @@ func TestBolt5(outer *testing.T) {
 		tcpConn, srv, cleanup := setupBolt5Pipe(t)
 		go serverJob(srv)
 
-		c, err := Connect(context.Background(), "serverName", tcpConn, auth, "007", nil, logger, nil)
+		c, err := Connect(context.Background(), "serverName", tcpConn, auth, "007", nil, logger, nil, nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -188,7 +188,7 @@ func TestBolt5(outer *testing.T) {
 			}
 			srv.acceptHello()
 		}()
-		bolt, err := Connect(context.Background(), "serverName", conn, auth, "007", routingContext, logger, nil)
+		bolt, err := Connect(context.Background(), "serverName", conn, auth, "007", routingContext, logger, nil, nil)
 		AssertNoError(t, err)
 		bolt.Close(context.Background())
 	})
@@ -206,7 +206,7 @@ func TestBolt5(outer *testing.T) {
 			}
 			srv.acceptHello()
 		}()
-		bolt, err := Connect(context.Background(), "serverName", conn, auth, "007", nil, logger, nil)
+		bolt, err := Connect(context.Background(), "serverName", conn, auth, "007", nil, logger, nil, nil)
 		AssertNoError(t, err)
 		bolt.Close(context.Background())
 	})
@@ -221,7 +221,7 @@ func TestBolt5(outer *testing.T) {
 			srv.waitForHello()
 			srv.rejectHelloUnauthorized()
 		}()
-		bolt, err := Connect(context.Background(), "serverName", conn, auth, "007", nil, logger, nil)
+		bolt, err := Connect(context.Background(), "serverName", conn, auth, "007", nil, logger, nil, nil)
 		AssertNil(t, bolt)
 		AssertError(t, err)
 		dbErr, isDbErr := err.(*db.Neo4jError)
@@ -1204,7 +1204,7 @@ func TestBolt5(outer *testing.T) {
 				srv.acceptHello()
 			}()
 
-			bolt, err := Connect(ctx, "serverName", conn, auth, "007", nil, logger, nil)
+			bolt, err := Connect(ctx, "serverName", conn, auth, "007", nil, logger, nil, nil)
 
 			AssertNoError(t, err)
 			bolt.Close(ctx)
@@ -1224,7 +1224,7 @@ func TestBolt5(outer *testing.T) {
 				srv.acceptHello()
 			}()
 
-			bolt, err := Connect(ctx, "serverName", conn, auth, "007", nil, logger, nil, notificationFilters...)
+			bolt, err := Connect(ctx, "serverName", conn, auth, "007", nil, logger, nil, notificationFilters)
 
 			AssertNoError(t, err)
 			bolt.Close(ctx)
@@ -1240,7 +1240,7 @@ func TestBolt5(outer *testing.T) {
 				srv.acceptHello()
 			}()
 
-			bolt, err := Connect(ctx, "serverName", conn, auth, "007", nil, logger, nil, "SERVER_DEFAULT")
+			bolt, err := Connect(ctx, "serverName", conn, auth, "007", nil, logger, nil, []string{"SERVER_DEFAULT"})
 
 			AssertNoError(t, err)
 			bolt.Close(ctx)
@@ -1262,7 +1262,7 @@ func TestBolt5(outer *testing.T) {
 				srv.send(msgSuccess, map[string]any{})
 			}()
 
-			bolt, err := Connect(ctx, "serverName", conn, auth, "007", nil, logger, nil)
+			bolt, err := Connect(ctx, "serverName", conn, auth, "007", nil, logger, nil, nil)
 
 			AssertNoError(t, err)
 			_, err = bolt.TxBegin(ctx, idb.TxConfig{NotificationFilters: notificationFilters})
@@ -1289,7 +1289,7 @@ func TestBolt5(outer *testing.T) {
 				})
 				srv.send(msgSuccess, map[string]any{})
 			}()
-			bolt, err := Connect(ctx, "serverName", conn, auth, "007", nil, logger, nil, "WARNING.DEPRECATION", "INFORMATION.QUERY")
+			bolt, err := Connect(ctx, "serverName", conn, auth, "007", nil, logger, nil, []string{"WARNING.DEPRECATION", "INFORMATION.QUERY"})
 			AssertNoError(t, err)
 
 			_, err = bolt.TxBegin(ctx, idb.TxConfig{NotificationFilters: []string{"SERVER_DEFAULT"}})
@@ -1316,7 +1316,7 @@ func TestBolt5(outer *testing.T) {
 				})
 				srv.send(msgSuccess, map[string]any{})
 			}()
-			bolt, err := Connect(ctx, "serverName", conn, auth, "007", nil, logger, nil, "WARNING.DEPRECATION", "INFORMATION.QUERY")
+			bolt, err := Connect(ctx, "serverName", conn, auth, "007", nil, logger, nil, []string{"WARNING.DEPRECATION", "INFORMATION.QUERY"})
 			AssertNoError(t, err)
 
 			_, err = bolt.TxBegin(ctx, idb.TxConfig{})
@@ -1339,7 +1339,7 @@ func TestBolt5(outer *testing.T) {
 				})
 				srv.send(msgSuccess, map[string]any{})
 			}()
-			bolt, err := Connect(ctx, "serverName", conn, auth, "007", nil, logger, nil)
+			bolt, err := Connect(ctx, "serverName", conn, auth, "007", nil, logger, nil, nil)
 			AssertNoError(t, err)
 
 			_, err = bolt.Run(ctx, idb.Command{Cypher: "RETURN 42"}, idb.TxConfig{NotificationFilters: notificationFilters})
@@ -1368,7 +1368,7 @@ func TestBolt5(outer *testing.T) {
 				})
 				srv.send(msgSuccess, map[string]any{})
 			}()
-			bolt, err := Connect(ctx, "serverName", conn, auth, "007", nil, logger, nil, "WARNING.DEPRECATION", "INFORMATION.QUERY")
+			bolt, err := Connect(ctx, "serverName", conn, auth, "007", nil, logger, nil, []string{"WARNING.DEPRECATION", "INFORMATION.QUERY"})
 			AssertNoError(t, err)
 
 			_, err = bolt.Run(ctx, idb.Command{Cypher: "RETURN 42"}, idb.TxConfig{NotificationFilters: []string{"SERVER_DEFAULT"}})
@@ -1397,7 +1397,7 @@ func TestBolt5(outer *testing.T) {
 				})
 				srv.send(msgSuccess, map[string]any{})
 			}()
-			bolt, err := Connect(ctx, "serverName", conn, auth, "007", nil, logger, nil, "WARNING.DEPRECATION", "INFORMATION.QUERY")
+			bolt, err := Connect(ctx, "serverName", conn, auth, "007", nil, logger, nil, []string{"WARNING.DEPRECATION", "INFORMATION.QUERY"})
 			AssertNoError(t, err)
 
 			_, err = bolt.Run(ctx, idb.Command{Cypher: "RETURN 42"}, idb.TxConfig{})
