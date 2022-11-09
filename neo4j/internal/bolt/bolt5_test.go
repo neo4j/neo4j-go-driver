@@ -180,7 +180,7 @@ func TestBolt5(outer *testing.T) {
 		defer cleanup()
 		go func() {
 			srv.waitForHandshake()
-			srv.acceptVersion(5, 1)
+			srv.acceptVersion(5, 0)
 			hmap := srv.waitForHello()
 			helloRoutingContext := hmap["routing"].(map[string]any)
 			if len(helloRoutingContext) != len(routingContext) {
@@ -198,7 +198,7 @@ func TestBolt5(outer *testing.T) {
 		defer cleanup()
 		go func() {
 			srv.waitForHandshake()
-			srv.acceptVersion(5, 1)
+			srv.acceptVersion(5, 0)
 			hmap := srv.waitForHello()
 			_, exists := hmap["routing"].(map[string]any)
 			if exists {
