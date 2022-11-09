@@ -252,8 +252,8 @@ func (b *bolt5) Connect(ctx context.Context, minor int, auth map[string]any, use
 	if routingContext != nil {
 		hello["routing"] = routingContext
 	}
-	// TODO move this to a new appendHello for 5.3+
-	if minor >= 3 {
+	// TODO move this to a new appendHello for protocol version 5.1+ (neo4j servers 5.3+)
+	if minor >= 1 {
 		hello["auth"] = auth
 		if b.notificationFilters != nil && !receiveDefaultServerNotifications(b.notificationFilters) {
 			hello["notifications"] = b.notificationFilters

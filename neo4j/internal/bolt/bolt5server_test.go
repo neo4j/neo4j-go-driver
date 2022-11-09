@@ -95,23 +95,24 @@ func (s *bolt5server) waitForHello() map[string]any {
 	return m
 }
 
-func (s *bolt5server) waitForHello53(assertNotifications assertInExtraMap[string, []string]) map[string]any {
+// note: Bolt protocol 5.1 is for Neo4j servers 5.3+
+func (s *bolt5server) waitForHello51(assertNotifications assertInExtraMap[string, []string]) map[string]any {
 	msg := s.receiveMsg()
 	s.assertStructType(msg, msgHello)
 	m := msg.fields[0].(map[string]any)
 	rawAuth, exists := m["auth"]
 	if !exists {
-		s.sendFailureMsg("?", "Missing auth in hello (5.3+)")
+		s.sendFailureMsg("?", "Missing auth in hello (5.1+)")
 	} else {
 		auth := rawAuth.(map[string]any)
 		_, exists = auth["scheme"]
 		if !exists {
-			s.sendFailureMsg("?", "Missing auth scheme in hello (5.3+)")
+			s.sendFailureMsg("?", "Missing auth scheme in hello (5.1+)")
 		}
 	}
 	_, exists = m["user_agent"]
 	if !exists {
-		s.sendFailureMsg("?", "Missing user_agent in hello (5.3+)")
+		s.sendFailureMsg("?", "Missing user_agent in hello (5.1+)")
 	}
 	actualNotifications, found := m[assertNotifications.key]
 	if found != assertNotifications.found {
@@ -158,7 +159,8 @@ func (s *bolt5server) waitForTxBegin() {
 	s.assertStructType(msg, msgBegin)
 }
 
-func (s *bolt5server) waitForTxBegin53(assertNotifications assertInExtraMap[string, []string]) {
+// note: Bolt protocol 5.1 is for Neo4j servers 5.3+
+func (s *bolt5server) waitForTxBegin51(assertNotifications assertInExtraMap[string, []string]) {
 	msg := s.receiveMsg()
 	s.assertStructType(msg, msgBegin)
 	m := msg.fields[0].(map[string]any)

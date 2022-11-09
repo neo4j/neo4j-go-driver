@@ -1185,6 +1185,8 @@ func TestBolt5(outer *testing.T) {
 	})
 
 	outer.Run("passes configured notification filters", func(inner *testing.T) {
+		inner.Parallel()
+
 		ctx := context.Background()
 		noNotifications := assertInExtraMap[string, []string]{
 			key:   "notifications",
@@ -1197,8 +1199,8 @@ func TestBolt5(outer *testing.T) {
 			defer cleanup()
 			go func() {
 				srv.waitForHandshake()
-				srv.acceptVersion(5, 3)
-				srv.waitForHello53(noNotifications)
+				srv.acceptVersion(5, 1)
+				srv.waitForHello51(noNotifications)
 				srv.acceptHello()
 			}()
 
@@ -1213,8 +1215,8 @@ func TestBolt5(outer *testing.T) {
 			defer cleanup()
 			go func() {
 				srv.waitForHandshake()
-				srv.acceptVersion(5, 3)
-				srv.waitForHello53(assertInExtraMap[string, []string]{
+				srv.acceptVersion(5, 1)
+				srv.waitForHello51(assertInExtraMap[string, []string]{
 					key:   "notifications",
 					found: true,
 					value: notificationFilters,
@@ -1233,8 +1235,8 @@ func TestBolt5(outer *testing.T) {
 			defer cleanup()
 			go func() {
 				srv.waitForHandshake()
-				srv.acceptVersion(5, 3)
-				srv.waitForHello53(noNotifications)
+				srv.acceptVersion(5, 1)
+				srv.waitForHello51(noNotifications)
 				srv.acceptHello()
 			}()
 
@@ -1249,10 +1251,10 @@ func TestBolt5(outer *testing.T) {
 			defer cleanup()
 			go func() {
 				srv.waitForHandshake()
-				srv.acceptVersion(5, 3)
-				srv.waitForHello53(noNotifications)
+				srv.acceptVersion(5, 1)
+				srv.waitForHello51(noNotifications)
 				srv.acceptHello()
-				srv.waitForTxBegin53(assertInExtraMap[string, []string]{
+				srv.waitForTxBegin51(assertInExtraMap[string, []string]{
 					key:   "notifications",
 					found: true,
 					value: notificationFilters,
@@ -1273,14 +1275,14 @@ func TestBolt5(outer *testing.T) {
 			defer cleanup()
 			go func() {
 				srv.waitForHandshake()
-				srv.acceptVersion(5, 3)
-				srv.waitForHello53(assertInExtraMap[string, []string]{
+				srv.acceptVersion(5, 1)
+				srv.waitForHello51(assertInExtraMap[string, []string]{
 					key:   "notifications",
 					found: true,
 					value: notificationFilters,
 				})
 				srv.acceptHello()
-				srv.waitForTxBegin53(assertInExtraMap[string, []string]{
+				srv.waitForTxBegin51(assertInExtraMap[string, []string]{
 					key:   "notifications",
 					found: true,
 					value: nil,
@@ -1301,14 +1303,14 @@ func TestBolt5(outer *testing.T) {
 			defer cleanup()
 			go func() {
 				srv.waitForHandshake()
-				srv.acceptVersion(5, 3)
-				srv.waitForHello53(assertInExtraMap[string, []string]{
+				srv.acceptVersion(5, 1)
+				srv.waitForHello51(assertInExtraMap[string, []string]{
 					key:   "notifications",
 					found: true,
 					value: notificationFilters,
 				})
 				srv.acceptHello()
-				srv.waitForTxBegin53(assertInExtraMap[string, []string]{
+				srv.waitForTxBegin51(assertInExtraMap[string, []string]{
 					key:   "notifications",
 					found: false,
 				})
@@ -1328,8 +1330,8 @@ func TestBolt5(outer *testing.T) {
 			defer cleanup()
 			go func() {
 				srv.waitForHandshake()
-				srv.acceptVersion(5, 3)
-				srv.waitForHello53(noNotifications)
+				srv.acceptVersion(5, 1)
+				srv.waitForHello51(noNotifications)
 				srv.acceptHello()
 				srv.waitForRun(func(fields []any) {
 					meta := fields[2].(map[string]any)
@@ -1351,8 +1353,8 @@ func TestBolt5(outer *testing.T) {
 			defer cleanup()
 			go func() {
 				srv.waitForHandshake()
-				srv.acceptVersion(5, 3)
-				srv.waitForHello53(assertInExtraMap[string, []string]{
+				srv.acceptVersion(5, 1)
+				srv.waitForHello51(assertInExtraMap[string, []string]{
 					key:   "notifications",
 					found: true,
 					value: notificationFilters,
@@ -1380,8 +1382,8 @@ func TestBolt5(outer *testing.T) {
 			defer cleanup()
 			go func() {
 				srv.waitForHandshake()
-				srv.acceptVersion(5, 3)
-				srv.waitForHello53(assertInExtraMap[string, []string]{
+				srv.acceptVersion(5, 1)
+				srv.waitForHello51(assertInExtraMap[string, []string]{
 					key:   "notifications",
 					found: true,
 					value: notificationFilters,
