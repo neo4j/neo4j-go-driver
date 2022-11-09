@@ -140,6 +140,42 @@ type Config struct {
 	// If a single large result is to be retrieved, this is the most performant
 	// setting.
 	FetchSize int
+	// notificationFilters defines which notifications the Driver or DriverWithContext instance should receive from the server.
+	// This is ignored when servers below version 5.3 are targeted.
+	// See neo4j.WithDriverNotificationFilters for more information
+	//
+	// Available since 5.3.
+	//
+	// default: nil
+	notificationFilters any
+}
+
+// WithDriverNotificationFilters defines which notifications the driver should receive from the server.
+// This is ignored when servers below version 5.3 are targeted.
+// Filters are overridable on a per-session basis.
+// In other words, notifications set at the session level have higher precedence than the filters set here.
+// Valid arguments are:
+//
+//   - a slice of neo4j.NotificationFilter, call neo4j.NewNotificationFilters:
+//     // you can also specify the "catch-all" filter: neo4j.NotificationFilter{Severity: neo4j.SeverityAll, Category: neo4j.CategoryAll}
+//     filters, err := neo4j.NewNotificationFilters(
+//     neo4j.NotificationFilter{Severity: neo4j.SeverityWarning, Category: neo4j.CategoryDeprecation},
+//     neo4j.NotificationFilter{Severity: neo4j.SeverityInformation, Category: neo4j.CategoryHint},
+//     )
+//
+//   - a pointer to neo4j.NoNotification, call neo4j.NoNotificationFilters:
+//     filters := neo4j.NewNotificationFilters(neo4j.ServerDefaultNotificationFilters())
+//
+//   - a pointer to neo4j.ServerDefaultNotifications, call neo4j.ServerDefaultNotificationFilters:
+//     filters := neo4j.NewNotificationFilters(neo4j.ServerDefaultNotificationFilters())
+//
+// Call neo4j.WithDriverNotificationFilters as follows:
+//
+//	driver, err := neo4j.NewDriverWithContext(uri, token, neo4j.WithDriverNotificationFilters(filters))
+func WithDriverNotificationFilters[T NotificationFilterType](filters T) func(*Config) {
+	return func(config *Config) {
+		config.notificationFilters = filters
+	}
 }
 
 func defaultConfig() *Config {
@@ -154,6 +190,7 @@ func defaultConfig() *Config {
 		RootCAs:                      nil,
 		UserAgent:                    UserAgent,
 		FetchSize:                    FetchDefault,
+		notificationFilters:          nil,
 	}
 }
 
