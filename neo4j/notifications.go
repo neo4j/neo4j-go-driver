@@ -8,9 +8,15 @@ import (
 type NotificationSeverity string
 
 const (
-	SeverityAll         NotificationSeverity = "*"
-	SeverityWarning                          = "WARNING"
-	SeverityInformation                      = "INFORMATION"
+	// SeverityAll includes notifications of any NotificationSeverity.
+	// Since 5.3
+	SeverityAll NotificationSeverity = "*"
+	// SeverityWarning includes notifications with warnings the user should act on.
+	// Since 5.3
+	SeverityWarning = "WARNING"
+	// SeverityInformation includes notifications with information about the query.
+	// Since 5.3
+	SeverityInformation = "INFORMATION"
 )
 
 func (sev NotificationSeverity) Valid() bool {
@@ -28,13 +34,27 @@ func (sev NotificationSeverity) Valid() bool {
 type NotificationCategory string
 
 const (
-	CategoryAll          NotificationCategory = "*"
-	CategoryDeprecation                       = "DEPRECATION"
-	CategoryHint                              = "HINT"
-	CategoryUnrecognized                      = "UNRECOGNIZED"
-	CategoryUnsupported                       = "UNSUPPORTED"
-	CategoryGeneric                           = "GENERIC"
-	CategoryPerformance                       = "PERFORMANCE"
+	// CategoryAll includes notifications of any NotificationCategory.
+	// Since 5.3
+	CategoryAll NotificationCategory = "*"
+	// CategoryDeprecation includes notifications of queries using deprecated features.
+	// Since 5.3
+	CategoryDeprecation = "DEPRECATION"
+	// CategoryHint includes notifications of queries specifying hints that cannot be satisfied.
+	// Since 5.3
+	CategoryHint = "HINT"
+	// CategoryUnrecognized includes notifications of queries mentioning unknown entities.
+	// Since 5.3
+	CategoryUnrecognized = "UNRECOGNIZED"
+	// CategoryUnsupported includes notifications of queries using unsupported or experimental features.
+	// Since 5.3
+	CategoryUnsupported = "UNSUPPORTED"
+	// CategoryGeneric includes notifications of queries with potential issues
+	// Since 5.3
+	CategoryGeneric = "GENERIC"
+	// CategoryPerformance includes notifications of queries using costly/slow operations.
+	// Since 5.3
+	CategoryPerformance = "PERFORMANCE"
 )
 
 func (cat NotificationCategory) Valid() bool {
