@@ -450,7 +450,7 @@ func (b *backend) handleRequest(req map[string]any) {
 			if data["connectionTimeoutMs"] != nil {
 				c.SocketConnectTimeout = time.Millisecond * time.Duration(asInt64(data["connectionTimeoutMs"].(json.Number)))
 			}
-		})
+		}, withDriverNotificationFilters(data["notificationFilters"]))
 		if err != nil {
 			b.writeError(err)
 			return
@@ -524,6 +524,7 @@ func (b *backend) handleRequest(req map[string]any) {
 			}
 			sessionConfig.BookmarkManager = bookmarkManager
 		}
+		setSessionNotificationFilters(data["notificationFilters"], &sessionConfig)
 		session := driver.NewSession(ctx, sessionConfig)
 		idKey := b.nextId()
 		b.sessionStates[idKey] = &sessionState{session: session}
@@ -796,10 +797,12 @@ func (b *backend) handleRequest(req map[string]any) {
 				"Feature:API:ConnectionAcquisitionTimeout",
 				"Feature:API:Driver:GetServerInfo",
 				"Feature:API:Driver.IsEncrypted",
+				"Feature:API:Driver:NotificationFilters",
 				"Feature:API:Driver.VerifyConnectivity",
 				"Feature:API:Liveness.Check",
 				"Feature:API:Result.List",
 				"Feature:API:Result.Peek",
+				"Feature:API:Session:NotificationFilters",
 				"Feature:API:Type.Spatial",
 				"Feature:API:Type.Temporal",
 				"Feature:Auth:Custom",
@@ -811,6 +814,7 @@ func (b *backend) handleRequest(req map[string]any) {
 				"Feature:Bolt:4.3",
 				"Feature:Bolt:4.4",
 				"Feature:Bolt:5.0",
+				"Feature:Bolt:5.1",
 				"Feature:Bolt:Patch:UTC",
 				"Feature:Impersonation",
 				"Feature:TLS:1.1",
@@ -1094,6 +1098,69 @@ func patchNumbersInMap(dictionary map[string]any) error {
 		}
 	}
 	return nil
+}
+
+func withDriverNotificationFilters(rawFilters any) func(*neo4j.Config) {
+	if rawFilters == nil {
+		return func(config *neo4j.Config) {}
+	}
+	filters := make([]neo4j.NotificationFilter, len(rawFilters.([]any)))
+	for i, rawFilter := range rawFilters.([]any) {
+		filter, isNone, isServerDefaults := parseNotificationFilter(rawFilter.(string))
+		if isNone {
+			return neo4j.WithoutNotifications()
+		}
+		if isServerDefaults {
+			return neo4j.WithServerDefaultNotifications()
+		}
+		filters[i] = filter
+	}
+	filterConfigurer, err := neo4j.WithNotifications(filters)
+	if err != nil {
+		panic(err)
+	}
+	return filterConfigurer
+}
+
+func setSessionNotificationFilters(rawFilters any, sessionConfig *neo4j.SessionConfig) {
+	if rawFilters == nil {
+		return
+	}
+	filters := make([]neo4j.NotificationFilter, len(rawFilters.([]any)))
+	for i, rawFilter := range rawFilters.([]any) {
+		filter, isNone, isServerDefaults := parseNotificationFilter(rawFilter.(string))
+		if isNone {
+			sessionConfig.NotificationFilters = neo4j.NoNotificationFilters()
+			return
+		}
+		if isServerDefaults {
+			sessionConfig.NotificationFilters = neo4j.ServerDefaultNotificationFilters()
+			return
+		}
+		filters[i] = filter
+	}
+	sessionConfig.NotificationFilters = filters
+}
+
+func parseNotificationFilter(rawFilter string) (_ neo4j.NotificationFilter, isNone bool, isServerDefault bool) {
+	if rawFilter == "NONE" {
+		return neo4j.NotificationFilter{}, true, false
+	}
+	if rawFilter == "SERVER_DEFAULT" {
+		return neo4j.NotificationFilter{}, false, true
+	}
+	severity, category, _ := strings.Cut(rawFilter, ".")
+	return neo4j.NotificationFilter{
+		Severity: neo4j.NotificationSeverity(processNotificationWildcard(severity)),
+		Category: neo4j.NotificationCategory(processNotificationWildcard(category)),
+	}, false, false
+}
+
+func processNotificationWildcard(str string) string {
+	if str == "ALL" {
+		return "*"
+	}
+	return str
 }
 
 func (b *backend) bookmarkManagerConfig(bookmarkManagerId string,

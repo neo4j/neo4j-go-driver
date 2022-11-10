@@ -99,17 +99,15 @@ func (s *bolt5server) waitForHello() map[string]any {
 func (s *bolt5server) waitForHello51(assertNotifications assertInExtraMap[string, []string]) map[string]any {
 	msg := s.receiveMsg()
 	s.assertStructType(msg, msgHello)
-	m := msg.fields[0].(map[string]any)
-	rawAuth, exists := m["auth"]
-	if !exists {
-		s.sendFailureMsg("?", "Missing auth in hello (5.1+)")
-	} else {
-		auth := rawAuth.(map[string]any)
-		_, exists = auth["scheme"]
-		if !exists {
-			s.sendFailureMsg("?", "Missing auth scheme in hello (5.1+)")
-		}
+	if len(msg.fields) != 2 {
+		s.sendFailureMsg("?", fmt.Sprintf("Expected 2 parameters for hello (5.1+), got %d", len(msg.fields)))
 	}
+	auth := msg.fields[0].(map[string]any)
+	_, exists := auth["scheme"]
+	if !exists {
+		s.sendFailureMsg("?", "Missing auth scheme in hello (5.1+)")
+	}
+	m := msg.fields[1].(map[string]any)
 	_, exists = m["user_agent"]
 	if !exists {
 		s.sendFailureMsg("?", "Missing user_agent in hello (5.1+)")

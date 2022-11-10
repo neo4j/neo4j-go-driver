@@ -124,13 +124,33 @@ type SessionConfig struct {
 	// This is ignored when servers below version 5.3 are targeted.
 	// When set, these filters have higher precedence over the ones configured at the ​driver level.
 	//
-	// It is *highly* recommended to initialize this field with either of these helper functions:
+	// It is *highly* recommended to initialize this field with either of the below approaches.
 	//
-	// - neo4j.ServerDefaultNotificationFilters (to receive the server-default notifications)
+	// - receive only the notifications from server matching the specified filters:
 	//
-	// - neo4j.NoNotificationFilters (to receive no notifications)
+	//		// check out neo4j.Severity* and neo4j.Category* constants
+	//		sessionConfig.NotificationFilters = []neo4j.NotificationFilter{
+	//			{
+	//				Severity: neo4j.SeverityInformation,
+	//				Category: neo4j.CategoryHint,
+	//			},
+	//			{
+	//				Severity: neo4j.SeverityAll,
+	//				Category: neo4j.CategoryDeprecation,
+	//			},
+	//		}
 	//
-	// - neo4j.NewNotificationFilters (to receive notifications filtered by the provided set of neo4j.NotificationFilter)
+	// - receive all notifications from server:
+	//
+	//		sessionConfig.NotificationFilters = neo4j.ServerDefaultNotificationFilters()
+	//
+	// - receive no notification:
+	//
+	//		sessionConfig.NotificationFilters = neo4j.NoNotificationFilters()
+	//
+	// - receive notifications as configured at the driver level (default):
+	//
+	//		sessionConfig.NotificationFilters = nil
 	//
 	// Available since 5.3.
 	//
@@ -169,10 +189,10 @@ type sessionWithContext struct {
 	throttleTime        time.Duration
 	fetchSize           int
 	boltLogger          log.BoltLogger
-	notificationFilters any
+	notificationFilters []string
 }
 
-func newSessionWithContext(config *Config, sessConfig SessionConfig, router sessionRouter, pool sessionPool, logger log.Logger) *sessionWithContext {
+func newSessionWithContext(config *Config, sessConfig SessionConfig, router sessionRouter, pool sessionPool, logger log.Logger, notificationFilters []string) *sessionWithContext {
 	logId := log.NewId()
 	logger.Debugf(log.Session, logId, "Created with context")
 
@@ -197,7 +217,7 @@ func newSessionWithContext(config *Config, sessConfig SessionConfig, router sess
 		throttleTime:        time.Second * 1,
 		fetchSize:           fetchSize,
 		boltLogger:          sessConfig.BoltLogger,
-		notificationFilters: sessConfig.NotificationFilters,
+		notificationFilters: notificationFilters,
 	}
 }
 
@@ -247,11 +267,6 @@ func (s *sessionWithContext) BeginTransaction(ctx context.Context, configurers .
 		s.autocommitTx.done(ctx)
 	}
 
-	sessionNotificationFilters, err := notificationFilterRawValuesOf(s.notificationFilters)
-	if err != nil {
-		return nil, err
-	}
-
 	// Apply configuration functions
 	config := defaultTransactionConfig()
 	for _, c := range configurers {
@@ -280,7 +295,7 @@ func (s *sessionWithContext) BeginTransaction(ctx context.Context, configurers .
 			Timeout:             config.Timeout,
 			Meta:                config.Metadata,
 			ImpersonatedUser:    s.impersonatedUser,
-			NotificationFilters: sessionNotificationFilters,
+			NotificationFilters: s.notificationFilters,
 		})
 	if err != nil {
 		s.pool.Return(ctx, conn)
@@ -331,11 +346,6 @@ func (s *sessionWithContext) runRetriable(
 		s.autocommitTx.done(ctx)
 	}
 
-	sessionNotificationFilters, err := notificationFilterRawValuesOf(s.notificationFilters)
-	if err != nil {
-		return nil, err
-	}
-
 	config := defaultTransactionConfig()
 	for _, c := range configurers {
 		c(&config)
@@ -369,7 +379,7 @@ func (s *sessionWithContext) runRetriable(
 		},
 	}
 	for state.Continue() {
-		if tryAgain, result := s.executeTransactionFunction(ctx, mode, config, &state, sessionNotificationFilters, work); tryAgain {
+		if tryAgain, result := s.executeTransactionFunction(ctx, mode, config, &state, s.notificationFilters, work); tryAgain {
 			continue
 		} else {
 			return result, nil
@@ -384,7 +394,7 @@ func (s *sessionWithContext) runRetriable(
 		return nil, err
 	}
 	// Wrap and log the error if it belongs to the driver
-	err = wrapError(state.LastErr)
+	err := wrapError(state.LastErr)
 	switch err.(type) {
 	case *UsageError, *ConnectivityError:
 		s.log.Error(log.Session, s.logId, err)
@@ -393,7 +403,6 @@ func (s *sessionWithContext) runRetriable(
 }
 
 func (s *sessionWithContext) executeTransactionFunction(ctx context.Context, mode idb.AccessMode, config TransactionConfig, state *retry.State, notificationFilters []string, work ManagedTransactionWork) (bool, any) {
-
 	conn, err := s.getConnection(ctx, mode, pool.DefaultLivenessCheckThreshold)
 	if err != nil {
 		state.OnFailure(ctx, conn, err, false)
@@ -530,11 +539,6 @@ func (s *sessionWithContext) Run(ctx context.Context,
 		s.autocommitTx.done(ctx)
 	}
 
-	sessionNotificationFilters, err := notificationFilterRawValuesOf(s.notificationFilters)
-	if err != nil {
-		return nil, err
-	}
-
 	config := defaultTransactionConfig()
 	for _, c := range configurers {
 		c(&config)
@@ -566,7 +570,7 @@ func (s *sessionWithContext) Run(ctx context.Context,
 			Timeout:             config.Timeout,
 			Meta:                config.Metadata,
 			ImpersonatedUser:    s.impersonatedUser,
-			NotificationFilters: sessionNotificationFilters,
+			NotificationFilters: s.notificationFilters,
 		})
 	if err != nil {
 		s.pool.Return(ctx, conn)

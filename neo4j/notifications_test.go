@@ -117,7 +117,7 @@ func TestNewNotificationFilters(outer *testing.T) {
 	outer.Parallel()
 
 	outer.Run("deduplicates filters", func(t *testing.T) {
-		filters, err := NewNotificationFilters(
+		filters, err := processNotificationFilters(
 			NotificationFilter{
 				Severity: SeverityInformation,
 				Category: CategoryGeneric,
@@ -146,7 +146,7 @@ func TestNewNotificationFilters(outer *testing.T) {
 	})
 
 	outer.Run("rejects invalid filters", func(t *testing.T) {
-		_, err := NewNotificationFilters(NotificationFilter{
+		_, err := processNotificationFilters(NotificationFilter{
 			// invalid because "oopsie: severity and category are mixed"
 			Severity: CategoryUnrecognized,
 			Category: SeverityInformation,
@@ -166,13 +166,13 @@ func TestNotificationFiltersToStringSlice(outer *testing.T) {
 		err    error
 	}
 
-	filters, _ := NewNotificationFilters(
+	filters, _ := processNotificationFilters(
 		NotificationFilter{Severity: SeverityAll, Category: CategoryDeprecation},
 		NotificationFilter{Severity: SeverityInformation, Category: CategoryGeneric},
 	)
 	testCases := []testCase{
 		{
-			name:   "filter set",
+			name:   "processed filter set",
 			input:  filters,
 			output: []string{"*.DEPRECATION", "INFORMATION.GENERIC"},
 		},
@@ -184,7 +184,7 @@ func TestNotificationFiltersToStringSlice(outer *testing.T) {
 		{
 			name:   "no filters", // punk is not dead
 			input:  NoNotificationFilters(),
-			output: nil,
+			output: []string{"NONE"},
 		},
 		{
 			name:   "server-side default filters",
@@ -201,7 +201,7 @@ func TestNotificationFiltersToStringSlice(outer *testing.T) {
 		outer.Run(test.name, func(t *testing.T) {
 			output, err := notificationFilterRawValuesOf(test.input)
 
-			testutil.AssertDeepEquals(t, output, test.output)
+			testutil.AssertEqualsInAnyOrder(t, output, test.output)
 			testutil.AssertDeepEquals(t, err, test.err)
 		})
 	}

@@ -1236,7 +1236,11 @@ func TestBolt5(outer *testing.T) {
 			go func() {
 				srv.waitForHandshake()
 				srv.acceptVersion(5, 1)
-				srv.waitForHello51(noNotifications)
+				srv.waitForHello51(assertInExtraMap[string, []string]{
+					key:   "notifications",
+					found: true,
+					value: []string{},
+				})
 				srv.acceptHello()
 			}()
 

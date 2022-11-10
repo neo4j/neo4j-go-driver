@@ -171,12 +171,12 @@ func NewDriverWithContext(target string, auth AuthToken, configurers ...func(*Co
 	d.connector.Auth = auth.tokens
 	d.connector.RoutingContext = routingContext
 
-	// Let the pool use the same log ID as the driver to simplify log reading.
-	driverNotificationFilters, err := notificationFilterRawValuesOf(d.config.notificationFilters)
+	driverFilters, err := convertDriverNotificationFilters(d.config.notificationFilters)
 	if err != nil {
 		return nil, err
 	}
-	d.pool = pool.New(d.config.MaxConnectionPoolSize, d.config.MaxConnectionLifetime, d.connector.Connect, d.log, d.logId, driverNotificationFilters)
+	// Let the pool use the same log ID as the driver to simplify log reading.
+	d.pool = pool.New(d.config.MaxConnectionPoolSize, d.config.MaxConnectionLifetime, d.connector.Connect, d.log, d.logId, driverFilters)
 
 	if !routing {
 		d.router = &directRouter{address: address}
@@ -224,7 +224,7 @@ func routingContextFromUrl(useRouting bool, u *url.URL) (map[string]string, erro
 		v = strings.TrimSpace(v)
 		if len(v) == 0 {
 			return nil, &UsageError{
-				Message: fmt.Sprintf("Empty routing context value for key '%s'", k),
+				Message: fmt.Sprintf("Empty routing context input for key '%s'", k),
 			}
 		}
 		if k == routingContextAddressKey {
@@ -284,7 +284,11 @@ func (d *driverWithContext) NewSession(ctx context.Context, config SessionConfig
 		return &erroredSessionWithContext{
 			err: &UsageError{Message: "Trying to create session on closed driver"}}
 	}
-	return newSessionWithContext(d.config, config, d.router, d.pool, d.log)
+	sessionFilters, err := convertSessionNotificationFilters(config.NotificationFilters)
+	if err != nil {
+		return &erroredSessionWithContext{err: &UsageError{Message: err.Error()}}
+	}
+	return newSessionWithContext(d.config, config, d.router, d.pool, d.log, sessionFilters)
 }
 
 func (d *driverWithContext) VerifyConnectivity(ctx context.Context) error {
@@ -318,4 +322,25 @@ func (d *driverWithContext) Close(ctx context.Context) error {
 	d.pool = nil
 	d.log.Infof(log.Driver, d.logId, "Closed")
 	return nil
+}
+
+func convertDriverNotificationFilters(configuredFilters any) ([]string, error) {
+	if configuredFilters == nil {
+		return serverDefaultNoticationRawValues(), nil
+	}
+	return notificationFilterRawValuesOf(configuredFilters)
+}
+
+func convertSessionNotificationFilters(configuredFilters any) ([]string, error) {
+	if configuredFilters == nil {
+		return nil, nil
+	}
+	if filters, ok := configuredFilters.([]NotificationFilter); ok {
+		processedFilters, err := processNotificationFilters(filters...)
+		if err != nil {
+			return nil, err
+		}
+		configuredFilters = processedFilters
+	}
+	return notificationFilterRawValuesOf(configuredFilters)
 }

@@ -46,6 +46,7 @@ const (
 const bolt5FetchSize = 1000
 
 const DefaultServerNotifications = "SERVER_DEFAULT"
+const NoNotifications = "NONE"
 
 type internalTx5 struct {
 	mode                idb.AccessMode
@@ -79,9 +80,12 @@ func (i *internalTx5) toMeta() map[string]any {
 		meta["imp_user"] = i.impersonatedUser
 	}
 	if i.notificationFilters != nil {
-		if receiveDefaultServerNotifications(i.notificationFilters) {
+		switch {
+		case receiveDefaultServerNotifications(i.notificationFilters):
 			meta["notifications"] = nil
-		} else {
+		case receiveNoServerNotifications(i.notificationFilters):
+			meta["notifications"] = []string{}
+		default:
 			meta["notifications"] = i.notificationFilters
 		}
 	}
@@ -245,31 +249,7 @@ func (b *bolt5) Connect(ctx context.Context, minor int, auth map[string]any, use
 		return err
 	}
 
-	// Prepare hello message
-	hello := map[string]any{
-		"user_agent": userAgent,
-	}
-	if routingContext != nil {
-		hello["routing"] = routingContext
-	}
-	// TODO move this to a new appendHello for protocol version 5.1+ (neo4j servers 5.3+)
-	// TODO: check credentials redaction still works
-	if minor >= 1 {
-		hello["auth"] = auth
-		if b.notificationFilters != nil && !receiveDefaultServerNotifications(b.notificationFilters) {
-			hello["notifications"] = b.notificationFilters
-		}
-	} else {
-		for k, v := range auth {
-			_, exists := hello[k]
-			if !exists {
-				hello[k] = v
-			}
-		}
-	}
-
-	// Send hello message and wait for confirmation
-	b.out.appendHello(hello)
+	b.sayHello(userAgent, routingContext, minor, auth)
 	b.out.send(ctx, b.conn)
 	succ := b.receiveSuccess(ctx)
 	if b.err != nil {
@@ -929,6 +909,36 @@ func (b *bolt5) Version() db.ProtocolVersion {
 	}
 }
 
+func (b *bolt5) sayHello(userAgent string, routingContext map[string]string, minor int, auth map[string]any) {
+	hello := map[string]any{
+		"user_agent": userAgent,
+	}
+	if routingContext != nil {
+		hello["routing"] = routingContext
+	}
+	if minor >= 1 {
+		if b.notificationFilters != nil {
+			switch {
+			case receiveDefaultServerNotifications(b.notificationFilters):
+				hello["notifications"] = nil
+			case receiveNoServerNotifications(b.notificationFilters):
+				hello["notifications"] = []string{}
+			default:
+				hello["notifications"] = b.notificationFilters
+			}
+		}
+		b.out.appendHello51(auth, hello)
+		return
+	}
+	for k, v := range auth {
+		_, exists := hello[k]
+		if !exists {
+			hello[k] = v
+		}
+	}
+	b.out.appendHello(hello)
+}
+
 func (b *bolt5) initializeReadTimeoutHint(hints map[string]any) {
 	readTimeoutHint, ok := hints[readTimeoutHintName]
 	if !ok {
@@ -949,6 +959,15 @@ func (b *bolt5) initializeReadTimeoutHint(hints map[string]any) {
 func receiveDefaultServerNotifications(notificationFilters []string) bool {
 	for _, notificationFilter := range notificationFilters {
 		if notificationFilter == DefaultServerNotifications {
+			return true
+		}
+	}
+	return false
+}
+
+func receiveNoServerNotifications(notificationFilters []string) bool {
+	for _, notificationFilter := range notificationFilters {
+		if notificationFilter == NoNotifications {
 			return true
 		}
 	}
