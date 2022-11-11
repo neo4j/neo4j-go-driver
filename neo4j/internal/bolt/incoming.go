@@ -28,7 +28,7 @@ import (
 
 type incoming struct {
 	buf             []byte // Reused buffer
-	hyd             hydrator
+	hyd             *hydrator
 	connReadTimeout time.Duration
 	logger          log.Logger
 	logName         string

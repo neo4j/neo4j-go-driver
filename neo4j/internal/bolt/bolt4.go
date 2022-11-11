@@ -82,11 +82,11 @@ func (i *internalTx4) toMeta() map[string]any {
 type bolt4 struct {
 	state            int
 	txId             idb.TxHandle
-	streams          openstreams
+	streams          *openstreams
 	conn             net.Conn
 	serverName       string
-	out              outgoing
-	in               incoming
+	out              *outgoing
+	in               *incoming
 	connId           string
 	logId            string
 	serverVersion    string
@@ -111,10 +111,10 @@ func NewBolt4(serverName string, conn net.Conn, logger log.Logger, boltLog log.B
 		birthDate:  now,
 		idleDate:   now,
 		log:        logger,
-		streams:    openstreams{},
-		in: incoming{
+		streams:    &openstreams{},
+		in: &incoming{
 			buf: make([]byte, 4096),
-			hyd: hydrator{
+			hyd: &hydrator{
 				boltLogger: boltLog,
 				boltMajor:  4,
 			},
@@ -124,7 +124,7 @@ func NewBolt4(serverName string, conn net.Conn, logger log.Logger, boltLog log.B
 		},
 		lastQid: -1,
 	}
-	b.out = outgoing{
+	b.out = &outgoing{
 		chunker:    newChunker(),
 		packer:     packstream.Packer{},
 		onErr:      func(err error) { b.setError(err, true) },
@@ -653,7 +653,7 @@ func (b *bolt4) Keys(streamHandle idb.StreamHandle) ([]string, error) {
 	return stream.keys, nil
 }
 
-// Reads one record from the stream.
+// Next Reads one record from the stream.
 func (b *bolt4) Next(ctx context.Context, streamHandle idb.StreamHandle) (
 	*db.Record, *db.Summary, error) {
 	// Do NOT set b.err for this error

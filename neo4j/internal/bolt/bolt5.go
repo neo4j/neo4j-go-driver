@@ -81,11 +81,11 @@ func (i *internalTx5) toMeta() map[string]any {
 type bolt5 struct {
 	state            int
 	txId             idb.TxHandle
-	streams          openstreams
+	streams          *openstreams
 	conn             net.Conn
 	serverName       string
-	out              outgoing
-	in               incoming
+	out              *outgoing
+	in               *incoming
 	connId           string
 	logId            string
 	serverVersion    string
@@ -110,10 +110,10 @@ func NewBolt5(serverName string, conn net.Conn, logger log.Logger, boltLog log.B
 		birthDate:  now,
 		idleDate:   now,
 		log:        logger,
-		streams:    openstreams{},
-		in: incoming{
+		streams:    &openstreams{},
+		in: &incoming{
 			buf: make([]byte, 4096),
-			hyd: hydrator{
+			hyd: &hydrator{
 				boltLogger: boltLog,
 				boltMajor:  5,
 				useUtc:     true,
@@ -124,7 +124,7 @@ func NewBolt5(serverName string, conn net.Conn, logger log.Logger, boltLog log.B
 		},
 		lastQid: -1,
 	}
-	b.out = outgoing{
+	b.out = &outgoing{
 		chunker:    newChunker(),
 		packer:     packstream.Packer{},
 		onErr:      func(err error) { b.setError(err, true) },

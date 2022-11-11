@@ -56,7 +56,7 @@ func (s *stream) bufferedNext() (bool, *db.Record, *db.Summary, error) {
 	return false, nil, nil, nil
 }
 
-// Delayed error until fifo emptied
+// Err until fifo emptied
 func (s *stream) Err() error {
 	if s.fifo.Len() > 0 {
 		return nil
@@ -138,7 +138,7 @@ func (o *openstreams) reset() {
 
 // Checks that the handle represents a stream but not necessarily a stream belonging
 // to this set of open streams.
-func (o openstreams) getUnsafe(h idb.StreamHandle) (*stream, error) {
+func (o *openstreams) getUnsafe(h idb.StreamHandle) (*stream, error) {
 	stream, ok := h.(*stream)
 	if !ok || stream == nil {
 		return nil, errInvalidStream
@@ -146,7 +146,7 @@ func (o openstreams) getUnsafe(h idb.StreamHandle) (*stream, error) {
 	return stream, nil
 }
 
-func (o openstreams) isSafe(s *stream) error {
+func (o *openstreams) isSafe(s *stream) error {
 	if s.key == o.key {
 		return nil
 	}

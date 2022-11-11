@@ -95,7 +95,7 @@ func NewBolt3(serverName string, conn net.Conn, logger log.Logger, boltLog log.B
 		serverName: serverName,
 		in: &incoming{
 			buf: make([]byte, 4096),
-			hyd: hydrator{
+			hyd: &hydrator{
 				boltLogger: boltLog,
 				boltMajor:  3,
 			},
