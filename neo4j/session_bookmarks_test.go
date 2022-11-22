@@ -52,7 +52,7 @@ func TestSessionBookmarks(outer *testing.T) {
 			"", "bookmark", "", "deutschmark", "",
 		})
 
-		err := sessionBookmarks.replaceBookmarks(ctx, "db", nil, "booking mark")
+		err := sessionBookmarks.replaceBookmarks(ctx, nil, "booking mark")
 
 		if err != nil {
 			t.Errorf("expected nil error, got: %v", err)
@@ -70,7 +70,7 @@ func TestSessionBookmarks(outer *testing.T) {
 	outer.Run("does not replace set bookmarks when new bookmark is empty", func(t *testing.T) {
 		sessionBookmarks := newSessionBookmarks(nil, []string{"book marking"})
 
-		err := sessionBookmarks.replaceBookmarks(ctx, "db", nil, "")
+		err := sessionBookmarks.replaceBookmarks(ctx, nil, "")
 
 		if err != nil {
 			t.Errorf("expected nil error, got: %v", err)
@@ -100,34 +100,23 @@ func TestSessionBookmarks(outer *testing.T) {
 			bookmarkManager := &fakeBookmarkManager{}
 			sessionBookmarks := newSessionBookmarks(bookmarkManager, nil)
 
-			err := sessionBookmarks.replaceBookmarks(ctx, "dbz", []string{"b1", "b2"}, "b3")
+			err := sessionBookmarks.replaceBookmarks(ctx, []string{"b1", "b2"}, "b3")
 
 			if err != nil {
 				t.Errorf("expected nil error, got: %v", err)
 			}
-			if !bookmarkManager.called(1, "UpdateBookmarks", ctx, "dbz", []string{"b1", "b2"}, []string{"b3"}) {
+			if !bookmarkManager.called(1, "UpdateBookmarks", ctx, []string{"b1", "b2"}, []string{"b3"}) {
 				t.Errorf("Expected UpdateBookmarks to be called once but was not")
 			}
 		})
 
-		inner.Run("retrieves the specified database's bookmarks", func(t *testing.T) {
+		inner.Run("retrieves bookmarks", func(t *testing.T) {
 			bookmarkManager := &fakeBookmarkManager{}
 			sessionBookmarks := newSessionBookmarks(bookmarkManager, nil)
 
-			_, _ = sessionBookmarks.bookmarksOfDatabase(ctx, "dbz")
+			_, _ = sessionBookmarks.getBookmarks(ctx)
 
-			if !bookmarkManager.called(1, "GetBookmarks", ctx, "dbz") {
-				t.Errorf("Expected GetBookmarks to be called once but was not")
-			}
-		})
-
-		inner.Run("retrieves all databases' bookmarks", func(t *testing.T) {
-			bookmarkManager := &fakeBookmarkManager{}
-			sessionBookmarks := newSessionBookmarks(bookmarkManager, nil)
-
-			_, _ = sessionBookmarks.allBookmarks(ctx)
-
-			if !bookmarkManager.called(1, "GetAllBookmarks", ctx) {
+			if !bookmarkManager.called(1, "GetBookmarks", ctx) {
 				t.Errorf("Expected GetBookmarks with the provided arguments to be called once but was not")
 			}
 		})
@@ -143,18 +132,18 @@ type fakeBookmarkManager struct {
 	recordedCalls []invocation
 }
 
-func (f *fakeBookmarkManager) UpdateBookmarks(ctx context.Context, database string, previousBookmarks, newBookmarks Bookmarks) error {
+func (f *fakeBookmarkManager) UpdateBookmarks(ctx context.Context, previousBookmarks, newBookmarks Bookmarks) error {
 	f.recordedCalls = append(f.recordedCalls, invocation{
 		function:  "UpdateBookmarks",
-		arguments: []any{ctx, database, previousBookmarks, newBookmarks},
+		arguments: []any{ctx, previousBookmarks, newBookmarks},
 	})
 	return nil
 }
 
-func (f *fakeBookmarkManager) GetBookmarks(ctx context.Context, database string) (Bookmarks, error) {
+func (f *fakeBookmarkManager) GetBookmarks(ctx context.Context) (Bookmarks, error) {
 	f.recordedCalls = append(f.recordedCalls, invocation{
 		function:  "GetBookmarks",
-		arguments: []any{ctx, database},
+		arguments: []any{ctx},
 	})
 	return nil, nil
 }
@@ -167,7 +156,7 @@ func (f *fakeBookmarkManager) GetAllBookmarks(ctx context.Context) (Bookmarks, e
 	return nil, nil
 }
 
-func (f *fakeBookmarkManager) Forget(context.Context, ...string) error {
+func (f *fakeBookmarkManager) Forget(context.Context) error {
 	return nil
 }
 

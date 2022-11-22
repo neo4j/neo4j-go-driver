@@ -46,12 +46,12 @@ func (sb *sessionBookmarks) lastBookmark() string {
 	return bookmarks[count-1]
 }
 
-func (sb *sessionBookmarks) replaceBookmarks(ctx context.Context, database string, previousBookmarks []string, newBookmark string) error {
+func (sb *sessionBookmarks) replaceBookmarks(ctx context.Context, previousBookmarks []string, newBookmark string) error {
 	if len(newBookmark) == 0 {
 		return nil
 	}
 	if sb.bookmarkManager != nil {
-		if err := sb.bookmarkManager.UpdateBookmarks(ctx, database, previousBookmarks, []string{newBookmark}); err != nil {
+		if err := sb.bookmarkManager.UpdateBookmarks(ctx, previousBookmarks, []string{newBookmark}); err != nil {
 			return err
 		}
 	}
@@ -66,18 +66,11 @@ func (sb *sessionBookmarks) replaceSessionBookmarks(newBookmark string) {
 	sb.bookmarks = []string{newBookmark}
 }
 
-func (sb *sessionBookmarks) bookmarksOfDatabase(ctx context.Context, db string) (Bookmarks, error) {
+func (sb *sessionBookmarks) getBookmarks(ctx context.Context) (Bookmarks, error) {
 	if sb.bookmarkManager == nil {
 		return nil, nil
 	}
-	return sb.bookmarkManager.GetBookmarks(ctx, db)
-}
-
-func (sb *sessionBookmarks) allBookmarks(ctx context.Context) (Bookmarks, error) {
-	if sb.bookmarkManager == nil {
-		return nil, nil
-	}
-	return sb.bookmarkManager.GetAllBookmarks(ctx)
+	return sb.bookmarkManager.GetBookmarks(ctx)
 }
 
 // Remove empty string bookmarks to check for "bad" callers

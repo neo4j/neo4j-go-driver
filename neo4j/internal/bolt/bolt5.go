@@ -79,26 +79,25 @@ func (i *internalTx5) toMeta() map[string]any {
 }
 
 type bolt5 struct {
-	state            int
-	txId             idb.TxHandle
-	streams          openstreams
-	conn             net.Conn
-	serverName       string
-	out              outgoing
-	in               incoming
-	connId           string
-	logId            string
-	serverVersion    string
-	tfirst           int64  // Time that server started streaming
-	bookmark         string // Last bookmark
-	bookmarkDatabase string // Last bookmark's database
-	birthDate        time.Time
-	log              log.Logger
-	databaseName     string
-	err              error // Last fatal error
-	minor            int
-	lastQid          int64 // Last seen qid
-	idleDate         time.Time
+	state         int
+	txId          idb.TxHandle
+	streams       openstreams
+	conn          net.Conn
+	serverName    string
+	out           outgoing
+	in            incoming
+	connId        string
+	logId         string
+	serverVersion string
+	tfirst        int64  // Time that server started streaming
+	bookmark      string // Last bookmark
+	birthDate     time.Time
+	log           log.Logger
+	databaseName  string
+	err           error // Last fatal error
+	minor         int
+	lastQid       int64 // Last seen qid
+	idleDate      time.Time
 }
 
 func NewBolt5(serverName string, conn net.Conn, logger log.Logger, boltLog log.BoltLogger) *bolt5 {
@@ -366,9 +365,6 @@ func (b *bolt5) TxCommit(ctx context.Context, txh idb.TxHandle) error {
 	// Keep track of bookmark
 	if len(succ.bookmark) > 0 {
 		b.bookmark = succ.bookmark
-		// SUCCESS can include the DB the bookmarks belong to when SSR is on
-		// and queries like `USE myDb MATCH (...)` are executed
-		b.bookmarkDatabase = succ.db
 	}
 
 	// Transition into ready state
@@ -778,9 +774,6 @@ func (b *bolt5) receiveNext(ctx context.Context) (*db.Record, bool, *db.Summary)
 		sum.TFirst = b.tfirst
 		if len(sum.Bookmark) > 0 {
 			b.bookmark = sum.Bookmark
-			// SUCCESS can include the DB the bookmarks belong to when SSR is on
-			// and queries like `USE myDb MATCH (...)` are executed
-			b.bookmarkDatabase = sum.Database
 		}
 		// Done with this stream
 		b.streams.detach(sum, nil)
@@ -796,8 +789,8 @@ func (b *bolt5) receiveNext(ctx context.Context) (*db.Record, bool, *db.Summary)
 	}
 }
 
-func (b *bolt5) Bookmark() (string, string) {
-	return b.bookmark, b.bookmarkDatabase
+func (b *bolt5) Bookmark() string {
+	return b.bookmark
 }
 
 func (b *bolt5) IsAlive() bool {
@@ -821,7 +814,6 @@ func (b *bolt5) Reset(ctx context.Context) {
 		b.log.Debugf(log.Bolt5, b.logId, "Resetting connection internal state")
 		b.txId = 0
 		b.bookmark = ""
-		b.bookmarkDatabase = ""
 		b.databaseName = idb.DefaultDatabase
 		b.err = nil
 		b.lastQid = -1

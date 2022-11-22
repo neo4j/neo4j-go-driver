@@ -617,11 +617,8 @@ func (b *bolt3) receiveNext(ctx context.Context) (*db.Record, *db.Summary, error
 	}
 }
 
-func (b *bolt3) Bookmark() (string, string) {
-	// the bookmark database is empty here since multi-tenancy (aka multi-database)
-	// is a Neo4j 4.x EE feature
-	// only Bolt 4.0+ connections may return a non-empty value
-	return b.bookmark, ""
+func (b *bolt3) Bookmark() string {
+	return b.bookmark
 }
 
 func (b *bolt3) IsAlive() bool {

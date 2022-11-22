@@ -37,101 +37,66 @@ type BookmarkManager interface {
 	// UpdateBookmarks updates the bookmark for the specified database
 	// previousBookmarks are the initial bookmarks of the bookmark holder (like a Session)
 	// newBookmarks are the bookmarks that are received after completion of the bookmark holder operation (like the end of a Session)
-	UpdateBookmarks(ctx context.Context, database string, previousBookmarks, newBookmarks Bookmarks) error
-
-	// GetAllBookmarks returns all the bookmarks tracked by this bookmark manager
-	// Note: the order of the returned bookmark slice is not guaranteed
-	GetAllBookmarks(ctx context.Context) (Bookmarks, error)
+	UpdateBookmarks(ctx context.Context, previousBookmarks, newBookmarks Bookmarks) error
 
 	// GetBookmarks returns all the bookmarks associated with the specified database
 	// Note: the order of the returned bookmark slice does not need to be deterministic
-	GetBookmarks(ctx context.Context, database string) (Bookmarks, error)
-
-	// Forget removes all databases' bookmarks
-	// Note: it is the driver user's responsibility to call this
-	Forget(ctx context.Context, databases ...string) error
+	GetBookmarks(ctx context.Context) (Bookmarks, error)
 }
 
 // BookmarkManagerConfig is an experimental API and may be changed or removed
 // without prior notice
 type BookmarkManagerConfig struct {
 	// Initial bookmarks per database
-	InitialBookmarks map[string]Bookmarks
+	InitialBookmarks Bookmarks
 
 	// Supplier providing external bookmarks
-	BookmarkSupplier BookmarkSupplier
+	BookmarkSupplier func(context.Context) (Bookmarks, error)
 
 	// Hook called whenever bookmarks for a given database get updated
 	// The hook is called with the database and the new bookmarks
 	// Note: the order of the supplied bookmark slice is not guaranteed
-	BookmarkConsumer func(ctx context.Context, database string, bookmarks Bookmarks) error
-}
-
-type BookmarkSupplier interface {
-	// GetAllBookmarks returns all known bookmarks to the bookmark manager
-	GetAllBookmarks(ctx context.Context) (Bookmarks, error)
-
-	// GetBookmarks returns all the bookmarks of the specified database to the bookmark manager
-	GetBookmarks(ctx context.Context, database string) (Bookmarks, error)
+	BookmarkConsumer func(ctx context.Context, bookmarks Bookmarks) error
 }
 
 type bookmarkManager struct {
-	bookmarks *sync.Map
-	supplier  BookmarkSupplier
-	consumer  func(context.Context, string, Bookmarks) error
+	bookmarks        collection.Set[string]
+	supplyBookmarks  func(context.Context) (Bookmarks, error)
+	consumeBookmarks func(context.Context, Bookmarks) error
+	mutex            sync.RWMutex
 }
 
-func (b *bookmarkManager) UpdateBookmarks(ctx context.Context, database string, previousBookmarks, newBookmarks Bookmarks) error {
+func (b *bookmarkManager) UpdateBookmarks(ctx context.Context, previousBookmarks, newBookmarks Bookmarks) error {
 	if len(newBookmarks) == 0 {
 		return nil
 	}
+	b.mutex.Lock()
+	defer b.mutex.Unlock()
 	var bookmarksToNotify Bookmarks
-	storedNewBookmarks := collection.NewSet(newBookmarks)
-	if rawCurrentBookmarks, loaded := b.bookmarks.LoadOrStore(database, storedNewBookmarks); !loaded {
-		bookmarksToNotify = storedNewBookmarks.Values()
-	} else {
-		currentBookmarks := (rawCurrentBookmarks).(collection.Set[string])
-		currentBookmarks.RemoveAll(previousBookmarks)
-		currentBookmarks.AddAll(newBookmarks)
-		bookmarksToNotify = currentBookmarks.Values()
-	}
-	if b.consumer != nil {
-		return b.consumer(ctx, database, bookmarksToNotify)
+	b.bookmarks.RemoveAll(previousBookmarks)
+	b.bookmarks.AddAll(newBookmarks)
+	bookmarksToNotify = b.bookmarks.Values()
+	if b.consumeBookmarks != nil {
+		return b.consumeBookmarks(ctx, bookmarksToNotify)
 	}
 	return nil
 }
 
-func (b *bookmarkManager) GetAllBookmarks(ctx context.Context) (Bookmarks, error) {
-	allBookmarks := collection.NewSet([]string{})
-	if b.supplier != nil {
-		bookmarks, err := b.supplier.GetAllBookmarks(ctx)
-		if err != nil {
-			return nil, err
-		}
-		allBookmarks.AddAll(bookmarks)
-	}
-	b.bookmarks.Range(func(db, rawBookmarks any) bool {
-		bookmarks := rawBookmarks.(collection.Set[string])
-		allBookmarks.Union(bookmarks)
-		return true
-	})
-	return allBookmarks.Values(), nil
-}
-
-func (b *bookmarkManager) GetBookmarks(ctx context.Context, database string) (Bookmarks, error) {
+func (b *bookmarkManager) GetBookmarks(ctx context.Context) (Bookmarks, error) {
 	var extraBookmarks Bookmarks
-	if b.supplier != nil {
-		bookmarks, err := b.supplier.GetBookmarks(ctx, database)
+	if b.supplyBookmarks != nil {
+		bookmarks, err := b.supplyBookmarks(ctx)
 		if err != nil {
 			return nil, err
 		}
 		extraBookmarks = bookmarks
 	}
-	rawBookmarks, found := b.bookmarks.Load(database)
-	if !found {
+	b.mutex.RLock()
+	defer b.mutex.RUnlock()
+	if len(b.bookmarks) == 0 {
 		return extraBookmarks, nil
 	}
-	bookmarks := rawBookmarks.(collection.Set[string]).Copy()
+	bookmarks := b.bookmarks.Copy()
 	if extraBookmarks == nil {
 		return bookmarks.Values(), nil
 	}
@@ -139,27 +104,12 @@ func (b *bookmarkManager) GetBookmarks(ctx context.Context, database string) (Bo
 	return bookmarks.Values(), nil
 }
 
-func (b *bookmarkManager) Forget(ctx context.Context, databases ...string) error {
-	for _, db := range databases {
-		b.bookmarks.Delete(db)
-	}
-	return nil
-}
-
 func NewBookmarkManager(config BookmarkManagerConfig) BookmarkManager {
 	return &bookmarkManager{
-		bookmarks: initializeBookmarks(config.InitialBookmarks),
-		supplier:  config.BookmarkSupplier,
-		consumer:  config.BookmarkConsumer,
+		bookmarks:        collection.NewSet(config.InitialBookmarks),
+		supplyBookmarks:  config.BookmarkSupplier,
+		consumeBookmarks: config.BookmarkConsumer,
 	}
-}
-
-func initializeBookmarks(allBookmarks map[string]Bookmarks) *sync.Map {
-	var initialBookmarks sync.Map
-	for db, bookmarks := range allBookmarks {
-		initialBookmarks.Store(db, collection.NewSet(bookmarks))
-	}
-	return &initialBookmarks
 }
 
 // CombineBookmarks is a helper method to combine []Bookmarks into a single Bookmarks instance.

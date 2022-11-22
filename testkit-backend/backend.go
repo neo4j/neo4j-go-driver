@@ -1099,16 +1099,14 @@ func patchNumbersInMap(dictionary map[string]any) error {
 func (b *backend) bookmarkManagerConfig(bookmarkManagerId string,
 	config map[string]any) neo4j.BookmarkManagerConfig {
 
-	var initialBookmarks map[string]neo4j.Bookmarks
+	var initialBookmarks neo4j.Bookmarks
 	if config["initialBookmarks"] != nil {
-		initialBookmarks = convertInitialBookmarks(config["initialBookmarks"].(map[string]any))
+		initialBookmarks = convertInitialBookmarks(config["initialBookmarks"].([]any))
 	}
 	result := neo4j.BookmarkManagerConfig{InitialBookmarks: initialBookmarks}
 	supplierRegistered := config["bookmarksSupplierRegistered"]
 	if supplierRegistered != nil && supplierRegistered.(bool) {
-		result.BookmarkSupplier = &testkitBookmarkSupplier{
-			supplier: b.supplyBookmarks(bookmarkManagerId),
-		}
+		result.BookmarkSupplier = b.supplyBookmarks(bookmarkManagerId)
 	}
 	consumerRegistered := config["bookmarksConsumerRegistered"]
 	if consumerRegistered != nil && consumerRegistered.(bool) {
@@ -1117,16 +1115,10 @@ func (b *backend) bookmarkManagerConfig(bookmarkManagerId string,
 	return result
 }
 
-func (b *backend) supplyBookmarks(bookmarkManagerId string) func(...string) (neo4j.Bookmarks, error) {
-	return func(databases ...string) (neo4j.Bookmarks, error) {
-		if len(databases) > 1 {
-			panic("at most 1 database should be specified")
-		}
+func (b *backend) supplyBookmarks(bookmarkManagerId string) func(context.Context) (neo4j.Bookmarks, error) {
+	return func(ctx context.Context) (neo4j.Bookmarks, error) {
 		id := b.nextId()
 		msg := map[string]any{"id": id, "bookmarkManagerId": bookmarkManagerId}
-		if len(databases) == 1 {
-			msg["database"] = databases[0]
-		}
 		b.writeResponse("BookmarksSupplierRequest", msg)
 		for {
 			b.process()
@@ -1135,13 +1127,12 @@ func (b *backend) supplyBookmarks(bookmarkManagerId string) func(...string) (neo
 	}
 }
 
-func (b *backend) consumeBookmarks(bookmarkManagerId string) func(context.Context, string, neo4j.Bookmarks) error {
-	return func(_ context.Context, database string, bookmarks neo4j.Bookmarks) error {
+func (b *backend) consumeBookmarks(bookmarkManagerId string) func(context.Context, neo4j.Bookmarks) error {
+	return func(_ context.Context, bookmarks neo4j.Bookmarks) error {
 		id := b.nextId()
 		b.writeResponse("BookmarksConsumerRequest", map[string]any{
 			"id":                id,
 			"bookmarkManagerId": bookmarkManagerId,
-			"database":          database,
 			"bookmarks":         bookmarks,
 		})
 		for {
@@ -1153,27 +1144,10 @@ func (b *backend) consumeBookmarks(bookmarkManagerId string) func(context.Contex
 	}
 }
 
-type testkitBookmarkSupplier struct {
-	supplier func(...string) (neo4j.Bookmarks, error)
-}
-
-func (t *testkitBookmarkSupplier) GetAllBookmarks(context.Context) (neo4j.Bookmarks, error) {
-	return t.supplier()
-}
-
-func (t *testkitBookmarkSupplier) GetBookmarks(_ context.Context, database string) (neo4j.Bookmarks, error) {
-	return t.supplier(database)
-}
-
-func convertInitialBookmarks(bookmarks map[string]any) map[string]neo4j.Bookmarks {
-	result := make(map[string]neo4j.Bookmarks, len(bookmarks))
-	for db, rawBookmarks := range bookmarks {
-		bookmarks := rawBookmarks.([]any)
-		storedBookmarks := make(neo4j.Bookmarks, len(bookmarks))
-		for i, bookmark := range bookmarks {
-			storedBookmarks[i] = bookmark.(string)
-		}
-		result[db] = storedBookmarks
+func convertInitialBookmarks(bookmarks []any) neo4j.Bookmarks {
+	result := make(neo4j.Bookmarks, len(bookmarks))
+	for i, bookmark := range bookmarks {
+		result[i] = bookmark.(string)
 	}
 	return result
 }
