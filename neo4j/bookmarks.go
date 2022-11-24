@@ -34,7 +34,7 @@ type Bookmarks = []string
 // BookmarkManager centralizes bookmark manager supply and notification
 // This API is experimental and may be changed or removed without prior notice
 type BookmarkManager interface {
-	// UpdateBookmarks updates the bookmark for the specified database
+	// UpdateBookmarks updates the bookmark tracked by this bookmark manager
 	// previousBookmarks are the initial bookmarks of the bookmark holder (like a Session)
 	// newBookmarks are the bookmarks that are received after completion of the bookmark holder operation (like the end of a Session)
 	UpdateBookmarks(ctx context.Context, previousBookmarks, newBookmarks Bookmarks) error
