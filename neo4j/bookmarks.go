@@ -53,7 +53,7 @@ type BookmarkManagerConfig struct {
 	// Supplier providing external bookmarks
 	BookmarkSupplier func(context.Context) (Bookmarks, error)
 
-	// Hook called whenever bookmarks for a given database get updated
+	// Hook called whenever bookmarks get updated
 	// The hook is called with the database and the new bookmarks
 	// Note: the order of the supplied bookmark slice is not guaranteed
 	BookmarkConsumer func(ctx context.Context, bookmarks Bookmarks) error
