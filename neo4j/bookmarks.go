@@ -39,7 +39,7 @@ type BookmarkManager interface {
 	// newBookmarks are the bookmarks that are received after completion of the bookmark holder operation (like the end of a Session)
 	UpdateBookmarks(ctx context.Context, previousBookmarks, newBookmarks Bookmarks) error
 
-	// GetBookmarks returns all the bookmarks associated with the specified database
+	// GetBookmarks returns all the bookmarks tracked by this bookmark manager
 	// Note: the order of the returned bookmark slice does not need to be deterministic
 	GetBookmarks(ctx context.Context) (Bookmarks, error)
 }
