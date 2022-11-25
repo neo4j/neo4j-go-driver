@@ -84,7 +84,7 @@ type Connection interface {
 	// Note that if there is an ongoing auto-commit transaction (stream active) the bookmark
 	// from that is not included, use Buffer or Consume to end the stream with a bookmark.
 	// Empty string if no bookmark.
-	Bookmark() (string, string)
+	Bookmark() string
 	// ServerName returns the name of the remote server
 	ServerName() string
 	// ServerVersion returns the server version on pattern Neo4j/1.2.3

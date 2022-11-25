@@ -243,7 +243,7 @@ func (s *sessionWithContext) BeginTransaction(ctx context.Context, configurers .
 	}
 
 	// Begin transaction
-	beginBookmarks, err := s.transactionBookmarks(ctx)
+	beginBookmarks, err := s.getBookmarks(ctx)
 	if err != nil {
 		s.pool.Return(ctx, conn)
 		return nil, wrapError(err)
@@ -377,7 +377,7 @@ func (s *sessionWithContext) executeTransactionFunction(
 	// handle transaction function panic as well
 	defer s.pool.Return(ctx, conn)
 
-	beginBookmarks, err := s.transactionBookmarks(ctx)
+	beginBookmarks, err := s.getBookmarks(ctx)
 	if err != nil {
 		state.OnFailure(ctx, conn, err, false)
 		return true, nil
@@ -421,11 +421,10 @@ func (s *sessionWithContext) executeTransactionFunction(
 }
 
 func (s *sessionWithContext) getServers(ctx context.Context, mode idb.AccessMode) ([]string, error) {
-	bookmarksFn := s.routingBookmarks
 	if mode == idb.ReadMode {
-		return s.router.Readers(ctx, bookmarksFn, s.databaseName, s.boltLogger)
+		return s.router.Readers(ctx, s.getBookmarks, s.databaseName, s.boltLogger)
 	} else {
-		return s.router.Writers(ctx, bookmarksFn, s.databaseName, s.boltLogger)
+		return s.router.Writers(ctx, s.getBookmarks, s.databaseName, s.boltLogger)
 	}
 }
 
@@ -474,20 +473,14 @@ func (s *sessionWithContext) retrieveBookmarks(ctx context.Context, conn idb.Con
 	if conn == nil {
 		return nil
 	}
-	bookmark, bookmarkDatabase := conn.Bookmark()
-	db := s.databaseName
-	if bookmarkDatabase != "" {
-		db = bookmarkDatabase
-	}
-	return s.bookmarks.replaceBookmarks(ctx, db, sentBookmarks, bookmark)
+	return s.bookmarks.replaceBookmarks(ctx, sentBookmarks, conn.Bookmark())
 }
 
 func (s *sessionWithContext) retrieveSessionBookmarks(conn idb.Connection) {
 	if conn == nil {
 		return
 	}
-	bookmark, _ := conn.Bookmark()
-	s.bookmarks.replaceSessionBookmarks(bookmark)
+	s.bookmarks.replaceSessionBookmarks(conn.Bookmark())
 }
 
 func (s *sessionWithContext) Run(ctx context.Context,
@@ -516,7 +509,7 @@ func (s *sessionWithContext) Run(ctx context.Context,
 		return nil, wrapError(err)
 	}
 
-	runBookmarks, err := s.transactionBookmarks(ctx)
+	runBookmarks, err := s.getBookmarks(ctx)
 	if err != nil {
 		s.pool.Return(ctx, conn)
 		return nil, wrapError(err)
@@ -608,8 +601,7 @@ func (s *sessionWithContext) resolveHomeDatabase(ctx context.Context) error {
 		return nil
 	}
 
-	// the actual database may not be known yet so the session initial bookmarks might actually belong to system
-	bookmarks, err := s.routingBookmarks(ctx)
+	bookmarks, err := s.getBookmarks(ctx)
 	if err != nil {
 		return err
 	}
@@ -623,25 +615,14 @@ func (s *sessionWithContext) resolveHomeDatabase(ctx context.Context) error {
 	return nil
 }
 
-func (s *sessionWithContext) transactionBookmarks(ctx context.Context) (Bookmarks, error) {
-	bookmarks, err := s.bookmarks.allBookmarks(ctx)
+func (s *sessionWithContext) getBookmarks(ctx context.Context) (Bookmarks, error) {
+	bookmarks, err := s.bookmarks.getBookmarks(ctx)
 	if err != nil {
 		return nil, err
 	}
 	result := collection.NewSet(bookmarks)
 	result.AddAll(s.bookmarks.currentBookmarks())
 	return result.Values(), nil
-}
-
-func (s *sessionWithContext) routingBookmarks(ctx context.Context) (Bookmarks, error) {
-	systemBookmarks, err := s.bookmarks.bookmarksOfDatabase(ctx, "system")
-	if err != nil {
-		return nil, err
-	}
-	sessionBookmarks := s.bookmarks.currentBookmarks()
-	bookmarks := collection.NewSet(systemBookmarks)
-	bookmarks.AddAll(sessionBookmarks)
-	return bookmarks.Values(), nil
 }
 
 type erroredSessionWithContext struct {

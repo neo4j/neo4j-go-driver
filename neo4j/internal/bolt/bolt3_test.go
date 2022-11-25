@@ -204,7 +204,7 @@ func TestBolt3(outer *testing.T) {
 
 		bolt.TxCommit(context.Background(), tx)
 		assertBoltState(t, bolt3_ready, bolt)
-		bookmark, _ := bolt.Bookmark()
+		bookmark := bolt.Bookmark()
 		AssertStringEqual(t, committedBookmark, bookmark)
 	})
 
@@ -226,7 +226,7 @@ func TestBolt3(outer *testing.T) {
 		assertBoltState(t, bolt3_streamingtx, bolt)
 		bolt.TxCommit(context.Background(), tx)
 		assertBoltState(t, bolt3_ready, bolt)
-		bookmark, _ := bolt.Bookmark()
+		bookmark := bolt.Bookmark()
 		AssertStringEqual(t, committedBookmark, bookmark)
 	})
 
@@ -243,7 +243,7 @@ func TestBolt3(outer *testing.T) {
 			idb.TxConfig{Mode: idb.ReadMode, Bookmarks: []string{"bm1"}})
 		assertBoltState(t, bolt3_failed, bolt)
 		AssertError(t, err)
-		bookmark, _ := bolt.Bookmark()
+		bookmark := bolt.Bookmark()
 		AssertStringEqual(t, "", bookmark)
 	})
 
@@ -386,7 +386,7 @@ func TestBolt3(outer *testing.T) {
 		err := bolt.Buffer(context.Background(), stream)
 		AssertNoError(t, err)
 		// The bookmark should be set
-		bookmark, _ := bolt.Bookmark()
+		bookmark := bolt.Bookmark()
 		AssertStringEqual(t, bookmark, runBookmark)
 
 		// Server closed connection and bolt will go into failed state
@@ -436,7 +436,7 @@ func TestBolt3(outer *testing.T) {
 		rec, sum, err = bolt.Next(context.Background(), stream)
 		AssertNextOnlyError(t, rec, sum, err)
 		// Should be no bookmark since we failed
-		bookmark, _ := bolt.Bookmark()
+		bookmark := bolt.Bookmark()
 		AssertStringEqual(t, bookmark, "")
 	})
 
@@ -467,7 +467,7 @@ func TestBolt3(outer *testing.T) {
 		AssertNoError(t, err)
 		AssertNotNil(t, sum)
 		// The bookmark should be set
-		bookmark, _ := bolt.Bookmark()
+		bookmark := bolt.Bookmark()
 		AssertStringEqual(t, bookmark, runBookmark)
 		AssertStringEqual(t, sum.Bookmark, runBookmark)
 
@@ -503,7 +503,7 @@ func TestBolt3(outer *testing.T) {
 		sum, err := bolt.Consume(context.Background(), stream)
 		AssertNeo4jError(t, err)
 		AssertNil(t, sum)
-		bookmark, _ := bolt.Bookmark()
+		bookmark := bolt.Bookmark()
 		AssertStringEqual(t, bookmark, "")
 
 		// Should not get the summary since there was an error
