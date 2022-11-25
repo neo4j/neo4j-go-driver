@@ -84,6 +84,8 @@ type SessionConfig struct {
 	Bookmarks Bookmarks
 	// DatabaseName sets the target database name for the queries executed within the session created with this
 	// configuration.
+	// Usage of Cypher clauses like USE is not a replacement for this option.
+	// Drive​r sends Cypher to the server for processing.
 	// This option has no explicit value by default, but it is recommended to set one if the target database is known
 	// in advance. This has the benefit of ensuring a consistent target database name throughout the session in a
 	// straightforward way and potentially simplifies driver logic as well as reduces network communication resulting
