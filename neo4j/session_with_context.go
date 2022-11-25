@@ -82,7 +82,37 @@ type SessionConfig struct {
 	// within the same session will automatically use the bookmark from the previous command in the
 	// session.
 	Bookmarks Bookmarks
-	// DatabaseName contains the name of the database that the commands in the session will execute on.
+	// DatabaseName sets the target database name for the queries executed within the session created with this
+	// configuration.
+	// Usage of Cypher clauses like USE is not a replacement for this option.
+	// Drive​r sends Cypher to the server for processing.
+	// This option has no explicit value by default, but it is recommended to set one if the target database is known
+	// in advance. This has the benefit of ensuring a consistent target database name throughout the session in a
+	// straightforward way and potentially simplifies driver logic as well as reduces network communication resulting
+	// in better performance.
+	// When no explicit name is set, the driver behavior depends on the connection URI scheme supplied to the driver on
+	// instantiation and Bolt protocol version.
+	//
+	// Specifically, the following applies:
+	//
+	// - for bolt schemes
+	//		queries are dispatched to the server for execution without explicit database name supplied,
+	// 		meaning that the target database name for query execution is determined by the server.
+	//		It is important to note that the target database may change (even within the same session), for instance if the
+	//		user's home database is changed on the server.
+	//
+	// - for neo4j schemes
+	//		providing that Bolt protocol version 4.4, which was introduced with Neo4j server 4.4, or above
+	//		is available, the driver fetches the user's home database name from the server on first query execution
+	//		within the session and uses the fetched database name explicitly for all queries executed within the session.
+	//		This ensures that the database name remains consistent within the given session. For instance, if the user's
+	//		home database name is 'movies' and the server supplies it to the driver upon database name fetching for the
+	//		session, all queries within that session are executed with the explicit database name 'movies' supplied.
+	//		Any change to the user’s home database is reflected only in sessions created after such change takes effect.
+	//		This behavior requires additional network communication.
+	//		In clustered environments, it is strongly recommended to avoid a single point of failure.
+	//		For instance, by ensuring that the connection URI resolves to multiple endpoints.
+	//		For older Bolt protocol versions, the behavior is the same as described for the bolt schemes above.
 	DatabaseName string
 	// FetchSize defines how many records to pull from server in each batch.
 	// From Bolt protocol v4 (Neo4j 4+) records can be fetched in batches as compared to fetching
