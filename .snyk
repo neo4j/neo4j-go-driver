@@ -1,0 +1,8 @@
+# Snyk (https://snyk.io) policy file
+exclude:
+ code:
+  - testkit/**
+  - testkit-backend/**
+  - test-stress/**
+  - benchmark/**
+  - neo4j/**/*_test.go
