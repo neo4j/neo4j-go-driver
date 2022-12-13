@@ -268,7 +268,8 @@ func (b *backend) toTransactionConfigApply(data map[string]any) func(*neo4j.Tran
 }
 
 func (b *backend) toCypherAndParams(data map[string]any) (string, map[string]any, error) {
-	parameters, err := b.toParams(data["params"].(map[string]any))
+	rawParameters, _ := data["params"].(map[string]any)
+	parameters, err := b.toParams(rawParameters)
 	if err != nil {
 		return "", nil, err
 	}
