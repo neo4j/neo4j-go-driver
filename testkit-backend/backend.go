@@ -247,7 +247,6 @@ func (b *backend) toTransactionConfigApply(data map[string]any) func(*neo4j.Tran
 	txConfig := neo4j.TransactionConfig{Timeout: math.MinInt}
 	// Optional transaction meta data
 	if data["txMeta"] != nil {
-		//toParams
 		txMetadata, err := b.toParams(data["txMeta"].(map[string]any))
 		if err != nil {
 			panic(err)
@@ -269,22 +268,24 @@ func (b *backend) toTransactionConfigApply(data map[string]any) func(*neo4j.Tran
 }
 
 func (b *backend) toCypherAndParams(data map[string]any) (string, map[string]any, error) {
-	params, _ := data["params"].(map[string]any)
-	if param, err := b.toParams(params); err != nil {
+	parameters, err := b.toParams(data["params"].(map[string]any))
+	if err != nil {
 		return "", nil, err
-	} else {
-		return data["cypher"].(string), param, nil
 	}
+	query := data["cypher"].(string)
+	return query, parameters, nil
 }
 
-func (b *backend) toParams(params map[string]any) (map[string]any, error) {
-	var err error
-	for i, p := range params {
-		if params[i], err = cypherToNative(p); err != nil {
+func (b *backend) toParams(parameters map[string]any) (map[string]any, error) {
+	result := make(map[string]any, len(parameters))
+	for name, rawParam := range parameters {
+		param, err := cypherToNative(rawParam)
+		if err != nil {
 			return nil, err
 		}
+		result[name] = param
 	}
-	return params, nil
+	return result, nil
 }
 
 func (b *backend) handleTransactionFunc(isRead bool, data map[string]any) {
