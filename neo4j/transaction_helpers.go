@@ -25,6 +25,12 @@ import (
 
 type ManagedTransactionWorkT[T any] func(tx ManagedTransaction) (T, error)
 
+// ExecuteRead executes the given unit of work in a read transaction with
+// retry logic in place, via the provided session.
+//
+// This is the generic variant of SessionWithContext.ExecuteRead.
+//
+// If an error occurs, the zero value of T is returned.
 func ExecuteRead[T any](ctx context.Context, session SessionWithContext,
 	work ManagedTransactionWorkT[T],
 	configurers ...func(config *TransactionConfig)) (T, error) {
@@ -32,6 +38,12 @@ func ExecuteRead[T any](ctx context.Context, session SessionWithContext,
 	return castGeneric[T](session.ExecuteRead(ctx, transactionWorkAdapter(work), configurers...))
 }
 
+// ExecuteWrite executes the given unit of work in a write transaction with
+// retry logic in place, via the provided session.
+//
+// This is the generic variant of SessionWithContext.ExecuteWrite.
+//
+// If an error occurs, the zero value of T is returned.
 func ExecuteWrite[T any](ctx context.Context, session SessionWithContext,
 	work ManagedTransactionWorkT[T],
 	configurers ...func(config *TransactionConfig)) (T, error) {
@@ -45,6 +57,14 @@ func transactionWorkAdapter[T any](work ManagedTransactionWorkT[T]) ManagedTrans
 	}
 }
 
+// castGeneric performs a type assertion on the given `result` to the generic type T, unless an error has occurred.
+//
+// Implementation note: the function currently assumes that `result` is compatible with T and does not perform a soft
+// assertions.
+//
+// For instance, the following code would currently panic instead of returning an error:
+//
+//	str, err := castGeneric[string](42, nil)
 func castGeneric[T any](result any, err error) (T, error) {
 	if err != nil {
 		return *new(T), err
