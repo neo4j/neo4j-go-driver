@@ -31,6 +31,10 @@ type Person struct {
 	Login string
 }
 
+func (p *Person) String() string {
+	return fmt.Sprintf("name: %s, login: %s", p.Name, p.Login)
+}
+
 func (p *Person) asNodeProps() map[string]any {
 	return map[string]any{
 		"name":  p.Name,

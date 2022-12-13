@@ -41,6 +41,7 @@ type (
 	Time          = dbtype.Time
 	OffsetTime    = dbtype.Time
 	Duration      = dbtype.Duration
+	Entity        = dbtype.Entity
 	Node          = dbtype.Node
 	Relationship  = dbtype.Relationship
 	Path          = dbtype.Path

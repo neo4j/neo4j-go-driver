@@ -20,6 +20,13 @@
 // Package dbtype contains definitions of supported database types.
 package dbtype
 
+type Entity interface {
+	// Deprecated: GetId is deprecated and will be removed in 6.0. Use GetElementId instead.
+	GetId() int64
+	GetElementId() string
+	GetProperties() map[string]any
+}
+
 // Node represents a node in the neo4j graph database
 type Node struct {
 	// Deprecated: Id is deprecated and will be removed in 6.0. Use ElementId instead.
@@ -27,6 +34,18 @@ type Node struct {
 	ElementId string         // ElementId of this Node.
 	Labels    []string       // Labels attached to this Node.
 	Props     map[string]any // Properties of this Node.
+}
+
+func (n Node) GetId() int64 {
+	return n.Id
+}
+
+func (n Node) GetElementId() string {
+	return n.ElementId
+}
+
+func (n Node) GetProperties() map[string]any {
+	return n.Props
 }
 
 // Relationship represents a relationship in the neo4j graph database
@@ -42,6 +61,18 @@ type Relationship struct {
 	EndElementId string         // ElementId of the end Node of this Relationship.
 	Type         string         // Type of this Relationship.
 	Props        map[string]any // Properties of this Relationship.
+}
+
+func (r Relationship) GetId() int64 {
+	return r.Id
+}
+
+func (r Relationship) GetElementId() string {
+	return r.ElementId
+}
+
+func (r Relationship) GetProperties() map[string]any {
+	return r.Props
 }
 
 // Path represents a directed sequence of relationships between two nodes.
