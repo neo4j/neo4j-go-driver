@@ -19,7 +19,9 @@
 
 package neo4j
 
-import "context"
+import (
+	"context"
+)
 
 type ManagedTransactionWorkT[T any] func(tx ManagedTransaction) (T, error)
 
