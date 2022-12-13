@@ -66,8 +66,6 @@ import (
 )
 
 func main() {
-	// Neo4j 4.0, defaults to no TLS therefore use bolt:// or neo4j://
-	// Neo4j 3.5, defaults to self-signed certificates, TLS on, therefore use bolt+ssc:// or neo4j+ssc://
 	dbUri := "neo4j://localhost:7687"
 	driver, err := neo4j.NewDriverWithContext(dbUri, neo4j.BasicAuth("username", "password", ""))
 	if err != nil {
