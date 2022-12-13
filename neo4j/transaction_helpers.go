@@ -60,7 +60,7 @@ func transactionWorkAdapter[T any](work ManagedTransactionWorkT[T]) ManagedTrans
 // castGeneric performs a type assertion on the given `result` to the generic type T, unless an error has occurred.
 //
 // Implementation note: the function currently assumes that `result` is compatible with T and does not perform a soft
-// assertions.
+// assertion.
 //
 // For instance, the following code would currently panic instead of returning an error:
 //
