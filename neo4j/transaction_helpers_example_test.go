@@ -123,7 +123,7 @@ func ExampleExecuteRead() {
 		}, nil
 	})
 	handleError(err)
-	fmt.Printf("There are %d people in the database\n", person)
+	fmt.Printf("Found person %v in the database\n", person)
 }
 
 func getPropertyValue[T any](node neo4j.Node, key string) (T, error) {
@@ -179,6 +179,7 @@ func handleClose(ctx context.Context, closer ctxCloser) {
 }
 
 func handleError(err error) {
+	//lint:ignore SA9003 empty branch allowed since it's demo code
 	if err != nil {
 		// do something
 	}
