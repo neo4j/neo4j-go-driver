@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+
+set -Eeuo pipefail
+
+grep_not(){ ! grep "${@}"; return $?;}
+
+echo "# pre-commit hook"
+printf '%-15s' "## staticcheck "
+cd "$(mktemp -d)" && go install honnef.co/go/tools/cmd/staticcheck@latest && cd - > /dev/null
+"${GOBIN:-$(go env PATH)/bin}"/staticcheck ./...
+echo "✅"
+
+printf '%-15s' "## go vet "
+go vet ./...
+echo "✅"
+
+printf '%-15s' "## go test "
+go test -short ./... | grep_not --invert-match --fixed-strings --regexp='?' --regexp='ok' # only show failures
+echo "✅"
