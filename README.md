@@ -66,8 +66,6 @@ import (
 )
 
 func main() {
-	// Neo4j 4.0, defaults to no TLS therefore use bolt:// or neo4j://
-	// Neo4j 3.5, defaults to self-signed certificates, TLS on, therefore use bolt+ssc:// or neo4j+ssc://
 	dbUri := "neo4j://localhost:7687"
 	driver, err := neo4j.NewDriverWithContext(dbUri, neo4j.BasicAuth("username", "password", ""))
 	if err != nil {
@@ -96,15 +94,13 @@ func insertItem(ctx context.Context, driver neo4j.DriverWithContext) (*Item, err
 	// read mode.
 	session := driver.NewSession(ctx, neo4j.SessionConfig{})
 	defer session.Close(ctx)
-	result, err := session.ExecuteWrite(ctx, createItemFn(ctx))
-	if err != nil {
-		return nil, err
-	}
-	return result.(*Item), nil
+	// The generic neo4j.ExecuteRead API is also available for read operations
+	// The legacy non-generic session.ExecuteWrite and session.ExecuteRead are also available
+	return neo4j.ExecuteWrite[*Item](ctx, session, createItemFn(ctx))
 }
 
-func createItemFn(ctx context.Context) neo4j.ManagedTransactionWork {
-	return func(tx neo4j.ManagedTransaction) (any, error) {
+func createItemFn(ctx context.Context) neo4j.ManagedTransactionWorkT[*Item] {
+	return func(tx neo4j.ManagedTransaction) (*Item, error) {
 		records, err := tx.Run(ctx, "CREATE (n:Item { id: $id, name: $name }) RETURN n.id, n.name", map[string]any{
 			"id":   1,
 			"name": "Item 1",
