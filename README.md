@@ -61,8 +61,6 @@ import (
 	"context"
 	"fmt"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
-	"io"
-	"log"
 )
 
 func main() {
@@ -101,7 +99,7 @@ func insertItem(ctx context.Context, driver neo4j.DriverWithContext) (*Item, err
 
 func createItemFn(ctx context.Context) neo4j.ManagedTransactionWorkT[*Item] {
 	return func(tx neo4j.ManagedTransaction) (*Item, error) {
-		records, err := tx.Run(ctx, "CREATE (n:Item { id: $id, name: $name }) RETURN n.id, n.name", map[string]any{
+		records, err := tx.Run(ctx, "CREATE (n:Item { id: $id, name: $name }) RETURN n", map[string]any{
 			"id":   1,
 			"name": "Item 1",
 		})
@@ -114,11 +112,20 @@ func createItemFn(ctx context.Context) neo4j.ManagedTransactionWorkT[*Item] {
 		if err != nil {
 			return nil, err
 		}
-		// You can also retrieve values by name, with e.g. `id, found := record.Get("n.id")`
-		return &Item{
-			Id:   record.Values[0].(int64),
-			Name: record.Values[1].(string),
-		}, nil
+		rawItemNode, found := record.Get("n")
+		if !found {
+			return nil, fmt.Errorf("could not find column")
+		}
+		itemNode := rawItemNode.(neo4j.Node)
+		id, err := neo4j.GetProperty[int64](itemNode, "id")
+		if err != nil {
+			return nil, err
+		}
+		name, err := neo4j.GetProperty[string](itemNode, "name")
+		if err != nil {
+			return nil, err
+		}
+		return &Item{Id: id, Name: name}, nil
 	}
 }
 
