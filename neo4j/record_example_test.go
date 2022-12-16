@@ -39,9 +39,13 @@ func ExampleGetRecordValue() {
 	handleError(err)
 
 	// GetRecordValue extracts the record value by the specified name
-	// it also makes sure it matches the specified type parameter
-	personNode, err := neo4j.GetRecordValue[neo4j.Node](record, "p")
+	// it also makes sure the value conforms to the specified type parameter
+	// if a particular value is not present for the current record, isNil will be true
+	personNode, isNil, err := neo4j.GetRecordValue[neo4j.Node](record, "p")
 	handleError(err)
-
-	fmt.Println(personNode)
+	if isNil {
+		fmt.Println("no person found")
+	} else {
+		fmt.Println(personNode)
+	}
 }
