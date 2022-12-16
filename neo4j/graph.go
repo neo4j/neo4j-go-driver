@@ -23,10 +23,18 @@ import (
 	"fmt"
 )
 
+type PropertyValue interface {
+	bool | int64 | float64 | string |
+		Point2D | Point3D |
+		Date | LocalTime | LocalDateTime | Time | Duration | /* OffsetTime == Time == dbtype.Time */
+		[]byte | []any
+}
+
 // GetProperty returns the value matching the property of the given neo4j.Node or neo4j.Relationship
+// The property type T must adhere to neo4j.PropertyValue
 // If the property does not exist, an error is returned
 // If the property type does not match the type specification, an error is returned
-func GetProperty[T any](entity Entity, key string) (T, error) {
+func GetProperty[T PropertyValue](entity Entity, key string) (T, error) {
 	rawValue, found := entity.GetProperties()[key]
 	if !found {
 		return *new(T), fmt.Errorf("could not find any property named %s", key)
