@@ -50,6 +50,13 @@ We can't guarantee that we'll accept pull requests and may ask you to make some 
 Occasionally, we might also have logistical, commercial, or legal reasons why we can't accept your work but we'll try to find an alternative way for you to contribute in that case.
 Remember that many community members have become regular contributors and some are now even Neo employees!
 
+## Go driver extra contribution guidelines
+
+Make sure to install the pre-commit hook to your local repository:
+
+```shell
+cp hooks/pre-commit .git/hooks/
+```
 
 ## Got an idea for a new project?
 
