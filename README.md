@@ -156,8 +156,8 @@ most accurate information about Neo4j.
 
  - `(EOL)`: End Of Life, a server version is marked as such when it is not supported anymore
  - `Yes`: this driver/server version combination is supported across all official drivers
- - `(Yes)`: this driver/server version combination is supported by this driver
- - `?`: this driver/server version combination may or may not work
+ - `(Yes)`: this driver/server version combination is supported by this driver, in a potentially degraded capacity
+ - `?`: this driver/server version combination may or may not work at all
 
 ## Connecting to a causal cluster
 
