@@ -156,9 +156,9 @@ most accurate information about Neo4j releases.
 
  - `(EOL)`: End Of Life, a server version is marked as such when it is not supported anymore
  - `(HO)`: Hotfixes only, a server version is marked as such when it is only updated for security patches
- - `(LTS)`: Long Term Support, a server version is marked as such when it receives updates over an extended period of time
+ - `(LTS)`: Long Term Support, a server version is marked as such when it actively receives updates over an extended period of time
  - `Yes`: this driver/server version combination is supported across all official drivers
- - `(Yes)`: this driver/server version combination is supported by this driver, in a potentially degraded capacity
+ - `(Yes)`: this driver/server version combination is supported by this driver, potentially with a subset of features
  - `?`: this driver/server version combination may or may not work at all
 
 ## Connecting to a causal cluster
