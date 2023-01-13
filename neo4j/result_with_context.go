@@ -45,8 +45,9 @@ type ResultWithContext interface {
 	Record() *Record
 	// Collect fetches all remaining records and returns them.
 	Collect(ctx context.Context) ([]*Record, error)
-	// Single returns one and only one record from the stream.
-	// If the result stream contains zero or more than one records, error is returned.
+	// Single returns the only remaining record from the stream.
+	// If none or more than one record is left, an error is returned.
+	// The result is fully consumed after this call and its summary is immediately available when calling Consume.
 	Single(ctx context.Context) (*Record, error)
 	// Consume discards all remaining records and returns the summary information
 	// about the statement execution.
