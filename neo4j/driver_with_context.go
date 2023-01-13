@@ -50,13 +50,18 @@ const (
 // DriverWithContext represents a pool(s) of connections to a neo4j server or cluster. It's
 // safe for concurrent use.
 type DriverWithContext interface {
-	// ExecuteQuery runs the specified query with its parameters and returns results.
-	// 	results, err := driver.ExecuteQuery(ctx, query, params)
+	// ExecuteQuery runs the specified query with its parameters and returns the query result.
+	// 	result, err := driver.ExecuteQuery(ctx, query, params)
 	//
-	// This function runs the query in a single explicit, retryable transaction within a session, entirely managed by
+	// This function runs the query in a single explicit, retryable transaction within a session entirely managed by
 	// the driver.
-	// Because it is an explicit transaction, Cypher queries using "CALL {} IN TRANSACTIONS" or the older
-	// "USING PERIODIC COMMIT" construct will not work (call SessionWithContext#Run for these).
+	//
+	// Retries occur in the same conditions as when calling SessionWithContext.ExecuteRead and
+	// SessionWithContext.ExecuteWrite.
+	//
+	// Because it is an explicit transaction from the server point of view, Cypher queries using
+	// "CALL {} IN TRANSACTIONS" or the older "USING PERIODIC COMMIT" construct will not work (call
+	// SessionWithContext.Run for these).
 	//
 	// Specific settings can be configured via configuration callbacks. Built-in callbacks are provided such as:
 	//	neo4j.WithDatabase
@@ -72,6 +77,7 @@ type DriverWithContext interface {
 	//		config.Database = "my-db"
 	//		config.RoutingControl = neo4j.Writers
 	//	})
+	//
 	// ExecuteQuery causal consistency is guaranteed by default across different successful calls to ExecuteQuery
 	// targeting the same database.
 	// In other words, a successful read query run by ExecuteQuery is guaranteed to be able to read results created
@@ -82,7 +88,7 @@ type DriverWithContext interface {
 	// neo4j.SessionWithContext API calls, unless sessions are explicitly configured with the same bookmark manager.
 	// That guarantee may also break if a custom implementation of neo4j.BookmarkManager is provided via for instance
 	// the built-in callback neo4j.WithBookmarkManager.
-	// You can disable bookmark management with neo4j.WithoutBookmarkManager.
+	// You can disable bookmark management by passing the neo4j.WithoutBookmarkManager callback to ExecuteQuery.
 	ExecuteQuery(context.Context, string, map[string]any, ...ExecuteQueryConfigurationOption) (*EagerResult, error)
 	// GetDefaultManagedBookmarkManager returns the bookmark manager instance used by ExecuteQuery by default.
 	// This is useful when ExecuteQuery is called without custom bookmark managers and the lower-level
