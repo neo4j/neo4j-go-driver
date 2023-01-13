@@ -76,6 +76,7 @@ func ExampleDriverWithContext_GetDefaultManagedBookmarkManager() {
 }
 
 func handleError(err error) {
+	//lint:ignore SA9003 empty branch as the actual content depends on the reader's setup
 	if err != nil {
 		// do something with error
 	}
