@@ -64,7 +64,7 @@ type DriverWithContext interface {
 	//  ...
 	// see neo4j.ExecuteQueryConfiguration for all possibilities.
 	//
-	// These built-in can be used and combined as follows:
+	// These built-in callbacks can be used and combined as follows:
 	//	driver.ExecuteQuery(ctx, query, params, neo4j.WithDatabase("my-db"), neo4j.WithWritersRouting())
 	//
 	// For complete control over the configuration, you can also define your own callback:
