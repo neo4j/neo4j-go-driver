@@ -27,6 +27,7 @@ import (
 	"reflect"
 	"sort"
 	"strings"
+	"sync"
 )
 
 const mappingTypeKey = "mapping_type"
@@ -53,6 +54,16 @@ func MapSingle[T any](ctx context.Context, session neo4j.SessionWithContext, que
 	return mapSingleRecord[T](record)
 }
 
+// TODO: implement proper weak map: see Russ Cox impl here (https://go.dev/play/p/ATYDjKZ22mt)
+var metadataCache sync.Map
+
+type reflectionMetadata struct {
+	kind          reflect.Kind
+	numFields     int
+	fieldMappings []map[string]string
+	fieldNames    []string
+}
+
 func mapSingleRecord[T any](record *neo4j.Record) (_ T, mapErr error) {
 	value := new(T)
 	reflectedValue := reflect.ValueOf(value).Elem() // this is equivalent to deref(ptr(T)), i.e. accessing a T
@@ -62,10 +73,13 @@ func mapSingleRecord[T any](record *neo4j.Record) (_ T, mapErr error) {
 		reflectedValue = reflectedValue.Elem()                    // now manipulate deref(T) directly
 	}
 
-	switch reflectedValue.Kind() {
+	rawMetadata, _ := metadataCache.LoadOrStore(reflect.TypeOf(value), newMetadata(reflectedValue))
+	metadata := rawMetadata.(*reflectionMetadata)
+
+	switch metadata.kind {
 	case reflect.Struct:
-		for i := 0; i < reflectedValue.NumField(); i++ {
-			if err := setStructField[T](reflectedValue, i, record); err != nil {
+		for i := 0; i < metadata.numFields; i++ {
+			if err := setStructField[T](reflectedValue.Field(i), metadata.fieldNames[i], metadata.fieldMappings[i], record); err != nil {
 				return *value, err
 			}
 		}
@@ -88,39 +102,60 @@ func mapSingleRecord[T any](record *neo4j.Record) (_ T, mapErr error) {
 	return *value, nil
 }
 
-func setStructField[T any](reflectedValue reflect.Value, i int, record *db.Record) (err error) {
-	reflectedField := reflectedValue.Field(i)
-	reflectedFieldType := reflectedValue.Type().Field(i)
-	settings := parseFieldMapping(reflectedFieldType)
-	if settings == nil {
+func newMetadata(value reflect.Value) *reflectionMetadata {
+	kind := value.Kind()
+	metadata := reflectionMetadata{kind: kind}
+	if kind != reflect.Struct {
+		return &metadata
+	}
+	numField := value.NumField()
+	mappings := make([]map[string]string, numField)
+	names := make([]string, numField)
+	for i := 0; i < numField; i++ {
+		field := value.Type().Field(i)
+		names[i] = field.Name
+		mapping := parseFieldMapping(field)
+		if mapping == nil {
+			continue
+		}
+		mappings[i] = mapping
+	}
+	metadata.numFields = numField
+	metadata.fieldMappings = mappings
+	metadata.fieldNames = names
+	return &metadata
+}
+
+func setStructField[T any](field reflect.Value, fieldName string, mappings map[string]string, record *db.Record) (err error) {
+	if mappings == nil {
 		return nil
 	}
-	propertyName := settings[propertyNameKey]
-	mappingType := settings[mappingTypeKey]
+	propertyName := mappings[propertyNameKey]
+	mappingType := mappings[mappingTypeKey]
 	if propertyName == "" && !namelessMapping(mappingType) {
 		return fmt.Errorf("the property name is missing for field %q of type %T",
-			reflectedFieldType.Name, *new(T))
+			fieldName, *new(T))
 	}
 	if propertyName != "" && namelessMapping(mappingType) {
 		return fmt.Errorf("the property name %q on the field %q of %T must be removed when mapping %s",
-			propertyName, reflectedFieldType.Name, *new(T), mappingTypeNames[mappingType])
+			propertyName, fieldName, *new(T), mappingTypeNames[mappingType])
 	}
 	switch mappingType {
 	case "element_id":
 		defer func() {
 			if setterPanic := recover(); setterPanic != nil {
-				err = handlePanic[T, string](mappingTypeNames[mappingType], "", reflectedFieldType.Name, setterPanic)
+				err = handlePanic[T, string](mappingTypeNames[mappingType], "", fieldName, setterPanic)
 			}
 		}()
 		entity, err := getSingle[neo4j.Entity](record)
 		if err != nil {
 			return err
 		}
-		reflectedField.SetString(entity.GetElementId())
+		field.SetString(entity.GetElementId())
 	case "id":
 		defer func() {
 			if setterPanic := recover(); setterPanic != nil {
-				err = handlePanic[T, int64](mappingTypeNames[mappingType], "", reflectedFieldType.Name, setterPanic)
+				err = handlePanic[T, int64](mappingTypeNames[mappingType], "", fieldName, setterPanic)
 			}
 		}()
 		entity, err := getSingle[neo4j.Entity](record)
@@ -128,33 +163,33 @@ func setStructField[T any](reflectedValue reflect.Value, i int, record *db.Recor
 			return err
 		}
 		//lint:ignore SA1019 will be removed when ID support is dropped from server
-		reflectedField.SetInt(entity.GetId())
+		field.SetInt(entity.GetId())
 	case "labels":
 		defer func() {
 			if setterPanic := recover(); setterPanic != nil {
-				err = handlePanic[T, []string](mappingTypeNames[mappingType], "", reflectedFieldType.Name, setterPanic)
+				err = handlePanic[T, []string](mappingTypeNames[mappingType], "", fieldName, setterPanic)
 			}
 		}()
 		node, err := getSingle[neo4j.Node](record)
 		if err != nil {
 			return err
 		}
-		reflectedField.Set(reflect.ValueOf(node.Labels))
+		field.Set(reflect.ValueOf(node.Labels))
 	case "properties":
 		defer func() {
 			if setterPanic := recover(); setterPanic != nil {
-				err = handlePanic[T, []string](mappingTypeNames[mappingType], "", reflectedFieldType.Name, setterPanic)
+				err = handlePanic[T, []string](mappingTypeNames[mappingType], "", fieldName, setterPanic)
 			}
 		}()
 		entity, err := getSingle[neo4j.Entity](record)
 		if err != nil {
 			return err
 		}
-		reflectedField.Set(reflect.ValueOf(entity.GetProperties()))
+		field.Set(reflect.ValueOf(entity.GetProperties()))
 	case "property":
 		defer func() {
 			if setterPanic := recover(); setterPanic != nil {
-				err = handlePanic[T, []string](mappingTypeNames[mappingType], propertyName, reflectedFieldType.Name, setterPanic)
+				err = handlePanic[T, []string](mappingTypeNames[mappingType], propertyName, fieldName, setterPanic)
 			}
 		}()
 		entity, err := getSingle[neo4j.Entity](record)
@@ -162,15 +197,15 @@ func setStructField[T any](reflectedValue reflect.Value, i int, record *db.Recor
 			return err
 		}
 		property := entity.GetProperties()[propertyName]
-		if property == nil && !isNullable(reflectedField) {
+		if property == nil && !isNullable(field) {
 			return fmt.Errorf("the value of property %q is nil, "+
-				"but the type of the field %q of type %T is not nilable", propertyName, reflectedFieldType.Name, *new(T))
+				"but the type of the field %q of type %T is not nilable", propertyName, fieldName, *new(T))
 		}
-		reflectedField.Set(reflect.ValueOf(property))
+		field.Set(reflect.ValueOf(property))
 	case "type":
 		defer func() {
 			if setterPanic := recover(); setterPanic != nil {
-				err = handlePanic[T, string](mappingTypeNames[mappingType], "", reflectedFieldType.Name, setterPanic)
+				err = handlePanic[T, string](mappingTypeNames[mappingType], "", fieldName, setterPanic)
 			}
 		}()
 		relationship, err := getSingle[neo4j.Relationship](record)
@@ -178,7 +213,7 @@ func setStructField[T any](reflectedValue reflect.Value, i int, record *db.Recor
 			return err
 		}
 		relType := relationship.Type
-		reflectedField.Set(reflect.ValueOf(relType))
+		field.Set(reflect.ValueOf(relType))
 	default:
 		validMappings := keysOf(mappingTypeNames)
 		sort.Strings(validMappings)
