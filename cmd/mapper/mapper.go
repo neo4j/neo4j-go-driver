@@ -152,12 +152,8 @@ func (s *structVisitor) findStructTypeDef(structDeclaration *ast.GenDecl) *ast.S
 }
 
 func (s *structVisitor) generateMapping(directory string, originalFileName string) {
-	extensionPosition := strings.LastIndex(originalFileName, ".go")
-	if extensionPosition < 0 {
-		panic(fmt.Errorf("invalid file name, expected .go file: %v", originalFileName))
-	}
-	newFileName := fmt.Sprintf("%s_generated_mapping.go", originalFileName[:extensionPosition])
-	outputFile, err := os.Create(filepath.Join(directory, newFileName))
+	fileName := newFileName(originalFileName)
+	outputFile, err := os.Create(filepath.Join(directory, fileName))
 	if err != nil {
 		panic(err)
 	}
@@ -201,6 +197,18 @@ func (s *structVisitor) generateMapping(directory string, originalFileName strin
 	code.WriteString("}\n")
 	_, err = outputFile.WriteString(code.String())
 	panicOnErr(err)
+}
+
+func newFileName(originalFileName string) string {
+	extensionPosition := strings.LastIndex(originalFileName, "_test.go")
+	if extensionPosition >= 0 {
+		return fmt.Sprintf("%s_generated_mapping_test.go", originalFileName[:extensionPosition])
+	}
+	extensionPosition = strings.LastIndex(originalFileName, ".go")
+	if extensionPosition < 0 {
+		panic(fmt.Errorf("invalid file name, expected .go file: %v", originalFileName))
+	}
+	return fmt.Sprintf("%s_generated_mapping.go", originalFileName[:extensionPosition])
 }
 
 const neo4jTagPrefix = "neo4j:"
