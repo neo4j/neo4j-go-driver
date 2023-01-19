@@ -74,6 +74,10 @@ type DriverWithContext interface {
 	// or error describing the problem.
 	VerifyConnectivity(ctx context.Context) error
 	// Close the driver and all underlying connections
+	// While Close accepts any context, it is strongly advised to avoid using contexts with timeouts or deadlines.
+	// Better use context.Background() or context.WithValue(context.Context,any).
+	// Indeed, this is the last chance to tell the server to clean up interrupted connections.
+	// As a consequence, this must not be interrupted or the server will accumulate connections and run out of resources.
 	Close(ctx context.Context) error
 	// IsEncrypted determines whether the driver communication with the server
 	// is encrypted. This is a static check. The function can also be called on

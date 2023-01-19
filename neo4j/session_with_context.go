@@ -64,6 +64,10 @@ type SessionWithContext interface {
 	// Run executes an auto-commit statement and returns a result
 	Run(ctx context.Context, cypher string, params map[string]any, configurers ...func(*TransactionConfig)) (ResultWithContext, error)
 	// Close closes any open resources and marks this session as unusable
+	// While Close accepts any context, it is strongly advised to avoid using contexts with timeouts or deadlines.
+	// Better use context.Background() or context.WithValue(context.Context,any).
+	// Indeed, this is the earliest chance to tell the server to clean up interrupted connections.
+	// As a consequence, this must not be interrupted or the server will accumulate connections and run out of resources.
 	Close(ctx context.Context) error
 
 	legacy() Session
