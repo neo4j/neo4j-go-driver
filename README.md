@@ -215,19 +215,19 @@ The underlying types of the returned values depend on the corresponding Cypher t
 
 The mapping between Cypher types and the types used by this driver (to represent the Cypher type):
 
-|  Cypher Type | Driver Type            |
-|-------------:|:-----------------------|
-|       *null* | nil                    |
-|         List | []any          |
-|          Map | map[string]any |
-|      Boolean | bool                   |
-|      Integer | int64                  |
-|        Float | float                  |
-|       String | string                 |
-|    ByteArray | []byte                 |
-|         Node | neo4j.Node             |
-| Relationship | neo4j.Relationship     |
-|         Path | neo4j.Path             |
+|  Cypher Type | Driver Type        |
+|-------------:|:-------------------|
+|       *null* | nil                |
+|         List | []any              |
+|          Map | map[string]any     |
+|      Boolean | bool               |
+|      Integer | int64              |
+|        Float | float              |
+|       String | string             |
+|    ByteArray | []byte             |
+|         Node | neo4j.Node         |
+| Relationship | neo4j.Relationship |
+|         Path | neo4j.Path         |
 
 ### Spatial Types - Point
 
