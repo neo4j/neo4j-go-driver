@@ -22,6 +22,8 @@ package bolt
 import (
 	"context"
 	idb "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
+	"io"
+	"sync"
 	"testing"
 	"time"
 
@@ -770,4 +772,55 @@ func TestBolt3(outer *testing.T) {
 		}
 
 	})
+
+	outer.Run("closes underlying socket when context has terminated", func(inner *testing.T) {
+		ctx := context.Background()
+		pastDeadline := time.Now().Add(-6 * time.Hour)
+		pastCtx, pastCtxCancel := context.WithDeadline(context.Background(), pastDeadline)
+		defer pastCtxCancel()
+		canceledCtx, cancelFunc := context.WithCancel(ctx)
+		cancelFunc() // cancel it now
+		type testCase struct {
+			description string
+			ctx         context.Context
+			errorMatch  string
+		}
+
+		testCases := []testCase{
+			{
+				description: "due to a past deadline",
+				ctx:         pastCtx,
+				errorMatch:  "Timeout while writing to connection",
+			},
+			{
+				description: "because of cancelation",
+				ctx:         canceledCtx,
+				errorMatch:  "Writing to connection has been canceled",
+			},
+		}
+		for _, test := range testCases {
+			inner.Run(test.description, func(t *testing.T) {
+				var latch sync.WaitGroup
+				latch.Add(1)
+				bolt, cleanup := connectToServer(t, func(srv *bolt3server) {
+					srv.accept(3)
+					defer func() {
+						// test server reaches EOF since the client closes the socket
+						// this happens before being able to dechunk the run message
+						AssertDeepEquals(t, recover(), io.EOF)
+						latch.Done()
+					}()
+					srv.waitForRun()
+				})
+				defer cleanup()
+				defer bolt.Close(ctx)
+
+				_, err := bolt.Run(test.ctx, idb.Command{Cypher: "UNWIND [1,2] AS k RETURN k"}, idb.TxConfig{Mode: idb.ReadMode})
+
+				latch.Wait()
+				AssertErrorMessageContains(t, err, test.errorMatch)
+			})
+		}
+	})
+
 }

@@ -114,6 +114,9 @@ func NewBolt3(serverName string, conn net.Conn, logger log.Logger, boltLog log.B
 			if b.err == nil {
 				b.err = err
 			}
+			if ctxErr := handleTerminatedContextError(err, b.conn); ctxErr != nil {
+				b.err = ctxErr
+			}
 			b.state = bolt3_dead
 		},
 		boltLogger: boltLog,
