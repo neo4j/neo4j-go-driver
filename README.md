@@ -386,9 +386,9 @@ the [official Docker image](https://hub.docker.com/_/neo4j):
 ```shell
 docker run --rm \
   --env NEO4J_ACCEPT_LICENSE_AGREEMENT=yes \
-  --env NEO4J_AUTH=neo4j/pass \
+  --env NEO4J_AUTH=neo4j/password \
   --publish=7687:7687 \
-  --health-cmd 'cypher-shell -u neo4j -p pass "RETURN 1"' \
+  --health-cmd 'cypher-shell -u neo4j -p password "RETURN 1"' \
   --health-interval 5s \
   --health-timeout 5s \
   --health-retries 5 \
@@ -406,7 +406,7 @@ Likewise, benchmark tests are run like this:
 
 ```shell
 cd benchmark
-go run . neo4j://localhost neo4j pass
+go run . neo4j://localhost neo4j password
 ```
 
 ### All-In-One / Acceptance Testing

@@ -54,7 +54,7 @@ func GetDbServer(ctx context.Context) DbServer {
 		vars := map[string]string{
 			"TEST_NEO4J_HOST":       "",
 			"TEST_NEO4J_USER":       "neo4j",
-			"TEST_NEO4J_PASS":       "pass",
+			"TEST_NEO4J_PASS":       "password",
 			"TEST_NEO4J_SCHEME":     "neo4j",
 			"TEST_NEO4J_PORT":       "7687",
 			"TEST_NEO4J_EDITION":    "community",
