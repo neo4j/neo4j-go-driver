@@ -167,3 +167,11 @@ func (s DbServer) DropDatabaseQuery(db string) string {
 func (s DbServer) isV42OrLater(v Version) bool {
 	return (v.major == 4 && v.minor >= 2) || v.major > 4
 }
+
+func (s DbServer) GetTransactionWorkloadsQuery() string {
+	version := s.Version
+	if version.LessThan(VersionOf("4.4.0")) {
+		return "CALL dbms.listTransactions() YIELD status, currentQuery WHERE status = 'Running' RETURN currentQuery AS query"
+	}
+	return "SHOW TRANSACTIONS YIELD status, currentQuery WHERE status = 'Running' RETURN currentQuery AS query"
+}
