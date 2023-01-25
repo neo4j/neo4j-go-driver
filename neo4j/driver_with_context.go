@@ -24,10 +24,12 @@ import (
 	"context"
 	"fmt"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/errorutil"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/racing"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/log"
 	"net/url"
 	"strings"
+	"sync"
 
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/connector"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/pool"
@@ -48,6 +50,63 @@ const (
 // DriverWithContext represents a pool(s) of connections to a neo4j server or cluster. It's
 // safe for concurrent use.
 type DriverWithContext interface {
+	// ExecuteQuery runs the specified query with its parameters and returns the query result.
+	//
+	// This API is currently experimental and may change or be removed at any time.
+	//
+	// 	result, err := driver.ExecuteQuery(ctx, query, params)
+	//
+	// This function runs the query in a single explicit, retryable transaction within a session entirely managed by
+	// the driver.
+	//
+	// Retries occur in the same conditions as when calling SessionWithContext.ExecuteRead and
+	// SessionWithContext.ExecuteWrite.
+	//
+	// Because it is an explicit transaction from the server point of view, Cypher queries using
+	// "CALL {} IN TRANSACTIONS" or the older "USING PERIODIC COMMIT" construct will not work (call
+	// SessionWithContext.Run for these).
+	//
+	// Specific settings can be configured via configuration callbacks. Built-in callbacks are provided such as:
+	//	neo4j.ExecuteQueryWithDatabase
+	//	neo4j.ExecuteQueryWithWritersRouting
+	//  ...
+	// see neo4j.ExecuteQueryConfiguration for all possibilities.
+	//
+	// These built-in callbacks can be used and combined as follows:
+	//	driver.ExecuteQuery(ctx, query, params, neo4j.ExecuteQueryWithDatabase("my-db"), neo4j.ExecuteQueryWithWritersRouting())
+	//
+	// For complete control over the configuration, you can also define your own callback:
+	//	driver.ExecuteQuery(ctx, query, params, func(config *neo4j.ExecuteQueryConfiguration) {
+	//		config.Database = "my-db"
+	//		config.RoutingControl = neo4j.Writers
+	//	})
+	//
+	// ExecuteQuery causal consistency is guaranteed by default across different successful calls to ExecuteQuery
+	// targeting the same database.
+	// In other words, a successful read query run by ExecuteQuery is guaranteed to be able to read results created
+	// from a previous successful write query run by ExecuteQuery on the same database.
+	// This is achieved through the use of a bookmarks, managed by a default neo4j.BookmarkManager instance.
+	// This default BookmarkManager instance can be retrieved with GetDefaultManagedBookmarkManager.
+	// Such a consistency guarantee is not maintained between ExecuteQuery calls and the lower-level
+	// neo4j.SessionWithContext API calls, unless sessions are explicitly configured with the same bookmark manager.
+	// That guarantee may also break if a custom implementation of neo4j.BookmarkManager is provided via for instance
+	// the built-in callback neo4j.ExecuteQueryWithBookmarkManager.
+	// You can disable bookmark management by passing the neo4j.ExecuteQueryWithoutBookmarkManager callback to ExecuteQuery.
+	ExecuteQuery(context.Context, string, map[string]any, ...ExecuteQueryConfigurationOption) (*EagerResult, error)
+	// DefaultExecuteQueryBookmarkManager returns the bookmark manager instance used by ExecuteQuery by default.
+	//
+	// This API is currently experimental and may change or be removed at any time.
+	//
+	// This is useful when ExecuteQuery is called without custom bookmark managers and the lower-level
+	// neo4j.SessionWithContext APIs are called as well.
+	// In that case, the recommended approach is as follows:
+	// 	results, err := driver.ExecuteQuery(ctx, query, params)
+	// 	// [...] do something with results and error
+	//	bookmarkManager := driver.DefaultExecuteQueryBookmarkManager()
+	// 	// maintain consistency with sessions as well
+	//	session := driver.NewSession(ctx, neo4j.SessionConfig {BookmarkManager: bookmarkManager})
+	//	// [...] run something within the session
+	DefaultExecuteQueryBookmarkManager() BookmarkManager
 	// Target returns the url this driver is bootstrapped
 	Target() url.URL
 	// NewSession creates a new session based on the specified session configuration.
@@ -92,6 +151,7 @@ func NewDriverWithContext(target string, auth AuthToken, configurers ...func(*Co
 	}
 
 	d := driverWithContext{target: parsed, mut: racing.NewMutex()}
+	d.newSession = d.NewSession
 
 	routing := true
 	d.connector.Network = "tcp"
@@ -260,6 +320,12 @@ type driverWithContext struct {
 	router    sessionRouter
 	logId     string
 	log       log.Logger
+	// visible for tests
+	newSession                             func(context.Context, SessionConfig) SessionWithContext
+	executeQuerybookmarkManagerInitializer sync.Once
+	// instance of the bookmark manager only used by default by managed sessions of ExecuteQuery
+	// this is *not* used by default by user-created session (see NewSession)
+	defaultExecuteQueryBookmarkManager BookmarkManager
 }
 
 func (d *driverWithContext) Target() url.URL {
@@ -314,4 +380,181 @@ func (d *driverWithContext) Close(ctx context.Context) error {
 	d.pool = nil
 	d.log.Infof(log.Driver, d.logId, "Closed")
 	return nil
+}
+
+func (d *driverWithContext) ExecuteQuery(
+	ctx context.Context,
+	query string,
+	parameters map[string]any,
+	settings ...ExecuteQueryConfigurationOption) (res *EagerResult, err error) {
+
+	bookmarkManager := d.DefaultExecuteQueryBookmarkManager()
+	configuration := &ExecuteQueryConfiguration{
+		BookmarkManager: bookmarkManager,
+	}
+	for _, setter := range settings {
+		setter(configuration)
+	}
+	session := d.newSession(ctx, configuration.toSessionConfig())
+	defer func() {
+		err = errorutil.CombineAllErrors(err, session.Close(ctx))
+	}()
+	txFunction, err := configuration.selectTxFunctionApi(session)
+	if err != nil {
+		return nil, err
+	}
+	result, err := txFunction(ctx, d.executeQueryCallback(ctx, query, parameters))
+	if err != nil {
+		return nil, err
+	}
+	return result.(*EagerResult), nil
+}
+
+func (d *driverWithContext) DefaultExecuteQueryBookmarkManager() BookmarkManager {
+	d.executeQuerybookmarkManagerInitializer.Do(func() {
+		if d.defaultExecuteQueryBookmarkManager == nil { // this allows tests to init the field themselves
+			d.defaultExecuteQueryBookmarkManager = NewBookmarkManager(BookmarkManagerConfig{})
+		}
+	})
+	return d.defaultExecuteQueryBookmarkManager
+}
+
+func (d *driverWithContext) executeQueryCallback(ctx context.Context, query string, parameters map[string]any) ManagedTransactionWork {
+	return func(tx ManagedTransaction) (any, error) {
+		cursor, err := tx.Run(ctx, query, parameters)
+		if err != nil {
+			return nil, err
+		}
+		keys, err := cursor.Keys()
+		if err != nil {
+			return nil, err
+		}
+		records, err := cursor.Collect(ctx)
+		if err != nil {
+			return nil, err
+		}
+		summary, err := cursor.Consume(ctx)
+		if err != nil {
+			return nil, err
+		}
+		return &EagerResult{
+			Keys:    keys,
+			Records: records,
+			Summary: summary,
+		}, nil
+	}
+}
+
+// ExecuteQueryConfigurationOption is a callback that configures the execution of DriverWithContext.ExecuteQuery
+//
+// This API is currently experimental and may change or be removed at any time.
+type ExecuteQueryConfigurationOption func(*ExecuteQueryConfiguration)
+
+// ExecuteQueryWithReadersRouting configures DriverWithContext.ExecuteQuery to route to reader members of the cluster
+//
+// This API is currently experimental and may change or be removed at any time.
+func ExecuteQueryWithReadersRouting() ExecuteQueryConfigurationOption {
+	return func(configuration *ExecuteQueryConfiguration) {
+		configuration.Routing = Readers
+	}
+}
+
+// ExecuteQueryWithWritersRouting configures DriverWithContext.ExecuteQuery to route to writer members of the cluster
+//
+// This API is currently experimental and may change or be removed at any time.
+func ExecuteQueryWithWritersRouting() ExecuteQueryConfigurationOption {
+	return func(configuration *ExecuteQueryConfiguration) {
+		configuration.Routing = Writers
+	}
+}
+
+// ExecuteQueryWithImpersonatedUser configures DriverWithContext.ExecuteQuery to impersonate the specified user
+//
+// This API is currently experimental and may change or be removed at any time.
+func ExecuteQueryWithImpersonatedUser(user string) ExecuteQueryConfigurationOption {
+	return func(configuration *ExecuteQueryConfiguration) {
+		configuration.ImpersonatedUser = user
+	}
+}
+
+// ExecuteQueryWithDatabase configures DriverWithContext.ExecuteQuery to target the specified database
+//
+// This API is currently experimental and may change or be removed at any time.
+func ExecuteQueryWithDatabase(db string) ExecuteQueryConfigurationOption {
+	return func(configuration *ExecuteQueryConfiguration) {
+		configuration.Database = db
+	}
+}
+
+// ExecuteQueryWithBookmarkManager configures DriverWithContext.ExecuteQuery to rely on the specified BookmarkManager
+//
+// This API is currently experimental and may change or be removed at any time.
+func ExecuteQueryWithBookmarkManager(bookmarkManager BookmarkManager) ExecuteQueryConfigurationOption {
+	return func(configuration *ExecuteQueryConfiguration) {
+		configuration.BookmarkManager = bookmarkManager
+	}
+}
+
+// ExecuteQueryWithoutBookmarkManager configures DriverWithContext.ExecuteQuery to not rely on any BookmarkManager
+//
+// This API is currently experimental and may change or be removed at any time.
+func ExecuteQueryWithoutBookmarkManager() ExecuteQueryConfigurationOption {
+	return func(configuration *ExecuteQueryConfiguration) {
+		configuration.BookmarkManager = nil
+	}
+}
+
+// ExecuteQueryConfiguration holds all the possible configuration settings for DriverWithContext.ExecuteQuery
+//
+// This API is currently experimental and may change or be removed at any time.
+type ExecuteQueryConfiguration struct {
+	Routing          RoutingControl
+	ImpersonatedUser string
+	Database         string
+	BookmarkManager  BookmarkManager
+}
+
+// RoutingControl specifies how the query executed by DriverWithContext.ExecuteQuery is to be routed
+//
+// This API is currently experimental and may change or be removed at any time.
+type RoutingControl int
+
+const (
+	// Writers routes the query to execute to a writer member of the cluster
+	//
+	// This API is currently experimental and may change or be removed at any time.
+	Writers RoutingControl = iota
+	// Readers routes the query to execute to a writer member of the cluster
+	//
+	// This API is currently experimental and may change or be removed at any time.
+	Readers
+)
+
+func (c *ExecuteQueryConfiguration) toSessionConfig() SessionConfig {
+	return SessionConfig{
+		ImpersonatedUser: c.ImpersonatedUser,
+		DatabaseName:     c.Database,
+		BookmarkManager:  c.BookmarkManager,
+	}
+}
+
+type transactionFunction func(context.Context, ManagedTransactionWork, ...func(*TransactionConfig)) (any, error)
+
+func (c *ExecuteQueryConfiguration) selectTxFunctionApi(session SessionWithContext) (transactionFunction, error) {
+	switch c.Routing {
+	case Readers:
+		return session.ExecuteRead, nil
+	case Writers:
+		return session.ExecuteWrite, nil
+	}
+	return nil, fmt.Errorf("unsupported routing control, got: %d", c.Routing)
+}
+
+// EagerResult holds the result and result metadata of the query executed via DriverWithContext.ExecuteQuery
+//
+// This API is currently experimental and may change or be removed at any time.
+type EagerResult struct {
+	Keys    []string
+	Records []*Record
+	Summary ResultSummary
 }

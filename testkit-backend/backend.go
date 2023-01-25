@@ -494,6 +494,64 @@ func (b *backend) handleRequest(req map[string]any) {
 			"protocolVersion": fmt.Sprintf("%d.%d", protocolVersion.Major, protocolVersion.Minor),
 		})
 
+	case "ExecuteQuery":
+		driver := b.drivers[data["driverId"].(string)]
+		var configurers []neo4j.ExecuteQueryConfigurationOption
+		if rawConfig := data["config"]; rawConfig != nil {
+			executeQueryConfig := rawConfig.(map[string]any)
+			configurers = append(configurers, func(config *neo4j.ExecuteQueryConfiguration) {
+				routing := executeQueryConfig["routing"]
+				if routing != nil {
+					switch routing {
+					case "r":
+						config.Routing = neo4j.Readers
+					case "w":
+						config.Routing = neo4j.Writers
+					default:
+						b.writeError(fmt.Errorf("unexpected executequery routing value: %v", routing))
+						return
+					}
+				}
+				impersonatedUser := executeQueryConfig["impersonatedUser"]
+				if impersonatedUser != nil {
+					config.ImpersonatedUser = impersonatedUser.(string)
+				}
+				database := executeQueryConfig["database"]
+				if database != nil {
+					config.Database = database.(string)
+				}
+				bookmarkManagerId := executeQueryConfig["bookmarkManagerId"]
+				if bookmarkManagerId != nil {
+					if number, ok := bookmarkManagerId.(json.Number); ok {
+						id := number.String()
+						if id != "-1" {
+							b.writeError(fmt.Errorf("unexpected bookmark manager id: %s", id))
+							return
+						}
+						config.BookmarkManager = nil
+					} else {
+						config.BookmarkManager = b.bookmarkManagers[bookmarkManagerId.(string)]
+					}
+				}
+			})
+		}
+
+		cypher, params, err := b.toCypherAndParams(data)
+		if err != nil {
+			b.writeError(err)
+			return
+		}
+		eagerResult, err := driver.ExecuteQuery(ctx, cypher, params, configurers...)
+		if err != nil {
+			b.writeError(err)
+			return
+		}
+		b.writeResponse("EagerResult", map[string]any{
+			"keys":    eagerResult.Keys,
+			"records": serializeRecords(eagerResult.Records),
+			"summary": serializeSummary(eagerResult.Summary),
+		})
+
 	case "NewSession":
 		driver := b.drivers[data["driverId"].(string)]
 		sessionConfig := neo4j.SessionConfig{
@@ -693,12 +751,8 @@ func (b *backend) handleRequest(req map[string]any) {
 			b.writeError(err)
 			return
 		}
-		response := make([]any, len(records))
-		for i, record := range records {
-			response[i] = serializeRecord(record)
-		}
 		b.writeResponse("RecordList", map[string]any{
-			"records": response,
+			"records": serializeRecords(records),
 		})
 	case "ResultConsume":
 		result := b.results[data["resultId"].(string)]
@@ -707,52 +761,7 @@ func (b *backend) handleRequest(req map[string]any) {
 			b.writeError(err)
 			return
 		}
-		serverInfo := summary.Server()
-		counters := summary.Counters()
-		protocolVersion := serverInfo.ProtocolVersion()
-		response := map[string]any{
-			"serverInfo": map[string]any{
-				"protocolVersion": fmt.Sprintf("%d.%d", protocolVersion.Major, protocolVersion.Minor),
-				"agent":           serverInfo.Agent(),
-				"address":         serverInfo.Address(),
-			},
-			"counters": map[string]any{
-				"constraintsAdded":      counters.ConstraintsAdded(),
-				"constraintsRemoved":    counters.ConstraintsRemoved(),
-				"containsSystemUpdates": counters.ContainsSystemUpdates(),
-				"containsUpdates":       counters.ContainsUpdates(),
-				"indexesAdded":          counters.IndexesAdded(),
-				"indexesRemoved":        counters.IndexesRemoved(),
-				"labelsAdded":           counters.LabelsAdded(),
-				"labelsRemoved":         counters.LabelsRemoved(),
-				"nodesCreated":          counters.NodesCreated(),
-				"nodesDeleted":          counters.NodesDeleted(),
-				"propertiesSet":         counters.PropertiesSet(),
-				"relationshipsCreated":  counters.RelationshipsCreated(),
-				"relationshipsDeleted":  counters.RelationshipsDeleted(),
-				"systemUpdates":         counters.SystemUpdates(),
-			},
-			"query": map[string]any{
-				"text":       summary.Query().Text(),
-				"parameters": serializeParameters(summary.Query().Parameters()),
-			},
-			"notifications": serializeNotifications(summary.Notifications()),
-			"plan":          serializePlan(summary.Plan()),
-			"profile":       serializeProfile(summary.Profile()),
-		}
-		if summary.ResultAvailableAfter() >= 0 {
-			response["resultAvailableAfter"] = summary.ResultAvailableAfter().Milliseconds()
-		}
-		if summary.ResultConsumedAfter() >= 0 {
-			response["resultConsumedAfter"] = summary.ResultConsumedAfter().Milliseconds()
-		}
-		if summary.StatementType() != neo4j.StatementTypeUnknown {
-			response["queryType"] = summary.StatementType().String()
-		}
-		if summary.Database() != nil {
-			response["database"] = summary.Database().Name()
-		}
-		b.writeResponse("Summary", response)
+		b.writeResponse("Summary", serializeSummary(summary))
 
 	case "CheckMultiDBSupport":
 		driver := b.drivers[data["driverId"].(string)]
@@ -804,6 +813,7 @@ func (b *backend) handleRequest(req map[string]any) {
 				"Detail:ClosedDriverIsEncrypted",
 				"Feature:API:BookmarkManager",
 				"Feature:API:ConnectionAcquisitionTimeout",
+				"Feature:API:Driver.ExecuteQuery",
 				"Feature:API:Driver:GetServerInfo",
 				"Feature:API:Driver.IsEncrypted",
 				"Feature:API:Driver.VerifyConnectivity",
@@ -926,6 +936,14 @@ func asRegex(rawPattern string) *regexp.Regexp {
 	return regexp.MustCompile(pattern)
 }
 
+func serializeRecords(records []*neo4j.Record) []any {
+	response := make([]any, len(records))
+	for i, record := range records {
+		response[i] = serializeRecord(record)
+	}
+	return response
+}
+
 func serializeRecord(record *neo4j.Record) map[string]any {
 	values := record.Values
 	cypherValues := make([]any, len(values))
@@ -962,6 +980,63 @@ func serializeNotifications(slice []neo4j.Notification) []map[string]any {
 	return res
 }
 
+func serializeSummary(summary neo4j.ResultSummary) map[string]any {
+	serverInfo := summary.Server()
+	counters := summary.Counters()
+	protocolVersion := serverInfo.ProtocolVersion()
+	response := map[string]any{
+		"serverInfo": map[string]any{
+			"protocolVersion": fmt.Sprintf("%d.%d", protocolVersion.Major, protocolVersion.Minor),
+			"agent":           serverInfo.Agent(),
+			"address":         serverInfo.Address(),
+		},
+		"counters": map[string]any{
+			"constraintsAdded":      counters.ConstraintsAdded(),
+			"constraintsRemoved":    counters.ConstraintsRemoved(),
+			"containsSystemUpdates": counters.ContainsSystemUpdates(),
+			"containsUpdates":       counters.ContainsUpdates(),
+			"indexesAdded":          counters.IndexesAdded(),
+			"indexesRemoved":        counters.IndexesRemoved(),
+			"labelsAdded":           counters.LabelsAdded(),
+			"labelsRemoved":         counters.LabelsRemoved(),
+			"nodesCreated":          counters.NodesCreated(),
+			"nodesDeleted":          counters.NodesDeleted(),
+			"propertiesSet":         counters.PropertiesSet(),
+			"relationshipsCreated":  counters.RelationshipsCreated(),
+			"relationshipsDeleted":  counters.RelationshipsDeleted(),
+			"systemUpdates":         counters.SystemUpdates(),
+		},
+		"query": map[string]any{
+			"text":       summary.Query().Text(),
+			"parameters": serializeParameters(summary.Query().Parameters()),
+		},
+		"notifications": serializeNotifications(summary.Notifications()),
+		"plan":          serializePlan(summary.Plan()),
+		"profile":       serializeProfile(summary.Profile()),
+	}
+	if summary.ResultAvailableAfter() >= 0 {
+		response["resultAvailableAfter"] = summary.ResultAvailableAfter().Milliseconds()
+	}
+	if summary.ResultConsumedAfter() >= 0 {
+		response["resultConsumedAfter"] = summary.ResultConsumedAfter().Milliseconds()
+	}
+	if summary.StatementType() != neo4j.StatementTypeUnknown {
+		response["queryType"] = summary.StatementType().String()
+	}
+	if summary.Database() != nil {
+		response["database"] = summary.Database().Name()
+	}
+	return response
+}
+
+func serializePlans(children []neo4j.Plan) []map[string]any {
+	result := make([]map[string]any, len(children))
+	for i, child := range children {
+		result[i] = serializePlan(child)
+	}
+	return result
+}
+
 func serializePlan(plan neo4j.Plan) map[string]any {
 	if plan == nil {
 		return nil
@@ -972,14 +1047,6 @@ func serializePlan(plan neo4j.Plan) map[string]any {
 		"children":     serializePlans(plan.Children()),
 		"identifiers":  plan.Identifiers(),
 	}
-}
-
-func serializePlans(children []neo4j.Plan) []map[string]any {
-	result := make([]map[string]any, len(children))
-	for i, child := range children {
-		result[i] = serializePlan(child)
-	}
-	return result
 }
 
 func serializeProfile(profile neo4j.ProfiledPlan) map[string]any {
