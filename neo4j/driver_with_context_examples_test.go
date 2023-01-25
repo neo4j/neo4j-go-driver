@@ -47,13 +47,13 @@ func ExampleDriverWithContext_ExecuteQuery_self_causal_consistency() {
 	}
 }
 
-func ExampleDriverWithContext_GetDefaultManagedBookmarkManager() {
+func ExampleDriverWithContext_DefaultExecuteQueryBookmarkManager() {
 	_, err := myDriver.ExecuteQuery(ctx, "CREATE (n:Example)", map[string]any{"value": 42}, WithWritersRouting())
 	handleError(err)
 
 	// retrieve the default bookmark manager used by the previous call (since there was no bookmark manager explicitly
 	// configured)
-	bookmarkManager := myDriver.GetDefaultManagedBookmarkManager()
+	bookmarkManager := myDriver.DefaultExecuteQueryBookmarkManager()
 	session := myDriver.NewSession(ctx, SessionConfig{BookmarkManager: bookmarkManager})
 
 	// the following transaction function is guaranteed to see the result of the previous query

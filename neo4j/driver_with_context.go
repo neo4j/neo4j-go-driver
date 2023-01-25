@@ -93,7 +93,7 @@ type DriverWithContext interface {
 	// the built-in callback neo4j.WithBookmarkManager.
 	// You can disable bookmark management by passing the neo4j.WithoutBookmarkManager callback to ExecuteQuery.
 	ExecuteQuery(context.Context, string, map[string]any, ...ExecuteQueryConfigurationOption) (*EagerResult, error)
-	// GetDefaultManagedBookmarkManager returns the bookmark manager instance used by ExecuteQuery by default.
+	// DefaultExecuteQueryBookmarkManager returns the bookmark manager instance used by ExecuteQuery by default.
 	//
 	// This API is currently experimental and may change or be removed at any time.
 	//
@@ -102,11 +102,11 @@ type DriverWithContext interface {
 	// In that case, the recommended approach is as follows:
 	// 	results, err := driver.ExecuteQuery(ctx, query, params)
 	// 	// [...] do something with results and error
-	//	bookmarkManager := driver.GetDefaultManagedBookmarkManager()
+	//	bookmarkManager := driver.DefaultExecuteQueryBookmarkManager()
 	// 	// maintain consistency with sessions as well
 	//	session := driver.NewSession(ctx, neo4j.SessionConfig {BookmarkManager: bookmarkManager})
 	//	// [...] run something within the session
-	GetDefaultManagedBookmarkManager() BookmarkManager
+	DefaultExecuteQueryBookmarkManager() BookmarkManager
 	// Target returns the url this driver is bootstrapped
 	Target() url.URL
 	// NewSession creates a new session based on the specified session configuration.
@@ -321,11 +321,11 @@ type driverWithContext struct {
 	logId     string
 	log       log.Logger
 	// visible for tests
-	newSession              func(context.Context, SessionConfig) SessionWithContext
-	bookmarkManagerInitOnce sync.Once
+	newSession                             func(context.Context, SessionConfig) SessionWithContext
+	executeQuerybookmarkManagerInitializer sync.Once
 	// instance of the bookmark manager only used by default by managed sessions of ExecuteQuery
 	// this is *not* used by default by user-created session (see NewSession)
-	defaultManagedSessionBookmarkManager BookmarkManager
+	defaultExecuteQueryBookmarkManager BookmarkManager
 }
 
 func (d *driverWithContext) Target() url.URL {
@@ -388,7 +388,7 @@ func (d *driverWithContext) ExecuteQuery(
 	parameters map[string]any,
 	settings ...ExecuteQueryConfigurationOption) (res *EagerResult, err error) {
 
-	bookmarkManager := d.GetDefaultManagedBookmarkManager()
+	bookmarkManager := d.DefaultExecuteQueryBookmarkManager()
 	configuration := &ExecuteQueryConfiguration{
 		BookmarkManager: bookmarkManager,
 	}
@@ -410,13 +410,13 @@ func (d *driverWithContext) ExecuteQuery(
 	return result.(*EagerResult), nil
 }
 
-func (d *driverWithContext) GetDefaultManagedBookmarkManager() BookmarkManager {
-	d.bookmarkManagerInitOnce.Do(func() {
-		if d.defaultManagedSessionBookmarkManager == nil { // this allows tests to init the field themselves
-			d.defaultManagedSessionBookmarkManager = NewBookmarkManager(BookmarkManagerConfig{})
+func (d *driverWithContext) DefaultExecuteQueryBookmarkManager() BookmarkManager {
+	d.executeQuerybookmarkManagerInitializer.Do(func() {
+		if d.defaultExecuteQueryBookmarkManager == nil { // this allows tests to init the field themselves
+			d.defaultExecuteQueryBookmarkManager = NewBookmarkManager(BookmarkManagerConfig{})
 		}
 	})
-	return d.defaultManagedSessionBookmarkManager
+	return d.defaultExecuteQueryBookmarkManager
 }
 
 func (d *driverWithContext) executeQueryCallback(ctx context.Context, query string, parameters map[string]any) ManagedTransactionWork {

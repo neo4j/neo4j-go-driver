@@ -271,7 +271,7 @@ func TestDriverExecuteQuery(outer *testing.T) {
 					AssertDeepEquals(t, testCase.expectedSessionConfig, config)
 					return testCase.createSession
 				},
-				defaultManagedSessionBookmarkManager: defaultBookmarkManager,
+				defaultExecuteQueryBookmarkManager: defaultBookmarkManager,
 			}
 
 			eagerResult, err := driver.ExecuteQuery(ctx, "RETURN 42", nil, testCase.configurers...)
@@ -299,7 +299,7 @@ func TestDriverExecuteQuery(outer *testing.T) {
 				callExecuteQueryOrBookmarkManagerGetter(driver, i)
 				storeBookmarkManagerAddress(
 					&bookmarkManagerAddresses,
-					driver.defaultManagedSessionBookmarkManager.(*bookmarkManager))
+					driver.defaultExecuteQueryBookmarkManager.(*bookmarkManager))
 				wait.Done()
 			}(i)
 		}
@@ -313,7 +313,7 @@ func TestDriverExecuteQuery(outer *testing.T) {
 		if len(addressCounts) != 1 {
 			t.Errorf("expected exactly 1 bookmark manager pointer to have been created, got %v", addressCounts)
 		}
-		address := uintptr(unsafe.Pointer(driver.defaultManagedSessionBookmarkManager.(*bookmarkManager)))
+		address := uintptr(unsafe.Pointer(driver.defaultExecuteQueryBookmarkManager.(*bookmarkManager)))
 		if count, found := addressCounts[address]; !found || count != int32(goroutineCount) {
 			t.Errorf("expected pointer address %v to be seen %d time(s), got these instead %v", address, count, addressCounts)
 		}
@@ -323,7 +323,7 @@ func TestDriverExecuteQuery(outer *testing.T) {
 func callExecuteQueryOrBookmarkManagerGetter(driver *driverWithContext, i int) {
 	if i%2 == 0 {
 		// this lazily initializes the default bookmark manager
-		_ = driver.GetDefaultManagedBookmarkManager()
+		_ = driver.DefaultExecuteQueryBookmarkManager()
 	} else {
 		// this as well
 		_, _ = driver.ExecuteQuery(context.Background(), "RETURN 42", nil)
