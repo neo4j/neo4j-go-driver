@@ -51,7 +51,7 @@ func TestDriverExecuteQuery(outer *testing.T) {
 		},
 		{
 			description: "returns expected result of assumed write query impersonating user",
-			configurers: []ExecuteQueryConfigurationOption{WithImpersonatedUser("jane")},
+			configurers: []ExecuteQueryConfigurationOption{ExecuteQueryWithImpersonatedUser("jane")},
 			createSession: &fakeSession{
 				executeWriteTransactionResult: &fakeResult{
 					keys:    keys,
@@ -67,7 +67,7 @@ func TestDriverExecuteQuery(outer *testing.T) {
 		},
 		{
 			description: "returns expected result of assumed write query targeting database",
-			configurers: []ExecuteQueryConfigurationOption{WithDatabase("imdb")},
+			configurers: []ExecuteQueryConfigurationOption{ExecuteQueryWithDatabase("imdb")},
 			createSession: &fakeSession{
 				executeWriteTransactionResult: &fakeResult{
 					keys:    keys,
@@ -83,7 +83,7 @@ func TestDriverExecuteQuery(outer *testing.T) {
 		},
 		{
 			description: "returns expected result of assumed write query with custom bookmark manager",
-			configurers: []ExecuteQueryConfigurationOption{WithBookmarkManager(customBookmarkManager)},
+			configurers: []ExecuteQueryConfigurationOption{ExecuteQueryWithBookmarkManager(customBookmarkManager)},
 			createSession: &fakeSession{
 				executeWriteTransactionResult: &fakeResult{
 					keys:    keys,
@@ -99,7 +99,7 @@ func TestDriverExecuteQuery(outer *testing.T) {
 		},
 		{
 			description: "returns expected result of explicit write query",
-			configurers: []ExecuteQueryConfigurationOption{WithWritersRouting()},
+			configurers: []ExecuteQueryConfigurationOption{ExecuteQueryWithWritersRouting()},
 			createSession: &fakeSession{
 				executeWriteTransactionResult: &fakeResult{
 					keys:    keys,
@@ -115,7 +115,7 @@ func TestDriverExecuteQuery(outer *testing.T) {
 		},
 		{
 			description: "returns expected result of explicit read query",
-			configurers: []ExecuteQueryConfigurationOption{WithReadersRouting()},
+			configurers: []ExecuteQueryConfigurationOption{ExecuteQueryWithReadersRouting()},
 			createSession: &fakeSession{
 				executeReadTransactionResult: &fakeResult{
 					keys:    keys,
@@ -210,7 +210,7 @@ func TestDriverExecuteQuery(outer *testing.T) {
 		},
 		{
 			description: "returns error when read result keys cannot be retrieved",
-			configurers: []ExecuteQueryConfigurationOption{WithReadersRouting()},
+			configurers: []ExecuteQueryConfigurationOption{ExecuteQueryWithReadersRouting()},
 			createSession: &fakeSession{
 				executeReadTransactionResult: &fakeResult{
 					keysErr: fmt.Errorf("dude, where are my keys"),
@@ -220,7 +220,7 @@ func TestDriverExecuteQuery(outer *testing.T) {
 		},
 		{
 			description: "returns error when read result records cannot be collected",
-			configurers: []ExecuteQueryConfigurationOption{WithReadersRouting()},
+			configurers: []ExecuteQueryConfigurationOption{ExecuteQueryWithReadersRouting()},
 			createSession: &fakeSession{
 				executeReadTransactionResult: &fakeResult{
 					keys:       keys,
@@ -231,7 +231,7 @@ func TestDriverExecuteQuery(outer *testing.T) {
 		},
 		{
 			description: "returns error when read result summary cannot be retrieved",
-			configurers: []ExecuteQueryConfigurationOption{WithReadersRouting()},
+			configurers: []ExecuteQueryConfigurationOption{ExecuteQueryWithReadersRouting()},
 			createSession: &fakeSession{
 				executeReadTransactionResult: &fakeResult{
 					keys:       keys,
@@ -243,7 +243,7 @@ func TestDriverExecuteQuery(outer *testing.T) {
 		},
 		{
 			description: "returns error when read result summary cannot be retrieved",
-			configurers: []ExecuteQueryConfigurationOption{WithReadersRouting()},
+			configurers: []ExecuteQueryConfigurationOption{ExecuteQueryWithReadersRouting()},
 			createSession: &fakeSession{
 				executeReadTransactionResult: &fakeResult{
 					keys:       keys,
@@ -255,7 +255,7 @@ func TestDriverExecuteQuery(outer *testing.T) {
 		},
 		{
 			description: "returns error when read execution fails",
-			configurers: []ExecuteQueryConfigurationOption{WithReadersRouting()},
+			configurers: []ExecuteQueryConfigurationOption{ExecuteQueryWithReadersRouting()},
 			createSession: &fakeSession{
 				executeReadErr: fmt.Errorf("oopsie"),
 			},

@@ -27,13 +27,13 @@ func ExampleDriverWithContext_ExecuteQuery() {
 }
 
 func ExampleDriverWithContext_ExecuteQuery_self_causal_consistency() {
-	_, err := myDriver.ExecuteQuery(ctx, "CREATE (n:Example)", map[string]any{"value": 42}, WithWritersRouting())
+	_, err := myDriver.ExecuteQuery(ctx, "CREATE (n:Example)", map[string]any{"value": 42}, ExecuteQueryWithWritersRouting())
 	handleError(err)
 
 	// assuming an initial empty database, the following query should return 1
 	// indeed, causal consistency is guaranteed by default, which subsequent ExecuteQuery calls can read the writes of
 	// previous ExecuteQuery calls targeting the same database
-	eagerResult, err := myDriver.ExecuteQuery(ctx, "MATCH (n:Example) RETURN count(n) AS count", nil, WithReadersRouting())
+	eagerResult, err := myDriver.ExecuteQuery(ctx, "MATCH (n:Example) RETURN count(n) AS count", nil, ExecuteQueryWithReadersRouting())
 	handleError(err)
 
 	// there should be a single record
@@ -48,7 +48,7 @@ func ExampleDriverWithContext_ExecuteQuery_self_causal_consistency() {
 }
 
 func ExampleDriverWithContext_DefaultExecuteQueryBookmarkManager() {
-	_, err := myDriver.ExecuteQuery(ctx, "CREATE (n:Example)", map[string]any{"value": 42}, WithWritersRouting())
+	_, err := myDriver.ExecuteQuery(ctx, "CREATE (n:Example)", map[string]any{"value": 42}, ExecuteQueryWithWritersRouting())
 	handleError(err)
 
 	// retrieve the default bookmark manager used by the previous call (since there was no bookmark manager explicitly

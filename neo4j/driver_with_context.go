@@ -67,13 +67,13 @@ type DriverWithContext interface {
 	// SessionWithContext.Run for these).
 	//
 	// Specific settings can be configured via configuration callbacks. Built-in callbacks are provided such as:
-	//	neo4j.WithDatabase
-	//	neo4j.WithWritersRouting
+	//	neo4j.ExecuteQueryWithDatabase
+	//	neo4j.ExecuteQueryWithWritersRouting
 	//  ...
 	// see neo4j.ExecuteQueryConfiguration for all possibilities.
 	//
 	// These built-in callbacks can be used and combined as follows:
-	//	driver.ExecuteQuery(ctx, query, params, neo4j.WithDatabase("my-db"), neo4j.WithWritersRouting())
+	//	driver.ExecuteQuery(ctx, query, params, neo4j.ExecuteQueryWithDatabase("my-db"), neo4j.ExecuteQueryWithWritersRouting())
 	//
 	// For complete control over the configuration, you can also define your own callback:
 	//	driver.ExecuteQuery(ctx, query, params, func(config *neo4j.ExecuteQueryConfiguration) {
@@ -90,8 +90,8 @@ type DriverWithContext interface {
 	// Such a consistency guarantee is not maintained between ExecuteQuery calls and the lower-level
 	// neo4j.SessionWithContext API calls, unless sessions are explicitly configured with the same bookmark manager.
 	// That guarantee may also break if a custom implementation of neo4j.BookmarkManager is provided via for instance
-	// the built-in callback neo4j.WithBookmarkManager.
-	// You can disable bookmark management by passing the neo4j.WithoutBookmarkManager callback to ExecuteQuery.
+	// the built-in callback neo4j.ExecuteQueryWithBookmarkManager.
+	// You can disable bookmark management by passing the neo4j.ExecuteQueryWithoutBookmarkManager callback to ExecuteQuery.
 	ExecuteQuery(context.Context, string, map[string]any, ...ExecuteQueryConfigurationOption) (*EagerResult, error)
 	// DefaultExecuteQueryBookmarkManager returns the bookmark manager instance used by ExecuteQuery by default.
 	//
@@ -450,55 +450,55 @@ func (d *driverWithContext) executeQueryCallback(ctx context.Context, query stri
 // This API is currently experimental and may change or be removed at any time.
 type ExecuteQueryConfigurationOption func(*ExecuteQueryConfiguration)
 
-// WithReadersRouting configures DriverWithContext.ExecuteQuery to route to reader members of the cluster
+// ExecuteQueryWithReadersRouting configures DriverWithContext.ExecuteQuery to route to reader members of the cluster
 //
 // This API is currently experimental and may change or be removed at any time.
-func WithReadersRouting() ExecuteQueryConfigurationOption {
+func ExecuteQueryWithReadersRouting() ExecuteQueryConfigurationOption {
 	return func(configuration *ExecuteQueryConfiguration) {
 		configuration.Routing = Readers
 	}
 }
 
-// WithWritersRouting configures DriverWithContext.ExecuteQuery to route to writer members of the cluster
+// ExecuteQueryWithWritersRouting configures DriverWithContext.ExecuteQuery to route to writer members of the cluster
 //
 // This API is currently experimental and may change or be removed at any time.
-func WithWritersRouting() ExecuteQueryConfigurationOption {
+func ExecuteQueryWithWritersRouting() ExecuteQueryConfigurationOption {
 	return func(configuration *ExecuteQueryConfiguration) {
 		configuration.Routing = Writers
 	}
 }
 
-// WithImpersonatedUser configures DriverWithContext.ExecuteQuery to impersonate the specified user
+// ExecuteQueryWithImpersonatedUser configures DriverWithContext.ExecuteQuery to impersonate the specified user
 //
 // This API is currently experimental and may change or be removed at any time.
-func WithImpersonatedUser(user string) ExecuteQueryConfigurationOption {
+func ExecuteQueryWithImpersonatedUser(user string) ExecuteQueryConfigurationOption {
 	return func(configuration *ExecuteQueryConfiguration) {
 		configuration.ImpersonatedUser = user
 	}
 }
 
-// WithDatabase configures DriverWithContext.ExecuteQuery to target the specified database
+// ExecuteQueryWithDatabase configures DriverWithContext.ExecuteQuery to target the specified database
 //
 // This API is currently experimental and may change or be removed at any time.
-func WithDatabase(db string) ExecuteQueryConfigurationOption {
+func ExecuteQueryWithDatabase(db string) ExecuteQueryConfigurationOption {
 	return func(configuration *ExecuteQueryConfiguration) {
 		configuration.Database = db
 	}
 }
 
-// WithBookmarkManager configures DriverWithContext.ExecuteQuery to rely on the specified BookmarkManager
+// ExecuteQueryWithBookmarkManager configures DriverWithContext.ExecuteQuery to rely on the specified BookmarkManager
 //
 // This API is currently experimental and may change or be removed at any time.
-func WithBookmarkManager(bookmarkManager BookmarkManager) ExecuteQueryConfigurationOption {
+func ExecuteQueryWithBookmarkManager(bookmarkManager BookmarkManager) ExecuteQueryConfigurationOption {
 	return func(configuration *ExecuteQueryConfiguration) {
 		configuration.BookmarkManager = bookmarkManager
 	}
 }
 
-// WithoutBookmarkManager configures DriverWithContext.ExecuteQuery to not rely on any BookmarkManager
+// ExecuteQueryWithoutBookmarkManager configures DriverWithContext.ExecuteQuery to not rely on any BookmarkManager
 //
 // This API is currently experimental and may change or be removed at any time.
-func WithoutBookmarkManager() ExecuteQueryConfigurationOption {
+func ExecuteQueryWithoutBookmarkManager() ExecuteQueryConfigurationOption {
 	return func(configuration *ExecuteQueryConfiguration) {
 		configuration.BookmarkManager = nil
 	}
