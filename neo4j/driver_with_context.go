@@ -51,6 +51,9 @@ const (
 // safe for concurrent use.
 type DriverWithContext interface {
 	// ExecuteQuery runs the specified query with its parameters and returns the query result.
+	//
+	// This API is currently experimental and may change or be removed at any time.
+	//
 	// 	result, err := driver.ExecuteQuery(ctx, query, params)
 	//
 	// This function runs the query in a single explicit, retryable transaction within a session entirely managed by
@@ -91,6 +94,9 @@ type DriverWithContext interface {
 	// You can disable bookmark management by passing the neo4j.WithoutBookmarkManager callback to ExecuteQuery.
 	ExecuteQuery(context.Context, string, map[string]any, ...ExecuteQueryConfigurationOption) (*EagerResult, error)
 	// GetDefaultManagedBookmarkManager returns the bookmark manager instance used by ExecuteQuery by default.
+	//
+	// This API is currently experimental and may change or be removed at any time.
+	//
 	// This is useful when ExecuteQuery is called without custom bookmark managers and the lower-level
 	// neo4j.SessionWithContext APIs are called as well.
 	// In that case, the recommended approach is as follows:
@@ -439,44 +445,68 @@ func (d *driverWithContext) executeQueryCallback(ctx context.Context, query stri
 	}
 }
 
+// ExecuteQueryConfigurationOption is a callback that configures the execution of DriverWithContext.ExecuteQuery
+//
+// This API is currently experimental and may change or be removed at any time.
 type ExecuteQueryConfigurationOption func(*ExecuteQueryConfiguration)
 
+// WithReadersRouting configures DriverWithContext.ExecuteQuery to route to reader members of the cluster
+//
+// This API is currently experimental and may change or be removed at any time.
 func WithReadersRouting() ExecuteQueryConfigurationOption {
 	return func(configuration *ExecuteQueryConfiguration) {
 		configuration.Routing = Readers
 	}
 }
 
+// WithWritersRouting configures DriverWithContext.ExecuteQuery to route to writer members of the cluster
+//
+// This API is currently experimental and may change or be removed at any time.
 func WithWritersRouting() ExecuteQueryConfigurationOption {
 	return func(configuration *ExecuteQueryConfiguration) {
 		configuration.Routing = Writers
 	}
 }
 
+// WithImpersonatedUser configures DriverWithContext.ExecuteQuery to impersonate the specified user
+//
+// This API is currently experimental and may change or be removed at any time.
 func WithImpersonatedUser(user string) ExecuteQueryConfigurationOption {
 	return func(configuration *ExecuteQueryConfiguration) {
 		configuration.ImpersonatedUser = user
 	}
 }
 
+// WithDatabase configures DriverWithContext.ExecuteQuery to target the specified database
+//
+// This API is currently experimental and may change or be removed at any time.
 func WithDatabase(db string) ExecuteQueryConfigurationOption {
 	return func(configuration *ExecuteQueryConfiguration) {
 		configuration.Database = db
 	}
 }
 
+// WithBookmarkManager configures DriverWithContext.ExecuteQuery to rely on the specified BookmarkManager
+//
+// This API is currently experimental and may change or be removed at any time.
 func WithBookmarkManager(bookmarkManager BookmarkManager) ExecuteQueryConfigurationOption {
 	return func(configuration *ExecuteQueryConfiguration) {
 		configuration.BookmarkManager = bookmarkManager
 	}
 }
 
+// WithoutBookmarkManager configures DriverWithContext.ExecuteQuery to not rely on any BookmarkManager
+//
+// This API is currently experimental and may change or be removed at any time.
 func WithoutBookmarkManager() ExecuteQueryConfigurationOption {
 	return func(configuration *ExecuteQueryConfiguration) {
 		configuration.BookmarkManager = nil
 	}
 }
 
+// ExecuteQueryConfiguration holds all the possible configuration settings for DriverWithContext.ExecuteQuery
+//
+// This API is currently experimental and may change or be removed at any time.
 type ExecuteQueryConfiguration struct {
 	Routing          RoutingControl
 	ImpersonatedUser string
@@ -484,10 +514,19 @@ type ExecuteQueryConfiguration struct {
 	BookmarkManager  BookmarkManager
 }
 
+// RoutingControl specifies how the query executed by DriverWithContext.ExecuteQuery is to be routed
+//
+// This API is currently experimental and may change or be removed at any time.
 type RoutingControl int
 
 const (
+	// Writers routes the query to execute to a writer member of the cluster
+	//
+	// This API is currently experimental and may change or be removed at any time.
 	Writers RoutingControl = iota
+	// Readers routes the query to execute to a writer member of the cluster
+	//
+	// This API is currently experimental and may change or be removed at any time.
 	Readers
 )
 
@@ -511,6 +550,9 @@ func (c *ExecuteQueryConfiguration) selectTxFunctionApi(session SessionWithConte
 	return nil, fmt.Errorf("unsupported routing control, got: %d", c.Routing)
 }
 
+// EagerResult holds the result and result metadata of the query executed via DriverWithContext.ExecuteQuery
+//
+// This API is currently experimental and may change or be removed at any time.
 type EagerResult struct {
 	Keys    []string
 	Records []*Record
