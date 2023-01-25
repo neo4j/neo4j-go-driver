@@ -126,6 +126,20 @@ type DriverWithContext interface {
 	GetServerInfo(ctx context.Context) (ServerInfo, error)
 }
 
+// ResultTransformer is a record accumulator that produces an instance of T when the processing of records is over.
+//
+// This API is currently experimental and may change or be removed at any time.
+type ResultTransformer[T any] interface {
+	// Accept is called whenever a new record is fetched from the server
+	// Implementers are free to accumulate or discard the specified record
+	Accept(*Record)
+
+	// Complete is called when the record fetching is over and no error occurred.
+	// In particular, it is important to note that Accept may be called several times before an error occurs.
+	// In that case, Complete will not be called.
+	Complete([]string, ResultSummary) T
+}
+
 // NewDriverWithContext is the entry point to the neo4j driver to create an instance of a Driver. It is the first function to
 // be called in order to establish a connection to a neo4j database. It requires a Bolt URI and an authentication
 // token as parameters and can also take optional configuration function(s) as variadic parameters.
@@ -151,7 +165,6 @@ func NewDriverWithContext(target string, auth AuthToken, configurers ...func(*Co
 	}
 
 	d := driverWithContext{target: parsed, mut: racing.NewMutex()}
-	d.newSession = d.NewSession
 
 	routing := true
 	d.connector.Network = "tcp"
@@ -321,7 +334,6 @@ type driverWithContext struct {
 	logId     string
 	log       log.Logger
 	// visible for tests
-	newSession                             func(context.Context, SessionConfig) SessionWithContext
 	executeQuerybookmarkManagerInitializer sync.Once
 	// instance of the bookmark manager only used by default by managed sessions of ExecuteQuery
 	// this is *not* used by default by user-created session (see NewSession)
@@ -388,26 +400,60 @@ func (d *driverWithContext) ExecuteQuery(
 	parameters map[string]any,
 	settings ...ExecuteQueryConfigurationOption) (res *EagerResult, err error) {
 
-	bookmarkManager := d.DefaultExecuteQueryBookmarkManager()
+	return ExecuteQuery[*EagerResult](ctx, d, query, parameters, newDefaultResultTransformer, settings...)
+}
+
+// ExecuteQuery is a generic variant of DriverWithContext.ExecuteQuery.
+//
+// This API is currently experimental and may change or be removed at any time.
+//
+// See DriverWithContext.ExecuteQuery for the full documentation.
+//
+// DriverWithContext.ExecuteQuery computes an *EagerResult.
+// As the latter's name suggests, this is not optimal when the result is made of an important number of records.
+// As a consequence, this variant allows for a more memory-friendly approach since the ResultTransformer APIs do not
+// impose to keep all records in memory.
+func ExecuteQuery[T any](
+	ctx context.Context,
+	driver DriverWithContext,
+	query string,
+	parameters map[string]any,
+	newResultTransformer func() ResultTransformer[T],
+	settings ...ExecuteQueryConfigurationOption) (res T, err error) {
+
+	return internalExecuteQuery(ctx, driver, driver.NewSession, query, parameters, newResultTransformer, settings...)
+}
+
+// introduced for testing purposes
+func internalExecuteQuery[T any](
+	ctx context.Context,
+	driver DriverWithContext,
+	newSession func(context.Context, SessionConfig) SessionWithContext,
+	query string,
+	parameters map[string]any,
+	newResultTransformer func() ResultTransformer[T],
+	settings ...ExecuteQueryConfigurationOption) (res T, err error) {
+
+	bookmarkManager := driver.DefaultExecuteQueryBookmarkManager()
 	configuration := &ExecuteQueryConfiguration{
 		BookmarkManager: bookmarkManager,
 	}
 	for _, setter := range settings {
 		setter(configuration)
 	}
-	session := d.newSession(ctx, configuration.toSessionConfig())
+	session := newSession(ctx, configuration.toSessionConfig())
 	defer func() {
 		err = errorutil.CombineAllErrors(err, session.Close(ctx))
 	}()
 	txFunction, err := configuration.selectTxFunctionApi(session)
 	if err != nil {
-		return nil, err
+		return *new(T), err
 	}
-	result, err := txFunction(ctx, d.executeQueryCallback(ctx, query, parameters))
+	result, err := txFunction(ctx, executeQueryCallback(ctx, query, parameters, newResultTransformer))
 	if err != nil {
-		return nil, err
+		return *new(T), err
 	}
-	return result.(*EagerResult), nil
+	return result.(T), err
 }
 
 func (d *driverWithContext) DefaultExecuteQueryBookmarkManager() BookmarkManager {
@@ -419,9 +465,24 @@ func (d *driverWithContext) DefaultExecuteQueryBookmarkManager() BookmarkManager
 	return d.defaultExecuteQueryBookmarkManager
 }
 
-func (d *driverWithContext) executeQueryCallback(ctx context.Context, query string, parameters map[string]any) ManagedTransactionWork {
+func executeQueryCallback[T any](
+	ctx context.Context,
+	query string,
+	parameters map[string]any,
+	newTransformer func() ResultTransformer[T]) ManagedTransactionWork {
+
 	return func(tx ManagedTransaction) (any, error) {
 		cursor, err := tx.Run(ctx, query, parameters)
+		if err != nil {
+			return nil, err
+		}
+		transformer := newTransformer()
+		for cursor.Next(ctx) {
+			transformer.Accept(cursor.Record())
+		}
+		if err = cursor.Err(); err != nil {
+			return nil, err
+		}
 		if err != nil {
 			return nil, err
 		}
@@ -429,19 +490,31 @@ func (d *driverWithContext) executeQueryCallback(ctx context.Context, query stri
 		if err != nil {
 			return nil, err
 		}
-		records, err := cursor.Collect(ctx)
-		if err != nil {
-			return nil, err
-		}
 		summary, err := cursor.Consume(ctx)
 		if err != nil {
 			return nil, err
 		}
-		return &EagerResult{
-			Keys:    keys,
-			Records: records,
-			Summary: summary,
-		}, nil
+		return transformer.Complete(keys, summary), nil
+	}
+}
+
+func newDefaultResultTransformer() ResultTransformer[*EagerResult] {
+	return &eagerResultTransformer{}
+}
+
+type eagerResultTransformer struct {
+	records []*Record
+}
+
+func (e *eagerResultTransformer) Accept(record *Record) {
+	e.records = append(e.records, record)
+}
+
+func (e *eagerResultTransformer) Complete(keys []string, summary ResultSummary) *EagerResult {
+	return &EagerResult{
+		Keys:    keys,
+		Records: e.records,
+		Summary: summary,
 	}
 }
 
