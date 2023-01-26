@@ -27,17 +27,19 @@ func TestDriverExecuteQuery(outer *testing.T) {
 	customBookmarkManager := &fakeBookmarkManager{}
 	defaultSessionConfig := SessionConfig{BookmarkManager: defaultBookmarkManager}
 
-	type testCase struct {
+	type testCase[T any] struct {
 		description           string
+		resultTransformer     func() ResultTransformer[T]
 		configurers           []ExecuteQueryConfigurationOption
 		createSession         *fakeSession
 		expectedSessionConfig SessionConfig
-		expectedResult        *EagerResult
+		expectedResult        T
 		expectedErr           error
 	}
-	testCases := []testCase{
+	testCases := []testCase[*EagerResult]{
 		{
-			description: "returns expected result of assumed write query",
+			description:       "returns expected result of assumed write query",
+			resultTransformer: EagerResultTransformer,
 			createSession: &fakeSession{
 				executeWriteTransactionResult: &fakeResult{
 					nextIndex:   -1,
@@ -53,8 +55,9 @@ func TestDriverExecuteQuery(outer *testing.T) {
 			},
 		},
 		{
-			description: "returns expected result of assumed write query impersonating user",
-			configurers: []ExecuteQueryConfigurationOption{ExecuteQueryWithImpersonatedUser("jane")},
+			description:       "returns expected result of assumed write query impersonating user",
+			resultTransformer: EagerResultTransformer,
+			configurers:       []ExecuteQueryConfigurationOption{ExecuteQueryWithImpersonatedUser("jane")},
 			createSession: &fakeSession{
 				executeWriteTransactionResult: &fakeResult{
 					nextIndex:   -1,
@@ -70,8 +73,9 @@ func TestDriverExecuteQuery(outer *testing.T) {
 			},
 		},
 		{
-			description: "returns expected result of assumed write query targeting database",
-			configurers: []ExecuteQueryConfigurationOption{ExecuteQueryWithDatabase("imdb")},
+			description:       "returns expected result of assumed write query targeting database",
+			resultTransformer: EagerResultTransformer,
+			configurers:       []ExecuteQueryConfigurationOption{ExecuteQueryWithDatabase("imdb")},
 			createSession: &fakeSession{
 				executeWriteTransactionResult: &fakeResult{
 					nextIndex:   -1,
@@ -87,8 +91,9 @@ func TestDriverExecuteQuery(outer *testing.T) {
 			},
 		},
 		{
-			description: "returns expected result of assumed write query with custom bookmark manager",
-			configurers: []ExecuteQueryConfigurationOption{ExecuteQueryWithBookmarkManager(customBookmarkManager)},
+			description:       "returns expected result of assumed write query with custom bookmark manager",
+			resultTransformer: EagerResultTransformer,
+			configurers:       []ExecuteQueryConfigurationOption{ExecuteQueryWithBookmarkManager(customBookmarkManager)},
 			createSession: &fakeSession{
 				executeWriteTransactionResult: &fakeResult{
 					nextIndex:   -1,
@@ -104,8 +109,27 @@ func TestDriverExecuteQuery(outer *testing.T) {
 			},
 		},
 		{
-			description: "returns expected result of explicit write query",
-			configurers: []ExecuteQueryConfigurationOption{ExecuteQueryWithWritersRouting()},
+			description:       "returns expected result of assumed write query with nil bookmark manager",
+			resultTransformer: EagerResultTransformer,
+			configurers:       []ExecuteQueryConfigurationOption{ExecuteQueryWithoutBookmarkManager()},
+			createSession: &fakeSession{
+				executeWriteTransactionResult: &fakeResult{
+					nextIndex:   -1,
+					keys:        keys,
+					nextRecords: records,
+					summary:     summary,
+				}},
+			expectedSessionConfig: SessionConfig{BookmarkManager: nil},
+			expectedResult: &EagerResult{
+				Keys:    keys,
+				Records: records,
+				Summary: summary,
+			},
+		},
+		{
+			description:       "returns expected result of explicit write query",
+			resultTransformer: EagerResultTransformer,
+			configurers:       []ExecuteQueryConfigurationOption{ExecuteQueryWithWritersRouting()},
 			createSession: &fakeSession{
 				executeWriteTransactionResult: &fakeResult{
 					nextIndex:   -1,
@@ -121,8 +145,9 @@ func TestDriverExecuteQuery(outer *testing.T) {
 			},
 		},
 		{
-			description: "returns expected result of explicit read query",
-			configurers: []ExecuteQueryConfigurationOption{ExecuteQueryWithReadersRouting()},
+			description:       "returns expected result of explicit read query",
+			resultTransformer: EagerResultTransformer,
+			configurers:       []ExecuteQueryConfigurationOption{ExecuteQueryWithReadersRouting()},
 			createSession: &fakeSession{
 				executeReadTransactionResult: &fakeResult{
 					nextIndex:   -1,
@@ -138,7 +163,45 @@ func TestDriverExecuteQuery(outer *testing.T) {
 			},
 		},
 		{
-			description: "returns error when write result keys cannot be retrieved",
+			description:       "returns error when routing mode is invalid",
+			resultTransformer: EagerResultTransformer,
+			configurers: []ExecuteQueryConfigurationOption{func(config *ExecuteQueryConfiguration) {
+				config.Routing = 42
+			}},
+			createSession: &fakeSession{
+				executeWriteTransactionResult: &fakeResult{
+					nextIndex:   -1,
+					keys:        keys,
+					nextRecords: records,
+					summary:     summary,
+				}},
+			expectedSessionConfig: defaultSessionConfig,
+			expectedErr:           fmt.Errorf("unsupported routing control, expected 0 (Writers) or 1 (Readers) but got: 42"),
+		},
+		{
+			description:       "returns error when result transformer function is nil",
+			resultTransformer: nil,
+			expectedErr: fmt.Errorf("nil is not a valid ResultTransformer function argument. " +
+				"Consider passing EagerResultTransformer or a function that returns an instance of your own " +
+				"ResultTransformer implementation"),
+		},
+		{
+			description:       "returns error when result transformer function returns a nil transformer",
+			resultTransformer: func() ResultTransformer[*EagerResult] { return nil },
+			createSession: &fakeSession{
+				executeWriteTransactionResult: &fakeResult{
+					nextIndex:   -1,
+					keys:        keys,
+					nextRecords: records,
+					summary:     summary,
+				}},
+			expectedSessionConfig: defaultSessionConfig,
+			expectedErr: fmt.Errorf("expected the result transformer function to return a valid ResultTransformer" +
+				" instance, but got nil"),
+		},
+		{
+			description:       "returns error when write result keys cannot be retrieved",
+			resultTransformer: EagerResultTransformer,
 			createSession: &fakeSession{
 				executeWriteTransactionResult: &fakeResult{
 					nextIndex: -1,
@@ -148,18 +211,20 @@ func TestDriverExecuteQuery(outer *testing.T) {
 			expectedErr:           fmt.Errorf("dude, where are my keys"),
 		},
 		{
-			description: "returns error when write result records cannot be retrieved",
+			description:       "returns error when write result records cannot be retrieved",
+			resultTransformer: EagerResultTransformer,
 			createSession: &fakeSession{
 				executeWriteTransactionResult: &fakeResult{
 					nextIndex: -1,
 					keys:      keys,
-					nextErr:   fmt.Errorf("one does not simply nextRecords"),
+					nextErr:   fmt.Errorf("one does not simply get the next record"),
 				}},
 			expectedSessionConfig: defaultSessionConfig,
-			expectedErr:           fmt.Errorf("one does not simply nextRecords"),
+			expectedErr:           fmt.Errorf("one does not simply get the next record"),
 		},
 		{
-			description: "returns error when write result summary cannot be retrieved",
+			description:       "returns error when write result summary cannot be retrieved",
+			resultTransformer: EagerResultTransformer,
 			createSession: &fakeSession{
 				executeWriteTransactionResult: &fakeResult{
 					nextIndex:   -1,
@@ -171,7 +236,8 @@ func TestDriverExecuteQuery(outer *testing.T) {
 			expectedErr:           fmt.Errorf("in summary: nope"),
 		},
 		{
-			description: "returns error when write result summary cannot be retrieved",
+			description:       "returns error when write result summary cannot be retrieved",
+			resultTransformer: EagerResultTransformer,
 			createSession: &fakeSession{
 				executeWriteTransactionResult: &fakeResult{
 					nextIndex:   -1,
@@ -183,7 +249,8 @@ func TestDriverExecuteQuery(outer *testing.T) {
 			expectedErr:           fmt.Errorf("in summary: nope"),
 		},
 		{
-			description: "returns error when write execution fails",
+			description:       "returns error when write execution fails",
+			resultTransformer: EagerResultTransformer,
 			createSession: &fakeSession{
 				executeWriteErr: fmt.Errorf("oopsie"),
 			},
@@ -191,7 +258,8 @@ func TestDriverExecuteQuery(outer *testing.T) {
 			expectedErr:           fmt.Errorf("oopsie"),
 		},
 		{
-			description: "returns error when session close fails",
+			description:       "returns error when session close fails",
+			resultTransformer: EagerResultTransformer,
 			createSession: &fakeSession{
 				executeWriteTransactionResult: &fakeResult{
 					nextIndex:   -1,
@@ -211,7 +279,8 @@ func TestDriverExecuteQuery(outer *testing.T) {
 			},
 		},
 		{
-			description: "returns combined error when a previous error occurred before the session close's'",
+			description:       "returns combined error when a previous error occurred before the session close's'",
+			resultTransformer: EagerResultTransformer,
 			createSession: &fakeSession{
 				executeWriteErr: fmt.Errorf("he's a pirate writerrrr"),
 				closeErr:        fmt.Errorf("looking closer: it seems close erred 🥁"),
@@ -222,8 +291,9 @@ func TestDriverExecuteQuery(outer *testing.T) {
 				errors.New("he's a pirate writerrrr")),
 		},
 		{
-			description: "returns error when read result keys cannot be retrieved",
-			configurers: []ExecuteQueryConfigurationOption{ExecuteQueryWithReadersRouting()},
+			description:       "returns error when read result keys cannot be retrieved",
+			resultTransformer: EagerResultTransformer,
+			configurers:       []ExecuteQueryConfigurationOption{ExecuteQueryWithReadersRouting()},
 			createSession: &fakeSession{
 				executeReadTransactionResult: &fakeResult{
 					nextIndex: -1,
@@ -233,8 +303,9 @@ func TestDriverExecuteQuery(outer *testing.T) {
 			expectedErr:           fmt.Errorf("dude, where are my keys"),
 		},
 		{
-			description: "returns error when read result records cannot be retrieved",
-			configurers: []ExecuteQueryConfigurationOption{ExecuteQueryWithReadersRouting()},
+			description:       "returns error when read result records cannot be retrieved",
+			resultTransformer: EagerResultTransformer,
+			configurers:       []ExecuteQueryConfigurationOption{ExecuteQueryWithReadersRouting()},
 			createSession: &fakeSession{
 				executeReadTransactionResult: &fakeResult{
 					nextIndex: -1,
@@ -245,8 +316,9 @@ func TestDriverExecuteQuery(outer *testing.T) {
 			expectedErr:           fmt.Errorf("one does not simply get the next record"),
 		},
 		{
-			description: "returns error when read result summary cannot be retrieved",
-			configurers: []ExecuteQueryConfigurationOption{ExecuteQueryWithReadersRouting()},
+			description:       "returns error when read result summary cannot be retrieved",
+			resultTransformer: EagerResultTransformer,
+			configurers:       []ExecuteQueryConfigurationOption{ExecuteQueryWithReadersRouting()},
 			createSession: &fakeSession{
 				executeReadTransactionResult: &fakeResult{
 					nextIndex:   -1,
@@ -258,8 +330,9 @@ func TestDriverExecuteQuery(outer *testing.T) {
 			expectedErr:           fmt.Errorf("in summary: nope"),
 		},
 		{
-			description: "returns error when read result summary cannot be retrieved",
-			configurers: []ExecuteQueryConfigurationOption{ExecuteQueryWithReadersRouting()},
+			description:       "returns error when read result summary cannot be retrieved",
+			resultTransformer: EagerResultTransformer,
+			configurers:       []ExecuteQueryConfigurationOption{ExecuteQueryWithReadersRouting()},
 			createSession: &fakeSession{
 				executeReadTransactionResult: &fakeResult{
 					nextIndex:   -1,
@@ -271,8 +344,9 @@ func TestDriverExecuteQuery(outer *testing.T) {
 			expectedErr:           fmt.Errorf("in summary: nope"),
 		},
 		{
-			description: "returns error when read execution fails",
-			configurers: []ExecuteQueryConfigurationOption{ExecuteQueryWithReadersRouting()},
+			description:       "returns error when read execution fails",
+			resultTransformer: EagerResultTransformer,
+			configurers:       []ExecuteQueryConfigurationOption{ExecuteQueryWithReadersRouting()},
 			createSession: &fakeSession{
 				executeReadErr: fmt.Errorf("oopsie"),
 			},
@@ -295,7 +369,7 @@ func TestDriverExecuteQuery(outer *testing.T) {
 			}
 
 			eagerResult, err := ExecuteQuery[*EagerResult](
-				ctx, driver, "RETURN 42", nil, EagerResultTransformer, testCase.configurers...)
+				ctx, driver, "RETURN 42", nil, testCase.resultTransformer, testCase.configurers...)
 
 			AssertDeepEquals(t, testCase.expectedErr, err)
 			AssertDeepEquals(t, testCase.expectedResult, eagerResult)
@@ -396,11 +470,14 @@ func (d *driverDelegate) GetServerInfo(ctx context.Context) (ServerInfo, error) 
 }
 
 type fakeSession struct {
-	executeReadTransactionResult  *fakeResult
-	executeReadErr                error
-	executeWriteTransactionResult *fakeResult
-	executeWriteErr               error
-	closeErr                      error
+	executeReadTransactionResult   *fakeResult
+	executeReadErr                 error
+	executeWriteTransactionResult  *fakeResult
+	executeWriteTransactionResults []*fakeResult
+	executeWriteErr                error
+	executeWriteErrs               []error
+	executeWriteIndex              int
+	closeErr                       error
 }
 
 func (s *fakeSession) LastBookmarks() Bookmarks {
@@ -423,10 +500,14 @@ func (s *fakeSession) ExecuteRead(_ context.Context, callback ManagedTransaction
 }
 
 func (s *fakeSession) ExecuteWrite(_ context.Context, callback ManagedTransactionWork, _ ...func(*TransactionConfig)) (any, error) {
-	return callback(&fakeManagedTransaction{
-		result: s.executeWriteTransactionResult,
-		err:    s.executeWriteErr,
-	})
+	result := s.executeWriteTransactionResult
+	err := s.executeWriteErr
+	if s.executeWriteErrs != nil {
+		result = s.executeWriteTransactionResults[s.executeWriteIndex]
+		err = s.executeWriteErrs[s.executeWriteIndex]
+		s.executeWriteIndex++
+	}
+	return callback(&fakeManagedTransaction{result: result, err: err})
 }
 
 func (s *fakeSession) Run(context.Context, string, map[string]any, ...func(*TransactionConfig)) (ResultWithContext, error) {

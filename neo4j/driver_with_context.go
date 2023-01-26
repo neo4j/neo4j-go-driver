@@ -22,6 +22,7 @@ package neo4j
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/errorutil"
@@ -351,13 +352,18 @@ func (d *driverWithContext) Close(ctx context.Context) error {
 	return nil
 }
 
-// ExecuteQuery runs the specified query with its parameters and returns the query result.
+// ExecuteQuery runs the specified query with its parameters and returns the query result, transformed by the specified
+// ResultTransformer function.
 //
 // This API is currently experimental and may change or be removed at any time.
 //
 //	result, err := ExecuteQuery[*EagerResult](ctx, driver, query, params, EagerResultTransformer)
 //
-// This function runs the query in a single explicit, retryable transaction within a session entirely managed by
+// Passing a nil ResultTransformer function is invalid and will return an error.
+//
+// Likewise, passing a function that returns a nil ResultTransformer is invalid and will return an error.
+//
+// ExecuteQuery runs the query in a single explicit, retryable transaction within a session entirely managed by
 // the driver.
 //
 // Retries occur in the same conditions as when calling SessionWithContext.ExecuteRead and
@@ -438,6 +444,12 @@ func ExecuteQuery[T any](
 	newResultTransformer func() ResultTransformer[T],
 	settings ...ExecuteQueryConfigurationOption) (res T, err error) {
 
+	if newResultTransformer == nil {
+		return *new(T), errors.New("nil is not a valid ResultTransformer function argument. " +
+			"Consider passing EagerResultTransformer or a function that returns an instance of your own " +
+			"ResultTransformer implementation")
+	}
+
 	bookmarkManager := driver.DefaultExecuteQueryBookmarkManager()
 	configuration := &ExecuteQueryConfiguration{
 		BookmarkManager: bookmarkManager,
@@ -476,18 +488,20 @@ func executeQueryCallback[T any](
 	newTransformer func() ResultTransformer[T]) ManagedTransactionWork {
 
 	return func(tx ManagedTransaction) (any, error) {
+		transformer := newTransformer()
+		if transformer == nil {
+			return nil, errors.New(
+				"expected the result transformer function to return a valid ResultTransformer instance, " +
+					"but got nil")
+		}
 		cursor, err := tx.Run(ctx, query, parameters)
 		if err != nil {
 			return nil, err
 		}
-		transformer := newTransformer()
 		for cursor.Next(ctx) {
 			transformer.Accept(cursor.Record())
 		}
 		if err = cursor.Err(); err != nil {
-			return nil, err
-		}
-		if err != nil {
 			return nil, err
 		}
 		keys, err := cursor.Keys()
@@ -624,7 +638,8 @@ func (c *ExecuteQueryConfiguration) selectTxFunctionApi(session SessionWithConte
 	case Writers:
 		return session.ExecuteWrite, nil
 	}
-	return nil, fmt.Errorf("unsupported routing control, got: %d", c.Routing)
+	return nil, fmt.Errorf("unsupported routing control, expected %d (Writers) or %d (Readers) "+
+		"but got: %d", Writers, Readers, c.Routing)
 }
 
 // EagerResult holds the result and result metadata of the query executed via DriverWithContext.ExecuteQuery
