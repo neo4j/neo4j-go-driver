@@ -833,7 +833,6 @@ func (b *backend) handleRequest(req map[string]any) {
 				"Feature:Bolt:5.0",
 				"Feature:Bolt:Patch:UTC",
 				"Feature:Impersonation",
-				"Feature:TLS:1.1",
 				"Feature:TLS:1.2",
 				"Feature:TLS:1.3",
 				"Optimization:ConnectionReuse",
