@@ -47,7 +47,7 @@ type Config struct {
 	// The configuration is only used for URI schemes 'bolt+s', 'bolt+ssc',
 	// 'neo4j+s' and 'neo4j+ssc'.
 	//
-	// The MinVersion attribute is always set to VersionTLS11
+	// The default MinVersion attribute is tls.VersionTLS12. This is overridable.
 	// The InsecureSkipVerify attribute of TlsConfig is always derived from the initial URI scheme.
 	// The ServerName attribute of TlsConfig is always derived from the initial URI host.
 	//

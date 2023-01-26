@@ -92,7 +92,9 @@ func (c Connector) tlsConfig(serverName string) *tls.Config {
 	} else {
 		config = c.TlsConfig
 	}
-	config.MinVersion = tls.VersionTLS11
+	if config.MinVersion == 0 {
+		config.MinVersion = tls.VersionTLS12
+	}
 	config.InsecureSkipVerify = c.SkipVerify
 	config.ServerName = serverName
 	return config
