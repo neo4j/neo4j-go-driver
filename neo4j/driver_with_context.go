@@ -47,7 +47,7 @@ const (
 	AccessModeRead AccessMode = 1
 )
 
-// DriverWithContext represents a pool(s) of connections to a neo4j server or cluster. It's
+// DriverWithContext represents a pool of connections to a neo4j server or cluster. It's
 // safe for concurrent use.
 type DriverWithContext interface {
 	// ExecuteQuery runs the specified query with its parameters and returns the query result.
