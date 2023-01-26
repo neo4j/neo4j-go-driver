@@ -4,7 +4,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/racing"
 	. "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/testutil"
+	"net/url"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -25,22 +27,25 @@ func TestDriverExecuteQuery(outer *testing.T) {
 	customBookmarkManager := &fakeBookmarkManager{}
 	defaultSessionConfig := SessionConfig{BookmarkManager: defaultBookmarkManager}
 
-	type testCase struct {
+	type testCase[T any] struct {
 		description           string
+		resultTransformer     func() ResultTransformer[T]
 		configurers           []ExecuteQueryConfigurationOption
 		createSession         *fakeSession
 		expectedSessionConfig SessionConfig
-		expectedResult        *EagerResult
+		expectedResult        T
 		expectedErr           error
 	}
-	testCases := []testCase{
+	testCases := []testCase[*EagerResult]{
 		{
-			description: "returns expected result of assumed write query",
+			description:       "returns expected result of assumed write query",
+			resultTransformer: EagerResultTransformer,
 			createSession: &fakeSession{
 				executeWriteTransactionResult: &fakeResult{
-					keys:    keys,
-					collect: records,
-					summary: summary,
+					nextIndex:   -1,
+					keys:        keys,
+					nextRecords: records,
+					summary:     summary,
 				}},
 			expectedSessionConfig: defaultSessionConfig,
 			expectedResult: &EagerResult{
@@ -50,13 +55,15 @@ func TestDriverExecuteQuery(outer *testing.T) {
 			},
 		},
 		{
-			description: "returns expected result of assumed write query impersonating user",
-			configurers: []ExecuteQueryConfigurationOption{ExecuteQueryWithImpersonatedUser("jane")},
+			description:       "returns expected result of assumed write query impersonating user",
+			resultTransformer: EagerResultTransformer,
+			configurers:       []ExecuteQueryConfigurationOption{ExecuteQueryWithImpersonatedUser("jane")},
 			createSession: &fakeSession{
 				executeWriteTransactionResult: &fakeResult{
-					keys:    keys,
-					collect: records,
-					summary: summary,
+					nextIndex:   -1,
+					keys:        keys,
+					nextRecords: records,
+					summary:     summary,
 				}},
 			expectedSessionConfig: SessionConfig{ImpersonatedUser: "jane", BookmarkManager: defaultBookmarkManager},
 			expectedResult: &EagerResult{
@@ -66,13 +73,15 @@ func TestDriverExecuteQuery(outer *testing.T) {
 			},
 		},
 		{
-			description: "returns expected result of assumed write query targeting database",
-			configurers: []ExecuteQueryConfigurationOption{ExecuteQueryWithDatabase("imdb")},
+			description:       "returns expected result of assumed write query targeting database",
+			resultTransformer: EagerResultTransformer,
+			configurers:       []ExecuteQueryConfigurationOption{ExecuteQueryWithDatabase("imdb")},
 			createSession: &fakeSession{
 				executeWriteTransactionResult: &fakeResult{
-					keys:    keys,
-					collect: records,
-					summary: summary,
+					nextIndex:   -1,
+					keys:        keys,
+					nextRecords: records,
+					summary:     summary,
 				}},
 			expectedSessionConfig: SessionConfig{DatabaseName: "imdb", BookmarkManager: defaultBookmarkManager},
 			expectedResult: &EagerResult{
@@ -82,13 +91,15 @@ func TestDriverExecuteQuery(outer *testing.T) {
 			},
 		},
 		{
-			description: "returns expected result of assumed write query with custom bookmark manager",
-			configurers: []ExecuteQueryConfigurationOption{ExecuteQueryWithBookmarkManager(customBookmarkManager)},
+			description:       "returns expected result of assumed write query with custom bookmark manager",
+			resultTransformer: EagerResultTransformer,
+			configurers:       []ExecuteQueryConfigurationOption{ExecuteQueryWithBookmarkManager(customBookmarkManager)},
 			createSession: &fakeSession{
 				executeWriteTransactionResult: &fakeResult{
-					keys:    keys,
-					collect: records,
-					summary: summary,
+					nextIndex:   -1,
+					keys:        keys,
+					nextRecords: records,
+					summary:     summary,
 				}},
 			expectedSessionConfig: SessionConfig{BookmarkManager: customBookmarkManager},
 			expectedResult: &EagerResult{
@@ -98,13 +109,33 @@ func TestDriverExecuteQuery(outer *testing.T) {
 			},
 		},
 		{
-			description: "returns expected result of explicit write query",
-			configurers: []ExecuteQueryConfigurationOption{ExecuteQueryWithWritersRouting()},
+			description:       "returns expected result of assumed write query with nil bookmark manager",
+			resultTransformer: EagerResultTransformer,
+			configurers:       []ExecuteQueryConfigurationOption{ExecuteQueryWithoutBookmarkManager()},
 			createSession: &fakeSession{
 				executeWriteTransactionResult: &fakeResult{
-					keys:    keys,
-					collect: records,
-					summary: summary,
+					nextIndex:   -1,
+					keys:        keys,
+					nextRecords: records,
+					summary:     summary,
+				}},
+			expectedSessionConfig: SessionConfig{BookmarkManager: nil},
+			expectedResult: &EagerResult{
+				Keys:    keys,
+				Records: records,
+				Summary: summary,
+			},
+		},
+		{
+			description:       "returns expected result of explicit write query",
+			resultTransformer: EagerResultTransformer,
+			configurers:       []ExecuteQueryConfigurationOption{ExecuteQueryWithWritersRouting()},
+			createSession: &fakeSession{
+				executeWriteTransactionResult: &fakeResult{
+					nextIndex:   -1,
+					keys:        keys,
+					nextRecords: records,
+					summary:     summary,
 				}},
 			expectedSessionConfig: defaultSessionConfig,
 			expectedResult: &EagerResult{
@@ -114,13 +145,15 @@ func TestDriverExecuteQuery(outer *testing.T) {
 			},
 		},
 		{
-			description: "returns expected result of explicit read query",
-			configurers: []ExecuteQueryConfigurationOption{ExecuteQueryWithReadersRouting()},
+			description:       "returns expected result of explicit read query",
+			resultTransformer: EagerResultTransformer,
+			configurers:       []ExecuteQueryConfigurationOption{ExecuteQueryWithReadersRouting()},
 			createSession: &fakeSession{
 				executeReadTransactionResult: &fakeResult{
-					keys:    keys,
-					collect: records,
-					summary: summary,
+					nextIndex:   -1,
+					keys:        keys,
+					nextRecords: records,
+					summary:     summary,
 				}},
 			expectedSessionConfig: defaultSessionConfig,
 			expectedResult: &EagerResult{
@@ -130,48 +163,94 @@ func TestDriverExecuteQuery(outer *testing.T) {
 			},
 		},
 		{
-			description: "returns error when write result keys cannot be retrieved",
+			description:       "returns error when routing mode is invalid",
+			resultTransformer: EagerResultTransformer,
+			configurers: []ExecuteQueryConfigurationOption{func(config *ExecuteQueryConfiguration) {
+				config.Routing = 42
+			}},
 			createSession: &fakeSession{
 				executeWriteTransactionResult: &fakeResult{
-					keysErr: fmt.Errorf("dude, where are my keys"),
+					nextIndex:   -1,
+					keys:        keys,
+					nextRecords: records,
+					summary:     summary,
+				}},
+			expectedSessionConfig: defaultSessionConfig,
+			expectedErr:           fmt.Errorf("unsupported routing control, expected 0 (Writers) or 1 (Readers) but got: 42"),
+		},
+		{
+			description:       "returns error when result transformer function is nil",
+			resultTransformer: nil,
+			expectedErr: fmt.Errorf("nil is not a valid ResultTransformer function argument. " +
+				"Consider passing EagerResultTransformer or a function that returns an instance of your own " +
+				"ResultTransformer implementation"),
+		},
+		{
+			description:       "returns error when result transformer function returns a nil transformer",
+			resultTransformer: func() ResultTransformer[*EagerResult] { return nil },
+			createSession: &fakeSession{
+				executeWriteTransactionResult: &fakeResult{
+					nextIndex:   -1,
+					keys:        keys,
+					nextRecords: records,
+					summary:     summary,
+				}},
+			expectedSessionConfig: defaultSessionConfig,
+			expectedErr: fmt.Errorf("expected the result transformer function to return a valid ResultTransformer" +
+				" instance, but got nil"),
+		},
+		{
+			description:       "returns error when write result keys cannot be retrieved",
+			resultTransformer: EagerResultTransformer,
+			createSession: &fakeSession{
+				executeWriteTransactionResult: &fakeResult{
+					nextIndex: -1,
+					keysErr:   fmt.Errorf("dude, where are my keys"),
 				}},
 			expectedSessionConfig: defaultSessionConfig,
 			expectedErr:           fmt.Errorf("dude, where are my keys"),
 		},
 		{
-			description: "returns error when write result records cannot be collected",
+			description:       "returns error when write result records cannot be retrieved",
+			resultTransformer: EagerResultTransformer,
 			createSession: &fakeSession{
 				executeWriteTransactionResult: &fakeResult{
-					keys:       keys,
-					collectErr: fmt.Errorf("one does not simply collect"),
+					nextIndex: -1,
+					keys:      keys,
+					nextErr:   fmt.Errorf("one does not simply get the next record"),
 				}},
 			expectedSessionConfig: defaultSessionConfig,
-			expectedErr:           fmt.Errorf("one does not simply collect"),
+			expectedErr:           fmt.Errorf("one does not simply get the next record"),
 		},
 		{
-			description: "returns error when write result summary cannot be retrieved",
+			description:       "returns error when write result summary cannot be retrieved",
+			resultTransformer: EagerResultTransformer,
 			createSession: &fakeSession{
 				executeWriteTransactionResult: &fakeResult{
-					keys:       keys,
-					collect:    records,
-					summaryErr: fmt.Errorf("in summary: nope"),
-				}},
-			expectedSessionConfig: defaultSessionConfig,
-			expectedErr:           fmt.Errorf("in summary: nope"),
-		},
-		{
-			description: "returns error when write result summary cannot be retrieved",
-			createSession: &fakeSession{
-				executeWriteTransactionResult: &fakeResult{
-					keys:       keys,
-					collect:    records,
-					summaryErr: fmt.Errorf("in summary: nope"),
+					nextIndex:   -1,
+					keys:        keys,
+					nextRecords: records,
+					summaryErr:  fmt.Errorf("in summary: nope"),
 				}},
 			expectedSessionConfig: defaultSessionConfig,
 			expectedErr:           fmt.Errorf("in summary: nope"),
 		},
 		{
-			description: "returns error when write execution fails",
+			description:       "returns error when write result summary cannot be retrieved",
+			resultTransformer: EagerResultTransformer,
+			createSession: &fakeSession{
+				executeWriteTransactionResult: &fakeResult{
+					nextIndex:   -1,
+					keys:        keys,
+					nextRecords: records,
+					summaryErr:  fmt.Errorf("in summary: nope"),
+				}},
+			expectedSessionConfig: defaultSessionConfig,
+			expectedErr:           fmt.Errorf("in summary: nope"),
+		},
+		{
+			description:       "returns error when write execution fails",
+			resultTransformer: EagerResultTransformer,
 			createSession: &fakeSession{
 				executeWriteErr: fmt.Errorf("oopsie"),
 			},
@@ -179,12 +258,14 @@ func TestDriverExecuteQuery(outer *testing.T) {
 			expectedErr:           fmt.Errorf("oopsie"),
 		},
 		{
-			description: "returns error when session close fails",
+			description:       "returns error when session close fails",
+			resultTransformer: EagerResultTransformer,
 			createSession: &fakeSession{
 				executeWriteTransactionResult: &fakeResult{
-					keys:    keys,
-					collect: records,
-					summary: summary,
+					nextIndex:   -1,
+					keys:        keys,
+					nextRecords: records,
+					summary:     summary,
 				},
 				closeErr: fmt.Errorf("looking closer: it seems close erred 🥁"),
 			},
@@ -198,7 +279,8 @@ func TestDriverExecuteQuery(outer *testing.T) {
 			},
 		},
 		{
-			description: "returns combined error when a previous error occurred before the session close's'",
+			description:       "returns combined error when a previous error occurred before the session close's'",
+			resultTransformer: EagerResultTransformer,
 			createSession: &fakeSession{
 				executeWriteErr: fmt.Errorf("he's a pirate writerrrr"),
 				closeErr:        fmt.Errorf("looking closer: it seems close erred 🥁"),
@@ -206,56 +288,65 @@ func TestDriverExecuteQuery(outer *testing.T) {
 			expectedSessionConfig: defaultSessionConfig,
 			expectedErr: fmt.Errorf("error %v occurred after previous error %w",
 				errors.New("looking closer: it seems close erred 🥁"),
-				errors.New(("he's a pirate writerrrr"))),
+				errors.New("he's a pirate writerrrr")),
 		},
 		{
-			description: "returns error when read result keys cannot be retrieved",
-			configurers: []ExecuteQueryConfigurationOption{ExecuteQueryWithReadersRouting()},
+			description:       "returns error when read result keys cannot be retrieved",
+			resultTransformer: EagerResultTransformer,
+			configurers:       []ExecuteQueryConfigurationOption{ExecuteQueryWithReadersRouting()},
 			createSession: &fakeSession{
 				executeReadTransactionResult: &fakeResult{
-					keysErr: fmt.Errorf("dude, where are my keys"),
+					nextIndex: -1,
+					keysErr:   fmt.Errorf("dude, where are my keys"),
 				}},
 			expectedSessionConfig: defaultSessionConfig,
 			expectedErr:           fmt.Errorf("dude, where are my keys"),
 		},
 		{
-			description: "returns error when read result records cannot be collected",
-			configurers: []ExecuteQueryConfigurationOption{ExecuteQueryWithReadersRouting()},
+			description:       "returns error when read result records cannot be retrieved",
+			resultTransformer: EagerResultTransformer,
+			configurers:       []ExecuteQueryConfigurationOption{ExecuteQueryWithReadersRouting()},
 			createSession: &fakeSession{
 				executeReadTransactionResult: &fakeResult{
-					keys:       keys,
-					collectErr: fmt.Errorf("one does not simply collect"),
+					nextIndex: -1,
+					keys:      keys,
+					nextErr:   fmt.Errorf("one does not simply get the next record"),
 				}},
 			expectedSessionConfig: defaultSessionConfig,
-			expectedErr:           fmt.Errorf("one does not simply collect"),
+			expectedErr:           fmt.Errorf("one does not simply get the next record"),
 		},
 		{
-			description: "returns error when read result summary cannot be retrieved",
-			configurers: []ExecuteQueryConfigurationOption{ExecuteQueryWithReadersRouting()},
+			description:       "returns error when read result summary cannot be retrieved",
+			resultTransformer: EagerResultTransformer,
+			configurers:       []ExecuteQueryConfigurationOption{ExecuteQueryWithReadersRouting()},
 			createSession: &fakeSession{
 				executeReadTransactionResult: &fakeResult{
-					keys:       keys,
-					collect:    records,
-					summaryErr: fmt.Errorf("in summary: nope"),
-				}},
-			expectedSessionConfig: defaultSessionConfig,
-			expectedErr:           fmt.Errorf("in summary: nope"),
-		},
-		{
-			description: "returns error when read result summary cannot be retrieved",
-			configurers: []ExecuteQueryConfigurationOption{ExecuteQueryWithReadersRouting()},
-			createSession: &fakeSession{
-				executeReadTransactionResult: &fakeResult{
-					keys:       keys,
-					collect:    records,
-					summaryErr: fmt.Errorf("in summary: nope"),
+					nextIndex:   -1,
+					keys:        keys,
+					nextRecords: records,
+					summaryErr:  fmt.Errorf("in summary: nope"),
 				}},
 			expectedSessionConfig: defaultSessionConfig,
 			expectedErr:           fmt.Errorf("in summary: nope"),
 		},
 		{
-			description: "returns error when read execution fails",
-			configurers: []ExecuteQueryConfigurationOption{ExecuteQueryWithReadersRouting()},
+			description:       "returns error when read result summary cannot be retrieved",
+			resultTransformer: EagerResultTransformer,
+			configurers:       []ExecuteQueryConfigurationOption{ExecuteQueryWithReadersRouting()},
+			createSession: &fakeSession{
+				executeReadTransactionResult: &fakeResult{
+					nextIndex:   -1,
+					keys:        keys,
+					nextRecords: records,
+					summaryErr:  fmt.Errorf("in summary: nope"),
+				}},
+			expectedSessionConfig: defaultSessionConfig,
+			expectedErr:           fmt.Errorf("in summary: nope"),
+		},
+		{
+			description:       "returns error when read execution fails",
+			resultTransformer: EagerResultTransformer,
+			configurers:       []ExecuteQueryConfigurationOption{ExecuteQueryWithReadersRouting()},
 			createSession: &fakeSession{
 				executeReadErr: fmt.Errorf("oopsie"),
 			},
@@ -266,15 +357,19 @@ func TestDriverExecuteQuery(outer *testing.T) {
 
 	for _, testCase := range testCases {
 		outer.Run(testCase.description, func(t *testing.T) {
-			driver := &driverWithContext{
+			driver := &driverDelegate{
 				newSession: func(_ context.Context, config SessionConfig) SessionWithContext {
 					AssertDeepEquals(t, testCase.expectedSessionConfig, config)
 					return testCase.createSession
 				},
-				defaultExecuteQueryBookmarkManager: defaultBookmarkManager,
+				delegate: &driverWithContext{
+					defaultExecuteQueryBookmarkManager: defaultBookmarkManager,
+					mut:                                racing.NewMutex(),
+				},
 			}
 
-			eagerResult, err := driver.ExecuteQuery(ctx, "RETURN 42", nil, testCase.configurers...)
+			eagerResult, err := ExecuteQuery[*EagerResult](
+				ctx, driver, "RETURN 42", nil, testCase.resultTransformer, testCase.configurers...)
 
 			AssertDeepEquals(t, testCase.expectedErr, err)
 			AssertDeepEquals(t, testCase.expectedResult, eagerResult)
@@ -282,11 +377,14 @@ func TestDriverExecuteQuery(outer *testing.T) {
 	}
 
 	outer.Run("default bookmark manager is thread-safe", func(t *testing.T) {
-		driver := &driverWithContext{
+		driver := &driverDelegate{
 			newSession: func(_ context.Context, config SessionConfig) SessionWithContext {
 				return &fakeSession{
 					executeWriteErr: fmt.Errorf("oopsie, write failed"),
 				}
+			},
+			delegate: &driverWithContext{
+				mut: racing.NewMutex(),
 			},
 		}
 
@@ -299,7 +397,7 @@ func TestDriverExecuteQuery(outer *testing.T) {
 				callExecuteQueryOrBookmarkManagerGetter(driver, i)
 				storeBookmarkManagerAddress(
 					&bookmarkManagerAddresses,
-					driver.defaultExecuteQueryBookmarkManager.(*bookmarkManager))
+					driver.delegate.defaultExecuteQueryBookmarkManager.(*bookmarkManager))
 				wait.Done()
 			}(i)
 		}
@@ -313,20 +411,20 @@ func TestDriverExecuteQuery(outer *testing.T) {
 		if len(addressCounts) != 1 {
 			t.Errorf("expected exactly 1 bookmark manager pointer to have been created, got %v", addressCounts)
 		}
-		address := uintptr(unsafe.Pointer(driver.defaultExecuteQueryBookmarkManager.(*bookmarkManager)))
+		address := uintptr(unsafe.Pointer(driver.delegate.defaultExecuteQueryBookmarkManager.(*bookmarkManager)))
 		if count, found := addressCounts[address]; !found || count != int32(goroutineCount) {
 			t.Errorf("expected pointer address %v to be seen %d time(s), got these instead %v", address, count, addressCounts)
 		}
 	})
 }
 
-func callExecuteQueryOrBookmarkManagerGetter(driver *driverWithContext, i int) {
+func callExecuteQueryOrBookmarkManagerGetter(driver DriverWithContext, i int) {
 	if i%2 == 0 {
 		// this lazily initializes the default bookmark manager
 		_ = driver.DefaultExecuteQueryBookmarkManager()
 	} else {
 		// this as well
-		_, _ = driver.ExecuteQuery(context.Background(), "RETURN 42", nil)
+		_, _ = ExecuteQuery[*EagerResult](context.Background(), driver, "RETURN 42", nil, EagerResultTransformer)
 	}
 }
 
@@ -338,12 +436,48 @@ func storeBookmarkManagerAddress(bookmarkManagerAddresses *sync.Map, bookmarkMgr
 	}
 }
 
+type driverDelegate struct {
+	delegate   *driverWithContext
+	newSession func(context.Context, SessionConfig) SessionWithContext
+}
+
+func (d *driverDelegate) DefaultExecuteQueryBookmarkManager() BookmarkManager {
+	return d.delegate.DefaultExecuteQueryBookmarkManager()
+}
+
+func (d *driverDelegate) Target() url.URL {
+	return d.delegate.Target()
+}
+
+func (d *driverDelegate) NewSession(ctx context.Context, config SessionConfig) SessionWithContext {
+	return d.newSession(ctx, config)
+}
+
+func (d *driverDelegate) VerifyConnectivity(ctx context.Context) error {
+	return d.delegate.VerifyConnectivity(ctx)
+}
+
+func (d *driverDelegate) Close(ctx context.Context) error {
+	return d.delegate.Close(ctx)
+}
+
+func (d *driverDelegate) IsEncrypted() bool {
+	return d.delegate.IsEncrypted()
+}
+
+func (d *driverDelegate) GetServerInfo(ctx context.Context) (ServerInfo, error) {
+	return d.delegate.GetServerInfo(ctx)
+}
+
 type fakeSession struct {
-	executeReadTransactionResult  *fakeResult
-	executeReadErr                error
-	executeWriteTransactionResult *fakeResult
-	executeWriteErr               error
-	closeErr                      error
+	executeReadTransactionResult   *fakeResult
+	executeReadErr                 error
+	executeWriteTransactionResult  *fakeResult
+	executeWriteTransactionResults []*fakeResult
+	executeWriteErr                error
+	executeWriteErrs               []error
+	executeWriteIndex              int
+	closeErr                       error
 }
 
 func (s *fakeSession) LastBookmarks() Bookmarks {
@@ -366,10 +500,14 @@ func (s *fakeSession) ExecuteRead(_ context.Context, callback ManagedTransaction
 }
 
 func (s *fakeSession) ExecuteWrite(_ context.Context, callback ManagedTransactionWork, _ ...func(*TransactionConfig)) (any, error) {
-	return callback(&fakeManagedTransaction{
-		result: s.executeWriteTransactionResult,
-		err:    s.executeWriteErr,
-	})
+	result := s.executeWriteTransactionResult
+	err := s.executeWriteErr
+	if s.executeWriteErrs != nil {
+		result = s.executeWriteTransactionResults[s.executeWriteIndex]
+		err = s.executeWriteErrs[s.executeWriteIndex]
+		s.executeWriteIndex++
+	}
+	return callback(&fakeManagedTransaction{result: result, err: err})
 }
 
 func (s *fakeSession) Run(context.Context, string, map[string]any, ...func(*TransactionConfig)) (ResultWithContext, error) {
@@ -402,12 +540,13 @@ func (tx *fakeManagedTransaction) legacy() Transaction {
 }
 
 type fakeResult struct {
-	keys       []string
-	keysErr    error
-	collect    []*Record
-	collectErr error
-	summary    ResultSummary
-	summaryErr error
+	keys        []string
+	keysErr     error
+	nextRecords []*Record
+	nextIndex   int
+	nextErr     error
+	summary     ResultSummary
+	summaryErr  error
 }
 
 func (f *fakeResult) Keys() ([]string, error) {
@@ -419,7 +558,14 @@ func (f *fakeResult) NextRecord(context.Context, **Record) bool {
 }
 
 func (f *fakeResult) Next(context.Context) bool {
-	panic("implement me")
+	if f.nextErr != nil {
+		return false
+	}
+	if f.nextIndex == len(f.nextRecords)-1 {
+		return false
+	}
+	f.nextIndex++
+	return true
 }
 
 func (f *fakeResult) PeekRecord(context.Context, **Record) bool {
@@ -431,15 +577,15 @@ func (f *fakeResult) Peek(context.Context) bool {
 }
 
 func (f *fakeResult) Err() error {
-	panic("implement me")
+	return f.nextErr
 }
 
 func (f *fakeResult) Record() *Record {
-	panic("implement me")
+	return f.nextRecords[f.nextIndex]
 }
 
 func (f *fakeResult) Collect(context.Context) ([]*Record, error) {
-	return f.collect, f.collectErr
+	panic("implement me")
 }
 
 func (f *fakeResult) Single(context.Context) (*Record, error) {

@@ -8,8 +8,10 @@ import (
 var myDriver DriverWithContext
 var ctx context.Context
 
-func ExampleDriverWithContext_ExecuteQuery() {
-	eagerResult, err := myDriver.ExecuteQuery(ctx, "RETURN $value AS val", map[string]any{"value": 42})
+func ExampleExecuteQuery() {
+	query := "RETURN $value AS val"
+	params := map[string]any{"value": 42}
+	eagerResult, err := ExecuteQuery[*EagerResult](ctx, myDriver, query, params, EagerResultTransformer)
 	handleError(err)
 
 	// iterate over all keys (here it's only "val")
@@ -26,14 +28,19 @@ func ExampleDriverWithContext_ExecuteQuery() {
 	fmt.Printf("Hit database is: %s\n", summary.Database().Name())
 }
 
-func ExampleDriverWithContext_ExecuteQuery_self_causal_consistency() {
-	_, err := myDriver.ExecuteQuery(ctx, "CREATE (n:Example)", map[string]any{"value": 42}, ExecuteQueryWithWritersRouting())
+func ExampleExecuteQuery_self_causal_consistency() {
+	query := "CREATE (n:Example)"
+	params := map[string]any{"value": 42}
+	_, err := ExecuteQuery[*EagerResult](
+		ctx, myDriver, query, params, EagerResultTransformer, ExecuteQueryWithWritersRouting())
 	handleError(err)
 
 	// assuming an initial empty database, the following query should return 1
 	// indeed, causal consistency is guaranteed by default, which subsequent ExecuteQuery calls can read the writes of
 	// previous ExecuteQuery calls targeting the same database
-	eagerResult, err := myDriver.ExecuteQuery(ctx, "MATCH (n:Example) RETURN count(n) AS count", nil, ExecuteQueryWithReadersRouting())
+	query = "MATCH (n:Example) RETURN count(n) AS count"
+	eagerResult, err := ExecuteQuery[*EagerResult](
+		ctx, myDriver, query, nil, EagerResultTransformer, ExecuteQueryWithReadersRouting())
 	handleError(err)
 
 	// there should be a single record
@@ -47,8 +54,11 @@ func ExampleDriverWithContext_ExecuteQuery_self_causal_consistency() {
 	}
 }
 
-func ExampleDriverWithContext_DefaultExecuteQueryBookmarkManager() {
-	_, err := myDriver.ExecuteQuery(ctx, "CREATE (n:Example)", map[string]any{"value": 42}, ExecuteQueryWithWritersRouting())
+func ExampleExecuteQuery_default_bookmark_manager_explicit_reuse() {
+	query := "CREATE (n:Example)"
+	params := map[string]any{"value": 42}
+	_, err := ExecuteQuery[*EagerResult](
+		ctx, myDriver, query, params, EagerResultTransformer, ExecuteQueryWithWritersRouting())
 	handleError(err)
 
 	// retrieve the default bookmark manager used by the previous call (since there was no bookmark manager explicitly

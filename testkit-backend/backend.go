@@ -541,7 +541,8 @@ func (b *backend) handleRequest(req map[string]any) {
 			b.writeError(err)
 			return
 		}
-		eagerResult, err := driver.ExecuteQuery(ctx, cypher, params, configurers...)
+		eagerResult, err := neo4j.ExecuteQuery[*neo4j.EagerResult](
+			ctx, driver, cypher, params, neo4j.EagerResultTransformer, configurers...)
 		if err != nil {
 			b.writeError(err)
 			return
