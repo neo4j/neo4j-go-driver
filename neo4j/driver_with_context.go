@@ -92,6 +92,30 @@ type DriverWithContext interface {
 	// That guarantee may also break if a custom implementation of neo4j.BookmarkManager is provided via for instance
 	// the built-in callback neo4j.ExecuteQueryWithBookmarkManager.
 	// You can disable bookmark management by passing the neo4j.ExecuteQueryWithoutBookmarkManager callback to ExecuteQuery.
+	//
+	// The equivalent functionality of ExecuteQuery can be replicated with pre-existing APIs as follows:
+	//
+	//  // all the error handling bits have been omitted for brevity (do not do this in production!)
+	// 	session := driver.NewSession(ctx, neo4j.SessionConfig{
+	//		DatabaseName:     "<DATABASE>",
+	//		ImpersonatedUser: "<USER>",
+	//		BookmarkManager:  bookmarkManager,
+	//	})
+	//	defer handleClose(ctx, session)
+	//	// session.ExecuteRead is called if the routing is set to neo4j.Readers
+	//	result, _ := session.ExecuteWrite(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+	//		result, _ := tx.Run(ctx, "<CYPHER>", parameters)
+	//		records, _ := result.Collect(ctx) // real implementation does not use Collect
+	//		keys, _ := result.Keys()
+	//		summary, _ := result.Consume(ctx)
+	//		return &neo4j.EagerResult{
+	//			Keys:    keys,
+	//			Records: records,
+	//			Summary: summary,
+	//		}, nil
+	//	})
+	//	eagerResult := result.(*neo4j.EagerResult)
+	//	// do something with eagerResult
 	ExecuteQuery(context.Context, string, map[string]any, ...ExecuteQueryConfigurationOption) (*EagerResult, error)
 	// DefaultExecuteQueryBookmarkManager returns the bookmark manager instance used by ExecuteQuery by default.
 	//
