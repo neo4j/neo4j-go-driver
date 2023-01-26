@@ -84,7 +84,12 @@ func (c Connector) Connect(address string, boltLogger log.BoltLogger) (db.Connec
 		conn.Close()
 		return nil, err
 	}
-	config := tls.Config{InsecureSkipVerify: c.SkipVerify, RootCAs: c.RootCAs, ServerName: serverName}
+	config := tls.Config{
+		InsecureSkipVerify: c.SkipVerify,
+		RootCAs:            c.RootCAs,
+		ServerName:         serverName,
+		MinVersion:         tls.VersionTLS12,
+	}
 	tlsconn := tls.Client(conn, &config)
 	err = tlsconn.Handshake()
 	if err != nil {
