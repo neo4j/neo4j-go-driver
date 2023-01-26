@@ -437,6 +437,10 @@ func (d *driverWithContext) ExecuteQuery(
 // As the latter's name suggests, this is not optimal when the result is made of an important number of records.
 // As a consequence, this variant allows for a more memory-friendly approach since the ResultTransformer APIs do not
 // impose to keep all records in memory.
+//
+// The provided ResultTransformer function may be called several times since ExecuteQuery relies on transaction
+// functions. ResultTransformer implementations are also inherently stateful.
+// As a consequence, the function must return a new ResultTransformer instance every time it is called.
 func ExecuteQuery[T any](
 	ctx context.Context,
 	driver DriverWithContext,
