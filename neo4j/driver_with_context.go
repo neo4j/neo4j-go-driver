@@ -383,20 +383,23 @@ func (d *driverWithContext) Close(ctx context.Context) error {
 //
 // These built-in callbacks can be used and combined as follows:
 //
-//	ExecuteQuery[T](ctx, driver, query, params, transformerFunc, neo4j.ExecuteQueryWithDatabase("my-db"), neo4j.ExecuteQueryWithWritersRouting())
+//	ExecuteQuery[T](ctx, driver, query, params, transformerFunc,
+//		neo4j.ExecuteQueryWithDatabase("my-db"),
+//		neo4j.ExecuteQueryWithWritersRouting())
 //
 // For complete control over the configuration, you can also define your own callback:
 //
 //	ExecuteQuery[T](ctx, driver, query, params, transformerFunc, func(config *neo4j.ExecuteQueryConfiguration) {
 //		config.Database = "my-db"
 //		config.RoutingControl = neo4j.Writers
+//		config.ImpersonatedUser = "selda_bağcan"
 //	})
 //
 // ExecuteQuery causal consistency is guaranteed by default across different successful calls to ExecuteQuery
 // targeting the same database.
 // In other words, a successful read query run by ExecuteQuery is guaranteed to be able to read results created
 // from a previous successful write query run by ExecuteQuery on the same database.
-// This is achieved through the use of a bookmarks, managed by a default neo4j.BookmarkManager instance.
+// This is achieved through the use of bookmarks, managed by a default neo4j.BookmarkManager instance.
 // This default BookmarkManager instance can be retrieved with DriverWithContext.DefaultExecuteQueryBookmarkManager.
 // Such a consistency guarantee is *not* maintained between ExecuteQuery calls and the lower-level
 // neo4j.SessionWithContext API calls, unless sessions are explicitly configured with the same bookmark manager.
@@ -429,13 +432,14 @@ func (d *driverWithContext) Close(ctx context.Context) error {
 //		// do something with eagerResult
 //
 // The available ResultTransformer implementation, EagerResultTransformer, computes an *EagerResult.
-// As the latter's name suggests, this is not optimal when the result is made of an important number of records.
-// In that situation, it is advised to create a custom implementation of ResultTransformer APIs, which do not
-// impose to keep all records in memory.
+// As the latter's name suggests, this is not optimal when the result is made from a large number of records.
+// In that situation, it is advised to create a custom implementation of ResultTransformer APIs, which do not require
+// keeping all records in memory.
 //
 // The provided ResultTransformer function may be called several times since ExecuteQuery relies on transaction
-// functions. ResultTransformer implementations are also inherently stateful.
-// As a consequence, the function must return a new ResultTransformer instance every time it is called.
+// functions.
+// Since ResultTransformer implementations are inherently stateful, the function must return a new ResultTransformer
+// instance every time it is called.
 func ExecuteQuery[T any](
 	ctx context.Context,
 	driver DriverWithContext,
