@@ -19,6 +19,11 @@
 
 package db
 
+import (
+	"fmt"
+	"strings"
+)
+
 type Record struct {
 	// Values contains all the values in the record.
 	Values []any
@@ -41,4 +46,20 @@ func (r Record) Get(key string) (any, bool) {
 		}
 	}
 	return nil, false
+}
+
+func (r Record) String() string {
+	var builder strings.Builder
+	builder.WriteString("{")
+	for i, key := range r.Keys {
+		builder.WriteString(`"`)
+		builder.WriteString(key)
+		builder.WriteString(`": `)
+		builder.WriteString(fmt.Sprintf("%v", r.Values[i]))
+		if i < len(r.Keys)-1 {
+			builder.WriteString(", ")
+		}
+	}
+	builder.WriteString("}")
+	return builder.String()
 }
