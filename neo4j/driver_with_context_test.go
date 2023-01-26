@@ -294,7 +294,8 @@ func TestDriverExecuteQuery(outer *testing.T) {
 				},
 			}
 
-			eagerResult, err := driver.ExecuteQuery(ctx, "RETURN 42", nil, testCase.configurers...)
+			eagerResult, err := ExecuteQuery[*EagerResult](
+				ctx, driver, "RETURN 42", nil, EagerResultTransformer, testCase.configurers...)
 
 			AssertDeepEquals(t, testCase.expectedErr, err)
 			AssertDeepEquals(t, testCase.expectedResult, eagerResult)
@@ -349,7 +350,7 @@ func callExecuteQueryOrBookmarkManagerGetter(driver DriverWithContext, i int) {
 		_ = driver.DefaultExecuteQueryBookmarkManager()
 	} else {
 		// this as well
-		_, _ = driver.ExecuteQuery(context.Background(), "RETURN 42", nil)
+		_, _ = ExecuteQuery[*EagerResult](context.Background(), driver, "RETURN 42", nil, EagerResultTransformer)
 	}
 }
 
@@ -364,10 +365,6 @@ func storeBookmarkManagerAddress(bookmarkManagerAddresses *sync.Map, bookmarkMgr
 type driverDelegate struct {
 	delegate   *driverWithContext
 	newSession func(context.Context, SessionConfig) SessionWithContext
-}
-
-func (d *driverDelegate) ExecuteQuery(ctx context.Context, query string, params map[string]any, settings ...ExecuteQueryConfigurationOption) (*EagerResult, error) {
-	return internalExecuteQuery(ctx, d.delegate, d.newSession, query, params, newDefaultResultTransformer, settings...)
 }
 
 func (d *driverDelegate) DefaultExecuteQueryBookmarkManager() BookmarkManager {
