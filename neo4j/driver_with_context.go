@@ -72,6 +72,10 @@ type DriverWithContext interface {
 	// VerifyConnectivity checks that the driver can connect to a remote server or cluster by
 	// establishing a network connection with the remote. Returns nil if successful
 	// or error describing the problem.
+	// If the passed context terminates too early, the used connection and idle ones will have their underlying socket
+	// closed.
+	// These connections will not be reused by the connection pool, which likely results in the gradually
+	// degraded performance of the driver.
 	VerifyConnectivity(ctx context.Context) error
 	// Close the driver and all underlying connections
 	Close(ctx context.Context) error
@@ -81,6 +85,10 @@ type DriverWithContext interface {
 	IsEncrypted() bool
 	// GetServerInfo attempts to obtain server information from the target Neo4j
 	// deployment
+	// If the passed context terminates too early, the used connection and idle ones will have their underlying socket
+	// closed.
+	// These connections will not be reused by the connection pool, which likely results in the gradually
+	// degraded performance of the driver.
 	GetServerInfo(ctx context.Context) (ServerInfo, error)
 }
 
@@ -440,6 +448,10 @@ func (d *driverWithContext) Close(ctx context.Context) error {
 // functions.
 // Since ResultTransformer implementations are inherently stateful, the function must return a new ResultTransformer
 // instance every time it is called.
+//
+// If the passed context terminates too early, idle connections will have their underlying socket closed.
+// These connections will not be reused by the connection pool, which likely results in degraded performance of the
+// driver in general.
 func ExecuteQuery[T any](
 	ctx context.Context,
 	driver DriverWithContext,
