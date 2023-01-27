@@ -23,7 +23,6 @@ import (
 	"context"
 	"encoding/binary"
 	rio "github.com/neo4j/neo4j-go-driver/v4/neo4j/internal/racingio"
-	"github.com/neo4j/neo4j-go-driver/v4/neo4j/log"
 	"net"
 	"time"
 )
@@ -34,13 +33,7 @@ import (
 // Reads will race against the provided context ctx
 // If the server provides the connection read timeout hint readTimeout, a new context will be created from that timeout
 // and the user-provided context ctx before every read
-func dechunkMessage(
-	conn net.Conn,
-	msgBuf []byte,
-	readTimeout time.Duration,
-	logger log.Logger,
-	logName string,
-	logId string) ([]byte, []byte, error) {
+func dechunkMessage(conn net.Conn, msgBuf []byte, readTimeout time.Duration) ([]byte, []byte, error) {
 
 	sizeBuf := []byte{0x00, 0x00}
 	off := 0
@@ -48,7 +41,7 @@ func dechunkMessage(
 	reader := rio.NewRacingReader(conn)
 
 	for {
-		updatedCtx, cancelFunc := newContext(readTimeout, logger, logName, logId)
+		updatedCtx, cancelFunc := newContext(readTimeout)
 		_, err := reader.ReadFull(updatedCtx, sizeBuf)
 		if err != nil {
 			return msgBuf, nil, err
@@ -72,7 +65,7 @@ func dechunkMessage(
 			msgBuf = newMsgBuf
 		}
 		// Read the chunk into buffer
-		updatedCtx, cancelFunc = newContext(readTimeout, logger, logName, logId)
+		updatedCtx, cancelFunc = newContext(readTimeout)
 		_, err = reader.ReadFull(updatedCtx, msgBuf[off:(off+chunkSize)])
 		if err != nil {
 			return msgBuf, nil, err
@@ -85,29 +78,10 @@ func dechunkMessage(
 }
 
 // newContext computes a new context and cancel function if a readTimeout is set
-func newContext(
-	readTimeout time.Duration,
-	logger log.Logger,
-	logName string,
-	logId string) (context.Context, context.CancelFunc) {
-
+func newContext(readTimeout time.Duration) (context.Context, context.CancelFunc) {
 	ctx := context.Background()
 	if readTimeout >= 0 {
-		newCtx, cancelFunc := context.WithTimeout(ctx, readTimeout)
-		logger.Debugf(logName, logId,
-			"read timeout of %s applied, chunk read deadline is now: %s",
-			readTimeout.String(),
-			deadlineOf(newCtx),
-		)
-		return newCtx, cancelFunc
+		return context.WithTimeout(ctx, readTimeout)
 	}
 	return ctx, nil
-}
-
-func deadlineOf(ctx context.Context) string {
-	deadline, hasDeadline := ctx.Deadline()
-	if !hasDeadline {
-		return "N/A (no deadline set)"
-	}
-	return deadline.String()
 }
