@@ -87,8 +87,8 @@ type DriverWithContext interface {
 	// deployment
 	// If the passed context terminates too early, the used connection and idle ones will have their underlying socket
 	// closed.
-	// These connections will not be reused by the connection pool, which likely results in the gradually
-	// degraded performance of the driver.
+	// These connections will not be reused by the connection pool, which likely results in degraded performance of the
+	// driver in general.
 	GetServerInfo(ctx context.Context) (ServerInfo, error)
 }
 
