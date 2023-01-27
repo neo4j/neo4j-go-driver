@@ -170,6 +170,9 @@ func (b *bolt5) setError(err error, fatal bool) {
 
 	// Increase severity even if it was a previous error
 	if fatal {
+		if ctxErr := handleTerminatedContextError(err, b.conn); ctxErr != nil {
+			b.err = ctxErr
+		}
 		b.state = bolt5Dead
 	}
 
