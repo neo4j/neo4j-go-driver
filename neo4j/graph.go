@@ -34,6 +34,8 @@ type PropertyValue interface {
 // The property type T must adhere to neo4j.PropertyValue
 // If the property does not exist, an error is returned
 // If the property type does not match the type specification, an error is returned
+//
+// Note: due to the current limited generics support, any property array value other than byte array is typed as []any.
 func GetProperty[T PropertyValue](entity Entity, key string) (T, error) {
 	rawValue, found := entity.GetProperties()[key]
 	if !found {
