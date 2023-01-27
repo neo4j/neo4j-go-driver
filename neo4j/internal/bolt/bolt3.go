@@ -97,8 +97,6 @@ func NewBolt3(serverName string, conn net.Conn, logger log.Logger, boltLog log.B
 				boltLogger: boltLog,
 			},
 			connReadTimeout: -1,
-			logger:          logger,
-			logName:         log.Bolt3,
 		},
 		birthDate: time.Now(),
 		log:       logger,
@@ -199,7 +197,6 @@ func (b *bolt3) connect(minor int, auth map[string]interface{}, userAgent string
 	b.connId = succ.connectionId
 	connectionLogId := fmt.Sprintf("%s@%s", b.connId, b.serverName)
 	b.logId = connectionLogId
-	b.in.logId = connectionLogId
 	b.in.hyd.logId = connectionLogId
 	b.out.logId = connectionLogId
 	b.serverVersion = succ.server
