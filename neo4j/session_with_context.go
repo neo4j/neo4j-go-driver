@@ -75,7 +75,7 @@ type SessionWithContext interface {
 	// Run executes an auto-commit statement and returns a result
 	// If the passed context terminates too early, the used connection and idle ones will have their underlying socket
 	// closed.
-	// This connection will not be reused by the connection pool, which likely results in the gradually
+	// These connections will not be reused by the connection pool, which likely results in the gradually
 	// degraded performance of the driver.
 	Run(ctx context.Context, cypher string, params map[string]any, configurers ...func(*TransactionConfig)) (ResultWithContext, error)
 	// Close closes any open resources and marks this session as unusable
