@@ -35,13 +35,17 @@ type ManagedTransaction interface {
 // ExplicitTransaction represents a transaction in the Neo4j database
 type ExplicitTransaction interface {
 	// Run executes a statement on this transaction and returns a result
+	// Contexts terminating too early negatively affect connection pooling and degrade the driver performance.
 	Run(ctx context.Context, cypher string, params map[string]any) (ResultWithContext, error)
 	// Commit commits the transaction
+	// Contexts terminating too early negatively affect connection pooling and degrade the driver performance.
 	Commit(ctx context.Context) error
 	// Rollback rolls back the transaction
+	// Contexts terminating too early negatively affect connection pooling and degrade the driver performance.
 	Rollback(ctx context.Context) error
 	// Close rolls back the actual transaction if it's not already committed/rolled back
 	// and closes all resources associated with this transaction
+	// Contexts terminating too early negatively affect connection pooling and degrade the driver performance.
 	Close(ctx context.Context) error
 
 	// legacy returns the non-cancelling, legacy variant of this ExplicitTransaction type

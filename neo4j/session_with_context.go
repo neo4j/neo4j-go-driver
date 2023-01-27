@@ -54,16 +54,21 @@ type SessionWithContext interface {
 	LastBookmarks() Bookmarks
 	lastBookmark() string
 	// BeginTransaction starts a new explicit transaction on this session
+	// Contexts terminating too early negatively affect connection pooling and degrade the driver performance.
 	BeginTransaction(ctx context.Context, configurers ...func(*TransactionConfig)) (ExplicitTransaction, error)
 	// ExecuteRead executes the given unit of work in a AccessModeRead transaction with
 	// retry logic in place
+	// Contexts terminating too early negatively affect connection pooling and degrade the driver performance.
 	ExecuteRead(ctx context.Context, work ManagedTransactionWork, configurers ...func(*TransactionConfig)) (any, error)
 	// ExecuteWrite executes the given unit of work in a AccessModeWrite transaction with
 	// retry logic in place
+	// Contexts terminating too early negatively affect connection pooling and degrade the driver performance.
 	ExecuteWrite(ctx context.Context, work ManagedTransactionWork, configurers ...func(*TransactionConfig)) (any, error)
 	// Run executes an auto-commit statement and returns a result
+	// Contexts terminating too early negatively affect connection pooling and degrade the driver performance.
 	Run(ctx context.Context, cypher string, params map[string]any, configurers ...func(*TransactionConfig)) (ResultWithContext, error)
 	// Close closes any open resources and marks this session as unusable
+	// Contexts terminating too early negatively affect connection pooling and degrade the driver performance.
 	Close(ctx context.Context) error
 
 	legacy() Session
