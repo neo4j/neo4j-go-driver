@@ -22,7 +22,6 @@ package bolt
 import (
 	"context"
 	idb "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/log"
 	"net"
 	"reflect"
 	"testing"
@@ -112,7 +111,7 @@ func TestOutgoing(ot *testing.T) {
 		}()
 
 		// Dechunk it
-		_, byts, err := dechunkMessage(context.Background(), serv, []byte{}, -1, log.Void{}, "", "")
+		_, byts, err := dechunkMessage(context.Background(), serv, []byte{}, -1)
 		if err != nil {
 			t.Fatal(err)
 		}

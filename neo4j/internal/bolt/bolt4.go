@@ -118,8 +118,6 @@ func NewBolt4(serverName string, conn net.Conn, logger log.Logger, boltLog log.B
 				boltMajor:  4,
 			},
 			connReadTimeout: -1,
-			logger:          logger,
-			logName:         log.Bolt4,
 		},
 		lastQid: -1,
 	}
@@ -276,7 +274,6 @@ func (b *bolt4) Connect(ctx context.Context, minor int, auth map[string]any, use
 	connectionLogId := fmt.Sprintf("%s@%s", b.connId, b.serverName)
 	b.logId = connectionLogId
 	b.in.hyd.logId = connectionLogId
-	b.in.logId = connectionLogId
 	b.out.logId = connectionLogId
 
 	b.initializeReadTimeoutHint(succ.configurationHints)

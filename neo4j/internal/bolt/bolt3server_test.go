@@ -22,7 +22,6 @@ package bolt
 import (
 	"context"
 	"fmt"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/log"
 	"io"
 	"net"
 	"testing"
@@ -93,7 +92,7 @@ func (s *bolt3server) waitForHello() {
 }
 
 func (s *bolt3server) receiveMsg() *testStruct {
-	_, buf, err := dechunkMessage(context.Background(), s.conn, []byte{}, -1, log.Void{}, "", "")
+	_, buf, err := dechunkMessage(context.Background(), s.conn, []byte{}, -1)
 	if err != nil {
 		panic(err)
 	}
