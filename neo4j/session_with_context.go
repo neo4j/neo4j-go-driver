@@ -54,9 +54,10 @@ type SessionWithContext interface {
 	LastBookmarks() Bookmarks
 	lastBookmark() string
 	// BeginTransaction starts a new explicit transaction on this session
-	// If the passed context terminates too early, the connection will have its underlying socket closed.
-	// This connection will not be reused by the connection pool, which likely results in the gradually
-	// degraded performance of the driver.
+	// If the passed context terminates too early, the used connection and idle ones will have their underlying socket
+	// closed.
+	// These connections will not be reused by the connection pool, which likely results in degraded performance of the
+	// driver in general.
 	BeginTransaction(ctx context.Context, configurers ...func(*TransactionConfig)) (ExplicitTransaction, error)
 	// ExecuteRead executes the given unit of work in a AccessModeRead transaction with
 	// retry logic in place
@@ -75,8 +76,8 @@ type SessionWithContext interface {
 	// Run executes an auto-commit statement and returns a result
 	// If the passed context terminates too early, the used connection and idle ones will have their underlying socket
 	// closed.
-	// These connections will not be reused by the connection pool, which likely results in the gradually
-	// degraded performance of the driver.
+	// These connections will not be reused by the connection pool, which likely results in degraded performance of the
+	// driver in general.
 	Run(ctx context.Context, cypher string, params map[string]any, configurers ...func(*TransactionConfig)) (ResultWithContext, error)
 	// Close closes any open resources and marks this session as unusable
 	// While Close accepts any context, it is strongly advised to avoid using contexts with timeouts, deadlines or

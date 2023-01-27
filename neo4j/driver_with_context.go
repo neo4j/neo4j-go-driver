@@ -74,8 +74,8 @@ type DriverWithContext interface {
 	// or error describing the problem.
 	// If the passed context terminates too early, the used connection and idle ones will have their underlying socket
 	// closed.
-	// These connections will not be reused by the connection pool, which likely results in the gradually
-	// degraded performance of the driver.
+	// These connections will not be reused by the connection pool, which likely results in degraded performance of the
+	// driver in general.
 	VerifyConnectivity(ctx context.Context) error
 	// Close the driver and all underlying connections
 	Close(ctx context.Context) error

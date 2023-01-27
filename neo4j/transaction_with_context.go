@@ -36,24 +36,24 @@ type ManagedTransaction interface {
 type ExplicitTransaction interface {
 	// Run executes a statement on this transaction and returns a result
 	// If the passed context terminates too early, this and idle connections will have their underlying socket closed.
-	// These connections will not be reused by the connection pool, which likely results in the gradually
-	// degraded performance of the driver.
+	// These connections will not be reused by the connection pool, which likely results in degraded performance of the
+	// driver in general.
 	Run(ctx context.Context, cypher string, params map[string]any) (ResultWithContext, error)
 	// Commit commits the transaction
 	// If the passed context terminates too early, this and idle connections will have their underlying socket closed.
-	// These connections will not be reused by the connection pool, which likely results in the gradually
-	// degraded performance of the driver.
+	// These connections will not be reused by the connection pool, which likely results in degraded performance of the
+	// driver in general.
 	Commit(ctx context.Context) error
 	// Rollback rolls back the transaction
 	// If the passed context terminates too early, this and idle connections will have their underlying socket closed.
-	// These connections will not be reused by the connection pool, which likely results in the gradually
-	// degraded performance of the driver.
+	// These connections will not be reused by the connection pool, which likely results in degraded performance of the
+	// driver in general.
 	Rollback(ctx context.Context) error
 	// Close rolls back the actual transaction if it's not already committed/rolled back
 	// and closes all resources associated with this transaction
 	// If the passed context terminates too early, this and idle connections will have their underlying socket closed.
-	// These connections will not be reused by the connection pool, which likely results in the gradually
-	// degraded performance of the driver.
+	// These connections will not be reused by the connection pool, which likely results in degraded performance of the
+	// driver in general.
 	Close(ctx context.Context) error
 
 	// legacy returns the non-cancelling, legacy variant of this ExplicitTransaction type
