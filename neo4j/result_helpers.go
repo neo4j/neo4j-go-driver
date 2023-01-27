@@ -24,7 +24,10 @@ import (
 	"fmt"
 )
 
-// SingleTWithContext is like SingleT. It accepts a context.Context parameter
+// SingleTWithContext maps the single record left to an instance of T with the provided mapper function.
+// It relies on ResultWithContext.Single and propagate its error, if any.
+// It accepts a context.Context, which may be canceled or carry a deadline, to control the overall record fetching
+// execution time.
 func SingleTWithContext[T any](ctx context.Context, result ResultWithContext, mapper func(*Record) (T, error)) (T, error) {
 	single, err := result.Single(ctx)
 	if err != nil {
@@ -33,7 +36,9 @@ func SingleTWithContext[T any](ctx context.Context, result ResultWithContext, ma
 	return mapper(single)
 }
 
-// SingleT is like Single but maps the single Record with the provided mapper.
+// SingleT maps the single record left to an instance of T with the provided mapper function.
+// It relies on Result.Single and propagate its error, if any.
+//
 // Deprecated: use SingleTWithContext instead (the entry point of context-aware
 // APIs is NewDriverWithContext)
 func SingleT[T any](result Result, mapper func(*Record) (T, error)) (T, error) {
@@ -44,7 +49,10 @@ func SingleT[T any](result Result, mapper func(*Record) (T, error)) (T, error) {
 	return mapper(single)
 }
 
-// CollectTWithContext is like CollectT. It accepts a context.Context parameter
+// CollectTWithContext maps the records to a slice of T with the provided mapper function.
+// It relies on ResultWithContext.Collect and propagate its error, if any.
+// It accepts a context.Context, which may be canceled or carry a deadline, to control the overall record fetching
+// execution time.
 func CollectTWithContext[T any](ctx context.Context, result ResultWithContext, mapper func(*Record) (T, error)) ([]T, error) {
 	records, err := result.Collect(ctx)
 	if err != nil {
@@ -53,7 +61,9 @@ func CollectTWithContext[T any](ctx context.Context, result ResultWithContext, m
 	return mapAll(records, mapper)
 }
 
-// CollectT is like Collect but maps each record with the provided mapper.
+// CollectT maps the records to a slice of T with the provided mapper function.
+// It relies on Result.Collect and propagate its error, if any.
+//
 // Deprecated: use CollectTWithContext instead (the entry point of context-aware
 // APIs is NewDriverWithContext)
 func CollectT[T any](result Result, mapper func(*Record) (T, error)) ([]T, error) {
@@ -76,7 +86,8 @@ func Single(result Result, err error) (*Record, error) {
 	return result.Single()
 }
 
-// Collect behaves similarly to CollectWithContext
+// Collect aggregates the records into a slice.
+// It relies on Result.Collect and propagate its error, if any.
 //
 //	records, err := neo4j.Collect(session.Run(...))
 //
@@ -89,14 +100,14 @@ func Collect(result Result, err error) ([]*Record, error) {
 	return result.Collect()
 }
 
-// CollectWithContext loops through the result stream, collects records into a slice and returns the
-// resulting slice. Any error passed in or reported while navigating the result stream is
-// returned without any conversion.
+// CollectWithContext aggregates the records into a slice.
+// It relies on ResultWithContext.Collect and propagate its error, if any.
 //
 //	result, err := session.Run(...)
 //	records, err := neo4j.CollectWithContext(ctx, result, err)
 //
-// Note, you cannot write neo4j.CollectWithContext(ctx, session.Run(...)) due to Go limitations
+// It accepts a context.Context, which may be canceled or carry a deadline, to control the overall record fetching
+// execution time.
 func CollectWithContext(ctx context.Context, result ResultWithContext, err error) ([]*Record, error) {
 	if err != nil {
 		return nil, err
