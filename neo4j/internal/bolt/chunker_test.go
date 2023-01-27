@@ -22,7 +22,6 @@ package bolt
 import (
 	"bytes"
 	"context"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/log"
 	"net"
 	"testing"
 
@@ -83,7 +82,7 @@ func TestChunker(ot *testing.T) {
 
 	receiveAndAssertMessage := func(t *testing.T, conn net.Conn, expected []byte) {
 		t.Helper()
-		_, msg, err := dechunkMessage(context.Background(), conn, []byte{}, -1, log.Void{}, "", "")
+		_, msg, err := dechunkMessage(context.Background(), conn, []byte{}, -1)
 		AssertNoError(t, err)
 		assertSlices(t, msg, expected)
 	}

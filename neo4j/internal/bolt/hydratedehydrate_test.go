@@ -21,7 +21,6 @@ package bolt
 
 import (
 	"context"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/log"
 	"net"
 	"testing"
 	"time"
@@ -58,7 +57,7 @@ func TestDehydrateHydrate(ot *testing.T) {
 		go func() {
 			out.send(context.Background(), cli)
 		}()
-		_, byts, err := dechunkMessage(context.Background(), serv, []byte{}, -1, log.Void{}, "", "")
+		_, byts, err := dechunkMessage(context.Background(), serv, []byte{}, -1)
 		if err != nil {
 			t.Fatal(err)
 		}

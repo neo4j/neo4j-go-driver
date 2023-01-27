@@ -21,7 +21,6 @@ package bolt
 
 import (
 	"context"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/log"
 	"net"
 	"time"
 )
@@ -30,16 +29,13 @@ type incoming struct {
 	buf             []byte // Reused buffer
 	hyd             hydrator
 	connReadTimeout time.Duration
-	logger          log.Logger
-	logName         string
-	logId           string
 }
 
 func (i *incoming) next(ctx context.Context, rd net.Conn) (any, error) {
 	// Get next message from transport layer
 	var err error
 	var msg []byte
-	i.buf, msg, err = dechunkMessage(ctx, rd, i.buf, i.connReadTimeout, i.logger, i.logName, i.logId)
+	i.buf, msg, err = dechunkMessage(ctx, rd, i.buf, i.connReadTimeout)
 	if err != nil {
 		return nil, err
 	}
