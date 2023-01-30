@@ -353,6 +353,34 @@ func TestDriverExecuteQuery(outer *testing.T) {
 			expectedSessionConfig: defaultSessionConfig,
 			expectedErr:           fmt.Errorf("oopsie"),
 		},
+		{
+			description:       "returns error when custom transformer accept fails",
+			resultTransformer: newFailingAcceptTransformer(fmt.Errorf("accept... except not")),
+			configurers:       []ExecuteQueryConfigurationOption{ExecuteQueryWithReadersRouting()},
+			createSession: &fakeSession{
+				executeReadTransactionResult: &fakeResult{
+					nextIndex:   -1,
+					keys:        keys,
+					nextRecords: records,
+					summary:     summary,
+				}},
+			expectedSessionConfig: defaultSessionConfig,
+			expectedErr:           fmt.Errorf("accept... except not"),
+		},
+		{
+			description:       "returns error when custom transformer completion fails",
+			resultTransformer: newFailingCompleteTransformer(fmt.Errorf("complete...ly not")),
+			configurers:       []ExecuteQueryConfigurationOption{ExecuteQueryWithReadersRouting()},
+			createSession: &fakeSession{
+				executeReadTransactionResult: &fakeResult{
+					nextIndex:   -1,
+					keys:        keys,
+					nextRecords: records,
+					summary:     summary,
+				}},
+			expectedSessionConfig: defaultSessionConfig,
+			expectedErr:           fmt.Errorf("complete...ly not"),
+		},
 	}
 
 	for _, testCase := range testCases {
@@ -434,6 +462,31 @@ func storeBookmarkManagerAddress(bookmarkManagerAddresses *sync.Map, bookmarkMgr
 	if count, loaded := bookmarkManagerAddresses.LoadOrStore(address, &defaultCount); loaded {
 		atomic.AddInt32(count.(*int32), 1)
 	}
+}
+
+type failingResultTransformer struct {
+	acceptErr   error
+	completeErr error
+}
+
+func newFailingAcceptTransformer(err error) func() ResultTransformer[*EagerResult] {
+	return func() ResultTransformer[*EagerResult] {
+		return &failingResultTransformer{acceptErr: err}
+	}
+}
+
+func newFailingCompleteTransformer(err error) func() ResultTransformer[*EagerResult] {
+	return func() ResultTransformer[*EagerResult] {
+		return &failingResultTransformer{completeErr: err}
+	}
+}
+
+func (f *failingResultTransformer) Accept(*Record) error {
+	return f.acceptErr
+}
+
+func (f *failingResultTransformer) Complete([]string, ResultSummary) (*EagerResult, error) {
+	return nil, f.completeErr
 }
 
 type driverDelegate struct {

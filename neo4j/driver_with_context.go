@@ -92,12 +92,12 @@ type DriverWithContext interface {
 type ResultTransformer[T any] interface {
 	// Accept is called whenever a new record is fetched from the server
 	// Implementers are free to accumulate or discard the specified record
-	Accept(*Record)
+	Accept(*Record) error
 
 	// Complete is called when the record fetching is over and no error occurred.
 	// In particular, it is important to note that Accept may be called several times before an error occurs.
 	// In that case, Complete will not be called.
-	Complete([]string, ResultSummary) T
+	Complete([]string, ResultSummary) (T, error)
 }
 
 // NewDriverWithContext is the entry point to the neo4j driver to create an instance of a Driver. It is the first function to
@@ -507,7 +507,9 @@ func executeQueryCallback[T any](
 			return nil, err
 		}
 		for cursor.Next(ctx) {
-			transformer.Accept(cursor.Record())
+			if err := transformer.Accept(cursor.Record()); err != nil {
+				return nil, err
+			}
 		}
 		if err = cursor.Err(); err != nil {
 			return nil, err
@@ -520,7 +522,7 @@ func executeQueryCallback[T any](
 		if err != nil {
 			return nil, err
 		}
-		return transformer.Complete(keys, summary), nil
+		return transformer.Complete(keys, summary)
 	}
 }
 
@@ -532,16 +534,17 @@ type eagerResultTransformer struct {
 	records []*Record
 }
 
-func (e *eagerResultTransformer) Accept(record *Record) {
+func (e *eagerResultTransformer) Accept(record *Record) error {
 	e.records = append(e.records, record)
+	return nil
 }
 
-func (e *eagerResultTransformer) Complete(keys []string, summary ResultSummary) *EagerResult {
+func (e *eagerResultTransformer) Complete(keys []string, summary ResultSummary) (*EagerResult, error) {
 	return &EagerResult{
 		Keys:    keys,
 		Records: e.records,
 		Summary: summary,
-	}
+	}, nil
 }
 
 // ExecuteQueryConfigurationOption is a callback that configures the execution of DriverWithContext.ExecuteQuery
