@@ -355,7 +355,7 @@ func TestDriverExecuteQuery(outer *testing.T) {
 		},
 		{
 			description:       "returns error when custom transformer accept fails",
-			resultTransformer: newFailingAcceptTransformer(fmt.Errorf("accept... not")),
+			resultTransformer: newFailingAcceptTransformer(fmt.Errorf("accept... except not")),
 			configurers:       []ExecuteQueryConfigurationOption{ExecuteQueryWithReadersRouting()},
 			createSession: &fakeSession{
 				executeReadTransactionResult: &fakeResult{
@@ -365,7 +365,7 @@ func TestDriverExecuteQuery(outer *testing.T) {
 					summary:     summary,
 				}},
 			expectedSessionConfig: defaultSessionConfig,
-			expectedErr:           fmt.Errorf("accept... not"),
+			expectedErr:           fmt.Errorf("accept... except not"),
 		},
 		{
 			description:       "returns error when custom transformer completion fails",
