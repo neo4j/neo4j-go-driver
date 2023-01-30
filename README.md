@@ -58,81 +58,71 @@ Make sure to use the configuration in the code that matches the version of Neo4j
 package main
 
 import (
-	"context"
-	"fmt"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
+  "context"
+  "fmt"
+  "github.com/neo4j/neo4j-go-driver/v5/neo4j"
 )
 
 func main() {
-	dbUri := "neo4j://localhost:7687"
-	driver, err := neo4j.NewDriverWithContext(dbUri, neo4j.BasicAuth("username", "password", ""))
-	if err != nil {
-		panic(err)
-	}
-	// Starting with 5.0, you can control the execution of most driver APIs
-	// To keep things simple, we create here a never-cancelling context
-	// Read https://pkg.go.dev/context to learn more about contexts
-	ctx := context.Background()
-	// Handle driver lifetime based on your application lifetime requirements  driver's lifetime is usually
-	// bound by the application lifetime, which usually implies one driver instance per application
-	// Make sure to handle errors during deferred calls
-	defer driver.Close(ctx)
-	item, err := insertItem(ctx, driver)
-	if err != nil {
-		panic(err)
-	}
-	fmt.Printf("%v\n", item)
+  dbUri := "neo4j://localhost:7687"
+  driver, err := neo4j.NewDriverWithContext(dbUri, neo4j.BasicAuth("username", "password", ""))
+  if err != nil {
+    panic(err)
+  }
+  // Starting with 5.0, you can control the execution of most driver APIs
+  // To keep things simple, we create here a never-cancelling context
+  // Read https://pkg.go.dev/context to learn more about contexts
+  ctx := context.Background()
+  // Handle driver lifetime based on your application lifetime requirements  driver's lifetime is usually
+  // bound by the application lifetime, which usually implies one driver instance per application
+  // Make sure to handle errors during deferred calls
+  defer driver.Close(ctx)
+
+  query := "CREATE (n:Item { id: $id, name: $name }) RETURN n"
+  parameters := map[string]any{
+    "id":   1,
+    "name": "Item 1",
+  }
+  item, err := neo4j.ExecuteQuery[*Item](ctx, driver, query, parameters, NewItemTransformer)
+  if err != nil {
+    panic(err)
+  }
+  fmt.Printf("%v\n", item)
 }
 
-func insertItem(ctx context.Context, driver neo4j.DriverWithContext) (*Item, error) {
-	// Sessions are short-lived, cheap to create and NOT thread safe. Typically create one or more sessions
-	// per request in your web application. Make sure to call Close on the session when done.
-	// For multi-database support, set sessionConfig.DatabaseName to requested database
-	// Session config will default to write mode, if only reads are to be used configure session for
-	// read mode.
-	session := driver.NewSession(ctx, neo4j.SessionConfig{})
-	defer session.Close(ctx)
-	// The generic neo4j.ExecuteRead API is also available for read operations
-	// The legacy non-generic session.ExecuteWrite and session.ExecuteRead are also available
-	return neo4j.ExecuteWrite[*Item](ctx, session, createItemFn(ctx))
+func NewItemTransformer() neo4j.ResultTransformer[*Item] {
+  return &ItemTransformer{}
 }
 
-func createItemFn(ctx context.Context) neo4j.ManagedTransactionWorkT[*Item] {
-	return func(tx neo4j.ManagedTransaction) (*Item, error) {
-		records, err := tx.Run(ctx, "CREATE (n:Item { id: $id, name: $name }) RETURN n", map[string]any{
-			"id":   1,
-			"name": "Item 1",
-		})
-		// In face of driver native errors, make sure to return them directly.
-		// Depending on the error, the driver may try to execute the function again.
-		if err != nil {
-			return nil, err
-		}
-		record, err := records.Single(ctx)
-		if err != nil {
-			return nil, err
-		}
-		rawItemNode, found := record.Get("n")
-		if !found {
-			return nil, fmt.Errorf("could not find column")
-		}
-		itemNode := rawItemNode.(neo4j.Node)
-		id, err := neo4j.GetProperty[int64](itemNode, "id")
-		if err != nil {
-			return nil, err
-		}
-		name, err := neo4j.GetProperty[string](itemNode, "name")
-		if err != nil {
-			return nil, err
-		}
-		return &Item{Id: id, Name: name}, nil
-	}
+type ItemTransformer struct {
+  record *neo4j.Record
+}
+
+func (i *ItemTransformer) Accept(record *neo4j.Record) {
+  i.record = record
+}
+func (i *ItemTransformer) Complete([]string, neo4j.ResultSummary) *Item {
+  rawItemNode, found := i.record.Get("n")
+  if !found {
+    return nil
+  }
+  itemNode := rawItemNode.(neo4j.Node)
+  id, err := neo4j.GetProperty[int64](itemNode, "id")
+  if err != nil {
+    return nil
+  }
+  name, err := neo4j.GetProperty[string](itemNode, "name")
+  if err != nil {
+    return nil
+  }
+  return &Item{Id: id, Name: name}
 }
 
 type Item struct {
-	Id   int64
-	Name string
+  Id   int64
+  Name string
 }
+
 ```
 
 ## Neo4j and Bolt protocol versions
