@@ -97,7 +97,7 @@ type ResultTransformer[T any] interface {
 	// Complete is called when the record fetching is over and no error occurred.
 	// In particular, it is important to note that Accept may be called several times before an error occurs.
 	// In that case, Complete will not be called.
-	Complete([]string, ResultSummary) (T, error)
+	Complete(keys []string, summary ResultSummary) (T, error)
 }
 
 // NewDriverWithContext is the entry point to the neo4j driver to create an instance of a Driver. It is the first function to
