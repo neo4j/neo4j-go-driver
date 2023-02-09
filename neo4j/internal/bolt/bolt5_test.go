@@ -147,12 +147,66 @@ func TestBolt5(outer *testing.T) {
 		AssertTrue(t, reflect.DeepEqual(bolt.in.connReadTimeout, time.Duration(-1)))
 	})
 
+	outer.Run("Connect success in 5.1", func(t *testing.T) {
+		bolt, cleanup := connectToServer(t, func(srv *bolt5server) {
+			handshake := srv.waitForHandshake()
+			// There should be a version 5 somewhere
+			foundV := false
+			minorI := false
+			for i := 0; i < 5; i++ {
+				ver := handshake[(i * 4) : (i*4)+4]
+				if ver[3] == 5 {
+					foundV = true
+
+					if ver[2] >= 1 {
+						minorI = true
+					}
+				}
+			}
+			if !foundV {
+				t.Fatalf("Didn't find version 5 in handshake: %+v", handshake)
+			}
+			if !minorI {
+				t.Fatalf("Didn't find minor > 0 in handshake: %+v", handshake)
+			}
+
+			srv.acceptVersion(5, 1)
+			srv.waitForHelloWithoutAuthToken()
+			srv.acceptHello()
+
+			srv.waitForLogon()
+			srv.acceptLogon()
+		})
+		defer cleanup()
+		defer bolt.Close(context.Background())
+
+		// Check Bolt properties
+		AssertStringEqual(t, bolt.ServerName(), "serverName")
+		AssertTrue(t, bolt.IsAlive())
+		AssertTrue(t, reflect.DeepEqual(bolt.in.connReadTimeout, time.Duration(-1)))
+	})
+
 	outer.Run("Connect success with timeout hint", func(t *testing.T) {
 		bolt, cleanup := connectToServer(t, func(srv *bolt5server) {
 			srv.waitForHandshake()
 			srv.acceptVersion(5, 0)
 			srv.waitForHello()
 			srv.acceptHelloWithHints(map[string]any{"connection.recv_timeout_seconds": 42})
+		})
+		defer cleanup()
+		defer bolt.Close(context.Background())
+
+		AssertTrue(t, reflect.DeepEqual(bolt.in.connReadTimeout, 42*time.Second))
+	})
+
+	outer.Run("Connect success with timeout hint in 5.1", func(t *testing.T) {
+		bolt, cleanup := connectToServer(t, func(srv *bolt5server) {
+			srv.waitForHandshake()
+			srv.acceptVersion(5, 1)
+			srv.waitForHelloWithoutAuthToken()
+			srv.acceptHelloWithHints(map[string]any{"connection.recv_timeout_seconds": 42})
+			srv.waitForLogon()
+			srv.acceptLogon()
 		})
 		defer cleanup()
 		defer bolt.Close(context.Background())
@@ -182,7 +236,7 @@ func TestBolt5(outer *testing.T) {
 		defer cleanup()
 		go func() {
 			srv.waitForHandshake()
-			srv.acceptVersion(5, 1)
+			srv.acceptVersion(5, 0)
 			hmap := srv.waitForHello()
 			helloRoutingContext := hmap["routing"].(map[string]any)
 			if len(helloRoutingContext) != len(routingContext) {
@@ -195,18 +249,59 @@ func TestBolt5(outer *testing.T) {
 		bolt.Close(context.Background())
 	})
 
-	outer.Run("No routing in hello", func(t *testing.T) {
+	outer.Run("Routing in hello in 5.1", func(t *testing.T) {
+		routingContext := map[string]string{"some": "thing"}
 		conn, srv, cleanup := setupBolt5Pipe(t)
 		defer cleanup()
 		go func() {
 			srv.waitForHandshake()
 			srv.acceptVersion(5, 1)
+			hmap := srv.waitForHelloWithoutAuthToken()
+			helloRoutingContext := hmap["routing"].(map[string]any)
+			if len(helloRoutingContext) != len(routingContext) {
+				panic("Routing contexts differ")
+			}
+			srv.acceptHello()
+			srv.waitForLogon()
+			srv.acceptLogon()
+		}()
+		bolt, err := Connect(context.Background(), "serverName", conn, auth, "007", routingContext, logger, nil)
+		AssertNoError(t, err)
+		bolt.Close(context.Background())
+	})
+
+	outer.Run("No routing in hello", func(t *testing.T) {
+		conn, srv, cleanup := setupBolt5Pipe(t)
+		defer cleanup()
+		go func() {
+			srv.waitForHandshake()
+			srv.acceptVersion(5, 0)
 			hmap := srv.waitForHello()
 			_, exists := hmap["routing"].(map[string]any)
 			if exists {
 				panic("Should be no routing entry")
 			}
 			srv.acceptHello()
+		}()
+		bolt, err := Connect(context.Background(), "serverName", conn, auth, "007", nil, logger, nil)
+		AssertNoError(t, err)
+		bolt.Close(context.Background())
+	})
+
+	outer.Run("No routing in hello 5.1", func(t *testing.T) {
+		conn, srv, cleanup := setupBolt5Pipe(t)
+		defer cleanup()
+		go func() {
+			srv.waitForHandshake()
+			srv.acceptVersion(5, 1)
+			hmap := srv.waitForHelloWithoutAuthToken()
+			_, exists := hmap["routing"].(map[string]any)
+			if exists {
+				panic("Should be no routing entry")
+			}
+			srv.acceptHello()
+			srv.waitForLogon()
+			srv.acceptLogon()
 		}()
 		bolt, err := Connect(context.Background(), "serverName", conn, auth, "007", nil, logger, nil)
 		AssertNoError(t, err)
@@ -222,6 +317,30 @@ func TestBolt5(outer *testing.T) {
 			srv.acceptVersion(5, 0)
 			srv.waitForHello()
 			srv.rejectHelloUnauthorized()
+		}()
+		bolt, err := Connect(context.Background(), "serverName", conn, auth, "007", nil, logger, nil)
+		AssertNil(t, bolt)
+		AssertError(t, err)
+		dbErr, isDbErr := err.(*db.Neo4jError)
+		if !isDbErr {
+			panic(err)
+		}
+		if !dbErr.IsAuthenticationFailed() {
+			t.Errorf("Should be authentication error: %s", dbErr)
+		}
+	})
+
+	outer.Run("Failed authentication in 5.1", func(t *testing.T) {
+		conn, srv, cleanup := setupBolt5Pipe(t)
+		defer cleanup()
+		defer conn.Close()
+		go func() {
+			srv.waitForHandshake()
+			srv.acceptVersion(5, 1)
+			srv.waitForHelloWithoutAuthToken()
+			srv.acceptHello()
+			srv.waitForLogon()
+			srv.rejectLogonWithoutAuthToken()
 		}()
 		bolt, err := Connect(context.Background(), "serverName", conn, auth, "007", nil, logger, nil)
 		AssertNil(t, bolt)

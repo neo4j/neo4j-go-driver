@@ -33,6 +33,8 @@ const (
 	msgIgnored    byte = 0x7e
 	msgFailure    byte = 0x7f
 	msgHello      byte = 0x01
+	msgLogon      byte = 0x6A
+	msgLogoff     byte = 0x6B
 	msgGoodbye    byte = 0x02
 	msgBegin      byte = 0x11
 	msgCommit     byte = 0x12
