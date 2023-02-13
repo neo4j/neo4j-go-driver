@@ -258,13 +258,13 @@ func (b *bolt5) Connect(ctx context.Context, minor int, auth map[string]any, use
 	}
 
 	b.out.send(ctx, b.conn)
-	helloSucc := b.receiveSuccess(ctx)
+	helloSuccess := b.receiveSuccess(ctx)
 	if b.err != nil {
 		return b.err
 	}
 
-	b.connId = helloSucc.connectionId
-	b.serverVersion = helloSucc.server
+	b.connId = helloSuccess.connectionId
+	b.serverVersion = helloSuccess.server
 
 	// Construct log identity
 	connectionLogId := fmt.Sprintf("%s@%s", b.connId, b.serverName)
@@ -272,7 +272,7 @@ func (b *bolt5) Connect(ctx context.Context, minor int, auth map[string]any, use
 	b.in.hyd.logId = connectionLogId
 	b.out.logId = connectionLogId
 
-	b.initializeReadTimeoutHint(helloSucc.configurationHints)
+	b.initializeReadTimeoutHint(helloSuccess.configurationHints)
 
 	if minor > 0 {
 		// Receive logon success
@@ -290,7 +290,7 @@ func (b *bolt5) Connect(ctx context.Context, minor int, auth map[string]any, use
 	return nil
 }
 
-func (b *bolt5) ChangeUser(ctx context.Context, auth map[string]any) error {
+func (b *bolt5) changeUser(ctx context.Context, auth map[string]any) error {
 	if err := b.assertState(bolt5Ready); err != nil {
 		return err
 	}
