@@ -70,7 +70,7 @@ func (o *outgoing) appendLogon(logon map[string]any) {
 		o.boltLogger.LogClientMessage(o.logId, "LOGON %s", loggableDictionary(logon))
 	}
 	o.begin()
-	o.packer.StructHeader(byte(msgLogon), 1)
+	o.packer.StructHeader(msgLogon, 1)
 	o.packMap(logon)
 	o.end()
 }
@@ -80,7 +80,7 @@ func (o *outgoing) appendLogoff() {
 		o.boltLogger.LogClientMessage(o.logId, "LOGOFF")
 	}
 	o.begin()
-	o.packer.StructHeader(byte(msgLogoff), 0)
+	o.packer.StructHeader(msgLogoff, 0)
 	o.end()
 }
 

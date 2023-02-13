@@ -290,6 +290,27 @@ func (b *bolt5) Connect(ctx context.Context, minor int, auth map[string]any, use
 	return nil
 }
 
+func (b *bolt5) ChangeUser(ctx context.Context, auth map[string]any) error {
+	if err := b.assertState(bolt5Ready); err != nil {
+		return err
+	}
+	if b.minor == 0 {
+		return fmt.Errorf("invalid bolt minor version %d, expected: > 0", b.minor)
+	}
+	b.out.appendLogoff()
+	b.out.appendLogon(auth)
+	b.out.send(ctx, b.conn)
+	_ = b.receiveSuccess(ctx)
+	if b.err != nil {
+		return b.err
+	}
+	_ = b.receiveSuccess(ctx)
+	if b.err != nil {
+		return b.err
+	}
+	return nil
+}
+
 func (b *bolt5) TxBegin(ctx context.Context, txConfig idb.TxConfig) (idb.TxHandle, error) {
 	// Ok, to begin transaction while streaming auto-commit, just empty the stream and continue.
 	if b.state == bolt5Streaming {

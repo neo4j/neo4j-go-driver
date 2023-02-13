@@ -120,6 +120,12 @@ func (s *bolt5server) waitForLogon() map[string]any {
 	return m
 }
 
+func (s *bolt5server) waitForLogoff() {
+	msg := s.receiveMsg()
+
+	s.assertStructType(msg, msgLogoff)
+}
+
 func (s *bolt5server) receiveMsg() *testStruct {
 	_, buf, err := dechunkMessage(context.Background(), s.conn, []byte{}, -1)
 	if err != nil {
@@ -233,6 +239,10 @@ func (s *bolt5server) acceptLogon() {
 	s.sendSuccess(nil)
 }
 
+func (s *bolt5server) acceptLogoff() {
+	s.sendSuccess(nil)
+}
+
 func (s *bolt5server) acceptHelloWithHints(hints map[string]any) {
 	s.send(msgSuccess, map[string]any{
 		"connection_id": "cid",
@@ -270,6 +280,13 @@ func (s *bolt5server) serveRun(stream []testStruct, assertRun func([]any)) {
 	for _, x := range stream {
 		s.send(x.tag, x.fields...)
 	}
+}
+
+func (s *bolt5server) serveChangeUser() {
+	s.waitForLogoff()
+	s.sendSuccess(nil)
+	s.waitForLogon()
+	s.sendSuccess(nil)
 }
 
 func (s *bolt5server) serveRunTx(stream []testStruct, commit bool, bookmark string) {

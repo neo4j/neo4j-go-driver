@@ -186,6 +186,25 @@ func TestBolt5(outer *testing.T) {
 		AssertTrue(t, reflect.DeepEqual(bolt.in.connReadTimeout, time.Duration(-1)))
 	})
 
+	outer.Run("Can change user", func(t *testing.T) {
+		bolt, cleanup := connectToServer(t, func(srv *bolt5server) {
+			srv.waitForHandshake()
+			srv.acceptVersion(5, 1)
+			srv.waitForHelloWithoutAuthToken()
+			srv.acceptHello()
+			srv.waitForLogon()
+			srv.acceptLogon()
+			srv.serveChangeUser()
+		})
+		defer cleanup()
+		defer bolt.Close(context.Background())
+
+		err := bolt.ChangeUser(context.Background(), auth)
+
+		AssertNil(t, err)
+		assertBoltState(t, bolt5Ready, bolt)
+	})
+
 	outer.Run("Connect success with timeout hint", func(t *testing.T) {
 		bolt, cleanup := connectToServer(t, func(srv *bolt5server) {
 			srv.waitForHandshake()
@@ -203,6 +222,32 @@ func TestBolt5(outer *testing.T) {
 		bolt, cleanup := connectToServer(t, func(srv *bolt5server) {
 			srv.waitForHandshake()
 			srv.acceptVersion(5, 1)
+			outer.Run("Run auto-commit", func(t *testing.T) {
+				cypherText := "MATCH (n)"
+				theDb := "thedb"
+				bolt, cleanup := connectToServer(t, func(srv *bolt5server) {
+					srv.accept(5)
+					srv.serveRun(runResponse, func(fields []any) {
+						// fields consist of cypher text, cypher params, meta
+						AssertStringEqual(t, fields[0].(string), cypherText)
+						meta := fields[2].(map[string]any)
+						AssertStringEqual(t, meta["db"].(string), theDb)
+					})
+				})
+				defer cleanup()
+				defer bolt.Close(context.Background())
+
+				bolt.SelectDatabase(theDb)
+				str, _ := bolt.Run(context.Background(),
+					idb.Command{Cypher: cypherText}, idb.TxConfig{Mode: idb.ReadMode})
+				skeys, _ := bolt.Keys(str)
+				assertKeys(t, runKeys, skeys)
+				assertBoltState(t, bolt5Streaming, bolt)
+
+				// Retrieve the records
+				assertRunResponseOk(t, bolt, str)
+				assertBoltState(t, bolt5Ready, bolt)
+			})
 			srv.waitForHelloWithoutAuthToken()
 			srv.acceptHelloWithHints(map[string]any{"connection.recv_timeout_seconds": 42})
 			srv.waitForLogon()
@@ -352,33 +397,6 @@ func TestBolt5(outer *testing.T) {
 		if !dbErr.IsAuthenticationFailed() {
 			t.Errorf("Should be authentication error: %s", dbErr)
 		}
-	})
-
-	outer.Run("Run auto-commit", func(t *testing.T) {
-		cypherText := "MATCH (n)"
-		theDb := "thedb"
-		bolt, cleanup := connectToServer(t, func(srv *bolt5server) {
-			srv.accept(5)
-			srv.serveRun(runResponse, func(fields []any) {
-				// fields consist of cypher text, cypher params, meta
-				AssertStringEqual(t, fields[0].(string), cypherText)
-				meta := fields[2].(map[string]any)
-				AssertStringEqual(t, meta["db"].(string), theDb)
-			})
-		})
-		defer cleanup()
-		defer bolt.Close(context.Background())
-
-		bolt.SelectDatabase(theDb)
-		str, _ := bolt.Run(context.Background(),
-			idb.Command{Cypher: cypherText}, idb.TxConfig{Mode: idb.ReadMode})
-		skeys, _ := bolt.Keys(str)
-		assertKeys(t, runKeys, skeys)
-		assertBoltState(t, bolt5Streaming, bolt)
-
-		// Retrieve the records
-		assertRunResponseOk(t, bolt, str)
-		assertBoltState(t, bolt5Ready, bolt)
 	})
 
 	outer.Run("Run auto-commit with impersonation", func(t *testing.T) {
