@@ -194,6 +194,7 @@ func TestBolt5(outer *testing.T) {
 			srv.acceptHello()
 			srv.waitForLogon()
 			srv.acceptLogon()
+
 			srv.serveChangeUser()
 		})
 		defer cleanup()

@@ -284,9 +284,9 @@ func (s *bolt5server) serveRun(stream []testStruct, assertRun func([]any)) {
 
 func (s *bolt5server) serveChangeUser() {
 	s.waitForLogoff()
-	s.sendSuccess(nil)
+	s.acceptLogoff()
 	s.waitForLogon()
-	s.sendSuccess(nil)
+	s.acceptLogon()
 }
 
 func (s *bolt5server) serveRunTx(stream []testStruct, commit bool, bookmark string) {
