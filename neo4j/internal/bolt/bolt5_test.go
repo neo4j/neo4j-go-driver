@@ -121,7 +121,7 @@ func TestBolt5(outer *testing.T) {
 	outer.Run("Connect success", func(t *testing.T) {
 		bolt, cleanup := connectToServer(t, func(srv *bolt5server) {
 			handshake := srv.waitForHandshake()
-			assertMajorVersionInHandshake(t, handshake, 5)
+			AssertMajorVersionInHandshake(t, handshake, 5)
 			srv.acceptVersion(5, 0)
 			srv.waitForHello()
 			srv.acceptHello()
@@ -137,7 +137,7 @@ func TestBolt5(outer *testing.T) {
 	outer.Run("Connect success in 5.1", func(t *testing.T) {
 		bolt, cleanup := connectToServer(t, func(srv *bolt5server) {
 			handshake := srv.waitForHandshake()
-			assertVersionInHandshake(t, handshake, 5, 1)
+			AssertVersionInHandshake(t, handshake, 5, 1)
 			srv.acceptVersion(5, 1)
 			srv.waitForHelloWithoutAuthToken()
 			srv.acceptHello()
@@ -1441,36 +1441,4 @@ func TestBolt5(outer *testing.T) {
 			})
 		}
 	})
-}
-
-func assertVersionInHandshake(t *testing.T, handshake []byte, major, minor byte) {
-	t.Helper()
-	assertMajorVersionInHandshake(t, handshake, major)
-	var minorMatches bool
-	for i := 0; i < 5; i++ {
-		version := handshake[(i * 4) : (i*4)+4]
-		if version[3] == major {
-			if version[2] >= minor {
-				minorMatches = true
-				break
-			}
-		}
-	}
-	if !minorMatches {
-		t.Errorf("Didn't find minor version >= %d in handshake: %X", minor, handshake)
-	}
-}
-
-func assertMajorVersionInHandshake(t *testing.T, handshake []byte, major byte) {
-	t.Helper()
-	var majorMatches bool
-	for i := 0; i < 5; i++ {
-		version := handshake[(i * 4) : (i*4)+4]
-		if version[3] == major {
-			majorMatches = true
-		}
-	}
-	if !majorMatches {
-		t.Errorf("Didn't find major version %d in handshake: %X", major, handshake)
-	}
 }

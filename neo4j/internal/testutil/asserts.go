@@ -246,3 +246,35 @@ func AssertEqualsInAnyOrder(t *testing.T, actual []string, expected []string) {
 		t.Errorf("Expected actual slice %v and expected slice %v to have same elements", actual, expected)
 	}
 }
+
+func AssertVersionInHandshake(t *testing.T, handshake []byte, major, minor byte) {
+	t.Helper()
+	AssertMajorVersionInHandshake(t, handshake, major)
+	var minorMatches bool
+	for i := 0; i < 5; i++ {
+		version := handshake[(i * 4) : (i*4)+4]
+		if version[3] == major {
+			if version[2] >= minor {
+				minorMatches = true
+				break
+			}
+		}
+	}
+	if !minorMatches {
+		t.Errorf("Didn't find minor version >= %d in handshake: %X", minor, handshake)
+	}
+}
+
+func AssertMajorVersionInHandshake(t *testing.T, handshake []byte, major byte) {
+	t.Helper()
+	var majorMatches bool
+	for i := 0; i < 5; i++ {
+		version := handshake[(i * 4) : (i*4)+4]
+		if version[3] == major {
+			majorMatches = true
+		}
+	}
+	if !majorMatches {
+		t.Errorf("Didn't find major version %d in handshake: %X", major, handshake)
+	}
+}
