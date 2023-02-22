@@ -154,7 +154,7 @@ func TestBolt5(outer *testing.T) {
 		AssertTrue(t, reflect.DeepEqual(bolt.in.connReadTimeout, time.Duration(-1)))
 	})
 
-	outer.Run("Can change user", func(t *testing.T) {
+	outer.Run("Re-authenticates connection", func(t *testing.T) {
 		bolt, cleanup := connectToServer(t, func(srv *bolt5server) {
 			srv.waitForHandshake()
 			srv.acceptVersion(5, 1)
@@ -163,15 +163,88 @@ func TestBolt5(outer *testing.T) {
 			srv.waitForLogon()
 			srv.acceptLogon()
 
-			srv.serveChangeUser()
+			srv.serveReAuth()
 		})
 		defer cleanup()
 		defer bolt.Close(context.Background())
 
-		err := bolt.changeUser(context.Background(), auth)
+		err := bolt.reAuthenticate(context.Background(), auth)
 
 		AssertNil(t, err)
 		assertBoltState(t, bolt5Ready, bolt)
+	})
+
+	outer.Run("Fails to re-authenticate if connection is not ready ", func(t *testing.T) {
+		bolt, cleanup := connectToServer(t, func(srv *bolt5server) {
+			srv.waitForHandshake()
+			srv.acceptVersion(5, 1)
+			srv.waitForHelloWithoutAuthToken()
+			srv.acceptHello()
+			srv.waitForLogon()
+			srv.acceptLogon()
+		})
+		defer cleanup()
+		defer bolt.Close(context.Background())
+
+		bolt.state = bolt5Tx
+		err := bolt.reAuthenticate(context.Background(), auth)
+
+		AssertErrorMessageContains(t, err, "invalid state 2, expected: [0]")
+	})
+
+	outer.Run("Fails to re-authenticate if connection uses 5.0 protocol version", func(t *testing.T) {
+		bolt, cleanup := connectToServer(t, func(srv *bolt5server) {
+			srv.waitForHandshake()
+			srv.acceptVersion(5, 0)
+			srv.waitForHelloWithoutAuthToken()
+			srv.acceptHello()
+		})
+		defer cleanup()
+		defer bolt.Close(context.Background())
+
+		err := bolt.reAuthenticate(context.Background(), auth)
+
+		AssertErrorMessageContains(t, err, "invalid bolt version 5.0, expected version > 5.0 for re-authentication")
+	})
+
+	outer.Run("Fails to re-authenticate if logoff fails", func(t *testing.T) {
+		bolt, cleanup := connectToServer(t, func(srv *bolt5server) {
+			srv.waitForHandshake()
+			srv.acceptVersion(5, 1)
+			srv.waitForHelloWithoutAuthToken()
+			srv.acceptHello()
+			srv.waitForLogon() // initial logon
+			srv.acceptLogon()
+			srv.waitForLogoff() // re-auth starts here
+			srv.sendFailureMsg("oops", "logoff.failed")
+		})
+		defer cleanup()
+		defer bolt.Close(context.Background())
+
+		err := bolt.reAuthenticate(context.Background(), auth)
+
+		AssertErrorMessageContains(t, err, "oops (logoff.failed)")
+	})
+
+	outer.Run("Fails to re-authenticate if logoff fails", func(t *testing.T) {
+		bolt, cleanup := connectToServer(t, func(srv *bolt5server) {
+			srv.waitForHandshake()
+			srv.acceptVersion(5, 1)
+			srv.waitForHelloWithoutAuthToken()
+			srv.acceptHello()
+			srv.waitForLogon() // initial logon
+			srv.acceptLogon()
+			srv.waitForLogoff() // re-auth starts here
+			srv.acceptLogoff()
+			srv.waitForLogon()
+			srv.sendFailureMsg("oops", "logon.failed")
+		})
+		defer cleanup()
+		defer bolt.Close(context.Background())
+
+		err := bolt.reAuthenticate(context.Background(), auth)
+
+		AssertErrorMessageContains(t, err, "oops (logon.failed)")
 	})
 
 	outer.Run("Connect success with timeout hint", func(t *testing.T) {

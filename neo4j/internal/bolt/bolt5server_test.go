@@ -282,7 +282,7 @@ func (s *bolt5server) serveRun(stream []testStruct, assertRun func([]any)) {
 	}
 }
 
-func (s *bolt5server) serveChangeUser() {
+func (s *bolt5server) serveReAuth() {
 	s.waitForLogoff()
 	s.acceptLogoff()
 	s.waitForLogon()

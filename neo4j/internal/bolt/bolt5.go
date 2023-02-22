@@ -290,25 +290,22 @@ func (b *bolt5) Connect(ctx context.Context, minor int, auth map[string]any, use
 	return nil
 }
 
-func (b *bolt5) changeUser(ctx context.Context, auth map[string]any) error {
+func (b *bolt5) reAuthenticate(ctx context.Context, authToken map[string]any) error {
 	if err := b.assertState(bolt5Ready); err != nil {
 		return err
 	}
 	if b.minor == 0 {
-		return fmt.Errorf("invalid bolt minor version %d, expected: > 0", b.minor)
+		return fmt.Errorf("invalid bolt version 5.%d, expected version > 5.0 for re-authentication", b.minor)
 	}
 	b.out.appendLogoff()
-	b.out.appendLogon(auth)
+	b.out.appendLogon(authToken)
 	b.out.send(ctx, b.conn)
-	_ = b.receiveSuccess(ctx)
+	b.receiveSuccess(ctx)
 	if b.err != nil {
 		return b.err
 	}
-	_ = b.receiveSuccess(ctx)
-	if b.err != nil {
-		return b.err
-	}
-	return nil
+	b.receiveSuccess(ctx)
+	return b.err
 }
 
 func (b *bolt5) TxBegin(ctx context.Context, txConfig idb.TxConfig) (idb.TxHandle, error) {
