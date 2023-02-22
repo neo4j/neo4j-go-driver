@@ -168,7 +168,7 @@ func TestBolt5(outer *testing.T) {
 		defer cleanup()
 		defer bolt.Close(context.Background())
 
-		err := bolt.reAuthenticate(context.Background(), auth)
+		err := bolt.ReAuthenticate(context.Background(), auth)
 
 		AssertNil(t, err)
 		assertBoltState(t, bolt5Ready, bolt)
@@ -187,7 +187,7 @@ func TestBolt5(outer *testing.T) {
 		defer bolt.Close(context.Background())
 
 		bolt.state = bolt5Tx
-		err := bolt.reAuthenticate(context.Background(), auth)
+		err := bolt.ReAuthenticate(context.Background(), auth)
 
 		AssertErrorMessageContains(t, err, "invalid state 2, expected: [0]")
 	})
@@ -202,9 +202,10 @@ func TestBolt5(outer *testing.T) {
 		defer cleanup()
 		defer bolt.Close(context.Background())
 
-		err := bolt.reAuthenticate(context.Background(), auth)
+		err := bolt.ReAuthenticate(context.Background(), auth)
 
-		AssertErrorMessageContains(t, err, "invalid bolt version 5.0, expected version > 5.0 for re-authentication")
+		AssertErrorMessageContains(t, err, "Server serverName does not support: re-authentication "+
+			"(requires at least Bolt protocol v5.1 [Neo4j server v5.5])")
 	})
 
 	outer.Run("Fails to re-authenticate if logoff fails", func(t *testing.T) {
@@ -221,7 +222,7 @@ func TestBolt5(outer *testing.T) {
 		defer cleanup()
 		defer bolt.Close(context.Background())
 
-		err := bolt.reAuthenticate(context.Background(), auth)
+		err := bolt.ReAuthenticate(context.Background(), auth)
 
 		AssertErrorMessageContains(t, err, "oops (logoff.failed)")
 	})
@@ -242,7 +243,7 @@ func TestBolt5(outer *testing.T) {
 		defer cleanup()
 		defer bolt.Close(context.Background())
 
-		err := bolt.reAuthenticate(context.Background(), auth)
+		err := bolt.ReAuthenticate(context.Background(), auth)
 
 		AssertErrorMessageContains(t, err, "oops (logon.failed)")
 	})

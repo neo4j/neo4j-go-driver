@@ -120,6 +120,12 @@ type Connection interface {
 	SetBoltLogger(boltLogger log.BoltLogger)
 	// Version returns the protocol version of the connection
 	Version() db.ProtocolVersion
+	// ReAuthenticate performs re-authentication with the current connection.
+	// This only works with connections negotiated with the 5.1 version of the Bolt protocol or later.
+	// Connections using an older protocol version will systematically return an error.
+	// This may also return an error if any of the messages involved in the re-authentication workflow fail being sent
+	// or received.
+	ReAuthenticate(ctx context.Context, authToken map[string]any) error
 }
 
 type RoutingTable struct {

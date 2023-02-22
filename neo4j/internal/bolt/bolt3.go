@@ -772,3 +772,8 @@ func (b *bolt3) Version() db.ProtocolVersion {
 		Minor: b.minor,
 	}
 }
+
+func (b *bolt3) ReAuthenticate(context.Context, map[string]any) error {
+	return &db.FeatureNotSupportedError{Server: b.serverName, Feature: "re-authentication",
+		Reason: "requires at least Bolt protocol v5.1 [Neo4j server v5.5]"}
+}

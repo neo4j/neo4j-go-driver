@@ -290,12 +290,13 @@ func (b *bolt5) Connect(ctx context.Context, minor int, auth map[string]any, use
 	return nil
 }
 
-func (b *bolt5) reAuthenticate(ctx context.Context, authToken map[string]any) error {
+func (b *bolt5) ReAuthenticate(ctx context.Context, authToken map[string]any) error {
 	if err := b.assertState(bolt5Ready); err != nil {
 		return err
 	}
 	if b.minor == 0 {
-		return fmt.Errorf("invalid bolt version 5.%d, expected version > 5.0 for re-authentication", b.minor)
+		return &db.FeatureNotSupportedError{Server: b.serverName, Feature: "re-authentication",
+			Reason: "requires at least Bolt protocol v5.1 [Neo4j server v5.5]"}
 	}
 	b.out.appendLogoff()
 	b.out.appendLogon(authToken)
