@@ -189,3 +189,7 @@ func (c *ConnFake) SetBoltLogger(log.BoltLogger) {
 func (c *ConnFake) Version() db.ProtocolVersion {
 	return c.ConnectionVersion
 }
+
+func (c *ConnFake) CompareTokenAndMarkForReAuth(map[string]any) error {
+	return nil
+}

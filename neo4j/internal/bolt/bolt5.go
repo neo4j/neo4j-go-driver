@@ -23,6 +23,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/collections"
 	idb "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
 	"net"
 	"time"
@@ -98,6 +99,8 @@ type bolt5 struct {
 	minor         int
 	lastQid       int64 // Last seen qid
 	idleDate      time.Time
+	authToken     map[string]any
+	reAuthToken   map[string]any
 }
 
 func NewBolt5(serverName string, conn net.Conn, logger log.Logger, boltLog log.BoltLogger) *bolt5 {
@@ -233,7 +236,7 @@ func (b *bolt5) Connect(ctx context.Context, minor int, auth map[string]any, use
 		return err
 	}
 
-	// Prepare hello message
+	b.authToken = auth
 	hello := map[string]any{
 		"user_agent": userAgent,
 	}
@@ -290,6 +293,23 @@ func (b *bolt5) Connect(ctx context.Context, minor int, auth map[string]any, use
 	return nil
 }
 
+func (b *bolt5) CompareTokenAndMarkForReAuth(authToken map[string]any) error {
+	if len(authToken) == 0 {
+		return nil
+	}
+	if b.minor == 0 {
+		return &db.FeatureNotSupportedError{Server: b.serverName, Feature: "re-authentication",
+			Reason: "requires at least Bolt protocol v5.1 [Neo4j server v5.5]"}
+	}
+	if err := b.assertState(bolt5Ready); err != nil {
+		return err
+	}
+	if !collections.ShallowMapEquals(b.authToken, authToken) {
+		b.reAuthToken = authToken
+	}
+	return nil
+}
+
 func (b *bolt5) TxBegin(ctx context.Context, txConfig idb.TxConfig) (idb.TxHandle, error) {
 	// Ok, to begin transaction while streaming auto-commit, just empty the stream and continue.
 	if b.state == bolt5Streaming {
@@ -314,9 +334,13 @@ func (b *bolt5) TxBegin(ctx context.Context, txConfig idb.TxConfig) (idb.TxHandl
 	}
 
 	b.out.appendBegin(tx.toMeta())
+	b.appendReAuth()
 	b.out.send(ctx, b.conn)
-	b.receiveSuccess(ctx)
+	b.receiveSuccess(ctx) // begin success
 	if b.err != nil {
+		return 0, b.err
+	}
+	if b.receiveReAuthSuccess(ctx); b.err != nil {
 		return 0, b.err
 	}
 	b.state = bolt5Tx
@@ -556,30 +580,25 @@ func (b *bolt5) run(ctx context.Context, cypher string, params map[string]any, f
 	if tx != nil {
 		meta = tx.toMeta()
 	}
-
-	// Append run message
 	b.out.appendRun(cypher, params, meta)
-
-	// Ensure that fetchSize is in a valid range
-	switch {
-	case fetchSize < 0:
-		fetchSize = -1
-	case fetchSize == 0:
-		fetchSize = bolt5FetchSize
+	if tx == nil { // autocommit
+		b.appendReAuth() // needs to be appended *before* PULL, since PULL response is not checked here
 	}
-	// Append pull message and send it along with other pending messages
+	fetchSize = normalizeFetchSize(fetchSize)
 	b.out.appendPullN(fetchSize)
 	b.out.send(ctx, b.conn)
 
-	// Receive confirmation of run message
-	succ := b.receiveSuccess(ctx)
+	succ := b.receiveSuccess(ctx) // RUN success
 	if b.err != nil {
 		// If failed with a database error, there will be an ignored response for the
 		// pull message as well, this will be cleaned up by Reset
 		return nil, b.err
 	}
-	// Extract the RUN response from success response
 	b.tfirst = succ.tfirst
+
+	if b.receiveReAuthSuccess(ctx); b.err != nil {
+		return nil, b.err
+	}
 	// Change state to streaming
 	if b.state == bolt5Ready {
 		b.state = bolt5Streaming
@@ -947,4 +966,38 @@ func (b *bolt5) initializeReadTimeoutHint(hints map[string]any) {
 		return
 	}
 	b.in.connReadTimeout = time.Duration(readTimeout) * time.Second
+}
+
+func (b *bolt5) appendReAuth() {
+	if b.reAuthToken == nil {
+		return
+	}
+	b.out.appendLogoff()
+	b.out.appendLogon(b.reAuthToken)
+}
+
+func (b *bolt5) receiveReAuthSuccess(ctx context.Context) {
+	if b.reAuthToken == nil {
+		return
+	}
+	b.receiveSuccess(ctx) // logoff success
+	if b.err != nil {
+		return
+	}
+	b.receiveSuccess(ctx) // logon success
+	if b.err != nil {
+		return
+	}
+	b.authToken, b.reAuthToken = b.reAuthToken, nil
+}
+
+// normalizeFetchSize makes sure that fetchSize is in a valid range
+func normalizeFetchSize(fetchSize int) int {
+	switch {
+	case fetchSize < 0:
+		return -1
+	case fetchSize == 0:
+		return bolt5FetchSize
+	}
+	return fetchSize
 }

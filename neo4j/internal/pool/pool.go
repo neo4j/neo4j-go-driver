@@ -27,6 +27,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/bolt"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/connector"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/racing"
 	"math"
@@ -40,6 +41,7 @@ import (
 // Liveness checks are performed before a connection is deemed idle enough to be reset
 const DefaultLivenessCheckThreshold = math.MaxInt64
 
+// Connect is called to create a new Bolt connection
 type Connect func(context.Context, string, log.BoltLogger) (db.Connection, error)
 
 type qitem struct {
@@ -49,17 +51,18 @@ type qitem struct {
 }
 
 type Pool struct {
-	maxSize    int
-	maxAge     time.Duration
-	connect    Connect
-	servers    map[string]*server
-	serversMut racing.Mutex
-	queueMut   racing.Mutex
-	queue      list.List
-	now        func() time.Time
-	closed     bool
-	log        log.Logger
-	logId      string
+	maxSize          int
+	maxAge           time.Duration
+	connector        connector.Connector
+	defaultAuthToken map[string]any
+	servers          map[string]*server
+	serversMut       racing.Mutex
+	queueMut         racing.Mutex
+	queue            list.List
+	now              func() time.Time
+	closed           bool
+	log              log.Logger
+	logId            string
 }
 
 type serverPenalty struct {
@@ -67,22 +70,23 @@ type serverPenalty struct {
 	penalty uint32
 }
 
-func New(maxSize int, maxAge time.Duration, connect Connect, logger log.Logger, logId string) *Pool {
+func New(connector connector.Connector, defaultAuthToken map[string]any, maxSize int, maxAge time.Duration, logger log.Logger, logId string) *Pool {
 	// Means infinite life, simplifies checking later on
 	if maxAge <= 0 {
 		maxAge = 1<<63 - 1
 	}
 
 	p := &Pool{
-		maxSize:    maxSize,
-		maxAge:     maxAge,
-		connect:    connect,
-		servers:    make(map[string]*server),
-		serversMut: racing.NewMutex(),
-		queueMut:   racing.NewMutex(),
-		now:        time.Now,
-		logId:      logId,
-		log:        logger,
+		maxSize:          maxSize,
+		maxAge:           maxAge,
+		connector:        connector,
+		defaultAuthToken: defaultAuthToken,
+		servers:          make(map[string]*server),
+		serversMut:       racing.NewMutex(),
+		queueMut:         racing.NewMutex(),
+		now:              time.Now,
+		logId:            logId,
+		log:              logger,
 	}
 	p.log.Infof(log.Pool, p.logId, "Created")
 	return p
@@ -207,7 +211,7 @@ func (p *Pool) tryAnyIdle(ctx context.Context, serverNames []string, idlenessThr
 	return nil, nil
 }
 
-func (p *Pool) Borrow(ctx context.Context, serverNames []string, wait bool, boltLogger log.BoltLogger, idlenessThreshold time.Duration) (db.Connection, error) {
+func (p *Pool) Borrow(ctx context.Context, serverNames []string, authToken map[string]any, wait bool, boltLogger log.BoltLogger, idlenessThreshold time.Duration) (db.Connection, error) {
 	if p.closed {
 		return nil, &PoolClosed{}
 	}
@@ -225,7 +229,7 @@ func (p *Pool) Borrow(ctx context.Context, serverNames []string, wait bool, bolt
 
 	var conn db.Connection
 	for _, s := range penalties {
-		conn, err = p.tryBorrow(ctx, s.name, boltLogger, idlenessThreshold)
+		conn, err = p.tryBorrow(ctx, s.name, authToken, boltLogger, idlenessThreshold)
 		if err == nil {
 			return conn, nil
 		}
@@ -301,7 +305,7 @@ func (p *Pool) Borrow(ctx context.Context, serverNames []string, wait bool, bolt
 	}
 }
 
-func (p *Pool) tryBorrow(ctx context.Context, serverName string, boltLogger log.BoltLogger, idlenessThreshold time.Duration) (db.Connection, error) {
+func (p *Pool) tryBorrow(ctx context.Context, serverName string, sessionAuthToken map[string]any, boltLogger log.BoltLogger, idlenessThreshold time.Duration) (db.Connection, error) {
 	// For now, lock complete servers map to avoid over connecting but with the downside
 	// that long connect times will block connects to other servers as well. To fix this
 	// we would need to add a pending connect to the server and lock per server.
@@ -319,6 +323,9 @@ func (p *Pool) tryBorrow(ctx context.Context, serverName string, boltLogger log.
 			}
 			if connection != nil {
 				connection.SetBoltLogger(boltLogger)
+				if err := connection.CompareTokenAndMarkForReAuth(sessionAuthToken); err != nil {
+					return nil, err
+				}
 				return connection, nil
 			}
 			if srv.size() >= p.maxSize {
@@ -334,7 +341,7 @@ func (p *Pool) tryBorrow(ctx context.Context, serverName string, boltLogger log.
 
 	// No idle connection, try to connect
 	p.log.Infof(log.Pool, p.logId, "Connecting to %s", serverName)
-	c, err := p.connect(ctx, serverName, boltLogger)
+	connection, err := p.connector.Connect(ctx, serverName, p.selectAuthToken(sessionAuthToken), boltLogger)
 	if err != nil {
 		// Failed to connect, keep track that it was bad for a while
 		srv.notifyFailedConnect(p.now())
@@ -343,9 +350,16 @@ func (p *Pool) tryBorrow(ctx context.Context, serverName string, boltLogger log.
 	}
 
 	// Ok, got a connection, register the connection
-	srv.registerBusy(c)
+	srv.registerBusy(connection)
 	srv.notifySuccessfulConnect()
-	return c, nil
+	return connection, nil
+}
+
+func (p *Pool) selectAuthToken(sessionAuthToken map[string]any) map[string]any {
+	if len(sessionAuthToken) == 0 {
+		return p.defaultAuthToken
+	}
+	return sessionAuthToken
 }
 
 func (p *Pool) unreg(ctx context.Context, serverName string, c db.Connection, now time.Time) error {

@@ -120,6 +120,13 @@ type Connection interface {
 	SetBoltLogger(boltLogger log.BoltLogger)
 	// Version returns the protocol version of the connection
 	Version() db.ProtocolVersion
+	// CompareTokenAndMarkForReAuth compares the provided token to the token initially used to authenticate this connection
+	// The connection is marked for later re-authentication only if the provided token does not match the token that was
+	// exercised during the initial authentication
+	// Re-authentication works with connections negotiated with the 5.1 version of the Bolt protocol or later.
+	// Connections using an older protocol version will systematically return an error when this is called with non-empty
+	// token.
+	CompareTokenAndMarkForReAuth(authToken map[string]any) error
 }
 
 type RoutingTable struct {

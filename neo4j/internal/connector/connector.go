@@ -34,14 +34,17 @@ import (
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/log"
 )
 
-type Connector struct {
+type Connector interface {
+	Connect(ctx context.Context, address string, authToken map[string]any, boltLogger log.BoltLogger) (db.Connection, error)
+}
+
+type DefaultConnector struct {
 	SkipEncryption bool
 	SkipVerify     bool
 	// Deprecated: RootCAs will be removed in 6.0. Configure TlsConfig directly instead.
 	RootCAs         *x509.CertPool
 	DialTimeout     time.Duration
 	SocketKeepAlive bool
-	Auth            map[string]any
 	Log             log.Logger
 	UserAgent       string
 	RoutingContext  map[string]string
@@ -49,7 +52,7 @@ type Connector struct {
 	TlsConfig       *tls.Config
 }
 
-func (c Connector) Connect(ctx context.Context, address string, boltLogger log.BoltLogger) (db.Connection, error) {
+func (c *DefaultConnector) Connect(ctx context.Context, address string, authToken map[string]any, boltLogger log.BoltLogger) (db.Connection, error) {
 	dialer := net.Dialer{Timeout: c.DialTimeout}
 	if !c.SocketKeepAlive {
 		dialer.KeepAlive = -1 * time.Second // Turns keep-alive off
@@ -62,7 +65,7 @@ func (c Connector) Connect(ctx context.Context, address string, boltLogger log.B
 
 	// TLS not requested, perform Bolt handshake
 	if c.SkipEncryption {
-		return bolt.Connect(ctx, address, conn, c.Auth, c.UserAgent, c.RoutingContext, c.Log, boltLogger)
+		return bolt.Connect(ctx, address, conn, authToken, c.UserAgent, c.RoutingContext, c.Log, boltLogger)
 	}
 
 	// TLS requested, continue with handshake
@@ -82,10 +85,10 @@ func (c Connector) Connect(ctx context.Context, address string, boltLogger log.B
 		return nil, &TlsError{inner: err}
 	}
 	// Perform Bolt handshake
-	return bolt.Connect(ctx, address, tlsConn, c.Auth, c.UserAgent, c.RoutingContext, c.Log, boltLogger)
+	return bolt.Connect(ctx, address, tlsConn, authToken, c.UserAgent, c.RoutingContext, c.Log, boltLogger)
 }
 
-func (c Connector) tlsConfig(serverName string) *tls.Config {
+func (c *DefaultConnector) tlsConfig(serverName string) *tls.Config {
 	var config *tls.Config
 	if c.TlsConfig == nil {
 		config = &tls.Config{RootCAs: c.RootCAs}

@@ -32,7 +32,7 @@ type poolFake struct {
 	cancel   context.CancelFunc
 }
 
-func (p *poolFake) Borrow(_ context.Context, servers []string, _ bool, logger log.BoltLogger, _ time.Duration) (db.Connection, error) {
+func (p *poolFake) Borrow(_ context.Context, servers []string, _ map[string]any, _ bool, logger log.BoltLogger, _ time.Duration) (db.Connection, error) {
 	return p.borrow(servers, p.cancel, logger)
 }
 

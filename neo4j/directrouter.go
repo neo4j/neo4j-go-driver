@@ -38,15 +38,15 @@ func (r *directRouter) InvalidateReader(context.Context, string, string) error {
 	return nil
 }
 
-func (r *directRouter) Readers(context.Context, func(context.Context) ([]string, error), string, log.BoltLogger) ([]string, error) {
+func (r *directRouter) Readers(context.Context, func(context.Context) ([]string, error), string, map[string]any, log.BoltLogger) ([]string, error) {
 	return []string{r.address}, nil
 }
 
-func (r *directRouter) Writers(context.Context, func(context.Context) ([]string, error), string, log.BoltLogger) ([]string, error) {
+func (r *directRouter) Writers(context.Context, func(context.Context) ([]string, error), string, map[string]any, log.BoltLogger) ([]string, error) {
 	return []string{r.address}, nil
 }
 
-func (r *directRouter) GetNameOfDefaultDatabase(context.Context, []string, string, log.BoltLogger) (string, error) {
+func (r *directRouter) GetNameOfDefaultDatabase(context.Context, []string, string, map[string]any, log.BoltLogger) (string, error) {
 	return db.DefaultDatabase, nil
 }
 

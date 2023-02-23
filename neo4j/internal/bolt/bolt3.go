@@ -216,6 +216,14 @@ func (b *bolt3) Connect(ctx context.Context, minor int, auth map[string]any, use
 	return nil
 }
 
+func (b *bolt3) CompareTokenAndMarkForReAuth(authToken map[string]any) error {
+	if len(authToken) == 0 {
+		return nil
+	}
+	return &db.FeatureNotSupportedError{Server: b.serverName, Feature: "re-authentication",
+		Reason: "requires at least Bolt protocol v5.1 [Neo4j server v5.5]"}
+}
+
 func (b *bolt3) TxBegin(ctx context.Context, txConfig idb.TxConfig) (idb.
 	TxHandle, error) {
 	// Ok, to begin transaction while streaming auto-commit, just empty the stream and continue.

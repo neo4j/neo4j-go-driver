@@ -28,8 +28,13 @@ import (
 
 // Tries to read routing table from any of the specified routers using new or existing connection
 // from the supplied pool.
-func readTable(ctx context.Context, connectionPool Pool, routers []string, routerContext map[string]string, bookmarks []string,
-	database, impersonatedUser string, boltLogger log.BoltLogger) (*db.RoutingTable, error) {
+func readTable(ctx context.Context, connectionPool Pool,
+	routers []string,
+	routerContext map[string]string,
+	bookmarks []string,
+	database, impersonatedUser string,
+	sessionAuthToken map[string]any,
+	boltLogger log.BoltLogger) (*db.RoutingTable, error) {
 	// Preserve last error to be returned, set a default for case of no routers
 	var err error = &ReadRoutingTableError{}
 
@@ -38,7 +43,7 @@ func readTable(ctx context.Context, connectionPool Pool, routers []string, route
 	// another db.
 	for _, router := range routers {
 		var conn db.Connection
-		if conn, err = connectionPool.Borrow(ctx, []string{router}, true, boltLogger, pool.DefaultLivenessCheckThreshold); err != nil {
+		if conn, err = connectionPool.Borrow(ctx, []string{router}, sessionAuthToken, true, boltLogger, pool.DefaultLivenessCheckThreshold); err != nil {
 			// Check if failed due to context timing out
 			if ctx.Err() != nil {
 				return nil, wrapError(router, ctx.Err())

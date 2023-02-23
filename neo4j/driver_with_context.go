@@ -201,11 +201,10 @@ func NewDriverWithContext(target string, auth AuthToken, configurers ...func(*Co
 	d.connector.RootCAs = d.config.RootCAs
 	d.connector.TlsConfig = d.config.TlsConfig
 	d.connector.Log = d.log
-	d.connector.Auth = auth.tokens
 	d.connector.RoutingContext = routingContext
 
 	// Let the pool use the same log ID as the driver to simplify log reading.
-	d.pool = pool.New(d.config.MaxConnectionPoolSize, d.config.MaxConnectionLifetime, d.connector.Connect, d.log, d.logId)
+	d.pool = pool.New(&d.connector, auth.tokens, d.config.MaxConnectionPoolSize, d.config.MaxConnectionLifetime, d.log, d.logId)
 
 	if !routing {
 		d.router = &directRouter{address: address}
@@ -270,14 +269,14 @@ type sessionRouter interface {
 	// note: bookmarks are lazily supplied, only when a new routing table needs to be fetched
 	// this is needed because custom bookmark managers may provide bookmarks from external systems
 	// they should not be called when it is not needed (e.g. when a routing table is cached)
-	Readers(ctx context.Context, bookmarks func(context.Context) ([]string, error), database string, boltLogger log.BoltLogger) ([]string, error)
+	Readers(ctx context.Context, bookmarks func(context.Context) ([]string, error), database string, sessionAuthToken map[string]any, boltLogger log.BoltLogger) ([]string, error)
 	// Writers returns the list of servers that can serve writes on the requested database.
 	// note: bookmarks are lazily supplied, see Readers documentation to learn why
-	Writers(ctx context.Context, bookmarks func(context.Context) ([]string, error), database string, boltLogger log.BoltLogger) ([]string, error)
+	Writers(ctx context.Context, bookmarks func(context.Context) ([]string, error), database string, sessionAuthToken map[string]any, boltLogger log.BoltLogger) ([]string, error)
 	// GetNameOfDefaultDatabase returns the name of the default database for the specified user.
 	// The correct database name is needed when requesting readers or writers.
 	// the bookmarks are eagerly provided since this method always fetches a new routing table
-	GetNameOfDefaultDatabase(ctx context.Context, bookmarks []string, user string, boltLogger log.BoltLogger) (string, error)
+	GetNameOfDefaultDatabase(ctx context.Context, bookmarks []string, user string, sessionAuthToken map[string]any, boltLogger log.BoltLogger) (string, error)
 	Invalidate(ctx context.Context, database string) error
 	CleanUp(ctx context.Context) error
 	InvalidateWriter(ctx context.Context, name string, server string) error
@@ -289,7 +288,7 @@ type driverWithContext struct {
 	config    *Config
 	pool      *pool.Pool
 	mut       racing.Mutex
-	connector connector.Connector
+	connector connector.DefaultConnector
 	router    sessionRouter
 	logId     string
 	log       log.Logger
