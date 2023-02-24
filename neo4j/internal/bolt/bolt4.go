@@ -1002,11 +1002,6 @@ func (b *bolt4) Version() db.ProtocolVersion {
 	}
 }
 
-func (b *bolt4) ReAuthenticate(context.Context, map[string]any) error {
-	return &db.FeatureNotSupportedError{Server: b.serverName, Feature: "re-authentication",
-		Reason: "requires at least Bolt protocol v5.1 [Neo4j server v5.5]"}
-}
-
 const readTimeoutHintName = "connection.recv_timeout_seconds"
 
 func (b *bolt4) initializeReadTimeoutHint(hints map[string]any) {

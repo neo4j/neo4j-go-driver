@@ -812,20 +812,4 @@ func TestBolt3(outer *testing.T) {
 		}
 	})
 
-	outer.Run("Fails to re-authenticate", func(t *testing.T) {
-		bolt, cleanup := connectToServer(t, func(srv *bolt3server) {
-			srv.waitForHandshake()
-			srv.acceptVersion(3)
-			srv.waitForHello()
-			srv.acceptHello()
-		})
-		defer cleanup()
-		defer bolt.Close(context.Background())
-
-		err := bolt.ReAuthenticate(context.Background(), auth)
-
-		AssertErrorMessageContains(t, err, "Server serverName does not support: re-authentication "+
-			"(requires at least Bolt protocol v5.1 [Neo4j server v5.5])")
-	})
-
 }

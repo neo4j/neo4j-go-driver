@@ -290,25 +290,6 @@ func (b *bolt5) Connect(ctx context.Context, minor int, auth map[string]any, use
 	return nil
 }
 
-func (b *bolt5) ReAuthenticate(ctx context.Context, authToken map[string]any) error {
-	if err := b.assertState(bolt5Ready); err != nil {
-		return err
-	}
-	if b.minor == 0 {
-		return &db.FeatureNotSupportedError{Server: b.serverName, Feature: "re-authentication",
-			Reason: "requires at least Bolt protocol v5.1 [Neo4j server v5.5]"}
-	}
-	b.out.appendLogoff()
-	b.out.appendLogon(authToken)
-	b.out.send(ctx, b.conn)
-	b.receiveSuccess(ctx)
-	if b.err != nil {
-		return b.err
-	}
-	b.receiveSuccess(ctx)
-	return b.err
-}
-
 func (b *bolt5) TxBegin(ctx context.Context, txConfig idb.TxConfig) (idb.TxHandle, error) {
 	// Ok, to begin transaction while streaming auto-commit, just empty the stream and continue.
 	if b.state == bolt5Streaming {

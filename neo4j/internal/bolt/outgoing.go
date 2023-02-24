@@ -75,15 +75,6 @@ func (o *outgoing) appendLogon(logon map[string]any) {
 	o.end()
 }
 
-func (o *outgoing) appendLogoff() {
-	if o.boltLogger != nil {
-		o.boltLogger.LogClientMessage(o.logId, "LOGOFF")
-	}
-	o.begin()
-	o.packer.StructHeader(msgLogoff, 0)
-	o.end()
-}
-
 func (o *outgoing) appendBegin(meta map[string]any) {
 	if o.boltLogger != nil {
 		o.boltLogger.LogClientMessage(o.logId, "BEGIN %s", loggableDictionary(meta))
