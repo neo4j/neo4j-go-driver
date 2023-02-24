@@ -23,8 +23,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/collections"
 	idb "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/slices"
 	"net"
 	"time"
 
@@ -265,7 +265,7 @@ func (b *bolt4) Connect(ctx context.Context, minor int, auth map[string]any, use
 	b.connId = succ.connectionId
 	b.serverVersion = succ.server
 	if checkUtcPatch {
-		useUtc := slices.Contains(succ.patches, "utc")
+		useUtc := collections.SliceContains(succ.patches, "utc")
 		b.in.hyd.useUtc = useUtc
 		b.out.useUtc = useUtc
 	}
