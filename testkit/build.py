@@ -31,7 +31,7 @@ if __name__ == "__main__":
     run(["go", "vet", "./..."], env=defaultEnv)
 
     print("Install staticcheck", flush=True)
-    run(["go", "install", "honnef.co/go/tools/cmd/staticcheck@latest"], env=defaultEnv)
+    run(["go", "install", "honnef.co/go/tools/cmd/staticcheck@v0.3.3"], env=defaultEnv)
 
     print("Run staticcheck", flush=True)
     gopath = Path(
