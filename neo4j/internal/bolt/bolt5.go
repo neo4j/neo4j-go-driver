@@ -23,9 +23,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/collections"
 	idb "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
 	"net"
+	"reflect"
 	"time"
 
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/db"
@@ -304,7 +304,7 @@ func (b *bolt5) CompareTokenAndMarkForReAuth(authToken map[string]any) error {
 	if err := b.assertState(bolt5Ready); err != nil {
 		return err
 	}
-	if !collections.ShallowMapEquals(b.authToken, authToken) {
+	if !reflect.DeepEqual(b.authToken, authToken) {
 		b.reAuthToken = authToken
 	}
 	return nil
@@ -580,14 +580,18 @@ func (b *bolt5) run(ctx context.Context, cypher string, params map[string]any, f
 	if tx != nil {
 		meta = tx.toMeta()
 	}
-	b.out.appendRun(cypher, params, meta)
-	if tx == nil { // autocommit
-		b.appendReAuth() // needs to be appended *before* PULL, since PULL response is not checked here
+	if tx == nil {
+		// re-auth autocommit RUN
+		b.appendReAuth()
 	}
+	b.out.appendRun(cypher, params, meta)
 	fetchSize = normalizeFetchSize(fetchSize)
 	b.out.appendPullN(fetchSize)
 	b.out.send(ctx, b.conn)
 
+	if b.receiveReAuthSuccess(ctx); b.err != nil {
+		return nil, b.err
+	}
 	succ := b.receiveSuccess(ctx) // RUN success
 	if b.err != nil {
 		// If failed with a database error, there will be an ignored response for the
@@ -595,11 +599,6 @@ func (b *bolt5) run(ctx context.Context, cypher string, params map[string]any, f
 		return nil, b.err
 	}
 	b.tfirst = succ.tfirst
-
-	if b.receiveReAuthSuccess(ctx); b.err != nil {
-		return nil, b.err
-	}
-	// Change state to streaming
 	if b.state == bolt5Ready {
 		b.state = bolt5Streaming
 	} else {
@@ -914,8 +913,12 @@ func (b *bolt5) GetRoutingTable(ctx context.Context,
 	if impersonatedUser != "" {
 		extras["imp_user"] = impersonatedUser
 	}
+	b.appendReAuth()
 	b.out.appendRoute(routingContext, bookmarks, extras)
 	b.out.send(ctx, b.conn)
+	if b.receiveReAuthSuccess(ctx); b.err != nil {
+		return nil, b.err
+	}
 	succ := b.receiveSuccess(ctx)
 	if b.err != nil {
 		return nil, b.err
