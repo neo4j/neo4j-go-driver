@@ -22,7 +22,7 @@ package neo4j
 import (
 	"context"
 	"fmt"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/collection"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/collections"
 	idb "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/errorutil"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/pool"
@@ -655,7 +655,7 @@ func (s *sessionWithContext) getBookmarks(ctx context.Context) (Bookmarks, error
 	if err != nil {
 		return nil, err
 	}
-	result := collection.NewSet(bookmarks)
+	result := collections.NewSet(bookmarks)
 	result.AddAll(s.bookmarks.currentBookmarks())
 	return result.Values(), nil
 }

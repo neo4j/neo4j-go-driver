@@ -21,7 +21,7 @@ package neo4j
 
 import (
 	"context"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/collection"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/collections"
 	"sync"
 )
 
@@ -60,7 +60,7 @@ type BookmarkManagerConfig struct {
 }
 
 type bookmarkManager struct {
-	bookmarks        collection.Set[string]
+	bookmarks        collections.Set[string]
 	supplyBookmarks  func(context.Context) (Bookmarks, error)
 	consumeBookmarks func(context.Context, Bookmarks) error
 	mutex            sync.RWMutex
@@ -106,7 +106,7 @@ func (b *bookmarkManager) GetBookmarks(ctx context.Context) (Bookmarks, error) {
 
 func NewBookmarkManager(config BookmarkManagerConfig) BookmarkManager {
 	return &bookmarkManager{
-		bookmarks:        collection.NewSet(config.InitialBookmarks),
+		bookmarks:        collections.NewSet(config.InitialBookmarks),
 		supplyBookmarks:  config.BookmarkSupplier,
 		consumeBookmarks: config.BookmarkConsumer,
 	}

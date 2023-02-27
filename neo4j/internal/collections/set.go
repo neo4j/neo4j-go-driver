@@ -17,7 +17,7 @@
  * limitations under the License.
  */
 
-package collection
+package collections
 
 type Set[T comparable] map[T]struct{}
 
