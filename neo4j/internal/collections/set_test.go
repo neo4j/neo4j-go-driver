@@ -17,10 +17,10 @@
  * limitations under the License.
  */
 
-package collection_test
+package collections_test
 
 import (
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/collection"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/collections"
 	"math"
 	"math/rand"
 	"testing"
@@ -31,7 +31,7 @@ func TestSet(outer *testing.T) {
 	outer.Parallel()
 
 	outer.Run("adds", func(t *testing.T) {
-		ints := collection.NewSet([]int{})
+		ints := collections.NewSet([]int{})
 		addition := func(i int) bool {
 			ints.Add(i)
 			return containsExactlyOnce(ints, i)
@@ -42,7 +42,7 @@ func TestSet(outer *testing.T) {
 	})
 
 	outer.Run("adds all", func(t *testing.T) {
-		strings := collection.NewSet([]string{})
+		strings := collections.NewSet([]string{})
 		additions := func(strs []string) bool {
 			strings.AddAll(strs)
 			for _, str := range strs {
@@ -58,9 +58,9 @@ func TestSet(outer *testing.T) {
 	})
 
 	outer.Run("union", func(t *testing.T) {
-		strings := collection.NewSet([]string{})
+		strings := collections.NewSet([]string{})
 		union := func(strs []string) bool {
-			strings.Union(collection.NewSet(strs))
+			strings.Union(collections.NewSet(strs))
 			for _, str := range strs {
 				if !containsExactlyOnce(strings, str) {
 					return false
@@ -75,7 +75,7 @@ func TestSet(outer *testing.T) {
 
 	outer.Run("removes", func(t *testing.T) {
 		randomInts := rand.Perm(100)
-		removal := collection.NewSet(randomInts)
+		removal := collections.NewSet(randomInts)
 		addition := func(rawIndex int) bool {
 			index := abs(rawIndex) % len(removal)
 			element := randomInts[index]
@@ -89,7 +89,7 @@ func TestSet(outer *testing.T) {
 
 	outer.Run("removes all", func(t *testing.T) {
 		randomInts := rand.Perm(100)
-		ints := collection.NewSet(randomInts)
+		ints := collections.NewSet(randomInts)
 		removals := func(rawIndices []int) bool {
 			indices := make([]int, len(rawIndices))
 			for i, rawIndex := range rawIndices {
@@ -111,7 +111,7 @@ func TestSet(outer *testing.T) {
 
 	outer.Run("returns slice", func(t *testing.T) {
 		sliceConversion := func(values []float64) bool {
-			set := collection.NewSet(values)
+			set := collections.NewSet(values)
 
 			for _, value := range set.Values() {
 				if !containsExactlyOnce(set, value) {
@@ -127,7 +127,7 @@ func TestSet(outer *testing.T) {
 
 	outer.Run("copies", func(t *testing.T) {
 		setCopy := func(values []int64) bool {
-			originalSet := collection.NewSet(values)
+			originalSet := collections.NewSet(values)
 			copiedSet := originalSet.Copy()
 
 			for _, value := range copiedSet.Values() {
@@ -149,7 +149,7 @@ func TestSet(outer *testing.T) {
 	})
 }
 
-func containsExactlyOnce[T comparable](values collection.Set[T], search T) bool {
+func containsExactlyOnce[T comparable](values collections.Set[T], search T) bool {
 	count := 0
 	for value := range values {
 		if value == search {
