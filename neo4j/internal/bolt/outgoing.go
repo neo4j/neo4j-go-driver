@@ -65,6 +65,16 @@ func (o *outgoing) appendHello(hello map[string]any) {
 	o.end()
 }
 
+func (o *outgoing) appendLogon(logon map[string]any) {
+	if o.boltLogger != nil {
+		o.boltLogger.LogClientMessage(o.logId, "LOGON %s", loggableDictionary(logon))
+	}
+	o.begin()
+	o.packer.StructHeader(msgLogon, 1)
+	o.packMap(logon)
+	o.end()
+}
+
 func (o *outgoing) appendBegin(meta map[string]any) {
 	if o.boltLogger != nil {
 		o.boltLogger.LogClientMessage(o.logId, "BEGIN %s", loggableDictionary(meta))

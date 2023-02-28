@@ -241,23 +241,30 @@ func (b *bolt5) Connect(ctx context.Context, minor int, auth map[string]any, use
 		hello["routing"] = routingContext
 	}
 	// Merge authentication keys into hello, avoid overwriting existing keys
-	for k, v := range auth {
-		_, exists := hello[k]
-		if !exists {
-			hello[k] = v
+	if minor == 0 {
+		for k, v := range auth {
+			_, exists := hello[k]
+			if !exists {
+				hello[k] = v
+			}
 		}
 	}
 
 	// Send hello message and wait for confirmation
 	b.out.appendHello(hello)
+
+	if minor > 0 {
+		b.out.appendLogon(auth)
+	}
+
 	b.out.send(ctx, b.conn)
-	succ := b.receiveSuccess(ctx)
+	helloSuccess := b.receiveSuccess(ctx)
 	if b.err != nil {
 		return b.err
 	}
 
-	b.connId = succ.connectionId
-	b.serverVersion = succ.server
+	b.connId = helloSuccess.connectionId
+	b.serverVersion = helloSuccess.server
 
 	// Construct log identity
 	connectionLogId := fmt.Sprintf("%s@%s", b.connId, b.serverName)
@@ -265,7 +272,16 @@ func (b *bolt5) Connect(ctx context.Context, minor int, auth map[string]any, use
 	b.in.hyd.logId = connectionLogId
 	b.out.logId = connectionLogId
 
-	b.initializeReadTimeoutHint(succ.configurationHints)
+	b.initializeReadTimeoutHint(helloSuccess.configurationHints)
+
+	if minor > 0 {
+		// Receive logon success
+		_ = b.receiveSuccess(ctx)
+		if b.err != nil {
+			return b.err
+		}
+	}
+
 	// Transition into ready state
 	b.state = bolt5Ready
 	b.minor = minor

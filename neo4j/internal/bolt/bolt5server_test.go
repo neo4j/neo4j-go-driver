@@ -94,6 +94,32 @@ func (s *bolt5server) waitForHello() map[string]any {
 	return m
 }
 
+// Returns the first hello field
+func (s *bolt5server) waitForHelloWithoutAuthToken() map[string]any {
+	msg := s.receiveMsg()
+	s.assertStructType(msg, msgHello)
+	m := msg.fields[0].(map[string]any)
+	// Hello should contain some musts
+	_, exists := m["user_agent"]
+	if !exists {
+		s.sendFailureMsg("?", "Missing user_agent in hello")
+	}
+	return m
+}
+
+// Returns the first hello field
+func (s *bolt5server) waitForLogon() map[string]any {
+	msg := s.receiveMsg()
+	s.assertStructType(msg, msgLogon)
+	m := msg.fields[0].(map[string]any)
+	// Hello should contain some musts
+	_, exists := m["scheme"]
+	if !exists {
+		s.sendFailureMsg("?", "Missing scheme in logon")
+	}
+	return m
+}
+
 func (s *bolt5server) receiveMsg() *testStruct {
 	_, buf, err := dechunkMessage(context.Background(), s.conn, []byte{}, -1)
 	if err != nil {
@@ -203,6 +229,9 @@ func (s *bolt5server) acceptHello() {
 		"server":        "fake/4.5",
 	})
 }
+func (s *bolt5server) acceptLogon() {
+	s.sendSuccess(nil)
+}
 
 func (s *bolt5server) acceptHelloWithHints(hints map[string]any) {
 	s.send(msgSuccess, map[string]any{
@@ -260,6 +289,13 @@ func (s *bolt5server) serveRunTx(stream []testStruct, commit bool, bookmark stri
 		s.waitForTxRollback()
 		s.send(msgSuccess, map[string]any{})
 	}
+}
+
+func (s *bolt5server) rejectLogonWithoutAuthToken() {
+	s.send(msgFailure, map[string]any{
+		"code":    "Neo.ClientError.Security.Unauthorized",
+		"message": "",
+	})
 }
 
 func setupBolt5Pipe(t *testing.T) (net.Conn, *bolt5server, func()) {

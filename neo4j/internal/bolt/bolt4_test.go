@@ -115,23 +115,10 @@ func TestBolt4(outer *testing.T) {
 		return bolt, cleanup
 	}
 
-	// Simple successful connect
 	outer.Run("Connect success", func(t *testing.T) {
 		bolt, cleanup := connectToServer(t, func(srv *bolt4server) {
 			handshake := srv.waitForHandshake()
-			// There should be a version 4 somewhere
-			foundV := false
-			for i := 0; i < 5; i++ {
-				ver := handshake[(i * 4) : (i*4)+4]
-				if ver[3] == 4 {
-					foundV = true
-				}
-			}
-			if !foundV {
-				t.Fatalf("Didn't find version 4 in handshake: %+v", handshake)
-			}
-
-			// Accept bolt version 4
+			AssertVersionInHandshake(t, handshake, 4, 0)
 			srv.acceptVersion(4, 0)
 			srv.waitForHello()
 			srv.acceptHello()

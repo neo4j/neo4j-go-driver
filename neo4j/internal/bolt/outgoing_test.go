@@ -21,9 +21,12 @@ package bolt
 
 import (
 	"context"
+	"fmt"
 	idb "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
+	. "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/testutil"
 	"net"
 	"reflect"
+	"strings"
 	"testing"
 	"time"
 
@@ -594,4 +597,76 @@ func TestOutgoing(ot *testing.T) {
 			}
 		})
 	}
+}
+
+func TestCredentialsRedaction(outer *testing.T) {
+	outer.Parallel()
+
+	type testCase struct {
+		description        string
+		produceBoltMessage func(*outgoing)
+		credentials        string
+	}
+
+	testCases := []testCase{
+		{
+			description: "HELLO msg",
+			produceBoltMessage: func(o *outgoing) {
+				o.appendHello(map[string]any{
+					"credentials": "sup3rs3cr3t",
+				})
+			},
+			credentials: "sup3rs3cr3t",
+		},
+		{
+			description: "LOGON msg",
+			produceBoltMessage: func(o *outgoing) {
+				o.appendLogon(map[string]any{
+					"credentials": "letmein!",
+				})
+			},
+			credentials: "letmein!",
+		},
+	}
+
+	for _, testCase := range testCases {
+		outer.Run(testCase.description, func(t *testing.T) {
+			logger := &inMemoryBoltLogger{}
+			outWriter := &outgoing{
+				chunker:    newChunker(),
+				packer:     packstream.Packer{},
+				boltLogger: logger,
+			}
+
+			testCase.produceBoltMessage(outWriter)
+
+			AssertFalse(t, logger.AnyClientMessageContains(testCase.credentials))
+		})
+	}
+}
+
+type inMemoryBoltLogger struct {
+	clientMessages []string
+	serverMessages []string
+}
+
+func (log *inMemoryBoltLogger) LogClientMessage(context string, msg string, args ...any) {
+	log.clientMessages = append(log.clientMessages, log.format(context, msg, args))
+}
+
+func (log *inMemoryBoltLogger) LogServerMessage(context string, msg string, args ...any) {
+	log.serverMessages = append(log.serverMessages, log.format(context, msg, args))
+}
+
+func (log *inMemoryBoltLogger) AnyClientMessageContains(substring string) bool {
+	for _, clientMessage := range log.clientMessages {
+		if strings.Contains(clientMessage, substring) {
+			return true
+		}
+	}
+	return false
+}
+
+func (log *inMemoryBoltLogger) format(context string, msg string, args []any) string {
+	return fmt.Sprintf("[%s] %s", context, fmt.Sprintf(msg, args...))
 }
