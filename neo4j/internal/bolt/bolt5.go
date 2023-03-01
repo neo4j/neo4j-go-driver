@@ -483,7 +483,7 @@ func (b *bolt5) sendPullN(ctx context.Context) {
 	}
 }
 
-// Collects all records in current stream if in streaming state and there is a current stream.
+// bufferStream pulls all the records of the current stream if there is a current stream.
 func (b *bolt5) bufferStream(ctx context.Context) {
 	stream := b.streams.curr
 	if stream == nil {
@@ -505,8 +505,7 @@ func (b *bolt5) bufferStream(ctx context.Context) {
 	}
 }
 
-// Prepares the current stream for being switched out by collecting all records in the current
-// stream up until the next batch. Assumes that we are in a streaming state.
+// pauseStream pulls all the records of the current stream ongoing batch of records and unsets the stream as current
 func (b *bolt5) pauseStream(ctx context.Context) {
 	stream := b.streams.curr
 	if stream == nil {
@@ -527,12 +526,10 @@ func (b *bolt5) pauseStream(ctx context.Context) {
 	}
 }
 
+// resumeStream marks the current stream as current and requests PULL
 func (b *bolt5) resumeStream(ctx context.Context, s *stream) {
 	b.streams.resume(s)
 	b.sendPullN(ctx)
-	if b.err != nil {
-		return
-	}
 }
 
 func (b *bolt5) run(ctx context.Context, cypher string, params map[string]any, fetchSize int, tx *internalTx5) (*stream, error) {
