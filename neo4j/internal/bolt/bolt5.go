@@ -55,6 +55,9 @@ type internalTx5 struct {
 }
 
 func (i *internalTx5) toMeta() map[string]any {
+	if i == nil {
+		return nil
+	}
 	meta := map[string]any{}
 	if i.mode == idb.ReadMode {
 		meta["mode"] = "r"
@@ -84,8 +87,7 @@ type bolt5 struct {
 	streams       openstreams
 	conn          net.Conn
 	serverName    string
-	out           outgoing
-	in            incoming
+	queue         messageQueue
 	connId        string
 	logId         string
 	serverVersion string
@@ -110,7 +112,11 @@ func NewBolt5(serverName string, conn net.Conn, logger log.Logger, boltLog log.B
 		idleDate:   now,
 		log:        logger,
 		streams:    openstreams{},
-		in: incoming{
+		lastQid:    -1,
+	}
+	b.queue = newMessageQueue(
+		conn,
+		incoming{
 			buf: make([]byte, 4096),
 			hyd: hydrator{
 				boltLogger: boltLog,
@@ -119,16 +125,16 @@ func NewBolt5(serverName string, conn net.Conn, logger log.Logger, boltLog log.B
 			},
 			connReadTimeout: -1,
 		},
-		lastQid: -1,
-	}
-	b.out = outgoing{
-		chunker:    newChunker(),
-		packer:     packstream.Packer{},
-		onErr:      func(err error) { b.setError(err, true) },
-		boltLogger: boltLog,
-		useUtc:     true,
-	}
-
+		outgoing{
+			chunker:    newChunker(),
+			packer:     packstream.Packer{},
+			onErr:      func(err error) { b.setError(err, true) },
+			boltLogger: boltLog,
+			useUtc:     true,
+		},
+		b.onNextMessage,
+		b.onNextMessageError,
+	)
 	return b
 }
 
@@ -189,45 +195,6 @@ func (b *bolt5) setError(err error, fatal bool) {
 	}
 }
 
-func (b *bolt5) receiveMsg(ctx context.Context) any {
-	// Potentially dangerous to receive when an error has occurred, could hang.
-	// Important, a lot of code has been simplified relying on this check.
-	if b.err != nil {
-		return nil
-	}
-
-	msg, err := b.in.next(ctx, b.conn)
-	b.setError(err, true)
-	if err == nil {
-		b.idleDate = time.Now()
-	}
-	return msg
-}
-
-// Receives a message that is assumed to be a success response or a failure
-// in response to a sent command. Sets b.err and b.state on failure
-func (b *bolt5) receiveSuccess(ctx context.Context) *success {
-	msg := b.receiveMsg(ctx)
-	if b.err != nil {
-		return nil
-	}
-
-	switch v := msg.(type) {
-	case *success:
-		if v.qid > -1 {
-			b.lastQid = v.qid
-		}
-		return v
-	case *db.Neo4jError:
-		b.setError(v, isFatalError(v))
-		return nil
-	default:
-		// Unexpected message received
-		b.setError(errors.New("expected success or database error"), true)
-		return nil
-	}
-}
-
 func (b *bolt5) Connect(ctx context.Context, minor int, auth map[string]any, userAgent string, routingContext map[string]string) error {
 	if err := b.assertState(bolt5Unauthorized); err != nil {
 		return err
@@ -251,38 +218,22 @@ func (b *bolt5) Connect(ctx context.Context, minor int, auth map[string]any, use
 	}
 
 	// Send hello message and wait for confirmation
-	b.out.appendHello(hello)
-
-	if minor > 0 {
-		b.out.appendLogon(auth)
+	b.queue.appendHello(
+		boltVersion{major: 5, minor: minor},
+		hello, auth,
+		b.helloResponseHandler(),
+		b.logonResponseHandler(),
+	)
+	if b.queue.send(ctx); b.err != nil {
+		return b.err
 	}
-
-	b.out.send(ctx, b.conn)
-	helloSuccess := b.receiveSuccess(ctx)
-	if b.err != nil {
+	if err := b.queue.receiveAll(ctx); err != nil {
+		return err
+	}
+	if b.err != nil { // onNextMessageErr kicked in
 		return b.err
 	}
 
-	b.connId = helloSuccess.connectionId
-	b.serverVersion = helloSuccess.server
-
-	// Construct log identity
-	connectionLogId := fmt.Sprintf("%s@%s", b.connId, b.serverName)
-	b.logId = connectionLogId
-	b.in.hyd.logId = connectionLogId
-	b.out.logId = connectionLogId
-
-	b.initializeReadTimeoutHint(helloSuccess.configurationHints)
-
-	if minor > 0 {
-		// Receive logon success
-		_ = b.receiveSuccess(ctx)
-		if b.err != nil {
-			return b.err
-		}
-	}
-
-	// Transition into ready state
 	b.state = bolt5Ready
 	b.minor = minor
 	b.streams.reset()
@@ -313,12 +264,17 @@ func (b *bolt5) TxBegin(ctx context.Context, txConfig idb.TxConfig) (idb.TxHandl
 		impersonatedUser: txConfig.ImpersonatedUser,
 	}
 
-	b.out.appendBegin(tx.toMeta())
-	b.out.send(ctx, b.conn)
-	b.receiveSuccess(ctx)
-	if b.err != nil {
+	b.queue.appendBegin(tx.toMeta(), b.beginResponseHandler())
+	if b.queue.send(ctx); b.err != nil {
 		return 0, b.err
 	}
+	if err := b.queue.receiveAll(ctx); err != nil {
+		return 0, err
+	}
+	if b.err != nil { // onNextMessageErr kicked in
+		return 0, b.err
+	}
+
 	b.state = bolt5Tx
 	b.txId = idb.TxHandle(time.Now().Unix())
 	return b.txId, nil
@@ -371,16 +327,15 @@ func (b *bolt5) TxCommit(ctx context.Context, txh idb.TxHandle) error {
 		return err
 	}
 
-	// Send request to server to commit
-	b.out.appendCommit()
-	b.out.send(ctx, b.conn)
-	succ := b.receiveSuccess(ctx)
-	if b.err != nil {
+	b.queue.appendCommit(b.commitResponseHandler())
+	if b.queue.send(ctx); b.err != nil {
 		return b.err
 	}
-	// Keep track of bookmark
-	if len(succ.bookmark) > 0 {
-		b.bookmark = succ.bookmark
+	if err := b.queue.receiveAll(ctx); err != nil {
+		return err
+	}
+	if b.err != nil {
+		return b.err
 	}
 
 	// Transition into ready state
@@ -405,10 +360,14 @@ func (b *bolt5) TxRollback(ctx context.Context, txh idb.TxHandle) error {
 		return err
 	}
 
-	// Send rollback request to server
-	b.out.appendRollback()
-	b.out.send(ctx, b.conn)
-	if b.receiveSuccess(ctx); b.err != nil {
+	b.queue.appendRollback(b.rollbackResponseHandler())
+	if b.queue.send(ctx); b.err != nil {
+		return b.err
+	}
+	if err := b.queue.receiveAll(ctx); err != nil {
+		return err
+	}
+	if b.err != nil {
 		return b.err
 	}
 
@@ -427,29 +386,32 @@ func (b *bolt5) discardStream(ctx context.Context) {
 		return
 	}
 
+	// we need to get rid of the pending PULL response handler that would end up consuming everything
+	b.queue.replaceFront(b.discardResponseHandler(stream))
 	discarded := false
 	for {
-		_, batch, sum := b.receiveNext(ctx)
-		if batch {
-			if discarded {
-				// Response to discard, see below
-				b.streams.remove(stream)
-				b.checkStreams()
-				return
-			}
-			// Discard all! After this the next receive will get another batch
-			// as a response to the discard, we need to keep track of that we
-			// already sent a discard.
-			discarded = true
-			stream.fetchSize = -1
-			if b.state == bolt5StreamingTx && stream.qid != b.lastQid {
-				b.out.appendDiscardNQid(stream.fetchSize, stream.qid)
-			} else {
-				b.out.appendDiscardN(stream.fetchSize)
-			}
-			b.out.send(ctx, b.conn)
-		} else if sum != nil || b.err != nil {
-			// Stream is detached in receiveNext
+		if err := b.queue.receiveAll(ctx); err != nil {
+			return
+		}
+		if b.err != nil {
+			return
+		}
+		if stream.sum != nil || stream.err != nil {
+			return
+		}
+		if stream.endOfBatch && discarded {
+			b.streams.remove(stream)
+			b.checkStreams()
+			return
+		}
+		discarded = true
+		stream.fetchSize = -1 // request infinite batch to consume the rest
+		if b.state == bolt5StreamingTx && stream.qid != b.lastQid {
+			b.queue.appendDiscardNQid(stream.fetchSize, stream.qid, b.discardResponseHandler(stream))
+		} else {
+			b.queue.appendDiscardN(stream.fetchSize, b.discardResponseHandler(stream))
+		}
+		if b.queue.send(ctx); b.err != nil {
 			return
 		}
 	}
@@ -466,23 +428,6 @@ func (b *bolt5) discardAllStreams(ctx context.Context) {
 	b.checkStreams()
 }
 
-// Sends a PULL n request to server. State should be streaming and there should be a current stream.
-func (b *bolt5) sendPullN(ctx context.Context) {
-	_ = b.assertState(bolt5Streaming, bolt5StreamingTx)
-	if b.state == bolt5Streaming {
-		b.out.appendPullN(b.streams.curr.fetchSize)
-		b.out.send(ctx, b.conn)
-	} else if b.state == bolt5StreamingTx {
-		fetchSize := b.streams.curr.fetchSize
-		if b.streams.curr.qid == b.lastQid {
-			b.out.appendPullN(fetchSize)
-		} else {
-			b.out.appendPullNQid(fetchSize, b.streams.curr.qid)
-		}
-		b.out.send(ctx, b.conn)
-	}
-}
-
 // bufferStream pulls all the records of the current stream if there is a current stream.
 func (b *bolt5) bufferStream(ctx context.Context) {
 	stream := b.streams.curr
@@ -490,17 +435,22 @@ func (b *bolt5) bufferStream(ctx context.Context) {
 		return
 	}
 
-	// Buffer current batch and start infinite batch and/or buffer the infinite batch
 	for {
-		rec, batch, _ := b.receiveNext(ctx)
-		if rec != nil {
-			stream.push(rec)
-		} else if batch {
-			stream.fetchSize = -1
-			b.sendPullN(ctx)
-		} else {
-			// Either summary or an error
+		if err := b.queue.receiveAll(ctx); err != nil {
 			return
+		}
+		if b.err != nil {
+			return
+		}
+		if stream.sum != nil || stream.err != nil {
+			return
+		}
+		if stream.endOfBatch {
+			stream.fetchSize = -1
+			b.appendPullN(stream)
+			if b.queue.send(ctx); b.err != nil {
+				return
+			}
 		}
 	}
 }
@@ -513,15 +463,17 @@ func (b *bolt5) pauseStream(ctx context.Context) {
 	}
 
 	for {
-		rec, batch, _ := b.receiveNext(ctx)
-		if rec != nil {
-			stream.push(rec)
-		} else if batch {
+		if err := b.queue.receiveAll(ctx); err != nil {
+			return
+		}
+		if b.err != nil {
+			return
+		}
+		if stream.sum != nil || stream.err != nil {
+			return
+		}
+		if stream.endOfBatch {
 			b.streams.pause()
-			return
-		} else {
-			// Either summary or an error
-			return
 		}
 	}
 }
@@ -529,10 +481,11 @@ func (b *bolt5) pauseStream(ctx context.Context) {
 // resumeStream marks the current stream as current and requests PULL
 func (b *bolt5) resumeStream(ctx context.Context, s *stream) {
 	b.streams.resume(s)
-	b.sendPullN(ctx)
+	b.queue.appendPullN(s.fetchSize, b.pullResponseHandler(s))
+	b.queue.send(ctx)
 }
 
-func (b *bolt5) run(ctx context.Context, cypher string, params map[string]any, fetchSize int, tx *internalTx5) (*stream, error) {
+func (b *bolt5) run(ctx context.Context, cypher string, params map[string]any, rawFetchSize int, tx *internalTx5) (*stream, error) {
 	// If already streaming, consume the whole thing first
 	if b.state == bolt5Streaming {
 		if b.bufferStream(ctx); b.err != nil {
@@ -548,48 +501,34 @@ func (b *bolt5) run(ctx context.Context, cypher string, params map[string]any, f
 		return nil, err
 	}
 
-	// Transaction metadata, used either in lazily started transaction or to run message.
-	var meta map[string]any
-	if tx != nil {
-		meta = tx.toMeta()
-	}
-
-	// Append run message
-	b.out.appendRun(cypher, params, meta)
-
-	// Ensure that fetchSize is in a valid range
-	switch {
-	case fetchSize < 0:
-		fetchSize = -1
-	case fetchSize == 0:
-		fetchSize = bolt5FetchSize
-	}
-	// Append pull message and send it along with other pending messages
-	b.out.appendPullN(fetchSize)
-	b.out.send(ctx, b.conn)
-
-	// Receive confirmation of run message
-	succ := b.receiveSuccess(ctx)
-	if b.err != nil {
-		// If failed with a database error, there will be an ignored response for the
-		// pull message as well, this will be cleaned up by Reset
+	fetchSize := b.normalizeFetchSize(rawFetchSize)
+	stream := &stream{fetchSize: fetchSize}
+	b.queue.appendRun(cypher, params, tx.toMeta(), fetchSize,
+		b.runResponseHandler(stream),
+		b.pullResponseHandler(stream))
+	if b.queue.send(ctx); b.err != nil {
 		return nil, b.err
 	}
-	// Extract the RUN response from success response
-	b.tfirst = succ.tfirst
-	// Change state to streaming
-	if b.state == bolt5Ready {
-		b.state = bolt5Streaming
-	} else {
-		b.state = bolt5StreamingTx
+	// only read response for RUN
+	if err := b.queue.receive(ctx); err != nil {
+		// rely on RESET being sent
+		return nil, err
 	}
-
-	// Create a stream representation, set it to current and track it
-	stream := &stream{keys: succ.fields, qid: succ.qid, fetchSize: fetchSize}
+	if b.err != nil {
+		return nil, b.err
+	}
 	b.streams.attach(stream)
-	// No need to check streams state, we know we are streaming
-
 	return stream, nil
+}
+
+func (b *bolt5) normalizeFetchSize(fetchSize int) int {
+	if fetchSize < 0 {
+		return -1
+	}
+	if fetchSize == 0 {
+		return bolt5FetchSize
+	}
+	return fetchSize
 }
 
 func (b *bolt5) Run(ctx context.Context, cmd idb.Command,
@@ -644,40 +583,40 @@ func (b *bolt5) Next(ctx context.Context, streamHandle idb.StreamHandle) (
 		return nil, nil, err
 	}
 
-	// Buffered stream or someone else's stream, doesn't matter...
-	// Summary and error are considered buffered as well.
 	buf, rec, sum, err := stream.bufferedNext()
 	if buf {
+		// stream still has buffered records, is fully consumed or failed
 		return rec, sum, err
 	}
 
-	// Make sure that the stream belongs to this bolt instance otherwise we might mess
-	// up the internal state machine. If clients stick to the streams out of
-	// transaction scope or after the connection been sent back to the pool we might end
-	// up here.
-	if err = b.streams.isSafe(stream); err != nil {
+	err = b.queue.receive(ctx)
+	if err != nil {
 		return nil, nil, err
 	}
-
-	// If the stream isn't the current we must finish what we're doing with the current stream
-	// and make it the current one.
-	if stream != b.streams.curr {
-		b.pauseStream(ctx)
-		if b.err != nil {
-			return nil, nil, b.err
-		}
-		b.resumeStream(ctx, stream)
+	if b.err != nil {
+		return nil, nil, b.err
 	}
-
-	rec, batchCompleted, sum := b.receiveNext(ctx)
-	if batchCompleted {
-		b.sendPullN(ctx)
-		if b.err != nil {
-			return nil, nil, b.err
-		}
-		rec, _, sum = b.receiveNext(ctx)
+	buf, rec, sum, err = stream.bufferedNext()
+	if buf {
+		return rec, sum, err
 	}
-	return rec, sum, b.err
+	b.appendPullN(stream)
+	b.queue.send(ctx)
+	if b.err != nil {
+		return nil, nil, b.err
+	}
+	err = b.queue.receiveAll(ctx)
+	if err != nil {
+		return nil, nil, err
+	}
+	if b.err != nil {
+		return nil, nil, err
+	}
+	buf, rec, sum, err = stream.bufferedNext()
+	if buf {
+		return rec, sum, err
+	}
+	return nil, nil, errors.New("buffer should not be empty")
 }
 
 func (b *bolt5) Consume(ctx context.Context, streamHandle idb.StreamHandle) (
@@ -757,51 +696,6 @@ func (b *bolt5) Buffer(ctx context.Context,
 	return stream.Err()
 }
 
-// Reads one record from the network and returns either a record, a flag that indicates that
-// a PULL N batch completed, a summary indicating end of stream or an error.
-// Assumes that there is a current stream and that streaming is active.
-func (b *bolt5) receiveNext(ctx context.Context) (*db.Record, bool, *db.Summary) {
-	res := b.receiveMsg(ctx)
-	if b.err != nil {
-		return nil, false, nil
-	}
-
-	switch x := res.(type) {
-	case *db.Record:
-		// A new record
-		x.Keys = b.streams.curr.keys
-		return x, false, nil
-	case *success:
-		// End of batch or end of stream?
-		if x.hasMore {
-			// End of batch
-			return nil, true, nil
-		}
-		// End of stream, parse summary. Current implementation never fails.
-		sum := x.summary()
-		// Add some extras to the summary
-		sum.Agent = b.serverVersion
-		sum.Major = 5
-		sum.Minor = b.minor
-		sum.ServerName = b.serverName
-		sum.TFirst = b.tfirst
-		if len(sum.Bookmark) > 0 {
-			b.bookmark = sum.Bookmark
-		}
-		// Done with this stream
-		b.streams.detach(sum, nil)
-		b.checkStreams()
-		return nil, false, sum
-	case *db.Neo4jError:
-		b.setError(x, isFatalError(x)) // Will detach the stream
-		return nil, false, nil
-	default:
-		// Unknown territory
-		b.setError(errors.New("unknown response"), true)
-		return nil, false, nil
-	}
-}
-
 func (b *bolt5) Bookmark() string {
 	return b.bookmark
 }
@@ -850,31 +744,12 @@ func (b *bolt5) ForceReset(ctx context.Context) {
 	// it should be recoverable.
 	b.err = nil
 
-	// Send the reset message to the server
-	b.out.appendReset()
-	b.out.send(ctx, b.conn)
-	if b.err != nil {
+	b.queue.appendReset(b.resetResponseHandler())
+	if b.queue.send(ctx); b.err != nil {
 		return
 	}
-
-	for {
-		msg := b.receiveMsg(ctx)
-		if b.err != nil {
-			return
-		}
-		switch x := msg.(type) {
-		case *ignored, *db.Record:
-			// Command ignored
-		case *success:
-			if x.isResetResponse() {
-				// Reset confirmed
-				b.state = bolt5Ready
-				return
-			}
-		default:
-			b.state = bolt5Dead
-			return
-		}
+	if err := b.queue.receiveAll(ctx); b.err != nil || err != nil {
+		return
 	}
 }
 
@@ -892,13 +767,23 @@ func (b *bolt5) GetRoutingTable(ctx context.Context,
 	if impersonatedUser != "" {
 		extras["imp_user"] = impersonatedUser
 	}
-	b.out.appendRoute(routingContext, bookmarks, extras)
-	b.out.send(ctx, b.conn)
-	succ := b.receiveSuccess(ctx)
+
+	var routingTable *idb.RoutingTable
+	b.queue.appendRoute(routingContext, bookmarks, extras, b.routeResponseHandler(&routingTable))
+	if b.queue.send(ctx); b.err != nil {
+		return nil, b.err
+	}
+	if err := b.queue.receiveAll(ctx); err != nil {
+		return nil, err
+	}
 	if b.err != nil {
 		return nil, b.err
 	}
-	return succ.routingTable, nil
+	return routingTable, nil
+}
+
+func (b *bolt5) SetBoltLogger(boltLogger log.BoltLogger) {
+	b.queue.setBoltLogger(boltLogger)
 }
 
 // Close closes the underlying connection.
@@ -906,8 +791,8 @@ func (b *bolt5) GetRoutingTable(ctx context.Context,
 func (b *bolt5) Close(ctx context.Context) {
 	b.log.Infof(log.Bolt5, b.logId, "Close")
 	if b.state != bolt5Dead {
-		b.out.appendGoodbye()
-		b.out.send(ctx, b.conn)
+		b.queue.appendGoodbye()
+		b.queue.send(ctx)
 	}
 	_ = b.conn.Close()
 	b.state = bolt5Dead
@@ -917,16 +802,199 @@ func (b *bolt5) SelectDatabase(database string) {
 	b.databaseName = database
 }
 
-func (b *bolt5) SetBoltLogger(boltLogger log.BoltLogger) {
-	b.in.hyd.boltLogger = boltLogger
-	b.out.boltLogger = boltLogger
-}
-
 func (b *bolt5) Version() db.ProtocolVersion {
 	return db.ProtocolVersion{
 		Major: 5,
 		Minor: b.minor,
 	}
+}
+
+func (b *bolt5) appendPullN(stream *stream) {
+	if b.state == bolt5Streaming {
+		b.queue.appendPullN(stream.fetchSize, b.pullResponseHandler(stream))
+	} else if b.state == bolt5StreamingTx {
+		if stream.qid == b.lastQid {
+			b.queue.appendPullN(stream.fetchSize, b.pullResponseHandler(stream))
+		} else {
+			b.queue.appendPullNQid(stream.fetchSize, stream.qid, b.pullResponseHandler(stream))
+		}
+	}
+}
+
+func (b *bolt5) helloResponseHandler() responseHandler {
+	return b.expectedSuccessHandler(b.onHelloSuccess)
+}
+
+func (b *bolt5) logonResponseHandler() responseHandler {
+	return b.expectedSuccessHandler(onSuccessNoOp)
+}
+
+func (b *bolt5) routeResponseHandler(table **idb.RoutingTable) responseHandler {
+	return b.expectedSuccessHandler(func(routeSuccess *success) {
+		*table = routeSuccess.routingTable
+	})
+}
+
+func (b *bolt5) beginResponseHandler() responseHandler {
+	return b.expectedSuccessHandler(onSuccessNoOp)
+}
+
+func (b *bolt5) runResponseHandler(stream *stream) responseHandler {
+	return b.expectedSuccessHandler(func(runSuccess *success) {
+		stream.keys = runSuccess.fields
+		stream.qid = runSuccess.qid
+		if runSuccess.qid > -1 {
+			b.lastQid = runSuccess.qid
+		}
+		b.streams.attach(stream)
+		b.tfirst = runSuccess.tfirst
+		if b.state == bolt5Ready {
+			b.state = bolt5Streaming
+		} else if b.state == bolt5Tx {
+			b.state = bolt5StreamingTx
+		}
+	})
+}
+
+func (b *bolt5) commitResponseHandler() responseHandler {
+	return b.expectedSuccessHandler(b.onCommitSuccess)
+}
+
+func (b *bolt5) rollbackResponseHandler() responseHandler {
+	return b.expectedSuccessHandler(onSuccessNoOp)
+}
+
+func (b *bolt5) discardResponseHandler(stream *stream) responseHandler {
+	return responseHandler{
+		onRecord: func(record *db.Record) {
+			stream.endOfBatch = false
+			// no record accumulation since we want to discard the stream
+			b.queue.enqueueCallback(b.discardResponseHandler(stream))
+		},
+		onIgnored: onIgnoredNoOp,
+		onSuccess: func(discardSuccess *success) {
+			if discardSuccess.hasMore {
+				stream.endOfBatch = true
+				return
+			}
+			summary := b.extractSummary(discardSuccess)
+			if len(summary.Bookmark) > 0 {
+				b.bookmark = summary.Bookmark
+			}
+			stream.sum = summary
+			b.streams.detach(summary, nil)
+			b.checkStreams()
+		},
+		onFailure: func(failure *db.Neo4jError) {
+			stream.err = failure
+			b.setError(failure, isFatalError(failure)) // Will detach the stream
+		},
+		onUnknown: func(msg any) {
+			b.setError(fmt.Errorf("unknown response %v", msg), true)
+		},
+	}
+}
+
+func (b *bolt5) pullResponseHandler(stream *stream) responseHandler {
+	return responseHandler{
+		onRecord: func(record *db.Record) {
+			stream.endOfBatch = false
+			record.Keys = stream.keys
+			stream.push(record)
+			b.queue.enqueueCallback(b.pullResponseHandler(stream))
+		},
+		onIgnored: onIgnoredNoOp,
+		onSuccess: func(pullSuccess *success) {
+			if pullSuccess.hasMore {
+				stream.endOfBatch = true
+				return
+			}
+			summary := b.extractSummary(pullSuccess)
+			if len(summary.Bookmark) > 0 {
+				b.bookmark = summary.Bookmark
+			}
+			stream.sum = summary
+			b.streams.detach(summary, nil)
+			b.checkStreams()
+		},
+		onFailure: func(failure *db.Neo4jError) {
+			stream.err = failure
+			b.setError(failure, isFatalError(failure)) // Will detach the stream
+		},
+		onUnknown: func(msg any) {
+			b.setError(fmt.Errorf("unknown response %v", msg), true)
+		},
+	}
+}
+
+func (b *bolt5) extractSummary(success *success) *db.Summary {
+	summary := success.summary()
+	summary.Agent = b.serverVersion
+	summary.Major = 5
+	summary.Minor = b.minor
+	summary.ServerName = b.serverName
+	summary.TFirst = b.tfirst
+	return summary
+}
+
+func (b *bolt5) resetResponseHandler() responseHandler {
+	return responseHandler{
+		onSuccess: func(resetSuccess *success) {
+			b.state = bolt5Ready
+			b.queue.reset() // clear queue since it may contain PULL handler callbacks
+		},
+		onRecord: onRecordNoOp,
+		onFailure: func(*db.Neo4jError) {
+			b.state = bolt5Dead
+			b.queue.reset() // clear queue since it may contain PULL handler callbacks
+		},
+		onUnknown: func(any) {
+			b.state = bolt5Dead
+			b.queue.reset() // clear queue since it may contain PULL handler callbacks
+		},
+		onIgnored: onIgnoredNoOp,
+	}
+}
+
+func (b *bolt5) expectedSuccessHandler(onSuccess func(*success)) responseHandler {
+	return responseHandler{
+		onSuccess: onSuccess,
+		onFailure: b.onFailure,
+		onUnknown: b.onUnknown,
+		onIgnored: onIgnoredNoOp,
+	}
+}
+
+func (b *bolt5) onHelloSuccess(helloSuccess *success) {
+	b.connId = helloSuccess.connectionId
+	b.serverVersion = helloSuccess.server
+
+	connectionLogId := fmt.Sprintf("%s@%s", b.connId, b.serverName)
+	b.logId = connectionLogId
+	b.queue.setLogId(connectionLogId)
+	b.initializeReadTimeoutHint(helloSuccess.configurationHints)
+}
+
+func (b *bolt5) onCommitSuccess(commitSuccess *success) {
+	if len(commitSuccess.bookmark) > 0 {
+		b.bookmark = commitSuccess.bookmark
+	}
+}
+
+func (b *bolt5) onNextMessage() {
+	b.idleDate = time.Now()
+}
+
+func (b *bolt5) onNextMessageError(err error) {
+	b.setError(err, true)
+}
+
+func (b *bolt5) onFailure(err *db.Neo4jError) {
+	b.setError(err, isFatalError(err))
+}
+
+func (b *bolt5) onUnknown(msg any) {
+	b.setError(fmt.Errorf("expected success or database error, got %v", msg), true)
 }
 
 func (b *bolt5) initializeReadTimeoutHint(hints map[string]any) {
@@ -943,5 +1011,5 @@ func (b *bolt5) initializeReadTimeoutHint(hints map[string]any) {
 		b.log.Infof(log.Bolt5, b.logId, `invalid %q integer value: %d. Only strictly positive values are accepted"`, readTimeoutHintName, readTimeout)
 		return
 	}
-	b.in.connReadTimeout = time.Duration(readTimeout) * time.Second
+	b.queue.in.connReadTimeout = time.Duration(readTimeout) * time.Second
 }

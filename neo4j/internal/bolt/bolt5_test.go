@@ -112,7 +112,7 @@ func TestBolt5(outer *testing.T) {
 
 		bolt := c.(*bolt5)
 		assertBoltState(t, bolt5Ready, bolt)
-		if !bolt.out.useUtc {
+		if !bolt.queue.out.useUtc {
 			t.Fatalf("Bolt 5+ connections must always send and receive UTC datetimes")
 		}
 		return bolt, cleanup
@@ -131,7 +131,7 @@ func TestBolt5(outer *testing.T) {
 
 		AssertStringEqual(t, bolt.ServerName(), "serverName")
 		AssertTrue(t, bolt.IsAlive())
-		AssertTrue(t, reflect.DeepEqual(bolt.in.connReadTimeout, time.Duration(-1)))
+		AssertTrue(t, reflect.DeepEqual(bolt.queue.in.connReadTimeout, time.Duration(-1)))
 	})
 
 	outer.Run("Connect success in 5.1", func(t *testing.T) {
@@ -151,7 +151,7 @@ func TestBolt5(outer *testing.T) {
 		// Check Bolt properties
 		AssertStringEqual(t, bolt.ServerName(), "serverName")
 		AssertTrue(t, bolt.IsAlive())
-		AssertTrue(t, reflect.DeepEqual(bolt.in.connReadTimeout, time.Duration(-1)))
+		AssertTrue(t, reflect.DeepEqual(bolt.queue.in.connReadTimeout, time.Duration(-1)))
 	})
 
 	outer.Run("Connect success with timeout hint", func(t *testing.T) {
@@ -164,7 +164,7 @@ func TestBolt5(outer *testing.T) {
 		defer cleanup()
 		defer bolt.Close(context.Background())
 
-		AssertTrue(t, reflect.DeepEqual(bolt.in.connReadTimeout, 42*time.Second))
+		AssertTrue(t, reflect.DeepEqual(bolt.queue.in.connReadTimeout, 42*time.Second))
 	})
 
 	outer.Run("Connect success with timeout hint in 5.1", func(t *testing.T) {
@@ -205,7 +205,7 @@ func TestBolt5(outer *testing.T) {
 		defer cleanup()
 		defer bolt.Close(context.Background())
 
-		AssertTrue(t, reflect.DeepEqual(bolt.in.connReadTimeout, 42*time.Second))
+		AssertTrue(t, reflect.DeepEqual(bolt.queue.in.connReadTimeout, 42*time.Second))
 	})
 
 	invalidValues := []any{4.2, "42", -42}
@@ -220,7 +220,7 @@ func TestBolt5(outer *testing.T) {
 			defer cleanup()
 			defer bolt.Close(context.Background())
 
-			AssertTrue(t, reflect.DeepEqual(bolt.in.connReadTimeout, time.Duration(-1)))
+			AssertTrue(t, reflect.DeepEqual(bolt.queue.in.connReadTimeout, time.Duration(-1)))
 		})
 	}
 

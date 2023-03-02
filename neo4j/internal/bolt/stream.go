@@ -29,13 +29,14 @@ import (
 )
 
 type stream struct {
-	keys      []string
-	fifo      list.List
-	sum       *db.Summary
-	err       error
-	qid       int64
-	fetchSize int
-	key       int64
+	keys       []string
+	fifo       list.List
+	sum        *db.Summary
+	err        error
+	qid        int64
+	fetchSize  int
+	key        int64
+	endOfBatch bool
 }
 
 // Acts on buffered data, first return value indicates if buffering
