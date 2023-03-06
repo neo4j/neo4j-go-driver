@@ -386,8 +386,7 @@ func (b *bolt5) discardStream(ctx context.Context) {
 		return
 	}
 
-	stream.discarding = true
-	// we need to get rid of the pending PULL response handler that would end up consuming everything
+	stream.discarding = true // pull response handler will discard any accumulated record for this stream
 	discarded := false
 	for {
 		if err := b.queue.receiveAll(ctx); err != nil {
@@ -898,10 +897,10 @@ func (b *bolt5) pullResponseHandler(stream *stream) responseHandler {
 	return responseHandler{
 		onRecord: func(record *db.Record) {
 			stream.endOfBatch = false
-			record.Keys = stream.keys
 			if stream.discarding {
 				stream.emptyRecords()
 			} else {
+				record.Keys = stream.keys
 				stream.push(record)
 			}
 			b.queue.pushFront(b.pullResponseHandler(stream))
@@ -934,16 +933,6 @@ func (b *bolt5) pullResponseHandler(stream *stream) responseHandler {
 			b.setError(fmt.Errorf("unknown response %v", msg), true)
 		},
 	}
-}
-
-func (b *bolt5) extractSummary(success *success) *db.Summary {
-	summary := success.summary()
-	summary.Agent = b.serverVersion
-	summary.Major = 5
-	summary.Minor = b.minor
-	summary.ServerName = b.serverName
-	summary.TFirst = b.tfirst
-	return summary
 }
 
 func (b *bolt5) resetResponseHandler() responseHandler {
@@ -1016,4 +1005,14 @@ func (b *bolt5) initializeReadTimeoutHint(hints map[string]any) {
 		return
 	}
 	b.queue.in.connReadTimeout = time.Duration(readTimeout) * time.Second
+}
+
+func (b *bolt5) extractSummary(success *success) *db.Summary {
+	summary := success.summary()
+	summary.Agent = b.serverVersion
+	summary.Major = 5
+	summary.Minor = b.minor
+	summary.ServerName = b.serverName
+	summary.TFirst = b.tfirst
+	return summary
 }
