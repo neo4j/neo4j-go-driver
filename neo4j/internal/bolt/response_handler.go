@@ -12,6 +12,5 @@ type responseHandler struct {
 	onIgnored func(*ignored)
 }
 
-func onSuccessNoOp(*success)  {}
-func onRecordNoOp(*db.Record) {}
-func onIgnoredNoOp(*ignored)  {}
+func onSuccessNoOp(*success) {}
+func onIgnoredNoOp(*ignored) {}

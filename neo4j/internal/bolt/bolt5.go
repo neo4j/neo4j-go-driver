@@ -951,14 +951,12 @@ func (b *bolt5) resetResponseHandler() responseHandler {
 		onSuccess: func(resetSuccess *success) {
 			b.state = bolt5Ready
 		},
-		onRecord: onRecordNoOp,
 		onFailure: func(*db.Neo4jError) {
 			b.state = bolt5Dead
 		},
 		onUnknown: func(any) {
 			b.state = bolt5Dead
 		},
-		onIgnored: onIgnoredNoOp,
 	}
 }
 
