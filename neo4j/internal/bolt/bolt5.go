@@ -386,8 +386,8 @@ func (b *bolt5) discardStream(ctx context.Context) {
 		return
 	}
 
+	stream.discarding = true
 	// we need to get rid of the pending PULL response handler that would end up consuming everything
-	b.queue.replaceFront(b.discardResponseHandler(stream))
 	discarded := false
 	for {
 		if err := b.queue.receiveAll(ctx); err != nil {
@@ -462,19 +462,17 @@ func (b *bolt5) pauseStream(ctx context.Context) {
 		return
 	}
 
-	for {
-		if err := b.queue.receiveAll(ctx); err != nil {
-			return
-		}
-		if b.err != nil {
-			return
-		}
-		if stream.sum != nil || stream.err != nil {
-			return
-		}
-		if stream.endOfBatch {
-			b.streams.pause()
-		}
+	if err := b.queue.receiveAll(ctx); err != nil {
+		return
+	}
+	if b.err != nil {
+		return
+	}
+	if stream.sum != nil || stream.err != nil {
+		return
+	}
+	if stream.endOfBatch {
+		b.streams.pause()
 	}
 }
 
@@ -511,7 +509,7 @@ func (b *bolt5) run(ctx context.Context, cypher string, params map[string]any, r
 	}
 	// only read response for RUN
 	if err := b.queue.receive(ctx); err != nil {
-		// rely on RESET being sent
+		// rely on RESET to deal with unhandled PULL response
 		return nil, err
 	}
 	if b.err != nil {
@@ -744,11 +742,14 @@ func (b *bolt5) ForceReset(ctx context.Context) {
 	// it should be recoverable.
 	b.err = nil
 
+	if err := b.queue.receiveAll(ctx); b.err != nil || err != nil {
+		return
+	}
 	b.queue.appendReset(b.resetResponseHandler())
 	if b.queue.send(ctx); b.err != nil {
 		return
 	}
-	if err := b.queue.receiveAll(ctx); b.err != nil || err != nil {
+	if err := b.queue.receive(ctx); b.err != nil || err != nil {
 		return
 	}
 }
@@ -866,12 +867,10 @@ func (b *bolt5) rollbackResponseHandler() responseHandler {
 
 func (b *bolt5) discardResponseHandler(stream *stream) responseHandler {
 	return responseHandler{
-		onRecord: func(record *db.Record) {
-			stream.endOfBatch = false
-			// no record accumulation since we want to discard the stream
-			b.queue.enqueueCallback(b.discardResponseHandler(stream))
+		onIgnored: func(*ignored) {
+			b.streams.detach(nil, fmt.Errorf("stream interrupted while discarding results"))
+			b.checkStreams()
 		},
-		onIgnored: onIgnoredNoOp,
 		onSuccess: func(discardSuccess *success) {
 			if discardSuccess.hasMore {
 				stream.endOfBatch = true
@@ -900,11 +899,21 @@ func (b *bolt5) pullResponseHandler(stream *stream) responseHandler {
 		onRecord: func(record *db.Record) {
 			stream.endOfBatch = false
 			record.Keys = stream.keys
-			stream.push(record)
-			b.queue.enqueueCallback(b.pullResponseHandler(stream))
+			if stream.discarding {
+				stream.emptyRecords()
+			} else {
+				stream.push(record)
+			}
+			b.queue.pushFront(b.pullResponseHandler(stream))
 		},
-		onIgnored: onIgnoredNoOp,
+		onIgnored: func(*ignored) {
+			b.streams.detach(nil, fmt.Errorf("stream interrupted while pulling results"))
+			b.checkStreams()
+		},
 		onSuccess: func(pullSuccess *success) {
+			if stream.discarding {
+				stream.emptyRecords()
+			}
 			if pullSuccess.hasMore {
 				stream.endOfBatch = true
 				return
@@ -941,16 +950,13 @@ func (b *bolt5) resetResponseHandler() responseHandler {
 	return responseHandler{
 		onSuccess: func(resetSuccess *success) {
 			b.state = bolt5Ready
-			b.queue.reset() // clear queue since it may contain PULL handler callbacks
 		},
 		onRecord: onRecordNoOp,
 		onFailure: func(*db.Neo4jError) {
 			b.state = bolt5Dead
-			b.queue.reset() // clear queue since it may contain PULL handler callbacks
 		},
 		onUnknown: func(any) {
 			b.state = bolt5Dead
-			b.queue.reset() // clear queue since it may contain PULL handler callbacks
 		},
 		onIgnored: onIgnoredNoOp,
 	}

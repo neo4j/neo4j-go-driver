@@ -1,6 +1,8 @@
 package bolt
 
-import "github.com/neo4j/neo4j-go-driver/v5/neo4j/db"
+import (
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/db"
+)
 
 type responseHandler struct {
 	onSuccess func(*success)

@@ -147,6 +147,10 @@ func (q *messageQueue) receive(ctx context.Context) error {
 	return nil
 }
 
+func (q *messageQueue) pushFront(handler responseHandler) {
+	q.callbacks.PushFront(handler)
+}
+
 func (q *messageQueue) pop() responseHandler {
 	return q.callbacks.Remove(q.callbacks.Front()).(responseHandler)
 }
@@ -180,15 +184,6 @@ func (q *messageQueue) setLogId(logId string) {
 func (q *messageQueue) setBoltLogger(logger log.BoltLogger) {
 	q.in.hyd.boltLogger = logger
 	q.out.boltLogger = logger
-}
-
-func (q *messageQueue) reset() {
-	q.callbacks.Init()
-}
-
-func (q *messageQueue) replaceFront(handler responseHandler) {
-	q.pop()
-	q.callbacks.PushFront(handler)
 }
 
 type boltVersion struct {

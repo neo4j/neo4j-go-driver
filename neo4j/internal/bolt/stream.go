@@ -37,6 +37,7 @@ type stream struct {
 	fetchSize  int
 	key        int64
 	endOfBatch bool
+	discarding bool
 }
 
 // Acts on buffered data, first return value indicates if buffering
@@ -55,6 +56,13 @@ func (s *stream) bufferedNext() (bool, *db.Record, *db.Summary, error) {
 	}
 
 	return false, nil, nil, nil
+}
+
+func (s *stream) emptyRecords() {
+	if s.fifo.Len() == 0 {
+		return
+	}
+	s.fifo.Init()
 }
 
 // Delayed error until fifo emptied

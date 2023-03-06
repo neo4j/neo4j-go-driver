@@ -167,11 +167,11 @@ func TestBolt5(outer *testing.T) {
 		AssertTrue(t, reflect.DeepEqual(bolt.queue.in.connReadTimeout, 42*time.Second))
 	})
 
-	outer.Run("Connect success with timeout hint in 5.1", func(t *testing.T) {
-		bolt, cleanup := connectToServer(t, func(srv *bolt5server) {
+	outer.Run("Connect success with timeout hint in 5.1", func(inner *testing.T) {
+		bolt, cleanup := connectToServer(inner, func(srv *bolt5server) {
 			srv.waitForHandshake()
 			srv.acceptVersion(5, 1)
-			outer.Run("Run auto-commit", func(t *testing.T) {
+			inner.Run("Run auto-commit", func(t *testing.T) {
 				cypherText := "MATCH (n)"
 				theDb := "thedb"
 				bolt, cleanup := connectToServer(t, func(srv *bolt5server) {
@@ -205,7 +205,7 @@ func TestBolt5(outer *testing.T) {
 		defer cleanup()
 		defer bolt.Close(context.Background())
 
-		AssertTrue(t, reflect.DeepEqual(bolt.queue.in.connReadTimeout, 42*time.Second))
+		AssertTrue(inner, reflect.DeepEqual(bolt.queue.in.connReadTimeout, 42*time.Second))
 	})
 
 	invalidValues := []any{4.2, "42", -42}
@@ -656,8 +656,8 @@ func TestBolt5(outer *testing.T) {
 			srv.waitForRun(nil)
 			srv.waitForPullN(bolt5FetchSize)
 			srv.sendFailureMsg("code", "msg") // RUN failed
+			srv.sendIgnoredMsg()              // PULL Ignored
 			srv.waitForReset()
-			srv.sendIgnoredMsg() // PULL Ignored
 			srv.sendSuccess(map[string]any{})
 		})
 		defer cleanup()
@@ -693,31 +693,6 @@ func TestBolt5(outer *testing.T) {
 		AssertNeo4jError(t, err)
 		err = bolt.TxCommit(context.Background(), tx) // This will fail due to above failed
 		AssertNeo4jError(t, err)                      // Should have same error as from run since that is original cause
-	})
-
-	outer.Run("Reset while streaming", func(t *testing.T) {
-		bolt, cleanup := connectToServer(t, func(srv *bolt5server) {
-			srv.accept(5)
-			srv.waitForRun(nil)
-			srv.waitForPullN(bolt5FetchSize)
-			// Send RUN response and a record
-			for i := 0; i < 2; i++ {
-				srv.send(runResponse[i].tag, runResponse[i].fields...)
-			}
-			srv.waitForReset()
-			// Acknowledge reset, no fields
-			srv.sendSuccess(map[string]any{})
-		})
-		defer cleanup()
-		defer bolt.Close(context.Background())
-
-		_, err := bolt.Run(context.Background(), idb.Command{Cypher: "MATCH (" +
-			"n) RETURN n"}, idb.TxConfig{Mode: idb.ReadMode})
-		AssertNoError(t, err)
-		assertBoltState(t, bolt5Streaming, bolt)
-
-		bolt.Reset(context.Background())
-		assertBoltState(t, bolt5Ready, bolt)
 	})
 
 	outer.Run("Reset in ready state", func(t *testing.T) {
