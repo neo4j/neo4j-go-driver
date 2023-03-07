@@ -580,12 +580,11 @@ func (b *bolt5) Next(ctx context.Context, streamHandle idb.StreamHandle) (
 		return nil, nil, err
 	}
 
-	buf, rec, sum, err := stream.bufferedNext()
-	if buf {
-		return rec, sum, err
-	}
-
 	for {
+		buf, rec, sum, err := stream.bufferedNext()
+		if buf {
+			return rec, sum, err
+		}
 		if stream.endOfBatch {
 			b.appendPullN(stream)
 			if b.queue.send(ctx); b.err != nil {
@@ -602,10 +601,6 @@ func (b *bolt5) Next(ctx context.Context, streamHandle idb.StreamHandle) (
 		}
 		if b.err != nil {
 			return nil, nil, b.err
-		}
-		buf, rec, sum, err = stream.bufferedNext()
-		if buf {
-			return rec, sum, err
 		}
 	}
 }
