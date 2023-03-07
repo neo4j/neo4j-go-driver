@@ -186,6 +186,10 @@ func (q *messageQueue) setBoltLogger(logger log.BoltLogger) {
 	q.out.boltLogger = logger
 }
 
+func (q *messageQueue) isEmpty() bool {
+	return q.callbacks.Len() == 0
+}
+
 type boltVersion struct {
 	major int
 	minor int

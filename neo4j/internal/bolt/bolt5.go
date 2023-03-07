@@ -582,38 +582,32 @@ func (b *bolt5) Next(ctx context.Context, streamHandle idb.StreamHandle) (
 
 	buf, rec, sum, err := stream.bufferedNext()
 	if buf {
-		// stream still has buffered records, is fully consumed or failed
 		return rec, sum, err
 	}
 
-	err = b.queue.receive(ctx)
-	if err != nil {
-		return nil, nil, err
+	for {
+		if stream.endOfBatch {
+			b.appendPullN(stream)
+			if b.queue.send(ctx); b.err != nil {
+				return nil, nil, b.err
+			}
+			stream.endOfBatch = false
+		}
+		if b.queue.isEmpty() {
+			return nil, nil, errors.New("there should be more results to pull")
+		}
+		err = b.queue.receive(ctx)
+		if err != nil {
+			return nil, nil, err
+		}
+		if b.err != nil {
+			return nil, nil, b.err
+		}
+		buf, rec, sum, err = stream.bufferedNext()
+		if buf {
+			return rec, sum, err
+		}
 	}
-	if b.err != nil {
-		return nil, nil, b.err
-	}
-	buf, rec, sum, err = stream.bufferedNext()
-	if buf {
-		return rec, sum, err
-	}
-	b.appendPullN(stream)
-	b.queue.send(ctx)
-	if b.err != nil {
-		return nil, nil, b.err
-	}
-	err = b.queue.receiveAll(ctx)
-	if err != nil {
-		return nil, nil, err
-	}
-	if b.err != nil {
-		return nil, nil, err
-	}
-	buf, rec, sum, err = stream.bufferedNext()
-	if buf {
-		return rec, sum, err
-	}
-	return nil, nil, errors.New("buffer should not be empty")
 }
 
 func (b *bolt5) Consume(ctx context.Context, streamHandle idb.StreamHandle) (
@@ -897,7 +891,6 @@ func (b *bolt5) discardResponseHandler(stream *stream) responseHandler {
 func (b *bolt5) pullResponseHandler(stream *stream) responseHandler {
 	return responseHandler{
 		onRecord: func(record *db.Record) {
-			stream.endOfBatch = false
 			if stream.discarding {
 				stream.emptyRecords()
 			} else {
