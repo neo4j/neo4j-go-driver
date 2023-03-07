@@ -867,7 +867,8 @@ func (b *bolt5) rollbackResponseHandler() responseHandler {
 func (b *bolt5) discardResponseHandler(stream *stream) responseHandler {
 	return responseHandler{
 		onIgnored: func(*ignored) {
-			b.streams.detach(nil, fmt.Errorf("stream interrupted while discarding results"))
+			stream.err = fmt.Errorf("stream interrupted while discarding results")
+			b.streams.remove(stream)
 			b.checkStreams()
 		},
 		onSuccess: func(discardSuccess *success) {
@@ -880,7 +881,7 @@ func (b *bolt5) discardResponseHandler(stream *stream) responseHandler {
 				b.bookmark = summary.Bookmark
 			}
 			stream.sum = summary
-			b.streams.detach(summary, nil)
+			b.streams.remove(stream)
 			b.checkStreams()
 		},
 		onFailure: func(failure *db.Neo4jError) {
@@ -906,7 +907,8 @@ func (b *bolt5) pullResponseHandler(stream *stream) responseHandler {
 			b.queue.pushFront(b.pullResponseHandler(stream))
 		},
 		onIgnored: func(*ignored) {
-			b.streams.detach(nil, fmt.Errorf("stream interrupted while pulling results"))
+			stream.err = fmt.Errorf("stream interrupted while pulling results")
+			b.streams.remove(stream)
 			b.checkStreams()
 		},
 		onSuccess: func(pullSuccess *success) {
@@ -922,7 +924,7 @@ func (b *bolt5) pullResponseHandler(stream *stream) responseHandler {
 				b.bookmark = summary.Bookmark
 			}
 			stream.sum = summary
-			b.streams.detach(summary, nil)
+			b.streams.remove(stream)
 			b.checkStreams()
 		},
 		onFailure: func(failure *db.Neo4jError) {
