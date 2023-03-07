@@ -478,7 +478,7 @@ func (b *bolt5) pauseStream(ctx context.Context) {
 // resumeStream marks the current stream as current and requests PULL
 func (b *bolt5) resumeStream(ctx context.Context, s *stream) {
 	b.streams.resume(s)
-	b.queue.appendPullN(s.fetchSize, b.pullResponseHandler(s))
+	b.appendPullN(s)
 	b.queue.send(ctx)
 }
 
