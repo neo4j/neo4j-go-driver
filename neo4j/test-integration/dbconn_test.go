@@ -449,6 +449,27 @@ func TestConnectionConformance(outer *testing.T) {
 					AssertNoError(t, err)
 				},
 			},
+			{
+				name: "Discarding when stream's partly consumed",
+				fun: func(t *testing.T, c idb.Connection) {
+					ctx := context.Background()
+					streamHandle, err := c.Run(ctx,
+						idb.Command{Cypher: "UNWIND [1, 2, 3, 4] AS x RETURN x", FetchSize: 2},
+						idb.TxConfig{Mode: idb.ReadMode})
+					AssertNoError(t, err)
+					record, summary, err := c.Next(ctx, streamHandle)
+					AssertNextOnlyRecord(t, record, summary, err)
+					record, summary, err = c.Next(ctx, streamHandle)
+					AssertNextOnlyRecord(t, record, summary, err)
+					record, summary, err = c.Next(ctx, streamHandle)
+					AssertNextOnlyRecord(t, record, summary, err)
+
+					summary, err = c.Consume(ctx, streamHandle)
+
+					AssertNoError(t, err)
+					AssertNotNil(t, summary)
+				},
+			},
 		}
 		for _, c := range cases {
 			inner.Run(c.name, func(t *testing.T) {
