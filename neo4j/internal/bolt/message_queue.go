@@ -56,12 +56,9 @@ func (q *messageQueue) appendBegin(meta map[string]any, handler responseHandler)
 	q.enqueueCallback(handler)
 }
 
-func (q *messageQueue) appendRun(cypher string, params, meta map[string]any, fetchSize int,
-	runHandler responseHandler, pullHandler responseHandler) {
-
+func (q *messageQueue) appendRun(cypher string, params, meta map[string]any, runHandler responseHandler) {
 	q.out.appendRun(cypher, params, meta)
 	q.enqueueCallback(runHandler)
-	q.appendPullN(fetchSize, pullHandler)
 }
 
 func (q *messageQueue) appendPullN(fetchSize int, handler responseHandler) {

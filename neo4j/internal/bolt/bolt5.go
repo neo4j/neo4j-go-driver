@@ -495,9 +495,8 @@ func (b *bolt5) run(ctx context.Context, cypher string, params map[string]any, r
 
 	fetchSize := b.normalizeFetchSize(rawFetchSize)
 	stream := &stream{fetchSize: fetchSize}
-	b.queue.appendRun(cypher, params, tx.toMeta(), fetchSize,
-		b.runResponseHandler(stream),
-		b.pullResponseHandler(stream))
+	b.queue.appendRun(cypher, params, tx.toMeta(), b.runResponseHandler(stream))
+	b.queue.appendPullN(fetchSize, b.pullResponseHandler(stream))
 	if b.queue.send(ctx); b.err != nil {
 		return nil, b.err
 	}
