@@ -385,70 +385,70 @@ func TestConnectionConformance(outer *testing.T) {
 					}
 				},
 			},
-			//{
-			//	name: "Run autocommit with division by zero in result",
-			//	fun: func(t *testing.T, c idb.Connection) {
-			//		s, err := c.Run(context.Background(),
-			//			idb.Command{Cypher: "UNWIND [0] AS x RETURN 10 / x",
-			//				Params: map[string]any{"r": randInt()}},
-			//			idb.TxConfig{Mode: idb.ReadMode})
-			//		AssertNoError(t, err)
-			//		// Should get error while iterating
-			//		_, _, err = c.Next(context.Background(), s)
-			//		if err == nil {
-			//			t.Error("Should have error")
-			//		}
-			//		_, isDbError := err.(*db.Neo4jError)
-			//		if !isDbError {
-			//			t.Error("Should be connection error")
-			//		}
-			//	},
-			//},
-			//// Connection is in transaction (lazy)
-			//{
-			//	name: "Set connection in transaction mode",
-			//	fun: func(t *testing.T, c idb.Connection) {
-			//		_, err := c.TxBegin(context.Background(),
-			//			idb.TxConfig{Mode: idb.WriteMode})
-			//		AssertNoError(t, err)
-			//	},
-			//},
-			//// Connection is in transaction
-			//{
-			//	name: "Set connection in transaction mode",
-			//	fun: func(t *testing.T, c idb.Connection) {
-			//		tx, _ := c.TxBegin(context.Background(),
-			//			idb.TxConfig{Mode: idb.WriteMode})
-			//		_, err := c.RunTx(context.Background(), tx,
-			//			idb.Command{Cypher: "UNWIND [1] AS n RETURN n"})
-			//		AssertNoError(t, err)
-			//	},
-			//},
-			//// Really big stream streaming
-			//{
-			//	name: "Streaming big stream (autocommit)",
-			//	fun: func(t *testing.T, c idb.Connection) {
-			//		_, err := c.Run(context.Background(),
-			//			idb.Command{Cypher: "UNWIND RANGE (0, " +
-			//				"1000000) AS x RETURN x"}, idb.TxConfig{Mode: idb.
-			//				ReadMode})
-			//		AssertNoError(t, err)
-			//	},
-			//},
-			//// Big nested streams in an uncommitted tx
-			//{
-			//	name: "Streaming big stream (explicit tx)",
-			//	fun: func(t *testing.T, c idb.Connection) {
-			//		tx, _ := c.TxBegin(context.Background(),
-			//			idb.TxConfig{Mode: idb.WriteMode})
-			//		_, err := c.RunTx(context.Background(), tx,
-			//			idb.Command{Cypher: "UNWIND RANGE (0, 1000000) AS n RETURN n"})
-			//		AssertNoError(t, err)
-			//		_, err = c.RunTx(context.Background(), tx,
-			//			idb.Command{Cypher: "UNWIND RANGE (0, 1000000) AS n RETURN n"})
-			//		AssertNoError(t, err)
-			//	},
-			//},
+			{
+				name: "Run autocommit with division by zero in result",
+				fun: func(t *testing.T, c idb.Connection) {
+					s, err := c.Run(context.Background(),
+						idb.Command{Cypher: "UNWIND [0] AS x RETURN 10 / x",
+							Params: map[string]any{"r": randInt()}},
+						idb.TxConfig{Mode: idb.ReadMode})
+					AssertNoError(t, err)
+					// Should get error while iterating
+					_, _, err = c.Next(context.Background(), s)
+					if err == nil {
+						t.Error("Should have error")
+					}
+					_, isDbError := err.(*db.Neo4jError)
+					if !isDbError {
+						t.Error("Should be connection error")
+					}
+				},
+			},
+			// Connection is in transaction (lazy)
+			{
+				name: "Set connection in transaction mode",
+				fun: func(t *testing.T, c idb.Connection) {
+					_, err := c.TxBegin(context.Background(),
+						idb.TxConfig{Mode: idb.WriteMode})
+					AssertNoError(t, err)
+				},
+			},
+			// Connection is in transaction
+			{
+				name: "Set connection in transaction mode",
+				fun: func(t *testing.T, c idb.Connection) {
+					tx, _ := c.TxBegin(context.Background(),
+						idb.TxConfig{Mode: idb.WriteMode})
+					_, err := c.RunTx(context.Background(), tx,
+						idb.Command{Cypher: "UNWIND [1] AS n RETURN n"})
+					AssertNoError(t, err)
+				},
+			},
+			// Really big stream streaming
+			{
+				name: "Streaming big stream (autocommit)",
+				fun: func(t *testing.T, c idb.Connection) {
+					_, err := c.Run(context.Background(),
+						idb.Command{Cypher: "UNWIND RANGE (0, " +
+							"1000000) AS x RETURN x"}, idb.TxConfig{Mode: idb.
+							ReadMode})
+					AssertNoError(t, err)
+				},
+			},
+			// Big nested streams in an uncommitted tx
+			{
+				name: "Streaming big stream (explicit tx)",
+				fun: func(t *testing.T, c idb.Connection) {
+					tx, _ := c.TxBegin(context.Background(),
+						idb.TxConfig{Mode: idb.WriteMode})
+					_, err := c.RunTx(context.Background(), tx,
+						idb.Command{Cypher: "UNWIND RANGE (0, 1000000) AS n RETURN n"})
+					AssertNoError(t, err)
+					_, err = c.RunTx(context.Background(), tx,
+						idb.Command{Cypher: "UNWIND RANGE (0, 1000000) AS n RETURN n"})
+					AssertNoError(t, err)
+				},
+			},
 		}
 		for _, c := range cases {
 			inner.Run(c.name, func(t *testing.T) {
