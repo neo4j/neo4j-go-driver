@@ -200,15 +200,14 @@ func (b *bolt5) Connect(ctx context.Context, minor int, auth map[string]any, use
 		return err
 	}
 
-	// Prepare hello message
 	hello := map[string]any{
 		"user_agent": userAgent,
 	}
 	if routingContext != nil {
 		hello["routing"] = routingContext
 	}
-	// Merge authentication keys into hello, avoid overwriting existing keys
 	if minor == 0 {
+		// Merge authentication keys into hello, avoid overwriting existing keys
 		for k, v := range auth {
 			_, exists := hello[k]
 			if !exists {
@@ -216,14 +215,10 @@ func (b *bolt5) Connect(ctx context.Context, minor int, auth map[string]any, use
 			}
 		}
 	}
-
-	// Send hello message and wait for confirmation
-	b.queue.appendHello(
-		boltVersion{major: 5, minor: minor},
-		hello, auth,
-		b.helloResponseHandler(),
-		b.logonResponseHandler(),
-	)
+	b.queue.appendHello(hello, b.helloResponseHandler())
+	if minor > 0 {
+		b.queue.appendLogon(auth, b.logonResponseHandler())
+	}
 	if b.queue.send(ctx); b.err != nil {
 		return b.err
 	}

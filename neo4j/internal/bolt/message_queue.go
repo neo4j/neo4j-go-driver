@@ -14,7 +14,6 @@ type messageQueue struct {
 	out              outgoing
 	callbacks        list.List // List[responseHandler]
 	targetConnection net.Conn
-	protocolVersion  boltVersion
 	err              error
 
 	onNextMessage    func()
@@ -37,15 +36,14 @@ func newMessageQueue(
 	}
 }
 
-func (q *messageQueue) appendHello(protocolVersion boltVersion, hello, token map[string]any,
-	helloHandler responseHandler, logonHandler responseHandler) {
-	q.protocolVersion = protocolVersion
+func (q *messageQueue) appendHello(hello map[string]any, helloHandler responseHandler) {
 	q.out.appendHello(hello)
 	q.enqueueCallback(helloHandler)
-	if q.protocolVersion.greaterThanOrEqual(5, 1) {
-		q.out.appendLogon(token)
-		q.enqueueCallback(logonHandler)
-	}
+}
+
+func (q *messageQueue) appendLogon(token map[string]any, logonHandler responseHandler) {
+	q.out.appendLogon(token)
+	q.enqueueCallback(logonHandler)
 }
 
 func (q *messageQueue) appendRoute(routingContext map[string]string, bookmarks []string, extras map[string]any, handler responseHandler) {
@@ -188,19 +186,4 @@ func (q *messageQueue) setBoltLogger(logger log.BoltLogger) {
 
 func (q *messageQueue) isEmpty() bool {
 	return q.callbacks.Len() == 0
-}
-
-type boltVersion struct {
-	major int
-	minor int
-}
-
-func (v *boltVersion) greaterThanOrEqual(major int, minor int) bool {
-	if v.major < major {
-		return false
-	}
-	if v.major == major {
-		return v.minor >= minor
-	}
-	return true
 }
