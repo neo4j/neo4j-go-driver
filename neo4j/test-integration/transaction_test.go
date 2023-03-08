@@ -81,11 +81,12 @@ func TestTransaction(outer *testing.T) {
 	})
 
 	outer.Run("should commit if work function doesn't return error", func(t *testing.T) {
+		initialCount := readTransactionWithIntWork(ctx, t, session, intReturningWork(ctx, t, "MATCH (n:Person1) RETURN count(n)", nil))
 		createResult := writeTransactionWithIntWork(ctx, t, session, intReturningWork(ctx, t, "CREATE (n:Person1) RETURN count(n)", nil))
 		assertEquals(t, createResult, 1)
 
 		matchResult := readTransactionWithIntWork(ctx, t, session, intReturningWork(ctx, t, "MATCH (n:Person1) RETURN count(n)", nil))
-		assertEquals(t, matchResult, 1)
+		assertEquals(t, matchResult, initialCount+createResult)
 	})
 
 	outer.Run("should rollback if work function returns error", func(t *testing.T) {

@@ -186,6 +186,22 @@ func TestSession(outer *testing.T) {
 		}()
 
 		inner.Run("when nested queries are executed, all queries should run and return results from all queries", func(t *testing.T) {
+			initialPropertyCountResult, err := session.Run(ctx, "MATCH (p:Property) RETURN count(p)", nil)
+			assertNil(t, err)
+			initialPropertyCountValueRecord, err := initialPropertyCountResult.Single(ctx)
+			assertNil(t, err)
+			rawInitialPropertyCount, ok := initialPropertyCountValueRecord.Get("count(p)")
+			assertTrue(t, ok)
+			initialPropertyCount, ok := rawInitialPropertyCount.(int64)
+			assertTrue(t, ok)
+			initialResourceCountResult, err := session.Run(ctx, "MATCH (r:Resource) RETURN count(r)", nil)
+			assertNil(t, err)
+			initialResourceCountValueRecord, err := initialResourceCountResult.Single(ctx)
+			assertNil(t, err)
+			rawInitialResourceCount, ok := initialResourceCountValueRecord.Get("count(r)")
+			assertTrue(t, ok)
+			initialResourceCount, ok := rawInitialResourceCount.(int64)
+			assertTrue(t, ok)
 			result, err = session.Run(ctx, "UNWIND range(1, 100) AS x CREATE (:Property {id: x})", nil)
 			assertNil(t, err)
 			_, err = result.Consume(ctx)
@@ -200,13 +216,13 @@ func TestSession(outer *testing.T) {
 			seenResources := 0
 			properties, err := session.Run(ctx, "MATCH (p:Property) RETURN p", nil)
 			assertNil(t, err)
-			for properties.Next(ctx) {
+			for properties.Next(ctx) { // initialPropertyCount+100
 				assertNotNil(t, properties.Record())
 				seenProps++
 
 				resources, err := session.Run(ctx, "MATCH (r:Resource) RETURN r", nil)
 				assertNil(t, err)
-				for resources.Next(ctx) {
+				for resources.Next(ctx) { // initialResourceCount+10
 					assertNotNil(t, resources.Record())
 					seenResources++
 				}
@@ -214,8 +230,8 @@ func TestSession(outer *testing.T) {
 			}
 			assertNil(t, properties.Err())
 
-			assertEquals(t, seenProps, 100)
-			assertEquals(t, seenResources, 1000)
+			assertEquals(t, seenProps, initialPropertyCount+100)
+			assertEquals(t, seenResources, (initialPropertyCount+100)*(initialResourceCount+10))
 		})
 
 		inner.Run("when a node is created, summary should contain correct counter values", func(t *testing.T) {
