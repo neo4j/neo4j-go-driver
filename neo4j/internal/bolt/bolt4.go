@@ -56,6 +56,9 @@ type internalTx4 struct {
 }
 
 func (i *internalTx4) toMeta() map[string]any {
+	if i == nil {
+		return nil
+	}
 	meta := map[string]any{}
 	if i.mode == idb.ReadMode {
 		meta["mode"] = "r"
@@ -85,8 +88,6 @@ type bolt4 struct {
 	streams       openstreams
 	conn          net.Conn
 	serverName    string
-	out           outgoing
-	in            incoming
 	connId        string
 	logId         string
 	serverVersion string
@@ -99,6 +100,7 @@ type bolt4 struct {
 	minor         int
 	lastQid       int64 // Last seen qid
 	idleDate      time.Time
+	queue         messageQueue
 }
 
 func NewBolt4(serverName string, conn net.Conn, logger log.Logger, boltLog log.BoltLogger) *bolt4 {
@@ -111,7 +113,11 @@ func NewBolt4(serverName string, conn net.Conn, logger log.Logger, boltLog log.B
 		idleDate:   now,
 		log:        logger,
 		streams:    openstreams{},
-		in: incoming{
+		lastQid:    -1,
+	}
+	b.queue = newMessageQueue(
+		conn,
+		&incoming{
 			buf: make([]byte, 4096),
 			hyd: hydrator{
 				boltLogger: boltLog,
@@ -119,14 +125,15 @@ func NewBolt4(serverName string, conn net.Conn, logger log.Logger, boltLog log.B
 			},
 			connReadTimeout: -1,
 		},
-		lastQid: -1,
-	}
-	b.out = outgoing{
-		chunker:    newChunker(),
-		packer:     packstream.Packer{},
-		onErr:      func(err error) { b.setError(err, true) },
-		boltLogger: boltLog,
-	}
+		&outgoing{
+			chunker:    newChunker(),
+			packer:     packstream.Packer{},
+			onErr:      func(err error) { b.setError(err, true) },
+			boltLogger: boltLog,
+		},
+		b.onNextMessage,
+		b.onNextMessageError,
+	)
 
 	return b
 }
@@ -188,45 +195,6 @@ func (b *bolt4) setError(err error, fatal bool) {
 	}
 }
 
-func (b *bolt4) receiveMsg(ctx context.Context) any {
-	// Potentially dangerous to receive when an error has occurred, could hang.
-	// Important, a lot of code has been simplified relying on this check.
-	if b.err != nil {
-		return nil
-	}
-
-	msg, err := b.in.next(ctx, b.conn)
-	b.setError(err, true)
-	if err == nil {
-		b.idleDate = time.Now()
-	}
-	return msg
-}
-
-// Receives a message that is assumed to be a success response or a failure in response to a
-// sent command. Sets b.err and b.state on failure
-func (b *bolt4) receiveSuccess(ctx context.Context) *success {
-	msg := b.receiveMsg(ctx)
-	if b.err != nil {
-		return nil
-	}
-
-	switch v := msg.(type) {
-	case *success:
-		if v.qid > -1 {
-			b.lastQid = v.qid
-		}
-		return v
-	case *db.Neo4jError:
-		b.setError(v, isFatalError(v))
-		return nil
-	default:
-		// Unexpected message received
-		b.setError(errors.New("expected success or database error"), true)
-		return nil
-	}
-}
-
 func (b *bolt4) Connect(ctx context.Context, minor int, auth map[string]any, userAgent string, routingContext map[string]string) error {
 	if err := b.assertState(bolt4_unauthorized); err != nil {
 		return err
@@ -254,29 +222,17 @@ func (b *bolt4) Connect(ctx context.Context, minor int, auth map[string]any, use
 		}
 	}
 
-	// Send hello message and wait for confirmation
-	b.out.appendHello(hello)
-	b.out.send(ctx, b.conn)
-	succ := b.receiveSuccess(ctx)
-	if b.err != nil {
+	b.queue.appendHello(hello, b.helloResponseHandler(checkUtcPatch))
+	if b.queue.send(ctx); b.err != nil {
+		return b.err
+	}
+	if err := b.queue.receive(ctx); err != nil {
+		return err
+	}
+	if b.err != nil { // onNextMessageErr kicked in
 		return b.err
 	}
 
-	b.connId = succ.connectionId
-	b.serverVersion = succ.server
-	if checkUtcPatch {
-		useUtc := collections.SliceContains(succ.patches, "utc")
-		b.in.hyd.useUtc = useUtc
-		b.out.useUtc = useUtc
-	}
-
-	// Construct log identity
-	connectionLogId := fmt.Sprintf("%s@%s", b.connId, b.serverName)
-	b.logId = connectionLogId
-	b.in.hyd.logId = connectionLogId
-	b.out.logId = connectionLogId
-
-	b.initializeReadTimeoutHint(succ.configurationHints)
 	// Transition into ready state
 	b.state = bolt4_ready
 	b.minor = minor
@@ -319,18 +275,23 @@ func (b *bolt4) TxBegin(ctx context.Context, txConfig idb.TxConfig) (idb.TxHandl
 		impersonatedUser: txConfig.ImpersonatedUser,
 	}
 
-	b.out.appendBegin(tx.toMeta())
-	b.out.send(ctx, b.conn)
-	b.receiveSuccess(ctx)
-	if b.err != nil {
+	b.queue.appendBegin(tx.toMeta(), b.beginResponseHandler())
+	if b.queue.send(ctx); b.err != nil {
 		return 0, b.err
 	}
+	if err := b.queue.receiveAll(ctx); err != nil {
+		return 0, err
+	}
+	if b.err != nil { // onNextMessageErr kicked in
+		return 0, b.err
+	}
+
 	b.state = bolt4_tx
 	b.txId = idb.TxHandle(time.Now().Unix())
 	return b.txId, nil
 }
 
-// Should NOT set b.err or change b.state as this is used to guard from
+// Should NOT set b.err or change b.state as this is used to guard against
 // misuse from clients that stick to their connections when they shouldn't.
 func (b *bolt4) assertTxHandle(h1, h2 idb.TxHandle) error {
 	if h1 != h2 {
@@ -366,7 +327,7 @@ func (b *bolt4) TxCommit(ctx context.Context, txh idb.TxHandle) error {
 	}
 
 	// Consume pending stream if any to turn state from streamingtx to tx
-	// Access to streams outside of tx boundary is not allowed, therefore we should discard
+	// Access to streams outside tx boundary is not allowed, therefore we should discard
 	// the stream (not buffer).
 	if b.discardAllStreams(ctx); b.err != nil {
 		return b.err
@@ -377,16 +338,15 @@ func (b *bolt4) TxCommit(ctx context.Context, txh idb.TxHandle) error {
 		return err
 	}
 
-	// Send request to server to commit
-	b.out.appendCommit()
-	b.out.send(ctx, b.conn)
-	succ := b.receiveSuccess(ctx)
-	if b.err != nil {
+	b.queue.appendCommit(b.commitResponseHandler())
+	if b.queue.send(ctx); b.err != nil {
 		return b.err
 	}
-	// Keep track of bookmark
-	if len(succ.bookmark) > 0 {
-		b.bookmark = succ.bookmark
+	if err := b.queue.receiveAll(ctx); err != nil {
+		return err
+	}
+	if b.err != nil {
+		return b.err
 	}
 
 	// Transition into ready state
@@ -400,7 +360,7 @@ func (b *bolt4) TxRollback(ctx context.Context, txh idb.TxHandle) error {
 	}
 
 	// Can not send rollback while still streaming, consume to turn state into tx
-	// Access to streams outside of tx boundary is not allowed, therefore we should discard
+	// Access to streams outside tx boundary is not allowed, therefore we should discard
 	// the stream (not buffer).
 	if b.discardAllStreams(ctx); b.err != nil {
 		return b.err
@@ -411,10 +371,14 @@ func (b *bolt4) TxRollback(ctx context.Context, txh idb.TxHandle) error {
 		return err
 	}
 
-	// Send rollback request to server
-	b.out.appendRollback()
-	b.out.send(ctx, b.conn)
-	if b.receiveSuccess(ctx); b.err != nil {
+	b.queue.appendRollback(b.rollbackResponseHandler())
+	if b.queue.send(ctx); b.err != nil {
+		return b.err
+	}
+	if err := b.queue.receiveAll(ctx); err != nil {
+		return err
+	}
+	if b.err != nil {
 		return b.err
 	}
 
@@ -433,29 +397,31 @@ func (b *bolt4) discardStream(ctx context.Context) {
 		return
 	}
 
+	stream.discarding = true // pull response handler will discard any accumulated record for this stream
 	discarded := false
 	for {
-		_, batch, sum := b.receiveNext(ctx)
-		if batch {
-			if discarded {
-				// Response to discard, see below
-				b.streams.remove(stream)
-				b.checkStreams()
-				return
-			}
-			// Discard all! After this the next receive will get another batch
-			// as a response to the discard, we need to keep track of that we
-			// already sent a discard.
-			discarded = true
-			stream.fetchSize = -1
-			if b.state == bolt4_streamingtx && stream.qid != b.lastQid {
-				b.out.appendDiscardNQid(stream.fetchSize, stream.qid)
-			} else {
-				b.out.appendDiscardN(stream.fetchSize)
-			}
-			b.out.send(ctx, b.conn)
-		} else if sum != nil || b.err != nil {
-			// Stream is detached in receiveNext
+		if err := b.queue.receiveAll(ctx); err != nil {
+			return
+		}
+		if b.err != nil {
+			return
+		}
+		if stream.sum != nil || stream.err != nil {
+			return
+		}
+		if stream.endOfBatch && discarded {
+			b.streams.remove(stream)
+			b.checkStreams()
+			return
+		}
+		discarded = true
+		stream.fetchSize = -1 // request infinite batch to consume the rest
+		if b.state == bolt5StreamingTx && stream.qid != b.lastQid {
+			b.queue.appendDiscardNQid(stream.fetchSize, stream.qid, b.discardResponseHandler(stream))
+		} else {
+			b.queue.appendDiscardN(stream.fetchSize, b.discardResponseHandler(stream))
+		}
+		if b.queue.send(ctx); b.err != nil {
 			return
 		}
 	}
@@ -472,20 +438,15 @@ func (b *bolt4) discardAllStreams(ctx context.Context) {
 	b.checkStreams()
 }
 
-// Sends a PULL n request to server. State should be streaming and there should be a current stream.
-func (b *bolt4) sendPullN(ctx context.Context) {
-	b.assertState(bolt4_streaming, bolt4_streamingtx)
+func (b *bolt4) appendPullN(stream *stream) {
 	if b.state == bolt4_streaming {
-		b.out.appendPullN(b.streams.curr.fetchSize)
-		b.out.send(ctx, b.conn)
+		b.queue.appendPullN(stream.fetchSize, b.pullResponseHandler(stream))
 	} else if b.state == bolt4_streamingtx {
-		fetchSize := b.streams.curr.fetchSize
-		if b.streams.curr.qid == b.lastQid {
-			b.out.appendPullN(fetchSize)
+		if stream.qid == b.lastQid {
+			b.queue.appendPullN(stream.fetchSize, b.pullResponseHandler(stream))
 		} else {
-			b.out.appendPullNQid(fetchSize, b.streams.curr.qid)
+			b.queue.appendPullNQid(stream.fetchSize, stream.qid, b.pullResponseHandler(stream))
 		}
-		b.out.send(ctx, b.conn)
 	}
 }
 
@@ -496,17 +457,22 @@ func (b *bolt4) bufferStream(ctx context.Context) {
 		return
 	}
 
-	// Buffer current batch and start infinite batch and/or buffer the infinite batch
 	for {
-		rec, batch, _ := b.receiveNext(ctx)
-		if rec != nil {
-			stream.push(rec)
-		} else if batch {
-			stream.fetchSize = -1
-			b.sendPullN(ctx)
-		} else {
-			// Either summary or an error
+		if err := b.queue.receiveAll(ctx); err != nil {
 			return
+		}
+		if b.err != nil {
+			return
+		}
+		if stream.sum != nil || stream.err != nil {
+			return
+		}
+		if stream.endOfBatch {
+			stream.fetchSize = -1
+			b.appendPullN(stream)
+			if b.queue.send(ctx); b.err != nil {
+				return
+			}
 		}
 	}
 }
@@ -519,29 +485,27 @@ func (b *bolt4) pauseStream(ctx context.Context) {
 		return
 	}
 
-	for {
-		rec, batch, _ := b.receiveNext(ctx)
-		if rec != nil {
-			stream.push(rec)
-		} else if batch {
-			b.streams.pause()
-			return
-		} else {
-			// Either summary or an error
-			return
-		}
+	if err := b.queue.receiveAll(ctx); err != nil {
+		return
+	}
+	if b.err != nil {
+		return
+	}
+	if stream.sum != nil || stream.err != nil {
+		return
+	}
+	if stream.endOfBatch {
+		b.streams.pause()
 	}
 }
 
 func (b *bolt4) resumeStream(ctx context.Context, s *stream) {
 	b.streams.resume(s)
-	b.sendPullN(ctx)
-	if b.err != nil {
-		return
-	}
+	b.appendPullN(s)
+	b.queue.send(ctx)
 }
 
-func (b *bolt4) run(ctx context.Context, cypher string, params map[string]any, fetchSize int, tx *internalTx4) (*stream, error) {
+func (b *bolt4) run(ctx context.Context, cypher string, params map[string]any, rawFetchSize int, tx *internalTx4) (*stream, error) {
 	// If already streaming, consume the whole thing first
 	if b.state == bolt4_streaming {
 		if b.bufferStream(ctx); b.err != nil {
@@ -557,35 +521,22 @@ func (b *bolt4) run(ctx context.Context, cypher string, params map[string]any, f
 		return nil, err
 	}
 
-	// Transaction metadata, used either in lazily started transaction or to run message.
-	var meta map[string]any
-	if tx != nil {
-		meta = tx.toMeta()
-	}
-
-	// Append run message
-	b.out.appendRun(cypher, params, meta)
-
-	// Ensure that fetchSize is in a valid range
-	switch {
-	case fetchSize < 0:
-		fetchSize = -1
-	case fetchSize == 0:
-		fetchSize = bolt4_fetchsize
-	}
-	// Append pull message and send it along with other pending messages
-	b.out.appendPullN(fetchSize)
-	b.out.send(ctx, b.conn)
-
-	// Receive confirmation of run message
-	succ := b.receiveSuccess(ctx)
-	if b.err != nil {
-		// If failed with a database error, there will be an ignored response for the
-		// pull message as well, this will be cleaned up by Reset
+	fetchSize := b.normalizeFetchSize(rawFetchSize)
+	stream := &stream{fetchSize: fetchSize}
+	b.queue.appendRun(cypher, params, tx.toMeta(), b.runResponseHandler(stream))
+	b.queue.appendPullN(fetchSize, b.pullResponseHandler(stream))
+	if b.queue.send(ctx); b.err != nil {
 		return nil, b.err
 	}
-	// Extract the RUN response from success response
-	b.tfirst = succ.tfirst
+	// only read response for RUN
+	if err := b.queue.receive(ctx); err != nil {
+		// rely on RESET to deal with unhandled PULL response
+		return nil, err
+	}
+	if b.err != nil {
+		return nil, b.err
+	}
+
 	// Change state to streaming
 	if b.state == bolt4_ready {
 		b.state = bolt4_streaming
@@ -593,12 +544,17 @@ func (b *bolt4) run(ctx context.Context, cypher string, params map[string]any, f
 		b.state = bolt4_streamingtx
 	}
 
-	// Create a stream representation, set it to current and track it
-	stream := &stream{keys: succ.fields, qid: succ.qid, fetchSize: fetchSize}
-	b.streams.attach(stream)
-	// No need to check streams state, we know we are streaming
-
 	return stream, nil
+}
+
+func (b *bolt4) normalizeFetchSize(fetchSize int) int {
+	if fetchSize < 0 {
+		return -1
+	}
+	if fetchSize == 0 {
+		return bolt4_fetchsize
+	}
+	return fetchSize
 }
 
 func (b *bolt4) Run(ctx context.Context, cmd idb.Command,
@@ -649,7 +605,7 @@ func (b *bolt4) Keys(streamHandle idb.StreamHandle) ([]string, error) {
 	return stream.keys, nil
 }
 
-// Reads one record from the stream.
+// Next reads one record from the stream.
 func (b *bolt4) Next(ctx context.Context, streamHandle idb.StreamHandle) (
 	*db.Record, *db.Summary, error) {
 	// Do NOT set b.err for this error
@@ -658,40 +614,29 @@ func (b *bolt4) Next(ctx context.Context, streamHandle idb.StreamHandle) (
 		return nil, nil, err
 	}
 
-	// Buffered stream or someone else's stream, doesn't matter...
-	// Summary and error are considered buffered as well.
-	buf, rec, sum, err := stream.bufferedNext()
-	if buf {
-		return rec, sum, err
-	}
-
-	// Make sure that the stream belongs to this bolt instance otherwise we might mess
-	// up the internal state machine really bad. If clients stick to streams out of
-	// transaction scope or after the connection been sent back to the pool we might end
-	// up here.
-	if err = b.streams.isSafe(stream); err != nil {
-		return nil, nil, err
-	}
-
-	// If the stream isn't the current we must finish what we're doing with the current stream
-	// and make it the current one.
-	if stream != b.streams.curr {
-		b.pauseStream(ctx)
+	for {
+		buf, rec, sum, err := stream.bufferedNext()
+		if buf {
+			return rec, sum, err
+		}
+		if stream.endOfBatch {
+			b.appendPullN(stream)
+			if b.queue.send(ctx); b.err != nil {
+				return nil, nil, b.err
+			}
+			stream.endOfBatch = false
+		}
+		if b.queue.isEmpty() {
+			return nil, nil, errors.New("there should be more results to pull")
+		}
+		err = b.queue.receive(ctx)
+		if err != nil {
+			return nil, nil, err
+		}
 		if b.err != nil {
 			return nil, nil, b.err
 		}
-		b.resumeStream(ctx, stream)
 	}
-
-	rec, batchCompleted, sum := b.receiveNext(ctx)
-	if batchCompleted {
-		b.sendPullN(ctx)
-		if b.err != nil {
-			return nil, nil, b.err
-		}
-		rec, _, sum = b.receiveNext(ctx)
-	}
-	return rec, sum, b.err
 }
 
 func (b *bolt4) Consume(ctx context.Context, streamHandle idb.StreamHandle) (
@@ -712,7 +657,7 @@ func (b *bolt4) Consume(ctx context.Context, streamHandle idb.StreamHandle) (
 		return nil, err
 	}
 
-	// We should be streaming otherwise it is a an internal error, shouldn't be
+	// We should be streaming otherwise it is an internal error, shouldn't be
 	// a safe stream while not streaming.
 	if err = b.assertState(bolt4_streaming, bolt4_streamingtx); err != nil {
 		return nil, err
@@ -752,7 +697,7 @@ func (b *bolt4) Buffer(ctx context.Context,
 		return err
 	}
 
-	// We should be streaming otherwise it is a an internal error, shouldn't be
+	// We should be streaming otherwise it is an internal error, shouldn't be
 	// a safe stream while not streaming.
 	if err = b.assertState(bolt4_streaming, bolt4_streamingtx); err != nil {
 		return err
@@ -769,51 +714,6 @@ func (b *bolt4) Buffer(ctx context.Context,
 
 	b.bufferStream(ctx)
 	return stream.Err()
-}
-
-// Reads one record from the network and returns either a record, a flag that indicates that
-// a PULL N batch completed, a summary indicating end of stream or an error.
-// Assumes that there is a current stream and that streaming is active.
-func (b *bolt4) receiveNext(ctx context.Context) (*db.Record, bool, *db.Summary) {
-	res := b.receiveMsg(ctx)
-	if b.err != nil {
-		return nil, false, nil
-	}
-
-	switch x := res.(type) {
-	case *db.Record:
-		// A new record
-		x.Keys = b.streams.curr.keys
-		return x, false, nil
-	case *success:
-		// End of batch or end of stream?
-		if x.hasMore {
-			// End of batch
-			return nil, true, nil
-		}
-		// End of stream, parse summary. Current implementation never fails.
-		sum := x.summary()
-		// Add some extras to the summary
-		sum.Agent = b.serverVersion
-		sum.Major = 4
-		sum.Minor = b.minor
-		sum.ServerName = b.serverName
-		sum.TFirst = b.tfirst
-		if len(sum.Bookmark) > 0 {
-			b.bookmark = sum.Bookmark
-		}
-		// Done with this stream
-		b.streams.detach(sum, nil)
-		b.checkStreams()
-		return nil, false, sum
-	case *db.Neo4jError:
-		b.setError(x, isFatalError(x)) // Will detach the stream
-		return nil, false, nil
-	default:
-		// Unknown territory
-		b.setError(errors.New("unknown response"), true)
-		return nil, false, nil
-	}
 }
 
 func (b *bolt4) Bookmark() string {
@@ -858,35 +758,19 @@ func (b *bolt4) ForceReset(ctx context.Context) {
 	if b.state == bolt4_dead {
 		return
 	}
-	// Reset any pending error, should be matching bolt4_failed so
+	// Reset any pending error, should be matching bolt4_failed, so
 	// it should be recoverable.
 	b.err = nil
 
-	// Send the reset message to the server
-	b.out.appendReset()
-	b.out.send(ctx, b.conn)
-	if b.err != nil {
+	if err := b.queue.receiveAll(ctx); b.err != nil || err != nil {
 		return
 	}
-
-	for {
-		msg := b.receiveMsg(ctx)
-		if b.err != nil {
-			return
-		}
-		switch x := msg.(type) {
-		case *ignored, *db.Record:
-			// Command ignored
-		case *success:
-			if x.isResetResponse() {
-				// Reset confirmed
-				b.state = bolt4_ready
-				return
-			}
-		default:
-			b.state = bolt4_dead
-			return
-		}
+	b.queue.appendReset(b.resetResponseHandler())
+	if b.queue.send(ctx); b.err != nil {
+		return
+	}
+	if err := b.queue.receive(ctx); b.err != nil || err != nil {
+		return
 	}
 }
 
@@ -905,13 +789,18 @@ func (b *bolt4) GetRoutingTable(ctx context.Context,
 		if impersonatedUser != "" {
 			extras["imp_user"] = impersonatedUser
 		}
-		b.out.appendRoute(routingContext, bookmarks, extras)
-		b.out.send(ctx, b.conn)
-		succ := b.receiveSuccess(ctx)
+		var routingTable *idb.RoutingTable
+		b.queue.appendRoute(routingContext, bookmarks, extras, b.routeResponseHandler(&routingTable))
+		if b.queue.send(ctx); b.err != nil {
+			return nil, b.err
+		}
+		if err := b.queue.receiveAll(ctx); err != nil {
+			return nil, err
+		}
 		if b.err != nil {
 			return nil, b.err
 		}
-		return succ.routingTable, nil
+		return routingTable, nil
 	}
 
 	if err := b.checkImpersonationAndVersion(impersonatedUser); err != nil {
@@ -919,15 +808,19 @@ func (b *bolt4) GetRoutingTable(ctx context.Context,
 	}
 
 	if b.minor > 2 {
-		b.out.appendRouteToV43(routingContext, bookmarks, database)
-		b.out.send(ctx, b.conn)
-		succ := b.receiveSuccess(ctx)
+		var routingTable *idb.RoutingTable
+		b.queue.appendRouteV43(routingContext, bookmarks, database, b.routeResponseHandler(&routingTable))
+		if b.queue.send(ctx); b.err != nil {
+			return nil, b.err
+		}
+		if err := b.queue.receiveAll(ctx); err != nil {
+			return nil, err
+		}
 		if b.err != nil {
 			return nil, b.err
 		}
-		// On this version we will not receive the database name
-		succ.routingTable.DatabaseName = database
-		return succ.routingTable, nil
+		routingTable.DatabaseName = database
+		return routingTable, nil
 	}
 	return b.callGetRoutingTable(ctx, routingContext, bookmarks, database)
 }
@@ -963,7 +856,7 @@ func (b *bolt4) callGetRoutingTable(ctx context.Context,
 		return nil, errors.New("no routing table record")
 	}
 	// Just empty the stream, ignore the summary should leave the connection in ready state
-	b.Next(ctx, streamHandle)
+	_, _, _ = b.Next(ctx, streamHandle)
 
 	table := parseRoutingTableRecord(rec)
 	if table == nil {
@@ -979,10 +872,10 @@ func (b *bolt4) callGetRoutingTable(ctx context.Context,
 func (b *bolt4) Close(ctx context.Context) {
 	b.log.Infof(log.Bolt4, b.logId, "Close")
 	if b.state != bolt4_dead {
-		b.out.appendGoodbye()
-		b.out.send(ctx, b.conn)
+		b.queue.appendGoodbye()
+		b.queue.send(ctx)
 	}
-	b.conn.Close()
+	_ = b.conn.Close()
 	b.state = bolt4_dead
 }
 
@@ -991,8 +884,7 @@ func (b *bolt4) SelectDatabase(database string) {
 }
 
 func (b *bolt4) SetBoltLogger(boltLogger log.BoltLogger) {
-	b.in.hyd.boltLogger = boltLogger
-	b.out.boltLogger = boltLogger
+	b.queue.setBoltLogger(boltLogger)
 }
 
 func (b *bolt4) Version() db.ProtocolVersion {
@@ -1000,6 +892,175 @@ func (b *bolt4) Version() db.ProtocolVersion {
 		Major: 4,
 		Minor: b.minor,
 	}
+}
+
+func (b *bolt4) helloResponseHandler(checkUtcPatch bool) responseHandler {
+	return b.expectedSuccessHandler(b.onHelloSuccess(checkUtcPatch))
+}
+
+func (b *bolt4) beginResponseHandler() responseHandler {
+	return b.expectedSuccessHandler(onSuccessNoOp)
+}
+
+func (b *bolt4) commitResponseHandler() responseHandler {
+	return b.expectedSuccessHandler(b.onCommitSuccess)
+}
+
+func (b *bolt4) rollbackResponseHandler() responseHandler {
+	return b.expectedSuccessHandler(onSuccessNoOp)
+}
+
+func (b *bolt4) discardResponseHandler(stream *stream) responseHandler {
+	return responseHandler{
+		onIgnored: func(*ignored) {
+			stream.err = fmt.Errorf("stream interrupted while discarding results")
+			b.streams.remove(stream)
+			b.checkStreams()
+		},
+		onSuccess: func(discardSuccess *success) {
+			if discardSuccess.hasMore {
+				stream.endOfBatch = true
+				return
+			}
+			summary := b.extractSummary(discardSuccess)
+			if len(summary.Bookmark) > 0 {
+				b.bookmark = summary.Bookmark
+			}
+			stream.sum = summary
+			b.streams.remove(stream)
+			b.checkStreams()
+		},
+		onFailure: func(failure *db.Neo4jError) {
+			stream.err = failure
+			b.setError(failure, isFatalError(failure)) // Will detach the stream
+		},
+		onUnknown: func(msg any) {
+			b.setError(fmt.Errorf("unknown response %v", msg), true)
+		},
+	}
+}
+
+func (b *bolt4) pullResponseHandler(stream *stream) responseHandler {
+	return responseHandler{
+		onRecord: func(record *db.Record) {
+			if stream.discarding {
+				stream.emptyRecords()
+			} else {
+				record.Keys = stream.keys
+				stream.push(record)
+			}
+			b.queue.pushFront(b.pullResponseHandler(stream))
+		},
+		onIgnored: func(*ignored) {
+			stream.err = fmt.Errorf("stream interrupted while pulling results")
+			b.streams.remove(stream)
+			b.checkStreams()
+		},
+		onSuccess: func(pullSuccess *success) {
+			if stream.discarding {
+				stream.emptyRecords()
+			}
+			if pullSuccess.hasMore {
+				stream.endOfBatch = true
+				return
+			}
+			summary := b.extractSummary(pullSuccess)
+			if len(summary.Bookmark) > 0 {
+				b.bookmark = summary.Bookmark
+			}
+			stream.sum = summary
+			b.streams.remove(stream)
+			b.checkStreams()
+		},
+		onFailure: func(failure *db.Neo4jError) {
+			stream.err = failure
+			b.setError(failure, isFatalError(failure)) // Will detach the stream
+		},
+		onUnknown: func(msg any) {
+			b.setError(fmt.Errorf("unknown response %v", msg), true)
+		},
+	}
+
+}
+
+func (b *bolt4) runResponseHandler(stream *stream) responseHandler {
+	return b.expectedSuccessHandler(func(runSuccess *success) {
+		stream.keys = runSuccess.fields
+		stream.qid = runSuccess.qid
+		if runSuccess.qid > -1 {
+			b.lastQid = runSuccess.qid
+		}
+		b.tfirst = runSuccess.tfirst
+		b.streams.attach(stream)
+	})
+}
+
+func (b *bolt4) resetResponseHandler() responseHandler {
+	return responseHandler{
+		onSuccess: func(resetSuccess *success) {
+			b.state = bolt4_ready
+		},
+		onFailure: func(*db.Neo4jError) {
+			b.state = bolt4_dead
+		},
+		onUnknown: func(any) {
+			b.state = bolt4_dead
+		},
+	}
+}
+
+func (b *bolt4) routeResponseHandler(table **idb.RoutingTable) responseHandler {
+	return b.expectedSuccessHandler(func(routeSuccess *success) {
+		*table = routeSuccess.routingTable
+	})
+}
+
+func (b *bolt4) onHelloSuccess(checkUtcPatch bool) func(*success) {
+	return func(helloSuccess *success) {
+		if checkUtcPatch {
+			useUtc := collections.SliceContains(helloSuccess.patches, "utc")
+			b.queue.in.hyd.useUtc = useUtc
+			b.queue.out.useUtc = useUtc
+		}
+		b.connId = helloSuccess.connectionId
+		b.serverVersion = helloSuccess.server
+
+		connectionLogId := fmt.Sprintf("%s@%s", b.connId, b.serverName)
+		b.logId = connectionLogId
+		b.queue.setLogId(connectionLogId)
+		b.initializeReadTimeoutHint(helloSuccess.configurationHints)
+	}
+}
+
+func (b *bolt4) onCommitSuccess(commitSuccess *success) {
+	if len(commitSuccess.bookmark) > 0 {
+		b.bookmark = commitSuccess.bookmark
+	}
+}
+
+func (b *bolt4) expectedSuccessHandler(onSuccess func(*success)) responseHandler {
+	return responseHandler{
+		onSuccess: onSuccess,
+		onFailure: b.onFailure,
+		onUnknown: b.onUnknown,
+		onIgnored: onIgnoredNoOp,
+	}
+}
+
+func (b *bolt4) onNextMessage() {
+	b.idleDate = time.Now()
+}
+
+func (b *bolt4) onNextMessageError(err error) {
+	b.setError(err, true)
+}
+
+func (b *bolt4) onFailure(err *db.Neo4jError) {
+	b.setError(err, isFatalError(err))
+}
+
+func (b *bolt4) onUnknown(msg any) {
+	b.setError(fmt.Errorf("expected success or database error, got %v", msg), true)
 }
 
 const readTimeoutHintName = "connection.recv_timeout_seconds"
@@ -1019,7 +1080,17 @@ func (b *bolt4) initializeReadTimeoutHint(hints map[string]any) {
 		return
 	}
 	b.log.Infof(log.Bolt4, b.logId, `received "connection.recv_timeout_seconds" hint value of %d second(s)`, readTimeout)
-	b.in.connReadTimeout = time.Duration(readTimeout) * time.Second
+	b.queue.in.connReadTimeout = time.Duration(readTimeout) * time.Second
+}
+
+func (b *bolt4) extractSummary(success *success) *db.Summary {
+	summary := success.summary()
+	summary.Agent = b.serverVersion
+	summary.Major = 4
+	summary.Minor = b.minor
+	summary.ServerName = b.serverName
+	summary.TFirst = b.tfirst
+	return summary
 }
 
 func isFatalError(err *db.Neo4jError) bool {

@@ -70,6 +70,11 @@ func (q *messageQueue) appendRoute(routingContext map[string]string, bookmarks [
 	q.enqueueCallback(handler)
 }
 
+func (q *messageQueue) appendRouteV43(routingContext map[string]string, bookmarks []string, database string, handler responseHandler) {
+	q.out.appendRouteToV43(routingContext, bookmarks, database)
+	q.enqueueCallback(handler)
+}
+
 func (q *messageQueue) appendBegin(meta map[string]any, handler responseHandler) {
 	q.out.appendBegin(meta)
 	q.enqueueCallback(handler)
