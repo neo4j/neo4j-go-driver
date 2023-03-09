@@ -116,7 +116,7 @@ func NewBolt5(serverName string, conn net.Conn, logger log.Logger, boltLog log.B
 	}
 	b.queue = newMessageQueue(
 		conn,
-		incoming{
+		&incoming{
 			buf: make([]byte, 4096),
 			hyd: hydrator{
 				boltLogger: boltLog,
@@ -125,7 +125,7 @@ func NewBolt5(serverName string, conn net.Conn, logger log.Logger, boltLog log.B
 			},
 			connReadTimeout: -1,
 		},
-		outgoing{
+		&outgoing{
 			chunker:    newChunker(),
 			packer:     packstream.Packer{},
 			onErr:      func(err error) { b.setError(err, true) },

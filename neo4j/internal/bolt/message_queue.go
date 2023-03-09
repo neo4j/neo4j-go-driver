@@ -1,3 +1,22 @@
+/*
+ * Copyright (c) "Neo4j"
+ * Neo4j Sweden AB [https://neo4j.com]
+ *
+ * This file is part of Neo4j.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      https://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an "AS IS" BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
+ */
+
 package bolt
 
 import (
@@ -10,9 +29,9 @@ import (
 )
 
 type messageQueue struct {
-	in               incoming
-	out              outgoing
-	callbacks        list.List // List[responseHandler]
+	in               *incoming
+	out              *outgoing
+	handlers         list.List // List[responseHandler]
 	targetConnection net.Conn
 	err              error
 
@@ -22,14 +41,14 @@ type messageQueue struct {
 
 func newMessageQueue(
 	target net.Conn,
-	in incoming, out outgoing,
+	in *incoming, out *outgoing,
 	onNext func(),
 	onNextErr func(error)) messageQueue {
 
 	return messageQueue{
 		in:               in,
 		out:              out,
-		callbacks:        list.List{},
+		handlers:         list.List{},
 		targetConnection: target,
 		onNextMessage:    onNext,
 		onNextMessageErr: onNextErr,
@@ -107,7 +126,7 @@ func (q *messageQueue) send(ctx context.Context) {
 
 func (q *messageQueue) receiveAll(ctx context.Context) error {
 	for {
-		if q.callbacks.Len() == 0 {
+		if q.handlers.Len() == 0 {
 			return nil
 		}
 		if err := q.receive(ctx); err != nil {
@@ -122,7 +141,7 @@ func (q *messageQueue) receive(ctx context.Context) error {
 		return q.err
 	}
 
-	if q.callbacks.Len() == 0 {
+	if q.handlers.Len() == 0 {
 		return errors.New("no more response callback to apply")
 	}
 	callback := q.pop()
@@ -143,11 +162,11 @@ func (q *messageQueue) receive(ctx context.Context) error {
 }
 
 func (q *messageQueue) pushFront(handler responseHandler) {
-	q.callbacks.PushFront(handler)
+	q.handlers.PushFront(handler)
 }
 
 func (q *messageQueue) pop() responseHandler {
-	return q.callbacks.Remove(q.callbacks.Front()).(responseHandler)
+	return q.handlers.Remove(q.handlers.Front()).(responseHandler)
 }
 
 func (q *messageQueue) receiveMsg(ctx context.Context) any {
@@ -168,7 +187,7 @@ func (q *messageQueue) receiveMsg(ctx context.Context) any {
 }
 
 func (q *messageQueue) enqueueCallback(callbacks responseHandler) {
-	q.callbacks.PushBack(callbacks)
+	q.handlers.PushBack(callbacks)
 }
 
 func (q *messageQueue) setLogId(logId string) {
@@ -182,5 +201,5 @@ func (q *messageQueue) setBoltLogger(logger log.BoltLogger) {
 }
 
 func (q *messageQueue) isEmpty() bool {
-	return q.callbacks.Len() == 0
+	return q.handlers.Len() == 0
 }
