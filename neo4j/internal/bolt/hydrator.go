@@ -104,10 +104,6 @@ func extractBoolPointer(counters map[string]any, key string) *bool {
 	return result.(*bool)
 }
 
-func (s *success) isResetResponse() bool {
-	return s.num == 0
-}
-
 type hydrator struct {
 	unpacker      packstream.Unpacker
 	unp           *packstream.Unpacker

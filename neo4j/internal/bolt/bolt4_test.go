@@ -129,8 +129,8 @@ func TestBolt4(outer *testing.T) {
 		// Check Bolt properties
 		AssertStringEqual(t, bolt.ServerName(), "serverName")
 		AssertTrue(t, bolt.IsAlive())
-		AssertTrue(t, reflect.DeepEqual(bolt.in.connReadTimeout, time.Duration(-1)))
-		AssertFalse(t, bolt.out.useUtc)
+		AssertTrue(t, reflect.DeepEqual(bolt.queue.in.connReadTimeout, time.Duration(-1)))
+		AssertFalse(t, bolt.queue.out.useUtc)
 	})
 
 	outer.Run("Connect success with timeout hint", func(t *testing.T) {
@@ -143,7 +143,7 @@ func TestBolt4(outer *testing.T) {
 		defer cleanup()
 		defer bolt.Close(context.Background())
 
-		AssertTrue(t, reflect.DeepEqual(bolt.in.connReadTimeout, 42*time.Second))
+		AssertTrue(t, reflect.DeepEqual(bolt.queue.in.connReadTimeout, 42*time.Second))
 	})
 
 	for _, version := range [][]byte{{4, 3}, {4, 4}} {
@@ -159,7 +159,7 @@ func TestBolt4(outer *testing.T) {
 			defer cleanup()
 			defer bolt.Close(context.Background())
 
-			AssertTrue(t, bolt.out.useUtc)
+			AssertTrue(t, bolt.queue.out.useUtc)
 		})
 
 		outer.Run(fmt.Sprintf("[%d.%d] Connect success with unknown patch", major, minor), func(t *testing.T) {
@@ -172,7 +172,7 @@ func TestBolt4(outer *testing.T) {
 			defer cleanup()
 			defer bolt.Close(context.Background())
 
-			AssertFalse(t, bolt.out.useUtc)
+			AssertFalse(t, bolt.queue.out.useUtc)
 		})
 	}
 
@@ -188,7 +188,7 @@ func TestBolt4(outer *testing.T) {
 			defer cleanup()
 			defer bolt.Close(context.Background())
 
-			AssertTrue(t, reflect.DeepEqual(bolt.in.connReadTimeout, time.Duration(-1)))
+			AssertTrue(t, reflect.DeepEqual(bolt.queue.in.connReadTimeout, time.Duration(-1)))
 		})
 	}
 
@@ -577,8 +577,8 @@ func TestBolt4(outer *testing.T) {
 			srv.waitForRun(nil)
 			srv.waitForPullN(bolt4_fetchsize)
 			srv.sendFailureMsg("code", "msg") // RUN failed
+			srv.sendIgnoredMsg()              // PULL Ignored
 			srv.waitForReset()
-			srv.sendIgnoredMsg() // PULL Ignored
 			srv.sendSuccess(map[string]any{})
 		})
 		defer cleanup()
@@ -614,31 +614,6 @@ func TestBolt4(outer *testing.T) {
 		AssertNeo4jError(t, err)
 		err = bolt.TxCommit(context.Background(), tx) // This will fail due to above failed
 		AssertNeo4jError(t, err)                      // Should have same error as from run since that is original cause
-	})
-
-	outer.Run("Reset while streaming", func(t *testing.T) {
-		bolt, cleanup := connectToServer(t, func(srv *bolt4server) {
-			srv.accept(4)
-			srv.waitForRun(nil)
-			srv.waitForPullN(bolt4_fetchsize)
-			// Send RUN response and a record
-			for i := 0; i < 2; i++ {
-				srv.send(runResponse[i].tag, runResponse[i].fields...)
-			}
-			srv.waitForReset()
-			// Acknowledge reset, no fields
-			srv.sendSuccess(map[string]any{})
-		})
-		defer cleanup()
-		defer bolt.Close(context.Background())
-
-		_, err := bolt.Run(context.Background(), idb.Command{Cypher: "MATCH (" +
-			"n) RETURN n"}, idb.TxConfig{Mode: idb.ReadMode})
-		AssertNoError(t, err)
-		assertBoltState(t, bolt4_streaming, bolt)
-
-		bolt.Reset(context.Background())
-		assertBoltState(t, bolt4_ready, bolt)
 	})
 
 	outer.Run("Reset in ready state", func(t *testing.T) {

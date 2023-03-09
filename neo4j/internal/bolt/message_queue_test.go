@@ -76,6 +76,7 @@ func TestMessageQueue(outer *testing.T) {
 				description: "ROUTE",
 				action: func(queue *messageQueue) {
 					queue.appendRoute(nil, nil, nil, handlers[msgRoute])
+					// note: appendRouteV43 is also ROUTE, so skipping it
 				},
 				expectedMessageType: msgRoute,
 			},
