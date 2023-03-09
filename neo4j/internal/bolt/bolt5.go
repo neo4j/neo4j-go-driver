@@ -508,7 +508,12 @@ func (b *bolt5) run(ctx context.Context, cypher string, params map[string]any, r
 	if b.err != nil {
 		return nil, b.err
 	}
-	b.streams.attach(stream)
+
+	if b.state == bolt5Ready {
+		b.state = bolt5Streaming
+	} else if b.state == bolt5Tx {
+		b.state = bolt5StreamingTx
+	}
 	return stream, nil
 }
 
@@ -829,13 +834,8 @@ func (b *bolt5) runResponseHandler(stream *stream) responseHandler {
 		if runSuccess.qid > -1 {
 			b.lastQid = runSuccess.qid
 		}
-		b.streams.attach(stream)
 		b.tfirst = runSuccess.tfirst
-		if b.state == bolt5Ready {
-			b.state = bolt5Streaming
-		} else if b.state == bolt5Tx {
-			b.state = bolt5StreamingTx
-		}
+		b.streams.attach(stream)
 	})
 }
 
