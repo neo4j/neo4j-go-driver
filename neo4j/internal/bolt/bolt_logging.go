@@ -3,7 +3,6 @@ package bolt
 import (
 	"encoding/json"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/db"
-	"strconv"
 	"strings"
 )
 
@@ -48,9 +47,9 @@ type loggedSuccess struct {
 	Server       string              `json:"server,omitempty"`
 	ConnectionId string              `json:"connection_id,omitempty"`
 	Fields       []string            `json:"fields,omitempty"`
-	TFirst       string              `json:"t_first,omitempty"`
+	TFirst       int64               `json:"t_first,omitempty"`
 	Bookmark     string              `json:"bookmark,omitempty"`
-	TLast        string              `json:"t_last,omitempty"`
+	TLast        int64               `json:"t_last,omitempty"`
 	HasMore      bool                `json:"has_more,omitempty"`
 	Db           string              `json:"db,omitempty"`
 	Qid          int64               `json:"qid,omitempty"`
@@ -63,12 +62,16 @@ func (s loggableSuccess) String() string {
 		Server:       s.server,
 		ConnectionId: s.connectionId,
 		Fields:       s.fields,
-		TFirst:       formatOmittingZero(s.tfirst),
 		Bookmark:     s.bookmark,
-		TLast:        formatOmittingZero(s.tlast),
 		HasMore:      s.hasMore,
 		Db:           s.db,
 		ConfigHints:  s.configurationHints,
+	}
+	if s.tfirst > -1 {
+		success.TFirst = s.tfirst
+	}
+	if s.tlast > -1 {
+		success.TFirst = s.tlast
 	}
 	if s.qid > -1 {
 		success.Qid = s.qid
@@ -92,13 +95,6 @@ type loggedRoutingTable struct {
 	Routers      []string `json:"routers,omitempty"`
 	Readers      []string `json:"readers,omitempty"`
 	Writers      []string `json:"writers,omitempty"`
-}
-
-func formatOmittingZero(i int64) string {
-	if i == 0 {
-		return ""
-	}
-	return strconv.FormatInt(i, 10)
 }
 
 type loggableFailure db.Neo4jError

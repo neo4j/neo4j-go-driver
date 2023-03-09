@@ -32,17 +32,14 @@ import (
 
 func intReturningWork(ctx context.Context, t *testing.T, query string, params map[string]any) neo4j.ManagedTransactionWork {
 	return func(tx neo4j.ManagedTransaction) (any, error) {
-		create, err := tx.Run(ctx, query, params)
+		results, err := tx.Run(ctx, query, params)
 		assertNil(t, err)
 
-		returnValue := int64(0)
-		if create.Next(ctx) {
-			returnValue = create.Record().Values[0].(int64)
-		}
-		assertFalse(t, create.Next(ctx))
-		assertNil(t, create.Err())
-
-		return returnValue, nil
+		record, err := results.Single(ctx)
+		assertNil(t, err)
+		result, ok := record.Values[0].(int64)
+		assertTrue(t, ok)
+		return result, nil
 	}
 }
 

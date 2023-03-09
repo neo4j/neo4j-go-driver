@@ -22,6 +22,8 @@ package test_integration
 import (
 	"context"
 	"crypto/rand"
+	"fmt"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/db"
 	idb "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
 	"math"
 	"math/big"
@@ -31,7 +33,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/db"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/bolt"
 	. "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/testutil"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/log"
@@ -101,382 +102,411 @@ func TestConnectionConformance(outer *testing.T) {
 		return bid.Int64()
 	}
 
-	// All of these tests should leave the connection in a good state without the need
-	// for a reset. All tests share the same connection.
-	cases := []struct {
-		name string
-		fun  func(*testing.T, idb.Connection)
-	}{
-		{
-			// Leaves the connection in perfect state after creating and iterating through all records
-			name: "Run autocommit, full consume",
-			fun: func(t *testing.T, c idb.Connection) {
-				s, err := c.Run(context.Background(),
-					idb.Command{Cypher: "CREATE (n:Rand {val: $r}) RETURN n",
-						Params: map[string]any{"r": randInt()}},
-					idb.TxConfig{Mode: idb.WriteMode})
-				AssertNoError(t, err)
-				rec, sum, err := c.Next(context.Background(), s)
-				AssertNextOnlyRecord(t, rec, sum, err)
-				rec, sum, err = c.Next(context.Background(), s)
-				AssertNextOnlySummary(t, rec, sum, err)
-			},
-		},
-		{
-			// Let the connection buffer the result before next autocommit.
-			// Leaves the connection in streaming state from the last Run.
-			name: "Run autocommit twice, no consume",
-			fun: func(t *testing.T, c idb.Connection) {
-				_, err := c.Run(context.Background(),
-					idb.Command{Cypher: "CREATE (n:Rand {val: $r})",
-						Params: map[string]any{"r": randInt()}},
-					idb.TxConfig{Mode: idb.WriteMode})
-				AssertNoError(t, err)
-				_, err = c.Run(context.Background(),
-					idb.Command{Cypher: "CREATE (n:Rand {val: $r})",
-						Params: map[string]any{"r": randInt()}},
-					idb.TxConfig{Mode: idb.WriteMode})
-				AssertNoError(t, err)
-			},
-		},
-		{
-			// Iterate everything before committing
-			name: "Run explicit commit, full consume",
-			fun: func(t *testing.T, c idb.Connection) {
-				txHandle, err := c.TxBegin(context.Background(),
-					idb.TxConfig{Mode: idb.WriteMode,
-						Timeout: 10 * time.Minute})
-				AssertNoError(t, err)
-				r := randInt()
-				s, err := c.RunTx(context.Background(), txHandle,
-					idb.Command{Cypher: "CREATE (n:Rand {val: $r}) RETURN n", Params: map[string]any{"r": r}})
-				AssertNoError(t, err)
-				rec, sum, err := c.Next(context.Background(), s)
-				AssertNextOnlyRecord(t, rec, sum, err)
-				rec, sum, err = c.Next(context.Background(), s)
-				AssertNextOnlySummary(t, rec, sum, err)
-				err = c.TxCommit(context.Background(), txHandle)
-				AssertNoError(t, err)
-				// Make sure it's commited
-				s, err = c.Run(context.Background(),
-					idb.Command{Cypher: "MATCH (n:Rand {val: $r}) RETURN n",
-						Params: map[string]any{"r": r}},
-					idb.TxConfig{Mode: idb.ReadMode})
-				AssertNoError(t, err)
-				rec, sum, err = c.Next(context.Background(), s)
-				AssertNextOnlyRecord(t, rec, sum, err)
-				// Not everything consumed from the read check, but that is also fine
-			},
-		},
-		{
-			// Do not consume anything before commiting
-			name: "Run explicit commit, no consume",
-			fun: func(t *testing.T, c idb.Connection) {
-				txHandle, err := c.TxBegin(context.Background(),
-					idb.TxConfig{Mode: idb.WriteMode,
-						Timeout: 10 * time.Minute})
-				AssertNoError(t, err)
-				r := randInt()
-				_, err = c.RunTx(context.Background(), txHandle,
-					idb.Command{Cypher: "CREATE (n:Rand {val: $r}) RETURN n", Params: map[string]any{"r": r}})
-				AssertNoError(t, err)
-				err = c.TxCommit(context.Background(), txHandle)
-				AssertNoError(t, err)
-				// Make sure it's committed
-				s, err := c.Run(context.Background(),
-					idb.Command{Cypher: "MATCH (n:Rand {val: $r}) RETURN n",
-						Params: map[string]any{"r": r}},
-					idb.TxConfig{Mode: idb.ReadMode})
-				AssertNoError(t, err)
-				rec, sum, err := c.Next(context.Background(), s)
-				AssertNextOnlyRecord(t, rec, sum, err)
-				// Not everything consumed from the read check, but that is also fine
-			},
-		},
-		{
-			// Iterate everything returned from create before rolling back
-			name: "Run explicit rollback, full consume",
-			fun: func(t *testing.T, c idb.Connection) {
-				txHandle, err := c.TxBegin(context.Background(),
-					idb.TxConfig{Mode: idb.WriteMode,
-						Timeout: 10 * time.Minute})
-				AssertNoError(t, err)
-				r := randInt()
-				s, err := c.RunTx(context.Background(), txHandle,
-					idb.Command{Cypher: "CREATE (n:Rand {val: $r}) RETURN n", Params: map[string]any{"r": r}})
-				AssertNoError(t, err)
-				rec, sum, err := c.Next(context.Background(), s)
-				AssertNextOnlyRecord(t, rec, sum, err)
-				rec, sum, err = c.Next(context.Background(), s)
-				AssertNextOnlySummary(t, rec, sum, err)
-				err = c.TxRollback(context.Background(), txHandle)
-				AssertNoError(t, err)
-				// Make sure it's rolled back
-				s, err = c.Run(context.Background(),
-					idb.Command{Cypher: "MATCH (n:Rand {val: $r}) RETURN n",
-						Params: map[string]any{"r": r}},
-					idb.TxConfig{Mode: idb.ReadMode})
-				AssertNoError(t, err)
-				rec, sum, err = c.Next(context.Background(), s)
-				AssertNextOnlySummary(t, rec, sum, err)
-			},
-		},
-		{
-			// Do not consume anything before rolling back
-			name: "Run explicit rollback, no consume",
-			fun: func(t *testing.T, c idb.Connection) {
-				txHandle, err := c.TxBegin(context.Background(),
-					idb.TxConfig{Mode: idb.WriteMode,
-						Timeout: 10 * time.Minute})
-				AssertNoError(t, err)
-				r := randInt()
-				_, err = c.RunTx(context.Background(), txHandle,
-					idb.Command{Cypher: "CREATE (n:Rand {val: $r}) RETURN n", Params: map[string]any{"r": r}})
-				AssertNoError(t, err)
-				err = c.TxRollback(context.Background(), txHandle)
-				AssertNoError(t, err)
-				// Make sure it's committed
-				s, err := c.Run(context.Background(),
-					idb.Command{Cypher: "MATCH (n:Rand {val: $r}) RETURN n",
-						Params: map[string]any{"r": r}},
-					idb.TxConfig{Mode: idb.ReadMode})
-				AssertNoError(t, err)
-				rec, sum, err := c.Next(context.Background(), s)
-				AssertNextOnlySummary(t, rec, sum, err)
-			},
-		},
-		{
-			name: "Nested results in transaction, iterate outer result",
-			fun: func(t *testing.T, c idb.Connection) {
-				tx, err := c.TxBegin(context.Background(),
-					idb.TxConfig{Mode: idb.ReadMode})
-				AssertNoError(t, err)
-				r1, err := c.RunTx(context.Background(), tx,
-					idb.Command{Cypher: "UNWIND RANGE(0, 100) AS n RETURN n"})
-				AssertNoError(t, err)
-				n := int64(0)
-				rec, _, _ := c.Next(context.Background(), r1)
-				for ; rec != nil; rec, _, _ = c.Next(context.Background(), r1) {
-					n = rec.Values[0].(int64)
-					_, err := c.RunTx(context.Background(), tx,
-						idb.Command{Cypher: "UNWIND RANGE (0, $x) AS x RETURN x", Params: map[string]any{"x": n}})
+	outer.Run("without reset", func(inner *testing.T) {
+		// All of these tests should leave the connection in a good state without the need
+		// for a reset. All tests share the same connection.
+		cases := []struct {
+			name string
+			fun  func(*testing.T, idb.Connection)
+		}{
+			{
+				// Leaves the connection in perfect state after creating and iterating through all records
+				name: "Run autocommit, full consume",
+				fun: func(t *testing.T, c idb.Connection) {
+					s, err := c.Run(context.Background(),
+						idb.Command{Cypher: "CREATE (n:Rand {val: $r}) RETURN n",
+							Params: map[string]any{"r": randInt()}},
+						idb.TxConfig{Mode: idb.WriteMode})
 					AssertNoError(t, err)
-				}
-				if n != 100 {
-					t.Errorf("n should have reached 100: %d", n)
-				}
-				err = c.TxCommit(context.Background(), tx)
-				AssertNoError(t, err)
-				bookmark := c.Bookmark()
-				AssertStringNotEmpty(t, bookmark)
+					rec, sum, err := c.Next(context.Background(), s)
+					AssertNextOnlyRecord(t, rec, sum, err)
+					rec, sum, err = c.Next(context.Background(), s)
+					AssertNextOnlySummary(t, rec, sum, err)
+				},
 			},
-		},
-		{
-			name: "Next without streaming",
-			fun: func(t *testing.T, c idb.Connection) {
-				rec, sum, err := c.Next(context.Background(), 3)
-				AssertNextOnlyError(t, rec, sum, err)
+			{
+				// Let the connection buffer the result before next autocommit.
+				// Leaves the connection in streaming state from the last Run.
+				name: "Run autocommit twice, no consume",
+				fun: func(t *testing.T, c idb.Connection) {
+					_, err := c.Run(context.Background(),
+						idb.Command{Cypher: "CREATE (n:Rand {val: $r})",
+							Params: map[string]any{"r": randInt()}},
+						idb.TxConfig{Mode: idb.WriteMode})
+					AssertNoError(t, err)
+					_, err = c.Run(context.Background(),
+						idb.Command{Cypher: "CREATE (n:Rand {val: $r})",
+							Params: map[string]any{"r": randInt()}},
+						idb.TxConfig{Mode: idb.WriteMode})
+					AssertNoError(t, err)
+				},
 			},
-		},
-		{
-			name: "Next passed the summary",
-			fun: func(t *testing.T, c idb.Connection) {
+			{
+				// Iterate everything before committing
+				name: "Run explicit commit, full consume",
+				fun: func(t *testing.T, c idb.Connection) {
+					txHandle, err := c.TxBegin(context.Background(),
+						idb.TxConfig{Mode: idb.WriteMode,
+							Timeout: 10 * time.Minute})
+					AssertNoError(t, err)
+					r := randInt()
+					s, err := c.RunTx(context.Background(), txHandle,
+						idb.Command{Cypher: "CREATE (n:Rand {val: $r}) RETURN n", Params: map[string]any{"r": r}})
+					AssertNoError(t, err)
+					rec, sum, err := c.Next(context.Background(), s)
+					AssertNextOnlyRecord(t, rec, sum, err)
+					rec, sum, err = c.Next(context.Background(), s)
+					AssertNextOnlySummary(t, rec, sum, err)
+					err = c.TxCommit(context.Background(), txHandle)
+					AssertNoError(t, err)
+					// Make sure it's commited
+					s, err = c.Run(context.Background(),
+						idb.Command{Cypher: "MATCH (n:Rand {val: $r}) RETURN n",
+							Params: map[string]any{"r": r}},
+						idb.TxConfig{Mode: idb.ReadMode})
+					AssertNoError(t, err)
+					rec, sum, err = c.Next(context.Background(), s)
+					AssertNextOnlyRecord(t, rec, sum, err)
+					// Not everything consumed from the read check, but that is also fine
+				},
+			},
+			{
+				// Do not consume anything before committing
+				name: "Run explicit commit, no consume",
+				fun: func(t *testing.T, c idb.Connection) {
+					txHandle, err := c.TxBegin(context.Background(),
+						idb.TxConfig{Mode: idb.WriteMode,
+							Timeout: 10 * time.Minute})
+					AssertNoError(t, err)
+					r := randInt()
+					_, err = c.RunTx(context.Background(), txHandle,
+						idb.Command{Cypher: "CREATE (n:Rand {val: $r}) RETURN n", Params: map[string]any{"r": r}})
+					AssertNoError(t, err)
+					err = c.TxCommit(context.Background(), txHandle)
+					AssertNoError(t, err)
+					// Make sure it's committed
+					s, err := c.Run(context.Background(),
+						idb.Command{Cypher: "MATCH (n:Rand {val: $r}) RETURN n",
+							Params: map[string]any{"r": r}},
+						idb.TxConfig{Mode: idb.ReadMode})
+					AssertNoError(t, err)
+					rec, sum, err := c.Next(context.Background(), s)
+					AssertNextOnlyRecord(t, rec, sum, err)
+					// Not everything consumed from the read check, but that is also fine
+				},
+			},
+			{
+				// Iterate everything returned from create before rolling back
+				name: "Run explicit rollback, full consume",
+				fun: func(t *testing.T, c idb.Connection) {
+					txHandle, err := c.TxBegin(context.Background(),
+						idb.TxConfig{Mode: idb.WriteMode,
+							Timeout: 10 * time.Minute})
+					AssertNoError(t, err)
+					r := randInt()
+					s, err := c.RunTx(context.Background(), txHandle,
+						idb.Command{Cypher: "CREATE (n:Rand {val: $r}) RETURN n", Params: map[string]any{"r": r}})
+					AssertNoError(t, err)
+					rec, sum, err := c.Next(context.Background(), s)
+					AssertNextOnlyRecord(t, rec, sum, err)
+					rec, sum, err = c.Next(context.Background(), s)
+					AssertNextOnlySummary(t, rec, sum, err)
+					err = c.TxRollback(context.Background(), txHandle)
+					AssertNoError(t, err)
+					// Make sure it's rolled back
+					s, err = c.Run(context.Background(),
+						idb.Command{Cypher: "MATCH (n:Rand {val: $r}) RETURN n",
+							Params: map[string]any{"r": r}},
+						idb.TxConfig{Mode: idb.ReadMode})
+					AssertNoError(t, err)
+					rec, sum, err = c.Next(context.Background(), s)
+					AssertNextOnlySummary(t, rec, sum, err)
+				},
+			},
+			{
+				// Do not consume anything before rolling back
+				name: "Run explicit rollback, no consume",
+				fun: func(t *testing.T, c idb.Connection) {
+					txHandle, err := c.TxBegin(context.Background(),
+						idb.TxConfig{Mode: idb.WriteMode,
+							Timeout: 10 * time.Minute})
+					AssertNoError(t, err)
+					r := randInt()
+					_, err = c.RunTx(context.Background(), txHandle,
+						idb.Command{Cypher: "CREATE (n:Rand {val: $r}) RETURN n", Params: map[string]any{"r": r}})
+					AssertNoError(t, err)
+					err = c.TxRollback(context.Background(), txHandle)
+					AssertNoError(t, err)
+					// Make sure it's committed
+					s, err := c.Run(context.Background(),
+						idb.Command{Cypher: "MATCH (n:Rand {val: $r}) RETURN n",
+							Params: map[string]any{"r": r}},
+						idb.TxConfig{Mode: idb.ReadMode})
+					AssertNoError(t, err)
+					rec, sum, err := c.Next(context.Background(), s)
+					AssertNextOnlySummary(t, rec, sum, err)
+				},
+			},
+			{
+				name: "Nested results in transaction, iterate outer result",
+				fun: func(t *testing.T, c idb.Connection) {
+					tx, err := c.TxBegin(context.Background(),
+						idb.TxConfig{Mode: idb.ReadMode})
+					AssertNoError(t, err)
+					r1, err := c.RunTx(context.Background(), tx,
+						idb.Command{Cypher: "UNWIND RANGE(0, 100) AS n RETURN n"})
+					AssertNoError(t, err)
+					n := int64(0)
+					rec, _, _ := c.Next(context.Background(), r1)
+					for ; rec != nil; rec, _, _ = c.Next(context.Background(), r1) {
+						n = rec.Values[0].(int64)
+						_, err := c.RunTx(context.Background(), tx,
+							idb.Command{Cypher: "UNWIND RANGE (0, $x) AS x RETURN x", Params: map[string]any{"x": n}})
+						AssertNoError(t, err)
+					}
+					if n != 100 {
+						t.Errorf("n should have reached 100: %d", n)
+					}
+					err = c.TxCommit(context.Background(), tx)
+					AssertNoError(t, err)
+					bookmark := c.Bookmark()
+					AssertStringNotEmpty(t, bookmark)
+				},
+			},
+			{
+				name: "Next without streaming",
+				fun: func(t *testing.T, c idb.Connection) {
+					rec, sum, err := c.Next(context.Background(), 3)
+					AssertNextOnlyError(t, rec, sum, err)
+				},
+			},
+			{
+				name: "Next passed the summary",
+				fun: func(t *testing.T, c idb.Connection) {
+					s, err := boltConn.Run(context.Background(),
+						idb.Command{Cypher: "RETURN 42"},
+						idb.TxConfig{Mode: idb.ReadMode})
+					AssertNoError(t, err)
+					rec, sum, err := c.Next(context.Background(), s)
+					AssertNextOnlyRecord(t, rec, sum, err)
+					rec, sum, err = c.Next(context.Background(), s)
+					AssertNextOnlySummary(t, rec, sum, err)
+					rec, sum, err = c.Next(context.Background(), s)
+					AssertNextOnlySummary(t, rec, sum, err)
+				},
+			},
+			{
+				name: "Run autocommit while in tx",
+				fun: func(t *testing.T, c idb.Connection) {
+					txHandle, err := c.TxBegin(context.Background(),
+						idb.TxConfig{Mode: idb.WriteMode,
+							Timeout: 10 * time.Minute})
+					AssertNoError(t, err)
+					defer c.TxRollback(context.Background(), txHandle)
+					s, err := c.Run(context.Background(),
+						idb.Command{Cypher: "CREATE (n:Rand {val: $r})",
+							Params: map[string]any{"r": randInt()}},
+						idb.TxConfig{Mode: idb.WriteMode})
+					if s != nil || err == nil {
+						t.Fatal("Should fail to run auto commit when in transaction")
+					}
+					// TODO: Assert type of error!
+				},
+			},
+			{
+				name: "Commit while not in tx",
+				fun: func(t *testing.T, c idb.Connection) {
+					err := c.TxCommit(context.Background(), 1)
+					if err == nil {
+						t.Fatal("Should have failed")
+					}
+					// TODO: Assert type of error!
+				},
+			},
+			{
+				name: "Rollback while not in tx",
+				fun: func(t *testing.T, c idb.Connection) {
+					err := c.TxRollback(context.Background(), 3)
+					if err == nil {
+						t.Fatal("Should have failed")
+					}
+					// TODO: Assert type of error!
+				},
+			},
+		}
+		// Run all above in sequence
+		for _, c := range cases {
+			inner.Run(c.name, func(t *testing.T) {
+				c.fun(t, boltConn)
+				if !boltConn.IsAlive() {
+					t.Error("Connection died")
+				}
+			})
+		}
+		// Run some of the above at random as one test
+		inner.Run("Random sequence", func(t *testing.T) {
+			randoms := make([]int, 25)
+			for i := range randoms {
+				randoms[i] = int(randInt() % int64(len(cases)))
+			}
+
+			for _, i := range randoms {
+				c := cases[i]
+				fmt.Printf("Running now %s\n", c.name)
+				c.fun(t, boltConn)
+				if !boltConn.IsAlive() {
+					t.Error("Connection died")
+				}
+			}
+		})
+	})
+
+	outer.Run("with reset", func(inner *testing.T) {
+		// All of these tests should leave the connection in a good state after a
+		//reset/but not necessarily without it. All tests share the same connection.
+		cases := []struct {
+			name string
+			fun  func(*testing.T, idb.Connection)
+		}{
+			// Connection is in failed state due to syntax error
+			{
+				name: "Run autocommit with syntax error",
+				fun: func(t *testing.T, c idb.Connection) {
+					s, err := c.Run(context.Background(),
+						idb.Command{Cypher: "MATCH (n:Rand {val: $r} ",
+							Params: map[string]any{"r": randInt()}},
+						idb.TxConfig{Mode: idb.ReadMode})
+					if err == nil || s != nil {
+						t.Fatal("Should have received error")
+					}
+					_, isDbError := err.(*db.Neo4jError)
+					if !isDbError {
+						t.Error("Should be connection error")
+					}
+				},
+			},
+			{
+				name: "Run autocommit with division by zero in result",
+				fun: func(t *testing.T, c idb.Connection) {
+					s, err := c.Run(context.Background(),
+						idb.Command{Cypher: "UNWIND [0] AS x RETURN 10 / x",
+							Params: map[string]any{"r": randInt()}},
+						idb.TxConfig{Mode: idb.ReadMode})
+					AssertNoError(t, err)
+					// Should get error while iterating
+					_, _, err = c.Next(context.Background(), s)
+					if err == nil {
+						t.Error("Should have error")
+					}
+					_, isDbError := err.(*db.Neo4jError)
+					if !isDbError {
+						t.Error("Should be connection error")
+					}
+				},
+			},
+			// Connection is in transaction (lazy)
+			{
+				name: "Set connection in transaction mode",
+				fun: func(t *testing.T, c idb.Connection) {
+					_, err := c.TxBegin(context.Background(),
+						idb.TxConfig{Mode: idb.WriteMode})
+					AssertNoError(t, err)
+				},
+			},
+			// Connection is in transaction
+			{
+				name: "Set connection in transaction mode",
+				fun: func(t *testing.T, c idb.Connection) {
+					tx, _ := c.TxBegin(context.Background(),
+						idb.TxConfig{Mode: idb.WriteMode})
+					_, err := c.RunTx(context.Background(), tx,
+						idb.Command{Cypher: "UNWIND [1] AS n RETURN n"})
+					AssertNoError(t, err)
+				},
+			},
+			// Really big stream streaming
+			{
+				name: "Streaming big stream (autocommit)",
+				fun: func(t *testing.T, c idb.Connection) {
+					_, err := c.Run(context.Background(),
+						idb.Command{Cypher: "UNWIND RANGE (0, " +
+							"1000000) AS x RETURN x"}, idb.TxConfig{Mode: idb.
+							ReadMode})
+					AssertNoError(t, err)
+				},
+			},
+			// Big nested streams in an uncommitted tx
+			{
+				name: "Streaming big stream (explicit tx)",
+				fun: func(t *testing.T, c idb.Connection) {
+					tx, _ := c.TxBegin(context.Background(),
+						idb.TxConfig{Mode: idb.WriteMode})
+					_, err := c.RunTx(context.Background(), tx,
+						idb.Command{Cypher: "UNWIND RANGE (0, 1000000) AS n RETURN n"})
+					AssertNoError(t, err)
+					_, err = c.RunTx(context.Background(), tx,
+						idb.Command{Cypher: "UNWIND RANGE (0, 1000000) AS n RETURN n"})
+					AssertNoError(t, err)
+				},
+			},
+			{
+				name: "Discarding when stream's partly consumed",
+				fun: func(t *testing.T, c idb.Connection) {
+					ctx := context.Background()
+					streamHandle, err := c.Run(ctx,
+						idb.Command{Cypher: "UNWIND [1, 2, 3, 4] AS x RETURN x", FetchSize: 2},
+						idb.TxConfig{Mode: idb.ReadMode})
+					AssertNoError(t, err)
+					record, summary, err := c.Next(ctx, streamHandle)
+					AssertNextOnlyRecord(t, record, summary, err)
+					record, summary, err = c.Next(ctx, streamHandle)
+					AssertNextOnlyRecord(t, record, summary, err)
+					record, summary, err = c.Next(ctx, streamHandle)
+					AssertNextOnlyRecord(t, record, summary, err)
+
+					summary, err = c.Consume(ctx, streamHandle)
+
+					AssertNoError(t, err)
+					AssertNotNil(t, summary)
+				},
+			},
+		}
+		for _, c := range cases {
+			inner.Run(c.name, func(t *testing.T) {
+				c.fun(t, boltConn)
+				if !boltConn.IsAlive() {
+					t.Error("Connection died")
+				}
+				boltConn.Reset(context.Background())
+				// Should be working now
 				s, err := boltConn.Run(context.Background(),
 					idb.Command{Cypher: "RETURN 42"},
 					idb.TxConfig{Mode: idb.ReadMode})
 				AssertNoError(t, err)
-				rec, sum, err := c.Next(context.Background(), s)
-				AssertNextOnlyRecord(t, rec, sum, err)
-				rec, sum, err = c.Next(context.Background(), s)
-				AssertNextOnlySummary(t, rec, sum, err)
-				rec, sum, err = c.Next(context.Background(), s)
-				AssertNextOnlySummary(t, rec, sum, err)
-			},
-		},
-		{
-			name: "Run autocommit while in tx",
-			fun: func(t *testing.T, c idb.Connection) {
-				txHandle, err := c.TxBegin(context.Background(),
-					idb.TxConfig{Mode: idb.WriteMode,
-						Timeout: 10 * time.Minute})
-				AssertNoError(t, err)
-				defer c.TxRollback(context.Background(), txHandle)
-				s, err := c.Run(context.Background(),
-					idb.Command{Cypher: "CREATE (n:Rand {val: $r})",
-						Params: map[string]any{"r": randInt()}},
-					idb.TxConfig{Mode: idb.WriteMode})
-				if s != nil || err == nil {
-					t.Fatal("Should fail to run auto commit when in transaction")
+				if s == nil {
+					t.Fatal("Didn't get a stream")
 				}
-				// TODO: Assert type of error!
-			},
-		},
-		{
-			name: "Commit while not in tx",
-			fun: func(t *testing.T, c idb.Connection) {
-				err := c.TxCommit(context.Background(), 1)
-				if err == nil {
-					t.Fatal("Should have failed")
-				}
-				// TODO: Assert type of error!
-			},
-		},
-		{
-			name: "Rollback while not in tx",
-			fun: func(t *testing.T, c idb.Connection) {
-				err := c.TxRollback(context.Background(), 3)
-				if err == nil {
-					t.Fatal("Should have failed")
-				}
-				// TODO: Assert type of error!
-			},
-		},
-	}
-	// Run all above in sequence
-	for _, c := range cases {
-		outer.Run(c.name, func(t *testing.T) {
-			c.fun(t, boltConn)
-			if !boltConn.IsAlive() {
-				t.Error("Connection died")
-			}
-		})
-	}
-	// Run some of the above at random as one test
-	outer.Run("Random sequence", func(t *testing.T) {
-		randoms := make([]int, 25)
-		for i := range randoms {
-			randoms[i] = int(randInt() % int64(len(cases)))
+				boltConn.Next(context.Background(), s)
+				boltConn.Next(context.Background(), s)
+			})
 		}
-		for _, i := range randoms {
-			c := cases[i]
-			c.fun(t, boltConn)
-			if !boltConn.IsAlive() {
-				t.Error("Connection died")
-			}
-		}
-	})
 
-	// All of these tests should leave the connection in a good state after a
-	//reset/but not necessarily without it. All tests share the same connection.
-	cases = []struct {
-		name string
-		fun  func(*testing.T, idb.Connection)
-	}{
-		// Connection is in failed state due to syntax error
-		{
-			name: "Run autocommit with syntax error",
-			fun: func(t *testing.T, c idb.Connection) {
-				s, err := c.Run(context.Background(),
-					idb.Command{Cypher: "MATCH (n:Rand {val: $r} ",
-						Params: map[string]any{"r": randInt()}},
-					idb.TxConfig{Mode: idb.ReadMode})
-				if err == nil || s != nil {
-					t.Fatal("Should have received error")
-				}
-				_, isDbError := err.(*db.Neo4jError)
-				if !isDbError {
-					t.Error("Should be connection error")
-				}
-			},
-		},
-		{
-			name: "Run autocommit with division by zero in result",
-			fun: func(t *testing.T, c idb.Connection) {
-				s, err := c.Run(context.Background(),
-					idb.Command{Cypher: "UNWIND [0] AS x RETURN 10 / x",
-						Params: map[string]any{"r": randInt()}},
-					idb.TxConfig{Mode: idb.ReadMode})
-				AssertNoError(t, err)
-				// Should get error while iterating
-				_, _, err = c.Next(context.Background(), s)
-				if err == nil {
-					t.Error("Should have error")
-				}
-				_, isDbError := err.(*db.Neo4jError)
-				if !isDbError {
-					t.Error("Should be connection error")
-				}
-			},
-		},
-		// Connection is in transaction (lazy)
-		{
-			name: "Set connection in transaction mode",
-			fun: func(t *testing.T, c idb.Connection) {
-				_, err := c.TxBegin(context.Background(),
-					idb.TxConfig{Mode: idb.WriteMode})
-				AssertNoError(t, err)
-			},
-		},
-		// Connection is in transaction
-		{
-			name: "Set connection in transaction mode",
-			fun: func(t *testing.T, c idb.Connection) {
-				tx, _ := c.TxBegin(context.Background(),
-					idb.TxConfig{Mode: idb.WriteMode})
-				_, err := c.RunTx(context.Background(), tx,
-					idb.Command{Cypher: "UNWIND [1] AS n RETURN n"})
-				AssertNoError(t, err)
-			},
-		},
-		// Really big stream streaming
-		{
-			name: "Streaming big stream",
-			fun: func(t *testing.T, c idb.Connection) {
-				_, err := c.Run(context.Background(),
-					idb.Command{Cypher: "UNWIND RANGE (0, " +
-						"1000000) AS x RETURN x"}, idb.TxConfig{Mode: idb.
-						ReadMode})
-				AssertNoError(t, err)
-			},
-		},
-		// Big nested streams in an uncommitted tx
-		{
-			name: "Streaming big stream",
-			fun: func(t *testing.T, c idb.Connection) {
-				tx, _ := c.TxBegin(context.Background(),
-					idb.TxConfig{Mode: idb.WriteMode})
-				_, err := c.RunTx(context.Background(), tx,
-					idb.Command{Cypher: "UNWIND RANGE (0, 1000000) AS n RETURN n"})
-				AssertNoError(t, err)
-				_, err = c.RunTx(context.Background(), tx,
-					idb.Command{Cypher: "UNWIND RANGE (0, 1000000) AS n RETURN n"})
-				AssertNoError(t, err)
-			},
-		},
-	}
-	for _, c := range cases {
-		outer.Run(c.name, func(t *testing.T) {
-			c.fun(t, boltConn)
-			if !boltConn.IsAlive() {
-				t.Error("Connection died")
+		// Run some of the above at random as one test
+		outer.Run("Random reset sequence", func(t *testing.T) {
+			randoms := make([]int, 25)
+			for i := range randoms {
+				randoms[i] = int(randInt() % int64(len(cases)))
 			}
-			boltConn.Reset(context.Background())
-			// Should be working now
-			s, err := boltConn.Run(context.Background(),
-				idb.Command{Cypher: "RETURN 42"},
-				idb.TxConfig{Mode: idb.ReadMode})
-			AssertNoError(t, err)
-			if s == nil {
-				t.Fatal("Didn't get a stream")
+			for _, i := range randoms {
+				c := cases[i]
+				fmt.Printf("Running now %s (test %d)\n", c.name, i)
+				c.fun(t, boltConn)
+				if !boltConn.IsAlive() {
+					t.Error("Connection died")
+				}
+				boltConn.Reset(context.Background())
 			}
-			boltConn.Next(context.Background(), s)
-			boltConn.Next(context.Background(), s)
 		})
-	}
-	// Run some of the above at random as one test
-	outer.Run("Random reset sequence", func(t *testing.T) {
-		randoms := make([]int, 25)
-		for i := range randoms {
-			randoms[i] = int(randInt() % int64(len(cases)))
-		}
-		for _, i := range randoms {
-			c := cases[i]
-			c.fun(t, boltConn)
-			if !boltConn.IsAlive() {
-				t.Error("Connection died")
-			}
-			boltConn.Reset(context.Background())
-		}
 	})
 
 	// Write really big query

@@ -109,12 +109,14 @@ func TestExamples(outer *testing.T) {
 			assertNil(t, err)
 			assertNotNil(t, driver)
 			defer driver.Close(ctx)
+			initialCount, err := countNodes(ctx, driver, "Person", "name", "Tom")
+			assertNil(t, err)
 
 			err = addPersonInSession(ctx, driver, "Tom")
 			assertNil(t, err)
 			count, err := countNodes(ctx, driver, "Person", "name", "Tom")
 			assertNil(t, err)
-			assertEquals(t, count, int64(1))
+			assertEquals(t, count, initialCount+int64(1))
 		})
 
 		inner.Run("Autocommit Transaction", func(t *testing.T) {
@@ -122,12 +124,14 @@ func TestExamples(outer *testing.T) {
 			assertNil(t, err)
 			assertNotNil(t, driver)
 			defer driver.Close(ctx)
+			initialCount, err := countNodes(ctx, driver, "Person", "name", "Shanon")
+			assertNil(t, err)
 
 			err = addPersonInAutoCommitTx(ctx, driver, "Shanon")
 			assertNil(t, err)
 			count, err := countNodes(ctx, driver, "Person", "name", "Shanon")
 			assertNil(t, err)
-			assertEquals(t, count, int64(1))
+			assertEquals(t, count, initialCount+int64(1))
 		})
 
 		inner.Run("Pass Bookmarks", func(t *testing.T) {
@@ -135,25 +139,33 @@ func TestExamples(outer *testing.T) {
 			assertNil(t, err)
 			assertNotNil(t, driver)
 			defer driver.Close(ctx)
+			initialAliceCount, err := countNodes(ctx, driver, "Person", "name", "Alice")
+			assertNil(t, err)
+			initialBobCount, err := countNodes(ctx, driver, "Person", "name", "Bob")
+			assertNil(t, err)
+			initialLexCorpCount, err := countNodes(ctx, driver, "Company", "name", "LexCorp")
+			assertNil(t, err)
+			initialWayneEnterpriseCount, err := countNodes(ctx, driver, "Company", "name", "Wayne Enterprises")
+			assertNil(t, err)
 
 			err = addEmployAndMakeFriends(ctx, driver)
 			assertNil(t, err)
 
 			count, err := countNodes(ctx, driver, "Person", "name", "Alice")
 			assertNil(t, err)
-			assertEquals(t, count, int64(1))
+			assertEquals(t, count, initialAliceCount+int64(1))
 
 			count, err = countNodes(ctx, driver, "Person", "name", "Bob")
 			assertNil(t, err)
-			assertEquals(t, count, int64(1))
+			assertEquals(t, count, initialBobCount+int64(1))
 
 			count, err = countNodes(ctx, driver, "Company", "name", "LexCorp")
 			assertNil(t, err)
-			assertEquals(t, count, int64(1))
+			assertEquals(t, count, initialLexCorpCount+int64(1))
 
 			count, err = countNodes(ctx, driver, "Company", "name", "Wayne Enterprises")
 			assertNil(t, err)
-			assertEquals(t, count, int64(1))
+			assertEquals(t, count, initialWayneEnterpriseCount+int64(1))
 		})
 
 		inner.Run("Read/Write Transaction", func(t *testing.T) {
