@@ -88,7 +88,6 @@ type bolt4 struct {
 	connId        string
 	logId         string
 	serverVersion string
-	tfirst        int64       // Time that server started streaming
 	pendingTx     internalTx4 // Stashed away when tx started explicitly
 	hasPendingTx  bool
 	bookmark      string // Last bookmark
@@ -615,8 +614,8 @@ func (b *bolt4) run(cypher string, params map[string]interface{}, fetchSize int,
 		// pull message as well, this will be cleaned up by Reset
 		return nil, b.err
 	}
-	// Extract the RUN response from success response
-	b.tfirst = succ.tfirst
+	// Create a stream representation, set it to current and track it
+	stream := &stream{keys: succ.fields, qid: succ.qid, fetchSize: fetchSize, tfirst: succ.tfirst}
 	// Change state to streaming
 	if b.state == bolt4_ready {
 		b.state = bolt4_streaming
@@ -624,8 +623,6 @@ func (b *bolt4) run(cypher string, params map[string]interface{}, fetchSize int,
 		b.state = bolt4_streamingtx
 	}
 
-	// Create a stream representation, set it to current and track it
-	stream := &stream{keys: succ.fields, qid: succ.qid, fetchSize: fetchSize}
 	b.streams.attach(stream)
 	// No need to check streams state, we know we are streaming
 
@@ -829,7 +826,7 @@ func (b *bolt4) receiveNext() (*db.Record, bool, *db.Summary) {
 		sum.Major = 4
 		sum.Minor = b.minor
 		sum.ServerName = b.serverName
-		sum.TFirst = b.tfirst
+		sum.TFirst = b.streams.curr.tfirst
 		if len(sum.Bookmark) > 0 {
 			b.bookmark = sum.Bookmark
 		}

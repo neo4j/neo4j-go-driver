@@ -1000,4 +1000,37 @@ func TestBolt4(ot *testing.T) {
 		assertBoltState(t, bolt4_failed, bolt)
 		AssertError(t, err)
 	})
+
+	ot.Run("tracks tfirst properly", func(t *testing.T) {
+		bolt, cleanup := connectToServer(t, func(srv *bolt4server) {
+			srv.accept(4)
+			srv.waitForTxBegin()
+			srv.sendSuccess(nil)
+			srv.waitForRun(nil)
+			srv.waitForPullN(1)
+			srv.send(msgSuccess, map[string]interface{}{"fields": []interface{}{"x"}, "t_first": int64(10)})
+			srv.send(msgRecord, []interface{}{"1"})
+			srv.send(msgSuccess, map[string]interface{}{"has_more": true})
+			srv.waitForRun(nil)
+			srv.waitForPullN(-1)
+			srv.send(msgSuccess, map[string]interface{}{"fields": []interface{}{"x"}, "t_first": int64(20)})
+			srv.send(msgRecord, []interface{}{"3"})
+			srv.send(msgRecord, []interface{}{"4"})
+			srv.send(msgSuccess, map[string]interface{}{"bookmark": "b2", "type": "r"})
+			srv.send(msgRecord, []interface{}{"2"})
+			srv.send(msgSuccess, map[string]interface{}{"bookmark": "b1", "type": "r"})
+		})
+		defer cleanup()
+		defer bolt.Close()
+
+		tx1, _ := bolt.TxBegin(db.TxConfig{Mode: db.ReadMode})
+		results1, _ := bolt.RunTx(tx1, db.Command{Cypher: "UNWIND [1,2] AS x RETURN x", FetchSize: 1})
+		results2, _ := bolt.RunTx(tx1, db.Command{Cypher: "UNWIND [3,4] AS x RETURN x", FetchSize: -1})
+		summary2, _ := bolt.Consume(results2)
+		summary1, _ := bolt.Consume(results1)
+
+		AssertIntEqual(t, int(summary1.TFirst), 10)
+		AssertIntEqual(t, int(summary2.TFirst), 20)
+	})
+
 }
