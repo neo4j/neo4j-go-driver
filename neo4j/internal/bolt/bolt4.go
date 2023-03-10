@@ -91,7 +91,6 @@ type bolt4 struct {
 	connId        string
 	logId         string
 	serverVersion string
-	tfirst        int64  // Time that server started streaming
 	bookmark      string // Last bookmark
 	birthDate     time.Time
 	log           log.Logger
@@ -922,7 +921,7 @@ func (b *bolt4) discardResponseHandler(stream *stream) responseHandler {
 				stream.endOfBatch = true
 				return
 			}
-			summary := b.extractSummary(discardSuccess)
+			summary := b.extractSummary(discardSuccess, stream)
 			if len(summary.Bookmark) > 0 {
 				b.bookmark = summary.Bookmark
 			}
@@ -964,7 +963,7 @@ func (b *bolt4) pullResponseHandler(stream *stream) responseHandler {
 				stream.endOfBatch = true
 				return
 			}
-			summary := b.extractSummary(pullSuccess)
+			summary := b.extractSummary(pullSuccess, stream)
 			if len(summary.Bookmark) > 0 {
 				b.bookmark = summary.Bookmark
 			}
@@ -987,10 +986,10 @@ func (b *bolt4) runResponseHandler(stream *stream) responseHandler {
 	return b.expectedSuccessHandler(func(runSuccess *success) {
 		stream.keys = runSuccess.fields
 		stream.qid = runSuccess.qid
+		stream.tfirst = runSuccess.tfirst
 		if runSuccess.qid > -1 {
 			b.lastQid = runSuccess.qid
 		}
-		b.tfirst = runSuccess.tfirst
 		b.streams.attach(stream)
 	})
 }
@@ -1083,13 +1082,13 @@ func (b *bolt4) initializeReadTimeoutHint(hints map[string]any) {
 	b.queue.in.connReadTimeout = time.Duration(readTimeout) * time.Second
 }
 
-func (b *bolt4) extractSummary(success *success) *db.Summary {
+func (b *bolt4) extractSummary(success *success, stream *stream) *db.Summary {
 	summary := success.summary()
 	summary.Agent = b.serverVersion
 	summary.Major = 4
 	summary.Minor = b.minor
 	summary.ServerName = b.serverName
-	summary.TFirst = b.tfirst
+	summary.TFirst = stream.tfirst
 	return summary
 }
 

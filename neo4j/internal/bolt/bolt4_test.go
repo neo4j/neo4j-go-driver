@@ -1279,4 +1279,36 @@ func TestBolt4(outer *testing.T) {
 		}
 	})
 
+	outer.Run("tracks tfirst properly", func(t *testing.T) {
+		ctx := context.Background()
+		bolt, cleanup := connectToServer(t, func(srv *bolt4server) {
+			srv.accept(4)
+			srv.waitForTxBegin()
+			srv.sendSuccess(nil)
+			srv.waitForRun(nil)
+			srv.waitForPullN(1)
+			srv.send(msgSuccess, map[string]any{"fields": []any{"x"}, "t_first": int64(10)})
+			srv.send(msgRecord, []any{"1"})
+			srv.send(msgSuccess, map[string]any{"has_more": true})
+			srv.waitForRun(nil)
+			srv.waitForPullN(-1)
+			srv.send(msgSuccess, map[string]any{"fields": []any{"x"}, "t_first": int64(20)})
+			srv.send(msgRecord, []any{"3"})
+			srv.send(msgRecord, []any{"4"})
+			srv.send(msgSuccess, map[string]any{"bookmark": "b2", "type": "r"})
+			srv.send(msgRecord, []any{"2"})
+			srv.send(msgSuccess, map[string]any{"bookmark": "b1", "type": "r"})
+		})
+		defer cleanup()
+		defer bolt.Close(ctx)
+
+		tx1, _ := bolt.TxBegin(ctx, idb.TxConfig{Mode: idb.ReadMode})
+		results1, _ := bolt.RunTx(ctx, tx1, idb.Command{Cypher: "UNWIND [1,2] AS x RETURN x", FetchSize: 1})
+		results2, _ := bolt.RunTx(ctx, tx1, idb.Command{Cypher: "UNWIND [3,4] AS x RETURN x", FetchSize: -1})
+		summary2, _ := bolt.Consume(ctx, results2)
+		summary1, _ := bolt.Consume(ctx, results1)
+
+		AssertIntEqual(t, int(summary1.TFirst), 10)
+		AssertIntEqual(t, int(summary2.TFirst), 20)
+	})
 }
