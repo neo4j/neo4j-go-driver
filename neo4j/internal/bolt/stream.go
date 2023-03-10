@@ -34,6 +34,7 @@ type stream struct {
 	qid       int64
 	fetchSize int
 	key       int64
+	tfirst    int64 // Time that server started streaming
 }
 
 // Acts on buffered data, first return value indicates if buffering

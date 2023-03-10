@@ -77,7 +77,6 @@ type bolt3 struct {
 	connId        string
 	logId         string
 	serverVersion string
-	tfirst        int64        // Time that server started streaming
 	pendingTx     *internalTx3 // Stashed away when tx started explcitly
 	bookmark      string       // Last bookmark
 	birthDate     time.Time
@@ -455,7 +454,7 @@ func (b *bolt3) run(cypher string, params map[string]interface{}, tx *internalTx
 	if b.err != nil {
 		return nil, b.err
 	}
-	b.tfirst = succ.tfirst
+	b.currStream = &stream{keys: succ.fields, tfirst: succ.tfirst}
 	// Change state to streaming
 	if b.state == bolt3_ready {
 		b.state = bolt3_streaming
@@ -463,7 +462,6 @@ func (b *bolt3) run(cypher string, params map[string]interface{}, tx *internalTx
 		b.state = bolt3_streamingtx
 	}
 
-	b.currStream = &stream{keys: succ.fields}
 	return b.currStream, nil
 }
 
@@ -609,14 +607,14 @@ func (b *bolt3) receiveNext() (*db.Record, *db.Summary, error) {
 				b.bookmark = sum.Bookmark
 			}
 		}
-		b.currStream.sum = sum
-		b.currStream = nil
 		// Add some extras to the summary
 		sum.Agent = b.serverVersion
 		sum.Major = 3
 		sum.Minor = b.minor
 		sum.ServerName = b.serverName
-		sum.TFirst = b.tfirst
+		sum.TFirst = b.currStream.tfirst
+		b.currStream.sum = sum
+		b.currStream = nil
 		return nil, sum, nil
 	case *db.Neo4jError:
 		b.err = x
