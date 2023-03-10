@@ -416,7 +416,7 @@ func (b *bolt4) discardStream(ctx context.Context) {
 		}
 		discarded = true
 		stream.fetchSize = -1 // request infinite batch to consume the rest
-		if b.state == bolt5StreamingTx && stream.qid != b.lastQid {
+		if b.state == bolt4_streamingtx && stream.qid != b.lastQid {
 			b.queue.appendDiscardNQid(stream.fetchSize, stream.qid, b.discardResponseHandler(stream))
 		} else {
 			b.queue.appendDiscardN(stream.fetchSize, b.discardResponseHandler(stream))
