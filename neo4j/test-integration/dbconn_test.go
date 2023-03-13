@@ -25,6 +25,7 @@ import (
 	"fmt"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/db"
 	idb "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/notifications"
 	"math"
 	"math/big"
 	"net"
@@ -59,7 +60,18 @@ func makeRawConnection(ctx context.Context, logger log.Logger, boltLogger log.Bo
 		"credentials": server.Password,
 	}
 
-	boltConn, err := bolt.Connect(context.Background(), parsedUri.Host, tcpConn, authMap, "007", nil, logger, boltLogger)
+	boltConn, err := bolt.Connect(
+		context.Background(),
+		parsedUri.Host,
+		tcpConn,
+		authMap,
+		"007",
+		nil,
+		logger,
+		boltLogger,
+		notifications.DefaultLevel,
+		notifications.NotificationDisabledCategories{},
+	)
 	if err != nil {
 		panic(err)
 	}

@@ -37,7 +37,6 @@ import (
 type Connector struct {
 	SkipEncryption bool
 	SkipVerify     bool
-	// Deprecated: RootCAs will be removed in 6.0. Configure TlsConfig directly instead.
 	Auth           map[string]any
 	Log            log.Logger
 	RoutingContext map[string]string
@@ -127,6 +126,7 @@ func (c Connector) createConnection(ctx context.Context, address string) (net.Co
 func (c Connector) tlsConfig(serverName string) *tls.Config {
 	var config *tls.Config
 	if c.Config.TlsConfig == nil {
+		//lint:ignore SA1019 RootCAs is supported until 6.0
 		config = &tls.Config{RootCAs: c.Config.RootCAs}
 	} else {
 		config = c.Config.TlsConfig
