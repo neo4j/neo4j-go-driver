@@ -106,6 +106,8 @@ type Notification struct {
 	Position *InputPosition
 	// Severity contains the severity level of this notification.
 	Severity string
+	// TODO: docs
+	Category string
 }
 
 // InputPosition contains information about a specific position in a statement

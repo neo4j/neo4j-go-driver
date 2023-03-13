@@ -23,6 +23,7 @@ import (
 	"context"
 	"fmt"
 	idb "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/notifications"
 	"io"
 	"reflect"
 	"sync"
@@ -105,7 +106,18 @@ func TestBolt5(outer *testing.T) {
 		tcpConn, srv, cleanup := setupBolt5Pipe(t)
 		go serverJob(srv)
 
-		c, err := Connect(context.Background(), "serverName", tcpConn, auth, "007", nil, logger, nil)
+		c, err := Connect(
+			context.Background(),
+			"serverName",
+			tcpConn,
+			auth,
+			"007",
+			nil,
+			logger,
+			nil,
+			notifications.DefaultLevel,
+			notifications.NotificationDisabledCategories{},
+		)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -238,7 +250,18 @@ func TestBolt5(outer *testing.T) {
 			}
 			srv.acceptHello()
 		}()
-		bolt, err := Connect(context.Background(), "serverName", conn, auth, "007", routingContext, logger, nil)
+		bolt, err := Connect(
+			context.Background(),
+			"serverName",
+			conn,
+			auth,
+			"007",
+			routingContext,
+			logger,
+			nil,
+			notifications.DefaultLevel,
+			notifications.NotificationDisabledCategories{},
+		)
 		AssertNoError(t, err)
 		bolt.Close(context.Background())
 	})
@@ -259,7 +282,18 @@ func TestBolt5(outer *testing.T) {
 			srv.waitForLogon()
 			srv.acceptLogon()
 		}()
-		bolt, err := Connect(context.Background(), "serverName", conn, auth, "007", routingContext, logger, nil)
+		bolt, err := Connect(
+			context.Background(),
+			"serverName",
+			conn,
+			auth,
+			"007",
+			routingContext,
+			logger,
+			nil,
+			notifications.DefaultLevel,
+			notifications.NotificationDisabledCategories{},
+		)
 		AssertNoError(t, err)
 		bolt.Close(context.Background())
 	})
@@ -277,7 +311,18 @@ func TestBolt5(outer *testing.T) {
 			}
 			srv.acceptHello()
 		}()
-		bolt, err := Connect(context.Background(), "serverName", conn, auth, "007", nil, logger, nil)
+		bolt, err := Connect(
+			context.Background(),
+			"serverName",
+			conn,
+			auth,
+			"007",
+			nil,
+			logger,
+			nil,
+			notifications.DefaultLevel,
+			notifications.NotificationDisabledCategories{},
+		)
 		AssertNoError(t, err)
 		bolt.Close(context.Background())
 	})
@@ -297,7 +342,18 @@ func TestBolt5(outer *testing.T) {
 			srv.waitForLogon()
 			srv.acceptLogon()
 		}()
-		bolt, err := Connect(context.Background(), "serverName", conn, auth, "007", nil, logger, nil)
+		bolt, err := Connect(
+			context.Background(),
+			"serverName",
+			conn,
+			auth,
+			"007",
+			nil,
+			logger,
+			nil,
+			notifications.DefaultLevel,
+			notifications.NotificationDisabledCategories{},
+		)
 		AssertNoError(t, err)
 		bolt.Close(context.Background())
 	})
@@ -312,7 +368,18 @@ func TestBolt5(outer *testing.T) {
 			srv.waitForHello()
 			srv.rejectHelloUnauthorized()
 		}()
-		bolt, err := Connect(context.Background(), "serverName", conn, auth, "007", nil, logger, nil)
+		bolt, err := Connect(
+			context.Background(),
+			"serverName",
+			conn,
+			auth,
+			"007",
+			nil,
+			logger,
+			nil,
+			notifications.DefaultLevel,
+			notifications.NotificationDisabledCategories{},
+		)
 		AssertNil(t, bolt)
 		AssertError(t, err)
 		dbErr, isDbErr := err.(*db.Neo4jError)
@@ -336,7 +403,18 @@ func TestBolt5(outer *testing.T) {
 			srv.waitForLogon()
 			srv.rejectLogonWithoutAuthToken()
 		}()
-		bolt, err := Connect(context.Background(), "serverName", conn, auth, "007", nil, logger, nil)
+		bolt, err := Connect(
+			context.Background(),
+			"serverName",
+			conn,
+			auth,
+			"007",
+			nil,
+			logger,
+			nil,
+			notifications.DefaultLevel,
+			notifications.NotificationDisabledCategories{},
+		)
 		AssertNil(t, bolt)
 		AssertError(t, err)
 		dbErr, isDbErr := err.(*db.Neo4jError)

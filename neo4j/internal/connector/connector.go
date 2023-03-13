@@ -23,8 +23,8 @@ package connector
 import (
 	"context"
 	"crypto/tls"
-	"crypto/x509"
 	"errors"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/config"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
 	"io"
 	"net"
@@ -38,15 +38,11 @@ type Connector struct {
 	SkipEncryption bool
 	SkipVerify     bool
 	// Deprecated: RootCAs will be removed in 6.0. Configure TlsConfig directly instead.
-	RootCAs          *x509.CertPool
-	DialTimeout      time.Duration
-	SocketKeepAlive  bool
-	Auth             map[string]any
-	Log              log.Logger
-	UserAgent        string
-	RoutingContext   map[string]string
-	Network          string
-	TlsConfig        *tls.Config
+	Auth           map[string]any
+	Log            log.Logger
+	RoutingContext map[string]string
+	Network        string
+	Config         config.Config
 	SupplyConnection func(context.Context, string) (net.Conn, error)
 }
 
@@ -54,6 +50,7 @@ func (c Connector) Connect(ctx context.Context, address string, boltLogger log.B
 	if c.SupplyConnection == nil {
 		c.SupplyConnection = c.createConnection
 	}
+
 	conn, err := c.SupplyConnection(ctx, address)
 	if err != nil {
 		return nil, err
@@ -61,7 +58,18 @@ func (c Connector) Connect(ctx context.Context, address string, boltLogger log.B
 
 	// TLS not requested
 	if c.SkipEncryption {
-		connection, err := bolt.Connect(ctx, address, conn, c.Auth, c.UserAgent, c.RoutingContext, c.Log, boltLogger)
+		connection, err := bolt.Connect(
+			ctx,
+			address,
+			conn,
+			c.Auth,
+			c.Config.UserAgent,
+			c.RoutingContext,
+			c.Log,
+			boltLogger,
+			c.Config.NotificationsMinSeverity,
+			c.Config.NotificationsDisabledCategories,
+		)
 		if err != nil {
 			if connErr := conn.Close(); connErr != nil {
 				c.Log.Warnf(log.Driver, address, "could not close underlying socket after Bolt handshake error")
@@ -87,7 +95,17 @@ func (c Connector) Connect(ctx context.Context, address string, boltLogger log.B
 		conn.Close()
 		return nil, &TlsError{inner: err}
 	}
-	connection, err := bolt.Connect(ctx, address, tlsConn, c.Auth, c.UserAgent, c.RoutingContext, c.Log, boltLogger)
+	connection, err := bolt.Connect(ctx,
+		address,
+		tlsConn,
+		c.Auth,
+		c.Config.UserAgent,
+		c.RoutingContext,
+		c.Log,
+		boltLogger,
+		c.Config.NotificationsMinSeverity,
+		c.Config.NotificationsDisabledCategories,
+	)
 	if err != nil {
 		if connErr := conn.Close(); connErr != nil {
 			c.Log.Warnf(log.Driver, address, "could not close underlying socket after Bolt handshake error")
@@ -98,8 +116,8 @@ func (c Connector) Connect(ctx context.Context, address string, boltLogger log.B
 }
 
 func (c Connector) createConnection(ctx context.Context, address string) (net.Conn, error) {
-	dialer := net.Dialer{Timeout: c.DialTimeout}
-	if !c.SocketKeepAlive {
+	dialer := net.Dialer{Timeout: c.Config.SocketConnectTimeout}
+	if !c.Config.SocketKeepalive {
 		dialer.KeepAlive = -1 * time.Second // Turns keep-alive off
 	}
 
@@ -108,10 +126,10 @@ func (c Connector) createConnection(ctx context.Context, address string) (net.Co
 
 func (c Connector) tlsConfig(serverName string) *tls.Config {
 	var config *tls.Config
-	if c.TlsConfig == nil {
-		config = &tls.Config{RootCAs: c.RootCAs}
+	if c.Config.TlsConfig == nil {
+		config = &tls.Config{RootCAs: c.Config.RootCAs}
 	} else {
-		config = c.TlsConfig
+		config = c.Config.TlsConfig
 	}
 	if config.MinVersion == 0 {
 		config.MinVersion = tls.VersionTLS12

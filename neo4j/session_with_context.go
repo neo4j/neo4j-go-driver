@@ -26,6 +26,7 @@ import (
 	idb "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/errorutil"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/pool"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/notifications"
 	"math"
 	"time"
 
@@ -153,6 +154,10 @@ type SessionConfig struct {
 	// Since 5.0
 	// default: nil (no-op)
 	BookmarkManager BookmarkManager
+	// TODO: docs
+	NotificationsMinSeverity notifications.NotificationMinimumSeverityLevel
+	// TODO: docs
+	NotificationsDisabledCategories notifications.NotificationDisabledCategories
 }
 
 // FetchAll turns off fetching records in batches.

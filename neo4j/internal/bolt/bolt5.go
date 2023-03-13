@@ -24,6 +24,7 @@ import (
 	"errors"
 	"fmt"
 	idb "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/notifications"
 	"net"
 	"time"
 
@@ -194,10 +195,20 @@ func (b *bolt5) setError(err error, fatal bool) {
 	}
 }
 
-func (b *bolt5) Connect(ctx context.Context, minor int, auth map[string]any, userAgent string, routingContext map[string]string) error {
+func (b *bolt5) Connect(
+	ctx context.Context,
+	minor int,
+	auth map[string]any,
+	userAgent string,
+	routingContext map[string]string,
+	notiMinSev notifications.NotificationMinimumSeverityLevel,
+	notiDisCats notifications.NotificationDisabledCategories,
+) error {
 	if err := b.assertState(bolt5Unauthorized); err != nil {
 		return err
 	}
+
+	b.minor = minor
 
 	hello := map[string]any{
 		"user_agent": userAgent,
@@ -205,7 +216,7 @@ func (b *bolt5) Connect(ctx context.Context, minor int, auth map[string]any, use
 	if routingContext != nil {
 		hello["routing"] = routingContext
 	}
-	if minor == 0 {
+	if b.minor == 0 {
 		// Merge authentication keys into hello, avoid overwriting existing keys
 		for k, v := range auth {
 			_, exists := hello[k]
@@ -214,8 +225,27 @@ func (b *bolt5) Connect(ctx context.Context, minor int, auth map[string]any, use
 			}
 		}
 	}
+
+	if err := checkNotificationFiltering(notiMinSev, notiDisCats, b); err != nil {
+		return err
+	}
+	if notiMinSev != notifications.DefaultLevel {
+		hello["notifications_minimum_severity"] = string(notiMinSev)
+	}
+	if notiDisCats.DisablesNone() {
+		hello["notifications_disabled_categories"] = make([]string, 0)
+	} else {
+		notiDisCatsSlice := notiDisCats.DisabledCategories()
+		if len(notiDisCatsSlice) != 0 {
+			notiDisCatsStrSlice := make([]string, len(notiDisCatsSlice))
+			for i, v := range notiDisCatsSlice {
+				notiDisCatsStrSlice[i] = string(v)
+			}
+			hello["notifications_disabled_categories"] = notiDisCatsSlice
+		}
+	}
 	b.queue.appendHello(hello, b.helloResponseHandler())
-	if minor > 0 {
+	if b.minor > 0 {
 		b.queue.appendLogon(auth, b.logonResponseHandler())
 	}
 	if b.queue.send(ctx); b.err != nil {
@@ -229,7 +259,6 @@ func (b *bolt5) Connect(ctx context.Context, minor int, auth map[string]any, use
 	}
 
 	b.state = bolt5Ready
-	b.minor = minor
 	b.streams.reset()
 	b.log.Infof(log.Bolt5, b.logId, "Connected")
 	return nil

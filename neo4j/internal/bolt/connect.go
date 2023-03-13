@@ -25,6 +25,7 @@ import (
 	"fmt"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/racing"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/notifications"
 	"net"
 
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/log"
@@ -38,7 +39,7 @@ type protocolVersion struct {
 
 // Supported versions in priority order
 var versions = [4]protocolVersion{
-	{major: 5, minor: 1, back: 1},
+	{major: 5, minor: 2, back: 2},
 	{major: 4, minor: 4, back: 2},
 	{major: 4, minor: 1},
 	{major: 3, minor: 0},
@@ -46,7 +47,18 @@ var versions = [4]protocolVersion{
 
 // Connect initiates the negotiation of the Bolt protocol version.
 // Returns the instance of bolt protocol implementing the low-level Connection interface.
-func Connect(ctx context.Context, serverName string, conn net.Conn, auth map[string]any, userAgent string, routingContext map[string]string, logger log.Logger, boltLog log.BoltLogger) (db.Connection, error) {
+func Connect(
+	ctx context.Context,
+	serverName string,
+	conn net.Conn,
+	auth map[string]any,
+	userAgent string,
+	routingContext map[string]string,
+	logger log.Logger,
+	boltLog log.BoltLogger,
+	notiMinSev notifications.NotificationMinimumSeverityLevel,
+	notiDisCats notifications.NotificationDisabledCategories,
+) (db.Connection, error) {
 	// Perform Bolt handshake to negotiate version
 	// Send handshake to server
 	handshake := []byte{
@@ -91,7 +103,7 @@ func Connect(ctx context.Context, serverName string, conn net.Conn, auth map[str
 	default:
 		return nil, fmt.Errorf("server responded with unsupported version %d.%d", major, minor)
 	}
-	if err = boltConn.Connect(ctx, int(minor), auth, userAgent, routingContext); err != nil {
+	if err = boltConn.Connect(ctx, int(minor), auth, userAgent, routingContext, notiMinSev, notiDisCats); err != nil {
 		return nil, err
 	}
 	return boltConn, nil

@@ -24,6 +24,7 @@ import (
 	"context"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/db"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/log"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/notifications"
 	"math"
 	"time"
 )
@@ -59,7 +60,15 @@ const DefaultTxConfigTimeout = math.MinInt
 
 // Connection defines an abstract database server connection.
 type Connection interface {
-	Connect(ctx context.Context, minor int, auth map[string]any, userAgent string, routingContext map[string]string) error
+	Connect(
+		ctx context.Context,
+		minor int,
+		auth map[string]any,
+		userAgent string,
+		routingContext map[string]string,
+		notiMinSev notifications.NotificationMinimumSeverityLevel,
+		notiDisCats notifications.NotificationDisabledCategories,
+	) error
 
 	TxBegin(ctx context.Context, txConfig TxConfig) (TxHandle, error)
 	TxRollback(ctx context.Context, tx TxHandle) error

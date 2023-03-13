@@ -25,6 +25,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/notifications"
 	"io"
 	"math"
 	"net/url"
@@ -460,6 +461,21 @@ func (b *backend) handleRequest(req map[string]any) {
 			if data["connectionTimeoutMs"] != nil {
 				c.SocketConnectTimeout = time.Millisecond * time.Duration(asInt64(data["connectionTimeoutMs"].(json.Number)))
 			}
+			if data["notificationsMinSeverity"] != nil {
+				c.NotificationsMinSeverity = notifications.NotificationMinimumSeverityLevel(data["notificationsMinSeverity"].(string))
+			}
+			if data["notificationsDisabledCategories"] != nil {
+				notiDisCats := data["notificationsDisabledCategories"].([]any)
+				if len(notiDisCats) == 0 {
+					c.NotificationsDisabledCategories = notifications.NotificationAllCategories()
+				} else {
+					cats := make([]notifications.NotificationCategory, len(notiDisCats))
+					for i, cat := range notiDisCats {
+						cats[i] = notifications.NotificationCategory(cat.(string))
+					}
+					c.NotificationsDisabledCategories = notifications.NotificationDisableCategories(cats)
+				}
+			}
 		})
 		if err != nil {
 			b.writeError(err)
@@ -817,6 +833,7 @@ func (b *backend) handleRequest(req map[string]any) {
 				"Feature:API:Driver.ExecuteQuery",
 				"Feature:API:Driver:GetServerInfo",
 				"Feature:API:Driver.IsEncrypted",
+				"Feature:API:Driver:NotificationsConfig",
 				"Feature:API:Driver.VerifyConnectivity",
 				"Feature:API:Liveness.Check",
 				"Feature:API:Result.List",
@@ -833,6 +850,7 @@ func (b *backend) handleRequest(req map[string]any) {
 				"Feature:Bolt:4.4",
 				"Feature:Bolt:5.0",
 				"Feature:Bolt:5.1",
+				"Feature:Bolt:5.2",
 				"Feature:Bolt:Patch:UTC",
 				"Feature:Impersonation",
 				"Feature:TLS:1.2",
@@ -966,10 +984,13 @@ func serializeNotifications(slice []neo4j.Notification) []map[string]any {
 	var res []map[string]any
 	for i, notification := range slice {
 		res = append(res, map[string]any{
-			"code":        notification.Code(),
-			"title":       notification.Title(),
-			"description": notification.Description(),
-			"severity":    notification.Severity(),
+			"code":             notification.Code(),
+			"title":            notification.Title(),
+			"description":      notification.Description(),
+			"severityLevel":    string(notification.SeverityLevel()),
+			"rawSeverityLevel": notification.RawSeverityLevel(),
+			"category":         string(notification.Category()),
+			"rawCategory":      notification.RawCategory(),
 		})
 		if notification.Position() != nil {
 			res[i]["position"] = map[string]any{

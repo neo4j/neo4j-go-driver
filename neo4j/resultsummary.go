@@ -217,7 +217,17 @@ type Notification interface {
 	// Not all notifications have a unique position to point to and in that case the position would be set to nil.
 	Position() InputPosition
 	// Severity returns the severity level of this notification.
+	// Deprecated: Severity will be removed in 6.0.
+	// Please rely on RawSeverity instead.
 	Severity() string
+	//RawSeverityLevel TODO: docs
+	RawSeverityLevel() string
+	// RawCategory TODO: docs
+	RawCategory() string
+	// SeverityLevel TODO: docs
+	SeverityLevel() NotificationSeverity
+	// Category TODO: docs
+	Category() NotificationCategory
 }
 
 // InputPosition contains information about a specific position in a statement
@@ -229,6 +239,26 @@ type InputPosition interface {
 	// Column returns the column number referred to by this position; column numbers start at 1.
 	Column() int
 }
+
+type NotificationSeverity string
+
+const (
+	Warning         NotificationSeverity = "WARNING"
+	Information     NotificationSeverity = "INFORMATION"
+	UnknownSeverity NotificationSeverity = "UNKNOWN"
+)
+
+type NotificationCategory string
+
+const (
+	Hint            NotificationCategory = "HINT"
+	Unrecognized    NotificationCategory = "UNRECOGNIZED"
+	Unsupported     NotificationCategory = "UNSUPPORTED"
+	Performance     NotificationCategory = "PERFORMANCE"
+	Deprecation     NotificationCategory = "DEPRECATION"
+	Generic         NotificationCategory = "GENERIC"
+	UnknownCategory NotificationCategory = "UNKNOWN"
+)
 
 type resultSummary struct {
 	sum    *db.Summary
@@ -492,7 +522,45 @@ func (n *notification) Description() string {
 }
 
 func (n *notification) Severity() string {
+	return n.RawSeverityLevel()
+}
+
+func (n *notification) RawSeverityLevel() string {
 	return n.notification.Severity
+}
+
+func (n *notification) SeverityLevel() NotificationSeverity {
+	switch n.notification.Severity {
+	case "WARNING":
+		return Warning
+	case "INFORMATION":
+		return Information
+	default:
+		return UnknownSeverity
+	}
+}
+
+func (n *notification) RawCategory() string {
+	return n.notification.Category
+}
+
+func (n *notification) Category() NotificationCategory {
+	switch n.notification.Category {
+	case "HINT":
+		return Hint
+	case "UNRECOGNIZED":
+		return Unrecognized
+	case "UNSUPPORTED":
+		return Unsupported
+	case "PERFORMANCE":
+		return Performance
+	case "DEPRECATION":
+		return Deprecation
+	case "GENERIC":
+		return Generic
+	default:
+		return UnknownCategory
+	}
 }
 
 func (n *notification) Position() InputPosition {

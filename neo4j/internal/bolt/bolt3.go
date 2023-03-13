@@ -24,6 +24,7 @@ import (
 	"errors"
 	"fmt"
 	idb "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/notifications"
 	"net"
 	"time"
 
@@ -173,10 +174,20 @@ func (b *bolt3) receiveSuccess(ctx context.Context) *success {
 	}
 }
 
-func (b *bolt3) Connect(ctx context.Context, minor int, auth map[string]any, userAgent string, _ map[string]string) error {
+func (b *bolt3) Connect(
+	ctx context.Context,
+	minor int,
+	auth map[string]any,
+	userAgent string,
+	_ map[string]string,
+	notiMinSev notifications.NotificationMinimumSeverityLevel,
+	notiDisCats notifications.NotificationDisabledCategories,
+) error {
 	if err := b.assertState(bolt3_unauthorized); err != nil {
 		return err
 	}
+
+	b.minor = minor
 
 	hello := map[string]any{
 		"user_agent": userAgent,
@@ -188,6 +199,10 @@ func (b *bolt3) Connect(ctx context.Context, minor int, auth map[string]any, use
 			continue
 		}
 		hello[k] = v
+	}
+
+	if err := checkNotificationFiltering(notiMinSev, notiDisCats, b); err != nil {
+		return err
 	}
 
 	// Send hello message and wait for confirmation
@@ -210,7 +225,6 @@ func (b *bolt3) Connect(ctx context.Context, minor int, auth map[string]any, use
 
 	// Transition into ready state
 	b.state = bolt3_ready
-	b.minor = minor
 	b.log.Infof(log.Bolt3, b.logId, "Connected")
 	return nil
 }
