@@ -35,13 +35,13 @@ import (
 )
 
 type Connector struct {
-	SkipEncryption bool
-	SkipVerify     bool
-	Auth           map[string]any
-	Log            log.Logger
-	RoutingContext map[string]string
-	Network        string
-	Config         config.Config
+	SkipEncryption   bool
+	SkipVerify       bool
+	Auth             map[string]any
+	Log              log.Logger
+	RoutingContext   map[string]string
+	Network          string
+	Config           *config.Config
 	SupplyConnection func(context.Context, string) (net.Conn, error)
 }
 

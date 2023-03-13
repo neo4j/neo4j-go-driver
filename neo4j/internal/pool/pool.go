@@ -50,7 +50,7 @@ type qitem struct {
 }
 
 type Pool struct {
-	config     config.Config
+	config     *config.Config
 	connect    Connect
 	servers    map[string]*server
 	serversMut racing.Mutex
@@ -67,7 +67,7 @@ type serverPenalty struct {
 	penalty uint32
 }
 
-func New(config config.Config, connect Connect, logger log.Logger, logId string) *Pool {
+func New(config *config.Config, connect Connect, logger log.Logger, logId string) *Pool {
 	// Means infinite life, simplifies checking later on
 
 	p := &Pool{
