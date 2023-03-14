@@ -609,6 +609,22 @@ func (b *backend) handleRequest(req map[string]any) {
 			}
 			sessionConfig.BookmarkManager = bookmarkManager
 		}
+
+		if data["notificationsMinSeverity"] != nil {
+			sessionConfig.NotificationsMinSeverity = notifications.NotificationMinimumSeverityLevel(data["notificationsMinSeverity"].(string))
+		}
+		if data["notificationsDisabledCategories"] != nil {
+			notiDisCats := data["notificationsDisabledCategories"].([]any)
+			if len(notiDisCats) == 0 {
+				sessionConfig.NotificationsDisabledCategories = notifications.NotificationAllCategories()
+			} else {
+				cats := make([]notifications.NotificationCategory, len(notiDisCats))
+				for i, cat := range notiDisCats {
+					cats[i] = notifications.NotificationCategory(cat.(string))
+				}
+				sessionConfig.NotificationsDisabledCategories = notifications.NotificationDisableCategories(cats)
+			}
+		}
 		session := driver.NewSession(ctx, sessionConfig)
 		idKey := b.nextId()
 		b.sessionStates[idKey] = &sessionState{session: session}
@@ -838,6 +854,7 @@ func (b *backend) handleRequest(req map[string]any) {
 				"Feature:API:Liveness.Check",
 				"Feature:API:Result.List",
 				"Feature:API:Result.Peek",
+				"Feature:API:Session:NotificationsConfig",
 				"Feature:API:Type.Spatial",
 				"Feature:API:Type.Temporal",
 				"Feature:Auth:Custom",
@@ -987,6 +1004,7 @@ func serializeNotifications(slice []neo4j.Notification) []map[string]any {
 			"code":             notification.Code(),
 			"title":            notification.Title(),
 			"description":      notification.Description(),
+			"severity":         notification.Severity(),
 			"severityLevel":    string(notification.SeverityLevel()),
 			"rawSeverityLevel": notification.RawSeverityLevel(),
 			"category":         string(notification.Category()),
@@ -1039,15 +1057,23 @@ func serializeSummary(summary neo4j.ResultSummary) map[string]any {
 	}
 	if summary.ResultAvailableAfter() >= 0 {
 		response["resultAvailableAfter"] = summary.ResultAvailableAfter().Milliseconds()
+	} else {
+		response["resultAvailableAfter"] = nil
 	}
 	if summary.ResultConsumedAfter() >= 0 {
 		response["resultConsumedAfter"] = summary.ResultConsumedAfter().Milliseconds()
+	} else {
+		response["resultConsumedAfter"] = nil
 	}
 	if summary.StatementType() != neo4j.StatementTypeUnknown {
 		response["queryType"] = summary.StatementType().String()
+	} else {
+		response["queryType"] = nil
 	}
 	if summary.Database() != nil {
 		response["database"] = summary.Database().Name()
+	} else {
+		response["database"] = nil
 	}
 	return response
 }
