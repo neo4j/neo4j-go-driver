@@ -38,6 +38,7 @@ type stream struct {
 	key        int64
 	endOfBatch bool
 	discarding bool
+	tfirst     int64 // Time that server started streaming
 }
 
 // Acts on buffered data, first return value indicates if buffering
