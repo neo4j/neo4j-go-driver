@@ -27,6 +27,12 @@ func TestDriverExecuteQuery(outer *testing.T) {
 	customBookmarkManager := &fakeBookmarkManager{}
 	defaultSessionConfig := SessionConfig{BookmarkManager: defaultBookmarkManager}
 
+	outer.Run("nil driver is not allowed", func(t *testing.T) {
+		_, err := ExecuteQuery(ctx, nil, "RETURN 42", nil, EagerResultTransformer)
+
+		AssertErrorMessageContains(t, err, "driver cannot be nil")
+	})
+
 	type testCase[T any] struct {
 		description           string
 		resultTransformer     func() ResultTransformer[T]

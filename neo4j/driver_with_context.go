@@ -452,6 +452,10 @@ func ExecuteQuery[T any](
 	newResultTransformer func() ResultTransformer[T],
 	settings ...ExecuteQueryConfigurationOption) (res T, err error) {
 
+	if driver == nil {
+		return *new(T), errors.New("driver cannot be nil")
+	}
+
 	if newResultTransformer == nil {
 		return *new(T), errors.New("nil is not a valid ResultTransformer function argument. " +
 			"Consider passing EagerResultTransformer or a function that returns an instance of your own " +
