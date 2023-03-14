@@ -23,7 +23,6 @@ import (
 	"context"
 	idb "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/log"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/notifications"
 	"time"
 
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/db"
@@ -80,8 +79,7 @@ func (c *ConnFake) Connect(
 	map[string]any,
 	string,
 	map[string]string,
-	notifications.NotificationMinimumSeverityLevel,
-	notifications.NotificationDisabledCategories,
+	idb.NotificationConfig,
 ) error {
 	return nil
 }

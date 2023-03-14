@@ -25,7 +25,6 @@ import (
 	"fmt"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/racing"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/notifications"
 	"net"
 
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/log"
@@ -56,8 +55,7 @@ func Connect(
 	routingContext map[string]string,
 	logger log.Logger,
 	boltLog log.BoltLogger,
-	notiMinSev notifications.NotificationMinimumSeverityLevel,
-	notiDisCats notifications.NotificationDisabledCategories,
+	notificationConfig db.NotificationConfig,
 ) (db.Connection, error) {
 	// Perform Bolt handshake to negotiate version
 	// Send handshake to server
@@ -103,7 +101,7 @@ func Connect(
 	default:
 		return nil, fmt.Errorf("server responded with unsupported version %d.%d", major, minor)
 	}
-	if err = boltConn.Connect(ctx, int(minor), auth, userAgent, routingContext, notiMinSev, notiDisCats); err != nil {
+	if err = boltConn.Connect(ctx, int(minor), auth, userAgent, routingContext, notificationConfig); err != nil {
 		return nil, err
 	}
 	return boltConn, nil

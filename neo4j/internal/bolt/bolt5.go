@@ -24,7 +24,6 @@ import (
 	"errors"
 	"fmt"
 	idb "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/notifications"
 	"net"
 	"time"
 
@@ -47,12 +46,13 @@ const (
 const bolt5FetchSize = 1000
 
 type internalTx5 struct {
-	mode             idb.AccessMode
-	bookmarks        []string
-	timeout          time.Duration
-	txMeta           map[string]any
-	databaseName     string
-	impersonatedUser string
+	mode               idb.AccessMode
+	bookmarks          []string
+	timeout            time.Duration
+	txMeta             map[string]any
+	databaseName       string
+	impersonatedUser   string
+	notificationConfig idb.NotificationConfig
 }
 
 func (i *internalTx5) toMeta() map[string]any {
@@ -79,6 +79,7 @@ func (i *internalTx5) toMeta() map[string]any {
 	if i.impersonatedUser != "" {
 		meta["imp_user"] = i.impersonatedUser
 	}
+	i.notificationConfig.ToMeta(meta)
 	return meta
 }
 
@@ -201,8 +202,7 @@ func (b *bolt5) Connect(
 	auth map[string]any,
 	userAgent string,
 	routingContext map[string]string,
-	notiMinSev notifications.NotificationMinimumSeverityLevel,
-	notiDisCats notifications.NotificationDisabledCategories,
+	notificationConfig idb.NotificationConfig,
 ) error {
 	if err := b.assertState(bolt5Unauthorized); err != nil {
 		return err
@@ -226,24 +226,10 @@ func (b *bolt5) Connect(
 		}
 	}
 
-	if err := checkNotificationFiltering(notiMinSev, notiDisCats, b); err != nil {
+	if err := checkNotificationFiltering(notificationConfig, b); err != nil {
 		return err
 	}
-	if notiMinSev != notifications.DefaultLevel {
-		hello["notifications_minimum_severity"] = string(notiMinSev)
-	}
-	if notiDisCats.DisablesNone() {
-		hello["notifications_disabled_categories"] = make([]string, 0)
-	} else {
-		notiDisCatsSlice := notiDisCats.DisabledCategories()
-		if len(notiDisCatsSlice) != 0 {
-			notiDisCatsStrSlice := make([]string, len(notiDisCatsSlice))
-			for i, v := range notiDisCatsSlice {
-				notiDisCatsStrSlice[i] = string(v)
-			}
-			hello["notifications_disabled_categories"] = notiDisCatsSlice
-		}
-	}
+	notificationConfig.ToMeta(hello)
 	b.queue.appendHello(hello, b.helloResponseHandler())
 	if b.minor > 0 {
 		b.queue.appendLogon(auth, b.logonResponseHandler())
@@ -264,7 +250,10 @@ func (b *bolt5) Connect(
 	return nil
 }
 
-func (b *bolt5) TxBegin(ctx context.Context, txConfig idb.TxConfig) (idb.TxHandle, error) {
+func (b *bolt5) TxBegin(
+	ctx context.Context,
+	txConfig idb.TxConfig,
+) (idb.TxHandle, error) {
 	// Ok, to begin transaction while streaming auto-commit, just empty the stream and continue.
 	if b.state == bolt5Streaming {
 		if b.bufferStream(ctx); b.err != nil {
@@ -277,14 +266,18 @@ func (b *bolt5) TxBegin(ctx context.Context, txConfig idb.TxConfig) (idb.TxHandl
 	if err := b.assertState(bolt5Ready); err != nil {
 		return 0, err
 	}
+	if err := checkNotificationFiltering(txConfig.NotificationConfig, b); err != nil {
+		return 0, err
+	}
 
 	tx := internalTx5{
-		mode:             txConfig.Mode,
-		bookmarks:        txConfig.Bookmarks,
-		timeout:          txConfig.Timeout,
-		txMeta:           txConfig.Meta,
-		databaseName:     b.databaseName,
-		impersonatedUser: txConfig.ImpersonatedUser,
+		mode:               txConfig.Mode,
+		bookmarks:          txConfig.Bookmarks,
+		timeout:            txConfig.Timeout,
+		txMeta:             txConfig.Meta,
+		databaseName:       b.databaseName,
+		impersonatedUser:   txConfig.ImpersonatedUser,
+		notificationConfig: txConfig.NotificationConfig,
 	}
 
 	b.queue.appendBegin(tx.toMeta(), b.beginResponseHandler())
@@ -555,19 +548,26 @@ func (b *bolt5) normalizeFetchSize(fetchSize int) int {
 	return fetchSize
 }
 
-func (b *bolt5) Run(ctx context.Context, cmd idb.Command,
-	txConfig idb.TxConfig) (idb.StreamHandle, error) {
+func (b *bolt5) Run(
+	ctx context.Context,
+	cmd idb.Command,
+	txConfig idb.TxConfig,
+) (idb.StreamHandle, error) {
 	if err := b.assertState(bolt5Streaming, bolt5Ready); err != nil {
+		return nil, err
+	}
+	if err := checkNotificationFiltering(txConfig.NotificationConfig, b); err != nil {
 		return nil, err
 	}
 
 	tx := internalTx5{
-		mode:             txConfig.Mode,
-		bookmarks:        txConfig.Bookmarks,
-		timeout:          txConfig.Timeout,
-		txMeta:           txConfig.Meta,
-		databaseName:     b.databaseName,
-		impersonatedUser: txConfig.ImpersonatedUser,
+		mode:               txConfig.Mode,
+		bookmarks:          txConfig.Bookmarks,
+		timeout:            txConfig.Timeout,
+		txMeta:             txConfig.Meta,
+		databaseName:       b.databaseName,
+		impersonatedUser:   txConfig.ImpersonatedUser,
+		notificationConfig: txConfig.NotificationConfig,
 	}
 	stream, err := b.run(ctx, cmd.Cypher, cmd.Params, cmd.FetchSize, &tx)
 	if err != nil {

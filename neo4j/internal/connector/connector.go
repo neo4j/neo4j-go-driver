@@ -55,6 +55,11 @@ func (c Connector) Connect(ctx context.Context, address string, boltLogger log.B
 		return nil, err
 	}
 
+	notificationConfig := db.NotificationConfig{
+		MinSev:  c.Config.NotificationsMinSeverity,
+		DisCats: c.Config.NotificationsDisabledCategories,
+	}
+
 	// TLS not requested
 	if c.SkipEncryption {
 		connection, err := bolt.Connect(
@@ -66,8 +71,7 @@ func (c Connector) Connect(ctx context.Context, address string, boltLogger log.B
 			c.RoutingContext,
 			c.Log,
 			boltLogger,
-			c.Config.NotificationsMinSeverity,
-			c.Config.NotificationsDisabledCategories,
+			notificationConfig,
 		)
 		if err != nil {
 			if connErr := conn.Close(); connErr != nil {
@@ -102,8 +106,7 @@ func (c Connector) Connect(ctx context.Context, address string, boltLogger log.B
 		c.RoutingContext,
 		c.Log,
 		boltLogger,
-		c.Config.NotificationsMinSeverity,
-		c.Config.NotificationsDisabledCategories,
+		notificationConfig,
 	)
 	if err != nil {
 		if connErr := conn.Close(); connErr != nil {

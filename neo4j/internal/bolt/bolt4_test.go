@@ -23,7 +23,6 @@ import (
 	"context"
 	"fmt"
 	idb "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/notifications"
 	"io"
 	"reflect"
 	"sync"
@@ -114,8 +113,7 @@ func TestBolt4(outer *testing.T) {
 			nil,
 			logger,
 			nil,
-			notifications.DefaultLevel,
-			notifications.NotificationDisabledCategories{},
+			idb.NotificationConfig{},
 		)
 		if err != nil {
 			t.Fatal(err)
@@ -225,8 +223,7 @@ func TestBolt4(outer *testing.T) {
 			routingContext,
 			logger,
 			nil,
-			notifications.DefaultLevel,
-			notifications.NotificationDisabledCategories{},
+			idb.NotificationConfig{},
 		)
 		AssertNoError(t, err)
 		bolt.Close(context.Background())
@@ -254,8 +251,7 @@ func TestBolt4(outer *testing.T) {
 			nil,
 			logger,
 			nil,
-			notifications.DefaultLevel,
-			notifications.NotificationDisabledCategories{},
+			idb.NotificationConfig{},
 		)
 		AssertNoError(t, err)
 		bolt.Close(context.Background())
@@ -284,8 +280,7 @@ func TestBolt4(outer *testing.T) {
 			routingContext,
 			logger,
 			nil,
-			notifications.DefaultLevel,
-			notifications.NotificationDisabledCategories{},
+			idb.NotificationConfig{},
 		)
 		AssertNoError(t, err)
 		bolt.Close(context.Background())
@@ -310,8 +305,7 @@ func TestBolt4(outer *testing.T) {
 			nil,
 			logger,
 			nil,
-			notifications.DefaultLevel,
-			notifications.NotificationDisabledCategories{},
+			idb.NotificationConfig{},
 		)
 		AssertNil(t, bolt)
 		AssertError(t, err)

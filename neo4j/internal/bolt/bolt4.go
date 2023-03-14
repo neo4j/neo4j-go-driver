@@ -25,7 +25,6 @@ import (
 	"fmt"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/collections"
 	idb "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/notifications"
 	"net"
 	"time"
 
@@ -201,8 +200,7 @@ func (b *bolt4) Connect(
 	auth map[string]any,
 	userAgent string,
 	routingContext map[string]string,
-	notiMinSev notifications.NotificationMinimumSeverityLevel,
-	notiDisCats notifications.NotificationDisabledCategories,
+	notificationConfig idb.NotificationConfig,
 ) error {
 	if err := b.assertState(bolt4_unauthorized); err != nil {
 		return err
@@ -232,7 +230,7 @@ func (b *bolt4) Connect(
 		}
 	}
 
-	if err := checkNotificationFiltering(notiMinSev, notiDisCats, b); err != nil {
+	if err := checkNotificationFiltering(notificationConfig, b); err != nil {
 		return err
 	}
 
@@ -261,7 +259,10 @@ func (b *bolt4) checkImpersonationAndVersion(impersonatedUser string) error {
 	return nil
 }
 
-func (b *bolt4) TxBegin(ctx context.Context, txConfig idb.TxConfig) (idb.TxHandle, error) {
+func (b *bolt4) TxBegin(
+	ctx context.Context,
+	txConfig idb.TxConfig,
+) (idb.TxHandle, error) {
 	// Ok, to begin transaction while streaming auto-commit, just empty the stream and continue.
 	if b.state == bolt4_streaming {
 		if b.bufferStream(ctx); b.err != nil {
@@ -274,8 +275,10 @@ func (b *bolt4) TxBegin(ctx context.Context, txConfig idb.TxConfig) (idb.TxHandl
 	if err := b.assertState(bolt4_ready); err != nil {
 		return 0, err
 	}
-
 	if err := b.checkImpersonationAndVersion(txConfig.ImpersonatedUser); err != nil {
+		return 0, err
+	}
+	if err := checkNotificationFiltering(txConfig.NotificationConfig, b); err != nil {
 		return 0, err
 	}
 
@@ -570,14 +573,19 @@ func (b *bolt4) normalizeFetchSize(fetchSize int) int {
 	return fetchSize
 }
 
-func (b *bolt4) Run(ctx context.Context, cmd idb.Command,
-	txConfig idb.TxConfig) (idb.StreamHandle, error) {
+func (b *bolt4) Run(
+	ctx context.Context,
+	cmd idb.Command,
+	txConfig idb.TxConfig,
+) (idb.StreamHandle, error) {
 	if err := b.assertState(bolt4_streaming, bolt4_ready); err != nil {
 		return nil, err
 	}
-
 	if err := b.checkImpersonationAndVersion(txConfig.ImpersonatedUser); err != nil {
 		return 0, err
+	}
+	if err := checkNotificationFiltering(txConfig.NotificationConfig, b); err != nil {
+		return nil, err
 	}
 
 	tx := internalTx4{

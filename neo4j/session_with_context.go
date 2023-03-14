@@ -551,7 +551,7 @@ func (s *sessionWithContext) Run(ctx context.Context,
 
 	runBookmarks, err := s.getBookmarks(ctx)
 	if err != nil {
-		s.pool.Return(ctx, conn)
+		_ = s.pool.Return(ctx, conn)
 		return nil, wrapError(err)
 	}
 	stream, err := conn.Run(
@@ -567,9 +567,14 @@ func (s *sessionWithContext) Run(ctx context.Context,
 			Timeout:          config.Timeout,
 			Meta:             config.Metadata,
 			ImpersonatedUser: s.impersonatedUser,
-		})
+			NotificationConfig: idb.NotificationConfig{
+				MinSev:  s.config.NotificationsMinSeverity,
+				DisCats: s.config.NotificationsDisabledCategories,
+			},
+		},
+	)
 	if err != nil {
-		s.pool.Return(ctx, conn)
+		_ = s.pool.Return(ctx, conn)
 		return nil, wrapError(err)
 	}
 
@@ -582,7 +587,7 @@ func (s *sessionWithContext) Run(ctx context.Context,
 			}
 		}),
 		onClosed: func() {
-			s.pool.Return(ctx, conn)
+			_ = s.pool.Return(ctx, conn)
 			s.autocommitTx = nil
 		},
 	}

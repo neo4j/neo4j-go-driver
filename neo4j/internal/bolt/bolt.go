@@ -7,11 +7,11 @@ import (
 )
 
 func checkNotificationFiltering(
-	notiMinSev notifications.NotificationMinimumSeverityLevel,
-	notiDisCats notifications.NotificationDisabledCategories,
+	notificationConfig idb.NotificationConfig,
 	bolt idb.Connection,
 ) error {
-	if notiMinSev == notifications.DefaultLevel && !notiDisCats.DisablesNone() && len(notiDisCats.DisabledCategories()) == 0 {
+	if notificationConfig.MinSev == notifications.DefaultLevel &&
+		!notificationConfig.DisCats.DisablesNone() && len(notificationConfig.DisCats.DisabledCategories()) == 0 {
 		return nil
 	}
 	version := bolt.Version()

@@ -21,7 +21,7 @@ package bolt
 
 import (
 	"context"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/notifications"
+	idb "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
 	"testing"
 
 	. "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/testutil"
@@ -60,8 +60,7 @@ func TestConnect(ot *testing.T) {
 			nil,
 			logger,
 			nil,
-			notifications.DefaultLevel,
-			notifications.NotificationDisabledCategories{},
+			idb.NotificationConfig{},
 		)
 		AssertError(t, err)
 	})
@@ -86,8 +85,7 @@ func TestConnect(ot *testing.T) {
 			nil,
 			logger,
 			nil,
-			notifications.DefaultLevel,
-			notifications.NotificationDisabledCategories{},
+			idb.NotificationConfig{},
 		)
 		AssertError(t, err)
 		if boltconn != nil {

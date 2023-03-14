@@ -22,7 +22,6 @@ package bolt
 import (
 	"context"
 	idb "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/notifications"
 	"io"
 	"sync"
 	"testing"
@@ -110,8 +109,7 @@ func TestBolt3(outer *testing.T) {
 			nil,
 			logger,
 			nil,
-			notifications.DefaultLevel,
-			notifications.NotificationDisabledCategories{},
+			idb.NotificationConfig{},
 		)
 		if err != nil {
 			t.Fatal(err)
@@ -162,8 +160,7 @@ func TestBolt3(outer *testing.T) {
 			nil,
 			logger,
 			nil,
-			notifications.DefaultLevel,
-			notifications.NotificationDisabledCategories{},
+			idb.NotificationConfig{},
 		)
 		AssertNil(t, bolt)
 		AssertError(t, err)
