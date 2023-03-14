@@ -179,6 +179,20 @@ func AssertStringContain(t *testing.T, s, sub string) {
 	}
 }
 
+func AssertMapHasKey[K comparable](t *testing.T, m map[K]any, key K) {
+	t.Helper()
+	if _, ok := m[key]; !ok {
+		t.Errorf("Expected map to contain key %v", key)
+	}
+}
+
+func AssertMapDoesNotHaveKey[K comparable](t *testing.T, m map[K]any, key K) {
+	t.Helper()
+	if _, ok := m[key]; ok {
+		t.Errorf("Expected map to not contain key %v", key)
+	}
+}
+
 func AssertIntEqual(t *testing.T, ai, ei int) {
 	t.Helper()
 	if ai != ei {

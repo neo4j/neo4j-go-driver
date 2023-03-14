@@ -16,7 +16,7 @@ type NotificationDisabledCategories struct {
 	none       bool
 }
 
-func NotificationDisableCategories(value []NotificationCategory) NotificationDisabledCategories {
+func NotificationDisableCategories(value ...NotificationCategory) NotificationDisabledCategories {
 	return NotificationDisabledCategories{value, false}
 }
 func NotificationAllCategories() NotificationDisabledCategories {

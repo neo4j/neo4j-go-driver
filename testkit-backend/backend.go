@@ -469,11 +469,8 @@ func (b *backend) handleRequest(req map[string]any) {
 				if len(notiDisCats) == 0 {
 					c.NotificationsDisabledCategories = notifications.NotificationAllCategories()
 				} else {
-					cats := make([]notifications.NotificationCategory, len(notiDisCats))
-					for i, cat := range notiDisCats {
-						cats[i] = notifications.NotificationCategory(cat.(string))
-					}
-					c.NotificationsDisabledCategories = notifications.NotificationDisableCategories(cats)
+					cats := convertSlice(notiDisCats, anyToNotificationCategory)
+					c.NotificationsDisabledCategories = notifications.NotificationDisableCategories(cats...)
 				}
 			}
 		})
@@ -618,11 +615,8 @@ func (b *backend) handleRequest(req map[string]any) {
 			if len(notiDisCats) == 0 {
 				sessionConfig.NotificationsDisabledCategories = notifications.NotificationAllCategories()
 			} else {
-				cats := make([]notifications.NotificationCategory, len(notiDisCats))
-				for i, cat := range notiDisCats {
-					cats[i] = notifications.NotificationCategory(cat.(string))
-				}
-				sessionConfig.NotificationsDisabledCategories = notifications.NotificationDisableCategories(cats)
+				cats := convertSlice(notiDisCats, anyToNotificationCategory)
+				sessionConfig.NotificationsDisabledCategories = notifications.NotificationDisableCategories(cats...)
 			}
 		}
 		session := driver.NewSession(ctx, sessionConfig)
@@ -1276,4 +1270,16 @@ func convertInitialBookmarks(bookmarks []any) neo4j.Bookmarks {
 		result[i] = bookmark.(string)
 	}
 	return result
+}
+
+func anyToNotificationCategory(v any) notifications.NotificationCategory {
+	return notifications.NotificationCategory(v.(string))
+}
+
+func convertSlice[T any](slice []any, transform func(any) T) []T {
+	res := make([]T, len(slice))
+	for i, cat := range slice {
+		res[i] = transform(cat)
+	}
+	return res
 }
