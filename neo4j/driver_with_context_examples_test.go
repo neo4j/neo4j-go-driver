@@ -86,8 +86,7 @@ func ExampleExecuteQuery_default_bookmark_manager_explicit_reuse() {
 }
 
 func handleError(err error) {
-	//lint:ignore SA9003 empty branch as the actual content depends on the reader's setup
 	if err != nil {
-		// do something with error
+		panic(err)
 	}
 }

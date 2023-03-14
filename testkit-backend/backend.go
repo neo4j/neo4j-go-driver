@@ -467,10 +467,10 @@ func (b *backend) handleRequest(req map[string]any) {
 			if data["notificationsDisabledCategories"] != nil {
 				notiDisCats := data["notificationsDisabledCategories"].([]any)
 				if len(notiDisCats) == 0 {
-					c.NotificationsDisabledCategories = notifications.NotificationAllCategories()
+					c.NotificationsDisabledCategories = notifications.DisableNoCategories()
 				} else {
 					cats := convertSlice(notiDisCats, anyToNotificationCategory)
-					c.NotificationsDisabledCategories = notifications.NotificationDisableCategories(cats...)
+					c.NotificationsDisabledCategories = notifications.DisableCategories(cats...)
 				}
 			}
 		})
@@ -613,10 +613,10 @@ func (b *backend) handleRequest(req map[string]any) {
 		if data["notificationsDisabledCategories"] != nil {
 			notiDisCats := data["notificationsDisabledCategories"].([]any)
 			if len(notiDisCats) == 0 {
-				sessionConfig.NotificationsDisabledCategories = notifications.NotificationAllCategories()
+				sessionConfig.NotificationsDisabledCategories = notifications.DisableNoCategories()
 			} else {
 				cats := convertSlice(notiDisCats, anyToNotificationCategory)
-				sessionConfig.NotificationsDisabledCategories = notifications.NotificationDisableCategories(cats...)
+				sessionConfig.NotificationsDisabledCategories = notifications.DisableCategories(cats...)
 			}
 		}
 		session := driver.NewSession(ctx, sessionConfig)

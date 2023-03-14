@@ -154,9 +154,13 @@ type SessionConfig struct {
 	// Since 5.0
 	// default: nil (no-op)
 	BookmarkManager BookmarkManager
-	// TODO: docs
+	// NotificationsMinSeverity defines the minimum severity level of notifications the server should send.
+	// By default, the driver's settings are used.
+	// Else, this option overrides the driver's settings.
 	NotificationsMinSeverity notifications.NotificationMinimumSeverityLevel
-	// TODO: docs
+	// NotificationsDisabledCategories defines the categories of notifications the server should not send.
+	// By default, the driver's settings are used.
+	// Else, this option overrides the driver's settings.
 	NotificationsDisabledCategories notifications.NotificationDisabledCategories
 }
 

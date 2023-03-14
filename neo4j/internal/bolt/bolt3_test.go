@@ -214,20 +214,20 @@ func TestBolt3(outer *testing.T) {
 				},
 				testCase{
 					description: "disabled categories",
-					DisCats:     notifications.NotificationDisableCategories(notifications.Unsupported, notifications.Generic),
+					DisCats:     notifications.DisableCategories(notifications.Unsupported, notifications.Generic),
 					ExpectError: true,
 					Method:      s,
 				},
 				testCase{
 					description: "warning minimum severity and disabled categories",
 					MinSev:      notifications.WarningLevel,
-					DisCats:     notifications.NotificationDisableCategories(notifications.Unsupported, notifications.Generic),
+					DisCats:     notifications.DisableCategories(notifications.Unsupported, notifications.Generic),
 					ExpectError: true,
 					Method:      s,
 				},
 				testCase{
 					description: "disable no categories",
-					DisCats:     notifications.NotificationAllCategories(),
+					DisCats:     notifications.DisableNoCategories(),
 					ExpectError: true,
 					Method:      s,
 				})

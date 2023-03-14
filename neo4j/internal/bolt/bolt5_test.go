@@ -529,7 +529,7 @@ func TestBolt5(outer *testing.T) {
 				},
 				testCase{
 					description:     "disabled categories",
-					DisCats:         notifications.NotificationDisableCategories(notifications.Unsupported, notifications.Generic),
+					DisCats:         notifications.DisableCategories(notifications.Unsupported, notifications.Generic),
 					ExpectDisCats:   true,
 					ExpectedDisCats: []any{"UNSUPPORTED", "GENERIC"},
 					Method:          s,
@@ -537,7 +537,7 @@ func TestBolt5(outer *testing.T) {
 				testCase{
 					description:     "warning minimum severity and disabled categories",
 					MinSev:          notifications.WarningLevel,
-					DisCats:         notifications.NotificationDisableCategories(notifications.Unsupported, notifications.Generic),
+					DisCats:         notifications.DisableCategories(notifications.Unsupported, notifications.Generic),
 					ExpectDisCats:   true,
 					ExpectedDisCats: []any{"UNSUPPORTED", "GENERIC"},
 					ExpectedMinSev:  &warningSev,
@@ -545,7 +545,7 @@ func TestBolt5(outer *testing.T) {
 				},
 				testCase{
 					description:     "disable no categories",
-					DisCats:         notifications.NotificationAllCategories(),
+					DisCats:         notifications.DisableNoCategories(),
 					ExpectDisCats:   true,
 					ExpectedDisCats: []any{},
 					Method:          s,
@@ -629,20 +629,20 @@ func TestBolt5(outer *testing.T) {
 				},
 				testCase{
 					description: "disabled categories",
-					DisCats:     notifications.NotificationDisableCategories(notifications.Unsupported, notifications.Generic),
+					DisCats:     notifications.DisableCategories(notifications.Unsupported, notifications.Generic),
 					ExpectError: true,
 					Method:      s,
 				},
 				testCase{
 					description: "warning minimum severity and disabled categories",
 					MinSev:      notifications.WarningLevel,
-					DisCats:     notifications.NotificationDisableCategories(notifications.Unsupported, notifications.Generic),
+					DisCats:     notifications.DisableCategories(notifications.Unsupported, notifications.Generic),
 					ExpectError: true,
 					Method:      s,
 				},
 				testCase{
 					description: "disable no categories",
-					DisCats:     notifications.NotificationAllCategories(),
+					DisCats:     notifications.DisableNoCategories(),
 					ExpectError: true,
 					Method:      s,
 				})
