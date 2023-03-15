@@ -30,7 +30,7 @@ func TestDriverExecuteQuery(outer *testing.T) {
 	outer.Run("nil driver is not allowed", func(t *testing.T) {
 		_, err := ExecuteQuery(ctx, nil, "RETURN 42", nil, EagerResultTransformer)
 
-		AssertErrorMessageContains(t, err, "driver cannot be nil")
+		AssertErrorMessageContains(t, err, "nil is not a valid DriverWithContext argument.")
 	})
 
 	type testCase[T any] struct {
@@ -187,9 +187,9 @@ func TestDriverExecuteQuery(outer *testing.T) {
 		{
 			description:       "returns error when result transformer function is nil",
 			resultTransformer: nil,
-			expectedErr: fmt.Errorf("nil is not a valid ResultTransformer function argument. " +
+			expectedErr: &UsageError{Message: "nil is not a valid ResultTransformer function argument. " +
 				"Consider passing EagerResultTransformer or a function that returns an instance of your own " +
-				"ResultTransformer implementation"),
+				"ResultTransformer implementation"},
 		},
 		{
 			description:       "returns error when result transformer function returns a nil transformer",
@@ -202,8 +202,8 @@ func TestDriverExecuteQuery(outer *testing.T) {
 					summary:     summary,
 				}},
 			expectedSessionConfig: defaultSessionConfig,
-			expectedErr: fmt.Errorf("expected the result transformer function to return a valid ResultTransformer" +
-				" instance, but got nil"),
+			expectedErr: &UsageError{Message: "expected the result transformer function to return a valid ResultTransformer" +
+				" instance, but got nil"},
 		},
 		{
 			description:       "returns error when write result keys cannot be retrieved",
