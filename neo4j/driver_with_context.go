@@ -22,7 +22,6 @@ package neo4j
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/errorutil"
@@ -452,10 +451,14 @@ func ExecuteQuery[T any](
 	newResultTransformer func() ResultTransformer[T],
 	settings ...ExecuteQueryConfigurationOption) (res T, err error) {
 
+	if driver == nil {
+		return *new(T), &UsageError{Message: "nil is not a valid DriverWithContext argument."}
+	}
+
 	if newResultTransformer == nil {
-		return *new(T), errors.New("nil is not a valid ResultTransformer function argument. " +
+		return *new(T), &UsageError{Message: "nil is not a valid ResultTransformer function argument. " +
 			"Consider passing EagerResultTransformer or a function that returns an instance of your own " +
-			"ResultTransformer implementation")
+			"ResultTransformer implementation"}
 	}
 
 	bookmarkManager := driver.DefaultExecuteQueryBookmarkManager()
@@ -498,9 +501,8 @@ func executeQueryCallback[T any](
 	return func(tx ManagedTransaction) (any, error) {
 		transformer := newTransformer()
 		if transformer == nil {
-			return nil, errors.New(
-				"expected the result transformer function to return a valid ResultTransformer instance, " +
-					"but got nil")
+			return nil, &UsageError{Message: "expected the result transformer function to return a valid " +
+				"ResultTransformer instance, but got nil"}
 		}
 		cursor, err := tx.Run(ctx, query, parameters)
 		if err != nil {
