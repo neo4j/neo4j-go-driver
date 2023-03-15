@@ -608,6 +608,15 @@ func ExecuteQueryWithoutBookmarkManager() ExecuteQueryConfigurationOption {
 	}
 }
 
+// ExecuteQueryWithBoltLogger configures DriverWithContext.ExecuteQuery to log Bolt messages with the provided BoltLogger
+//
+// This API is currently experimental and may change or be removed at any time.
+func ExecuteQueryWithBoltLogger(boltLogger log.BoltLogger) ExecuteQueryConfigurationOption {
+	return func(configuration *ExecuteQueryConfiguration) {
+		configuration.BoltLogger = boltLogger
+	}
+}
+
 // ExecuteQueryConfiguration holds all the possible configuration settings for DriverWithContext.ExecuteQuery
 //
 // This API is currently experimental and may change or be removed at any time.
@@ -616,6 +625,7 @@ type ExecuteQueryConfiguration struct {
 	ImpersonatedUser string
 	Database         string
 	BookmarkManager  BookmarkManager
+	BoltLogger       log.BoltLogger
 }
 
 // RoutingControl specifies how the query executed by DriverWithContext.ExecuteQuery is to be routed
@@ -639,6 +649,7 @@ func (c *ExecuteQueryConfiguration) toSessionConfig() SessionConfig {
 		ImpersonatedUser: c.ImpersonatedUser,
 		DatabaseName:     c.Database,
 		BookmarkManager:  c.BookmarkManager,
+		BoltLogger:       c.BoltLogger,
 	}
 }
 
