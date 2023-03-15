@@ -23,13 +23,13 @@ import (
 	"context"
 	"errors"
 	idb "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/errorutil"
 	"io"
 	"reflect"
 	"testing"
 	"time"
 
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/db"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/pool"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/testutil"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/log"
 )
@@ -64,8 +64,8 @@ func TestState(outer *testing.T) {
 
 	testCases := map[string][]TStateInvocation{
 		"Retry connect": {
-			{conn: nil, err: &pool.PoolTimeout{}, expectContinued: true,
-				expectLastErrWasRetryable: true, expectLastErrType: &pool.PoolTimeout{}},
+			{conn: nil, err: &errorutil.PoolTimeout{}, expectContinued: true,
+				expectLastErrWasRetryable: true, expectLastErrType: &errorutil.PoolTimeout{}},
 		},
 		"Retry connect timeout": {
 			{conn: nil, err: errors.New("connect error 1"), expectContinued: true, now: baseTime,
@@ -124,13 +124,13 @@ func TestState(outer *testing.T) {
 		},
 		"Fail during commit": {
 			{conn: &testutil.ConnFake{Alive: false}, err: io.EOF, isCommitting: true, expectContinued: false,
-				expectLastErrWasRetryable: false, expectLastErrType: &CommitFailedDeadError{}},
+				expectLastErrWasRetryable: false, expectLastErrType: &errorutil.CommitFailedDeadError{}},
 		},
 		"Fail during commit after retry": {
 			{conn: &testutil.ConnFake{Alive: true}, err: dbTransientErr, expectContinued: true,
 				expectLastErrWasRetryable: true},
 			{conn: &testutil.ConnFake{Alive: false}, err: io.EOF, isCommitting: true, expectContinued: false,
-				expectLastErrWasRetryable: false, expectLastErrType: &CommitFailedDeadError{}},
+				expectLastErrWasRetryable: false, expectLastErrType: &errorutil.CommitFailedDeadError{}},
 		},
 		"Does not retry on auth errors": {
 			{conn: nil, err: authErr, expectContinued: false,
@@ -173,7 +173,7 @@ func TestState(outer *testing.T) {
 					return router.InvalidateReader(ctx, dbName, server)
 				}
 
-				state.OnFailure(ctx, invocation.conn, invocation.err, invocation.isCommitting)
+				state.OnFailure(ctx, invocation.err, invocation.conn, invocation.isCommitting)
 				continued := state.Continue()
 				if continued != invocation.expectContinued {
 					t.Errorf("Expected continue to return %v but returned %v", invocation.expectContinued, continued)
@@ -185,14 +185,12 @@ func TestState(outer *testing.T) {
 						invocation.expectRouterInvalidated, invocation.expectRouterInvalidatedDb, invocation.expectRouterInvalidatedServer,
 						router.Invalidated, router.InvalidatedDb, router.InvalidatedServer)
 				}
-				if state.LastErr == nil {
-					t.Errorf("LastErr should be set")
-				}
-				if state.LastErrWasRetryable != invocation.expectLastErrWasRetryable {
+				lastError := state.Errs[len(state.Errs)-1]
+				if IsRetryable(lastError) != invocation.expectLastErrWasRetryable {
 					t.Errorf("LastErrWasRetryable mismatch")
 				}
 				if invocation.expectLastErrType != nil {
-					t1 := reflect.TypeOf(state.LastErr)
+					t1 := reflect.TypeOf(lastError)
 					t2 := reflect.TypeOf(invocation.expectLastErrType)
 					if t1 != t2 {
 						t.Errorf("LastErr type mismatch: %s vs %s", t1, t2)

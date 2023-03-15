@@ -22,6 +22,7 @@ package neo4j
 import (
 	"context"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/errorutil"
 )
 
 // ManagedTransaction represents a transaction managed by the driver and operated on by the user, via transaction functions
@@ -71,7 +72,7 @@ func (tx *explicitTransaction) Run(ctx context.Context, cypher string,
 		tx.err = err
 		tx.runFailed = true
 		tx.onClosed(tx)
-		return nil, wrapError(tx.err)
+		return nil, errorutil.WrapError(tx.err)
 	}
 	// no result consumption hook here since bookmarks are sent after commit, not after pulling results
 	return newResultWithContext(tx.conn, stream, cypher, params, nil), nil
@@ -88,7 +89,7 @@ func (tx *explicitTransaction) Commit(ctx context.Context) error {
 	tx.err = tx.conn.TxCommit(ctx, tx.txHandle)
 	tx.done = true
 	tx.onClosed(tx)
-	return wrapError(tx.err)
+	return errorutil.WrapError(tx.err)
 }
 
 func (tx *explicitTransaction) Close(ctx context.Context) error {
@@ -115,7 +116,7 @@ func (tx *explicitTransaction) Rollback(ctx context.Context) error {
 	}
 	tx.done = true
 	tx.onClosed(tx)
-	return wrapError(tx.err)
+	return errorutil.WrapError(tx.err)
 }
 
 func (tx *explicitTransaction) legacy() Transaction {
@@ -134,7 +135,7 @@ type managedTransaction struct {
 func (tx *managedTransaction) Run(ctx context.Context, cypher string, params map[string]any) (ResultWithContext, error) {
 	stream, err := tx.conn.RunTx(ctx, tx.txHandle, db.Command{Cypher: cypher, Params: params, FetchSize: tx.fetchSize})
 	if err != nil {
-		return nil, wrapError(err)
+		return nil, errorutil.WrapError(err)
 	}
 	// no result consumption hook here since bookmarks are sent after commit, not after pulling results
 	return newResultWithContext(tx.conn, stream, cypher, params, nil), nil

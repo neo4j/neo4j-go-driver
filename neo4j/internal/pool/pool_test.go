@@ -23,6 +23,7 @@ import (
 	"context"
 	"errors"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/errorutil"
 	"math/rand"
 	"sync"
 	"testing"
@@ -132,7 +133,7 @@ func TestPoolBorrowReturn(outer *testing.T) {
 		c2, err2 := p.Borrow(ctx, serverNames, false, nil, DefaultLivenessCheckThreshold)
 		assertNoConnection(t, c2, err2)
 		// Error should be pool full
-		_ = err2.(*PoolFull)
+		_ = err2.(*errorutil.PoolFull)
 	})
 
 	outer.Run("Multiple threads borrows and returns randomly", func(t *testing.T) {
@@ -215,7 +216,7 @@ func TestPoolBorrowReturn(outer *testing.T) {
 			t.Error("There should be an error due to cancelling")
 		}
 		// Should be a pool error with the cancellation error in it
-		_ = err.(*PoolTimeout)
+		_ = err.(*errorutil.PoolTimeout)
 	})
 
 	outer.Run("Borrows the first successfully reset long-idle connection", func(t *testing.T) {

@@ -274,14 +274,14 @@ func (s *sessionWithContext) BeginTransaction(ctx context.Context, configurers .
 	// Get a connection from the pool. This could fail in clustered environment.
 	conn, err := s.getConnection(ctx, s.defaultMode, pool.DefaultLivenessCheckThreshold)
 	if err != nil {
-		return nil, wrapError(err)
+		return nil, errorutil.WrapError(err)
 	}
 
 	// Begin transaction
 	beginBookmarks, err := s.getBookmarks(ctx)
 	if err != nil {
 		s.pool.Return(ctx, conn)
-		return nil, wrapError(err)
+		return nil, errorutil.WrapError(err)
 	}
 	txHandle, err := conn.TxBegin(ctx,
 		idb.TxConfig{
@@ -293,7 +293,7 @@ func (s *sessionWithContext) BeginTransaction(ctx context.Context, configurers .
 		})
 	if err != nil {
 		s.pool.Return(ctx, conn)
-		return nil, wrapError(err)
+		return nil, errorutil.WrapError(err)
 	}
 
 	// Create transaction wrapper
@@ -380,19 +380,8 @@ func (s *sessionWithContext) runRetriable(
 		}
 	}
 
-	// When retries has occurred wrap the error, the last error is always added but
-	// cause is only set when the retry logic could detect something strange.
-	if state.LastErrWasRetryable {
-		err := newTransactionExecutionLimit(state.Errs, state.Causes)
-		s.log.Error(log.Session, s.logId, err)
-		return nil, err
-	}
-	// Wrap and log the error if it belongs to the driver
-	err := wrapError(state.LastErr)
-	switch err.(type) {
-	case *UsageError, *ConnectivityError:
-		s.log.Error(log.Session, s.logId, err)
-	}
+	err := state.ProduceError()
+	s.log.Error(log.Session, s.logId, err)
 	return nil, err
 }
 
@@ -405,7 +394,7 @@ func (s *sessionWithContext) executeTransactionFunction(
 
 	conn, err := s.getConnection(ctx, mode, pool.DefaultLivenessCheckThreshold)
 	if err != nil {
-		state.OnFailure(ctx, conn, err, false)
+		state.OnFailure(ctx, err, conn, false)
 		return true, nil
 	}
 
@@ -414,7 +403,7 @@ func (s *sessionWithContext) executeTransactionFunction(
 
 	beginBookmarks, err := s.getBookmarks(ctx)
 	if err != nil {
-		state.OnFailure(ctx, conn, err, false)
+		state.OnFailure(ctx, err, conn, false)
 		return true, nil
 	}
 	txHandle, err := conn.TxBegin(ctx,
@@ -426,7 +415,7 @@ func (s *sessionWithContext) executeTransactionFunction(
 			ImpersonatedUser: s.impersonatedUser,
 		})
 	if err != nil {
-		state.OnFailure(ctx, conn, err, false)
+		state.OnFailure(ctx, err, conn, false)
 		return true, nil
 	}
 
@@ -437,13 +426,13 @@ func (s *sessionWithContext) executeTransactionFunction(
 		// client wants to rollback. We don't do an explicit rollback here
 		// but instead rely on the pool invoking reset on the connection,
 		// that will do an implicit rollback.
-		state.OnFailure(ctx, conn, err, false)
+		state.OnFailure(ctx, err, conn, false)
 		return true, nil
 	}
 
 	err = conn.TxCommit(ctx, txHandle)
 	if err != nil {
-		state.OnFailure(ctx, conn, err, true)
+		state.OnFailure(ctx, err, conn, true)
 		return true, nil
 	}
 
@@ -479,16 +468,16 @@ func (s *sessionWithContext) getConnection(ctx context.Context, mode idb.AccessM
 	}
 
 	if err := s.resolveHomeDatabase(ctx); err != nil {
-		return nil, wrapError(err)
+		return nil, errorutil.WrapError(err)
 	}
 	servers, err := s.getServers(ctx, mode)
 	if err != nil {
-		return nil, wrapError(err)
+		return nil, errorutil.WrapError(err)
 	}
 
 	conn, err := s.pool.Borrow(ctx, servers, s.config.ConnectionAcquisitionTimeout != 0, s.boltLogger, livenessCheckThreshold)
 	if err != nil {
-		return nil, wrapError(err)
+		return nil, errorutil.WrapError(err)
 	}
 
 	// Select database on server
@@ -541,13 +530,13 @@ func (s *sessionWithContext) Run(ctx context.Context,
 
 	conn, err := s.getConnection(ctx, s.defaultMode, pool.DefaultLivenessCheckThreshold)
 	if err != nil {
-		return nil, wrapError(err)
+		return nil, errorutil.WrapError(err)
 	}
 
 	runBookmarks, err := s.getBookmarks(ctx)
 	if err != nil {
 		s.pool.Return(ctx, conn)
-		return nil, wrapError(err)
+		return nil, errorutil.WrapError(err)
 	}
 	stream, err := conn.Run(
 		ctx,
@@ -565,7 +554,7 @@ func (s *sessionWithContext) Run(ctx context.Context,
 		})
 	if err != nil {
 		s.pool.Return(ctx, conn)
-		return nil, wrapError(err)
+		return nil, errorutil.WrapError(err)
 	}
 
 	s.autocommitTx = &autocommitTransaction{
@@ -613,15 +602,15 @@ func (s *sessionWithContext) legacy() Session {
 
 func (s *sessionWithContext) getServerInfo(ctx context.Context) (ServerInfo, error) {
 	if err := s.resolveHomeDatabase(ctx); err != nil {
-		return nil, wrapError(err)
+		return nil, errorutil.WrapError(err)
 	}
 	servers, err := s.getServers(ctx, idb.ReadMode)
 	if err != nil {
-		return nil, wrapError(err)
+		return nil, errorutil.WrapError(err)
 	}
 	conn, err := s.pool.Borrow(ctx, servers, s.config.ConnectionAcquisitionTimeout != 0, s.boltLogger, 0)
 	if err != nil {
-		return nil, wrapError(err)
+		return nil, errorutil.WrapError(err)
 	}
 	defer s.pool.Return(ctx, conn)
 	return &simpleServerInfo{

@@ -26,8 +26,8 @@ import (
 	"container/list"
 	"context"
 	"fmt"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/bolt"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/errorutil"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/racing"
 	"math"
 	"sort"
@@ -209,7 +209,7 @@ func (p *Pool) tryAnyIdle(ctx context.Context, serverNames []string, idlenessThr
 
 func (p *Pool) Borrow(ctx context.Context, serverNames []string, wait bool, boltLogger log.BoltLogger, idlenessThreshold time.Duration) (db.Connection, error) {
 	if p.closed {
-		return nil, &PoolClosed{}
+		return nil, &errorutil.PoolClosed{}
 	}
 	p.log.Debugf(log.Pool, p.logId, "Trying to borrow connection from %s", serverNames)
 
@@ -230,9 +230,9 @@ func (p *Pool) Borrow(ctx context.Context, serverNames []string, wait bool, bolt
 			return conn, nil
 		}
 
-		if bolt.IsTimeoutError(err) {
+		if errorutil.IsTimeoutError(err) {
 			p.log.Warnf(log.Pool, p.logId, "Borrow time-out")
-			return nil, &PoolTimeout{servers: serverNames, err: err}
+			return nil, &errorutil.PoolTimeout{Servers: serverNames, Err: err}
 		}
 	}
 
@@ -253,7 +253,7 @@ func (p *Pool) Borrow(ctx context.Context, serverNames []string, wait bool, bolt
 	}
 
 	if !wait {
-		return nil, &PoolFull{servers: serverNames}
+		return nil, &errorutil.PoolFull{Servers: serverNames}
 	}
 
 	// Wait for a matching connection to be returned from another thread.
@@ -297,7 +297,7 @@ func (p *Pool) Borrow(ctx context.Context, serverNames []string, wait bool, bolt
 			return q.conn, nil
 		}
 		p.log.Warnf(log.Pool, p.logId, "Borrow time-out")
-		return nil, &PoolTimeout{err: ctx.Err(), servers: serverNames}
+		return nil, &errorutil.PoolTimeout{Err: ctx.Err(), Servers: serverNames}
 	}
 }
 
@@ -322,7 +322,7 @@ func (p *Pool) tryBorrow(ctx context.Context, serverName string, boltLogger log.
 				return connection, nil
 			}
 			if srv.size() >= p.maxSize {
-				return nil, &PoolFull{servers: []string{serverName}}
+				return nil, &errorutil.PoolFull{Servers: []string{serverName}}
 			}
 			break
 		}

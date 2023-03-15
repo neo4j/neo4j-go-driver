@@ -21,6 +21,9 @@ package errorutil
 
 import (
 	"fmt"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/db"
+	"io"
+	"net"
 )
 
 func CombineAllErrors(errs ...error) error {
@@ -42,4 +45,72 @@ func CombineErrors(err1, err2 error) error {
 		return err2
 	}
 	return fmt.Errorf("error %v occurred after previous error %w", err2, err1)
+}
+
+func WrapError(err error) error {
+	if err == nil {
+		return nil
+	}
+	if err == io.EOF {
+		return &ConnectivityError{Inner: err}
+	}
+	switch e := err.(type) {
+	case *db.UnsupportedTypeError, *db.FeatureNotSupportedError:
+		// Usage of a type not supported by database network protocol or feature
+		// not supported by current version or edition.
+		return &UsageError{Message: err.Error()}
+	case *PoolClosed:
+		return &UsageError{Message: err.Error()}
+	case *TlsError, net.Error:
+		return &ConnectivityError{Inner: err}
+	case *PoolTimeout, *PoolFull:
+		return &ConnectivityError{Inner: err}
+	case *ReadRoutingTableError:
+		return &ConnectivityError{Inner: err}
+	case *CommitFailedDeadError:
+		return &ConnectivityError{Inner: err}
+	case *ConnectionReadTimeout:
+		return &ConnectivityError{Inner: err}
+	case *ConnectionWriteTimeout:
+		return &ConnectivityError{Inner: err}
+	case *db.Neo4jError:
+		if e.Code == "Neo.ClientError.Security.TokenExpired" {
+			return &TokenExpiredError{Code: e.Code, Message: e.Msg}
+		}
+	}
+	if err != nil && err.Error() == InvalidTransactionError {
+		return &UsageError{Message: InvalidTransactionError}
+	}
+	return err
+}
+
+// UsageError represents errors caused by incorrect usage of the driver API.
+// This does not include Cypher syntax (those errors will be Neo4jError).
+type UsageError struct {
+	Message string
+}
+
+func (e *UsageError) Error() string {
+	return e.Message
+}
+
+// ConnectivityError represent errors caused by the driver not being able to connect to Neo4j services,
+// or lost connections.
+type ConnectivityError struct {
+	Inner error
+}
+
+func (e *ConnectivityError) Error() string {
+	return fmt.Sprintf("ConnectivityError: %s", e.Inner.Error())
+}
+
+// TokenExpiredError represent errors caused by the driver not being able to connect to Neo4j services,
+// or lost connections.
+type TokenExpiredError struct {
+	Code    string
+	Message string
+}
+
+func (e *TokenExpiredError) Error() string {
+	return fmt.Sprintf("TokenExpiredError: %s (%s)", e.Code, e.Message)
 }
