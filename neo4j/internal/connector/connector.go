@@ -60,9 +60,16 @@ func (c Connector) Connect(ctx context.Context, address string, boltLogger log.B
 		return nil, err
 	}
 
-	// TLS not requested, perform Bolt handshake
+	// TLS not requested
 	if c.SkipEncryption {
-		return bolt.Connect(ctx, address, conn, c.Auth, c.UserAgent, c.RoutingContext, c.Log, boltLogger)
+		connection, err := bolt.Connect(ctx, address, conn, c.Auth, c.UserAgent, c.RoutingContext, c.Log, boltLogger)
+		if err != nil {
+			if connErr := conn.Close(); connErr != nil {
+				c.Log.Warnf(log.Driver, address, "could not close underlying socket after Bolt handshake error")
+			}
+			return nil, err
+		}
+		return connection, nil
 	}
 
 	// TLS requested, continue with handshake
@@ -81,8 +88,14 @@ func (c Connector) Connect(ctx context.Context, address string, boltLogger log.B
 		conn.Close()
 		return nil, &TlsError{inner: err}
 	}
-	// Perform Bolt handshake
-	return bolt.Connect(ctx, address, tlsConn, c.Auth, c.UserAgent, c.RoutingContext, c.Log, boltLogger)
+	connection, err := bolt.Connect(ctx, address, tlsConn, c.Auth, c.UserAgent, c.RoutingContext, c.Log, boltLogger)
+	if err != nil {
+		if connErr := conn.Close(); connErr != nil {
+			c.Log.Warnf(log.Driver, address, "could not close underlying socket after Bolt handshake error")
+		}
+		return nil, err
+	}
+	return connection, nil
 }
 
 func (c Connector) tlsConfig(serverName string) *tls.Config {
