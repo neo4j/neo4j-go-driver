@@ -49,7 +49,7 @@ type Connector struct {
 	TlsConfig       *tls.Config
 }
 
-func (c Connector) Connect(ctx context.Context, address string, boltLogger log.BoltLogger) (db.Connection, error) {
+func (c Connector) Connect(ctx context.Context, address string, boltLogger log.BoltLogger, auth map[string]any) (db.Connection, error) {
 	dialer := net.Dialer{Timeout: c.DialTimeout}
 	if !c.SocketKeepAlive {
 		dialer.KeepAlive = -1 * time.Second // Turns keep-alive off
@@ -81,8 +81,11 @@ func (c Connector) Connect(ctx context.Context, address string, boltLogger log.B
 		conn.Close()
 		return nil, &TlsError{inner: err}
 	}
+	if auth == nil {
+		auth = c.Auth
+	}
 	// Perform Bolt handshake
-	return bolt.Connect(ctx, address, tlsConn, c.Auth, c.UserAgent, c.RoutingContext, c.Log, boltLogger)
+	return bolt.Connect(ctx, address, tlsConn, auth, c.UserAgent, c.RoutingContext, c.Log, boltLogger)
 }
 
 func (c Connector) tlsConfig(serverName string) *tls.Config {

@@ -186,6 +186,10 @@ func (c *ConnFake) SelectDatabase(database string) {
 func (c *ConnFake) SetBoltLogger(log.BoltLogger) {
 }
 
+func (c *ConnFake) ReAuth(context.Context, map[string]any) error {
+	return nil
+}
+
 func (c *ConnFake) Version() db.ProtocolVersion {
 	return c.ConnectionVersion
 }

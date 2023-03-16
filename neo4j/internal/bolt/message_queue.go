@@ -60,6 +60,10 @@ func (q *messageQueue) appendHello(hello map[string]any, helloHandler responseHa
 	q.enqueueCallback(helloHandler)
 }
 
+func (q *messageQueue) appendLogoff(logoffHandler responseHandler) {
+	q.out.appendLogoff()
+	q.enqueueCallback(logoffHandler)
+}
 func (q *messageQueue) appendLogon(token map[string]any, logonHandler responseHandler) {
 	q.out.appendLogon(token)
 	q.enqueueCallback(logonHandler)

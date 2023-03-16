@@ -40,7 +40,7 @@ import (
 // Liveness checks are performed before a connection is deemed idle enough to be reset
 const DefaultLivenessCheckThreshold = math.MaxInt64
 
-type Connect func(context.Context, string, log.BoltLogger) (db.Connection, error)
+type Connect func(context.Context, string, log.BoltLogger, map[string]any) (db.Connection, error)
 
 type qitem struct {
 	servers []string
@@ -207,7 +207,7 @@ func (p *Pool) tryAnyIdle(ctx context.Context, serverNames []string, idlenessThr
 	return nil, nil
 }
 
-func (p *Pool) Borrow(ctx context.Context, serverNames []string, wait bool, boltLogger log.BoltLogger, idlenessThreshold time.Duration) (db.Connection, error) {
+func (p *Pool) Borrow(ctx context.Context, serverNames []string, wait bool, boltLogger log.BoltLogger, idlenessThreshold time.Duration, auth map[string]any) (db.Connection, error) {
 	if p.closed {
 		return nil, &PoolClosed{}
 	}
@@ -301,7 +301,7 @@ func (p *Pool) Borrow(ctx context.Context, serverNames []string, wait bool, bolt
 	}
 }
 
-func (p *Pool) tryBorrow(ctx context.Context, serverName string, boltLogger log.BoltLogger, idlenessThreshold time.Duration) (db.Connection, error) {
+func (p *Pool) tryBorrow(ctx context.Context, serverName string, boltLogger log.BoltLogger, idlenessThreshold time.Duration, auth map[string]any) (db.Connection, error) {
 	// For now, lock complete servers map to avoid over connecting but with the downside
 	// that long connect times will block connects to other servers as well. To fix this
 	// we would need to add a pending connect to the server and lock per server.
@@ -319,6 +319,9 @@ func (p *Pool) tryBorrow(ctx context.Context, serverName string, boltLogger log.
 			}
 			if connection != nil {
 				connection.SetBoltLogger(boltLogger)
+				if err := connection.ReAuth(ctx, auth); err != nil {
+					return nil, err
+				}
 				return connection, nil
 			}
 			if srv.size() >= p.maxSize {
@@ -334,7 +337,7 @@ func (p *Pool) tryBorrow(ctx context.Context, serverName string, boltLogger log.
 
 	// No idle connection, try to connect
 	p.log.Infof(log.Pool, p.logId, "Connecting to %s", serverName)
-	c, err := p.connect(ctx, serverName, boltLogger)
+	c, err := p.connect(ctx, serverName, boltLogger, auth)
 	if err != nil {
 		// Failed to connect, keep track that it was bad for a while
 		srv.notifyFailedConnect(p.now())

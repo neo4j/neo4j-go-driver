@@ -56,7 +56,7 @@ type Pool interface {
 	// If all connections are busy and the pool is full, calls to Borrow may wait for a connection to become idle
 	// If a connection has been idle for longer than idlenessThreshold, it will be reset
 	// to check if it's still alive.
-	Borrow(ctx context.Context, servers []string, wait bool, boltLogger log.BoltLogger, idlenessThreshold time.Duration) (db.Connection, error)
+	Borrow(ctx context.Context, servers []string, wait bool, boltLogger log.BoltLogger, idlenessThreshold time.Duration, auth map[string]any) (db.Connection, error)
 	Return(ctx context.Context, c db.Connection) error
 }
 
@@ -77,7 +77,15 @@ func New(rootRouter string, getRouters func() []string, routerContext map[string
 	return r
 }
 
-func (r *Router) readTable(ctx context.Context, dbRouter *databaseRouter, bookmarks []string, database, impersonatedUser string, boltLogger log.BoltLogger) (*db.RoutingTable, error) {
+func (r *Router) readTable(
+	ctx context.Context,
+	dbRouter *databaseRouter,
+	bookmarks []string,
+	database,
+	impersonatedUser string,
+	auth map[string]any,
+	boltLogger log.BoltLogger,
+) (*db.RoutingTable, error) {
 	var (
 		table *db.RoutingTable
 		err   error
@@ -87,20 +95,20 @@ func (r *Router) readTable(ctx context.Context, dbRouter *databaseRouter, bookma
 	if dbRouter != nil && len(dbRouter.table.Routers) > 0 {
 		routers := dbRouter.table.Routers
 		r.log.Infof(log.Router, r.logId, "Reading routing table for '%s' from previously known routers: %v", database, routers)
-		table, err = readTable(ctx, r.pool, routers, r.routerContext, bookmarks, database, impersonatedUser, boltLogger)
+		table, err = readTable(ctx, r.pool, routers, r.routerContext, bookmarks, database, impersonatedUser, auth, boltLogger)
 	}
 
 	// Try initial router if no routers or failed
 	if table == nil {
 		r.log.Infof(log.Router, r.logId, "Reading routing table from initial router: %s", r.rootRouter)
-		table, err = readTable(ctx, r.pool, []string{r.rootRouter}, r.routerContext, bookmarks, database, impersonatedUser, boltLogger)
+		table, err = readTable(ctx, r.pool, []string{r.rootRouter}, r.routerContext, bookmarks, database, impersonatedUser, auth, boltLogger)
 	}
 
 	// Use hook to retrieve possibly different set of routers and retry
 	if table == nil && r.getRouters != nil {
 		routers := r.getRouters()
 		r.log.Infof(log.Router, r.logId, "Reading routing table for '%s' from custom routers: %v", routers)
-		table, err = readTable(ctx, r.pool, routers, r.routerContext, bookmarks, database, impersonatedUser, boltLogger)
+		table, err = readTable(ctx, r.pool, routers, r.routerContext, bookmarks, database, impersonatedUser, auth, boltLogger)
 	}
 
 	if err != nil {
@@ -134,7 +142,7 @@ func (r *Router) getOrReadTable(ctx context.Context, bookmarksFn func(context.Co
 	if err != nil {
 		return nil, err
 	}
-	table, err := r.readTable(ctx, dbRouter, bookmarks, database, "", boltLogger)
+	table, err := r.readTable(ctx, dbRouter, bookmarks, database, "", nil, boltLogger)
 	if err != nil {
 		return nil, err
 	}
@@ -204,8 +212,8 @@ func (r *Router) Writers(ctx context.Context, bookmarks func(context.Context) ([
 	return table.Writers, nil
 }
 
-func (r *Router) GetNameOfDefaultDatabase(ctx context.Context, bookmarks []string, user string, boltLogger log.BoltLogger) (string, error) {
-	table, err := r.readTable(ctx, nil, bookmarks, db.DefaultDatabase, user, boltLogger)
+func (r *Router) GetNameOfDefaultDatabase(ctx context.Context, bookmarks []string, user string, auth map[string]any, boltLogger log.BoltLogger) (string, error) {
+	table, err := r.readTable(ctx, nil, bookmarks, db.DefaultDatabase, user, auth, boltLogger)
 	if err != nil {
 		return "", err
 	}

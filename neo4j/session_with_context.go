@@ -153,6 +153,8 @@ type SessionConfig struct {
 	// Since 5.0
 	// default: nil (no-op)
 	BookmarkManager BookmarkManager
+	// Auth TODO: docs
+	Auth *AuthToken
 }
 
 // FetchAll turns off fetching records in batches.
@@ -163,7 +165,7 @@ const FetchDefault = 0
 
 // Connection pool as seen by the session.
 type sessionPool interface {
-	Borrow(ctx context.Context, serverNames []string, wait bool, boltLogger log.BoltLogger, livenessCheckThreshold time.Duration) (idb.Connection, error)
+	Borrow(ctx context.Context, serverNames []string, wait bool, boltLogger log.BoltLogger, livenessCheckThreshold time.Duration, auth map[string]any) (idb.Connection, error)
 	Return(ctx context.Context, c idb.Connection) error
 	CleanUp(ctx context.Context) error
 }
@@ -186,6 +188,7 @@ type sessionWithContext struct {
 	throttleTime     time.Duration
 	fetchSize        int
 	boltLogger       log.BoltLogger
+	auth             map[string]any
 }
 
 func newSessionWithContext(config *Config, sessConfig SessionConfig, router sessionRouter, pool sessionPool, logger log.Logger) *sessionWithContext {
@@ -195,6 +198,11 @@ func newSessionWithContext(config *Config, sessConfig SessionConfig, router sess
 	fetchSize := config.FetchSize
 	if sessConfig.FetchSize != FetchDefault {
 		fetchSize = sessConfig.FetchSize
+	}
+
+	var auth map[string]any
+	if sessConfig.Auth != nil {
+		auth = sessConfig.Auth.tokens
 	}
 
 	return &sessionWithContext{
@@ -213,6 +221,7 @@ func newSessionWithContext(config *Config, sessConfig SessionConfig, router sess
 		throttleTime:     time.Second * 1,
 		fetchSize:        fetchSize,
 		boltLogger:       sessConfig.BoltLogger,
+		auth:             auth,
 	}
 }
 
@@ -486,7 +495,7 @@ func (s *sessionWithContext) getConnection(ctx context.Context, mode idb.AccessM
 		return nil, wrapError(err)
 	}
 
-	conn, err := s.pool.Borrow(ctx, servers, s.config.ConnectionAcquisitionTimeout != 0, s.boltLogger, livenessCheckThreshold)
+	conn, err := s.pool.Borrow(ctx, servers, s.config.ConnectionAcquisitionTimeout != 0, s.boltLogger, livenessCheckThreshold, s.auth)
 	if err != nil {
 		return nil, wrapError(err)
 	}
@@ -619,7 +628,7 @@ func (s *sessionWithContext) getServerInfo(ctx context.Context) (ServerInfo, err
 	if err != nil {
 		return nil, wrapError(err)
 	}
-	conn, err := s.pool.Borrow(ctx, servers, s.config.ConnectionAcquisitionTimeout != 0, s.boltLogger, 0)
+	conn, err := s.pool.Borrow(ctx, servers, s.config.ConnectionAcquisitionTimeout != 0, s.boltLogger, 0, s.auth)
 	if err != nil {
 		return nil, wrapError(err)
 	}
@@ -640,7 +649,7 @@ func (s *sessionWithContext) resolveHomeDatabase(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	defaultDb, err := s.router.GetNameOfDefaultDatabase(ctx, bookmarks, s.impersonatedUser, s.boltLogger)
+	defaultDb, err := s.router.GetNameOfDefaultDatabase(ctx, bookmarks, s.impersonatedUser, s.auth, s.boltLogger)
 	if err != nil {
 		return err
 	}

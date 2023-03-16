@@ -886,6 +886,13 @@ func (b *bolt4) SetBoltLogger(boltLogger log.BoltLogger) {
 	b.queue.setBoltLogger(boltLogger)
 }
 
+func (b *bolt4) ReAuth(_ context.Context, auth map[string]any) error {
+	if auth != nil {
+		return &db.FeatureNotSupportedError{Server: b.serverName, Feature: "session auth", Reason: "requires least server v5.5"}
+	}
+	return nil
+}
+
 func (b *bolt4) Version() db.ProtocolVersion {
 	return db.ProtocolVersion{
 		Major: 4,

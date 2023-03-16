@@ -25,6 +25,7 @@ import (
 	"fmt"
 	idb "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
 	"net"
+	"reflect"
 	"time"
 
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/db"
@@ -99,6 +100,7 @@ type bolt5 struct {
 	minor         int
 	lastQid       int64 // Last seen qid
 	idleDate      time.Time
+	auth          map[string]any
 }
 
 func NewBolt5(serverName string, conn net.Conn, logger log.Logger, boltLog log.BoltLogger) *bolt5 {
@@ -500,12 +502,14 @@ func (b *bolt5) run(ctx context.Context, cypher string, params map[string]any, r
 		return nil, b.err
 	}
 	// only read response for RUN
-	if err := b.queue.receive(ctx); err != nil {
-		// rely on RESET to deal with unhandled PULL response
-		return nil, err
-	}
-	if b.err != nil {
-		return nil, b.err
+	for !stream.attached {
+		if err := b.queue.receive(ctx); err != nil {
+			// rely on RESET to deal with unhandled PULL response
+			return nil, err
+		}
+		if b.err != nil {
+			return nil, b.err
+		}
 	}
 
 	if b.state == bolt5Ready {
@@ -773,6 +777,20 @@ func (b *bolt5) SetBoltLogger(boltLogger log.BoltLogger) {
 	b.queue.setBoltLogger(boltLogger)
 }
 
+func (b *bolt5) ReAuth(ctx context.Context, auth map[string]any) error {
+	if auth != nil && b.minor < 1 {
+		return &db.FeatureNotSupportedError{Server: b.serverName, Feature: "session auth", Reason: "requires least server v5.5"}
+	}
+	if !reflect.DeepEqual(b.auth, auth) {
+		b.queue.appendLogoff(b.logoffResponseHandler())
+		b.queue.appendLogon(auth, b.logonResponseHandler())
+		if b.queue.send(ctx); b.err != nil {
+			return b.err
+		}
+	}
+	return nil
+}
+
 // Close closes the underlying connection.
 // Beware: could be called on another thread when driver is closed.
 func (b *bolt5) Close(ctx context.Context) {
@@ -812,6 +830,10 @@ func (b *bolt5) helloResponseHandler() responseHandler {
 	return b.expectedSuccessHandler(b.onHelloSuccess)
 }
 
+func (b *bolt5) logoffResponseHandler() responseHandler {
+	return b.expectedSuccessHandler(onSuccessNoOp)
+}
+
 func (b *bolt5) logonResponseHandler() responseHandler {
 	return b.expectedSuccessHandler(onSuccessNoOp)
 }
@@ -828,6 +850,7 @@ func (b *bolt5) beginResponseHandler() responseHandler {
 
 func (b *bolt5) runResponseHandler(stream *stream) responseHandler {
 	return b.expectedSuccessHandler(func(runSuccess *success) {
+		stream.attached = true
 		stream.keys = runSuccess.fields
 		stream.qid = runSuccess.qid
 		stream.tfirst = runSuccess.tfirst

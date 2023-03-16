@@ -118,6 +118,8 @@ type Connection interface {
 	GetRoutingTable(ctx context.Context, context map[string]string, bookmarks []string, database, impersonatedUser string) (*RoutingTable, error)
 	// SetBoltLogger sets Bolt message logger on already initialized connections
 	SetBoltLogger(boltLogger log.BoltLogger)
+	// ReAuth TODO: docs
+	ReAuth(context.Context, map[string]any) error
 	// Version returns the protocol version of the connection
 	Version() db.ProtocolVersion
 }

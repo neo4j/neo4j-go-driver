@@ -276,7 +276,7 @@ type sessionRouter interface {
 	// GetNameOfDefaultDatabase returns the name of the default database for the specified user.
 	// The correct database name is needed when requesting readers or writers.
 	// the bookmarks are eagerly provided since this method always fetches a new routing table
-	GetNameOfDefaultDatabase(ctx context.Context, bookmarks []string, user string, boltLogger log.BoltLogger) (string, error)
+	GetNameOfDefaultDatabase(ctx context.Context, bookmarks []string, user string, auth map[string]any, boltLogger log.BoltLogger) (string, error)
 	Invalidate(ctx context.Context, database string) error
 	CleanUp(ctx context.Context) error
 	InvalidateWriter(ctx context.Context, name string, server string) error
@@ -306,6 +306,12 @@ func (d *driverWithContext) Target() url.URL {
 func (d *driverWithContext) NewSession(ctx context.Context, config SessionConfig) SessionWithContext {
 	if config.DatabaseName == "" {
 		config.DatabaseName = db.DefaultDatabase
+	}
+
+	if config.Auth == nil {
+		config.Auth = &AuthToken{
+			tokens: d.connector.Auth,
+		}
 	}
 
 	if !d.mut.TryLock(ctx) {
