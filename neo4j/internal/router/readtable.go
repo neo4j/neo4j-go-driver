@@ -36,7 +36,7 @@ func readTable(
 	bookmarks []string,
 	database,
 	impersonatedUser string,
-	auth map[string]any,
+	auth *db.ReAuthToken,
 	boltLogger log.BoltLogger,
 ) (*db.RoutingTable, error) {
 	// Preserve last error to be returned, set a default for case of no routers
@@ -47,7 +47,7 @@ func readTable(
 	// another db.
 	for _, router := range routers {
 		var conn db.Connection
-		if conn, err = connectionPool.Borrow(ctx, []string{router}, true, boltLogger, pool.DefaultLivenessCheckThreshold); err != nil {
+		if conn, err = connectionPool.Borrow(ctx, []string{router}, true, boltLogger, pool.DefaultLivenessCheckThreshold, auth); err != nil {
 			// Check if failed due to context timing out
 			if ctx.Err() != nil {
 				return nil, wrapError(router, ctx.Err())

@@ -17,26 +17,9 @@
  *  limitations under the License.
  */
 
-package router
+package db
 
-import (
-	"context"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/log"
-	"time"
-)
-
-type poolFake struct {
-	borrow   func(names []string, cancel context.CancelFunc, logger log.BoltLogger) (db.Connection, error)
-	returned []db.Connection
-	cancel   context.CancelFunc
-}
-
-func (p *poolFake) Borrow(_ context.Context, servers []string, _ bool, logger log.BoltLogger, _ time.Duration, _ *db.ReAuthToken) (db.Connection, error) {
-	return p.borrow(servers, p.cancel, logger)
-}
-
-func (p *poolFake) Return(_ context.Context, c db.Connection) error {
-	p.returned = append(p.returned, c)
-	return nil
+type ReAuthToken struct {
+	Token       map[string]any
+	FromSession bool
 }

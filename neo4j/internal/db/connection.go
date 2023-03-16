@@ -59,7 +59,7 @@ const DefaultTxConfigTimeout = math.MinInt
 
 // Connection defines an abstract database server connection.
 type Connection interface {
-	Connect(ctx context.Context, minor int, auth map[string]any, userAgent string, routingContext map[string]string) error
+	Connect(ctx context.Context, minor int, auth *ReAuthToken, userAgent string, routingContext map[string]string) error
 
 	TxBegin(ctx context.Context, txConfig TxConfig) (TxHandle, error)
 	TxRollback(ctx context.Context, tx TxHandle) error
@@ -119,7 +119,7 @@ type Connection interface {
 	// SetBoltLogger sets Bolt message logger on already initialized connections
 	SetBoltLogger(boltLogger log.BoltLogger)
 	// ReAuth TODO: docs
-	ReAuth(context.Context, map[string]any) error
+	ReAuth(context.Context, *ReAuthToken) error
 	// Version returns the protocol version of the connection
 	Version() db.ProtocolVersion
 }

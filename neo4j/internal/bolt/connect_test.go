@@ -21,6 +21,7 @@ package bolt
 
 import (
 	"context"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
 	"testing"
 
 	. "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/testutil"
@@ -32,10 +33,13 @@ var logger = &log.Void{}
 func TestConnect(ot *testing.T) {
 	// TODO: Test connect timeout
 
-	auth := map[string]any{
-		"scheme":      "basic",
-		"principal":   "neo4j",
-		"credentials": "pass",
+	auth := &db.ReAuthToken{
+		FromSession: false,
+		Token: map[string]any{
+			"scheme":      "basic",
+			"principal":   "neo4j",
+			"credentials": "pass",
+		},
 	}
 
 	ot.Run("Server rejects versions", func(t *testing.T) {

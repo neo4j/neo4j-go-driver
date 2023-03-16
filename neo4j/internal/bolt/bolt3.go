@@ -173,8 +173,12 @@ func (b *bolt3) receiveSuccess(ctx context.Context) *success {
 	}
 }
 
-func (b *bolt3) Connect(ctx context.Context, minor int, auth map[string]any, userAgent string, _ map[string]string) error {
+func (b *bolt3) Connect(ctx context.Context, minor int, auth *idb.ReAuthToken, userAgent string, _ map[string]string) error {
 	if err := b.assertState(bolt3_unauthorized); err != nil {
+		return err
+	}
+
+	if err := checkReAuth(auth, b); err != nil {
 		return err
 	}
 
@@ -182,7 +186,7 @@ func (b *bolt3) Connect(ctx context.Context, minor int, auth map[string]any, use
 		"user_agent": userAgent,
 	}
 	// Merge authentication info into hello message
-	for k, v := range auth {
+	for k, v := range auth.Token {
 		_, exists := hello[k]
 		if exists {
 			continue
@@ -763,11 +767,8 @@ func (b *bolt3) SetBoltLogger(boltLogger log.BoltLogger) {
 	b.out.boltLogger = boltLogger
 }
 
-func (b *bolt3) ReAuth(_ context.Context, auth map[string]any) error {
-	if auth != nil {
-		return &db.FeatureNotSupportedError{Server: b.serverName, Feature: "session auth", Reason: "requires least server v5.5"}
-	}
-	return nil
+func (b *bolt3) ReAuth(_ context.Context, auth *idb.ReAuthToken) error {
+	return b.assertReAuth(auth)
 }
 
 func (b *bolt3) Version() db.ProtocolVersion {
@@ -775,4 +776,8 @@ func (b *bolt3) Version() db.ProtocolVersion {
 		Major: 3,
 		Minor: b.minor,
 	}
+}
+
+func (b *bolt3) assertReAuth(auth *idb.ReAuthToken) error {
+	return checkReAuth(auth, b)
 }

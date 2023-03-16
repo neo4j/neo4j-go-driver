@@ -53,13 +53,16 @@ func makeRawConnection(ctx context.Context, logger log.Logger, boltLogger log.Bo
 		panic(err)
 	}
 
-	authMap := map[string]any{
-		"scheme":      "basic",
-		"principal":   server.Username,
-		"credentials": server.Password,
+	auth := &idb.ReAuthToken{
+		FromSession: false,
+		Token: map[string]any{
+			"scheme":      "basic",
+			"principal":   server.Username,
+			"credentials": server.Password,
+		},
 	}
 
-	boltConn, err := bolt.Connect(context.Background(), parsedUri.Host, tcpConn, authMap, "007", nil, logger, boltLogger)
+	boltConn, err := bolt.Connect(context.Background(), parsedUri.Host, tcpConn, auth, "007", nil, logger, boltLogger)
 	if err != nil {
 		panic(err)
 	}

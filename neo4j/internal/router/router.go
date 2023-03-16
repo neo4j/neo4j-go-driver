@@ -56,7 +56,7 @@ type Pool interface {
 	// If all connections are busy and the pool is full, calls to Borrow may wait for a connection to become idle
 	// If a connection has been idle for longer than idlenessThreshold, it will be reset
 	// to check if it's still alive.
-	Borrow(ctx context.Context, servers []string, wait bool, boltLogger log.BoltLogger, idlenessThreshold time.Duration, auth map[string]any) (db.Connection, error)
+	Borrow(ctx context.Context, servers []string, wait bool, boltLogger log.BoltLogger, idlenessThreshold time.Duration, auth *db.ReAuthToken) (db.Connection, error)
 	Return(ctx context.Context, c db.Connection) error
 }
 
@@ -83,7 +83,7 @@ func (r *Router) readTable(
 	bookmarks []string,
 	database,
 	impersonatedUser string,
-	auth map[string]any,
+	auth *db.ReAuthToken,
 	boltLogger log.BoltLogger,
 ) (*db.RoutingTable, error) {
 	var (
@@ -212,7 +212,7 @@ func (r *Router) Writers(ctx context.Context, bookmarks func(context.Context) ([
 	return table.Writers, nil
 }
 
-func (r *Router) GetNameOfDefaultDatabase(ctx context.Context, bookmarks []string, user string, auth map[string]any, boltLogger log.BoltLogger) (string, error) {
+func (r *Router) GetNameOfDefaultDatabase(ctx context.Context, bookmarks []string, user string, auth *db.ReAuthToken, boltLogger log.BoltLogger) (string, error) {
 	table, err := r.readTable(ctx, nil, bookmarks, db.DefaultDatabase, user, auth, boltLogger)
 	if err != nil {
 		return "", err

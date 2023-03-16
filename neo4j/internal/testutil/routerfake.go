@@ -21,6 +21,7 @@ package testutil
 
 import (
 	"context"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/log"
 )
 
@@ -69,7 +70,7 @@ func (r *RouterFake) Writers(ctx context.Context, bookmarksFn func(context.Conte
 	return r.WritersRet, r.Err
 }
 
-func (r *RouterFake) GetNameOfDefaultDatabase(_ context.Context, _ []string, user string, _ map[string]any, _ log.BoltLogger) (string, error) {
+func (r *RouterFake) GetNameOfDefaultDatabase(_ context.Context, _ []string, user string, _ *db.ReAuthToken, _ log.BoltLogger) (string, error) {
 	if r.GetNameOfDefaultDbHook != nil {
 		return r.GetNameOfDefaultDbHook(user)
 	}

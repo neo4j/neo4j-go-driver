@@ -46,7 +46,7 @@ func (r *directRouter) Writers(context.Context, func(context.Context) ([]string,
 	return []string{r.address}, nil
 }
 
-func (r *directRouter) GetNameOfDefaultDatabase(context.Context, []string, string, map[string]any, log.BoltLogger) (string, error) {
+func (r *directRouter) GetNameOfDefaultDatabase(context.Context, []string, string, *db.ReAuthToken, log.BoltLogger) (string, error) {
 	return db.DefaultDatabase, nil
 }
 

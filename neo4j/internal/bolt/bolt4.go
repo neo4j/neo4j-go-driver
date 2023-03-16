@@ -194,8 +194,12 @@ func (b *bolt4) setError(err error, fatal bool) {
 	}
 }
 
-func (b *bolt4) Connect(ctx context.Context, minor int, auth map[string]any, userAgent string, routingContext map[string]string) error {
+func (b *bolt4) Connect(ctx context.Context, minor int, auth *idb.ReAuthToken, userAgent string, routingContext map[string]string) error {
 	if err := b.assertState(bolt4_unauthorized); err != nil {
+		return err
+	}
+
+	if err := checkReAuth(auth, b); err != nil {
 		return err
 	}
 
@@ -214,7 +218,7 @@ func (b *bolt4) Connect(ctx context.Context, minor int, auth map[string]any, use
 		hello["patch_bolt"] = []string{"utc"}
 	}
 	// Merge authentication keys into hello, avoid overwriting existing keys
-	for k, v := range auth {
+	for k, v := range auth.Token {
 		_, exists := hello[k]
 		if !exists {
 			hello[k] = v
@@ -886,11 +890,8 @@ func (b *bolt4) SetBoltLogger(boltLogger log.BoltLogger) {
 	b.queue.setBoltLogger(boltLogger)
 }
 
-func (b *bolt4) ReAuth(_ context.Context, auth map[string]any) error {
-	if auth != nil {
-		return &db.FeatureNotSupportedError{Server: b.serverName, Feature: "session auth", Reason: "requires least server v5.5"}
-	}
-	return nil
+func (b *bolt4) ReAuth(_ context.Context, auth *idb.ReAuthToken) error {
+	return checkReAuth(auth, b)
 }
 
 func (b *bolt4) Version() db.ProtocolVersion {

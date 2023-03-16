@@ -40,7 +40,7 @@ import (
 // Liveness checks are performed before a connection is deemed idle enough to be reset
 const DefaultLivenessCheckThreshold = math.MaxInt64
 
-type Connect func(context.Context, string, log.BoltLogger, map[string]any) (db.Connection, error)
+type Connect func(context.Context, string, log.BoltLogger, *db.ReAuthToken) (db.Connection, error)
 
 type qitem struct {
 	servers []string
@@ -207,7 +207,7 @@ func (p *Pool) tryAnyIdle(ctx context.Context, serverNames []string, idlenessThr
 	return nil, nil
 }
 
-func (p *Pool) Borrow(ctx context.Context, serverNames []string, wait bool, boltLogger log.BoltLogger, idlenessThreshold time.Duration, auth map[string]any) (db.Connection, error) {
+func (p *Pool) Borrow(ctx context.Context, serverNames []string, wait bool, boltLogger log.BoltLogger, idlenessThreshold time.Duration, auth *db.ReAuthToken) (db.Connection, error) {
 	if p.closed {
 		return nil, &PoolClosed{}
 	}
@@ -225,7 +225,7 @@ func (p *Pool) Borrow(ctx context.Context, serverNames []string, wait bool, bolt
 
 	var conn db.Connection
 	for _, s := range penalties {
-		conn, err = p.tryBorrow(ctx, s.name, boltLogger, idlenessThreshold)
+		conn, err = p.tryBorrow(ctx, s.name, boltLogger, idlenessThreshold, auth)
 		if err == nil {
 			return conn, nil
 		}
@@ -301,7 +301,7 @@ func (p *Pool) Borrow(ctx context.Context, serverNames []string, wait bool, bolt
 	}
 }
 
-func (p *Pool) tryBorrow(ctx context.Context, serverName string, boltLogger log.BoltLogger, idlenessThreshold time.Duration, auth map[string]any) (db.Connection, error) {
+func (p *Pool) tryBorrow(ctx context.Context, serverName string, boltLogger log.BoltLogger, idlenessThreshold time.Duration, auth *db.ReAuthToken) (db.Connection, error) {
 	// For now, lock complete servers map to avoid over connecting but with the downside
 	// that long connect times will block connects to other servers as well. To fix this
 	// we would need to add a pending connect to the server and lock per server.
@@ -339,6 +339,9 @@ func (p *Pool) tryBorrow(ctx context.Context, serverName string, boltLogger log.
 	p.log.Infof(log.Pool, p.logId, "Connecting to %s", serverName)
 	c, err := p.connect(ctx, serverName, boltLogger, auth)
 	if err != nil {
+		// TODO: think about not penalizing the server for:
+		// - FeatureNotSupportedError(session auth)
+		// - general auth errors (LOGON or HELLO)
 		// Failed to connect, keep track that it was bad for a while
 		srv.notifyFailedConnect(p.now())
 		p.log.Warnf(log.Pool, p.logId, "Failed to connect to %s: %s", serverName, err)

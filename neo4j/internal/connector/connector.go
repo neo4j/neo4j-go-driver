@@ -49,7 +49,7 @@ type Connector struct {
 	TlsConfig       *tls.Config
 }
 
-func (c Connector) Connect(ctx context.Context, address string, boltLogger log.BoltLogger, auth map[string]any) (db.Connection, error) {
+func (c Connector) Connect(ctx context.Context, address string, boltLogger log.BoltLogger, auth *db.ReAuthToken) (db.Connection, error) {
 	dialer := net.Dialer{Timeout: c.DialTimeout}
 	if !c.SocketKeepAlive {
 		dialer.KeepAlive = -1 * time.Second // Turns keep-alive off
@@ -62,7 +62,7 @@ func (c Connector) Connect(ctx context.Context, address string, boltLogger log.B
 
 	// TLS not requested, perform Bolt handshake
 	if c.SkipEncryption {
-		return bolt.Connect(ctx, address, conn, c.Auth, c.UserAgent, c.RoutingContext, c.Log, boltLogger)
+		return bolt.Connect(ctx, address, conn, auth, c.UserAgent, c.RoutingContext, c.Log, boltLogger)
 	}
 
 	// TLS requested, continue with handshake
@@ -80,9 +80,6 @@ func (c Connector) Connect(ctx context.Context, address string, boltLogger log.B
 		}
 		conn.Close()
 		return nil, &TlsError{inner: err}
-	}
-	if auth == nil {
-		auth = c.Auth
 	}
 	// Perform Bolt handshake
 	return bolt.Connect(ctx, address, tlsConn, auth, c.UserAgent, c.RoutingContext, c.Log, boltLogger)

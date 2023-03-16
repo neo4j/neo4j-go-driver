@@ -69,10 +69,13 @@ func TestBolt4(outer *testing.T) {
 		},
 	}
 
-	auth := map[string]any{
-		"scheme":      "basic",
-		"principal":   "neo4j",
-		"credentials": "pass",
+	auth := &idb.ReAuthToken{
+		FromSession: false,
+		Token: map[string]any{
+			"scheme":      "basic",
+			"principal":   "neo4j",
+			"credentials": "pass",
+		},
 	}
 
 	assertBoltState := func(t *testing.T, expected int, bolt *bolt4) {

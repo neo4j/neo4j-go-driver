@@ -73,7 +73,7 @@ type ConnFake struct {
 	ForceResetHook     func()
 }
 
-func (c *ConnFake) Connect(context.Context, int, map[string]any, string, map[string]string) error {
+func (c *ConnFake) Connect(context.Context, int, *idb.ReAuthToken, string, map[string]string) error {
 	return nil
 }
 
@@ -186,7 +186,7 @@ func (c *ConnFake) SelectDatabase(database string) {
 func (c *ConnFake) SetBoltLogger(log.BoltLogger) {
 }
 
-func (c *ConnFake) ReAuth(context.Context, map[string]any) error {
+func (c *ConnFake) ReAuth(context.Context, *idb.ReAuthToken) error {
 	return nil
 }
 

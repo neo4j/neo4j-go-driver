@@ -23,7 +23,7 @@ package neo4j
 import (
 	"context"
 	"fmt"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
+	idb "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/errorutil"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/racing"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/log"
@@ -276,7 +276,8 @@ type sessionRouter interface {
 	// GetNameOfDefaultDatabase returns the name of the default database for the specified user.
 	// The correct database name is needed when requesting readers or writers.
 	// the bookmarks are eagerly provided since this method always fetches a new routing table
-	GetNameOfDefaultDatabase(ctx context.Context, bookmarks []string, user string, auth map[string]any, boltLogger log.BoltLogger) (string, error)
+	// TODO: update docs
+	GetNameOfDefaultDatabase(ctx context.Context, bookmarks []string, user string, auth *idb.ReAuthToken, boltLogger log.BoltLogger) (string, error)
 	Invalidate(ctx context.Context, database string) error
 	CleanUp(ctx context.Context) error
 	InvalidateWriter(ctx context.Context, name string, server string) error
@@ -305,12 +306,20 @@ func (d *driverWithContext) Target() url.URL {
 
 func (d *driverWithContext) NewSession(ctx context.Context, config SessionConfig) SessionWithContext {
 	if config.DatabaseName == "" {
-		config.DatabaseName = db.DefaultDatabase
+		config.DatabaseName = idb.DefaultDatabase
 	}
 
+	var reAuthToken *idb.ReAuthToken
 	if config.Auth == nil {
-		config.Auth = &AuthToken{
-			tokens: d.connector.Auth,
+		reAuthToken = &idb.ReAuthToken{
+			// TODO: move Auth field to driverWithContext struct
+			Token:       d.connector.Auth,
+			FromSession: false,
+		}
+	} else {
+		reAuthToken = &idb.ReAuthToken{
+			Token:       config.Auth.tokens,
+			FromSession: false,
 		}
 	}
 
@@ -323,7 +332,7 @@ func (d *driverWithContext) NewSession(ctx context.Context, config SessionConfig
 		return &erroredSessionWithContext{
 			err: &UsageError{Message: "Trying to create session on closed driver"}}
 	}
-	return newSessionWithContext(d.config, config, d.router, d.pool, d.log)
+	return newSessionWithContext(d.config, config, d.router, d.pool, d.log, reAuthToken)
 }
 
 func (d *driverWithContext) VerifyConnectivity(ctx context.Context) error {
