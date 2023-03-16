@@ -73,9 +73,16 @@ func (c Connector) Connect(address string, boltLogger log.BoltLogger) (db.Connec
 		return nil, &ConnectError{inner: err}
 	}
 
-	// TLS not requested, perform Bolt handshake
+	// TLS not requested
 	if c.SkipEncryption {
-		return bolt.Connect(address, conn, c.Auth, c.UserAgent, c.RoutingContext, c.Log, boltLogger)
+		connection, err := bolt.Connect(address, conn, c.Auth, c.UserAgent, c.RoutingContext, c.Log, boltLogger)
+		if err != nil {
+			if connErr := conn.Close(); connErr != nil {
+				c.Log.Warnf(log.Driver, "", "Could not close underlying socket after Bolt handshake error")
+			}
+			return nil, err
+		}
+		return connection, err
 	}
 
 	// TLS requested, continue with handshake
@@ -100,6 +107,12 @@ func (c Connector) Connect(address string, boltLogger log.BoltLogger) (db.Connec
 		conn.Close()
 		return nil, &TlsError{inner: err}
 	}
-	// Perform Bolt handshake
-	return bolt.Connect(address, tlsconn, c.Auth, c.UserAgent, c.RoutingContext, c.Log, boltLogger)
+	connection, err := bolt.Connect(address, tlsconn, c.Auth, c.UserAgent, c.RoutingContext, c.Log, boltLogger)
+	if err != nil {
+		if connErr := conn.Close(); connErr != nil {
+			c.Log.Warnf(log.Driver, "", "Could not close underlying socket after Bolt handshake error")
+		}
+		return nil, err
+	}
+	return connection, nil
 }
