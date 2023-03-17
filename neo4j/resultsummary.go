@@ -206,6 +206,7 @@ type ProfiledPlan interface {
 
 // Notification represents notifications generated when executing a statement.
 // A notification can be visualized in a client pinpointing problems or other information about the statement.
+// Contrary to failures or errors, notifications do not affect the execution of the statement.
 type Notification interface {
 	// Code returns a notification code for the discovered issue of this notification.
 	Code() string
@@ -218,15 +219,23 @@ type Notification interface {
 	Position() InputPosition
 	// Severity returns the severity level of this notification.
 	// Deprecated: Severity will be removed in 6.0.
-	// Please rely on RawSeverity instead.
+	// Please rely on SeverityLevel (or RawSeverityLevel) instead.
 	Severity() string
-	//RawSeverityLevel TODO: docs
+	// RawSeverityLevel returns the unmapped severity level of this notification.
+	// This is useful when the driver cannot interpret the severity level returned by the server
+	// In that case, SeverityLevel returns UnknownSeverity while RawSeverityLevel returns the raw string
 	RawSeverityLevel() string
-	// RawCategory TODO: docs
+	// RawCategory returns the unmapped category of this notification.
+	// This is useful when the driver cannot interpret the category returned by the server
+	// In that case, Category returns UnknownCategory while RawCategory returns the raw string
 	RawCategory() string
-	// SeverityLevel TODO: docs
+	// SeverityLevel returns the mapped security level of this notification.
+	// If the severity level is not a known value, SeverityLevel returns UnknownSeverity
+	// Call RawSeverityLevel to get access to the raw string value
 	SeverityLevel() NotificationSeverity
-	// Category TODO: docs
+	// Category returns the mapped category of this notification.
+	// If the category is not a known value, Category returns UnknownCategory
+	// Call RawCategory to get access to the raw string value
 	Category() NotificationCategory
 }
 
