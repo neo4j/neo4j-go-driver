@@ -34,16 +34,17 @@ import (
 )
 
 type Connector struct {
-	SkipEncryption  bool
-	SkipVerify      bool
-	RootCAs         *x509.CertPool
-	DialTimeout     time.Duration
-	SocketKeepAlive bool
-	Auth            map[string]interface{}
-	Log             log.Logger
-	UserAgent       string
-	RoutingContext  map[string]string
-	Network         string
+	SkipEncryption   bool
+	SkipVerify       bool
+	RootCAs          *x509.CertPool
+	DialTimeout      time.Duration
+	SocketKeepAlive  bool
+	Auth             map[string]interface{}
+	Log              log.Logger
+	UserAgent        string
+	RoutingContext   map[string]string
+	Network          string
+	SupplyConnection func(address string) (net.Conn, error)
 }
 
 type ConnectError struct {
@@ -63,19 +64,24 @@ func (e *TlsError) Error() string {
 }
 
 func (c Connector) Connect(address string, boltLogger log.BoltLogger) (db.Connection, error) {
-	dialer := net.Dialer{Timeout: c.DialTimeout}
-	if !c.SocketKeepAlive {
-		dialer.KeepAlive = -1 * time.Second // Turns keep-alive off
+	if c.SupplyConnection == nil {
+		c.SupplyConnection = c.createConnection
 	}
-
-	conn, err := dialer.Dial(c.Network, address)
+	conn, err := c.SupplyConnection(address)
 	if err != nil {
 		return nil, &ConnectError{inner: err}
 	}
 
-	// TLS not requested, perform Bolt handshake
+	// TLS not requested
 	if c.SkipEncryption {
-		return bolt.Connect(address, conn, c.Auth, c.UserAgent, c.RoutingContext, c.Log, boltLogger)
+		connection, err := bolt.Connect(address, conn, c.Auth, c.UserAgent, c.RoutingContext, c.Log, boltLogger)
+		if err != nil {
+			if connErr := conn.Close(); connErr != nil {
+				c.Log.Warnf(log.Driver, "", "Could not close underlying socket after Bolt handshake error")
+			}
+			return nil, err
+		}
+		return connection, err
 	}
 
 	// TLS requested, continue with handshake
@@ -100,6 +106,20 @@ func (c Connector) Connect(address string, boltLogger log.BoltLogger) (db.Connec
 		conn.Close()
 		return nil, &TlsError{inner: err}
 	}
-	// Perform Bolt handshake
-	return bolt.Connect(address, tlsconn, c.Auth, c.UserAgent, c.RoutingContext, c.Log, boltLogger)
+	connection, err := bolt.Connect(address, tlsconn, c.Auth, c.UserAgent, c.RoutingContext, c.Log, boltLogger)
+	if err != nil {
+		if connErr := conn.Close(); connErr != nil {
+			c.Log.Warnf(log.Driver, "", "Could not close underlying socket after Bolt handshake error")
+		}
+		return nil, err
+	}
+	return connection, nil
+}
+
+func (c Connector) createConnection(address string) (net.Conn, error) {
+	dialer := net.Dialer{Timeout: c.DialTimeout}
+	if !c.SocketKeepAlive {
+		dialer.KeepAlive = -1 * time.Second // Turns keep-alive off
+	}
+	return dialer.Dial(c.Network, address)
 }
