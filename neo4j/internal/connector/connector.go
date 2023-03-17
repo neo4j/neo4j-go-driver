@@ -34,16 +34,17 @@ import (
 )
 
 type Connector struct {
-	SkipEncryption  bool
-	SkipVerify      bool
-	RootCAs         *x509.CertPool
-	DialTimeout     time.Duration
-	SocketKeepAlive bool
-	Auth            map[string]interface{}
-	Log             log.Logger
-	UserAgent       string
-	RoutingContext  map[string]string
-	Network         string
+	SkipEncryption   bool
+	SkipVerify       bool
+	RootCAs          *x509.CertPool
+	DialTimeout      time.Duration
+	SocketKeepAlive  bool
+	Auth             map[string]interface{}
+	Log              log.Logger
+	UserAgent        string
+	RoutingContext   map[string]string
+	Network          string
+	SupplyConnection func(address string) (net.Conn, error)
 }
 
 type ConnectError struct {
@@ -63,12 +64,10 @@ func (e *TlsError) Error() string {
 }
 
 func (c Connector) Connect(address string, boltLogger log.BoltLogger) (db.Connection, error) {
-	dialer := net.Dialer{Timeout: c.DialTimeout}
-	if !c.SocketKeepAlive {
-		dialer.KeepAlive = -1 * time.Second // Turns keep-alive off
+	if c.SupplyConnection == nil {
+		c.SupplyConnection = c.createConnection
 	}
-
-	conn, err := dialer.Dial(c.Network, address)
+	conn, err := c.SupplyConnection(address)
 	if err != nil {
 		return nil, &ConnectError{inner: err}
 	}
@@ -115,4 +114,12 @@ func (c Connector) Connect(address string, boltLogger log.BoltLogger) (db.Connec
 		return nil, err
 	}
 	return connection, nil
+}
+
+func (c Connector) createConnection(address string) (net.Conn, error) {
+	dialer := net.Dialer{Timeout: c.DialTimeout}
+	if !c.SocketKeepAlive {
+		dialer.KeepAlive = -1 * time.Second // Turns keep-alive off
+	}
+	return dialer.Dial(c.Network, address)
 }
