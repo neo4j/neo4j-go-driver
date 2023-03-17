@@ -125,7 +125,7 @@ func (r *Router) readTable(
 	return table, nil
 }
 
-func (r *Router) getOrReadTable(ctx context.Context, bookmarksFn func(context.Context) ([]string, error), database string, boltLogger log.BoltLogger) (*db.RoutingTable, error) {
+func (r *Router) getOrReadTable(ctx context.Context, bookmarksFn func(context.Context) ([]string, error), database string, auth *db.ReAuthToken, boltLogger log.BoltLogger) (*db.RoutingTable, error) {
 	now := r.now()
 
 	if !r.dbRoutersMut.TryLock(ctx) {
@@ -142,7 +142,7 @@ func (r *Router) getOrReadTable(ctx context.Context, bookmarksFn func(context.Co
 	if err != nil {
 		return nil, err
 	}
-	table, err := r.readTable(ctx, dbRouter, bookmarks, database, "", nil, boltLogger)
+	table, err := r.readTable(ctx, dbRouter, bookmarks, database, "", auth, boltLogger)
 	if err != nil {
 		return nil, err
 	}
@@ -152,8 +152,8 @@ func (r *Router) getOrReadTable(ctx context.Context, bookmarksFn func(context.Co
 	return table, nil
 }
 
-func (r *Router) Readers(ctx context.Context, bookmarks func(context.Context) ([]string, error), database string, boltLogger log.BoltLogger) ([]string, error) {
-	table, err := r.getOrReadTable(ctx, bookmarks, database, boltLogger)
+func (r *Router) Readers(ctx context.Context, bookmarks func(context.Context) ([]string, error), database string, auth *db.ReAuthToken, boltLogger log.BoltLogger) ([]string, error) {
+	table, err := r.getOrReadTable(ctx, bookmarks, database, auth, boltLogger)
 	if err != nil {
 		return nil, err
 	}
@@ -170,7 +170,7 @@ func (r *Router) Readers(ctx context.Context, bookmarks func(context.Context) ([
 			return nil, err
 		}
 		r.sleep(100 * time.Millisecond)
-		table, err = r.getOrReadTable(ctx, bookmarks, database, boltLogger)
+		table, err = r.getOrReadTable(ctx, bookmarks, database, auth, boltLogger)
 		if err != nil {
 			return nil, err
 		}
@@ -182,8 +182,8 @@ func (r *Router) Readers(ctx context.Context, bookmarks func(context.Context) ([
 	return table.Readers, nil
 }
 
-func (r *Router) Writers(ctx context.Context, bookmarks func(context.Context) ([]string, error), database string, boltLogger log.BoltLogger) ([]string, error) {
-	table, err := r.getOrReadTable(ctx, bookmarks, database, boltLogger)
+func (r *Router) Writers(ctx context.Context, bookmarks func(context.Context) ([]string, error), database string, auth *db.ReAuthToken, boltLogger log.BoltLogger) ([]string, error) {
+	table, err := r.getOrReadTable(ctx, bookmarks, database, auth, boltLogger)
 	if err != nil {
 		return nil, err
 	}
@@ -200,7 +200,7 @@ func (r *Router) Writers(ctx context.Context, bookmarks func(context.Context) ([
 			return nil, err
 		}
 		r.sleep(100 * time.Millisecond)
-		table, err = r.getOrReadTable(ctx, bookmarks, database, boltLogger)
+		table, err = r.getOrReadTable(ctx, bookmarks, database, auth, boltLogger)
 		if err != nil {
 			return nil, err
 		}

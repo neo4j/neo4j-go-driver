@@ -461,9 +461,9 @@ func (s *sessionWithContext) executeTransactionFunction(
 
 func (s *sessionWithContext) getServers(ctx context.Context, mode idb.AccessMode) ([]string, error) {
 	if mode == idb.ReadMode {
-		return s.router.Readers(ctx, s.getBookmarks, s.databaseName, s.boltLogger)
+		return s.router.Readers(ctx, s.getBookmarks, s.databaseName, s.auth, s.boltLogger)
 	} else {
-		return s.router.Writers(ctx, s.getBookmarks, s.databaseName, s.boltLogger)
+		return s.router.Writers(ctx, s.getBookmarks, s.databaseName, s.auth, s.boltLogger)
 	}
 }
 

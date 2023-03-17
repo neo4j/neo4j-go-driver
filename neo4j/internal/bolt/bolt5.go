@@ -201,9 +201,12 @@ func (b *bolt5) Connect(ctx context.Context, minor int, auth *idb.ReAuthToken, u
 		return err
 	}
 
+	b.minor = minor
+
 	if err := checkReAuth(auth, b); err != nil {
 		return err
 	}
+	b.auth = auth.Token
 
 	hello := map[string]any{
 		"user_agent": userAgent,
@@ -235,7 +238,6 @@ func (b *bolt5) Connect(ctx context.Context, minor int, auth *idb.ReAuthToken, u
 	}
 
 	b.state = bolt5Ready
-	b.minor = minor
 	b.streams.reset()
 	b.log.Infof(log.Bolt5, b.logId, "Connected")
 	return nil
@@ -785,12 +787,13 @@ func (b *bolt5) ReAuth(ctx context.Context, auth *idb.ReAuthToken) error {
 	if err := checkReAuth(auth, b); err != nil {
 		return err
 	}
-	if !reflect.DeepEqual(b.auth, auth) {
+	if !reflect.DeepEqual(b.auth, auth.Token) {
 		b.queue.appendLogoff(b.logoffResponseHandler())
 		b.queue.appendLogon(auth.Token, b.logonResponseHandler())
 		if b.queue.send(ctx); b.err != nil {
 			return b.err
 		}
+		b.auth = auth.Token
 	}
 	return nil
 }

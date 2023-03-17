@@ -149,10 +149,12 @@ func wrapError(err error) error {
 		return &ConnectivityError{inner: err}
 	}
 	switch e := err.(type) {
-	case *db.UnsupportedTypeError, *db.FeatureNotSupportedError:
+	case *db.UnsupportedTypeError:
 		// Usage of a type not supported by database network protocol or feature
 		// not supported by current version or edition.
 		return &UsageError{Message: err.Error()}
+	case *db.FeatureNotSupportedError:
+		return &UsageError{Message: fmt.Sprintf("feature not supported: %s", err.Error())}
 	case *pool.PoolClosed:
 		return &UsageError{Message: err.Error()}
 	case *connector.TlsError, net.Error:

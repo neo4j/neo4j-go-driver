@@ -178,6 +178,8 @@ func (b *bolt3) Connect(ctx context.Context, minor int, auth *idb.ReAuthToken, u
 		return err
 	}
 
+	b.minor = minor
+
 	if err := checkReAuth(auth, b); err != nil {
 		return err
 	}
@@ -214,7 +216,6 @@ func (b *bolt3) Connect(ctx context.Context, minor int, auth *idb.ReAuthToken, u
 
 	// Transition into ready state
 	b.state = bolt3_ready
-	b.minor = minor
 	b.log.Infof(log.Bolt3, b.logId, "Connected")
 	return nil
 }

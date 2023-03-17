@@ -38,9 +38,10 @@ func (e *ReadRoutingTableError) Error() string {
 }
 
 func wrapError(server string, err error) error {
-	// Preserve error originating from the database, wrap other errors
-	_, isNeo4jErr := err.(*db.Neo4jError)
-	if isNeo4jErr {
+	if _, is := err.(*db.Neo4jError); is {
+		return err
+	}
+	if _, is := err.(*db.FeatureNotSupportedError); is {
 		return err
 	}
 	return &ReadRoutingTableError{server: server, err: err}

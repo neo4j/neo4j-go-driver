@@ -230,10 +230,20 @@ func (p *Pool) Borrow(ctx context.Context, serverNames []string, wait bool, bolt
 			return conn, nil
 		}
 
+		alive := false
+		if conn != nil {
+			alive = conn.IsAlive()
+			_ = p.unreg(ctx, s.name, conn, p.now())
+		}
+
 		if bolt.IsTimeoutError(err) {
 			p.log.Warnf(log.Pool, p.logId, "Borrow time-out")
 			return nil, &PoolTimeout{servers: serverNames, err: err}
 		}
+		if alive {
+			return nil, err
+		}
+
 	}
 
 	anyConnection, anyConnectionErr := p.anyExistingConnectionsOnServers(ctx, serverNames)
@@ -320,7 +330,7 @@ func (p *Pool) tryBorrow(ctx context.Context, serverName string, boltLogger log.
 			if connection != nil {
 				connection.SetBoltLogger(boltLogger)
 				if err := connection.ReAuth(ctx, auth); err != nil {
-					return nil, err
+					return connection, err
 				}
 				return connection, nil
 			}
@@ -360,6 +370,10 @@ func (p *Pool) unreg(ctx context.Context, serverName string, c db.Connection, no
 	}
 	defer p.serversMut.Unlock()
 
+	return p.unregUnlocked(ctx, serverName, c, now)
+}
+
+func (p *Pool) unregUnlocked(ctx context.Context, serverName string, c db.Connection, now time.Time) error {
 	defer func() {
 		// Close connection in another thread to avoid potential long blocking operation during close.
 		go c.Close(ctx)

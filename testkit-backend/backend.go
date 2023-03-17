@@ -402,35 +402,10 @@ func (b *backend) handleRequest(req map[string]any) {
 		b.consumedBookmarks[requestId] = struct{}{}
 
 	case "NewDriver":
-		// Parse authorization token
-		var authToken neo4j.AuthToken
-		authTokenMap := data["authorizationToken"].(map[string]any)["data"].(map[string]any)
-		switch authTokenMap["scheme"] {
-		case "basic":
-			realm, ok := authTokenMap["realm"].(string)
-			if !ok {
-				realm = ""
-			}
-			authToken = neo4j.BasicAuth(
-				authTokenMap["principal"].(string),
-				authTokenMap["credentials"].(string),
-				realm)
-		case "kerberos":
-			authToken = neo4j.KerberosAuth(authTokenMap["credentials"].(string))
-		case "bearer":
-			authToken = neo4j.BearerAuth(authTokenMap["credentials"].(string))
-		default:
-			parameters := authTokenMap["parameters"].(map[string]any)
-			if err := patchNumbersInMap(parameters); err != nil {
-				b.writeError(err)
-				return
-			}
-			authToken = neo4j.CustomAuth(
-				authTokenMap["scheme"].(string),
-				authTokenMap["principal"].(string),
-				authTokenMap["credentials"].(string),
-				authTokenMap["realm"].(string),
-				parameters)
+		authToken, err := getAuth(data["authorizationToken"].(map[string]any)["data"].(map[string]any))
+		if err != nil {
+			b.writeError(err)
+			return
 		}
 		// Parse URI (or rather type cast)
 		uri := data["uri"].(string)
@@ -592,6 +567,14 @@ func (b *backend) handleRequest(req map[string]any) {
 				return
 			}
 			sessionConfig.BookmarkManager = bookmarkManager
+		}
+		if data["authorizationToken"] != nil {
+			authToken, err := getAuth(data["authorizationToken"].(map[string]any)["data"].(map[string]any))
+			if err != nil {
+				b.writeError(err)
+				return
+			}
+			sessionConfig.Auth = &authToken
 		}
 		session := driver.NewSession(ctx, sessionConfig)
 		idKey := b.nextId()
@@ -821,6 +804,7 @@ func (b *backend) handleRequest(req map[string]any) {
 				"Feature:API:Liveness.Check",
 				"Feature:API:Result.List",
 				"Feature:API:Result.Peek",
+				"Feature:API:Session:AuthConfig",
 				"Feature:API:Type.Spatial",
 				"Feature:API:Type.Temporal",
 				"Feature:Auth:Custom",
@@ -872,6 +856,37 @@ func (b *backend) handleRequest(req map[string]any) {
 	default:
 		b.writeError(errors.New("Unknown request: " + name))
 	}
+}
+
+func getAuth(authTokenMap map[string]any) (neo4j.AuthToken, error) {
+	var authToken neo4j.AuthToken
+	switch authTokenMap["scheme"] {
+	case "basic":
+		realm, ok := authTokenMap["realm"].(string)
+		if !ok {
+			realm = ""
+		}
+		authToken = neo4j.BasicAuth(
+			authTokenMap["principal"].(string),
+			authTokenMap["credentials"].(string),
+			realm)
+	case "kerberos":
+		authToken = neo4j.KerberosAuth(authTokenMap["credentials"].(string))
+	case "bearer":
+		authToken = neo4j.BearerAuth(authTokenMap["credentials"].(string))
+	default:
+		parameters := authTokenMap["parameters"].(map[string]any)
+		if err := patchNumbersInMap(parameters); err != nil {
+			return neo4j.AuthToken{}, err
+		}
+		authToken = neo4j.CustomAuth(
+			authTokenMap["scheme"].(string),
+			authTokenMap["principal"].(string),
+			authTokenMap["credentials"].(string),
+			authTokenMap["realm"].(string),
+			parameters)
+	}
+	return authToken, nil
 }
 
 func (b *backend) writeRecord(result neo4j.ResultWithContext, record *neo4j.Record, expectRecord bool) {
