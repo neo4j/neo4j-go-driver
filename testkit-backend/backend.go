@@ -25,6 +25,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/notifications"
 	"io"
 	"math"
 	"net/url"
@@ -460,6 +461,18 @@ func (b *backend) handleRequest(req map[string]any) {
 			if data["connectionTimeoutMs"] != nil {
 				c.SocketConnectTimeout = time.Millisecond * time.Duration(asInt64(data["connectionTimeoutMs"].(json.Number)))
 			}
+			if data["notificationsMinSeverity"] != nil {
+				c.NotificationsMinSeverity = notifications.NotificationMinimumSeverityLevel(data["notificationsMinSeverity"].(string))
+			}
+			if data["notificationsDisabledCategories"] != nil {
+				notiDisCats := data["notificationsDisabledCategories"].([]any)
+				if len(notiDisCats) == 0 {
+					c.NotificationsDisabledCategories = notifications.DisableNoCategories()
+				} else {
+					cats := convertSlice(notiDisCats, anyToNotificationCategory)
+					c.NotificationsDisabledCategories = notifications.DisableCategories(cats...)
+				}
+			}
 		})
 		if err != nil {
 			b.writeError(err)
@@ -592,6 +605,19 @@ func (b *backend) handleRequest(req map[string]any) {
 				return
 			}
 			sessionConfig.BookmarkManager = bookmarkManager
+		}
+
+		if data["notificationsMinSeverity"] != nil {
+			sessionConfig.NotificationsMinSeverity = notifications.NotificationMinimumSeverityLevel(data["notificationsMinSeverity"].(string))
+		}
+		if data["notificationsDisabledCategories"] != nil {
+			notiDisCats := data["notificationsDisabledCategories"].([]any)
+			if len(notiDisCats) == 0 {
+				sessionConfig.NotificationsDisabledCategories = notifications.DisableNoCategories()
+			} else {
+				cats := convertSlice(notiDisCats, anyToNotificationCategory)
+				sessionConfig.NotificationsDisabledCategories = notifications.DisableCategories(cats...)
+			}
 		}
 		session := driver.NewSession(ctx, sessionConfig)
 		idKey := b.nextId()
@@ -817,10 +843,12 @@ func (b *backend) handleRequest(req map[string]any) {
 				"Feature:API:Driver.ExecuteQuery",
 				"Feature:API:Driver:GetServerInfo",
 				"Feature:API:Driver.IsEncrypted",
+				"Feature:API:Driver:NotificationsConfig",
 				"Feature:API:Driver.VerifyConnectivity",
 				"Feature:API:Liveness.Check",
 				"Feature:API:Result.List",
 				"Feature:API:Result.Peek",
+				"Feature:API:Session:NotificationsConfig",
 				"Feature:API:Type.Spatial",
 				"Feature:API:Type.Temporal",
 				"Feature:Auth:Custom",
@@ -833,6 +861,7 @@ func (b *backend) handleRequest(req map[string]any) {
 				"Feature:Bolt:4.4",
 				"Feature:Bolt:5.0",
 				"Feature:Bolt:5.1",
+				"Feature:Bolt:5.2",
 				"Feature:Bolt:Patch:UTC",
 				"Feature:Impersonation",
 				"Feature:TLS:1.2",
@@ -966,10 +995,14 @@ func serializeNotifications(slice []neo4j.Notification) []map[string]any {
 	var res []map[string]any
 	for i, notification := range slice {
 		res = append(res, map[string]any{
-			"code":        notification.Code(),
-			"title":       notification.Title(),
-			"description": notification.Description(),
-			"severity":    notification.Severity(),
+			"code":             notification.Code(),
+			"title":            notification.Title(),
+			"description":      notification.Description(),
+			"severity":         notification.Severity(),
+			"severityLevel":    string(notification.SeverityLevel()),
+			"rawSeverityLevel": notification.RawSeverityLevel(),
+			"category":         string(notification.Category()),
+			"rawCategory":      notification.RawCategory(),
 		})
 		if notification.Position() != nil {
 			res[i]["position"] = map[string]any{
@@ -1018,15 +1051,23 @@ func serializeSummary(summary neo4j.ResultSummary) map[string]any {
 	}
 	if summary.ResultAvailableAfter() >= 0 {
 		response["resultAvailableAfter"] = summary.ResultAvailableAfter().Milliseconds()
+	} else {
+		response["resultAvailableAfter"] = nil
 	}
 	if summary.ResultConsumedAfter() >= 0 {
 		response["resultConsumedAfter"] = summary.ResultConsumedAfter().Milliseconds()
+	} else {
+		response["resultConsumedAfter"] = nil
 	}
 	if summary.StatementType() != neo4j.StatementTypeUnknown {
 		response["queryType"] = summary.StatementType().String()
+	} else {
+		response["queryType"] = nil
 	}
 	if summary.Database() != nil {
 		response["database"] = summary.Database().Name()
+	} else {
+		response["database"] = nil
 	}
 	return response
 }
@@ -1229,4 +1270,16 @@ func convertInitialBookmarks(bookmarks []any) neo4j.Bookmarks {
 		result[i] = bookmark.(string)
 	}
 	return result
+}
+
+func anyToNotificationCategory(v any) notifications.NotificationCategory {
+	return notifications.NotificationCategory(v.(string))
+}
+
+func convertSlice[T any](slice []any, transform func(any) T) []T {
+	res := make([]T, len(slice))
+	for i, cat := range slice {
+		res[i] = transform(cat)
+	}
+	return res
 }

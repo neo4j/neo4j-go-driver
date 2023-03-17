@@ -21,7 +21,9 @@ package bolt
 
 import (
 	"context"
+	"fmt"
 	idb "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/notifications"
 	"io"
 	"sync"
 	"testing"
@@ -100,7 +102,17 @@ func TestBolt3(outer *testing.T) {
 		tcpConn, srv, cleanup := setupBolt3Pipe(t)
 		go serverJob(srv)
 
-		c, err := Connect(context.Background(), "serverName", tcpConn, auth, "007", nil, logger, nil)
+		c, err := Connect(
+			context.Background(),
+			"serverName",
+			tcpConn,
+			auth,
+			"007",
+			nil,
+			logger,
+			nil,
+			idb.NotificationConfig{},
+		)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -141,7 +153,17 @@ func TestBolt3(outer *testing.T) {
 			srv.waitForHello()
 			srv.rejectHelloUnauthorized()
 		}()
-		bolt, err := Connect(context.Background(), "serverName", conn, auth, "007", nil, logger, nil)
+		bolt, err := Connect(
+			context.Background(),
+			"serverName",
+			conn,
+			auth,
+			"007",
+			nil,
+			logger,
+			nil,
+			idb.NotificationConfig{},
+		)
 		AssertNil(t, bolt)
 		AssertError(t, err)
 		dbErr := err.(*db.Neo4jError)
@@ -167,6 +189,96 @@ func TestBolt3(outer *testing.T) {
 		// Retrieve the records
 		assertRunResponseOk(t, bolt, str)
 		assertBoltState(t, bolt3_ready, bolt)
+	})
+
+	outer.Run("notifications unsupported", func(inner *testing.T) {
+		type testCase struct {
+			description string
+			MinSev      notifications.NotificationMinimumSeverityLevel
+			DisCats     notifications.NotificationDisabledCategories
+			ExpectError bool
+			Method      string
+		}
+		var testCases []testCase
+		for _, s := range []string{"run", "txRun"} {
+			testCases = append(testCases,
+				testCase{
+					description: "default",
+					Method:      s,
+				},
+				testCase{
+					description: "warning minimum severity",
+					MinSev:      notifications.WarningLevel,
+					ExpectError: true,
+					Method:      s,
+				},
+				testCase{
+					description: "disabled categories",
+					DisCats:     notifications.DisableCategories(notifications.Unsupported, notifications.Generic),
+					ExpectError: true,
+					Method:      s,
+				},
+				testCase{
+					description: "warning minimum severity and disabled categories",
+					MinSev:      notifications.WarningLevel,
+					DisCats:     notifications.DisableCategories(notifications.Unsupported, notifications.Generic),
+					ExpectError: true,
+					Method:      s,
+				},
+				testCase{
+					description: "disable no categories",
+					DisCats:     notifications.DisableNoCategories(),
+					ExpectError: true,
+					Method:      s,
+				})
+		}
+		inner.Parallel()
+		for _, test := range testCases {
+			inner.Run(fmt.Sprintf("%s for %s", test.description, test.Method), func(t *testing.T) {
+				bolt, cleanup := connectToServer(t, func(srv *bolt3server) {
+					srv.accept(3)
+					if !test.ExpectError {
+						if test.Method == "run" {
+							srv.waitForRun()
+						} else {
+							srv.waitForTxBegin()
+						}
+						srv.sendFailureMsg("Neo.ClientError.Statement.SyntaxError", "Syntax error")
+					}
+				})
+				defer cleanup()
+				defer bolt.Close(context.Background())
+
+				var err error
+				if test.Method == "run" {
+					_, err = bolt.Run(
+						context.Background(),
+						idb.Command{Cypher: "cypher"},
+						idb.TxConfig{
+							NotificationConfig: idb.NotificationConfig{
+								MinSev:  test.MinSev,
+								DisCats: test.DisCats,
+							},
+						},
+					)
+				} else {
+					_, err = bolt.TxBegin(
+						context.Background(),
+						idb.TxConfig{
+							NotificationConfig: idb.NotificationConfig{
+								MinSev:  test.MinSev,
+								DisCats: test.DisCats,
+							},
+						},
+					)
+				}
+				if test.ExpectError {
+					AssertErrorMessageContains(t, err, "does not support: notification filtering")
+				} else {
+					AssertErrorMessageContains(t, err, "SyntaxError")
+				}
+			})
+		}
 	})
 
 	outer.Run("Run transactional commit", func(t *testing.T) {

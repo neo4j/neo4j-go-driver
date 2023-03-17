@@ -959,6 +959,7 @@ func parseNotification(m map[string]any) db.Notification {
 	n.Code, _ = m["code"].(string)
 	n.Description = m["description"].(string)
 	n.Severity, _ = m["severity"].(string)
+	n.Category, _ = m["category"].(string)
 	n.Title, _ = m["title"].(string)
 	posx, exists := m["position"].(map[string]any)
 	if exists {

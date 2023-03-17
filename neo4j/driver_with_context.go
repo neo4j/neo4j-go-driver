@@ -192,19 +192,13 @@ func NewDriverWithContext(target string, auth AuthToken, configurers ...func(*Co
 		return nil, err
 	}
 
-	// Continue to setup connector
-	d.connector.DialTimeout = d.config.SocketConnectTimeout
-	d.connector.SocketKeepAlive = d.config.SocketKeepalive
-	d.connector.UserAgent = d.config.UserAgent
-	//lint:ignore SA1019 RootCAs is still supported until 6.0
-	d.connector.RootCAs = d.config.RootCAs
-	d.connector.TlsConfig = d.config.TlsConfig
 	d.connector.Log = d.log
 	d.connector.Auth = auth.tokens
 	d.connector.RoutingContext = routingContext
+	d.connector.Config = d.config
 
 	// Let the pool use the same log ID as the driver to simplify log reading.
-	d.pool = pool.New(d.config.MaxConnectionPoolSize, d.config.MaxConnectionLifetime, d.connector.Connect, d.log, d.logId)
+	d.pool = pool.New(d.config, d.connector.Connect, d.log, d.logId)
 
 	if !routing {
 		d.router = &directRouter{address: address}

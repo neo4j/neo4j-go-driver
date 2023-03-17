@@ -26,6 +26,7 @@ import (
 	idb "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/errorutil"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/pool"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/notifications"
 	"math"
 	"time"
 
@@ -153,6 +154,14 @@ type SessionConfig struct {
 	// Since 5.0
 	// default: nil (no-op)
 	BookmarkManager BookmarkManager
+	// NotificationsMinSeverity defines the minimum severity level of notifications the server should send.
+	// By default, the driver's settings are used.
+	// Else, this option overrides the driver's settings.
+	NotificationsMinSeverity notifications.NotificationMinimumSeverityLevel
+	// NotificationsDisabledCategories defines the categories of notifications the server should not send.
+	// By default, the driver's settings are used.
+	// Else, this option overrides the driver's settings.
+	NotificationsDisabledCategories notifications.NotificationDisabledCategories
 }
 
 // FetchAll turns off fetching records in batches.
@@ -169,23 +178,21 @@ type sessionPool interface {
 }
 
 type sessionWithContext struct {
-	config           *Config
-	defaultMode      idb.AccessMode
-	bookmarks        *sessionBookmarks
-	databaseName     string
-	impersonatedUser string
-	resolveHomeDb    bool
-	pool             sessionPool
-	router           sessionRouter
-	explicitTx       *explicitTransaction
-	autocommitTx     *autocommitTransaction
-	sleep            func(d time.Duration)
-	now              func() time.Time
-	logId            string
-	log              log.Logger
-	throttleTime     time.Duration
-	fetchSize        int
-	boltLogger       log.BoltLogger
+	driverConfig  *Config
+	defaultMode   idb.AccessMode
+	bookmarks     *sessionBookmarks
+	resolveHomeDb bool
+	pool          sessionPool
+	router        sessionRouter
+	explicitTx    *explicitTransaction
+	autocommitTx  *autocommitTransaction
+	sleep         func(d time.Duration)
+	now           func() time.Time
+	logId         string
+	log           log.Logger
+	throttleTime  time.Duration
+	fetchSize     int
+	config        SessionConfig
 }
 
 func newSessionWithContext(config *Config, sessConfig SessionConfig, router sessionRouter, pool sessionPool, logger log.Logger) *sessionWithContext {
@@ -198,21 +205,19 @@ func newSessionWithContext(config *Config, sessConfig SessionConfig, router sess
 	}
 
 	return &sessionWithContext{
-		config:           config,
-		router:           router,
-		pool:             pool,
-		defaultMode:      idb.AccessMode(sessConfig.AccessMode),
-		bookmarks:        newSessionBookmarks(sessConfig.BookmarkManager, sessConfig.Bookmarks),
-		databaseName:     sessConfig.DatabaseName,
-		impersonatedUser: sessConfig.ImpersonatedUser,
-		resolveHomeDb:    sessConfig.DatabaseName == "",
-		sleep:            time.Sleep,
-		now:              time.Now,
-		log:              logger,
-		logId:            logId,
-		throttleTime:     time.Second * 1,
-		fetchSize:        fetchSize,
-		boltLogger:       sessConfig.BoltLogger,
+		driverConfig:  config,
+		router:        router,
+		pool:          pool,
+		defaultMode:   idb.AccessMode(sessConfig.AccessMode),
+		bookmarks:     newSessionBookmarks(sessConfig.BookmarkManager, sessConfig.Bookmarks),
+		config:        sessConfig,
+		resolveHomeDb: sessConfig.DatabaseName == "",
+		sleep:         time.Sleep,
+		now:           time.Now,
+		log:           logger,
+		logId:         logId,
+		throttleTime:  time.Second * 1,
+		fetchSize:     fetchSize,
 	}
 }
 
@@ -280,7 +285,7 @@ func (s *sessionWithContext) BeginTransaction(ctx context.Context, configurers .
 	// Begin transaction
 	beginBookmarks, err := s.getBookmarks(ctx)
 	if err != nil {
-		s.pool.Return(ctx, conn)
+		_ = s.pool.Return(ctx, conn)
 		return nil, wrapError(err)
 	}
 	txHandle, err := conn.TxBegin(ctx,
@@ -289,10 +294,14 @@ func (s *sessionWithContext) BeginTransaction(ctx context.Context, configurers .
 			Bookmarks:        beginBookmarks,
 			Timeout:          config.Timeout,
 			Meta:             config.Metadata,
-			ImpersonatedUser: s.impersonatedUser,
+			ImpersonatedUser: s.config.ImpersonatedUser,
+			NotificationConfig: idb.NotificationConfig{
+				MinSev:  s.config.NotificationsMinSeverity,
+				DisCats: s.config.NotificationsDisabledCategories,
+			},
 		})
 	if err != nil {
-		s.pool.Return(ctx, conn)
+		_ = s.pool.Return(ctx, conn)
 		return nil, wrapError(err)
 	}
 
@@ -349,23 +358,23 @@ func (s *sessionWithContext) runRetriable(
 	}
 
 	state := retry.State{
-		MaxTransactionRetryTime: s.config.MaxTransactionRetryTime,
+		MaxTransactionRetryTime: s.driverConfig.MaxTransactionRetryTime,
 		Log:                     s.log,
 		LogName:                 log.Session,
 		LogId:                   s.logId,
 		Now:                     s.now,
 		Sleep:                   s.sleep,
 		Throttle:                retry.Throttler(s.throttleTime),
-		MaxDeadConnections:      s.config.MaxConnectionPoolSize,
+		MaxDeadConnections:      s.driverConfig.MaxConnectionPoolSize,
 		Router:                  s.router,
-		DatabaseName:            s.databaseName,
+		DatabaseName:            s.config.DatabaseName,
 		OnDeadConnection: func(server string) error {
 			if mode == idb.WriteMode {
-				if err := s.router.InvalidateWriter(ctx, s.databaseName, server); err != nil {
+				if err := s.router.InvalidateWriter(ctx, s.config.DatabaseName, server); err != nil {
 					return err
 				}
 			} else {
-				if err := s.router.InvalidateReader(ctx, s.databaseName, server); err != nil {
+				if err := s.router.InvalidateReader(ctx, s.config.DatabaseName, server); err != nil {
 					return err
 				}
 			}
@@ -410,7 +419,9 @@ func (s *sessionWithContext) executeTransactionFunction(
 	}
 
 	// handle transaction function panic as well
-	defer s.pool.Return(ctx, conn)
+	defer func() {
+		_ = s.pool.Return(ctx, conn)
+	}()
 
 	beginBookmarks, err := s.getBookmarks(ctx)
 	if err != nil {
@@ -423,7 +434,11 @@ func (s *sessionWithContext) executeTransactionFunction(
 			Bookmarks:        beginBookmarks,
 			Timeout:          config.Timeout,
 			Meta:             config.Metadata,
-			ImpersonatedUser: s.impersonatedUser,
+			ImpersonatedUser: s.config.ImpersonatedUser,
+			NotificationConfig: idb.NotificationConfig{
+				MinSev:  s.config.NotificationsMinSeverity,
+				DisCats: s.config.NotificationsDisabledCategories,
+			},
 		})
 	if err != nil {
 		state.OnFailure(ctx, conn, err, false)
@@ -457,21 +472,21 @@ func (s *sessionWithContext) executeTransactionFunction(
 
 func (s *sessionWithContext) getServers(ctx context.Context, mode idb.AccessMode) ([]string, error) {
 	if mode == idb.ReadMode {
-		return s.router.Readers(ctx, s.getBookmarks, s.databaseName, s.boltLogger)
+		return s.router.Readers(ctx, s.getBookmarks, s.config.DatabaseName, s.config.BoltLogger)
 	} else {
-		return s.router.Writers(ctx, s.getBookmarks, s.databaseName, s.boltLogger)
+		return s.router.Writers(ctx, s.getBookmarks, s.config.DatabaseName, s.config.BoltLogger)
 	}
 }
 
 func (s *sessionWithContext) getConnection(ctx context.Context, mode idb.AccessMode, livenessCheckThreshold time.Duration) (idb.Connection, error) {
-	if s.config.ConnectionAcquisitionTimeout > 0 {
+	if s.driverConfig.ConnectionAcquisitionTimeout > 0 {
 		var cancel context.CancelFunc
-		ctx, cancel = context.WithTimeout(ctx, s.config.ConnectionAcquisitionTimeout)
+		ctx, cancel = context.WithTimeout(ctx, s.driverConfig.ConnectionAcquisitionTimeout)
 		if cancel != nil {
 			defer cancel()
 		}
 		s.log.Debugf(log.Session, s.logId, "connection acquisition timeout is: %s",
-			s.config.ConnectionAcquisitionTimeout.String())
+			s.driverConfig.ConnectionAcquisitionTimeout.String())
 		if deadline, ok := ctx.Deadline(); ok {
 			s.log.Debugf(log.Session, s.logId, "connection acquisition resolved deadline is: %s",
 				deadline.String())
@@ -486,19 +501,19 @@ func (s *sessionWithContext) getConnection(ctx context.Context, mode idb.AccessM
 		return nil, wrapError(err)
 	}
 
-	conn, err := s.pool.Borrow(ctx, servers, s.config.ConnectionAcquisitionTimeout != 0, s.boltLogger, livenessCheckThreshold)
+	conn, err := s.pool.Borrow(ctx, servers, s.driverConfig.ConnectionAcquisitionTimeout != 0, s.config.BoltLogger, livenessCheckThreshold)
 	if err != nil {
 		return nil, wrapError(err)
 	}
 
 	// Select database on server
-	if s.databaseName != idb.DefaultDatabase {
+	if s.config.DatabaseName != idb.DefaultDatabase {
 		dbSelector, ok := conn.(idb.DatabaseSelector)
 		if !ok {
 			s.pool.Return(ctx, conn)
 			return nil, &UsageError{Message: "Database does not support multi-database"}
 		}
-		dbSelector.SelectDatabase(s.databaseName)
+		dbSelector.SelectDatabase(s.config.DatabaseName)
 	}
 
 	return conn, nil
@@ -546,7 +561,7 @@ func (s *sessionWithContext) Run(ctx context.Context,
 
 	runBookmarks, err := s.getBookmarks(ctx)
 	if err != nil {
-		s.pool.Return(ctx, conn)
+		_ = s.pool.Return(ctx, conn)
 		return nil, wrapError(err)
 	}
 	stream, err := conn.Run(
@@ -561,10 +576,15 @@ func (s *sessionWithContext) Run(ctx context.Context,
 			Bookmarks:        runBookmarks,
 			Timeout:          config.Timeout,
 			Meta:             config.Metadata,
-			ImpersonatedUser: s.impersonatedUser,
-		})
+			ImpersonatedUser: s.config.ImpersonatedUser,
+			NotificationConfig: idb.NotificationConfig{
+				MinSev:  s.config.NotificationsMinSeverity,
+				DisCats: s.config.NotificationsDisabledCategories,
+			},
+		},
+	)
 	if err != nil {
-		s.pool.Return(ctx, conn)
+		_ = s.pool.Return(ctx, conn)
 		return nil, wrapError(err)
 	}
 
@@ -577,7 +597,7 @@ func (s *sessionWithContext) Run(ctx context.Context,
 			}
 		}),
 		onClosed: func() {
-			s.pool.Return(ctx, conn)
+			_ = s.pool.Return(ctx, conn)
 			s.autocommitTx = nil
 		},
 	}
@@ -619,7 +639,7 @@ func (s *sessionWithContext) getServerInfo(ctx context.Context) (ServerInfo, err
 	if err != nil {
 		return nil, wrapError(err)
 	}
-	conn, err := s.pool.Borrow(ctx, servers, s.config.ConnectionAcquisitionTimeout != 0, s.boltLogger, 0)
+	conn, err := s.pool.Borrow(ctx, servers, s.driverConfig.ConnectionAcquisitionTimeout != 0, s.config.BoltLogger, 0)
 	if err != nil {
 		return nil, wrapError(err)
 	}
@@ -640,12 +660,12 @@ func (s *sessionWithContext) resolveHomeDatabase(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	defaultDb, err := s.router.GetNameOfDefaultDatabase(ctx, bookmarks, s.impersonatedUser, s.boltLogger)
+	defaultDb, err := s.router.GetNameOfDefaultDatabase(ctx, bookmarks, s.config.ImpersonatedUser, s.config.BoltLogger)
 	if err != nil {
 		return err
 	}
 	s.log.Debugf(log.Session, s.logId, "Resolved home database, uses db '%s'", defaultDb)
-	s.databaseName = defaultDb
+	s.config.DatabaseName = defaultDb
 	s.resolveHomeDb = false
 	return nil
 }

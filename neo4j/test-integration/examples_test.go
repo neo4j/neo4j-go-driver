@@ -335,7 +335,7 @@ func TestExamples(outer *testing.T) {
 			// Serializing
 			_ = fieldCartesian.String() // Point{srId=9157, x=2.500000, y=-2.000000, z=2.000000}
 
-			// Acessing members
+			// Accessing members
 			print(fieldCartesian.X)            // 2.500000
 			print(fieldCartesian.Y)            // -2.000000
 			print(fieldCartesian.Z)            // 2.000000
@@ -348,7 +348,7 @@ func TestExamples(outer *testing.T) {
 			// Serializing
 			_ = fieldWgs84.String() // Point{srId=4979, x=-1.500000, y=1.00000, z=3.000000}
 
-			// Acessing members
+			// Accessing members
 			print(fieldWgs84.X)            // -1.500000
 			print(fieldWgs84.Y)            // 1.000000
 			print(fieldWgs84.Z)            // 3.000000

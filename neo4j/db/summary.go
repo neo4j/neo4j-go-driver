@@ -92,20 +92,13 @@ type ProfiledPlan struct {
 	Time              int64
 }
 
-// Notification represents notifications generated when executing a statement.
-// A notification can be visualized in a client pinpointing problems or other information about the statement.
 type Notification struct {
-	// Code contains a notification code for the discovered issue of this notification.
-	Code string
-	// Title contains a short summary of this notification.
-	Title string
-	// Description contains a longer description of this notification.
+	Code        string
+	Title       string
 	Description string
-	// Position contains the position in the statement where this notification points to.
-	// Not all notifications have a unique position to point to and in that case the position would be set to nil.
-	Position *InputPosition
-	// Severity contains the severity level of this notification.
-	Severity string
+	Position    *InputPosition
+	Severity    string
+	Category    string
 }
 
 // InputPosition contains information about a specific position in a statement

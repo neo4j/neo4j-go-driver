@@ -73,7 +73,14 @@ type ConnFake struct {
 	ForceResetHook     func()
 }
 
-func (c *ConnFake) Connect(context.Context, int, map[string]any, string, map[string]string) error {
+func (c *ConnFake) Connect(
+	context.Context,
+	int,
+	map[string]any,
+	string,
+	map[string]string,
+	idb.NotificationConfig,
+) error {
 	return nil
 }
 
