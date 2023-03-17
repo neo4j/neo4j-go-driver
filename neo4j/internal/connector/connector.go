@@ -38,24 +38,23 @@ type Connector struct {
 	SkipEncryption bool
 	SkipVerify     bool
 	// Deprecated: RootCAs will be removed in 6.0. Configure TlsConfig directly instead.
-	RootCAs         *x509.CertPool
-	DialTimeout     time.Duration
-	SocketKeepAlive bool
-	Auth            map[string]any
-	Log             log.Logger
-	UserAgent       string
-	RoutingContext  map[string]string
-	Network         string
-	TlsConfig       *tls.Config
+	RootCAs          *x509.CertPool
+	DialTimeout      time.Duration
+	SocketKeepAlive  bool
+	Auth             map[string]any
+	Log              log.Logger
+	UserAgent        string
+	RoutingContext   map[string]string
+	Network          string
+	TlsConfig        *tls.Config
+	SupplyConnection func(context.Context, string) (net.Conn, error)
 }
 
 func (c Connector) Connect(ctx context.Context, address string, boltLogger log.BoltLogger) (db.Connection, error) {
-	dialer := net.Dialer{Timeout: c.DialTimeout}
-	if !c.SocketKeepAlive {
-		dialer.KeepAlive = -1 * time.Second // Turns keep-alive off
+	if c.SupplyConnection == nil {
+		c.SupplyConnection = c.createConnection
 	}
-
-	conn, err := dialer.DialContext(ctx, c.Network, address)
+	conn, err := c.SupplyConnection(ctx, address)
 	if err != nil {
 		return nil, err
 	}
@@ -96,6 +95,15 @@ func (c Connector) Connect(ctx context.Context, address string, boltLogger log.B
 		return nil, err
 	}
 	return connection, nil
+}
+
+func (c Connector) createConnection(ctx context.Context, address string) (net.Conn, error) {
+	dialer := net.Dialer{Timeout: c.DialTimeout}
+	if !c.SocketKeepAlive {
+		dialer.KeepAlive = -1 * time.Second // Turns keep-alive off
+	}
+
+	return dialer.DialContext(ctx, c.Network, address)
 }
 
 func (c Connector) tlsConfig(serverName string) *tls.Config {
