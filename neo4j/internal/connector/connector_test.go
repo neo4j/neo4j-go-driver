@@ -21,6 +21,7 @@ package connector_test
 
 import (
 	"context"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/config"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/connector"
 	. "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/testutil"
 	"io"
@@ -40,7 +41,11 @@ func TestConnect(outer *testing.T) {
 			server.acceptVersion(1, 0)
 		}()
 		connectionDelegate := &ConnDelegate{Delegate: clientConnection}
-		connector := &connector.Connector{SupplyConnection: supplyThis(connectionDelegate), SkipEncryption: true}
+		connector := &connector.Connector{
+			SupplyConnection: supplyThis(connectionDelegate),
+			SkipEncryption:   true,
+			Config:           &config.Config{},
+		}
 
 		connection, err := connector.Connect(ctx, "irrelevant", nil)
 
@@ -55,7 +60,11 @@ func TestConnect(outer *testing.T) {
 			server.failAcceptingVersion()
 		}()
 		connectionDelegate := &ConnDelegate{Delegate: clientConnection}
-		connector := &connector.Connector{SupplyConnection: supplyThis(connectionDelegate), SkipEncryption: true}
+		connector := &connector.Connector{
+			SupplyConnection: supplyThis(connectionDelegate),
+			SkipEncryption:   true,
+			Config:           &config.Config{},
+		}
 
 		connection, err := connector.Connect(ctx, "irrelevant", nil)
 
