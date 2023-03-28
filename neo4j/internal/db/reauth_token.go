@@ -19,7 +19,9 @@
 
 package db
 
+import "github.com/neo4j/neo4j-go-driver/v5/neo4j/auth"
+
 type ReAuthToken struct {
-	Token       map[string]any
+	Manager     auth.TokenManager
 	FromSession bool
 }

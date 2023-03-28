@@ -34,26 +34,30 @@ import (
 	"time"
 
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/auth"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/db"
 )
 
 // Handles a testkit backend session.
 // Tracks all objects (and errors) that is created by testkit frontend.
 type backend struct {
-	rd                   *bufio.Reader // Socket to read requests from
-	wr                   io.Writer     // Socket to write responses (and logs) on, don't buffer (WriteString on bufio was weird...)
-	drivers              map[string]neo4j.DriverWithContext
-	sessionStates        map[string]*sessionState
-	results              map[string]neo4j.ResultWithContext
-	managedTransactions  map[string]neo4j.ManagedTransaction
-	explicitTransactions map[string]neo4j.ExplicitTransaction
-	recordedErrors       map[string]error
-	resolvedAddresses    map[string][]any
-	id                   int // ID to use for next object created by frontend
-	wrLock               sync.Mutex
-	suppliedBookmarks    map[string]neo4j.Bookmarks
-	consumedBookmarks    map[string]struct{}
-	bookmarkManagers     map[string]neo4j.BookmarkManager
+	rd                      *bufio.Reader // Socket to read requests from
+	wr                      io.Writer     // Socket to write responses (and logs) on, don't buffer (WriteString on bufio was weird...)
+	drivers                 map[string]neo4j.DriverWithContext
+	sessionStates           map[string]*sessionState
+	results                 map[string]neo4j.ResultWithContext
+	managedTransactions     map[string]neo4j.ManagedTransaction
+	explicitTransactions    map[string]neo4j.ExplicitTransaction
+	recordedErrors          map[string]error
+	resolvedAddresses       map[string][]any
+	authTokenManagers       map[string]auth.TokenManager
+	resolvedGetAuthTokens   map[string]neo4j.AuthToken
+	resolvedOnTokenExpiries map[string]bool
+	id                      int // ID to use for next object created by frontend
+	wrLock                  sync.Mutex
+	suppliedBookmarks       map[string]neo4j.Bookmarks
+	consumedBookmarks       map[string]struct{}
+	bookmarkManagers        map[string]neo4j.BookmarkManager
 }
 
 // To implement transactional functions a bit of extra state is needed on the
@@ -62,6 +66,19 @@ type sessionState struct {
 	session          neo4j.SessionWithContext
 	retryableState   int
 	retryableErrorId string
+}
+
+type GenericTokenManager struct {
+	GetAuthTokenFunc   func() neo4j.AuthToken
+	OnTokenExpiredFunc func(neo4j.AuthToken)
+}
+
+func (g GenericTokenManager) GetAuthToken(ctx context.Context) (neo4j.AuthToken, error) {
+	return g.GetAuthTokenFunc(), nil
+}
+
+func (g GenericTokenManager) OnTokenExpired(token neo4j.AuthToken) {
+	g.OnTokenExpiredFunc(token)
 }
 
 const (
@@ -74,19 +91,22 @@ var ctx = context.Background()
 
 func newBackend(rd *bufio.Reader, wr io.Writer) *backend {
 	return &backend{
-		rd:                   rd,
-		wr:                   wr,
-		drivers:              make(map[string]neo4j.DriverWithContext),
-		sessionStates:        make(map[string]*sessionState),
-		results:              make(map[string]neo4j.ResultWithContext),
-		managedTransactions:  make(map[string]neo4j.ManagedTransaction),
-		explicitTransactions: make(map[string]neo4j.ExplicitTransaction),
-		recordedErrors:       make(map[string]error),
-		resolvedAddresses:    make(map[string][]any),
-		id:                   0,
-		bookmarkManagers:     make(map[string]neo4j.BookmarkManager),
-		suppliedBookmarks:    make(map[string]neo4j.Bookmarks),
-		consumedBookmarks:    make(map[string]struct{}),
+		rd:                      rd,
+		wr:                      wr,
+		drivers:                 make(map[string]neo4j.DriverWithContext),
+		sessionStates:           make(map[string]*sessionState),
+		results:                 make(map[string]neo4j.ResultWithContext),
+		managedTransactions:     make(map[string]neo4j.ManagedTransaction),
+		explicitTransactions:    make(map[string]neo4j.ExplicitTransaction),
+		recordedErrors:          make(map[string]error),
+		resolvedAddresses:       make(map[string][]any),
+		authTokenManagers:       make(map[string]auth.TokenManager),
+		resolvedGetAuthTokens:   make(map[string]neo4j.AuthToken),
+		resolvedOnTokenExpiries: make(map[string]bool),
+		id:                      0,
+		bookmarkManagers:        make(map[string]neo4j.BookmarkManager),
+		suppliedBookmarks:       make(map[string]neo4j.Bookmarks),
+		consumedBookmarks:       make(map[string]struct{}),
 	}
 }
 
@@ -341,6 +361,7 @@ func (b *backend) customAddressResolverFunction() neo4j.ServerAddressResolver {
 		for {
 			b.process()
 			if addresses, ok := b.resolvedAddresses[id]; ok {
+				delete(b.resolvedAddresses, id)
 				result := make([]neo4j.ServerAddress, len(addresses))
 				for i, address := range addresses {
 					result[i] = NewServerAddress(address.(string))
@@ -349,7 +370,6 @@ func (b *backend) customAddressResolverFunction() neo4j.ServerAddressResolver {
 			}
 		}
 	}
-
 }
 
 type serverAddress struct {
@@ -402,10 +422,18 @@ func (b *backend) handleRequest(req map[string]any) {
 		b.consumedBookmarks[requestId] = struct{}{}
 
 	case "NewDriver":
-		authToken, err := getAuth(data["authorizationToken"].(map[string]any)["data"].(map[string]any))
-		if err != nil {
-			b.writeError(err)
-			return
+		rawAuth := data["authorizationToken"]
+		var err error
+		var authToken auth.TokenManager
+		if rawAuth == nil {
+			managerId := data["authTokenManagerId"].(string)
+			authToken = b.authTokenManagers[managerId]
+		} else {
+			authToken, err = getAuth(rawAuth.(map[string]any)["data"].(map[string]any))
+			if err != nil {
+				b.writeError(err)
+				return
+			}
 		}
 		// Parse URI (or rather type cast)
 		uri := data["uri"].(string)
@@ -790,6 +818,62 @@ func (b *backend) handleRequest(req map[string]any) {
 		}
 		b.writeResponse("Driver", map[string]any{"id": driverId})
 
+	case "NewAuthTokenManager":
+		managerId := b.nextId()
+		manager := GenericTokenManager{
+			GetAuthTokenFunc: func() neo4j.AuthToken {
+				id := b.nextId()
+				b.writeResponse(
+					"AuthTokenManagerGetAuthRequest",
+					map[string]any{
+						"id":                 id,
+						"authTokenManagerId": managerId,
+					})
+				for {
+					b.process()
+					if token, ok := b.resolvedGetAuthTokens[id]; ok {
+						delete(b.resolvedGetAuthTokens, id)
+						return token
+					}
+				}
+			},
+			OnTokenExpiredFunc: func(token neo4j.AuthToken) {
+				id := b.nextId()
+				b.writeResponse(
+					"AuthTokenManagerOnAuthExpiredRequest",
+					map[string]any{
+						"id":                 id,
+						"authTokenManagerId": managerId,
+						"auth":               serializeAuth(token),
+					})
+				for {
+					b.process()
+					if _, ok := b.resolvedOnTokenExpiries[id]; ok {
+						delete(b.resolvedOnTokenExpiries, id)
+						return
+					}
+				}
+
+			},
+		}
+		b.authTokenManagers[managerId] = manager
+		b.writeResponse("AuthTokenManager", map[string]any{"id": managerId})
+	case "AuthTokenManagerGetAuthCompleted":
+		id := data["requestId"].(string)
+		token, err := getAuth(data["auth"].(map[string]any)["data"].(map[string]any))
+		if err != nil {
+			b.writeError(err)
+			return
+		}
+		b.resolvedGetAuthTokens[id] = token
+	case "AuthTokenManagerOnAuthExpiredCompleted":
+		id := data["requestId"].(string)
+		b.resolvedOnTokenExpiries[id] = true
+	case "AuthTokenManagerClose":
+		id := data["id"].(string)
+		delete(b.authTokenManagers, id)
+		b.writeResponse("AuthTokenManager", map[string]any{"id": id})
+
 	case "GetFeatures":
 		b.writeResponse("FeatureList", map[string]any{
 			"features": []string{
@@ -810,6 +894,7 @@ func (b *backend) handleRequest(req map[string]any) {
 				"Feature:Auth:Custom",
 				"Feature:Auth:Bearer",
 				"Feature:Auth:Kerberos",
+				"Feature:Auth:Managed",
 				"Feature:Bolt:3.0",
 				"Feature:Bolt:4.1",
 				"Feature:Bolt:4.2",
@@ -887,6 +972,13 @@ func getAuth(authTokenMap map[string]any) (neo4j.AuthToken, error) {
 			parameters)
 	}
 	return authToken, nil
+}
+
+func serializeAuth(token neo4j.AuthToken) map[string]any {
+	return map[string]any{
+		"name": "AuthorizationToken",
+		"data": token.Tokens,
+	}
 }
 
 func (b *backend) writeRecord(result neo4j.ResultWithContext, record *neo4j.Record, expectRecord bool) {
@@ -1214,10 +1306,8 @@ func (b *backend) supplyBookmarks(bookmarkManagerId string) func(context.Context
 		id := b.nextId()
 		msg := map[string]any{"id": id, "bookmarkManagerId": bookmarkManagerId}
 		b.writeResponse("BookmarksSupplierRequest", msg)
-		for {
-			b.process()
-			return b.suppliedBookmarks[id], nil
-		}
+		b.process()
+		return b.suppliedBookmarks[id], nil
 	}
 }
 
@@ -1232,6 +1322,7 @@ func (b *backend) consumeBookmarks(bookmarkManagerId string) func(context.Contex
 		for {
 			b.process()
 			if _, found := b.consumedBookmarks[id]; found {
+				delete(b.consumedBookmarks, id)
 				return nil
 			}
 		}

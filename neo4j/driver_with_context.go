@@ -23,6 +23,7 @@ package neo4j
 import (
 	"context"
 	"fmt"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/auth"
 	idb "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/errorutil"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/racing"
@@ -117,7 +118,9 @@ type ResultTransformer[T any] interface {
 //	driver, err = NewDriverWithContext(uri, BasicAuth(username, password), function (config *Config) {
 //		config.MaxConnectionPoolSize = 10
 //	})
-func NewDriverWithContext(target string, auth AuthToken, configurers ...func(*Config)) (DriverWithContext, error) {
+//
+// TODO: docs for auth (+ nil == NoAuth)
+func NewDriverWithContext(target string, auth auth.TokenManager, configurers ...func(*Config)) (DriverWithContext, error) {
 	parsed, err := url.Parse(target)
 	if err != nil {
 		return nil, err
@@ -178,6 +181,9 @@ func NewDriverWithContext(target string, auth AuthToken, configurers ...func(*Co
 	if err := validateAndNormaliseConfig(d.config); err != nil {
 		return nil, err
 	}
+	if auth == nil {
+		auth = NoAuth()
+	}
 
 	// Setup logging
 	d.log = d.config.Log
@@ -200,7 +206,7 @@ func NewDriverWithContext(target string, auth AuthToken, configurers ...func(*Co
 	d.connector.RootCAs = d.config.RootCAs
 	d.connector.TlsConfig = d.config.TlsConfig
 	d.connector.Log = d.log
-	d.connector.Auth = auth.tokens
+	d.connector.Auth = auth
 	d.connector.RoutingContext = routingContext
 
 	// Let the pool use the same log ID as the driver to simplify log reading.
@@ -313,12 +319,12 @@ func (d *driverWithContext) NewSession(ctx context.Context, config SessionConfig
 	if config.Auth == nil {
 		reAuthToken = &idb.ReAuthToken{
 			// TODO: move Auth field to driverWithContext struct
-			Token:       d.connector.Auth,
+			Manager:     d.connector.Auth,
 			FromSession: false,
 		}
 	} else {
 		reAuthToken = &idb.ReAuthToken{
-			Token:       config.Auth.tokens,
+			Manager:     config.Auth,
 			FromSession: true,
 		}
 	}

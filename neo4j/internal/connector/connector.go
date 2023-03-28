@@ -25,6 +25,7 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"errors"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/auth"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
 	"io"
 	"net"
@@ -41,7 +42,7 @@ type Connector struct {
 	RootCAs         *x509.CertPool
 	DialTimeout     time.Duration
 	SocketKeepAlive bool
-	Auth            map[string]any
+	Auth            auth.TokenManager
 	Log             log.Logger
 	UserAgent       string
 	RoutingContext  map[string]string

@@ -56,14 +56,14 @@ func (r *RouterFake) Invalidate(ctx context.Context, database string) error {
 	return nil
 }
 
-func (r *RouterFake) Readers(ctx context.Context, bookmarksFn func(context.Context) ([]string, error), database string, log log.BoltLogger) ([]string, error) {
+func (r *RouterFake) Readers(_ context.Context, bookmarksFn func(context.Context) ([]string, error), database string, _ *db.ReAuthToken, _ log.BoltLogger) ([]string, error) {
 	if r.ReadersHook != nil {
 		return r.ReadersHook(bookmarksFn, database)
 	}
 	return r.ReadersRet, r.Err
 }
 
-func (r *RouterFake) Writers(ctx context.Context, bookmarksFn func(context.Context) ([]string, error), database string, log log.BoltLogger) ([]string, error) {
+func (r *RouterFake) Writers(_ context.Context, bookmarksFn func(context.Context) ([]string, error), database string, _ *db.ReAuthToken, _ log.BoltLogger) ([]string, error) {
 	if r.WritersHook != nil {
 		return r.WritersHook(bookmarksFn, database)
 	}

@@ -220,7 +220,11 @@ func (b *bolt4) Connect(ctx context.Context, minor int, auth *idb.ReAuthToken, u
 		hello["patch_bolt"] = []string{"utc"}
 	}
 	// Merge authentication keys into hello, avoid overwriting existing keys
-	for k, v := range auth.Token {
+	token, err := auth.Manager.GetAuthToken(ctx)
+	if err != nil {
+		return err
+	}
+	for k, v := range token.Tokens {
 		_, exists := hello[k]
 		if !exists {
 			hello[k] = v

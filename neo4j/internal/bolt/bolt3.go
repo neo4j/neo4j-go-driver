@@ -188,7 +188,11 @@ func (b *bolt3) Connect(ctx context.Context, minor int, auth *idb.ReAuthToken, u
 		"user_agent": userAgent,
 	}
 	// Merge authentication info into hello message
-	for k, v := range auth.Token {
+	token, err := auth.Manager.GetAuthToken(ctx)
+	if err != nil {
+		return err
+	}
+	for k, v := range token.Tokens {
 		_, exists := hello[k]
 		if exists {
 			continue

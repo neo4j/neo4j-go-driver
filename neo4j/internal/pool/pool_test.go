@@ -22,6 +22,7 @@ package pool
 import (
 	"context"
 	"errors"
+	iauth "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/auth"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
 	"math/rand"
 	"sync"
@@ -34,7 +35,7 @@ import (
 
 var logger = &log.Void{}
 var ctx = context.Background()
-var reAuthToken = &db.ReAuthToken{FromSession: false, Token: map[string]any{"scheme": "none"}}
+var reAuthToken = &db.ReAuthToken{FromSession: false, Manager: iauth.Token{Tokens: map[string]any{"scheme": "none"}}}
 
 func TestPoolBorrowReturn(outer *testing.T) {
 	maxAge := 1 * time.Second

@@ -206,7 +206,11 @@ func (b *bolt5) Connect(ctx context.Context, minor int, auth *idb.ReAuthToken, u
 	if err := checkReAuth(auth, b); err != nil {
 		return err
 	}
-	b.auth = auth.Token
+	token, err := auth.Manager.GetAuthToken(ctx)
+	if err != nil {
+		return err
+	}
+	b.auth = token.Tokens
 
 	hello := map[string]any{
 		"user_agent": userAgent,
@@ -216,7 +220,7 @@ func (b *bolt5) Connect(ctx context.Context, minor int, auth *idb.ReAuthToken, u
 	}
 	if minor == 0 {
 		// Merge authentication keys into hello, avoid overwriting existing keys
-		for k, v := range auth.Token {
+		for k, v := range token.Tokens {
 			_, exists := hello[k]
 			if !exists {
 				hello[k] = v
@@ -225,7 +229,7 @@ func (b *bolt5) Connect(ctx context.Context, minor int, auth *idb.ReAuthToken, u
 	}
 	b.queue.appendHello(hello, b.helloResponseHandler())
 	if minor > 0 {
-		b.queue.appendLogon(auth.Token, b.logonResponseHandler())
+		b.queue.appendLogon(token.Tokens, b.logonResponseHandler())
 	}
 	if b.queue.send(ctx); b.err != nil {
 		return b.err
@@ -787,13 +791,17 @@ func (b *bolt5) ReAuth(ctx context.Context, auth *idb.ReAuthToken) error {
 	if err := checkReAuth(auth, b); err != nil {
 		return err
 	}
-	if !reflect.DeepEqual(b.auth, auth.Token) {
+	token, err := auth.Manager.GetAuthToken(ctx)
+	if err != nil {
+		return err
+	}
+	if !reflect.DeepEqual(b.auth, token.Tokens) {
 		b.queue.appendLogoff(b.logoffResponseHandler())
-		b.queue.appendLogon(auth.Token, b.logonResponseHandler())
+		b.queue.appendLogon(token.Tokens, b.logonResponseHandler())
 		if b.queue.send(ctx); b.err != nil {
 			return b.err
 		}
-		b.auth = auth.Token
+		b.auth = token.Tokens
 	}
 	return nil
 }

@@ -26,12 +26,12 @@ import (
 func TestNoAuth(t *testing.T) {
 	token := NoAuth()
 
-	if len(token.tokens) != 1 {
+	if len(token.Tokens) != 1 {
 		t.Errorf("should only contain the key scheme")
 	}
 
-	if token.tokens[keyScheme] != schemeNone {
-		t.Errorf("the key scheme should be 'none' %v", token.tokens[keyScheme])
+	if token.Tokens[keyScheme] != schemeNone {
+		t.Errorf("the key scheme should be 'none' %v", token.Tokens[keyScheme])
 	}
 }
 
@@ -42,20 +42,20 @@ func TestBasicAuth(t *testing.T) {
 
 	token := BasicAuth(userName, password, realm)
 
-	if len(token.tokens) != 3 {
+	if len(token.Tokens) != 3 {
 		t.Errorf("should contain 3 keys when no realm data was passed")
 	}
 
-	if token.tokens[keyScheme] != schemeBasic {
-		t.Errorf("the key scheme should be 'basic' %v", token.tokens[keyScheme])
+	if token.Tokens[keyScheme] != schemeBasic {
+		t.Errorf("the key scheme should be 'basic' %v", token.Tokens[keyScheme])
 	}
 
-	if token.tokens[keyPrincipal] != userName {
-		t.Errorf("the key principal was not properly set %v", token.tokens[keyPrincipal])
+	if token.Tokens[keyPrincipal] != userName {
+		t.Errorf("the key principal was not properly set %v", token.Tokens[keyPrincipal])
 	}
 
-	if token.tokens[keyCredentials] != password {
-		t.Errorf("the key credentials was not properly set %v", token.tokens[keyCredentials])
+	if token.Tokens[keyCredentials] != password {
+		t.Errorf("the key credentials was not properly set %v", token.Tokens[keyCredentials])
 	}
 }
 
@@ -66,24 +66,24 @@ func TestBasicAuthWithRealm(t *testing.T) {
 
 	token := BasicAuth(userName, password, realm)
 
-	if len(token.tokens) != 4 {
+	if len(token.Tokens) != 4 {
 		t.Errorf("should contain 4 keys when realm data was passed")
 	}
 
-	if token.tokens[keyScheme] != schemeBasic {
-		t.Errorf("the key scheme should be 'basic' %v", token.tokens[keyScheme])
+	if token.Tokens[keyScheme] != schemeBasic {
+		t.Errorf("the key scheme should be 'basic' %v", token.Tokens[keyScheme])
 	}
 
-	if token.tokens[keyPrincipal] != userName {
-		t.Errorf("the key principal was not properly set %v", token.tokens[keyPrincipal])
+	if token.Tokens[keyPrincipal] != userName {
+		t.Errorf("the key principal was not properly set %v", token.Tokens[keyPrincipal])
 	}
 
-	if token.tokens[keyCredentials] != password {
-		t.Errorf("the key credentials was not properly set %v", token.tokens[keyCredentials])
+	if token.Tokens[keyCredentials] != password {
+		t.Errorf("the key credentials was not properly set %v", token.Tokens[keyCredentials])
 	}
 
-	if token.tokens[keyRealm] != realm {
-		t.Errorf("the key realm was not properly set %v", token.tokens[keyRealm])
+	if token.Tokens[keyRealm] != realm {
+		t.Errorf("the key realm was not properly set %v", token.Tokens[keyRealm])
 	}
 }
 
@@ -92,20 +92,20 @@ func TestKerberosAuth(t *testing.T) {
 
 	token := KerberosAuth(ticket)
 
-	if len(token.tokens) != 3 {
+	if len(token.Tokens) != 3 {
 		t.Errorf("should contain 3 keys")
 	}
 
-	if token.tokens[keyScheme] != schemeKerberos {
-		t.Errorf("the key scheme should be 'kerberos' %v", token.tokens[keyScheme])
+	if token.Tokens[keyScheme] != schemeKerberos {
+		t.Errorf("the key scheme should be 'kerberos' %v", token.Tokens[keyScheme])
 	}
 
-	if token.tokens[keyPrincipal] != "" {
-		t.Errorf("the key principal was not properly set %v", token.tokens[keyPrincipal])
+	if token.Tokens[keyPrincipal] != "" {
+		t.Errorf("the key principal was not properly set %v", token.Tokens[keyPrincipal])
 	}
 
-	if token.tokens[keyCredentials] != ticket {
-		t.Errorf("the key ticket was not properly set %v", token.tokens[keyCredentials])
+	if token.Tokens[keyCredentials] != ticket {
+		t.Errorf("the key ticket was not properly set %v", token.Tokens[keyCredentials])
 	}
 }
 
@@ -117,24 +117,24 @@ func TestCustomAuthWithNilParameters(t *testing.T) {
 
 	token := CustomAuth(scheme, userName, password, realm, nil)
 
-	if len(token.tokens) != 4 {
-		t.Errorf("should contain 4 keys no parameters data was passed %v", len(token.tokens))
+	if len(token.Tokens) != 4 {
+		t.Errorf("should contain 4 keys no parameters data was passed %v", len(token.Tokens))
 	}
 
-	if token.tokens[keyScheme] != scheme {
-		t.Errorf("the key scheme was not properly set %v", token.tokens[keyScheme])
+	if token.Tokens[keyScheme] != scheme {
+		t.Errorf("the key scheme was not properly set %v", token.Tokens[keyScheme])
 	}
 
-	if token.tokens[keyPrincipal] != userName {
-		t.Errorf("the key principal was not properly set %v", token.tokens[keyPrincipal])
+	if token.Tokens[keyPrincipal] != userName {
+		t.Errorf("the key principal was not properly set %v", token.Tokens[keyPrincipal])
 	}
 
-	if token.tokens[keyCredentials] != password {
-		t.Errorf("the key credentials was not properly set %v", token.tokens[keyCredentials])
+	if token.Tokens[keyCredentials] != password {
+		t.Errorf("the key credentials was not properly set %v", token.Tokens[keyCredentials])
 	}
 
-	if token.tokens[keyRealm] != realm {
-		t.Errorf("the key realm was not properly set %v", token.tokens[keyRealm])
+	if token.Tokens[keyRealm] != realm {
+		t.Errorf("the key realm was not properly set %v", token.Tokens[keyRealm])
 	}
 }
 
@@ -147,24 +147,24 @@ func TestCustomAuthWithEmptyParameters(t *testing.T) {
 
 	token := CustomAuth(scheme, userName, password, realm, parameters)
 
-	if len(token.tokens) != 4 {
-		t.Errorf("should contain 4 keys when parameters data was passed %v", len(token.tokens))
+	if len(token.Tokens) != 4 {
+		t.Errorf("should contain 4 keys when parameters data was passed %v", len(token.Tokens))
 	}
 
-	if token.tokens[keyScheme] != scheme {
-		t.Errorf("the key scheme was not properly set %v", token.tokens[keyScheme])
+	if token.Tokens[keyScheme] != scheme {
+		t.Errorf("the key scheme was not properly set %v", token.Tokens[keyScheme])
 	}
 
-	if token.tokens[keyPrincipal] != userName {
-		t.Errorf("the key principal was not properly set %v", token.tokens[keyPrincipal])
+	if token.Tokens[keyPrincipal] != userName {
+		t.Errorf("the key principal was not properly set %v", token.Tokens[keyPrincipal])
 	}
 
-	if token.tokens[keyCredentials] != password {
-		t.Errorf("the key credentials was not properly set %v", token.tokens[keyCredentials])
+	if token.Tokens[keyCredentials] != password {
+		t.Errorf("the key credentials was not properly set %v", token.Tokens[keyCredentials])
 	}
 
-	if token.tokens[keyRealm] != realm {
-		t.Errorf("the key realm was not properly set %v", token.tokens[keyRealm])
+	if token.Tokens[keyRealm] != realm {
+		t.Errorf("the key realm was not properly set %v", token.Tokens[keyRealm])
 	}
 }
 
@@ -180,27 +180,27 @@ func TestCustomAuthWithParameters(t *testing.T) {
 
 	token := CustomAuth(scheme, userName, password, realm, parameters)
 
-	if len(token.tokens) != 5 {
-		t.Errorf("should contain 5 keys when parameters data was passed %v", len(token.tokens))
+	if len(token.Tokens) != 5 {
+		t.Errorf("should contain 5 keys when parameters data was passed %v", len(token.Tokens))
 	}
 
-	if token.tokens[keyScheme] != scheme {
-		t.Errorf("the key scheme was not properly set %v", token.tokens[keyScheme])
+	if token.Tokens[keyScheme] != scheme {
+		t.Errorf("the key scheme was not properly set %v", token.Tokens[keyScheme])
 	}
 
-	if token.tokens[keyPrincipal] != userName {
-		t.Errorf("the key principal was not properly set %v", token.tokens[keyPrincipal])
+	if token.Tokens[keyPrincipal] != userName {
+		t.Errorf("the key principal was not properly set %v", token.Tokens[keyPrincipal])
 	}
 
-	if token.tokens[keyCredentials] != password {
-		t.Errorf("the key credentials was not properly set %v", token.tokens[keyCredentials])
+	if token.Tokens[keyCredentials] != password {
+		t.Errorf("the key credentials was not properly set %v", token.Tokens[keyCredentials])
 	}
 
-	if token.tokens[keyRealm] != realm {
-		t.Errorf("the key realm was not properly set %v", token.tokens[keyRealm])
+	if token.Tokens[keyRealm] != realm {
+		t.Errorf("the key realm was not properly set %v", token.Tokens[keyRealm])
 	}
 
-	if token.tokens["parameters"] == nil {
-		t.Errorf("the key parameters was not properly set %v", token.tokens["parameters"])
+	if token.Tokens["parameters"] == nil {
+		t.Errorf("the key parameters was not properly set %v", token.Tokens["parameters"])
 	}
 }

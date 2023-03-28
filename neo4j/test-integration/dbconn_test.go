@@ -24,6 +24,7 @@ import (
 	"crypto/rand"
 	"fmt"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/db"
+	iauth "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/auth"
 	idb "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
 	"math"
 	"math/big"
@@ -55,10 +56,12 @@ func makeRawConnection(ctx context.Context, logger log.Logger, boltLogger log.Bo
 
 	auth := &idb.ReAuthToken{
 		FromSession: false,
-		Token: map[string]any{
-			"scheme":      "basic",
-			"principal":   server.Username,
-			"credentials": server.Password,
+		Manager: iauth.Token{
+			Tokens: map[string]any{
+				"scheme":      "basic",
+				"principal":   server.Username,
+				"credentials": server.Password,
+			},
 		},
 	}
 

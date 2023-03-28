@@ -22,6 +22,7 @@ package router
 import (
 	"context"
 	"errors"
+	iauth "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/auth"
 	idb "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/log"
 	"testing"
@@ -183,7 +184,7 @@ func TestReadTableTable(ot *testing.T) {
 				nil,
 				"dbname",
 				"",
-				&idb.ReAuthToken{Token: map[string]any{"scheme": "none"}},
+				&idb.ReAuthToken{Manager: iauth.Token{Tokens: map[string]any{"scheme": "none"}}},
 				nil)
 			c.assert(t, table, err)
 			if err != nil && c.assertErr != nil {

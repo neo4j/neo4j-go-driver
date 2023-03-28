@@ -21,6 +21,7 @@ package bolt
 
 import (
 	"context"
+	iauth "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/auth"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
 	"testing"
 
@@ -35,11 +36,11 @@ func TestConnect(ot *testing.T) {
 
 	auth := &db.ReAuthToken{
 		FromSession: false,
-		Token: map[string]any{
+		Manager: iauth.Token{Tokens: map[string]any{
 			"scheme":      "basic",
 			"principal":   "neo4j",
 			"credentials": "pass",
-		},
+		}},
 	}
 
 	ot.Run("Server rejects versions", func(t *testing.T) {

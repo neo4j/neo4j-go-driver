@@ -21,6 +21,7 @@ package bolt
 
 import (
 	"context"
+	iauth "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/auth"
 	idb "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
 	"io"
 	"sync"
@@ -66,11 +67,11 @@ func TestBolt3(outer *testing.T) {
 
 	auth := &idb.ReAuthToken{
 		FromSession: false,
-		Token: map[string]any{
+		Manager: iauth.Token{Tokens: map[string]any{
 			"scheme":      "basic",
 			"principal":   "neo4j",
 			"credentials": "pass",
-		},
+		}},
 	}
 
 	assertBoltState := func(t *testing.T, expected int, bolt *bolt3) {
