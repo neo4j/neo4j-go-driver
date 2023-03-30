@@ -150,7 +150,8 @@ type SessionConfig struct {
 	ImpersonatedUser string
 	// BookmarkManager defines a central point to externally supply bookmarks
 	// and be notified of bookmark updates per database
-	// This is experimental and may be changed or removed without prior notice
+	// This is part of the BookmarkManager preview feature (see README on what it means in terms of
+	// support and compatibility guarantees)
 	// Since 5.0
 	// default: nil (no-op)
 	BookmarkManager BookmarkManager

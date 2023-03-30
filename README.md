@@ -43,6 +43,25 @@ go get github.com/neo4j/neo4j-go-driver
 Drivers manual that describes general driver concepts in depth [here](https://neo4j.com/docs/go-manual/current/).
 Go package API documentation [here](https://pkg.go.dev/github.com/neo4j/neo4j-go-driver/v5).
 
+## Preview Features
+
+The preview feature is a new feature that is a candidate for a future <abbr title="Generally Available">GA</abbr>
+status.
+
+It enables users to try the feature out and maintainers to refine and update it.
+
+The preview features are not considered to be experimental, temporary or unstable.
+
+However, they may change more rapidly, without following the usual deprecation cycle.
+
+Most preview features are expected to be granted the GA status unless some unexpected conditions arise.
+
+Due to the increased flexibility of the preview status, user feedback is encouraged so that it can be considered before
+the GA status.
+
+Every feature gets a dedicated [GitHub Discussion](https://github.com/neo4j/neo4j-go-driver/discussions) where users can
+share their initial impressions and thoughts.
+
 ## Migrating from previous versions
 
 See [migration guide](MIGRATION_GUIDE.md) for information on how to migrate 
