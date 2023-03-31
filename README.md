@@ -178,8 +178,9 @@ most accurate information about Neo4j releases.
 | Neo4j 5.2 (HO)      | ?   | ?   | ?     | ?     | (Yes)   | Yes   | Yes   | Yes   | Yes   | Yes   | Yes   | Yes   | (Yes) | 
 | Neo4j 5.3 (HO)      | ?   | ?   | ?     | ?     | (Yes)   | Yes   | Yes   | Yes   | Yes   | Yes   | Yes   | Yes   | (Yes) | 
 | Neo4j 5.4 (HO)      | ?   | ?   | ?     | ?     | (Yes)   | Yes   | Yes   | Yes   | Yes   | Yes   | Yes   | Yes   | (Yes) | 
-| Neo4j 5.5 (HO)      | ?   | ?   | ?     | ?     | (Yes)   | Yes   | Yes   | Yes   | Yes   | Yes   | Yes   | Yes   | Yes   | 
-| Neo4j 5.6           | ?   | ?   | ?     | ?     | (Yes)   | Yes   | Yes   | Yes   | Yes   | Yes   | Yes   | Yes   | Yes   |
+| Neo4j 5.5 (HO)      | ?   | ?   | ?     | ?     | (Yes)   | Yes   | Yes   | Yes   | Yes   | Yes   | Yes   | Yes   | (Yes) | 
+| Neo4j 5.6           | ?   | ?   | ?     | ?     | (Yes)   | Yes   | Yes   | Yes   | Yes   | Yes   | Yes   | Yes   | (Yes) |
+| Neo4j 5.7           | ?   | ?   | ?     | ?     | (Yes)   | Yes   | Yes   | Yes   | Yes   | Yes   | Yes   | Yes   | Yes   |
 
 - `(EOL)`: End Of Life, a server version is marked as such when it is not supported anymore
 - `(HO)`: Hotfixes only, a server version is marked as such when it is only updated for security patches
