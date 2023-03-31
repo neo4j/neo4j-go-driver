@@ -59,8 +59,9 @@ Most preview features are expected to be granted the GA status unless some unexp
 Due to the increased flexibility of the preview status, user feedback is encouraged so that it can be considered before
 the GA status.
 
-Every feature gets a dedicated [GitHub Discussion](https://github.com/neo4j/neo4j-go-driver/discussions) where users can
-share their initial impressions and thoughts.
+Every preview feature gets a
+dedicated [GitHub Discussion](https://github.com/neo4j/neo4j-go-driver/discussions/categories/preview-feature-announcement)
+where users can share their initial impressions and thoughts.
 
 ## Migrating from previous versions
 
