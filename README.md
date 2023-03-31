@@ -165,20 +165,21 @@ func (i *Item) String() string {
 Please look at the [supported version's documentation](https://neo4j.com/developer/kb/neo4j-supported-versions/) for the
 most accurate information about Neo4j releases.
 
-| Server \\ Driver    | 1.7 | 4.0 | 4.2   | 4.3   | **4.4** | 5.0   | 5.1   | 5.2   | 5.3   | 5.4   | 5.5   |
-|---------------------|-----|-----|-------|-------|---------|-------|-------|-------|-------|-------|-------|
-| Neo4j 3.5 (EOL)     | Yes | Yes | (Yes) | (Yes) | (Yes)   | (Yes) | (Yes) | (Yes) | (Yes) | (Yes) | (Yes) |
-| Neo4j 4.0 (EOL)     | Yes | Yes | Yes   | Yes   | Yes     | (Yes) | (Yes) | (Yes) | (Yes) | (Yes) | (Yes) |
-| Neo4j 4.1 (EOL)     | ?   | Yes | Yes   | Yes   | Yes     | (Yes) | (Yes) | (Yes) | (Yes) | (Yes) | (Yes) |
-| Neo4j 4.2 (EOL)     | ?   | ?   | Yes   | Yes   | Yes     | (Yes) | (Yes) | (Yes) | (Yes) | (Yes) | (Yes) |
-| Neo4j 4.3 (EOL)     | ?   | ?   | Yes   | Yes   | Yes     | (Yes) | (Yes) | (Yes) | (Yes) | (Yes) | (Yes) |
-| **Neo4j 4.4 (LTS)** | ?   | ?   | ?     | Yes   | Yes     | Yes   | Yes   | Yes   | Yes   | Yes   | Yes   |
-| Neo4j 5.0 (HO)      | ?   | ?   | ?     | ?     | Yes     | Yes   | Yes   | Yes   | Yes   | Yes   | Yes   |
-| Neo4j 5.1 (HO)      | ?   | ?   | ?     | ?     | (Yes)   | Yes   | Yes   | Yes   | Yes   | Yes   | Yes   |
-| Neo4j 5.2 (HO)      | ?   | ?   | ?     | ?     | (Yes)   | Yes   | Yes   | Yes   | Yes   | Yes   | Yes   |
-| Neo4j 5.3 (HO)      | ?   | ?   | ?     | ?     | (Yes)   | Yes   | Yes   | Yes   | Yes   | Yes   | Yes   |
-| Neo4j 5.4           | ?   | ?   | ?     | ?     | (Yes)   | Yes   | Yes   | Yes   | Yes   | Yes   | Yes   |
-| Neo4j 5.5           | ?   | ?   | ?     | ?     | (Yes)   | Yes   | Yes   | Yes   | Yes   | Yes   | Yes   |
+| Server \\ Driver    | 1.7 | 4.0 | 4.2   | 4.3   | **4.4** | 5.0   | 5.1   | 5.2   | 5.3   | 5.4   | 5.5   | 5.6   | 5.7   |
+|---------------------|-----|-----|-------|-------|---------|-------|-------|-------|-------|-------|-------|-------|-------|
+| Neo4j 3.5 (EOL)     | Yes | Yes | (Yes) | (Yes) | (Yes)   | (Yes) | (Yes) | (Yes) | (Yes) | (Yes) | (Yes) | (Yes) | (Yes) |
+| Neo4j 4.0 (EOL)     | Yes | Yes | Yes   | Yes   | Yes     | (Yes) | (Yes) | (Yes) | (Yes) | (Yes) | (Yes) | (Yes) | (Yes) |
+| Neo4j 4.1 (EOL)     | ?   | Yes | Yes   | Yes   | Yes     | (Yes) | (Yes) | (Yes) | (Yes) | (Yes) | (Yes) | (Yes) | (Yes) | 
+| Neo4j 4.2 (EOL)     | ?   | ?   | Yes   | Yes   | Yes     | (Yes) | (Yes) | (Yes) | (Yes) | (Yes) | (Yes) | (Yes) | (Yes) | 
+| Neo4j 4.3 (EOL)     | ?   | ?   | Yes   | Yes   | Yes     | (Yes) | (Yes) | (Yes) | (Yes) | (Yes) | (Yes) | (Yes) | (Yes) | 
+| **Neo4j 4.4 (LTS)** | ?   | ?   | ?     | Yes   | Yes     | Yes   | Yes   | Yes   | Yes   | Yes   | Yes   | Yes   | (Yes) | 
+| Neo4j 5.0 (HO)      | ?   | ?   | ?     | ?     | Yes     | Yes   | Yes   | Yes   | Yes   | Yes   | Yes   | Yes   | (Yes) | 
+| Neo4j 5.1 (HO)      | ?   | ?   | ?     | ?     | (Yes)   | Yes   | Yes   | Yes   | Yes   | Yes   | Yes   | Yes   | (Yes) | 
+| Neo4j 5.2 (HO)      | ?   | ?   | ?     | ?     | (Yes)   | Yes   | Yes   | Yes   | Yes   | Yes   | Yes   | Yes   | (Yes) | 
+| Neo4j 5.3 (HO)      | ?   | ?   | ?     | ?     | (Yes)   | Yes   | Yes   | Yes   | Yes   | Yes   | Yes   | Yes   | (Yes) | 
+| Neo4j 5.4 (HO)      | ?   | ?   | ?     | ?     | (Yes)   | Yes   | Yes   | Yes   | Yes   | Yes   | Yes   | Yes   | (Yes) | 
+| Neo4j 5.5 (HO)      | ?   | ?   | ?     | ?     | (Yes)   | Yes   | Yes   | Yes   | Yes   | Yes   | Yes   | Yes   | Yes   | 
+| Neo4j 5.6           | ?   | ?   | ?     | ?     | (Yes)   | Yes   | Yes   | Yes   | Yes   | Yes   | Yes   | Yes   | Yes   |
 
 - `(EOL)`: End Of Life, a server version is marked as such when it is not supported anymore
 - `(HO)`: Hotfixes only, a server version is marked as such when it is only updated for security patches
