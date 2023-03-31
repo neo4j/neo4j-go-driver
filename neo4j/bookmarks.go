@@ -32,7 +32,7 @@ import (
 type Bookmarks = []string
 
 // BookmarkManager centralizes bookmark manager supply and notification
-// This API is experimental and may be changed or removed without prior notice
+// This is currently a preview feature (see README on what it means in terms of support and compatibility guarantees)
 type BookmarkManager interface {
 	// UpdateBookmarks updates the bookmark tracked by this bookmark manager
 	// previousBookmarks are the initial bookmarks of the bookmark holder (like a Session)
@@ -44,8 +44,8 @@ type BookmarkManager interface {
 	GetBookmarks(ctx context.Context) (Bookmarks, error)
 }
 
-// BookmarkManagerConfig is an experimental API and may be changed or removed
-// without prior notice
+// BookmarkManagerConfig is part of the BookmarkManager preview feature (see README on what it means in terms of support
+// and compatibility guarantees)
 type BookmarkManagerConfig struct {
 	// Initial bookmarks per database
 	InitialBookmarks Bookmarks
