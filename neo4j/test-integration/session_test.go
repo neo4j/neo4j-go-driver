@@ -22,6 +22,7 @@ package test_integration
 import (
 	"context"
 	"fmt"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/config"
 	"testing"
 	"time"
 
@@ -46,7 +47,7 @@ func TestSession(outer *testing.T) {
 			summary neo4j.ResultSummary
 		)
 
-		driver = server.Driver(func(c *neo4j.Config) {
+		driver = server.Driver(func(c *config.Config) {
 			c.Log = neo4j.ConsoleLogger(neo4j.DEBUG)
 		})
 		assertNotNil(inner, driver)

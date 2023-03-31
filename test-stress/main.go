@@ -24,6 +24,7 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/config"
 	"math/rand"
 	"sync"
 	"time"
@@ -93,7 +94,7 @@ func main() {
 
 	ctx := context.Background()
 	auth := neo4j.BasicAuth(user, password, "")
-	driver, err := neo4j.NewDriverWithContext(uri, auth, func(conf *neo4j.Config) {
+	driver, err := neo4j.NewDriverWithContext(uri, auth, func(conf *config.Config) {
 		conf.Log = neo4j.ConsoleLogger(neo4j.WARNING)
 	})
 	if err != nil {

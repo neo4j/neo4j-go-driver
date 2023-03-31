@@ -23,6 +23,7 @@ package dbserver
 import (
 	"context"
 	"fmt"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/config"
 	"os"
 	"strconv"
 	"sync"
@@ -136,7 +137,7 @@ func (s DbServer) AuthToken() neo4j.AuthToken {
 	return neo4j.BasicAuth(s.Username, s.Password, "")
 }
 
-func (s DbServer) Driver(configurers ...func(*neo4j.Config)) neo4j.DriverWithContext {
+func (s DbServer) Driver(configurers ...func(*config.Config)) neo4j.DriverWithContext {
 	driver, err := neo4j.NewDriverWithContext(s.URI(), s.AuthToken(), configurers...)
 	if err != nil {
 		panic(err)
@@ -144,8 +145,8 @@ func (s DbServer) Driver(configurers ...func(*neo4j.Config)) neo4j.DriverWithCon
 	return driver
 }
 
-func (s DbServer) ConfigFunc() func(*neo4j.Config) {
-	return func(*neo4j.Config) {}
+func (s DbServer) ConfigFunc() func(*config.Config) {
+	return func(*config.Config) {}
 }
 
 func (s DbServer) CreateDatabaseQuery(db string) string {

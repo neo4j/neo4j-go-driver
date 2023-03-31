@@ -21,6 +21,7 @@ package test_integration
 
 import (
 	"context"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/config"
 	"testing"
 	"time"
 
@@ -42,7 +43,7 @@ func TestTimeoutAndLifetime(outer *testing.T) {
 		var driver neo4j.DriverWithContext
 		var session1, session2 neo4j.SessionWithContext
 
-		driver, err = neo4j.NewDriverWithContext(server.BoltURI(), server.AuthToken(), server.ConfigFunc(), func(config *neo4j.Config) {
+		driver, err = neo4j.NewDriverWithContext(server.BoltURI(), server.AuthToken(), server.ConfigFunc(), func(config *config.Config) {
 			config.ConnectionAcquisitionTimeout = 1 * time.Second
 			config.MaxConnectionPoolSize = 1
 		})
@@ -66,7 +67,7 @@ func TestTimeoutAndLifetime(outer *testing.T) {
 		var driver neo4j.DriverWithContext
 		var session neo4j.SessionWithContext
 
-		driver, err = neo4j.NewDriverWithContext("bolt://10.255.255.1:8080", server.AuthToken(), server.ConfigFunc(), func(config *neo4j.Config) {
+		driver, err = neo4j.NewDriverWithContext("bolt://10.255.255.1:8080", server.AuthToken(), server.ConfigFunc(), func(config *config.Config) {
 			config.SocketConnectTimeout = 1 * time.Second
 		})
 		assertNil(t, err)
