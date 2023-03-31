@@ -36,7 +36,7 @@ type NotificationDisabledCategories struct {
 }
 
 // DisableCategories creates a NotificationDisabledCategories that disables the given categories.
-// Can be used for NotificationsDisabledCategories of neo4j.Config and neo4j.SessionConfig.
+// Can be used for NotificationsDisabledCategories of config.Config and config.SessionConfig.
 func DisableCategories(value ...NotificationCategory) NotificationDisabledCategories {
 	return NotificationDisabledCategories{value, false}
 }
@@ -58,7 +58,7 @@ func (n *NotificationDisabledCategories) DisabledCategories() []NotificationCate
 }
 
 // NotificationMinimumSeverityLevel defines the minimum severity level of notifications the server should send.
-// Can be used for NotificationsMinSeverity of neo4j.Config and neo4j.SessionConfig.
+// Can be used for NotificationsMinSeverity of config.Config and config.SessionConfig.
 type NotificationMinimumSeverityLevel string
 
 const (

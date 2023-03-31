@@ -78,7 +78,7 @@ type SessionWithContext interface {
 
 // SessionConfig is used to configure a new session, its zero value uses safe defaults.
 type SessionConfig struct {
-	// AccessMode used when using Session.Run and explicit transactions. Used to route query to
+	// AccessMode used when using Session.Run and explicit transactions. Used to route query
 	// to read or write servers when running in a cluster. Session.ReadTransaction and Session.WriteTransaction
 	// does not rely on this mode.
 	AccessMode AccessMode

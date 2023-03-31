@@ -3,6 +3,7 @@ package test_integration
 import (
 	"context"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/config"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/test-integration/dbserver"
 	"testing"
 )
@@ -21,7 +22,7 @@ func TestResultSummary(outer *testing.T) {
 	ctx := context.Background()
 
 	server = dbserver.GetDbServer(ctx)
-	driver = server.Driver(func(config *neo4j.Config) {
+	driver = server.Driver(func(config *config.Config) {
 		config.Log = neo4j.ConsoleLogger(neo4j.DEBUG)
 	})
 	assertNotNil(outer, driver)

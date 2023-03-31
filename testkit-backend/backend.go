@@ -25,6 +25,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/config"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/notifications"
 	"io"
 	"math"
@@ -332,8 +333,8 @@ func (b *backend) handleTransactionFunc(isRead bool, data map[string]any) {
 	}
 }
 
-func (b *backend) customAddressResolverFunction() neo4j.ServerAddressResolver {
-	return func(address neo4j.ServerAddress) []neo4j.ServerAddress {
+func (b *backend) customAddressResolverFunction() config.ServerAddressResolver {
+	return func(address config.ServerAddress) []config.ServerAddress {
 		id := b.nextId()
 		b.writeResponse("ResolverResolutionRequired", map[string]string{
 			"id":      id,
@@ -342,7 +343,7 @@ func (b *backend) customAddressResolverFunction() neo4j.ServerAddressResolver {
 		for {
 			b.process()
 			if addresses, ok := b.resolvedAddresses[id]; ok {
-				result := make([]neo4j.ServerAddress, len(addresses))
+				result := make([]config.ServerAddress, len(addresses))
 				for i, address := range addresses {
 					result[i] = NewServerAddress(address.(string))
 				}
@@ -358,7 +359,7 @@ type serverAddress struct {
 	port     string
 }
 
-func NewServerAddress(address string) neo4j.ServerAddress {
+func NewServerAddress(address string) config.ServerAddress {
 	parsedAddress, err := url.Parse("//" + address)
 	if err != nil {
 		panic(err)
@@ -435,7 +436,7 @@ func (b *backend) handleRequest(req map[string]any) {
 		}
 		// Parse URI (or rather type cast)
 		uri := data["uri"].(string)
-		driver, err := neo4j.NewDriverWithContext(uri, authToken, func(c *neo4j.Config) {
+		driver, err := neo4j.NewDriverWithContext(uri, authToken, func(c *config.Config) {
 			// Setup custom logger that redirects log entries back to frontend
 			c.Log = &streamLog{writeLine: b.writeLineLocked}
 			// Optional custom user agent from frontend

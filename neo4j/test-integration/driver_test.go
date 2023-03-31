@@ -21,6 +21,7 @@ package test_integration
 
 import (
 	"context"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/config"
 	"math"
 	"testing"
 	"time"
@@ -117,7 +118,7 @@ func TestDriver(outer *testing.T) {
 			driver neo4j.DriverWithContext
 		)
 
-		driver, err = neo4j.NewDriverWithContext(server.BoltURI(), server.AuthToken(), server.ConfigFunc(), func(config *neo4j.Config) {
+		driver, err = neo4j.NewDriverWithContext(server.BoltURI(), server.AuthToken(), server.ConfigFunc(), func(config *config.Config) {
 			config.MaxConnectionPoolSize = 2
 			config.ConnectionAcquisitionTimeout = 0
 		})
@@ -156,7 +157,7 @@ func TestDriver(outer *testing.T) {
 			driver neo4j.DriverWithContext
 		)
 
-		driver, err = neo4j.NewDriverWithContext(server.BoltURI(), server.AuthToken(), server.ConfigFunc(), func(config *neo4j.Config) {
+		driver, err = neo4j.NewDriverWithContext(server.BoltURI(), server.AuthToken(), server.ConfigFunc(), func(config *config.Config) {
 			config.MaxConnectionPoolSize = 2
 			config.ConnectionAcquisitionTimeout = 10 * time.Second
 		})

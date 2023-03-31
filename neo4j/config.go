@@ -27,8 +27,13 @@ import (
 	"time"
 )
 
+// Deprecated: please use config.Config directly. This alias will be removed in 6.0.
 type Config = config.Config
+
+// Deprecated: please use config.ServerAddressResolver directly. This alias will be removed in 6.0.
 type ServerAddressResolver = config.ServerAddressResolver
+
+// Deprecated: please use config.ServerAddress directly. This alias will be removed in 6.0.
 type ServerAddress = config.ServerAddress
 
 func defaultConfig() *Config {

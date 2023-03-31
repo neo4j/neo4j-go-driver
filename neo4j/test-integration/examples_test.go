@@ -23,6 +23,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/config"
 	"testing"
 	"time"
 
@@ -451,10 +452,10 @@ func createDriverWithCustomAuth(uri, principal, credentials, realm, scheme strin
 // end::config-trust[]
 
 // tag::config-custom-resolver[]
-func createDriverWithAddressResolver(virtualURI, username, password string, addresses ...neo4j.ServerAddress) (neo4j.DriverWithContext, error) {
+func createDriverWithAddressResolver(virtualURI, username, password string, addresses ...config.ServerAddress) (neo4j.DriverWithContext, error) {
 	// Address resolver is only valid for neo4j uri
-	return neo4j.NewDriverWithContext(virtualURI, neo4j.BasicAuth(username, password, ""), func(config *neo4j.Config) {
-		config.AddressResolver = func(address neo4j.ServerAddress) []neo4j.ServerAddress {
+	return neo4j.NewDriverWithContext(virtualURI, neo4j.BasicAuth(username, password, ""), func(settings *config.Config) {
+		settings.AddressResolver = func(address config.ServerAddress) []config.ServerAddress {
 			return addresses
 		}
 	})
@@ -495,7 +496,7 @@ func addPerson(ctx context.Context, name string) error {
 
 // tag::config-connection-pool[]
 func createDriverWithCustomizedConnectionPool(uri, username, password string) (neo4j.DriverWithContext, error) {
-	return neo4j.NewDriverWithContext(uri, neo4j.BasicAuth(username, password, ""), func(config *neo4j.Config) {
+	return neo4j.NewDriverWithContext(uri, neo4j.BasicAuth(username, password, ""), func(config *config.Config) {
 		config.MaxConnectionLifetime = 30 * time.Minute
 		config.MaxConnectionPoolSize = 50
 		config.ConnectionAcquisitionTimeout = 2 * time.Minute
@@ -506,7 +507,7 @@ func createDriverWithCustomizedConnectionPool(uri, username, password string) (n
 
 // tag::config-connection-timeout[]
 func createDriverWithConnectionTimeout(uri, username, password string) (neo4j.DriverWithContext, error) {
-	return neo4j.NewDriverWithContext(uri, neo4j.BasicAuth(username, password, ""), func(config *neo4j.Config) {
+	return neo4j.NewDriverWithContext(uri, neo4j.BasicAuth(username, password, ""), func(config *config.Config) {
 		config.SocketConnectTimeout = 15 * time.Second
 	})
 }
@@ -516,7 +517,7 @@ func createDriverWithConnectionTimeout(uri, username, password string) (neo4j.Dr
 // tag::config-max-retry-time[]
 // This driver is used to run queries, needs actual TLS configuration as well.
 func createDriverWithMaxRetryTime(uri, username, password string) (neo4j.DriverWithContext, error) {
-	return neo4j.NewDriverWithContext(uri, neo4j.BasicAuth(username, password, ""), func(config *neo4j.Config) {
+	return neo4j.NewDriverWithContext(uri, neo4j.BasicAuth(username, password, ""), func(config *config.Config) {
 		config.MaxTransactionRetryTime = 15 * time.Second
 	})
 }
