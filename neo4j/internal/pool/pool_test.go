@@ -23,6 +23,7 @@ import (
 	"context"
 	"errors"
 	iauth "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/auth"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/bolt"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
 	"math/rand"
 	"sync"
@@ -41,12 +42,12 @@ func TestPoolBorrowReturn(outer *testing.T) {
 	maxAge := 1 * time.Second
 	birthdate := time.Now()
 
-	succeedingConnect := func(_ context.Context, s string, _ log.BoltLogger, _ *db.ReAuthToken) (db.Connection, error) {
+	succeedingConnect := func(_ context.Context, s string, _ *db.ReAuthToken, _ bolt.Neo4jErrorCallback, _ log.BoltLogger) (db.Connection, error) {
 		return &testutil.ConnFake{Name: s, Alive: true, Birth: birthdate}, nil
 	}
 
 	failingError := errors.New("whatever")
-	failingConnect := func(_ context.Context, s string, _ log.BoltLogger, _ *db.ReAuthToken) (db.Connection, error) {
+	failingConnect := func(_ context.Context, s string, _ *db.ReAuthToken, _ bolt.Neo4jErrorCallback, _ log.BoltLogger) (db.Connection, error) {
 		return nil, failingError
 	}
 
@@ -264,7 +265,7 @@ func TestPoolResourceUsage(ot *testing.T) {
 	maxAge := 1 * time.Second
 	birthdate := time.Now()
 
-	succeedingConnect := func(_ context.Context, s string, _ log.BoltLogger, _ *db.ReAuthToken) (db.Connection, error) {
+	succeedingConnect := func(_ context.Context, s string, _ *db.ReAuthToken, _ bolt.Neo4jErrorCallback, _ log.BoltLogger) (db.Connection, error) {
 		return &testutil.ConnFake{Name: s, Alive: true, Birth: birthdate}, nil
 	}
 
@@ -409,7 +410,7 @@ func TestPoolResourceUsage(ot *testing.T) {
 func TestPoolCleanup(ot *testing.T) {
 	birthdate := time.Now()
 	maxLife := 1 * time.Second
-	succeedingConnect := func(_ context.Context, s string, _ log.BoltLogger, _ *db.ReAuthToken) (db.Connection, error) {
+	succeedingConnect := func(_ context.Context, s string, _ *db.ReAuthToken, _ bolt.Neo4jErrorCallback, _ log.BoltLogger) (db.Connection, error) {
 		return &testutil.ConnFake{Name: s, Alive: true, Birth: birthdate}, nil
 	}
 
@@ -474,7 +475,7 @@ func TestPoolCleanup(ot *testing.T) {
 	})
 
 	ot.Run("Should not remove servers with only idle connections but with recent connect failures ", func(t *testing.T) {
-		failingConnect := func(_ context.Context, s string, _ log.BoltLogger, _ *db.ReAuthToken) (db.Connection, error) {
+		failingConnect := func(_ context.Context, s string, _ *db.ReAuthToken, _ bolt.Neo4jErrorCallback, _ log.BoltLogger) (db.Connection, error) {
 			return nil, errors.New("an error")
 		}
 		p := New(0, maxLife, failingConnect, logger, "pool id")
@@ -507,8 +508,8 @@ func TestPoolCleanup(ot *testing.T) {
 	})
 }
 
-func connectTo(singleConnection *testutil.ConnFake) func(ctx context.Context, name string, _ log.BoltLogger, _ *db.ReAuthToken) (db.Connection, error) {
-	return func(ctx context.Context, name string, _ log.BoltLogger, _ *db.ReAuthToken) (db.Connection, error) {
+func connectTo(singleConnection *testutil.ConnFake) func(ctx context.Context, name string, _ *db.ReAuthToken, _ bolt.Neo4jErrorCallback, _ log.BoltLogger) (db.Connection, error) {
+	return func(ctx context.Context, name string, _ *db.ReAuthToken, _ bolt.Neo4jErrorCallback, _ log.BoltLogger) (db.Connection, error) {
 		return singleConnection, nil
 	}
 }

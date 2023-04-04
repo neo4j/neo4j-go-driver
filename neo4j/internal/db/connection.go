@@ -122,6 +122,8 @@ type Connection interface {
 	ReAuth(context.Context, *ReAuthToken) error
 	// Version returns the protocol version of the connection
 	Version() db.ProtocolVersion
+	// ResetAuth clears any authentication token held by this connection
+	ResetAuth()
 }
 
 type RoutingTable struct {

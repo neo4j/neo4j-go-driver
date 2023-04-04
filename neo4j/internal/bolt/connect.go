@@ -46,7 +46,16 @@ var versions = [4]protocolVersion{
 
 // Connect initiates the negotiation of the Bolt protocol version.
 // Returns the instance of bolt protocol implementing the low-level Connection interface.
-func Connect(ctx context.Context, serverName string, conn net.Conn, auth *db.ReAuthToken, userAgent string, routingContext map[string]string, logger log.Logger, boltLog log.BoltLogger) (db.Connection, error) {
+func Connect(
+	ctx context.Context,
+	serverName string,
+	conn net.Conn,
+	auth *db.ReAuthToken,
+	userAgent string,
+	routingContext map[string]string,
+	callback Neo4jErrorCallback,
+	logger log.Logger,
+	boltLogger log.BoltLogger) (db.Connection, error) {
 	// Perform Bolt handshake to negotiate version
 	// Send handshake to server
 	handshake := []byte{
@@ -56,9 +65,9 @@ func Connect(ctx context.Context, serverName string, conn net.Conn, auth *db.ReA
 		0x00, versions[2].back, versions[2].minor, versions[2].major,
 		0x00, versions[3].back, versions[3].minor, versions[3].major,
 	}
-	if boltLog != nil {
-		boltLog.LogClientMessage("", "<MAGIC> %#010X", handshake[0:4])
-		boltLog.LogClientMessage("", "<HANDSHAKE> %#010X %#010X %#010X %#010X", handshake[4:8], handshake[8:12], handshake[12:16], handshake[16:20])
+	if boltLogger != nil {
+		boltLogger.LogClientMessage("", "<MAGIC> %#010X", handshake[0:4])
+		boltLogger.LogClientMessage("", "<HANDSHAKE> %#010X %#010X %#010X %#010X", handshake[4:8], handshake[8:12], handshake[12:16], handshake[16:20])
 	}
 	_, err := racing.NewRacingWriter(conn).Write(ctx, handshake)
 	if err != nil {
@@ -72,8 +81,8 @@ func Connect(ctx context.Context, serverName string, conn net.Conn, auth *db.ReA
 		return nil, err
 	}
 
-	if boltLog != nil {
-		boltLog.LogServerMessage("", "<HANDSHAKE> %#010X", buf)
+	if boltLogger != nil {
+		boltLogger.LogServerMessage("", "<HANDSHAKE> %#010X", buf)
 	}
 
 	major := buf[3]
@@ -81,11 +90,11 @@ func Connect(ctx context.Context, serverName string, conn net.Conn, auth *db.ReA
 	var boltConn db.Connection
 	switch major {
 	case 3:
-		boltConn = NewBolt3(serverName, conn, logger, boltLog)
+		boltConn = NewBolt3(serverName, conn, callback, logger, boltLogger)
 	case 4:
-		boltConn = NewBolt4(serverName, conn, logger, boltLog)
+		boltConn = NewBolt4(serverName, conn, callback, logger, boltLogger)
 	case 5:
-		boltConn = NewBolt5(serverName, conn, logger, boltLog)
+		boltConn = NewBolt5(serverName, conn, callback, logger, boltLogger)
 	case 0:
 		return nil, fmt.Errorf("server did not accept any of the requested Bolt versions (%#v)", versions)
 	default:

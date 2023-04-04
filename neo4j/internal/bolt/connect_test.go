@@ -55,7 +55,7 @@ func TestConnect(ot *testing.T) {
 			srv.closeConnection()
 		}()
 
-		_, err := Connect(context.Background(), "servername", conn, auth, "007", nil, logger, nil)
+		_, err := Connect(context.Background(), "servername", conn, auth, "007", nil, nil, logger, nil)
 		AssertError(t, err)
 	})
 
@@ -70,7 +70,7 @@ func TestConnect(ot *testing.T) {
 			srv.acceptVersion(1, 0)
 		}()
 
-		boltconn, err := Connect(context.Background(), "servername", conn, auth, "007", nil, logger, nil)
+		boltconn, err := Connect(context.Background(), "servername", conn, auth, "007", nil, nil, logger, nil)
 		AssertError(t, err)
 		if boltconn != nil {
 			t.Error("Shouldn't returned conn")

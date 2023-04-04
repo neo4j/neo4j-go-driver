@@ -193,3 +193,6 @@ func (c *ConnFake) ReAuth(context.Context, *idb.ReAuthToken) error {
 func (c *ConnFake) Version() db.ProtocolVersion {
 	return c.ConnectionVersion
 }
+
+func (c *ConnFake) ResetAuth() {
+}

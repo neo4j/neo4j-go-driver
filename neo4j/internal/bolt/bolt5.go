@@ -24,6 +24,7 @@ import (
 	"errors"
 	"fmt"
 	idb "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/errorutil"
 	"net"
 	"reflect"
 	"time"
@@ -101,19 +102,22 @@ type bolt5 struct {
 	lastQid       int64 // Last seen qid
 	idleDate      time.Time
 	auth          map[string]any
+	resetAuth     bool
+	onNeo4jError  Neo4jErrorCallback
 }
 
-func NewBolt5(serverName string, conn net.Conn, logger log.Logger, boltLog log.BoltLogger) *bolt5 {
+func NewBolt5(serverName string, conn net.Conn, callback Neo4jErrorCallback, logger log.Logger, boltLog log.BoltLogger) *bolt5 {
 	now := time.Now()
 	b := &bolt5{
-		state:      bolt5Unauthorized,
-		conn:       conn,
-		serverName: serverName,
-		birthDate:  now,
-		idleDate:   now,
-		log:        logger,
-		streams:    openstreams{},
-		lastQid:    -1,
+		state:        bolt5Unauthorized,
+		conn:         conn,
+		serverName:   serverName,
+		birthDate:    now,
+		idleDate:     now,
+		log:          logger,
+		streams:      openstreams{},
+		lastQid:      -1,
+		onNeo4jError: callback,
 	}
 	b.queue = newMessageQueue(
 		conn,
@@ -788,6 +792,11 @@ func (b *bolt5) SetBoltLogger(boltLogger log.BoltLogger) {
 }
 
 func (b *bolt5) ReAuth(ctx context.Context, auth *idb.ReAuthToken) error {
+	if b.resetAuth {
+		b.log.Infof(log.Bolt5, b.logId, "Closing connection because auth token expired")
+		b.Close(ctx)
+		return nil
+	}
 	if err := checkReAuth(auth, b); err != nil {
 		return err
 	}
@@ -826,6 +835,14 @@ func (b *bolt5) Version() db.ProtocolVersion {
 	return db.ProtocolVersion{
 		Major: 5,
 		Minor: b.minor,
+	}
+}
+
+func (b *bolt5) ResetAuth() {
+	if b.minor == 0 {
+		b.resetAuth = true
+	} else {
+		b.auth = nil
 	}
 }
 
@@ -904,9 +921,9 @@ func (b *bolt5) discardResponseHandler(stream *stream) responseHandler {
 			b.streams.remove(stream)
 			b.checkStreams()
 		},
-		onFailure: func(failure *db.Neo4jError) {
+		onFailure: func(ctx context.Context, failure *db.Neo4jError) {
 			stream.err = failure
-			b.setError(failure, isFatalError(failure)) // Will detach the stream
+			b.onFailure(ctx, failure) // Will detach the stream
 		},
 		onUnknown: func(msg any) {
 			b.setError(fmt.Errorf("unknown response %v", msg), true)
@@ -946,9 +963,9 @@ func (b *bolt5) pullResponseHandler(stream *stream) responseHandler {
 			b.streams.remove(stream)
 			b.checkStreams()
 		},
-		onFailure: func(failure *db.Neo4jError) {
+		onFailure: func(ctx context.Context, failure *db.Neo4jError) {
 			stream.err = failure
-			b.setError(failure, isFatalError(failure)) // Will detach the stream
+			b.onFailure(ctx, failure) // Will detach the stream
 		},
 		onUnknown: func(msg any) {
 			b.setError(fmt.Errorf("unknown response %v", msg), true)
@@ -961,7 +978,8 @@ func (b *bolt5) resetResponseHandler() responseHandler {
 		onSuccess: func(resetSuccess *success) {
 			b.state = bolt5Ready
 		},
-		onFailure: func(*db.Neo4jError) {
+		onFailure: func(ctx context.Context, failure *db.Neo4jError) {
+			_ = b.onNeo4jError(ctx, b, failure)
 			b.state = bolt5Dead
 		},
 		onUnknown: func(any) {
@@ -1003,8 +1021,13 @@ func (b *bolt5) onNextMessageError(err error) {
 	b.setError(err, true)
 }
 
-func (b *bolt5) onFailure(err *db.Neo4jError) {
-	b.setError(err, isFatalError(err))
+func (b *bolt5) onFailure(ctx context.Context, failure *db.Neo4jError) {
+	var err error
+	err = failure
+	if callbackErr := b.onNeo4jError(ctx, b, failure); callbackErr != nil {
+		err = errorutil.CombineErrors(failure, callbackErr)
+	}
+	b.setError(err, isFatalError(failure))
 }
 
 func (b *bolt5) onUnknown(msg any) {

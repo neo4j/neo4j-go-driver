@@ -160,7 +160,7 @@ func (q *messageQueue) receive(ctx context.Context) error {
 	case *success:
 		callback.onSuccess(message)
 	case *db.Neo4jError:
-		callback.onFailure(message)
+		callback.onFailure(ctx, message)
 		return message
 	case *ignored:
 		callback.onIgnored(message)

@@ -24,6 +24,7 @@ import (
 	"errors"
 	"fmt"
 	idb "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/errorutil"
 	"net"
 	"time"
 
@@ -84,9 +85,11 @@ type bolt3 struct {
 	err           error // Last fatal error
 	minor         int
 	idleDate      time.Time
+	resetAuth     bool
+	onNeo4jError  Neo4jErrorCallback
 }
 
-func NewBolt3(serverName string, conn net.Conn, logger log.Logger, boltLog log.BoltLogger) *bolt3 {
+func NewBolt3(serverName string, conn net.Conn, callback Neo4jErrorCallback, logger log.Logger, boltLog log.BoltLogger) *bolt3 {
 	now := time.Now()
 	b := &bolt3{
 		state:      bolt3_unauthorized,
@@ -100,9 +103,10 @@ func NewBolt3(serverName string, conn net.Conn, logger log.Logger, boltLog log.B
 			},
 			connReadTimeout: -1,
 		},
-		birthDate: now,
-		idleDate:  now,
-		log:       logger,
+		birthDate:    now,
+		idleDate:     now,
+		log:          logger,
+		onNeo4jError: callback,
 	}
 	b.out = &outgoing{
 		chunker: newChunker(),
@@ -147,17 +151,20 @@ func (b *bolt3) receiveMsg(ctx context.Context) any {
 // to a sent command.
 // Sets b.err and b.state on failure
 func (b *bolt3) receiveSuccess(ctx context.Context) *success {
-	switch v := b.receiveMsg(ctx).(type) {
+	switch message := b.receiveMsg(ctx).(type) {
 	case *success:
-		return v
+		return message
 	case *db.Neo4jError:
 		b.state = bolt3_failed
-		b.err = v
-		if v.Classification() == "ClientError" {
+		b.err = message
+		if message.Classification() == "ClientError" {
 			// These could include potentially large cypher statement, only log to debug
-			b.log.Debugf(log.Bolt3, b.logId, "%s", v)
+			b.log.Debugf(log.Bolt3, b.logId, "%s", message)
 		} else {
-			b.log.Error(log.Bolt3, b.logId, v)
+			b.log.Error(log.Bolt3, b.logId, message)
+		}
+		if err := b.onNeo4jError(ctx, b, message); err != nil {
+			b.err = errorutil.CombineErrors(message, b.err)
 		}
 		return nil
 	default:
@@ -568,13 +575,13 @@ func (b *bolt3) receiveNext(ctx context.Context) (*db.Record, *db.Summary, error
 		return nil, nil, b.err
 	}
 
-	switch x := res.(type) {
+	switch message := res.(type) {
 	case *db.Record:
-		x.Keys = b.currStream.keys
-		return x, nil, nil
+		message.Keys = b.currStream.keys
+		return message, nil, nil
 	case *success:
 		// End of stream, parse summary
-		sum := x.summary()
+		sum := message.summary()
 		if sum == nil {
 			b.state = bolt3_dead
 			b.err = errors.New("failed to parse summary")
@@ -602,17 +609,20 @@ func (b *bolt3) receiveNext(ctx context.Context) (*db.Record, *db.Summary, error
 		b.currStream = nil
 		return nil, sum, nil
 	case *db.Neo4jError:
-		b.err = x
+		b.err = message
 		b.currStream.err = b.err
 		b.currStream = nil
 		b.state = bolt3_failed
-		if x.Classification() == "ClientError" {
+		if message.Classification() == "ClientError" {
 			// These could include potentially large cypher statement, only log to debug
-			b.log.Debugf(log.Bolt3, b.logId, "%s", x)
+			b.log.Debugf(log.Bolt3, b.logId, "%s", message)
 		} else {
-			b.log.Error(log.Bolt3, b.logId, x)
+			b.log.Error(log.Bolt3, b.logId, message)
 		}
-		return nil, nil, x
+		if err := b.onNeo4jError(ctx, b, message); err != nil {
+			return nil, nil, errorutil.CombineErrors(message, err)
+		}
+		return nil, nil, message
 	default:
 		b.state = bolt3_dead
 		b.err = errors.New("unknown response")
@@ -772,8 +782,13 @@ func (b *bolt3) SetBoltLogger(boltLogger log.BoltLogger) {
 	b.out.boltLogger = boltLogger
 }
 
-func (b *bolt3) ReAuth(_ context.Context, auth *idb.ReAuthToken) error {
-	return b.assertReAuth(auth)
+func (b *bolt3) ReAuth(ctx context.Context, auth *idb.ReAuthToken) error {
+	if b.resetAuth {
+		b.log.Infof(log.Bolt3, b.logId, "Closing connection because auth token expired")
+		b.Close(ctx)
+		return nil
+	}
+	return checkReAuth(auth, b)
 }
 
 func (b *bolt3) Version() db.ProtocolVersion {
@@ -783,6 +798,6 @@ func (b *bolt3) Version() db.ProtocolVersion {
 	}
 }
 
-func (b *bolt3) assertReAuth(auth *idb.ReAuthToken) error {
-	return checkReAuth(auth, b)
+func (b *bolt3) ResetAuth() {
+	b.resetAuth = true
 }

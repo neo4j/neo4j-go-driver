@@ -41,12 +41,12 @@ func TestMessageQueue(outer *testing.T) {
 			// at least 1 non-nil function is needed per handler to ensure proper equality check
 			// see assertEqualResponseHandlers
 			msgHello:    {onSuccess: func(*success) {}},
-			msgLogon:    {onFailure: func(*db.Neo4jError) {}},
+			msgLogon:    {onFailure: func(context.Context, *db.Neo4jError) {}},
 			msgRoute:    {onIgnored: func(*ignored) {}},
 			msgBegin:    {onUnknown: func(any) {}},
 			msgRun:      {onRecord: func(*db.Record) {}},
 			msgPullN:    {onSuccess: func(*success) {}},
-			msgCommit:   {onFailure: func(*db.Neo4jError) {}},
+			msgCommit:   {onFailure: func(context.Context, *db.Neo4jError) {}},
 			msgRollback: {onIgnored: func(*ignored) {}},
 			msgDiscardN: {onUnknown: func(any) {}},
 			msgReset:    {onRecord: func(*db.Record) {}},

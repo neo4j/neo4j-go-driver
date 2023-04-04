@@ -23,6 +23,7 @@ import (
 	"container/list"
 	"context"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/log"
 	"sync/atomic"
 	"time"
 )
@@ -49,25 +50,37 @@ var sharedRoundRobin uint32
 const rememberFailedConnectDuration = 3 * time.Minute
 
 // Returns an idle connection if any
-func (s *server) getIdle(ctx context.Context, idlenessThreshold time.Duration) (db.Connection, bool) {
+func (s *server) getIdle(
+	ctx context.Context,
+	idlenessThreshold time.Duration,
+	auth *db.ReAuthToken,
+	boltLogger log.BoltLogger) (db.Connection, error, bool) {
+
 	availableConnection := s.idle.Front()
 	found := availableConnection != nil
 	if found {
 		idleConnection := s.idle.Remove(availableConnection)
 		connection := idleConnection.(db.Connection)
+		connection.SetBoltLogger(boltLogger)
 		if time.Since(connection.IdleDate()) > idlenessThreshold {
 			connection.ForceReset(ctx)
 			if !connection.IsAlive() {
-				return nil, found
+				return nil, nil, true
 			}
+		}
+		if err := connection.ReAuth(ctx, auth); err != nil {
+			return connection, err, true
+		}
+		if !connection.IsAlive() {
+			return nil, nil, true
 		}
 		s.busy.PushFront(idleConnection)
 		// Update round-robin counter every time we give away a connection and keep track
 		// of our own round-robin index
 		s.roundRobin = atomic.AddUint32(&sharedRoundRobin, 1)
-		return connection, found
+		return connection, nil, true
 	}
-	return nil, found
+	return nil, nil, false
 }
 
 func (s *server) notifyFailedConnect(now time.Time) {
@@ -122,12 +135,12 @@ func (s *server) returnBusy(c db.Connection) {
 }
 
 // Number of idle connections
-func (s server) numIdle() int {
+func (s *server) numIdle() int {
 	return s.idle.Len()
 }
 
 // Number of busy connections
-func (s server) numBusy() int {
+func (s *server) numBusy() int {
 	return s.busy.Len()
 }
 
@@ -174,6 +187,15 @@ func (s *server) closeAll(ctx context.Context) {
 	closeAndEmptyConnections(ctx, s.idle)
 	// Closing the busy connections could mean here that we do close from another thread.
 	closeAndEmptyConnections(ctx, s.busy)
+}
+
+func (s *server) executeForAllConnections(callback func(c db.Connection)) {
+	for item := s.busy.Front(); item != nil; item = item.Next() {
+		callback(item.Value.(db.Connection))
+	}
+	for item := s.idle.Front(); item != nil; item = item.Next() {
+		callback(item.Value.(db.Connection))
+	}
 }
 
 func closeAndEmptyConnections(ctx context.Context, l list.List) {
