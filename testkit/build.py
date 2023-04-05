@@ -2,14 +2,18 @@
 Executed in Go driver container.
 Responsible for building driver and test backend.
 """
+
+import sys
 from pathlib import Path
 import os
 import subprocess
 
 
 def run(args, env=None):
-    subprocess.run(args, universal_newlines=True, stderr=subprocess.STDOUT,
-                   check=True, env=env)
+    subprocess.run(
+        args, universal_newlines=True, check=True, env=env,
+        stdout=sys.stdout, stderr=sys.stderr,
+    )
 
 
 if __name__ == "__main__":
