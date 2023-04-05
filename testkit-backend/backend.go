@@ -213,7 +213,7 @@ func (b *backend) process() bool {
 func (b *backend) writeResponse(name string, data any) {
 	response := map[string]any{"name": name, "data": data}
 	responseJson, err := json.Marshal(response)
-	fmt.Printf("RES: %s\n", name) //string(responseJson))
+	fmt.Printf("RES: %s %s\n", name, string(responseJson))
 	if err != nil {
 		panic(err.Error())
 	}
@@ -382,7 +382,13 @@ func (b *backend) handleRequest(req map[string]any) {
 	name := req["name"].(string)
 	data := req["data"].(map[string]any)
 
-	fmt.Printf("REQ: %s\n", name)
+	dataJson, err := json.Marshal(data)
+	if err != nil {
+		// This data comes from a json decoder. So it better be serializable.
+		panic(err)
+	}
+
+	fmt.Printf("REQ: %s %s\n", name, dataJson)
 	switch name {
 
 	case "ResolverResolutionCompleted":
