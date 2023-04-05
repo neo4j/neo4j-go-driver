@@ -28,6 +28,7 @@ import (
 	idb "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/errorutil"
 	"net"
+	"reflect"
 	"time"
 
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/db"
@@ -903,12 +904,23 @@ func (b *bolt4) SetBoltLogger(boltLogger log.BoltLogger) {
 }
 
 func (b *bolt4) ReAuth(ctx context.Context, auth *idb.ReAuthToken) error {
+	if err := checkReAuth(auth, b); err != nil {
+		return err
+	}
 	if b.resetAuth {
-		b.log.Infof(log.Bolt4, b.logId, "Closing connection because auth token expired")
+		b.log.Infof(log.Bolt4, b.logId, "Closing connection because auth token expired (informed by other connection)")
 		b.Close(ctx)
 		return nil
 	}
-	return checkReAuth(auth, b)
+	token, err := auth.Manager.GetAuthToken(ctx)
+	if err != nil {
+		return err
+	}
+	if !reflect.DeepEqual(b.auth, token.Tokens) {
+		b.log.Infof(log.Bolt4, b.logId, "Closing connection because auth token expired (informed by auth manager)")
+		b.Close(ctx)
+	}
+	return nil
 }
 
 func (b *bolt4) Version() db.ProtocolVersion {

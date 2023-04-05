@@ -793,26 +793,57 @@ func (b *bolt5) SetBoltLogger(boltLogger log.BoltLogger) {
 }
 
 func (b *bolt5) ReAuth(ctx context.Context, auth *idb.ReAuthToken) error {
-	if b.resetAuth && b.minor == 0 {
-		b.log.Infof(log.Bolt5, b.logId, "Closing connection because auth token expired")
-		b.Close(ctx)
-		return nil
+	if b.minor == 0 {
+		return b.fallbackReAuth(ctx, auth)
 	}
+	return b.reAuth(ctx, auth)
+}
+
+func (b *bolt5) fallbackReAuth(ctx context.Context, auth *idb.ReAuthToken) error {
 	if err := checkReAuth(auth, b); err != nil {
 		return err
+	}
+	if b.resetAuth {
+		b.log.Infof(log.Bolt4, b.logId, "Closing connection because auth token expired (informed by other connection)")
+		b.Close(ctx)
+		return nil
 	}
 	token, err := auth.Manager.GetAuthToken(ctx)
 	if err != nil {
 		return err
 	}
-	if b.resetAuth || !reflect.DeepEqual(b.auth, token.Tokens) {
+	if !reflect.DeepEqual(b.auth, token.Tokens) {
+		b.log.Infof(log.Bolt4, b.logId, "Closing connection because auth token expired (informed by auth manager)")
+		b.Close(ctx)
+	}
+	return nil
+}
+
+func (b *bolt5) reAuth(ctx context.Context, auth *idb.ReAuthToken) error {
+	token, err := auth.Manager.GetAuthToken(ctx)
+	if err != nil {
+		return err
+	}
+	if b.resetAuth {
+		b.log.Infof(
+			log.Bolt4, b.logId,
+			"Re-authenticating connection because auth token expired (informed by other connection)")
 		b.queue.appendLogoff(b.logoffResponseHandler())
 		b.queue.appendLogon(token.Tokens, b.logonResponseHandler())
-		if b.queue.send(ctx); b.err != nil {
-			return b.err
-		}
-		b.auth = token.Tokens
+	} else if !reflect.DeepEqual(b.auth, token.Tokens) {
+		b.log.Infof(
+			log.Bolt4, b.logId,
+			"Re-authenticating connection because auth token expired (informed by auth manager)")
+		b.queue.appendLogoff(b.logoffResponseHandler())
+		b.queue.appendLogon(token.Tokens, b.logonResponseHandler())
+	} else {
+		return nil
 	}
+
+	if b.queue.send(ctx); b.err != nil {
+		return b.err
+	}
+	b.auth = token.Tokens
 	return nil
 }
 
