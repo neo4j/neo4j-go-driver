@@ -8,13 +8,13 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      https://www.apache.org/licenses/LICENSE-2.0
+ *     https://www.apache.org/licenses/LICENSE-2.0
  *
- *  Unless required by applicable law or agreed to in writing, software
- *  distributed under the License is distributed on an "AS IS" BASIS,
- *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *  See the License for the specific language governing permissions and
- *  limitations under the License.
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 
 package bolt
@@ -23,6 +23,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/auth"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/collections"
 	idb "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/errorutil"
@@ -101,6 +102,7 @@ type bolt4 struct {
 	lastQid       int64 // Last seen qid
 	idleDate      time.Time
 	queue         messageQueue
+	auth          map[string]any
 	resetAuth     bool
 	onNeo4jError  Neo4jErrorCallback
 }
@@ -228,6 +230,7 @@ func (b *bolt4) Connect(ctx context.Context, minor int, auth *idb.ReAuthToken, u
 	if err != nil {
 		return err
 	}
+	b.auth = token.Tokens
 	for k, v := range token.Tokens {
 		_, exists := hello[k]
 		if !exists {
@@ -917,6 +920,12 @@ func (b *bolt4) Version() db.ProtocolVersion {
 
 func (b *bolt4) ResetAuth() {
 	b.resetAuth = true
+}
+
+func (b *bolt4) GetCurrentAuth() auth.Token {
+	return auth.Token{
+		Tokens: b.auth,
+	}
 }
 
 func (b *bolt4) helloResponseHandler(checkUtcPatch bool) responseHandler {

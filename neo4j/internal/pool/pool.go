@@ -8,13 +8,13 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      https://www.apache.org/licenses/LICENSE-2.0
+ *     https://www.apache.org/licenses/LICENSE-2.0
  *
- *  Unless required by applicable law or agreed to in writing, software
- *  distributed under the License is distributed on an "AS IS" BASIS,
- *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *  See the License for the specific language governing permissions and
- *  limitations under the License.
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 
 // Package pool handles the database connection pool.
@@ -27,6 +27,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/db"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/auth"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/bolt"
 	idb "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/racing"
@@ -42,6 +43,7 @@ import (
 const DefaultLivenessCheckThreshold = math.MaxInt64
 
 type Connect func(context.Context, string, *idb.ReAuthToken, bolt.Neo4jErrorCallback, log.BoltLogger) (idb.Connection, error)
+type OnTokenExpired func(context.Context, auth.Token) error
 
 type qitem struct {
 	servers []string
@@ -50,17 +52,18 @@ type qitem struct {
 }
 
 type Pool struct {
-	maxSize    int
-	maxAge     time.Duration
-	connect    Connect
-	servers    map[string]*server
-	serversMut racing.Mutex
-	queueMut   racing.Mutex
-	queue      list.List
-	now        func() time.Time
-	closed     bool
-	log        log.Logger
-	logId      string
+	maxSize        int
+	maxAge         time.Duration
+	connect        Connect
+	onTokenExpired OnTokenExpired
+	servers        map[string]*server
+	serversMut     racing.Mutex
+	queueMut       racing.Mutex
+	queue          list.List
+	now            func() time.Time
+	closed         bool
+	log            log.Logger
+	logId          string
 }
 
 type serverPenalty struct {
@@ -68,22 +71,30 @@ type serverPenalty struct {
 	penalty uint32
 }
 
-func New(maxSize int, maxAge time.Duration, connect Connect, logger log.Logger, logId string) *Pool {
+func New(
+	maxSize int,
+	maxAge time.Duration,
+	connect Connect,
+	expiredCallback OnTokenExpired,
+	logger log.Logger,
+	logId string,
+) *Pool {
 	// Means infinite life, simplifies checking later on
 	if maxAge <= 0 {
 		maxAge = 1<<63 - 1
 	}
 
 	p := &Pool{
-		maxSize:    maxSize,
-		maxAge:     maxAge,
-		connect:    connect,
-		servers:    make(map[string]*server),
-		serversMut: racing.NewMutex(),
-		queueMut:   racing.NewMutex(),
-		now:        time.Now,
-		logId:      logId,
-		log:        logger,
+		maxSize:        maxSize,
+		maxAge:         maxAge,
+		connect:        connect,
+		onTokenExpired: expiredCallback,
+		servers:        make(map[string]*server),
+		serversMut:     racing.NewMutex(),
+		queueMut:       racing.NewMutex(),
+		now:            time.Now,
+		logId:          logId,
+		log:            logger,
 	}
 	p.log.Infof(log.Pool, p.logId, "Created")
 	return p
@@ -501,6 +512,10 @@ func (p *Pool) OnConnectionError(ctx context.Context, connection idb.Connection,
 		server.executeForAllConnections(func(c idb.Connection) {
 			c.ResetAuth()
 		})
+	} else if error.Code == "Neo.ClientError.Security.TokenExpired" {
+		if err := p.onTokenExpired(ctx, connection.GetCurrentAuth()); err != nil {
+			return err
+		}
 	}
 	return nil
 }

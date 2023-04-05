@@ -29,4 +29,4 @@ func (a Token) GetAuthToken(context.Context) (Token, error) {
 	return a, nil
 }
 
-func (a Token) OnTokenExpired(Token) {}
+func (a Token) OnTokenExpired(context.Context, Token) error { return nil }

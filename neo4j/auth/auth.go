@@ -26,5 +26,5 @@ import (
 
 type TokenManager interface {
 	GetAuthToken(ctx context.Context) (auth.Token, error)
-	OnTokenExpired(auth.Token)
+	OnTokenExpired(context.Context, auth.Token) error
 }
