@@ -40,6 +40,10 @@ import (
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/test-integration/dbserver"
 )
 
+func noopOnNeo4jError(context.Context, idb.Connection, *db.Neo4jError) error {
+	return nil
+}
+
 func makeRawConnection(ctx context.Context, logger log.Logger, boltLogger log.BoltLogger) (
 	dbserver.DbServer, idb.Connection) {
 	server := dbserver.GetDbServer(ctx)
@@ -65,7 +69,7 @@ func makeRawConnection(ctx context.Context, logger log.Logger, boltLogger log.Bo
 		},
 	}
 
-	boltConn, err := bolt.Connect(context.Background(), parsedUri.Host, tcpConn, auth, "007", nil, nil, logger, boltLogger)
+	boltConn, err := bolt.Connect(context.Background(), parsedUri.Host, tcpConn, auth, "007", nil, noopOnNeo4jError, logger, boltLogger)
 	if err != nil {
 		panic(err)
 	}

@@ -73,7 +73,7 @@ func TestServer(ot *testing.T) {
 
 	ot.Run("getIdle/returnBusy", func(t *testing.T) {
 		s := NewServer()
-		c1 := &testutil.ConnFake{}
+		c1 := &testutil.ConnFake{Alive: true}
 		registerIdle(s, c1)
 
 		c2, _, _ := s.getIdle(context.Background(), DefaultLivenessCheckThreshold, nil, nil)
@@ -92,7 +92,7 @@ func TestServer(ot *testing.T) {
 		conns := make([]*testutil.ConnFake, 3)
 		now := time.Now()
 		for i := range conns {
-			c := &testutil.ConnFake{Birth: now}
+			c := &testutil.ConnFake{Birth: now, Alive: true}
 			conns[i] = c
 			registerIdle(s, c)
 		}
@@ -141,7 +141,7 @@ func TestServerPenalty(t *testing.T) {
 
 	// Add one busy connection to srv1
 	// Higher penalty to srv1 since it is in use
-	c11 := &testutil.ConnFake{Id: 11}
+	c11 := &testutil.ConnFake{Id: 11, Alive: true}
 	srv1.registerBusy(c11)
 	assertPenaltiesGreaterThan(srv1, srv2, now)
 
@@ -152,7 +152,7 @@ func TestServerPenalty(t *testing.T) {
 	assertPenaltiesGreaterThan(srv2, srv1, now)
 
 	// Add an idle connection to srv2 to make both servers have one idle connection each.
-	c21 := &testutil.ConnFake{Id: 21}
+	c21 := &testutil.ConnFake{Id: 21, Alive: true}
 	registerIdle(srv2, c21)
 
 	// At this point round-robin should kick in to even out what server to use, since
@@ -167,9 +167,9 @@ func TestServerPenalty(t *testing.T) {
 	assertPenaltiesGreaterThan(srv1, srv2, now)
 
 	// Add one more connection each to the servers
-	c12 := &testutil.ConnFake{Id: 12}
+	c12 := &testutil.ConnFake{Id: 12, Alive: true}
 	registerIdle(srv1, c12)
-	c22 := &testutil.ConnFake{Id: 22}
+	c22 := &testutil.ConnFake{Id: 22, Alive: true}
 	registerIdle(srv2, c22)
 
 	// Both servers have two idle connections, srv2 was last used, so it should have higher penalty.

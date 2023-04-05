@@ -109,7 +109,7 @@ func TestBolt4(outer *testing.T) {
 		tcpConn, srv, cleanup := setupBolt4Pipe(t)
 		go serverJob(srv)
 
-		c, err := Connect(context.Background(), "serverName", tcpConn, auth, "007", nil, nil, logger, nil)
+		c, err := Connect(context.Background(), "serverName", tcpConn, auth, "007", nil, noopOnNeo4jError, logger, nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -262,7 +262,7 @@ func TestBolt4(outer *testing.T) {
 			srv.waitForHello()
 			srv.rejectHelloUnauthorized()
 		}()
-		bolt, err := Connect(context.Background(), "serverName", conn, auth, "007", nil, nil, logger, nil)
+		bolt, err := Connect(context.Background(), "serverName", conn, auth, "007", nil, noopOnNeo4jError, logger, nil)
 		AssertNil(t, bolt)
 		AssertError(t, err)
 		dbErr, isDbErr := err.(*db.Neo4jError)
