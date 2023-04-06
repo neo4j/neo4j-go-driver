@@ -55,6 +55,7 @@ type backend struct {
 	authTokenManagers       map[string]auth.TokenManager
 	resolvedGetAuthTokens   map[string]neo4j.AuthToken
 	resolvedOnTokenExpiries map[string]bool
+	resolvedExpiringTokens  map[string]AuthTokenAndExpiration
 	id                      int // ID to use for next object created by frontend
 	wrLock                  sync.Mutex
 	suppliedBookmarks       map[string]neo4j.Bookmarks
@@ -73,6 +74,11 @@ type sessionState struct {
 type GenericTokenManager struct {
 	GetAuthTokenFunc   func() neo4j.AuthToken
 	OnTokenExpiredFunc func(neo4j.AuthToken)
+}
+
+type AuthTokenAndExpiration struct {
+	token      neo4j.AuthToken
+	expiration *time.Time
 }
 
 func (g GenericTokenManager) GetAuthToken(_ context.Context) (neo4j.AuthToken, error) {
@@ -106,6 +112,7 @@ func newBackend(rd *bufio.Reader, wr io.Writer) *backend {
 		authTokenManagers:       make(map[string]auth.TokenManager),
 		resolvedGetAuthTokens:   make(map[string]neo4j.AuthToken),
 		resolvedOnTokenExpiries: make(map[string]bool),
+		resolvedExpiringTokens:  make(map[string]AuthTokenAndExpiration),
 		id:                      0,
 		bookmarkManagers:        make(map[string]neo4j.BookmarkManager),
 		suppliedBookmarks:       make(map[string]neo4j.Bookmarks),
@@ -887,11 +894,11 @@ func (b *backend) handleRequest(req map[string]any) {
 						return
 					}
 				}
-
 			},
 		}
 		b.authTokenManagers[managerId] = manager
 		b.writeResponse("AuthTokenManager", map[string]any{"id": managerId})
+		// TODO
 	case "AuthTokenManagerGetAuthCompleted":
 		id := data["requestId"].(string)
 		token, err := getAuth(data["auth"].(map[string]any)["data"].(map[string]any))
@@ -903,6 +910,42 @@ func (b *backend) handleRequest(req map[string]any) {
 	case "AuthTokenManagerOnAuthExpiredCompleted":
 		id := data["requestId"].(string)
 		b.resolvedOnTokenExpiries[id] = true
+	case "NewExpirationBasedAuthTokenManager":
+		managerId := b.nextId()
+		b.authTokenManagers[managerId] = auth.ExpirationBasedTokenManager(
+			func(context.Context) (neo4j.AuthToken, *time.Time, error) {
+				id := b.nextId()
+				b.writeResponse(
+					"ExpirationBasedAuthTokenProviderRequest",
+					map[string]any{
+						"id":                                id,
+						"expirationBasedAuthTokenManagerId": managerId,
+					})
+				for {
+					b.process()
+					if expiringToken, ok := b.resolvedExpiringTokens[id]; ok {
+						delete(b.resolvedExpiringTokens, id)
+						return expiringToken.token, expiringToken.expiration, nil
+					}
+				}
+			})
+		b.writeResponse("ExpirationBasedAuthTokenManager", map[string]any{"id": managerId})
+	case "ExpirationBasedAuthTokenProviderCompleted":
+		id := data["requestId"].(string)
+		expiringToken := data["auth"].(map[string]any)["data"].(map[string]any)
+		token, err := getAuth(expiringToken["auth"].(map[string]any)["data"].(map[string]any))
+		if err != nil {
+			b.writeError(err)
+			return
+		}
+		var expiration *time.Time
+		expiresInRaw := expiringToken["expiresInMs"]
+		if expiresInRaw != nil {
+			expiresIn := time.Millisecond * time.Duration(asInt64(expiringToken["expiresInMs"].(json.Number)))
+			expirationTime := time.Now().Add(expiresIn)
+			expiration = &expirationTime
+		}
+		b.resolvedExpiringTokens[id] = AuthTokenAndExpiration{token, expiration}
 	case "AuthTokenManagerClose":
 		id := data["id"].(string)
 		delete(b.authTokenManagers, id)
