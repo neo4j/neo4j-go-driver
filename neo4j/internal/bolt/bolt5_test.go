@@ -8,13 +8,13 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      https://www.apache.org/licenses/LICENSE-2.0
+ *     https://www.apache.org/licenses/LICENSE-2.0
  *
- *  Unless required by applicable law or agreed to in writing, software
- *  distributed under the License is distributed on an "AS IS" BASIS,
- *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *  See the License for the specific language governing permissions and
- *  limitations under the License.
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 
 package bolt
@@ -24,6 +24,7 @@ import (
 	"fmt"
 	iauth "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/auth"
 	idb "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/notifications"
 	"io"
 	"reflect"
 	"sync"
@@ -109,7 +110,18 @@ func TestBolt5(outer *testing.T) {
 		tcpConn, srv, cleanup := setupBolt5Pipe(t)
 		go serverJob(srv)
 
-		c, err := Connect(context.Background(), "serverName", tcpConn, auth, "007", nil, noopOnNeo4jError, logger, nil)
+		c, err := Connect(
+			context.Background(),
+			"serverName",
+			tcpConn,
+			auth,
+			"007",
+			nil,
+			noopOnNeo4jError,
+			logger,
+			nil,
+			idb.NotificationConfig{},
+		)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -242,7 +254,18 @@ func TestBolt5(outer *testing.T) {
 			}
 			srv.acceptHello()
 		}()
-		bolt, err := Connect(context.Background(), "serverName", conn, auth, "007", routingContext, nil, logger, nil)
+		bolt, err := Connect(
+			context.Background(),
+			"serverName",
+			conn,
+			auth,
+			"007",
+			routingContext,
+			nil,
+			logger,
+			nil,
+			idb.NotificationConfig{},
+		)
 		AssertNoError(t, err)
 		bolt.Close(context.Background())
 	})
@@ -263,7 +286,18 @@ func TestBolt5(outer *testing.T) {
 			srv.waitForLogon()
 			srv.acceptLogon()
 		}()
-		bolt, err := Connect(context.Background(), "serverName", conn, auth, "007", routingContext, nil, logger, nil)
+		bolt, err := Connect(
+			context.Background(),
+			"serverName",
+			conn,
+			auth,
+			"007",
+			routingContext,
+			nil,
+			logger,
+			nil,
+			idb.NotificationConfig{},
+		)
 		AssertNoError(t, err)
 		bolt.Close(context.Background())
 	})
@@ -281,7 +315,18 @@ func TestBolt5(outer *testing.T) {
 			}
 			srv.acceptHello()
 		}()
-		bolt, err := Connect(context.Background(), "serverName", conn, auth, "007", nil, nil, logger, nil)
+		bolt, err := Connect(
+			context.Background(),
+			"serverName",
+			conn,
+			auth,
+			"007",
+			nil,
+			nil,
+			logger,
+			nil,
+			idb.NotificationConfig{},
+		)
 		AssertNoError(t, err)
 		bolt.Close(context.Background())
 	})
@@ -301,7 +346,18 @@ func TestBolt5(outer *testing.T) {
 			srv.waitForLogon()
 			srv.acceptLogon()
 		}()
-		bolt, err := Connect(context.Background(), "serverName", conn, auth, "007", nil, nil, logger, nil)
+		bolt, err := Connect(
+			context.Background(),
+			"serverName",
+			conn,
+			auth,
+			"007",
+			nil,
+			nil,
+			logger,
+			nil,
+			idb.NotificationConfig{},
+		)
 		AssertNoError(t, err)
 		bolt.Close(context.Background())
 	})
@@ -316,7 +372,18 @@ func TestBolt5(outer *testing.T) {
 			srv.waitForHello()
 			srv.rejectHelloUnauthorized()
 		}()
-		bolt, err := Connect(context.Background(), "serverName", conn, auth, "007", nil, noopOnNeo4jError, logger, nil)
+		bolt, err := Connect(
+			context.Background(),
+			"serverName",
+			conn,
+			auth,
+			"007",
+			nil,
+			noopOnNeo4jError,
+			logger,
+			nil,
+			idb.NotificationConfig{},
+		)
 		AssertNil(t, bolt)
 		AssertError(t, err)
 		dbErr, isDbErr := err.(*db.Neo4jError)
@@ -340,7 +407,18 @@ func TestBolt5(outer *testing.T) {
 			srv.waitForLogon()
 			srv.rejectLogonWithoutAuthToken()
 		}()
-		bolt, err := Connect(context.Background(), "serverName", conn, auth, "007", nil, noopOnNeo4jError, logger, nil)
+		bolt, err := Connect(
+			context.Background(),
+			"serverName",
+			conn,
+			auth,
+			"007",
+			nil,
+			noopOnNeo4jError,
+			logger,
+			nil,
+			idb.NotificationConfig{},
+		)
 		AssertNil(t, bolt)
 		AssertError(t, err)
 		dbErr, isDbErr := err.(*db.Neo4jError)
@@ -436,6 +514,199 @@ func TestBolt5(outer *testing.T) {
 		assertBoltState(t, bolt5Ready, bolt)
 	})
 
+	outer.Run("with notifications", func(inner *testing.T) {
+		warningSev := "WARNING"
+		type testCase struct {
+			description     string
+			MinSev          notifications.NotificationMinimumSeverityLevel
+			DisCats         notifications.NotificationDisabledCategories
+			ExpectedMinSev  *string
+			ExpectDisCats   bool
+			ExpectedDisCats []any
+			Method          string
+		}
+		var testCases []testCase
+		for _, s := range []string{"run", "txRun"} {
+			testCases = append(testCases,
+				testCase{
+					description: "default",
+					Method:      s,
+				},
+				testCase{
+					description:    "warning minimum severity",
+					MinSev:         notifications.WarningLevel,
+					ExpectedMinSev: &warningSev,
+					Method:         s,
+				},
+				testCase{
+					description:     "disabled categories",
+					DisCats:         notifications.DisableCategories(notifications.Unsupported, notifications.Generic),
+					ExpectDisCats:   true,
+					ExpectedDisCats: []any{"UNSUPPORTED", "GENERIC"},
+					Method:          s,
+				},
+				testCase{
+					description:     "warning minimum severity and disabled categories",
+					MinSev:          notifications.WarningLevel,
+					DisCats:         notifications.DisableCategories(notifications.Unsupported, notifications.Generic),
+					ExpectDisCats:   true,
+					ExpectedDisCats: []any{"UNSUPPORTED", "GENERIC"},
+					ExpectedMinSev:  &warningSev,
+					Method:          s,
+				},
+				testCase{
+					description:     "disable no categories",
+					DisCats:         notifications.DisableNoCategories(),
+					ExpectDisCats:   true,
+					ExpectedDisCats: []any{},
+					Method:          s,
+				})
+		}
+		inner.Parallel()
+		for _, test := range testCases {
+			inner.Run(fmt.Sprintf("%s for %s", test.description, test.Method), func(t *testing.T) {
+				bolt, cleanup := connectToServer(t, func(srv *bolt5server) {
+					srv.acceptWithMinor(5, 2)
+					fieldAssertion := func(fieldNum int) func(fields []any) {
+						return func(fields []any) {
+							if test.ExpectedMinSev != nil {
+								AssertStringEqual(t, fields[fieldNum].(map[string]any)["notifications_minimum_severity"].(string), *test.ExpectedMinSev)
+							} else {
+								AssertMapDoesNotHaveKey(t, fields[fieldNum].(map[string]any), "notifications_minimum_severity")
+							}
+							if test.ExpectDisCats {
+								AssertDeepEquals(t, fields[fieldNum].(map[string]any)["notifications_disabled_categories"], test.ExpectedDisCats)
+							} else {
+								AssertMapDoesNotHaveKey(t, fields[fieldNum].(map[string]any), "notifications_disabled_categories")
+							}
+						}
+					}
+					if test.Method == "run" {
+						srv.waitForRun(fieldAssertion(2))
+					} else {
+						srv.waitForTxBegin(fieldAssertion(0))
+					}
+					srv.sendFailureMsg("Neo.ClientError.Statement.SyntaxError", "Syntax error")
+				})
+				defer cleanup()
+				defer bolt.Close(context.Background())
+
+				if test.Method == "run" {
+					_, _ = bolt.Run(
+						context.Background(),
+						idb.Command{Cypher: "cypher"},
+						idb.TxConfig{
+							NotificationConfig: idb.NotificationConfig{
+								MinSev:  test.MinSev,
+								DisCats: test.DisCats,
+							},
+						},
+					)
+				} else {
+					_, _ = bolt.TxBegin(
+						context.Background(),
+						idb.TxConfig{
+							NotificationConfig: idb.NotificationConfig{
+								MinSev:  test.MinSev,
+								DisCats: test.DisCats,
+							},
+						},
+					)
+				}
+			})
+		}
+	})
+
+	outer.Run("notifications unsupported", func(inner *testing.T) {
+		type testCase struct {
+			description string
+			MinSev      notifications.NotificationMinimumSeverityLevel
+			DisCats     notifications.NotificationDisabledCategories
+			ExpectError bool
+			Method      string
+		}
+		var testCases []testCase
+		for _, s := range []string{"run", "txRun"} {
+			testCases = append(testCases,
+				testCase{
+					description: "default",
+					Method:      s,
+				},
+				testCase{
+					description: "warning minimum severity",
+					MinSev:      notifications.WarningLevel,
+					ExpectError: true,
+					Method:      s,
+				},
+				testCase{
+					description: "disabled categories",
+					DisCats:     notifications.DisableCategories(notifications.Unsupported, notifications.Generic),
+					ExpectError: true,
+					Method:      s,
+				},
+				testCase{
+					description: "warning minimum severity and disabled categories",
+					MinSev:      notifications.WarningLevel,
+					DisCats:     notifications.DisableCategories(notifications.Unsupported, notifications.Generic),
+					ExpectError: true,
+					Method:      s,
+				},
+				testCase{
+					description: "disable no categories",
+					DisCats:     notifications.DisableNoCategories(),
+					ExpectError: true,
+					Method:      s,
+				})
+		}
+		inner.Parallel()
+		for _, test := range testCases {
+			inner.Run(fmt.Sprintf("%s for %s", test.description, test.Method), func(t *testing.T) {
+				bolt, cleanup := connectToServer(t, func(srv *bolt5server) {
+					srv.acceptWithMinor(5, 1)
+					if !test.ExpectError {
+						if test.Method == "run" {
+							srv.waitForRun(nil)
+						} else {
+							srv.waitForTxBegin(nil)
+						}
+						srv.sendFailureMsg("Neo.ClientError.Statement.SyntaxError", "Syntax error")
+					}
+				})
+				defer cleanup()
+				defer bolt.Close(context.Background())
+
+				var err error
+				if test.Method == "run" {
+					_, err = bolt.Run(
+						context.Background(),
+						idb.Command{Cypher: "cypher"},
+						idb.TxConfig{
+							NotificationConfig: idb.NotificationConfig{
+								MinSev:  test.MinSev,
+								DisCats: test.DisCats,
+							},
+						},
+					)
+				} else {
+					_, err = bolt.TxBegin(
+						context.Background(),
+						idb.TxConfig{
+							NotificationConfig: idb.NotificationConfig{
+								MinSev:  test.MinSev,
+								DisCats: test.DisCats,
+							},
+						},
+					)
+				}
+				if test.ExpectError {
+					AssertErrorMessageContains(t, err, "does not support: notification filtering")
+				} else {
+					AssertErrorMessageContains(t, err, "SyntaxError")
+				}
+			})
+		}
+	})
+
 	outer.Run("Run transactional commit", func(t *testing.T) {
 		committedBookmark := "cbm"
 		bolt, cleanup := connectToServer(t, func(srv *bolt5server) {
@@ -473,7 +744,7 @@ func TestBolt5(outer *testing.T) {
 		qid := int64(2)
 		bolt, cleanup := connectToServer(t, func(srv *bolt5server) {
 			srv.accept(5)
-			srv.waitForTxBegin()
+			srv.waitForTxBegin(nil)
 			srv.send(msgSuccess, map[string]any{})
 			srv.waitForRun(nil)
 			srv.waitForPullN(1)
@@ -512,7 +783,7 @@ func TestBolt5(outer *testing.T) {
 		qid := int64(2)
 		bolt, cleanup := connectToServer(t, func(srv *bolt5server) {
 			srv.accept(5)
-			srv.waitForTxBegin()
+			srv.waitForTxBegin(nil)
 			srv.send(msgSuccess, map[string]any{})
 			// First RunTx
 			srv.waitForRun(nil)
@@ -580,7 +851,7 @@ func TestBolt5(outer *testing.T) {
 	outer.Run("Begin transaction with bookmark failure", func(t *testing.T) {
 		bolt, cleanup := connectToServer(t, func(srv *bolt5server) {
 			srv.accept(5)
-			srv.waitForTxBegin()
+			srv.waitForTxBegin(nil)
 			srv.sendFailureMsg("code", "not synced")
 		})
 		defer cleanup()
@@ -680,7 +951,7 @@ func TestBolt5(outer *testing.T) {
 	outer.Run("Server fail on run continue to commit", func(t *testing.T) {
 		bolt, cleanup := connectToServer(t, func(srv *bolt5server) {
 			srv.accept(5)
-			srv.waitForTxBegin()
+			srv.waitForTxBegin(nil)
 			srv.sendSuccess(nil)
 			srv.waitForRun(nil)
 			srv.waitForPullN(bolt5FetchSize)
@@ -1138,7 +1409,7 @@ func TestBolt5(outer *testing.T) {
 			{
 				scenario: "after successful BEGIN",
 				server: func(t *testing.T, srv *bolt5server) {
-					srv.waitForTxBegin()
+					srv.waitForTxBegin(nil)
 					srv.sendSuccess(map[string]any{})
 				},
 				client: func(t *testing.T, cli *bolt5) {
@@ -1150,7 +1421,7 @@ func TestBolt5(outer *testing.T) {
 			{
 				scenario: "after failed BEGIN",
 				server: func(t *testing.T, srv *bolt5server) {
-					srv.waitForTxBegin()
+					srv.waitForTxBegin(nil)
 					srv.sendFailureMsg("o.o.p.s", "begin failed")
 				},
 				client: func(t *testing.T, cli *bolt5) {
@@ -1162,7 +1433,7 @@ func TestBolt5(outer *testing.T) {
 			{
 				scenario: "not after errored BEGIN",
 				server: func(t *testing.T, srv *bolt5server) {
-					srv.waitForTxBegin()
+					srv.waitForTxBegin(nil)
 					srv.closeConnection()
 				},
 				client: func(t *testing.T, cli *bolt5) {
@@ -1174,7 +1445,7 @@ func TestBolt5(outer *testing.T) {
 			{
 				scenario: "after successful COMMIT",
 				server: func(t *testing.T, srv *bolt5server) {
-					srv.waitForTxBegin()
+					srv.waitForTxBegin(nil)
 					srv.sendSuccess(map[string]any{})
 					srv.waitForTxCommit()
 					srv.sendSuccess(map[string]any{})
@@ -1189,7 +1460,7 @@ func TestBolt5(outer *testing.T) {
 			{
 				scenario: "after failed COMMIT",
 				server: func(t *testing.T, srv *bolt5server) {
-					srv.waitForTxBegin()
+					srv.waitForTxBegin(nil)
 					srv.sendSuccess(map[string]any{})
 					srv.waitForTxCommit()
 					srv.sendFailureMsg("o.o.p.s", "commit failed")
@@ -1204,7 +1475,7 @@ func TestBolt5(outer *testing.T) {
 			{
 				scenario: "not after errored COMMIT",
 				server: func(t *testing.T, srv *bolt5server) {
-					srv.waitForTxBegin()
+					srv.waitForTxBegin(nil)
 					srv.sendSuccess(map[string]any{})
 					srv.waitForTxCommit()
 					srv.closeConnection()
@@ -1219,7 +1490,7 @@ func TestBolt5(outer *testing.T) {
 			{
 				scenario: "after successful ROLLBACK",
 				server: func(t *testing.T, srv *bolt5server) {
-					srv.waitForTxBegin()
+					srv.waitForTxBegin(nil)
 					srv.sendSuccess(map[string]any{})
 					srv.waitForTxRollback()
 					srv.sendSuccess(map[string]any{})
@@ -1234,7 +1505,7 @@ func TestBolt5(outer *testing.T) {
 			{
 				scenario: "after failed ROLLBACK",
 				server: func(t *testing.T, srv *bolt5server) {
-					srv.waitForTxBegin()
+					srv.waitForTxBegin(nil)
 					srv.sendSuccess(map[string]any{})
 					srv.waitForTxRollback()
 					srv.sendFailureMsg("o.o.p.s", "rollback failed")
@@ -1249,7 +1520,7 @@ func TestBolt5(outer *testing.T) {
 			{
 				scenario: "not after errored ROLLBACK",
 				server: func(t *testing.T, srv *bolt5server) {
-					srv.waitForTxBegin()
+					srv.waitForTxBegin(nil)
 					srv.sendSuccess(map[string]any{})
 					srv.waitForTxRollback()
 					srv.closeConnection()
@@ -1332,7 +1603,7 @@ func TestBolt5(outer *testing.T) {
 		ctx := context.Background()
 		bolt, cleanup := connectToServer(t, func(srv *bolt5server) {
 			srv.accept(5)
-			srv.waitForTxBegin()
+			srv.waitForTxBegin(nil)
 			srv.sendSuccess(nil)
 			srv.waitForRun(nil)
 			srv.waitForPullN(1)

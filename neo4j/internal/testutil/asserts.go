@@ -8,13 +8,13 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      https://www.apache.org/licenses/LICENSE-2.0
+ *     https://www.apache.org/licenses/LICENSE-2.0
  *
- *  Unless required by applicable law or agreed to in writing, software
- *  distributed under the License is distributed on an "AS IS" BASIS,
- *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *  See the License for the specific language governing permissions and
- *  limitations under the License.
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 
 // Package testutil contains shared test functionality
@@ -176,6 +176,20 @@ func AssertStringContain(t *testing.T, s, sub string) {
 	t.Helper()
 	if !strings.Contains(s, sub) {
 		t.Errorf("Expected %s to contain %s", s, sub)
+	}
+}
+
+func AssertMapHasKey[K comparable](t *testing.T, m map[K]any, key K) {
+	t.Helper()
+	if _, ok := m[key]; !ok {
+		t.Errorf("Expected map to contain key %v", key)
+	}
+}
+
+func AssertMapDoesNotHaveKey[K comparable](t *testing.T, m map[K]any, key K) {
+	t.Helper()
+	if _, ok := m[key]; ok {
+		t.Errorf("Expected map to not contain key %v", key)
 	}
 }
 

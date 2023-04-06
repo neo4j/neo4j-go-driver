@@ -8,13 +8,13 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      https://www.apache.org/licenses/LICENSE-2.0
+ *     https://www.apache.org/licenses/LICENSE-2.0
  *
- *  Unless required by applicable law or agreed to in writing, software
- *  distributed under the License is distributed on an "AS IS" BASIS,
- *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *  See the License for the specific language governing permissions and
- *  limitations under the License.
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 
 // Package connector is responsible for connecting to a database server.
@@ -23,9 +23,9 @@ package connector
 import (
 	"context"
 	"crypto/tls"
-	"crypto/x509"
 	"errors"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/auth"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/config"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
 	"io"
 	"net"
@@ -36,34 +36,52 @@ import (
 )
 
 type Connector struct {
-	SkipEncryption bool
-	SkipVerify     bool
-	// Deprecated: RootCAs will be removed in 6.0. Configure TlsConfig directly instead.
-	RootCAs         *x509.CertPool
-	DialTimeout     time.Duration
-	SocketKeepAlive bool
-	Auth            auth.TokenManager
-	Log             log.Logger
-	UserAgent       string
-	RoutingContext  map[string]string
-	Network         string
-	TlsConfig       *tls.Config
+	SkipEncryption   bool
+	SkipVerify       bool
+	Auth             auth.TokenManager
+	Log              log.Logger
+	RoutingContext   map[string]string
+	Network          string
+	Config           *config.Config
+	SupplyConnection func(context.Context, string) (net.Conn, error)
 }
 
 func (c Connector) Connect(ctx context.Context, address string, auth *db.ReAuthToken, callback bolt.Neo4jErrorCallback, boltLogger log.BoltLogger) (db.Connection, error) {
-	dialer := net.Dialer{Timeout: c.DialTimeout}
-	if !c.SocketKeepAlive {
-		dialer.KeepAlive = -1 * time.Second // Turns keep-alive off
+	if c.SupplyConnection == nil {
+		c.SupplyConnection = c.createConnection
 	}
 
-	conn, err := dialer.DialContext(ctx, c.Network, address)
+	conn, err := c.SupplyConnection(ctx, address)
 	if err != nil {
 		return nil, err
 	}
 
-	// TLS not requested, perform Bolt handshake
+	notificationConfig := db.NotificationConfig{
+		MinSev:  c.Config.NotificationsMinSeverity,
+		DisCats: c.Config.NotificationsDisabledCategories,
+	}
+
+	// TLS not requested
 	if c.SkipEncryption {
-		return bolt.Connect(ctx, address, conn, auth, c.UserAgent, c.RoutingContext, callback, c.Log, boltLogger)
+		connection, err := bolt.Connect(
+			ctx,
+			address,
+			conn,
+			auth,
+			c.Config.UserAgent,
+			c.RoutingContext,
+			callback,
+			c.Log,
+			boltLogger,
+			notificationConfig,
+		)
+		if err != nil {
+			if connErr := conn.Close(); connErr != nil {
+				c.Log.Warnf(log.Driver, address, "could not close underlying socket after Bolt handshake error")
+			}
+			return nil, err
+		}
+		return connection, nil
 	}
 
 	// TLS requested, continue with handshake
@@ -82,16 +100,42 @@ func (c Connector) Connect(ctx context.Context, address string, auth *db.ReAuthT
 		conn.Close()
 		return nil, &TlsError{inner: err}
 	}
-	// Perform Bolt handshake
-	return bolt.Connect(ctx, address, tlsConn, auth, c.UserAgent, c.RoutingContext, callback, c.Log, boltLogger)
+	connection, err := bolt.Connect(ctx,
+		address,
+		tlsConn,
+		auth,
+		c.Config.UserAgent,
+		c.RoutingContext,
+		callback,
+		c.Log,
+		boltLogger,
+		notificationConfig,
+	)
+	if err != nil {
+		if connErr := conn.Close(); connErr != nil {
+			c.Log.Warnf(log.Driver, address, "could not close underlying socket after Bolt handshake error")
+		}
+		return nil, err
+	}
+	return connection, nil
+}
+
+func (c Connector) createConnection(ctx context.Context, address string) (net.Conn, error) {
+	dialer := net.Dialer{Timeout: c.Config.SocketConnectTimeout}
+	if !c.Config.SocketKeepalive {
+		dialer.KeepAlive = -1 * time.Second // Turns keep-alive off
+	}
+
+	return dialer.DialContext(ctx, c.Network, address)
 }
 
 func (c Connector) tlsConfig(serverName string) *tls.Config {
 	var config *tls.Config
-	if c.TlsConfig == nil {
-		config = &tls.Config{RootCAs: c.RootCAs}
+	if c.Config.TlsConfig == nil {
+		//lint:ignore SA1019 RootCAs is supported until 6.0
+		config = &tls.Config{RootCAs: c.Config.RootCAs}
 	} else {
-		config = c.TlsConfig
+		config = c.Config.TlsConfig
 	}
 	if config.MinVersion == 0 {
 		config.MinVersion = tls.VersionTLS12

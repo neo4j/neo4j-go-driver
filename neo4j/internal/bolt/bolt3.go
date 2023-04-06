@@ -183,7 +183,14 @@ func (b *bolt3) receiveSuccess(ctx context.Context) *success {
 	}
 }
 
-func (b *bolt3) Connect(ctx context.Context, minor int, auth *idb.ReAuthToken, userAgent string, _ map[string]string) error {
+func (b *bolt3) Connect(
+	ctx context.Context,
+	minor int,
+	auth *idb.ReAuthToken,
+	userAgent string,
+	_ map[string]string,
+	notificationConfig idb.NotificationConfig,
+) error {
 	if err := b.assertState(bolt3_unauthorized); err != nil {
 		return err
 	}
@@ -193,6 +200,8 @@ func (b *bolt3) Connect(ctx context.Context, minor int, auth *idb.ReAuthToken, u
 	if err := checkReAuth(auth, b); err != nil {
 		return err
 	}
+
+	b.minor = minor
 
 	hello := map[string]any{
 		"user_agent": userAgent,
@@ -209,6 +218,10 @@ func (b *bolt3) Connect(ctx context.Context, minor int, auth *idb.ReAuthToken, u
 			continue
 		}
 		hello[k] = v
+	}
+
+	if err := checkNotificationFiltering(notificationConfig, b); err != nil {
+		return err
 	}
 
 	// Send hello message and wait for confirmation
@@ -235,7 +248,10 @@ func (b *bolt3) Connect(ctx context.Context, minor int, auth *idb.ReAuthToken, u
 	return nil
 }
 
-func (b *bolt3) TxBegin(ctx context.Context, txConfig idb.TxConfig) (idb.TxHandle, error) {
+func (b *bolt3) TxBegin(
+	ctx context.Context,
+	txConfig idb.TxConfig,
+) (idb.TxHandle, error) {
 	// Ok, to begin transaction while streaming auto-commit, just empty the stream and continue.
 	if b.state == bolt3_streaming {
 		if err := b.bufferStream(ctx); err != nil {
@@ -247,6 +263,9 @@ func (b *bolt3) TxBegin(ctx context.Context, txConfig idb.TxConfig) (idb.TxHandl
 		return 0, err
 	}
 	if err := b.checkImpersonation(txConfig.ImpersonatedUser); err != nil {
+		return 0, err
+	}
+	if err := checkNotificationFiltering(txConfig.NotificationConfig, b); err != nil {
 		return 0, err
 	}
 
@@ -458,12 +477,18 @@ func (b *bolt3) run(ctx context.Context, cypher string, params map[string]any, t
 	return b.currStream, nil
 }
 
-func (b *bolt3) Run(ctx context.Context, runCommand idb.Command,
-	txConfig idb.TxConfig) (idb.StreamHandle, error) {
+func (b *bolt3) Run(
+	ctx context.Context,
+	runCommand idb.Command,
+	txConfig idb.TxConfig,
+) (idb.StreamHandle, error) {
 	if err := b.assertState(bolt3_streaming, bolt3_ready); err != nil {
 		return nil, err
 	}
 	if err := b.checkImpersonation(txConfig.ImpersonatedUser); err != nil {
+		return nil, err
+	}
+	if err := checkNotificationFiltering(txConfig.NotificationConfig, b); err != nil {
 		return nil, err
 	}
 

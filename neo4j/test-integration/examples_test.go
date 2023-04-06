@@ -8,13 +8,13 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      https://www.apache.org/licenses/LICENSE-2.0
+ *     https://www.apache.org/licenses/LICENSE-2.0
  *
- *  Unless required by applicable law or agreed to in writing, software
- *  distributed under the License is distributed on an "AS IS" BASIS,
- *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *  See the License for the specific language governing permissions and
- *  limitations under the License.
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 
 package test_integration
@@ -23,6 +23,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/config"
 	"testing"
 	"time"
 
@@ -335,7 +336,7 @@ func TestExamples(outer *testing.T) {
 			// Serializing
 			_ = fieldCartesian.String() // Point{srId=9157, x=2.500000, y=-2.000000, z=2.000000}
 
-			// Acessing members
+			// Accessing members
 			print(fieldCartesian.X)            // 2.500000
 			print(fieldCartesian.Y)            // -2.000000
 			print(fieldCartesian.Z)            // 2.000000
@@ -348,7 +349,7 @@ func TestExamples(outer *testing.T) {
 			// Serializing
 			_ = fieldWgs84.String() // Point{srId=4979, x=-1.500000, y=1.00000, z=3.000000}
 
-			// Acessing members
+			// Accessing members
 			print(fieldWgs84.X)            // -1.500000
 			print(fieldWgs84.Y)            // 1.000000
 			print(fieldWgs84.Z)            // 3.000000
@@ -451,10 +452,10 @@ func createDriverWithCustomAuth(uri, principal, credentials, realm, scheme strin
 // end::config-trust[]
 
 // tag::config-custom-resolver[]
-func createDriverWithAddressResolver(virtualURI, username, password string, addresses ...neo4j.ServerAddress) (neo4j.DriverWithContext, error) {
+func createDriverWithAddressResolver(virtualURI, username, password string, addresses ...config.ServerAddress) (neo4j.DriverWithContext, error) {
 	// Address resolver is only valid for neo4j uri
-	return neo4j.NewDriverWithContext(virtualURI, neo4j.BasicAuth(username, password, ""), func(config *neo4j.Config) {
-		config.AddressResolver = func(address neo4j.ServerAddress) []neo4j.ServerAddress {
+	return neo4j.NewDriverWithContext(virtualURI, neo4j.BasicAuth(username, password, ""), func(settings *config.Config) {
+		settings.AddressResolver = func(address config.ServerAddress) []config.ServerAddress {
 			return addresses
 		}
 	})
@@ -495,7 +496,7 @@ func addPerson(ctx context.Context, name string) error {
 
 // tag::config-connection-pool[]
 func createDriverWithCustomizedConnectionPool(uri, username, password string) (neo4j.DriverWithContext, error) {
-	return neo4j.NewDriverWithContext(uri, neo4j.BasicAuth(username, password, ""), func(config *neo4j.Config) {
+	return neo4j.NewDriverWithContext(uri, neo4j.BasicAuth(username, password, ""), func(config *config.Config) {
 		config.MaxConnectionLifetime = 30 * time.Minute
 		config.MaxConnectionPoolSize = 50
 		config.ConnectionAcquisitionTimeout = 2 * time.Minute
@@ -506,7 +507,7 @@ func createDriverWithCustomizedConnectionPool(uri, username, password string) (n
 
 // tag::config-connection-timeout[]
 func createDriverWithConnectionTimeout(uri, username, password string) (neo4j.DriverWithContext, error) {
-	return neo4j.NewDriverWithContext(uri, neo4j.BasicAuth(username, password, ""), func(config *neo4j.Config) {
+	return neo4j.NewDriverWithContext(uri, neo4j.BasicAuth(username, password, ""), func(config *config.Config) {
 		config.SocketConnectTimeout = 15 * time.Second
 	})
 }
@@ -516,7 +517,7 @@ func createDriverWithConnectionTimeout(uri, username, password string) (neo4j.Dr
 // tag::config-max-retry-time[]
 // This driver is used to run queries, needs actual TLS configuration as well.
 func createDriverWithMaxRetryTime(uri, username, password string) (neo4j.DriverWithContext, error) {
-	return neo4j.NewDriverWithContext(uri, neo4j.BasicAuth(username, password, ""), func(config *neo4j.Config) {
+	return neo4j.NewDriverWithContext(uri, neo4j.BasicAuth(username, password, ""), func(config *config.Config) {
 		config.MaxTransactionRetryTime = 15 * time.Second
 	})
 }

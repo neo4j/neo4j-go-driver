@@ -8,13 +8,13 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      https://www.apache.org/licenses/LICENSE-2.0
+ *     https://www.apache.org/licenses/LICENSE-2.0
  *
- *  Unless required by applicable law or agreed to in writing, software
- *  distributed under the License is distributed on an "AS IS" BASIS,
- *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *  See the License for the specific language governing permissions and
- *  limitations under the License.
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 
 package bolt
@@ -24,6 +24,7 @@ import (
 	"fmt"
 	iauth "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/auth"
 	idb "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/notifications"
 	"io"
 	"reflect"
 	"sync"
@@ -109,7 +110,17 @@ func TestBolt4(outer *testing.T) {
 		tcpConn, srv, cleanup := setupBolt4Pipe(t)
 		go serverJob(srv)
 
-		c, err := Connect(context.Background(), "serverName", tcpConn, auth, "007", nil, noopOnNeo4jError, logger, nil)
+		c, err := Connect(context.Background(),
+			"serverName",
+			tcpConn,
+			auth,
+			"007",
+			nil,
+			noopOnNeo4jError,
+			logger,
+			nil,
+			idb.NotificationConfig{},
+		)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -210,7 +221,17 @@ func TestBolt4(outer *testing.T) {
 			}
 			srv.acceptHello()
 		}()
-		bolt, err := Connect(context.Background(), "serverName", conn, auth, "007", routingContext, nil, logger, nil)
+		bolt, err := Connect(context.Background(),
+			"serverName",
+			conn,
+			auth,
+			"007",
+			routingContext,
+			nil,
+			logger,
+			nil,
+			idb.NotificationConfig{},
+		)
 		AssertNoError(t, err)
 		bolt.Close(context.Background())
 	})
@@ -228,7 +249,18 @@ func TestBolt4(outer *testing.T) {
 			}
 			srv.acceptHello()
 		}()
-		bolt, err := Connect(context.Background(), "serverName", conn, auth, "007", nil, nil, logger, nil)
+		bolt, err := Connect(
+			context.Background(),
+			"serverName",
+			conn,
+			auth,
+			"007",
+			nil,
+			nil,
+			logger,
+			nil,
+			idb.NotificationConfig{},
+		)
 		AssertNoError(t, err)
 		bolt.Close(context.Background())
 	})
@@ -247,7 +279,18 @@ func TestBolt4(outer *testing.T) {
 			}
 			srv.acceptHello()
 		}()
-		bolt, err := Connect(context.Background(), "serverName", conn, auth, "007", routingContext, nil, logger, nil)
+		bolt, err := Connect(
+			context.Background(),
+			"serverName",
+			conn,
+			auth,
+			"007",
+			routingContext,
+			nil,
+			logger,
+			nil,
+			idb.NotificationConfig{},
+		)
 		AssertNoError(t, err)
 		bolt.Close(context.Background())
 	})
@@ -262,7 +305,18 @@ func TestBolt4(outer *testing.T) {
 			srv.waitForHello()
 			srv.rejectHelloUnauthorized()
 		}()
-		bolt, err := Connect(context.Background(), "serverName", conn, auth, "007", nil, noopOnNeo4jError, logger, nil)
+		bolt, err := Connect(
+			context.Background(),
+			"serverName",
+			conn,
+			auth,
+			"007",
+			nil,
+			noopOnNeo4jError,
+			logger,
+			nil,
+			idb.NotificationConfig{},
+		)
 		AssertNil(t, bolt)
 		AssertError(t, err)
 		dbErr, isDbErr := err.(*db.Neo4jError)
@@ -356,6 +410,96 @@ func TestBolt4(outer *testing.T) {
 		// Retrieve the records
 		assertRunResponseOk(t, bolt, str)
 		assertBoltState(t, bolt4_ready, bolt)
+	})
+
+	outer.Run("notifications unsupported", func(inner *testing.T) {
+		type testCase struct {
+			description string
+			MinSev      notifications.NotificationMinimumSeverityLevel
+			DisCats     notifications.NotificationDisabledCategories
+			ExpectError bool
+			Method      string
+		}
+		var testCases []testCase
+		for _, s := range []string{"run", "txRun"} {
+			testCases = append(testCases,
+				testCase{
+					description: "default",
+					Method:      s,
+				},
+				testCase{
+					description: "warning minimum severity",
+					MinSev:      notifications.WarningLevel,
+					ExpectError: true,
+					Method:      s,
+				},
+				testCase{
+					description: "disabled categories",
+					DisCats:     notifications.DisableCategories(notifications.Unsupported, notifications.Generic),
+					ExpectError: true,
+					Method:      s,
+				},
+				testCase{
+					description: "warning minimum severity and disabled categories",
+					MinSev:      notifications.WarningLevel,
+					DisCats:     notifications.DisableCategories(notifications.Unsupported, notifications.Generic),
+					ExpectError: true,
+					Method:      s,
+				},
+				testCase{
+					description: "disable no categories",
+					DisCats:     notifications.DisableNoCategories(),
+					ExpectError: true,
+					Method:      s,
+				})
+		}
+		inner.Parallel()
+		for _, test := range testCases {
+			inner.Run(fmt.Sprintf("%s for %s", test.description, test.Method), func(t *testing.T) {
+				bolt, cleanup := connectToServer(t, func(srv *bolt4server) {
+					srv.acceptWithMinor(4, 4)
+					if !test.ExpectError {
+						if test.Method == "run" {
+							srv.waitForRun(nil)
+						} else {
+							srv.waitForTxBegin()
+						}
+						srv.sendFailureMsg("Neo.ClientError.Statement.SyntaxError", "Syntax error")
+					}
+				})
+				defer cleanup()
+				defer bolt.Close(context.Background())
+
+				var err error
+				if test.Method == "run" {
+					_, err = bolt.Run(
+						context.Background(),
+						idb.Command{Cypher: "cypher"},
+						idb.TxConfig{
+							NotificationConfig: idb.NotificationConfig{
+								MinSev:  test.MinSev,
+								DisCats: test.DisCats,
+							},
+						},
+					)
+				} else {
+					_, err = bolt.TxBegin(
+						context.Background(),
+						idb.TxConfig{
+							NotificationConfig: idb.NotificationConfig{
+								MinSev:  test.MinSev,
+								DisCats: test.DisCats,
+							},
+						},
+					)
+				}
+				if test.ExpectError {
+					AssertErrorMessageContains(t, err, "does not support: notification filtering")
+				} else {
+					AssertErrorMessageContains(t, err, "SyntaxError")
+				}
+			})
+		}
 	})
 
 	outer.Run("Run transactional commit", func(t *testing.T) {

@@ -25,6 +25,7 @@ import (
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/db"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/auth"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/log"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/notifications"
 	"math"
 	"time"
 )
@@ -49,18 +50,49 @@ type Command struct {
 }
 
 type TxConfig struct {
-	Mode             AccessMode
-	Bookmarks        []string
-	Timeout          time.Duration
-	ImpersonatedUser string
-	Meta             map[string]any
+	Mode               AccessMode
+	Bookmarks          []string
+	Timeout            time.Duration
+	ImpersonatedUser   string
+	Meta               map[string]any
+	NotificationConfig NotificationConfig
+}
+
+type NotificationConfig struct {
+	MinSev  notifications.NotificationMinimumSeverityLevel
+	DisCats notifications.NotificationDisabledCategories
+}
+
+func (n *NotificationConfig) ToMeta(meta map[string]any) {
+	if n.MinSev != notifications.DefaultLevel {
+		meta["notifications_minimum_severity"] = string(n.MinSev)
+	}
+	if n.DisCats.DisablesNone() {
+		meta["notifications_disabled_categories"] = make([]string, 0)
+	} else {
+		notiDisCatsSlice := n.DisCats.DisabledCategories()
+		if len(notiDisCatsSlice) != 0 {
+			notiDisCatsStrSlice := make([]string, len(notiDisCatsSlice))
+			for i, v := range notiDisCatsSlice {
+				notiDisCatsStrSlice[i] = string(v)
+			}
+			meta["notifications_disabled_categories"] = notiDisCatsSlice
+		}
+	}
 }
 
 const DefaultTxConfigTimeout = math.MinInt
 
 // Connection defines an abstract database server connection.
 type Connection interface {
-	Connect(ctx context.Context, minor int, auth *ReAuthToken, userAgent string, routingContext map[string]string) error
+	Connect(
+		ctx context.Context,
+		minor int,
+		auth *ReAuthToken,
+		userAgent string,
+		routingContext map[string]string,
+		notificationConfig NotificationConfig,
+	) error
 
 	TxBegin(ctx context.Context, txConfig TxConfig) (TxHandle, error)
 	TxRollback(ctx context.Context, tx TxHandle) error

@@ -49,12 +49,13 @@ const (
 const bolt5FetchSize = 1000
 
 type internalTx5 struct {
-	mode             idb.AccessMode
-	bookmarks        []string
-	timeout          time.Duration
-	txMeta           map[string]any
-	databaseName     string
-	impersonatedUser string
+	mode               idb.AccessMode
+	bookmarks          []string
+	timeout            time.Duration
+	txMeta             map[string]any
+	databaseName       string
+	impersonatedUser   string
+	notificationConfig idb.NotificationConfig
 }
 
 func (i *internalTx5) toMeta() map[string]any {
@@ -81,6 +82,7 @@ func (i *internalTx5) toMeta() map[string]any {
 	if i.impersonatedUser != "" {
 		meta["imp_user"] = i.impersonatedUser
 	}
+	i.notificationConfig.ToMeta(meta)
 	return meta
 }
 
@@ -201,7 +203,14 @@ func (b *bolt5) setError(err error, fatal bool) {
 	}
 }
 
-func (b *bolt5) Connect(ctx context.Context, minor int, auth *idb.ReAuthToken, userAgent string, routingContext map[string]string) error {
+func (b *bolt5) Connect(
+	ctx context.Context,
+	minor int,
+	auth *idb.ReAuthToken,
+	userAgent string,
+	routingContext map[string]string,
+	notificationConfig idb.NotificationConfig,
+) error {
 	if err := b.assertState(bolt5Unauthorized); err != nil {
 		return err
 	}
@@ -217,13 +226,15 @@ func (b *bolt5) Connect(ctx context.Context, minor int, auth *idb.ReAuthToken, u
 	}
 	b.auth = token.Tokens
 
+	b.minor = minor
+
 	hello := map[string]any{
 		"user_agent": userAgent,
 	}
 	if routingContext != nil {
 		hello["routing"] = routingContext
 	}
-	if minor == 0 {
+	if b.minor == 0 {
 		// Merge authentication keys into hello, avoid overwriting existing keys
 		for k, v := range token.Tokens {
 			_, exists := hello[k]
@@ -232,8 +243,13 @@ func (b *bolt5) Connect(ctx context.Context, minor int, auth *idb.ReAuthToken, u
 			}
 		}
 	}
+
+	if err := checkNotificationFiltering(notificationConfig, b); err != nil {
+		return err
+	}
+	notificationConfig.ToMeta(hello)
 	b.queue.appendHello(hello, b.helloResponseHandler())
-	if minor > 0 {
+	if b.minor > 0 {
 		b.queue.appendLogon(token.Tokens, b.logonResponseHandler())
 	}
 	if b.queue.send(ctx); b.err != nil {
@@ -252,7 +268,10 @@ func (b *bolt5) Connect(ctx context.Context, minor int, auth *idb.ReAuthToken, u
 	return nil
 }
 
-func (b *bolt5) TxBegin(ctx context.Context, txConfig idb.TxConfig) (idb.TxHandle, error) {
+func (b *bolt5) TxBegin(
+	ctx context.Context,
+	txConfig idb.TxConfig,
+) (idb.TxHandle, error) {
 	// Ok, to begin transaction while streaming auto-commit, just empty the stream and continue.
 	if b.state == bolt5Streaming {
 		if b.bufferStream(ctx); b.err != nil {
@@ -265,14 +284,18 @@ func (b *bolt5) TxBegin(ctx context.Context, txConfig idb.TxConfig) (idb.TxHandl
 	if err := b.assertState(bolt5Ready); err != nil {
 		return 0, err
 	}
+	if err := checkNotificationFiltering(txConfig.NotificationConfig, b); err != nil {
+		return 0, err
+	}
 
 	tx := internalTx5{
-		mode:             txConfig.Mode,
-		bookmarks:        txConfig.Bookmarks,
-		timeout:          txConfig.Timeout,
-		txMeta:           txConfig.Meta,
-		databaseName:     b.databaseName,
-		impersonatedUser: txConfig.ImpersonatedUser,
+		mode:               txConfig.Mode,
+		bookmarks:          txConfig.Bookmarks,
+		timeout:            txConfig.Timeout,
+		txMeta:             txConfig.Meta,
+		databaseName:       b.databaseName,
+		impersonatedUser:   txConfig.ImpersonatedUser,
+		notificationConfig: txConfig.NotificationConfig,
 	}
 
 	b.queue.appendBegin(tx.toMeta(), b.beginResponseHandler())
@@ -545,19 +568,26 @@ func (b *bolt5) normalizeFetchSize(fetchSize int) int {
 	return fetchSize
 }
 
-func (b *bolt5) Run(ctx context.Context, cmd idb.Command,
-	txConfig idb.TxConfig) (idb.StreamHandle, error) {
+func (b *bolt5) Run(
+	ctx context.Context,
+	cmd idb.Command,
+	txConfig idb.TxConfig,
+) (idb.StreamHandle, error) {
 	if err := b.assertState(bolt5Streaming, bolt5Ready); err != nil {
+		return nil, err
+	}
+	if err := checkNotificationFiltering(txConfig.NotificationConfig, b); err != nil {
 		return nil, err
 	}
 
 	tx := internalTx5{
-		mode:             txConfig.Mode,
-		bookmarks:        txConfig.Bookmarks,
-		timeout:          txConfig.Timeout,
-		txMeta:           txConfig.Meta,
-		databaseName:     b.databaseName,
-		impersonatedUser: txConfig.ImpersonatedUser,
+		mode:               txConfig.Mode,
+		bookmarks:          txConfig.Bookmarks,
+		timeout:            txConfig.Timeout,
+		txMeta:             txConfig.Meta,
+		databaseName:       b.databaseName,
+		impersonatedUser:   txConfig.ImpersonatedUser,
+		notificationConfig: txConfig.NotificationConfig,
 	}
 	stream, err := b.run(ctx, cmd.Cypher, cmd.Params, cmd.FetchSize, &tx)
 	if err != nil {

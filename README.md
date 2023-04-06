@@ -43,6 +43,26 @@ go get github.com/neo4j/neo4j-go-driver
 Drivers manual that describes general driver concepts in depth [here](https://neo4j.com/docs/go-manual/current/).
 Go package API documentation [here](https://pkg.go.dev/github.com/neo4j/neo4j-go-driver/v5).
 
+## Preview Features
+
+The preview feature is a new feature that is a candidate for a future <abbr title="Generally Available">GA</abbr>
+status.
+
+It enables users to try the feature out and maintainers to refine and update it.
+
+The preview features are not considered to be experimental, temporary or unstable.
+
+However, they may change more rapidly, without following the usual deprecation cycle.
+
+Most preview features are expected to be granted the GA status unless some unexpected conditions arise.
+
+Due to the increased flexibility of the preview status, user feedback is encouraged so that it can be considered before
+the GA status.
+
+Every preview feature gets a
+dedicated [GitHub Discussion](https://github.com/neo4j/neo4j-go-driver/discussions/categories/preview-feature-announcement)
+where users can share their initial impressions and thoughts.
+
 ## Migrating from previous versions
 
 See [migration guide](MIGRATION_GUIDE.md) for information on how to migrate 
@@ -145,20 +165,22 @@ func (i *Item) String() string {
 Please look at the [supported version's documentation](https://neo4j.com/developer/kb/neo4j-supported-versions/) for the
 most accurate information about Neo4j releases.
 
-| Server \\ Driver    | 1.7 | 4.0 | 4.2   | 4.3   | **4.4** | 5.0   | 5.1   | 5.2   | 5.3   | 5.4   | 5.5   |
-|---------------------|-----|-----|-------|-------|---------|-------|-------|-------|-------|-------|-------|
-| Neo4j 3.5 (EOL)     | Yes | Yes | (Yes) | (Yes) | (Yes)   | (Yes) | (Yes) | (Yes) | (Yes) | (Yes) | (Yes) |
-| Neo4j 4.0 (EOL)     | Yes | Yes | Yes   | Yes   | Yes     | (Yes) | (Yes) | (Yes) | (Yes) | (Yes) | (Yes) |
-| Neo4j 4.1 (EOL)     | ?   | Yes | Yes   | Yes   | Yes     | (Yes) | (Yes) | (Yes) | (Yes) | (Yes) | (Yes) |
-| Neo4j 4.2 (EOL)     | ?   | ?   | Yes   | Yes   | Yes     | (Yes) | (Yes) | (Yes) | (Yes) | (Yes) | (Yes) |
-| Neo4j 4.3 (EOL)     | ?   | ?   | Yes   | Yes   | Yes     | (Yes) | (Yes) | (Yes) | (Yes) | (Yes) | (Yes) |
-| **Neo4j 4.4 (LTS)** | ?   | ?   | ?     | Yes   | Yes     | Yes   | Yes   | Yes   | Yes   | Yes   | Yes   |
-| Neo4j 5.0 (HO)      | ?   | ?   | ?     | ?     | Yes     | Yes   | Yes   | Yes   | Yes   | Yes   | Yes   |
-| Neo4j 5.1 (HO)      | ?   | ?   | ?     | ?     | (Yes)   | Yes   | Yes   | Yes   | Yes   | Yes   | Yes   |
-| Neo4j 5.2 (HO)      | ?   | ?   | ?     | ?     | (Yes)   | Yes   | Yes   | Yes   | Yes   | Yes   | Yes   |
-| Neo4j 5.3 (HO)      | ?   | ?   | ?     | ?     | (Yes)   | Yes   | Yes   | Yes   | Yes   | Yes   | Yes   |
-| Neo4j 5.4           | ?   | ?   | ?     | ?     | (Yes)   | Yes   | Yes   | Yes   | Yes   | Yes   | Yes   |
-| Neo4j 5.5           | ?   | ?   | ?     | ?     | (Yes)   | Yes   | Yes   | Yes   | Yes   | Yes   | Yes   |
+| Server \\ Driver    | 1.7 | 4.0 | 4.2   | 4.3   | **4.4** | 5.0   | 5.1   | 5.2   | 5.3   | 5.4   | 5.5   | 5.6   | 5.7   |
+|---------------------|-----|-----|-------|-------|---------|-------|-------|-------|-------|-------|-------|-------|-------|
+| Neo4j 3.5 (EOL)     | Yes | Yes | (Yes) | (Yes) | (Yes)   | (Yes) | (Yes) | (Yes) | (Yes) | (Yes) | (Yes) | (Yes) | (Yes) |
+| Neo4j 4.0 (EOL)     | Yes | Yes | Yes   | Yes   | Yes     | (Yes) | (Yes) | (Yes) | (Yes) | (Yes) | (Yes) | (Yes) | (Yes) |
+| Neo4j 4.1 (EOL)     | ?   | Yes | Yes   | Yes   | Yes     | (Yes) | (Yes) | (Yes) | (Yes) | (Yes) | (Yes) | (Yes) | (Yes) |
+| Neo4j 4.2 (EOL)     | ?   | ?   | Yes   | Yes   | Yes     | (Yes) | (Yes) | (Yes) | (Yes) | (Yes) | (Yes) | (Yes) | (Yes) |
+| Neo4j 4.3 (EOL)     | ?   | ?   | Yes   | Yes   | Yes     | (Yes) | (Yes) | (Yes) | (Yes) | (Yes) | (Yes) | (Yes) | (Yes) |
+| **Neo4j 4.4 (LTS)** | ?   | ?   | ?     | Yes   | Yes     | Yes   | Yes   | Yes   | Yes   | Yes   | Yes   | Yes   | (Yes) |
+| Neo4j 5.0 (HO)      | ?   | ?   | ?     | ?     | Yes     | Yes   | Yes   | Yes   | Yes   | Yes   | Yes   | Yes   | (Yes) |
+| Neo4j 5.1 (HO)      | ?   | ?   | ?     | ?     | (Yes)   | Yes   | Yes   | Yes   | Yes   | Yes   | Yes   | Yes   | (Yes) |
+| Neo4j 5.2 (HO)      | ?   | ?   | ?     | ?     | (Yes)   | Yes   | Yes   | Yes   | Yes   | Yes   | Yes   | Yes   | (Yes) |
+| Neo4j 5.3 (HO)      | ?   | ?   | ?     | ?     | (Yes)   | Yes   | Yes   | Yes   | Yes   | Yes   | Yes   | Yes   | (Yes) |
+| Neo4j 5.4 (HO)      | ?   | ?   | ?     | ?     | (Yes)   | Yes   | Yes   | Yes   | Yes   | Yes   | Yes   | Yes   | (Yes) |
+| Neo4j 5.5 (HO)      | ?   | ?   | ?     | ?     | (Yes)   | Yes   | Yes   | Yes   | Yes   | Yes   | Yes   | Yes   | (Yes) |
+| Neo4j 5.6           | ?   | ?   | ?     | ?     | (Yes)   | Yes   | Yes   | Yes   | Yes   | Yes   | Yes   | Yes   | (Yes) |
+| Neo4j 5.7           | ?   | ?   | ?     | ?     | (Yes)   | Yes   | Yes   | Yes   | Yes   | Yes   | Yes   | Yes   | Yes   |
 
 - `(EOL)`: End Of Life, a server version is marked as such when it is not supported anymore
 - `(HO)`: Hotfixes only, a server version is marked as such when it is only updated for security patches

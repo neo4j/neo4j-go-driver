@@ -22,6 +22,7 @@ package pool
 import (
 	"context"
 	"errors"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/config"
 	iauth "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/auth"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/bolt"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
@@ -56,7 +57,8 @@ func TestPoolBorrowReturn(outer *testing.T) {
 	}
 
 	outer.Run("Single thread borrow+return", func(t *testing.T) {
-		p := New(1, maxAge, succeedingConnect, onTokenExpired, logger, "pool id")
+		conf := config.Config{MaxConnectionLifetime: maxAge, MaxConnectionPoolSize: 1}
+		p := New(&conf, succeedingConnect, onTokenExpired, logger, "pool id")
 		p.now = func() time.Time { return birthdate }
 		defer func() {
 			if err := p.Close(ctx); err != nil {
@@ -81,7 +83,8 @@ func TestPoolBorrowReturn(outer *testing.T) {
 	})
 
 	outer.Run("First thread borrows, second thread blocks on borrow", func(t *testing.T) {
-		p := New(1, maxAge, succeedingConnect, onTokenExpired, logger, "pool id")
+		conf := config.Config{MaxConnectionLifetime: maxAge, MaxConnectionPoolSize: 1}
+		p := New(&conf, succeedingConnect, onTokenExpired, logger, "pool id")
 		p.now = func() time.Time { return birthdate }
 		defer func() {
 			if err := p.Close(ctx); err != nil {
@@ -122,7 +125,8 @@ func TestPoolBorrowReturn(outer *testing.T) {
 	})
 
 	outer.Run("First thread borrows, second thread should not block on borrow without wait", func(t *testing.T) {
-		p := New(1, maxAge, succeedingConnect, onTokenExpired, logger, "pool id")
+		conf := config.Config{MaxConnectionLifetime: maxAge, MaxConnectionPoolSize: 1}
+		p := New(&conf, succeedingConnect, onTokenExpired, logger, "pool id")
 		p.now = func() time.Time { return birthdate }
 		defer func() {
 			if err := p.Close(ctx); err != nil {
@@ -144,7 +148,8 @@ func TestPoolBorrowReturn(outer *testing.T) {
 
 	outer.Run("Multiple threads borrows and returns randomly", func(t *testing.T) {
 		maxConnections := 2
-		p := New(maxConnections, maxAge, succeedingConnect, onTokenExpired, logger, "pool id")
+		conf := config.Config{MaxConnectionLifetime: maxAge, MaxConnectionPoolSize: maxConnections}
+		p := New(&conf, succeedingConnect, onTokenExpired, logger, "pool id")
 		p.now = func() time.Time { return birthdate }
 		serverNames := []string{"srv1"}
 		numWorkers := 5
@@ -181,7 +186,8 @@ func TestPoolBorrowReturn(outer *testing.T) {
 	})
 
 	outer.Run("Failing connect", func(t *testing.T) {
-		p := New(2, maxAge, failingConnect, onTokenExpired, logger, "pool id")
+		conf := config.Config{MaxConnectionLifetime: maxAge, MaxConnectionPoolSize: 2}
+		p := New(&conf, failingConnect, onTokenExpired, logger, "pool id")
 		p.now = func() time.Time { return birthdate }
 		serverNames := []string{"srv1"}
 		c, err := p.Borrow(ctx, serverNames, true, nil, DefaultLivenessCheckThreshold, reAuthToken)
@@ -193,7 +199,8 @@ func TestPoolBorrowReturn(outer *testing.T) {
 	})
 
 	outer.Run("Cancel Borrow", func(t *testing.T) {
-		p := New(1, maxAge, succeedingConnect, onTokenExpired, logger, "pool id")
+		conf := config.Config{MaxConnectionLifetime: maxAge, MaxConnectionPoolSize: 1}
+		p := New(&conf, succeedingConnect, onTokenExpired, logger, "pool id")
 		p.now = func() time.Time { return birthdate }
 		c1, _ := p.Borrow(ctx, []string{"A"}, true, nil, DefaultLivenessCheckThreshold, reAuthToken)
 		cancelableCtx, cancel := context.WithCancel(ctx)
@@ -233,7 +240,8 @@ func TestPoolBorrowReturn(outer *testing.T) {
 		whatATimeToBeAlive := &testutil.ConnFake{Alive: true, Idle: idleness, Name: "whatATimeToBeAlive", ForceResetHook: func() {
 			t.Errorf("y u call me?")
 		}}
-		pool := New(1, maxAge, nil, onTokenExpired, logger, "pool id")
+		conf := config.Config{MaxConnectionLifetime: maxAge, MaxConnectionPoolSize: 1}
+		pool := New(&conf, nil, onTokenExpired, logger, "pool id")
 		setIdleConnections(pool, map[string][]db.Connection{"a server": {
 			deadAfterReset,
 			stayingAlive,
@@ -254,7 +262,8 @@ func TestPoolBorrowReturn(outer *testing.T) {
 		healthyConnection := &testutil.ConnFake{Name: "healthy", ForceResetHook: func() {
 			t.Errorf("force reset should not be called on new connections")
 		}}
-		pool := New(1, maxAge, connectTo(healthyConnection), onTokenExpired, logger, "pool id")
+		conf := config.Config{MaxConnectionLifetime: maxAge, MaxConnectionPoolSize: 1}
+		pool := New(&conf, connectTo(healthyConnection), onTokenExpired, logger, "pool id")
 		setIdleConnections(pool, map[string][]db.Connection{"a server": {deadAfterReset1, deadAfterReset2}})
 
 		result, err := pool.tryBorrow(ctx, "a server", nil, idlenessThreshold, reAuthToken)
@@ -274,7 +283,8 @@ func TestPoolResourceUsage(ot *testing.T) {
 	}
 
 	ot.Run("Use order of named servers as priority when creating new servers", func(t *testing.T) {
-		p := New(1, maxAge, succeedingConnect, onTokenExpired, logger, "pool id")
+		conf := config.Config{MaxConnectionLifetime: maxAge, MaxConnectionPoolSize: 1}
+		p := New(&conf, succeedingConnect, onTokenExpired, logger, "pool id")
 		p.now = func() time.Time { return birthdate }
 		defer func() {
 			if err := p.Close(ctx); err != nil {
@@ -289,7 +299,8 @@ func TestPoolResourceUsage(ot *testing.T) {
 	})
 
 	ot.Run("Do not put dead connection back to server", func(t *testing.T) {
-		p := New(2, maxAge, succeedingConnect, onTokenExpired, logger, "pool id")
+		conf := config.Config{MaxConnectionLifetime: maxAge, MaxConnectionPoolSize: 2}
+		p := New(&conf, succeedingConnect, onTokenExpired, logger, "pool id")
 		p.now = func() time.Time { return birthdate }
 		defer func() {
 			if err := p.Close(ctx); err != nil {
@@ -312,7 +323,8 @@ func TestPoolResourceUsage(ot *testing.T) {
 	})
 
 	ot.Run("Do not put too old connection back to server", func(t *testing.T) {
-		p := New(2, maxAge, succeedingConnect, onTokenExpired, logger, "pool id")
+		conf := config.Config{MaxConnectionLifetime: maxAge, MaxConnectionPoolSize: 2}
+		p := New(&conf, succeedingConnect, onTokenExpired, logger, "pool id")
 		p.now = func() time.Time { return birthdate.Add(maxAge * 2) }
 		defer func() {
 			if err := p.Close(ctx); err != nil {
@@ -334,7 +346,8 @@ func TestPoolResourceUsage(ot *testing.T) {
 	})
 
 	ot.Run("Returning dead connection to server should remove older idle connections", func(t *testing.T) {
-		p := New(3, 0, succeedingConnect, onTokenExpired, logger, "pool id")
+		conf := config.Config{MaxConnectionLifetime: 1<<63 - 1, MaxConnectionPoolSize: 3}
+		p := New(&conf, succeedingConnect, onTokenExpired, logger, "pool id")
 		// Trigger creation of three connections on the same server
 		c1, _ := p.Borrow(ctx, []string{"A"}, true, nil, DefaultLivenessCheckThreshold, reAuthToken)
 		c2, _ := p.Borrow(ctx, []string{"A"}, true, nil, DefaultLivenessCheckThreshold, reAuthToken)
@@ -365,7 +378,8 @@ func TestPoolResourceUsage(ot *testing.T) {
 	})
 
 	ot.Run("Do not borrow too old connections", func(t *testing.T) {
-		p := New(1, maxAge, succeedingConnect, onTokenExpired, logger, "pool id")
+		conf := config.Config{MaxConnectionLifetime: maxAge, MaxConnectionPoolSize: 1}
+		p := New(&conf, succeedingConnect, onTokenExpired, logger, "pool id")
 		nowMut := sync.Mutex{}
 		now := birthdate
 		p.now = func() time.Time {
@@ -396,7 +410,8 @@ func TestPoolResourceUsage(ot *testing.T) {
 	})
 
 	ot.Run("Add servers when existing servers are full", func(t *testing.T) {
-		p := New(1, maxAge, succeedingConnect, onTokenExpired, logger, "pool id")
+		conf := config.Config{MaxConnectionLifetime: maxAge, MaxConnectionPoolSize: 1}
+		p := New(&conf, succeedingConnect, onTokenExpired, logger, "pool id")
 		p.now = func() time.Time { return birthdate }
 		defer func() {
 			if err := p.Close(ctx); err != nil {
@@ -428,7 +443,8 @@ func TestPoolCleanup(ot *testing.T) {
 	}
 
 	ot.Run("Should remove servers with only idle too old connections", func(t *testing.T) {
-		p := New(0, maxLife, succeedingConnect, onTokenExpired, logger, "pool id")
+		conf := config.Config{MaxConnectionLifetime: maxLife, MaxConnectionPoolSize: 0}
+		p := New(&conf, succeedingConnect, onTokenExpired, logger, "pool id")
 		defer func() {
 			if err := p.Close(ctx); err != nil {
 				t.Errorf("Should not fail closing the pool, but got: %v", err)
@@ -455,7 +471,8 @@ func TestPoolCleanup(ot *testing.T) {
 	})
 
 	ot.Run("Should not remove servers with busy connections", func(t *testing.T) {
-		p := New(0, maxLife, succeedingConnect, onTokenExpired, logger, "pool id")
+		conf := config.Config{MaxConnectionLifetime: maxLife, MaxConnectionPoolSize: 0}
+		p := New(&conf, succeedingConnect, onTokenExpired, logger, "pool id")
 		defer func() {
 			if err := p.Close(ctx); err != nil {
 				t.Errorf("Should not fail closing the pool, but got: %v", err)
@@ -482,7 +499,8 @@ func TestPoolCleanup(ot *testing.T) {
 		failingConnect := func(_ context.Context, s string, _ *db.ReAuthToken, _ bolt.Neo4jErrorCallback, _ log.BoltLogger) (db.Connection, error) {
 			return nil, errors.New("an error")
 		}
-		p := New(0, maxLife, failingConnect, onTokenExpired, logger, "pool id")
+		conf := config.Config{MaxConnectionLifetime: maxLife, MaxConnectionPoolSize: 0}
+		p := New(&conf, failingConnect, onTokenExpired, logger, "pool id")
 		defer func() {
 			if err := p.Close(ctx); err != nil {
 				t.Errorf("Should not fail closing the pool, but got: %v", err)

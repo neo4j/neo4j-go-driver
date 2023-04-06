@@ -8,13 +8,13 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      https://www.apache.org/licenses/LICENSE-2.0
+ *     https://www.apache.org/licenses/LICENSE-2.0
  *
- *  Unless required by applicable law or agreed to in writing, software
- *  distributed under the License is distributed on an "AS IS" BASIS,
- *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *  See the License for the specific language governing permissions and
- *  limitations under the License.
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 
 package test_integration
@@ -69,7 +69,18 @@ func makeRawConnection(ctx context.Context, logger log.Logger, boltLogger log.Bo
 		},
 	}
 
-	boltConn, err := bolt.Connect(context.Background(), parsedUri.Host, tcpConn, auth, "007", nil, noopOnNeo4jError, logger, boltLogger)
+	boltConn, err := bolt.Connect(
+		context.Background(),
+		parsedUri.Host,
+		tcpConn,
+		auth,
+		"007",
+		nil,
+		noopOnNeo4jError,
+		logger,
+		boltLogger,
+		idb.NotificationConfig{},
+	)
 	if err != nil {
 		panic(err)
 	}

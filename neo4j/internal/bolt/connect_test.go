@@ -8,13 +8,13 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      https://www.apache.org/licenses/LICENSE-2.0
+ *     https://www.apache.org/licenses/LICENSE-2.0
  *
- *  Unless required by applicable law or agreed to in writing, software
- *  distributed under the License is distributed on an "AS IS" BASIS,
- *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *  See the License for the specific language governing permissions and
- *  limitations under the License.
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 
 package bolt
@@ -22,7 +22,7 @@ package bolt
 import (
 	"context"
 	iauth "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/auth"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
+	idb "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
 	"testing"
 
 	. "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/testutil"
@@ -34,7 +34,7 @@ var logger = &log.Void{}
 func TestConnect(ot *testing.T) {
 	// TODO: Test connect timeout
 
-	auth := &db.ReAuthToken{
+	auth := &idb.ReAuthToken{
 		FromSession: false,
 		Manager: iauth.Token{Tokens: map[string]any{
 			"scheme":      "basic",
@@ -55,7 +55,18 @@ func TestConnect(ot *testing.T) {
 			srv.closeConnection()
 		}()
 
-		_, err := Connect(context.Background(), "servername", conn, auth, "007", nil, nil, logger, nil)
+		_, err := Connect(
+			context.Background(),
+			"servername",
+			conn,
+			auth,
+			"007",
+			nil,
+			nil,
+			logger,
+			nil,
+			idb.NotificationConfig{},
+		)
 		AssertError(t, err)
 	})
 
@@ -70,7 +81,18 @@ func TestConnect(ot *testing.T) {
 			srv.acceptVersion(1, 0)
 		}()
 
-		boltconn, err := Connect(context.Background(), "servername", conn, auth, "007", nil, nil, logger, nil)
+		boltconn, err := Connect(
+			context.Background(),
+			"servername",
+			conn,
+			auth,
+			"007",
+			nil,
+			nil,
+			logger,
+			nil,
+			idb.NotificationConfig{},
+		)
 		AssertError(t, err)
 		if boltconn != nil {
 			t.Error("Shouldn't returned conn")
