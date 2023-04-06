@@ -3,9 +3,11 @@ Executed in Go driver container.
 Assumes driver and backend has been built.
 Responsible for starting the test backend.
 """
+
 import os
 import subprocess
 import sys
+
 
 if __name__ == "__main__":
     backend_path = os.path.join(".", "testkit-backend")

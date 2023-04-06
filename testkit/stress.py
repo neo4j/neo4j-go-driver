@@ -3,15 +3,20 @@ Executed in Go driver container.
 Responsible for running stress tests.
 Assumes driver has been setup by build script prior to this.
 """
+
 import os
 import subprocess
+import sys
 
-root_package = "github.com/neo4j/neo4j-go-driver"
+
+ROOT_PACKAGE = "github.com/neo4j/neo4j-go-driver"
 
 
 def run(args):
     subprocess.run(
-        args, universal_newlines=True, stderr=subprocess.STDOUT, check=True)
+        args, universal_newlines=True, check=True,
+        stdout=sys.stdout, stderr=sys.stderr,
+    )
 
 
 if __name__ == "__main__":

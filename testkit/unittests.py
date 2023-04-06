@@ -3,13 +3,17 @@ Executed in Go driver container.
 Responsible for running unit tests.
 Assumes driver has been setup by build script prior to this.
 """
+
 import os
 import subprocess
+import sys
 
 
 def run(args):
-    subprocess.run(args, universal_newlines=True, stderr=subprocess.STDOUT,
-                   check=True)
+    subprocess.run(
+        args, universal_newlines=True, check=True,
+        stdout=sys.stdout, stderr=sys.stderr,
+    )
 
 
 if __name__ == "__main__":
@@ -22,4 +26,5 @@ if __name__ == "__main__":
     run(cmd + ["-buildvcs=false", "-short", "./..."])
 
     # Repeat racing tests
-    run(cmd + ["-buildvcs=false", "-race", "-count", "50", "./neo4j/internal/racing"])
+    run(cmd + ["-buildvcs=false", "-race", "-count", "50",
+               "./neo4j/internal/racing"])
