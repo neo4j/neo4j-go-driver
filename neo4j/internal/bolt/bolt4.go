@@ -23,7 +23,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/auth"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/auth"
+	iauth "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/auth"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/collections"
 	idb "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/errorutil"
@@ -104,6 +105,7 @@ type bolt4 struct {
 	idleDate      time.Time
 	queue         messageQueue
 	auth          map[string]any
+	authManager   auth.TokenManager
 	resetAuth     bool
 	onNeo4jError  Neo4jErrorCallback
 }
@@ -241,6 +243,7 @@ func (b *bolt4) Connect(
 		return err
 	}
 	b.auth = token.Tokens
+	b.authManager = auth.Manager
 	for k, v := range token.Tokens {
 		_, exists := hello[k]
 		if !exists {
@@ -957,10 +960,9 @@ func (b *bolt4) ResetAuth() {
 	b.resetAuth = true
 }
 
-func (b *bolt4) GetCurrentAuth() auth.Token {
-	return auth.Token{
-		Tokens: b.auth,
-	}
+func (b *bolt4) GetCurrentAuth() (auth.TokenManager, iauth.Token) {
+	token := iauth.Token{Tokens: b.auth}
+	return b.authManager, token
 }
 
 func (b *bolt4) helloResponseHandler(checkUtcPatch bool) responseHandler {

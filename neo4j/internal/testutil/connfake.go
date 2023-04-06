@@ -21,7 +21,8 @@ package testutil
 
 import (
 	"context"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/auth"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/auth"
+	iauth "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/auth"
 	idb "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/log"
 	"time"
@@ -205,6 +206,6 @@ func (c *ConnFake) Version() db.ProtocolVersion {
 func (c *ConnFake) ResetAuth() {
 }
 
-func (c *ConnFake) GetCurrentAuth() auth.Token {
-	return auth.Token{}
+func (c *ConnFake) GetCurrentAuth() (auth.TokenManager, iauth.Token) {
+	return nil, iauth.Token{}
 }

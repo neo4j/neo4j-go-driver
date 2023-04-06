@@ -22,8 +22,9 @@ package db
 
 import (
 	"context"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/auth"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/db"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/auth"
+	iauth "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/auth"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/log"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/notifications"
 	"math"
@@ -157,8 +158,8 @@ type Connection interface {
 	Version() db.ProtocolVersion
 	// ResetAuth clears any authentication token held by this connection
 	ResetAuth()
-	// GetCurrentAuth returns the current authentication token that this connection is authenticated with
-	GetCurrentAuth() auth.Token
+	// GetCurrentAuth returns the current authentication manager and token that this connection is authenticated with
+	GetCurrentAuth() (auth.TokenManager, iauth.Token)
 }
 
 type RoutingTable struct {

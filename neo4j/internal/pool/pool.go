@@ -508,8 +508,11 @@ func (p *Pool) OnConnectionError(ctx context.Context, connection idb.Connection,
 			c.ResetAuth()
 		})
 	} else if error.Code == "Neo.ClientError.Security.TokenExpired" {
-		if err := p.onTokenExpired(ctx, connection.GetCurrentAuth()); err != nil {
-			return err
+		manager, token := connection.GetCurrentAuth()
+		if manager != nil {
+			if err := manager.OnTokenExpired(ctx, token); err != nil {
+				return err
+			}
 		}
 	}
 	return nil

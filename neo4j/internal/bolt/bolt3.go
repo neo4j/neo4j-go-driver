@@ -23,7 +23,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/auth"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/auth"
+	iauth "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/auth"
 	idb "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/errorutil"
 	"net"
@@ -88,6 +89,7 @@ type bolt3 struct {
 	minor         int
 	idleDate      time.Time
 	auth          map[string]any
+	authManager   auth.TokenManager
 	resetAuth     bool
 	onNeo4jError  Neo4jErrorCallback
 }
@@ -212,6 +214,7 @@ func (b *bolt3) Connect(
 		return err
 	}
 	b.auth = token.Tokens
+	b.authManager = auth.Manager
 	for k, v := range token.Tokens {
 		_, exists := hello[k]
 		if exists {
@@ -842,8 +845,7 @@ func (b *bolt3) ResetAuth() {
 	b.resetAuth = true
 }
 
-func (b *bolt3) GetCurrentAuth() auth.Token {
-	return auth.Token{
-		Tokens: b.auth,
-	}
+func (b *bolt3) GetCurrentAuth() (auth.TokenManager, iauth.Token) {
+	token := iauth.Token{Tokens: b.auth}
+	return b.authManager, token
 }
