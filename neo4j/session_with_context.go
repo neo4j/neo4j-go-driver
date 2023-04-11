@@ -8,13 +8,13 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      https://www.apache.org/licenses/LICENSE-2.0
+ *     https://www.apache.org/licenses/LICENSE-2.0
  *
- *  Unless required by applicable law or agreed to in writing, software
- *  distributed under the License is distributed on an "AS IS" BASIS,
- *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *  See the License for the specific language governing permissions and
- *  limitations under the License.
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 
 package neo4j
@@ -74,6 +74,7 @@ type SessionWithContext interface {
 
 	legacy() Session
 	getServerInfo(ctx context.Context) (ServerInfo, error)
+	verifyAuthentication(ctx context.Context) error
 }
 
 // SessionConfig is used to configure a new session, its zero value uses safe defaults.
@@ -165,6 +166,8 @@ type SessionConfig struct {
 	NotificationsDisabledCategories notifications.NotificationDisabledCategories
 	// Auth TODO: docs
 	Auth *AuthToken
+
+	forceReAuth bool
 }
 
 // FetchAll turns off fetching records in batches.
@@ -222,7 +225,7 @@ func newSessionWithContext(config *Config, sessConfig SessionConfig, router sess
 		logId:         logId,
 		throttleTime:  time.Second * 1,
 		fetchSize:     fetchSize,
-		auth:             token,
+		auth:          token,
 	}
 }
 
@@ -668,6 +671,25 @@ func (s *sessionWithContext) getServerInfo(ctx context.Context) (ServerInfo, err
 	}, nil
 }
 
+func (s *sessionWithContext) verifyAuthentication(ctx context.Context) error {
+	servers, err := s.getServers(ctx, idb.ReadMode)
+	if err != nil {
+		return wrapError(err)
+	}
+	conn, err := s.pool.Borrow(
+		ctx,
+		servers,
+		s.driverConfig.ConnectionAcquisitionTimeout != 0,
+		s.config.BoltLogger,
+		0,
+		s.auth) // TODO: force re-auth (and wait for result)
+	if err != nil {
+		return wrapError(err)
+	}
+	defer s.pool.Return(ctx, conn)
+	return nil
+}
+
 func (s *sessionWithContext) resolveHomeDatabase(ctx context.Context) error {
 	if !s.resolveHomeDb {
 		return nil
@@ -733,6 +755,10 @@ func (s *erroredSessionWithContext) legacy() Session {
 }
 func (s *erroredSessionWithContext) getServerInfo(context.Context) (ServerInfo, error) {
 	return nil, s.err
+}
+
+func (s *erroredSessionWithContext) verifyAuthentication(context.Context) error {
+	return s.err
 }
 
 func defaultTransactionConfig() TransactionConfig {

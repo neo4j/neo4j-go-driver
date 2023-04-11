@@ -859,6 +859,28 @@ func (b *backend) handleRequest(req map[string]any) {
 		}
 		b.writeResponse("Driver", map[string]any{"id": driverId})
 
+	case "VerifyAuthentication":
+		driverId := data["driverId"].(string)
+		var token *neo4j.AuthToken
+		if data["authorizationToken"] != nil {
+			authToken, err := getAuth(data["authorizationToken"].(map[string]any)["data"].(map[string]any))
+			if err != nil {
+				b.writeError(err)
+				return
+			}
+			token = &authToken
+		}
+		if err := b.drivers[driverId].VerifyAuthentication(ctx, token); err != nil {
+			invalidAuthError := &neo4j.InvalidAuthenticationError{}
+			if errors.As(err, &invalidAuthError) {
+				b.writeResponse("DriverIsAuthenticated", map[string]any{"id": driverId, "authenticated": false})
+			} else {
+				b.writeError(err)
+			}
+		} else {
+			b.writeResponse("DriverIsAuthenticated", map[string]any{"id": driverId, "authenticated": true})
+		}
+
 	case "NewAuthTokenManager":
 		managerId := b.nextId()
 		manager := GenericTokenManager{
@@ -962,6 +984,7 @@ func (b *backend) handleRequest(req map[string]any) {
 				"Feature:API:Driver:GetServerInfo",
 				"Feature:API:Driver.IsEncrypted",
 				"Feature:API:Driver:NotificationsConfig",
+				"Feature:API:Driver.VerifyAuthentication",
 				"Feature:API:Driver.VerifyConnectivity",
 				"Feature:API:Liveness.Check",
 				"Feature:API:Result.List",

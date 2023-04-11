@@ -75,6 +75,9 @@ type DriverWithContext interface {
 	// or error describing the problem.
 	// Contexts terminating too early negatively affect connection pooling and degrade the driver performance.
 	VerifyConnectivity(ctx context.Context) error
+	// VerifyAuthentication TODO docs
+	// nil: use driver's auth token
+	VerifyAuthentication(ctx context.Context, auth *AuthToken) error
 	// Close the driver and all underlying connections
 	Close(ctx context.Context) error
 	// IsEncrypted determines whether the driver communication with the server
@@ -317,11 +320,13 @@ func (d *driverWithContext) NewSession(ctx context.Context, config SessionConfig
 			// TODO: move Auth field to driverWithContext struct
 			Manager:     d.connector.Auth,
 			FromSession: false,
+			ForceReAuth: config.forceReAuth,
 		}
 	} else {
 		reAuthToken = &idb.ReAuthToken{
 			Manager:     config.Auth,
 			FromSession: true,
+			ForceReAuth: config.forceReAuth,
 		}
 	}
 
@@ -368,6 +373,26 @@ func (d *driverWithContext) Close(ctx context.Context) error {
 	d.pool = nil
 	d.log.Infof(log.Driver, d.logId, "Closed")
 	return nil
+}
+
+func (d *driverWithContext) VerifyAuthentication(ctx context.Context, auth *AuthToken) (err error) {
+	session := d.NewSession(ctx, SessionConfig{Auth: auth, forceReAuth: true, DatabaseName: "system"})
+	defer func() {
+		err = deferredClose(ctx, session, err)
+	}()
+	err = session.verifyAuthentication(ctx)
+
+	if tokenExpiredError, ok := err.(*TokenExpiredError); ok {
+		return &InvalidAuthenticationError{inner: tokenExpiredError}
+	}
+	if neo4jError, ok := err.(*Neo4jError); ok {
+		if neo4jError.Code == "Neo.ClientError.Security.CredentialsExpired" ||
+			neo4jError.Code == "Neo.ClientError.Security.Forbidden" ||
+			neo4jError.Code == "Neo.ClientError.Security.Unauthorized" {
+			return &InvalidAuthenticationError{inner: neo4jError}
+		}
+	}
+	return err
 }
 
 // ExecuteQuery runs the specified query with its parameters and returns the query result, transformed by the specified

@@ -106,6 +106,18 @@ func (e *ConnectivityError) Error() string {
 	return fmt.Sprintf("ConnectivityError: %s", e.inner.Error())
 }
 
+type InvalidAuthenticationError struct {
+	inner error
+}
+
+func (i *InvalidAuthenticationError) Error() string {
+	return fmt.Sprintf("InvalidAuthenticationError: %s", i.inner.Error())
+}
+
+func (i *InvalidAuthenticationError) Unwrap() error {
+	return i.inner
+}
+
 // IsNeo4jError returns true if the provided error is an instance of Neo4jError.
 func IsNeo4jError(err error) bool {
 	_, is := err.(*Neo4jError)

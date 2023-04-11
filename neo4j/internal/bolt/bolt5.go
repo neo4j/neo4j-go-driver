@@ -837,7 +837,7 @@ func (b *bolt5) fallbackReAuth(ctx context.Context, auth *idb.ReAuthToken) error
 		return err
 	}
 	if b.resetAuth {
-		b.log.Infof(log.Bolt4, b.logId, "Closing connection because auth token expired (informed by other connection)")
+		b.log.Infof(log.Bolt5, b.logId, "Closing connection because auth token expired (informed by other connection)")
 		b.Close(ctx)
 		return nil
 	}
@@ -846,7 +846,7 @@ func (b *bolt5) fallbackReAuth(ctx context.Context, auth *idb.ReAuthToken) error
 		return err
 	}
 	if !reflect.DeepEqual(b.auth, token.Tokens) {
-		b.log.Infof(log.Bolt4, b.logId, "Closing connection because auth token expired (informed by auth manager)")
+		b.log.Infof(log.Bolt5, b.logId, "Closing connection because auth token expired (informed by auth manager)")
 		b.Close(ctx)
 	}
 	return nil
@@ -859,14 +859,20 @@ func (b *bolt5) reAuth(ctx context.Context, auth *idb.ReAuthToken) error {
 	}
 	if b.resetAuth {
 		b.log.Infof(
-			log.Bolt4, b.logId,
+			log.Bolt5, b.logId,
 			"Re-authenticating connection because auth token expired (informed by other connection)")
 		b.queue.appendLogoff(b.logoffResponseHandler())
 		b.queue.appendLogon(token.Tokens, b.logonResponseHandler())
 	} else if !reflect.DeepEqual(b.auth, token.Tokens) {
 		b.log.Infof(
-			log.Bolt4, b.logId,
+			log.Bolt5, b.logId,
 			"Re-authenticating connection because auth token expired (informed by auth manager)")
+		b.queue.appendLogoff(b.logoffResponseHandler())
+		b.queue.appendLogon(token.Tokens, b.logonResponseHandler())
+	} else if auth.ForceReAuth {
+		b.log.Infof(
+			log.Bolt5, b.logId,
+			"Re-authenticating connection because auth token expired (forced by verifyAuthentication)")
 		b.queue.appendLogoff(b.logoffResponseHandler())
 		b.queue.appendLogon(token.Tokens, b.logonResponseHandler())
 	} else {
@@ -878,6 +884,14 @@ func (b *bolt5) reAuth(ctx context.Context, auth *idb.ReAuthToken) error {
 	}
 	b.auth = token.Tokens
 	b.authManager = auth.Manager
+	if auth.ForceReAuth {
+		if err := b.queue.receiveAll(ctx); err != nil {
+			return err
+		}
+		if b.err != nil {
+			return b.err
+		}
+	}
 	return nil
 }
 
