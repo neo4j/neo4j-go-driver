@@ -8,13 +8,13 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      https://www.apache.org/licenses/LICENSE-2.0
+ *     https://www.apache.org/licenses/LICENSE-2.0
  *
- *  Unless required by applicable law or agreed to in writing, software
- *  distributed under the License is distributed on an "AS IS" BASIS,
- *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *  See the License for the specific language governing permissions and
- *  limitations under the License.
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 
 package retry
@@ -102,12 +102,6 @@ func TestState(outer *testing.T) {
 			{conn: &testutil.ConnFake{Alive: true}, err: clusterErr, expectContinued: true,
 				expectRouterInvalidated: true, expectRouterInvalidatedDb: dbName, expectLastErrWasRetryable: true},
 		},
-		"Cluster error timeout": {
-			{conn: &testutil.ConnFake{Alive: true}, err: clusterErr, expectContinued: true,
-				expectRouterInvalidated: true, expectRouterInvalidatedDb: dbName, expectLastErrWasRetryable: true},
-			{conn: &testutil.ConnFake{Alive: true}, err: clusterErr, expectContinued: false, now: overTime,
-				expectLastErrWasRetryable: true},
-		},
 		"Database transient error": {
 			{conn: &testutil.ConnFake{Alive: true}, err: dbTransientErr, expectContinued: true,
 				expectLastErrWasRetryable: true},
@@ -129,8 +123,10 @@ func TestState(outer *testing.T) {
 		"Fail during commit after retry": {
 			{conn: &testutil.ConnFake{Alive: true}, err: dbTransientErr, expectContinued: true,
 				expectLastErrWasRetryable: true},
-			{conn: &testutil.ConnFake{Alive: false}, err: io.EOF, isCommitting: true, expectContinued: false,
-				expectLastErrWasRetryable: false, expectLastErrType: &errorutil.CommitFailedDeadError{}},
+			{conn: &testutil.ConnFake{Name: serverName, Alive: false}, err: io.EOF, isCommitting: true,
+				expectContinued: false, expectLastErrWasRetryable: false,
+				expectLastErrType: &errorutil.CommitFailedDeadError{}, expectRouterInvalidated: true,
+				expectRouterInvalidatedDb: dbName, expectRouterInvalidatedServer: serverName},
 		},
 		"Does not retry on auth errors": {
 			{conn: nil, err: authErr, expectContinued: false,
@@ -185,7 +181,14 @@ func TestState(outer *testing.T) {
 						invocation.expectRouterInvalidated, invocation.expectRouterInvalidatedDb, invocation.expectRouterInvalidatedServer,
 						router.Invalidated, router.InvalidatedDb, router.InvalidatedServer)
 				}
-				lastError := state.Errs[len(state.Errs)-1]
+				var lastError error
+				if err, ok := state.Errs[0].(*errorutil.TransactionExecutionLimit); ok {
+					errs := err.Errors
+					lastError = errs[len(errs)-1]
+				} else {
+					lastError = state.Errs[len(state.Errs)-1]
+				}
+
 				if IsRetryable(lastError) != invocation.expectLastErrWasRetryable {
 					t.Errorf("LastErrWasRetryable mismatch")
 				}
