@@ -572,14 +572,16 @@ func (b *backend) handleRequest(req map[string]any) {
 		sessionConfig := neo4j.SessionConfig{
 			BoltLogger: neo4j.ConsoleBoltLogger(),
 		}
-		switch data["accessMode"].(string) {
-		case "r":
-			sessionConfig.AccessMode = neo4j.AccessModeRead
-		case "w":
-			sessionConfig.AccessMode = neo4j.AccessModeWrite
-		default:
-			b.writeError(errors.New("Unknown access mode: " + data["accessMode"].(string)))
-			return
+		if data["accessMode"] != nil {
+			switch data["accessMode"].(string) {
+			case "r":
+				sessionConfig.AccessMode = neo4j.AccessModeRead
+			case "w":
+				sessionConfig.AccessMode = neo4j.AccessModeWrite
+			default:
+				b.writeError(errors.New("Unknown access mode: " + data["accessMode"].(string)))
+				return
+			}
 		}
 		if data["bookmarks"] != nil {
 			rawBookmarks := data["bookmarks"].([]any)
