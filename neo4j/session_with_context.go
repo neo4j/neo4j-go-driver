@@ -181,6 +181,7 @@ type sessionPool interface {
 	Borrow(ctx context.Context, serverNames []string, wait bool, boltLogger log.BoltLogger, livenessCheckThreshold time.Duration, auth *idb.ReAuthToken) (idb.Connection, error)
 	Return(ctx context.Context, c idb.Connection) error
 	CleanUp(ctx context.Context) error
+	Now() time.Time
 }
 
 type sessionWithContext struct {
@@ -193,7 +194,6 @@ type sessionWithContext struct {
 	explicitTx    *explicitTransaction
 	autocommitTx  *autocommitTransaction
 	sleep         func(d time.Duration)
-	now           func() time.Time
 	logId         string
 	log           log.Logger
 	throttleTime  time.Duration
@@ -220,7 +220,6 @@ func newSessionWithContext(config *Config, sessConfig SessionConfig, router sess
 		config:        sessConfig,
 		resolveHomeDb: sessConfig.DatabaseName == "",
 		sleep:         time.Sleep,
-		now:           time.Now,
 		log:           logger,
 		logId:         logId,
 		throttleTime:  time.Second * 1,
@@ -370,7 +369,7 @@ func (s *sessionWithContext) runRetriable(
 		Log:                     s.log,
 		LogName:                 log.Session,
 		LogId:                   s.logId,
-		Now:                     s.now,
+		Now:                     s.pool.Now,
 		Sleep:                   s.sleep,
 		Throttle:                retry.Throttler(s.throttleTime),
 		MaxDeadConnections:      s.driverConfig.MaxConnectionPoolSize,

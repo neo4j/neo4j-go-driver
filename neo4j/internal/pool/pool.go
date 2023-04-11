@@ -173,6 +173,10 @@ func (p *Pool) CleanUp(ctx context.Context) error {
 	return nil
 }
 
+func (p *Pool) Now() time.Time {
+	return p.now()
+}
+
 func (p *Pool) getPenaltiesForServers(ctx context.Context, serverNames []string) ([]serverPenalty, error) {
 	if !p.serversMut.TryLock(ctx) {
 		return nil, fmt.Errorf("could not acquire server lock in time when computing server penalties")
