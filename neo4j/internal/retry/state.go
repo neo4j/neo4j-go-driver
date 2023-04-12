@@ -53,7 +53,7 @@ type State struct {
 	Log                     log.Logger
 	LogName                 string
 	LogId                   string
-	Now                     func() time.Time
+	Now                     *func() time.Time
 	Sleep                   func(time.Duration)
 	Throttle                Throttler
 	MaxDeadConnections      int
@@ -74,9 +74,9 @@ func (s *State) OnFailure(ctx context.Context, conn idb.Connection, err error, i
 
 	// Check timeout
 	if s.start.IsZero() {
-		s.start = s.Now()
+		s.start = (*s.Now)()
 	}
-	if s.Now().Sub(s.start) > s.MaxTransactionRetryTime {
+	if (*s.Now)().Sub(s.start) > s.MaxTransactionRetryTime {
 		s.stop = true
 		s.cause = "Timeout"
 		return

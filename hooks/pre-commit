@@ -7,13 +7,13 @@ grep_not(){ ! grep "${@}"; return $?;}
 echo "# pre-commit hook"
 printf '%-15s' "## staticcheck "
 cd "$(mktemp -d)" && go install honnef.co/go/tools/cmd/staticcheck@v0.3.3 && cd - > /dev/null
-"${GOBIN:-$(go env GOPATH)/bin}"/staticcheck ./...
+"${GOBIN:-$(go env GOPATH)/bin}"/staticcheck -tags internal_testkit ./...
 echo "✅"
 
 printf '%-15s' "## go vet "
-go vet ./...
+go vet -tags internal_testkit ./...
 echo "✅"
 
 printf '%-15s' "## go test "
-go test -short ./... | grep_not --invert-match --fixed-strings --regexp='?' --regexp='ok' # only show failures
+go test -short ./neo4j/... | grep_not --invert-match --fixed-strings --regexp='?' --regexp='ok' # only show failures
 echo "✅"

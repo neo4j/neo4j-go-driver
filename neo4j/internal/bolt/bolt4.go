@@ -100,14 +100,16 @@ type bolt4 struct {
 	lastQid       int64 // Last seen qid
 	idleDate      time.Time
 	queue         messageQueue
+	now           *func() time.Time
 }
 
-func NewBolt4(serverName string, conn net.Conn, logger log.Logger, boltLog log.BoltLogger) *bolt4 {
-	now := time.Now()
+func NewBolt4(serverName string, conn net.Conn, timer *func() time.Time, logger log.Logger, boltLog log.BoltLogger) *bolt4 {
+	now := (*timer)()
 	b := &bolt4{
 		state:      bolt4_unauthorized,
 		conn:       conn,
 		serverName: serverName,
+		now:        timer,
 		birthDate:  now,
 		idleDate:   now,
 		log:        logger,
@@ -1069,7 +1071,7 @@ func (b *bolt4) expectedSuccessHandler(onSuccess func(*success)) responseHandler
 }
 
 func (b *bolt4) onNextMessage() {
-	b.idleDate = time.Now()
+	b.idleDate = (*b.now)()
 }
 
 func (b *bolt4) onNextMessageError(err error) {

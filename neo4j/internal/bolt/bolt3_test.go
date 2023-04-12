@@ -102,17 +102,8 @@ func TestBolt3(outer *testing.T) {
 		tcpConn, srv, cleanup := setupBolt3Pipe(t)
 		go serverJob(srv)
 
-		c, err := Connect(
-			context.Background(),
-			"serverName",
-			tcpConn,
-			auth,
-			"007",
-			nil,
-			logger,
-			nil,
-			idb.NotificationConfig{},
-		)
+		timer := time.Now
+		c, err := Connect(context.Background(), "serverName", tcpConn, auth, "007", nil, logger, nil, idb.NotificationConfig{}, &timer)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -153,17 +144,8 @@ func TestBolt3(outer *testing.T) {
 			srv.waitForHello()
 			srv.rejectHelloUnauthorized()
 		}()
-		bolt, err := Connect(
-			context.Background(),
-			"serverName",
-			conn,
-			auth,
-			"007",
-			nil,
-			logger,
-			nil,
-			idb.NotificationConfig{},
-		)
+		timer := time.Now
+		bolt, err := Connect(context.Background(), "serverName", conn, auth, "007", nil, logger, nil, idb.NotificationConfig{}, &timer)
 		AssertNil(t, bolt)
 		AssertError(t, err)
 		dbErr := err.(*db.Neo4jError)

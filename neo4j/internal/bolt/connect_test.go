@@ -23,6 +23,7 @@ import (
 	"context"
 	idb "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
 	"testing"
+	"time"
 
 	. "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/testutil"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/log"
@@ -51,17 +52,8 @@ func TestConnect(ot *testing.T) {
 			srv.closeConnection()
 		}()
 
-		_, err := Connect(
-			context.Background(),
-			"servername",
-			conn,
-			auth,
-			"007",
-			nil,
-			logger,
-			nil,
-			idb.NotificationConfig{},
-		)
+		timer := time.Now
+		_, err := Connect(context.Background(), "servername", conn, auth, "007", nil, logger, nil, idb.NotificationConfig{}, &timer)
 		AssertError(t, err)
 	})
 
@@ -76,17 +68,8 @@ func TestConnect(ot *testing.T) {
 			srv.acceptVersion(1, 0)
 		}()
 
-		boltconn, err := Connect(
-			context.Background(),
-			"servername",
-			conn,
-			auth,
-			"007",
-			nil,
-			logger,
-			nil,
-			idb.NotificationConfig{},
-		)
+		timer := time.Now
+		boltconn, err := Connect(context.Background(), "servername", conn, auth, "007", nil, logger, nil, idb.NotificationConfig{}, &timer)
 		AssertError(t, err)
 		if boltconn != nil {
 			t.Error("Shouldn't returned conn")

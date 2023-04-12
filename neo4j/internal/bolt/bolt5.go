@@ -101,14 +101,16 @@ type bolt5 struct {
 	minor         int
 	lastQid       int64 // Last seen qid
 	idleDate      time.Time
+	now           *func() time.Time
 }
 
-func NewBolt5(serverName string, conn net.Conn, logger log.Logger, boltLog log.BoltLogger) *bolt5 {
-	now := time.Now()
+func NewBolt5(serverName string, conn net.Conn, timer *func() time.Time, logger log.Logger, boltLog log.BoltLogger) *bolt5 {
+	now := (*timer)()
 	b := &bolt5{
 		state:      bolt5Unauthorized,
 		conn:       conn,
 		serverName: serverName,
+		now:        timer,
 		birthDate:  now,
 		idleDate:   now,
 		log:        logger,
@@ -987,7 +989,7 @@ func (b *bolt5) onCommitSuccess(commitSuccess *success) {
 }
 
 func (b *bolt5) onNextMessage() {
-	b.idleDate = time.Now()
+	b.idleDate = (*b.now)()
 }
 
 func (b *bolt5) onNextMessageError(err error) {

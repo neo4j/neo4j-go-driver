@@ -188,7 +188,7 @@ type sessionWithContext struct {
 	explicitTx    *explicitTransaction
 	autocommitTx  *autocommitTransaction
 	sleep         func(d time.Duration)
-	now           func() time.Time
+	now           *func() time.Time
 	logId         string
 	log           log.Logger
 	throttleTime  time.Duration
@@ -196,7 +196,7 @@ type sessionWithContext struct {
 	config        SessionConfig
 }
 
-func newSessionWithContext(config *Config, sessConfig SessionConfig, router sessionRouter, pool sessionPool, logger log.Logger) *sessionWithContext {
+func newSessionWithContext(config *Config, sessConfig SessionConfig, router sessionRouter, pool sessionPool, logger log.Logger, now *func() time.Time) *sessionWithContext {
 	logId := log.NewId()
 	logger.Debugf(log.Session, logId, "Created with context")
 
@@ -214,7 +214,7 @@ func newSessionWithContext(config *Config, sessConfig SessionConfig, router sess
 		config:        sessConfig,
 		resolveHomeDb: sessConfig.DatabaseName == "",
 		sleep:         time.Sleep,
-		now:           time.Now,
+		now:           now,
 		log:           logger,
 		logId:         logId,
 		throttleTime:  time.Second * 1,

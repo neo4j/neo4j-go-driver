@@ -43,7 +43,7 @@ type Router struct {
 	pool          Pool
 	dbRouters     map[string]*databaseRouter
 	dbRoutersMut  racing.Mutex
-	now           func() time.Time
+	now           *func() time.Time
 	sleep         func(time.Duration)
 	rootRouter    string
 	getRouters    func() []string
@@ -60,7 +60,7 @@ type Pool interface {
 	Return(ctx context.Context, c db.Connection) error
 }
 
-func New(rootRouter string, getRouters func() []string, routerContext map[string]string, pool Pool, logger log.Logger, logId string) *Router {
+func New(rootRouter string, getRouters func() []string, routerContext map[string]string, pool Pool, logger log.Logger, logId string, timer *func() time.Time) *Router {
 	r := &Router{
 		rootRouter:    rootRouter,
 		getRouters:    getRouters,
@@ -68,7 +68,7 @@ func New(rootRouter string, getRouters func() []string, routerContext map[string
 		pool:          pool,
 		dbRouters:     make(map[string]*databaseRouter),
 		dbRoutersMut:  racing.NewMutex(),
-		now:           time.Now,
+		now:           timer,
 		sleep:         time.Sleep,
 		log:           logger,
 		logId:         logId,
@@ -118,7 +118,7 @@ func (r *Router) readTable(ctx context.Context, dbRouter *databaseRouter, bookma
 }
 
 func (r *Router) getOrReadTable(ctx context.Context, bookmarksFn func(context.Context) ([]string, error), database string, boltLogger log.BoltLogger) (*db.RoutingTable, error) {
-	now := r.now()
+	now := (*r.now)()
 
 	if !r.dbRoutersMut.TryLock(ctx) {
 		return nil, racing.LockTimeoutError("could not acquire router lock in time when getting routing table")
@@ -210,7 +210,7 @@ func (r *Router) GetNameOfDefaultDatabase(ctx context.Context, bookmarks []strin
 		return "", err
 	}
 	// Store the fresh routing table as well to avoid another roundtrip to receive servers from session.
-	now := r.now()
+	now := (*r.now)()
 	if !r.dbRoutersMut.TryLock(ctx) {
 		return "", racing.LockTimeoutError("could not acquire router lock in time when resolving home database")
 	}
@@ -280,7 +280,7 @@ func (r *Router) InvalidateReader(ctx context.Context, db string, server string)
 
 func (r *Router) CleanUp(ctx context.Context) error {
 	r.log.Debugf(log.Router, r.logId, "Cleaning up")
-	now := r.now().Unix()
+	now := (*r.now)().Unix()
 	if !r.dbRoutersMut.TryLock(ctx) {
 		return racing.LockTimeoutError("could not acquire router lock in time when invalidating reader")
 	}

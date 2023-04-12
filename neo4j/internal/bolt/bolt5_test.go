@@ -106,17 +106,8 @@ func TestBolt5(outer *testing.T) {
 		tcpConn, srv, cleanup := setupBolt5Pipe(t)
 		go serverJob(srv)
 
-		c, err := Connect(
-			context.Background(),
-			"serverName",
-			tcpConn,
-			auth,
-			"007",
-			nil,
-			logger,
-			nil,
-			idb.NotificationConfig{},
-		)
+		timer := time.Now
+		c, err := Connect(context.Background(), "serverName", tcpConn, auth, "007", nil, logger, nil, idb.NotificationConfig{}, &timer)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -249,17 +240,8 @@ func TestBolt5(outer *testing.T) {
 			}
 			srv.acceptHello()
 		}()
-		bolt, err := Connect(
-			context.Background(),
-			"serverName",
-			conn,
-			auth,
-			"007",
-			routingContext,
-			logger,
-			nil,
-			idb.NotificationConfig{},
-		)
+		timer := time.Now
+		bolt, err := Connect(context.Background(), "serverName", conn, auth, "007", routingContext, logger, nil, idb.NotificationConfig{}, &timer)
 		AssertNoError(t, err)
 		bolt.Close(context.Background())
 	})
@@ -280,17 +262,8 @@ func TestBolt5(outer *testing.T) {
 			srv.waitForLogon()
 			srv.acceptLogon()
 		}()
-		bolt, err := Connect(
-			context.Background(),
-			"serverName",
-			conn,
-			auth,
-			"007",
-			routingContext,
-			logger,
-			nil,
-			idb.NotificationConfig{},
-		)
+		timer := time.Now
+		bolt, err := Connect(context.Background(), "serverName", conn, auth, "007", routingContext, logger, nil, idb.NotificationConfig{}, &timer)
 		AssertNoError(t, err)
 		bolt.Close(context.Background())
 	})
@@ -308,17 +281,8 @@ func TestBolt5(outer *testing.T) {
 			}
 			srv.acceptHello()
 		}()
-		bolt, err := Connect(
-			context.Background(),
-			"serverName",
-			conn,
-			auth,
-			"007",
-			nil,
-			logger,
-			nil,
-			idb.NotificationConfig{},
-		)
+		timer := time.Now
+		bolt, err := Connect(context.Background(), "serverName", conn, auth, "007", nil, logger, nil, idb.NotificationConfig{}, &timer)
 		AssertNoError(t, err)
 		bolt.Close(context.Background())
 	})
@@ -338,17 +302,8 @@ func TestBolt5(outer *testing.T) {
 			srv.waitForLogon()
 			srv.acceptLogon()
 		}()
-		bolt, err := Connect(
-			context.Background(),
-			"serverName",
-			conn,
-			auth,
-			"007",
-			nil,
-			logger,
-			nil,
-			idb.NotificationConfig{},
-		)
+		timer := time.Now
+		bolt, err := Connect(context.Background(), "serverName", conn, auth, "007", nil, logger, nil, idb.NotificationConfig{}, &timer)
 		AssertNoError(t, err)
 		bolt.Close(context.Background())
 	})
@@ -363,17 +318,8 @@ func TestBolt5(outer *testing.T) {
 			srv.waitForHello()
 			srv.rejectHelloUnauthorized()
 		}()
-		bolt, err := Connect(
-			context.Background(),
-			"serverName",
-			conn,
-			auth,
-			"007",
-			nil,
-			logger,
-			nil,
-			idb.NotificationConfig{},
-		)
+		timer := time.Now
+		bolt, err := Connect(context.Background(), "serverName", conn, auth, "007", nil, logger, nil, idb.NotificationConfig{}, &timer)
 		AssertNil(t, bolt)
 		AssertError(t, err)
 		dbErr, isDbErr := err.(*db.Neo4jError)
@@ -397,17 +343,8 @@ func TestBolt5(outer *testing.T) {
 			srv.waitForLogon()
 			srv.rejectLogonWithoutAuthToken()
 		}()
-		bolt, err := Connect(
-			context.Background(),
-			"serverName",
-			conn,
-			auth,
-			"007",
-			nil,
-			logger,
-			nil,
-			idb.NotificationConfig{},
-		)
+		timer := time.Now
+		bolt, err := Connect(context.Background(), "serverName", conn, auth, "007", nil, logger, nil, idb.NotificationConfig{}, &timer)
 		AssertNil(t, bolt)
 		AssertError(t, err)
 		dbErr, isDbErr := err.(*db.Neo4jError)

@@ -26,6 +26,7 @@ import (
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/racing"
 	"net"
+	"time"
 
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/log"
 )
@@ -46,8 +47,7 @@ var versions = [4]protocolVersion{
 
 // Connect initiates the negotiation of the Bolt protocol version.
 // Returns the instance of bolt protocol implementing the low-level Connection interface.
-func Connect(
-	ctx context.Context,
+func Connect(ctx context.Context,
 	serverName string,
 	conn net.Conn,
 	auth map[string]any,
@@ -56,7 +56,7 @@ func Connect(
 	logger log.Logger,
 	boltLog log.BoltLogger,
 	notificationConfig db.NotificationConfig,
-) (db.Connection, error) {
+	timer *func() time.Time) (db.Connection, error) {
 	// Perform Bolt handshake to negotiate version
 	// Send handshake to server
 	handshake := []byte{
@@ -91,11 +91,11 @@ func Connect(
 	var boltConn db.Connection
 	switch major {
 	case 3:
-		boltConn = NewBolt3(serverName, conn, logger, boltLog)
+		boltConn = NewBolt3(serverName, conn, timer, logger, boltLog)
 	case 4:
-		boltConn = NewBolt4(serverName, conn, logger, boltLog)
+		boltConn = NewBolt4(serverName, conn, timer, logger, boltLog)
 	case 5:
-		boltConn = NewBolt5(serverName, conn, logger, boltLog)
+		boltConn = NewBolt5(serverName, conn, timer, logger, boltLog)
 	case 0:
 		return nil, fmt.Errorf("server did not accept any of the requested Bolt versions (%#v)", versions)
 	default:

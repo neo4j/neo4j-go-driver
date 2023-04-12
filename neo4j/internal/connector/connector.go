@@ -43,6 +43,7 @@ type Connector struct {
 	Network          string
 	Config           *config.Config
 	SupplyConnection func(context.Context, string) (net.Conn, error)
+	Now              *func() time.Time
 }
 
 func (c Connector) Connect(ctx context.Context, address string, boltLogger log.BoltLogger) (db.Connection, error) {
@@ -72,6 +73,7 @@ func (c Connector) Connect(ctx context.Context, address string, boltLogger log.B
 			c.Log,
 			boltLogger,
 			notificationConfig,
+			c.Now,
 		)
 		if err != nil {
 			if connErr := conn.Close(); connErr != nil {
@@ -98,16 +100,7 @@ func (c Connector) Connect(ctx context.Context, address string, boltLogger log.B
 		conn.Close()
 		return nil, &TlsError{inner: err}
 	}
-	connection, err := bolt.Connect(ctx,
-		address,
-		tlsConn,
-		c.Auth,
-		c.Config.UserAgent,
-		c.RoutingContext,
-		c.Log,
-		boltLogger,
-		notificationConfig,
-	)
+	connection, err := bolt.Connect(ctx, address, tlsConn, c.Auth, c.Config.UserAgent, c.RoutingContext, c.Log, boltLogger, notificationConfig, c.Now)
 	if err != nil {
 		if connErr := conn.Close(); connErr != nil {
 			c.Log.Warnf(log.Driver, address, "could not close underlying socket after Bolt handshake error")

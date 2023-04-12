@@ -84,10 +84,11 @@ type bolt3 struct {
 	err           error // Last fatal error
 	minor         int
 	idleDate      time.Time
+	now           *func() time.Time
 }
 
-func NewBolt3(serverName string, conn net.Conn, logger log.Logger, boltLog log.BoltLogger) *bolt3 {
-	now := time.Now()
+func NewBolt3(serverName string, conn net.Conn, timer *func() time.Time, logger log.Logger, boltLog log.BoltLogger) *bolt3 {
+	now := (*timer)()
 	b := &bolt3{
 		state:      bolt3_unauthorized,
 		conn:       conn,
@@ -100,6 +101,7 @@ func NewBolt3(serverName string, conn net.Conn, logger log.Logger, boltLog log.B
 			},
 			connReadTimeout: -1,
 		},
+		now:       timer,
 		birthDate: now,
 		idleDate:  now,
 		log:       logger,
@@ -139,7 +141,7 @@ func (b *bolt3) receiveMsg(ctx context.Context) any {
 		b.state = bolt3_dead
 		return nil
 	}
-	b.idleDate = time.Now()
+	b.idleDate = (*b.now)()
 	return msg
 }
 
