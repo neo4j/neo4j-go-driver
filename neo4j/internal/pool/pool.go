@@ -26,6 +26,8 @@ import (
 	"container/list"
 	"context"
 	"fmt"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/config"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/bolt"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/errorutil"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/racing"
@@ -49,8 +51,7 @@ type qitem struct {
 }
 
 type Pool struct {
-	maxSize    int
-	maxAge     time.Duration
+	config     *config.Config
 	connect    Connect
 	servers    map[string]*server
 	serversMut racing.Mutex
@@ -67,15 +68,11 @@ type serverPenalty struct {
 	penalty uint32
 }
 
-func New(maxSize int, maxAge time.Duration, connect Connect, logger log.Logger, logId string) *Pool {
+func New(config *config.Config, connect Connect, logger log.Logger, logId string) *Pool {
 	// Means infinite life, simplifies checking later on
-	if maxAge <= 0 {
-		maxAge = 1<<63 - 1
-	}
 
 	p := &Pool{
-		maxSize:    maxSize,
-		maxAge:     maxAge,
+		config:     config,
 		connect:    connect,
 		servers:    make(map[string]*server),
 		serversMut: racing.NewMutex(),
@@ -158,7 +155,7 @@ func (p *Pool) CleanUp(ctx context.Context) error {
 	defer p.serversMut.Unlock()
 	now := p.now()
 	for n, s := range p.servers {
-		s.removeIdleOlderThan(ctx, now, p.maxAge)
+		s.removeIdleOlderThan(ctx, now, p.config.MaxConnectionLifetime)
 		if s.size() == 0 && !s.hasFailedConnect(now) {
 			delete(p.servers, n)
 		}
@@ -180,7 +177,7 @@ func (p *Pool) getPenaltiesForServers(ctx context.Context, serverNames []string)
 		penalties[i].name = n
 		if s != nil {
 			// Make sure that we don't get a too old connection
-			s.removeIdleOlderThan(ctx, now, p.maxAge)
+			s.removeIdleOlderThan(ctx, now, p.config.MaxConnectionLifetime)
 			penalties[i].penalty = s.calculatePenalty(now)
 		} else {
 			penalties[i].penalty = newConnectionPenalty
@@ -321,7 +318,7 @@ func (p *Pool) tryBorrow(ctx context.Context, serverName string, boltLogger log.
 				connection.SetBoltLogger(boltLogger)
 				return connection, nil
 			}
-			if srv.size() >= p.maxSize {
+			if srv.size() >= p.config.MaxConnectionPoolSize {
 				return nil, &errorutil.PoolFull{Servers: []string{serverName}}
 			}
 			break
@@ -399,7 +396,7 @@ func (p *Pool) Return(ctx context.Context, c db.Connection) error {
 
 	// If the connection is dead, remove all other idle connections on the same server that older
 	// or of the same age as the dead connection, otherwise perform normal cleanup of old connections
-	maxAge := p.maxAge
+	maxAge := p.config.MaxConnectionLifetime
 	now := p.now()
 	age := now.Sub(c.Birthdate())
 	if !isAlive {
@@ -424,7 +421,7 @@ func (p *Pool) Return(ctx context.Context, c db.Connection) error {
 	c.SetBoltLogger(nil)
 
 	// Shouldn't return a too old or dead connection back to the pool
-	if !isAlive || age >= p.maxAge {
+	if !isAlive || age >= p.config.MaxConnectionLifetime {
 		if err := p.unreg(ctx, serverName, c, now); err != nil {
 			return err
 		}

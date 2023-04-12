@@ -43,6 +43,26 @@ go get github.com/neo4j/neo4j-go-driver
 Drivers manual that describes general driver concepts in depth [here](https://neo4j.com/docs/go-manual/current/).
 Go package API documentation [here](https://pkg.go.dev/github.com/neo4j/neo4j-go-driver/v5).
 
+## Preview Features
+
+The preview feature is a new feature that is a candidate for a future <abbr title="Generally Available">GA</abbr>
+status.
+
+It enables users to try the feature out and maintainers to refine and update it.
+
+The preview features are not considered to be experimental, temporary or unstable.
+
+However, they may change more rapidly, without following the usual deprecation cycle.
+
+Most preview features are expected to be granted the GA status unless some unexpected conditions arise.
+
+Due to the increased flexibility of the preview status, user feedback is encouraged so that it can be considered before
+the GA status.
+
+Every preview feature gets a
+dedicated [GitHub Discussion](https://github.com/neo4j/neo4j-go-driver/discussions/categories/preview-feature-announcement)
+where users can share their initial impressions and thoughts.
+
 ## Migrating from previous versions
 
 See [migration guide](MIGRATION_GUIDE.md) for information on how to migrate 
@@ -58,81 +78,86 @@ Make sure to use the configuration in the code that matches the version of Neo4j
 package main
 
 import (
-	"context"
-	"fmt"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
+    "context"
+    "fmt"
+    "github.com/neo4j/neo4j-go-driver/v5/neo4j"
 )
 
 func main() {
-	dbUri := "neo4j://localhost:7687"
-	driver, err := neo4j.NewDriverWithContext(dbUri, neo4j.BasicAuth("username", "password", ""))
-	if err != nil {
-		panic(err)
-	}
-	// Starting with 5.0, you can control the execution of most driver APIs
-	// To keep things simple, we create here a never-cancelling context
-	// Read https://pkg.go.dev/context to learn more about contexts
-	ctx := context.Background()
-	// Handle driver lifetime based on your application lifetime requirements  driver's lifetime is usually
-	// bound by the application lifetime, which usually implies one driver instance per application
-	// Make sure to handle errors during deferred calls
-	defer driver.Close(ctx)
-	item, err := insertItem(ctx, driver)
-	if err != nil {
-		panic(err)
-	}
-	fmt.Printf("%v\n", item)
+    dbUri := "neo4j://localhost" // scheme://host(:port) (default port is 7687)
+    driver, err := neo4j.NewDriverWithContext(dbUri, neo4j.BasicAuth("neo4j", "letmein!", ""))
+    if err != nil {
+        panic(err)
+    }
+    // Starting with 5.0, you can control the execution of most driver APIs
+    // To keep things simple, we create here a never-cancelling context
+    // Read https://pkg.go.dev/context to learn more about contexts
+    ctx := context.Background()
+    // Handle driver lifetime based on your application lifetime requirements.
+    // driver's lifetime is usually bound by the application lifetime, which usually implies one driver instance per
+    // application
+
+    defer driver.Close(ctx) // Make sure to handle errors during deferred calls
+    item, err := insertItem(ctx, driver)
+    if err != nil {
+        panic(err)
+    }
+    fmt.Printf("%v\n", item)
 }
 
 func insertItem(ctx context.Context, driver neo4j.DriverWithContext) (*Item, error) {
-	// Sessions are short-lived, cheap to create and NOT thread safe. Typically create one or more sessions
-	// per request in your web application. Make sure to call Close on the session when done.
-	// For multi-database support, set sessionConfig.DatabaseName to requested database
-	// Session config will default to write mode, if only reads are to be used configure session for
-	// read mode.
-	session := driver.NewSession(ctx, neo4j.SessionConfig{})
-	defer session.Close(ctx)
-	// The generic neo4j.ExecuteRead API is also available for read operations
-	// The legacy non-generic session.ExecuteWrite and session.ExecuteRead are also available
-	return neo4j.ExecuteWrite[*Item](ctx, session, createItemFn(ctx))
+    // Sessions are short-lived, cheap to create and NOT thread safe. Typically, create one or more sessions
+    // per request in your web application. Make sure to call Close on the session when done.
+    // For multi-database support, set `SessionConfig.DatabaseName` to target a specific database
+    // Session config will default to write mode. If only reads are to be used, configure `SessionConfig.AccessMode`.
+    session := driver.NewSession(ctx, neo4j.SessionConfig{})
+    defer session.Close(ctx)
+    // The generic neo4j.ExecuteRead API is also available should you only need to read data
+    // The non-generic session.ExecuteWrite and session.ExecuteRead are also available
+    return neo4j.ExecuteWrite[*Item](ctx, session, createItemFn(ctx))
 }
 
 func createItemFn(ctx context.Context) neo4j.ManagedTransactionWorkT[*Item] {
-	return func(tx neo4j.ManagedTransaction) (*Item, error) {
-		records, err := tx.Run(ctx, "CREATE (n:Item { id: $id, name: $name }) RETURN n", map[string]any{
-			"id":   1,
-			"name": "Item 1",
-		})
-		// In face of driver native errors, make sure to return them directly.
-		// Depending on the error, the driver may try to execute the function again.
-		if err != nil {
-			return nil, err
-		}
-		record, err := records.Single(ctx)
-		if err != nil {
-			return nil, err
-		}
-		rawItemNode, found := record.Get("n")
-		if !found {
-			return nil, fmt.Errorf("could not find column")
-		}
-		itemNode := rawItemNode.(neo4j.Node)
-		id, err := neo4j.GetProperty[int64](itemNode, "id")
-		if err != nil {
-			return nil, err
-		}
-		name, err := neo4j.GetProperty[string](itemNode, "name")
-		if err != nil {
-			return nil, err
-		}
-		return &Item{Id: id, Name: name}, nil
-	}
+    return func(tx neo4j.ManagedTransaction) (*Item, error) {
+        records, err := tx.Run(ctx, "CREATE (n:Item { id: $id, name: $name }) RETURN n", map[string]any{
+            "id":   1,
+            "name": "Item 1",
+        })
+        // In face of driver native errors, make sure to return them directly.
+        // Depending on the error, the driver may try to execute the function again.
+        if err != nil {
+            return nil, err
+        }
+        record, err := records.Single(ctx)
+        if err != nil {
+            return nil, err
+        }
+        //  The second returned value (ignored here) is only useful to disambiguate default primitive values (see Godoc)
+        itemNode, _, err := neo4j.GetRecordValue[neo4j.Node](record, "n")
+        if err != nil {
+            return nil, fmt.Errorf("could not find node n")
+        }
+        id, err := neo4j.GetProperty[int64](itemNode, "id")
+        if err != nil {
+            return nil, err
+        }
+        name, err := neo4j.GetProperty[string](itemNode, "name")
+        if err != nil {
+            return nil, err
+        }
+        return &Item{Id: id, Name: name}, nil
+    }
 }
 
 type Item struct {
-	Id   int64
-	Name string
+    Id   int64
+    Name string
 }
+
+func (i *Item) String() string {
+    return fmt.Sprintf("Item (id: %d, name: %q)", i.Id, i.Name)
+}
+
 ```
 
 ## Neo4j and Bolt protocol versions
@@ -140,20 +165,22 @@ type Item struct {
 Please look at the [supported version's documentation](https://neo4j.com/developer/kb/neo4j-supported-versions/) for the
 most accurate information about Neo4j releases.
 
-| Server \\ Driver    | 1.7 | 4.0 | 4.2   | 4.3   | **4.4** | 5.0   | 5.1   | 5.2   | 5.3   | 5.4   | 5.5   |
-|---------------------|-----|-----|-------|-------|---------|-------|-------|-------|-------|-------|-------|
-| Neo4j 3.5 (EOL)     | Yes | Yes | (Yes) | (Yes) | (Yes)   | (Yes) | (Yes) | (Yes) | (Yes) | (Yes) | (Yes) |
-| Neo4j 4.0 (EOL)     | Yes | Yes | Yes   | Yes   | Yes     | (Yes) | (Yes) | (Yes) | (Yes) | (Yes) | (Yes) |
-| Neo4j 4.1 (EOL)     | ?   | Yes | Yes   | Yes   | Yes     | (Yes) | (Yes) | (Yes) | (Yes) | (Yes) | (Yes) |
-| Neo4j 4.2 (EOL)     | ?   | ?   | Yes   | Yes   | Yes     | (Yes) | (Yes) | (Yes) | (Yes) | (Yes) | (Yes) |
-| Neo4j 4.3 (EOL)     | ?   | ?   | Yes   | Yes   | Yes     | (Yes) | (Yes) | (Yes) | (Yes) | (Yes) | (Yes) |
-| **Neo4j 4.4 (LTS)** | ?   | ?   | ?     | Yes   | Yes     | Yes   | Yes   | Yes   | Yes   | Yes   | Yes   |
-| Neo4j 5.0 (HO)      | ?   | ?   | ?     | ?     | Yes     | Yes   | Yes   | Yes   | Yes   | Yes   | Yes   |
-| Neo4j 5.1 (HO)      | ?   | ?   | ?     | ?     | (Yes)   | Yes   | Yes   | Yes   | Yes   | Yes   | Yes   |
-| Neo4j 5.2 (HO)      | ?   | ?   | ?     | ?     | (Yes)   | Yes   | Yes   | Yes   | Yes   | Yes   | Yes   |
-| Neo4j 5.3 (HO)      | ?   | ?   | ?     | ?     | (Yes)   | Yes   | Yes   | Yes   | Yes   | Yes   | Yes   |
-| Neo4j 5.4           | ?   | ?   | ?     | ?     | (Yes)   | Yes   | Yes   | Yes   | Yes   | Yes   | Yes   |
-| Neo4j 5.5           | ?   | ?   | ?     | ?     | (Yes)   | Yes   | Yes   | Yes   | Yes   | Yes   | Yes   |
+| Server \\ Driver    | 1.7 | 4.0 | 4.2   | 4.3   | **4.4** | 5.0   | 5.1   | 5.2   | 5.3   | 5.4   | 5.5   | 5.6   | 5.7   |
+|---------------------|-----|-----|-------|-------|---------|-------|-------|-------|-------|-------|-------|-------|-------|
+| Neo4j 3.5 (EOL)     | Yes | Yes | (Yes) | (Yes) | (Yes)   | (Yes) | (Yes) | (Yes) | (Yes) | (Yes) | (Yes) | (Yes) | (Yes) |
+| Neo4j 4.0 (EOL)     | Yes | Yes | Yes   | Yes   | Yes     | (Yes) | (Yes) | (Yes) | (Yes) | (Yes) | (Yes) | (Yes) | (Yes) |
+| Neo4j 4.1 (EOL)     | ?   | Yes | Yes   | Yes   | Yes     | (Yes) | (Yes) | (Yes) | (Yes) | (Yes) | (Yes) | (Yes) | (Yes) | 
+| Neo4j 4.2 (EOL)     | ?   | ?   | Yes   | Yes   | Yes     | (Yes) | (Yes) | (Yes) | (Yes) | (Yes) | (Yes) | (Yes) | (Yes) | 
+| Neo4j 4.3 (EOL)     | ?   | ?   | Yes   | Yes   | Yes     | (Yes) | (Yes) | (Yes) | (Yes) | (Yes) | (Yes) | (Yes) | (Yes) | 
+| **Neo4j 4.4 (LTS)** | ?   | ?   | ?     | Yes   | Yes     | Yes   | Yes   | Yes   | Yes   | Yes   | Yes   | Yes   | (Yes) | 
+| Neo4j 5.0 (HO)      | ?   | ?   | ?     | ?     | Yes     | Yes   | Yes   | Yes   | Yes   | Yes   | Yes   | Yes   | (Yes) | 
+| Neo4j 5.1 (HO)      | ?   | ?   | ?     | ?     | (Yes)   | Yes   | Yes   | Yes   | Yes   | Yes   | Yes   | Yes   | (Yes) | 
+| Neo4j 5.2 (HO)      | ?   | ?   | ?     | ?     | (Yes)   | Yes   | Yes   | Yes   | Yes   | Yes   | Yes   | Yes   | (Yes) | 
+| Neo4j 5.3 (HO)      | ?   | ?   | ?     | ?     | (Yes)   | Yes   | Yes   | Yes   | Yes   | Yes   | Yes   | Yes   | (Yes) | 
+| Neo4j 5.4 (HO)      | ?   | ?   | ?     | ?     | (Yes)   | Yes   | Yes   | Yes   | Yes   | Yes   | Yes   | Yes   | (Yes) | 
+| Neo4j 5.5 (HO)      | ?   | ?   | ?     | ?     | (Yes)   | Yes   | Yes   | Yes   | Yes   | Yes   | Yes   | Yes   | (Yes) | 
+| Neo4j 5.6           | ?   | ?   | ?     | ?     | (Yes)   | Yes   | Yes   | Yes   | Yes   | Yes   | Yes   | Yes   | (Yes) |
+| Neo4j 5.7           | ?   | ?   | ?     | ?     | (Yes)   | Yes   | Yes   | Yes   | Yes   | Yes   | Yes   | Yes   | Yes   |
 
 - `(EOL)`: End Of Life, a server version is marked as such when it is not supported anymore
 - `(HO)`: Hotfixes only, a server version is marked as such when it is only updated for security patches

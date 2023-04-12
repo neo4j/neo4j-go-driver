@@ -59,7 +59,17 @@ func makeRawConnection(ctx context.Context, logger log.Logger, boltLogger log.Bo
 		"credentials": server.Password,
 	}
 
-	boltConn, err := bolt.Connect(context.Background(), parsedUri.Host, tcpConn, authMap, "007", nil, logger, boltLogger)
+	boltConn, err := bolt.Connect(
+		context.Background(),
+		parsedUri.Host,
+		tcpConn,
+		authMap,
+		"007",
+		nil,
+		logger,
+		boltLogger,
+		idb.NotificationConfig{},
+	)
 	if err != nil {
 		panic(err)
 	}

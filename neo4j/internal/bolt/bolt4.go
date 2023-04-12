@@ -195,22 +195,31 @@ func (b *bolt4) setError(err error, fatal bool) {
 	}
 }
 
-func (b *bolt4) Connect(ctx context.Context, minor int, auth map[string]any, userAgent string, routingContext map[string]string) error {
+func (b *bolt4) Connect(
+	ctx context.Context,
+	minor int,
+	auth map[string]any,
+	userAgent string,
+	routingContext map[string]string,
+	notificationConfig idb.NotificationConfig,
+) error {
 	if err := b.assertState(bolt4_unauthorized); err != nil {
 		return err
 	}
+
+	b.minor = minor
 
 	// Prepare hello message
 	hello := map[string]any{
 		"user_agent": userAgent,
 	}
 	// On bolt >= 4.1 add routing to enable/disable routing
-	if minor >= 1 {
+	if b.minor >= 1 {
 		if routingContext != nil {
 			hello["routing"] = routingContext
 		}
 	}
-	checkUtcPatch := minor >= 3
+	checkUtcPatch := b.minor >= 3
 	if checkUtcPatch {
 		hello["patch_bolt"] = []string{"utc"}
 	}
@@ -220,6 +229,10 @@ func (b *bolt4) Connect(ctx context.Context, minor int, auth map[string]any, use
 		if !exists {
 			hello[k] = v
 		}
+	}
+
+	if err := checkNotificationFiltering(notificationConfig, b); err != nil {
+		return err
 	}
 
 	b.queue.appendHello(hello, b.helloResponseHandler(checkUtcPatch))
@@ -235,7 +248,6 @@ func (b *bolt4) Connect(ctx context.Context, minor int, auth map[string]any, use
 
 	// Transition into ready state
 	b.state = bolt4_ready
-	b.minor = minor
 	b.streams.reset()
 	b.log.Infof(log.Bolt4, b.logId, "Connected")
 	return nil
@@ -248,7 +260,10 @@ func (b *bolt4) checkImpersonationAndVersion(impersonatedUser string) error {
 	return nil
 }
 
-func (b *bolt4) TxBegin(ctx context.Context, txConfig idb.TxConfig) (idb.TxHandle, error) {
+func (b *bolt4) TxBegin(
+	ctx context.Context,
+	txConfig idb.TxConfig,
+) (idb.TxHandle, error) {
 	// Ok, to begin transaction while streaming auto-commit, just empty the stream and continue.
 	if b.state == bolt4_streaming {
 		if b.bufferStream(ctx); b.err != nil {
@@ -261,8 +276,10 @@ func (b *bolt4) TxBegin(ctx context.Context, txConfig idb.TxConfig) (idb.TxHandl
 	if err := b.assertState(bolt4_ready); err != nil {
 		return 0, err
 	}
-
 	if err := b.checkImpersonationAndVersion(txConfig.ImpersonatedUser); err != nil {
+		return 0, err
+	}
+	if err := checkNotificationFiltering(txConfig.NotificationConfig, b); err != nil {
 		return 0, err
 	}
 
@@ -557,14 +574,19 @@ func (b *bolt4) normalizeFetchSize(fetchSize int) int {
 	return fetchSize
 }
 
-func (b *bolt4) Run(ctx context.Context, cmd idb.Command,
-	txConfig idb.TxConfig) (idb.StreamHandle, error) {
+func (b *bolt4) Run(
+	ctx context.Context,
+	cmd idb.Command,
+	txConfig idb.TxConfig,
+) (idb.StreamHandle, error) {
 	if err := b.assertState(bolt4_streaming, bolt4_ready); err != nil {
 		return nil, err
 	}
-
 	if err := b.checkImpersonationAndVersion(txConfig.ImpersonatedUser); err != nil {
 		return 0, err
+	}
+	if err := checkNotificationFiltering(txConfig.NotificationConfig, b); err != nil {
+		return nil, err
 	}
 
 	tx := internalTx4{
