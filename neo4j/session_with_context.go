@@ -373,9 +373,7 @@ func (s *sessionWithContext) runRetriable(
 		},
 	}
 	for state.Continue() {
-		if tryAgain, result := s.executeTransactionFunction(ctx, mode, config, &state, work); tryAgain {
-			continue
-		} else {
+		if hasCompleted, result := s.executeTransactionFunction(ctx, mode, config, &state, work); hasCompleted {
 			return result, nil
 		}
 	}
@@ -395,7 +393,7 @@ func (s *sessionWithContext) executeTransactionFunction(
 	conn, err := s.getConnection(ctx, mode, pool.DefaultLivenessCheckThreshold)
 	if err != nil {
 		state.OnFailure(ctx, err, conn, false)
-		return true, nil
+		return false, nil
 	}
 
 	// handle transaction function panic as well
@@ -404,7 +402,7 @@ func (s *sessionWithContext) executeTransactionFunction(
 	beginBookmarks, err := s.getBookmarks(ctx)
 	if err != nil {
 		state.OnFailure(ctx, err, conn, false)
-		return true, nil
+		return false, nil
 	}
 	txHandle, err := conn.TxBegin(ctx,
 		idb.TxConfig{
@@ -416,7 +414,7 @@ func (s *sessionWithContext) executeTransactionFunction(
 		})
 	if err != nil {
 		state.OnFailure(ctx, err, conn, false)
-		return true, nil
+		return false, nil
 	}
 
 	tx := managedTransaction{conn: conn, fetchSize: s.fetchSize, txHandle: txHandle}
@@ -427,13 +425,13 @@ func (s *sessionWithContext) executeTransactionFunction(
 		// but instead rely on the pool invoking reset on the connection,
 		// that will do an implicit rollback.
 		state.OnFailure(ctx, err, conn, false)
-		return true, nil
+		return false, nil
 	}
 
 	err = conn.TxCommit(ctx, txHandle)
 	if err != nil {
 		state.OnFailure(ctx, err, conn, true)
-		return true, nil
+		return false, nil
 	}
 
 	// transaction has been committed so let's ignore (ie just log) the error
@@ -441,7 +439,7 @@ func (s *sessionWithContext) executeTransactionFunction(
 		s.log.Warnf(log.Session, s.logId, "could not retrieve bookmarks after successful commit: %s\n"+
 			"the results of this transaction may not be visible to subsequent operations", err.Error())
 	}
-	return false, x
+	return true, x
 }
 
 func (s *sessionWithContext) getServers(ctx context.Context, mode idb.AccessMode) ([]string, error) {
