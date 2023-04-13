@@ -42,13 +42,13 @@ func handleTerminatedContextError(err error, connection net.Conn) error {
 
 func contextTerminatedErr(err error) bool {
 	switch err.(type) {
-	case *ConnectionWriteTimeout:
+	case *errorutil.ConnectionWriteTimeout:
 		return true
-	case *ConnectionReadTimeout:
+	case *errorutil.ConnectionReadTimeout:
 		return true
-	case *ConnectionWriteCanceled:
+	case *errorutil.ConnectionWriteCanceled:
 		return true
-	case *ConnectionReadCanceled:
+	case *errorutil.ConnectionReadCanceled:
 		return true
 	}
 	return false

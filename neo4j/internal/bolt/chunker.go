@@ -22,6 +22,7 @@ package bolt
 import (
 	"context"
 	"encoding/binary"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/errorutil"
 	rio "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/racing"
 	"io"
 )
@@ -111,15 +112,15 @@ func (c *chunker) send(ctx context.Context, wr io.Writer) error {
 }
 
 func processWriteError(err error, ctx context.Context) error {
-	if IsTimeoutError(err) {
-		return &ConnectionWriteTimeout{
-			userContext: ctx,
-			err:         err,
+	if errorutil.IsTimeoutError(err) {
+		return &errorutil.ConnectionWriteTimeout{
+			UserContext: ctx,
+			Err:         err,
 		}
 	}
 	if err == context.Canceled {
-		return &ConnectionWriteCanceled{
-			err: err,
+		return &errorutil.ConnectionWriteCanceled{
+			Err: err,
 		}
 	}
 	return err

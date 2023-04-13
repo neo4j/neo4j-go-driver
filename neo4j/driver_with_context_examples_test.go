@@ -82,7 +82,7 @@ func ExampleExecuteQuery_default_bookmark_manager_explicit_reuse() {
 
 	// retrieve the default bookmark manager used by the previous call (since there was no bookmark manager explicitly
 	// configured)
-	bookmarkManager := myDriver.DefaultExecuteQueryBookmarkManager()
+	bookmarkManager := myDriver.ExecuteQueryBookmarkManager()
 	session := myDriver.NewSession(ctx, SessionConfig{BookmarkManager: bookmarkManager})
 
 	// the following transaction function is guaranteed to see the result of the previous query

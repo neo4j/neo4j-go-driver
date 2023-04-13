@@ -535,9 +535,9 @@ func (b *backend) handleRequest(req map[string]any) {
 				if routing != nil {
 					switch routing {
 					case "r":
-						config.Routing = neo4j.Readers
+						config.Routing = neo4j.Read
 					case "w":
-						config.Routing = neo4j.Writers
+						config.Routing = neo4j.Write
 					default:
 						b.writeError(fmt.Errorf("unexpected executequery routing value: %v", routing))
 						return
@@ -589,14 +589,16 @@ func (b *backend) handleRequest(req map[string]any) {
 		sessionConfig := neo4j.SessionConfig{
 			BoltLogger: neo4j.ConsoleBoltLogger(),
 		}
-		switch data["accessMode"].(string) {
-		case "r":
-			sessionConfig.AccessMode = neo4j.AccessModeRead
-		case "w":
-			sessionConfig.AccessMode = neo4j.AccessModeWrite
-		default:
-			b.writeError(errors.New("Unknown access mode: " + data["accessMode"].(string)))
-			return
+		if data["accessMode"] != nil {
+			switch data["accessMode"].(string) {
+			case "r":
+				sessionConfig.AccessMode = neo4j.AccessModeRead
+			case "w":
+				sessionConfig.AccessMode = neo4j.AccessModeWrite
+			default:
+				b.writeError(errors.New("Unknown access mode: " + data["accessMode"].(string)))
+				return
+			}
 		}
 		if data["bookmarks"] != nil {
 			rawBookmarks := data["bookmarks"].([]any)

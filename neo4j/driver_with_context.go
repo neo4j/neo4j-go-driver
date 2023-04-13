@@ -51,21 +51,18 @@ const (
 // DriverWithContext represents a pool of connections to a neo4j server or cluster. It's
 // safe for concurrent use.
 type DriverWithContext interface {
-	// DefaultExecuteQueryBookmarkManager returns the bookmark manager instance used by ExecuteQuery by default.
-	//
-	// DefaultExecuteQueryBookmarkManager is part of the BookmarkManager preview feature (see README on what it means in
-	// terms of support and compatibility guarantees)
+	// ExecuteQueryBookmarkManager returns the bookmark manager instance used by ExecuteQuery by default.
 	//
 	// This is useful when ExecuteQuery is called without custom bookmark managers and the lower-level
 	// neo4j.SessionWithContext APIs are called as well.
 	// In that case, the recommended approach is as follows:
 	// 	results, err := driver.ExecuteQuery(ctx, query, params)
 	// 	// [...] do something with results and error
-	//	bookmarkManager := driver.DefaultExecuteQueryBookmarkManager()
+	//	bookmarkManager := driver.ExecuteQueryBookmarkManager()
 	// 	// maintain consistency with sessions as well
 	//	session := driver.NewSession(ctx, neo4j.SessionConfig {BookmarkManager: bookmarkManager})
 	//	// [...] run something within the session
-	DefaultExecuteQueryBookmarkManager() BookmarkManager
+	ExecuteQueryBookmarkManager() BookmarkManager
 	// Target returns the url this driver is bootstrapped
 	Target() url.URL
 	// NewSession creates a new session based on the specified session configuration.
@@ -91,9 +88,6 @@ type DriverWithContext interface {
 }
 
 // ResultTransformer is a record accumulator that produces an instance of T when the processing of records is over.
-//
-// ResultTransformer is part of the ExecuteQuery preview feature (see README on what it means in terms of support
-// and compatibility guarantees)
 type ResultTransformer[T any] interface {
 	// Accept is called whenever a new record is fetched from the server
 	// Implementers are free to accumulate or discard the specified record
@@ -302,7 +296,7 @@ type driverWithContext struct {
 	executeQueryBookmarkManagerInitializer sync.Once
 	// instance of the bookmark manager only used by default by managed sessions of ExecuteQuery
 	// this is *not* used by default by user-created session (see NewSession)
-	defaultExecuteQueryBookmarkManager BookmarkManager
+	executeQueryBookmarkManager BookmarkManager
 }
 
 func (d *driverWithContext) Target() url.URL {
@@ -398,8 +392,6 @@ func (d *driverWithContext) VerifyAuthentication(ctx context.Context, auth *Auth
 // ExecuteQuery runs the specified query with its parameters and returns the query result, transformed by the specified
 // ResultTransformer function.
 //
-// This is currently a preview feature (see README on what it means in terms of support and compatibility guarantees)
-//
 //	result, err := ExecuteQuery[*EagerResult](ctx, driver, query, params, EagerResultTransformer)
 //
 // Passing a nil ResultTransformer function is invalid and will return an error.
@@ -434,7 +426,7 @@ func (d *driverWithContext) VerifyAuthentication(ctx context.Context, auth *Auth
 //
 //	ExecuteQuery[T](ctx, driver, query, params, transformerFunc, func(config *neo4j.ExecuteQueryConfiguration) {
 //		config.Database = "my-db"
-//		config.RoutingControl = neo4j.Writers
+//		config.RoutingControl = neo4j.Write
 //		config.ImpersonatedUser = "selda_bağcan"
 //	})
 //
@@ -459,7 +451,7 @@ func (d *driverWithContext) VerifyAuthentication(ctx context.Context, auth *Auth
 //			BookmarkManager:  bookmarkManager,
 //		})
 //		defer handleClose(ctx, session)
-//		// session.ExecuteRead is called if the routing is set to neo4j.Readers
+//		// session.ExecuteRead is called if the routing is set to neo4j.Read
 //		result, _ := session.ExecuteWrite(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
 //			result, _ := tx.Run(ctx, "<CYPHER>", parameters)
 //			records, _ := result.Collect(ctx) // real implementation does not use Collect
@@ -503,7 +495,7 @@ func ExecuteQuery[T any](
 			"ResultTransformer implementation"}
 	}
 
-	bookmarkManager := driver.DefaultExecuteQueryBookmarkManager()
+	bookmarkManager := driver.ExecuteQueryBookmarkManager()
 	configuration := &ExecuteQueryConfiguration{
 		BookmarkManager: bookmarkManager,
 	}
@@ -525,13 +517,13 @@ func ExecuteQuery[T any](
 	return result.(T), err
 }
 
-func (d *driverWithContext) DefaultExecuteQueryBookmarkManager() BookmarkManager {
+func (d *driverWithContext) ExecuteQueryBookmarkManager() BookmarkManager {
 	d.executeQueryBookmarkManagerInitializer.Do(func() {
-		if d.defaultExecuteQueryBookmarkManager == nil { // this allows tests to init the field themselves
-			d.defaultExecuteQueryBookmarkManager = NewBookmarkManager(BookmarkManagerConfig{})
+		if d.executeQueryBookmarkManager == nil { // this allows tests to init the field themselves
+			d.executeQueryBookmarkManager = NewBookmarkManager(BookmarkManagerConfig{})
 		}
 	})
-	return d.defaultExecuteQueryBookmarkManager
+	return d.executeQueryBookmarkManager
 }
 
 func executeQueryCallback[T any](
@@ -592,35 +584,23 @@ func (e *eagerResultTransformer) Complete(keys []string, summary ResultSummary) 
 }
 
 // ExecuteQueryConfigurationOption is a callback that configures the execution of DriverWithContext.ExecuteQuery
-//
-// ExecuteQueryConfigurationOption is part of the ExecuteQuery preview feature (see README on what it means in terms of
-// support and compatibility guarantees)
 type ExecuteQueryConfigurationOption func(*ExecuteQueryConfiguration)
 
 // ExecuteQueryWithReadersRouting configures DriverWithContext.ExecuteQuery to route to reader members of the cluster
-//
-// ExecuteQueryWithReadersRouting is part of the ExecuteQuery preview feature (see README on what it means in terms of
-// support and compatibility guarantees)
 func ExecuteQueryWithReadersRouting() ExecuteQueryConfigurationOption {
 	return func(configuration *ExecuteQueryConfiguration) {
-		configuration.Routing = Readers
+		configuration.Routing = Read
 	}
 }
 
 // ExecuteQueryWithWritersRouting configures DriverWithContext.ExecuteQuery to route to writer members of the cluster
-//
-// ExecuteQueryWithWritersRouting is part of the ExecuteQuery preview feature (see README on what it means in terms of
-// support and compatibility guarantees)
 func ExecuteQueryWithWritersRouting() ExecuteQueryConfigurationOption {
 	return func(configuration *ExecuteQueryConfiguration) {
-		configuration.Routing = Writers
+		configuration.Routing = Write
 	}
 }
 
 // ExecuteQueryWithImpersonatedUser configures DriverWithContext.ExecuteQuery to impersonate the specified user
-//
-// ExecuteQueryWithImpersonatedUser is part of the ExecuteQuery preview feature (see README on what it means in terms of
-// support and compatibility guarantees)
 func ExecuteQueryWithImpersonatedUser(user string) ExecuteQueryConfigurationOption {
 	return func(configuration *ExecuteQueryConfiguration) {
 		configuration.ImpersonatedUser = user
@@ -628,9 +608,6 @@ func ExecuteQueryWithImpersonatedUser(user string) ExecuteQueryConfigurationOpti
 }
 
 // ExecuteQueryWithDatabase configures DriverWithContext.ExecuteQuery to target the specified database
-//
-// ExecuteQueryWithDatabase is part of the ExecuteQuery preview feature (see README on what it means in terms of
-// support and compatibility guarantees)
 func ExecuteQueryWithDatabase(db string) ExecuteQueryConfigurationOption {
 	return func(configuration *ExecuteQueryConfiguration) {
 		configuration.Database = db
@@ -638,9 +615,6 @@ func ExecuteQueryWithDatabase(db string) ExecuteQueryConfigurationOption {
 }
 
 // ExecuteQueryWithBookmarkManager configures DriverWithContext.ExecuteQuery to rely on the specified BookmarkManager
-//
-// ExecuteQueryWithBookmarkManager is part of the ExecuteQuery preview feature (see README on what it means in terms of
-// support and compatibility guarantees)
 func ExecuteQueryWithBookmarkManager(bookmarkManager BookmarkManager) ExecuteQueryConfigurationOption {
 	return func(configuration *ExecuteQueryConfiguration) {
 		configuration.BookmarkManager = bookmarkManager
@@ -648,9 +622,6 @@ func ExecuteQueryWithBookmarkManager(bookmarkManager BookmarkManager) ExecuteQue
 }
 
 // ExecuteQueryWithoutBookmarkManager configures DriverWithContext.ExecuteQuery to not rely on any BookmarkManager
-//
-// ExecuteQueryWithoutBookmarkManager is part of the ExecuteQuery preview feature (see README on what it means in terms of
-// support and compatibility guarantees)
 func ExecuteQueryWithoutBookmarkManager() ExecuteQueryConfigurationOption {
 	return func(configuration *ExecuteQueryConfiguration) {
 		configuration.BookmarkManager = nil
@@ -658,9 +629,6 @@ func ExecuteQueryWithoutBookmarkManager() ExecuteQueryConfigurationOption {
 }
 
 // ExecuteQueryWithBoltLogger configures DriverWithContext.ExecuteQuery to log Bolt messages with the provided BoltLogger
-//
-// ExecuteQueryWithBoltLogger is part of the ExecuteQuery preview feature (see README on what it means in terms of
-// support and compatibility guarantees)
 func ExecuteQueryWithBoltLogger(boltLogger log.BoltLogger) ExecuteQueryConfigurationOption {
 	return func(configuration *ExecuteQueryConfiguration) {
 		configuration.BoltLogger = boltLogger
@@ -668,9 +636,6 @@ func ExecuteQueryWithBoltLogger(boltLogger log.BoltLogger) ExecuteQueryConfigura
 }
 
 // ExecuteQueryConfiguration holds all the possible configuration settings for DriverWithContext.ExecuteQuery
-//
-// ExecuteQueryConfiguration is part of the ExecuteQuery preview feature (see README on what it means in terms of
-// support and compatibility guarantees)
 type ExecuteQueryConfiguration struct {
 	Routing          RoutingControl
 	ImpersonatedUser string
@@ -680,22 +645,13 @@ type ExecuteQueryConfiguration struct {
 }
 
 // RoutingControl specifies how the query executed by DriverWithContext.ExecuteQuery is to be routed
-//
-// RoutingControl is part of the ExecuteQuery preview feature (see README on what it means in terms of support and
-// compatibility guarantees)
 type RoutingControl int
 
 const (
-	// Writers routes the query to execute to a writer member of the cluster
-	//
-	// Writers is part of the ExecuteQuery preview feature (see README on what it means in terms of
-	// support and compatibility guarantees)
-	Writers RoutingControl = iota
-	// Readers routes the query to execute to a writer member of the cluster
-	//
-	// Readers is part of the ExecuteQuery preview feature (see README on what it means in terms of
-	// support and compatibility guarantees)
-	Readers
+	// Write routes the query to execute to a writer member of the cluster
+	Write RoutingControl = iota
+	// Read routes the query to execute to a writer member of the cluster
+	Read
 )
 
 func (c *ExecuteQueryConfiguration) toSessionConfig() SessionConfig {
@@ -711,19 +667,16 @@ type transactionFunction func(context.Context, ManagedTransactionWork, ...func(*
 
 func (c *ExecuteQueryConfiguration) selectTxFunctionApi(session SessionWithContext) (transactionFunction, error) {
 	switch c.Routing {
-	case Readers:
+	case Read:
 		return session.ExecuteRead, nil
-	case Writers:
+	case Write:
 		return session.ExecuteWrite, nil
 	}
-	return nil, fmt.Errorf("unsupported routing control, expected %d (Writers) or %d (Readers) "+
-		"but got: %d", Writers, Readers, c.Routing)
+	return nil, fmt.Errorf("unsupported routing control, expected %d (Write) or %d (Read) "+
+		"but got: %d", Write, Read, c.Routing)
 }
 
 // EagerResult holds the result and result metadata of the query executed via DriverWithContext.ExecuteQuery
-//
-// EagerResult is part of the ExecuteQuery preview feature (see README on what it means in terms of
-// support and compatibility guarantees)
 type EagerResult struct {
 	Keys    []string
 	Records []*Record

@@ -8,13 +8,13 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      https://www.apache.org/licenses/LICENSE-2.0
+ *     https://www.apache.org/licenses/LICENSE-2.0
  *
- *  Unless required by applicable law or agreed to in writing, software
- *  distributed under the License is distributed on an "AS IS" BASIS,
- *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *  See the License for the specific language governing permissions and
- *  limitations under the License.
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 
 // Package retry handles retry operations.
@@ -25,6 +25,7 @@ import (
 	"errors"
 	"fmt"
 	idb "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/errorutil"
 	"time"
 
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/db"
@@ -35,20 +36,8 @@ type Router interface {
 	Invalidate(ctx context.Context, database string) error
 }
 
-type CommitFailedDeadError struct {
-	inner error
-}
-
-func (e *CommitFailedDeadError) Error() string {
-	return fmt.Sprintf("Connection lost during commit: %s", e.inner)
-}
-
 type State struct {
-	LastErrWasRetryable     bool
-	LastErr                 error
-	stop                    bool
 	Errs                    []error
-	Causes                  []string
 	MaxTransactionRetryTime time.Duration
 	Log                     log.Logger
 	LogName                 string
@@ -67,112 +56,92 @@ type State struct {
 	OnDeadConnection func(server string) error
 }
 
-func (s *State) OnFailure(ctx context.Context, conn idb.Connection, err error, isCommitting bool) {
-	s.LastErr = err
-	s.cause = ""
-	s.skipSleep = false
-
-	// Check timeout
-	if s.start.IsZero() {
-		s.start = s.Now()
-	}
-	if s.Now().Sub(s.start) > s.MaxTransactionRetryTime {
-		s.stop = true
-		s.cause = "Timeout"
-		return
-	}
-
-	// Reset after determined to evaluate this error
-	s.LastErrWasRetryable = false
-
-	if neo4jErr, ok := err.(*db.Neo4jError); ok && neo4jErr.IsAuthenticationFailed() {
-		s.cause = "Authentication failed"
-		s.stop = true
-		return
-	}
-
-	if _, ok := err.(*db.ProtocolError); ok {
-		s.cause = "Protocol error detected"
-		s.stop = true
-		return
-	}
-
-	// Failed to connect
-	if conn == nil {
-		s.LastErrWasRetryable = true
-		s.cause = "No available connection"
-		return
-	}
-
-	// Check if the connection died, if it died during commit it is not safe to retry.
-	if !conn.IsAlive() {
+func (s *State) OnFailure(ctx context.Context, err error, conn idb.Connection, isCommitting bool) {
+	if conn != nil && !conn.IsAlive() {
 		if isCommitting {
-			s.stop = true
-			// The error is most probably io.EOF so enrich the error
-			// to make this error more recognizable.
-			s.LastErr = &CommitFailedDeadError{inner: s.LastErr}
-			return
+			s.Errs = append(s.Errs, &errorutil.CommitFailedDeadError{Inner: err})
+		} else {
+			s.Errs = append(s.Errs, err)
 		}
-
-		s.OnDeadConnection(conn.ServerName())
+		if err := s.OnDeadConnection(conn.ServerName()); err != nil {
+			s.Errs = append(s.Errs, err)
+		}
 		s.deadErrors += 1
-		s.stop = s.deadErrors > s.MaxDeadConnections
-		s.LastErrWasRetryable = true
-		s.cause = "Connection lost"
 		s.skipSleep = true
 		return
 	}
 
-	s.LastErrWasRetryable = IsRetryable(err)
-	if dbErr, isDbErr := err.(*db.Neo4jError); isDbErr {
-		if dbErr.IsRetriableCluster() {
-			// Force routing tables to be updated before trying again
-			if err := s.Router.Invalidate(ctx, s.DatabaseName); err != nil {
-				s.stop = true
-				s.LastErr = err
-			}
-			s.cause = "Cluster error"
-			return
-		}
-		if dbErr.IsRetriableTransient() {
-			s.cause = "Transient error"
-			return
+	s.Errs = append(s.Errs, err)
+	s.skipSleep = false
+
+	if dbErr, isDbErr := err.(*db.Neo4jError); isDbErr && dbErr.IsRetriableCluster() {
+		if err := s.Router.Invalidate(ctx, s.DatabaseName); err != nil {
+			s.Errs = append(s.Errs, err)
 		}
 	}
 
-	s.stop = true
 }
 
 func (s *State) Continue() bool {
-	// No error happened yet
-	if !s.stop && s.LastErr == nil {
+	if s.start.IsZero() {
+		s.start = s.Now()
+	}
+
+	if len(s.Errs) == 0 {
 		return true
 	}
 
-	// Track the error and the cause
-	s.Errs = append(s.Errs, s.LastErr)
-	if s.cause != "" {
-		s.Causes = append(s.Causes, s.cause)
+	lastErr := s.Errs[len(s.Errs)-1]
+	if !IsRetryable(errorutil.WrapError(lastErr)) {
+		return false
 	}
 
-	// Retry after optional sleep
-	if !s.stop {
-		if s.skipSleep {
-			s.Log.Debugf(s.LogName, s.LogId, "Retrying transaction (%s): %s", s.cause, s.LastErr)
-		} else {
-			s.Throttle = s.Throttle.next()
-			sleepTime := s.Throttle.delay()
-			s.Log.Debugf(s.LogName, s.LogId,
-				"Retrying transaction (%s): %s [after %s]", s.cause, s.LastErr, sleepTime)
-			s.Sleep(sleepTime)
-		}
-		return true
+	if s.Now().Sub(s.start) > s.MaxTransactionRetryTime {
+		s.Errs = []error{&errorutil.TransactionExecutionLimit{
+			Cause:  fmt.Sprintf("timeout (exceeded max retry time: %s)", s.MaxTransactionRetryTime.String()),
+			Errors: s.Errs,
+		}}
+		return false
 	}
 
-	return false
+	if s.deadErrors > s.MaxDeadConnections {
+		s.Errs = []error{&errorutil.TransactionExecutionLimit{
+			Cause:  fmt.Sprintf("too many failed connection attempts (allowed max %d)", s.MaxDeadConnections),
+			Errors: s.Errs,
+		}}
+		return false
+	}
+
+	if s.skipSleep {
+		s.Log.Debugf(s.LogName, s.LogId, "Retrying transaction (%s): %s", s.cause, lastErr)
+	} else {
+		s.Throttle = s.Throttle.next()
+		sleepTime := s.Throttle.delay()
+		s.Log.Debugf(s.LogName, s.LogId,
+			"Retrying transaction (%s): %s [after %s]", s.cause, lastErr, sleepTime)
+		s.Sleep(sleepTime)
+	}
+	return true
+}
+
+func (s *State) ProduceError() error {
+	lastErr := s.Errs[len(s.Errs)-1]
+	if limitReachedErr, ok := lastErr.(*errorutil.TransactionExecutionLimit); ok {
+		return limitReachedErr
+	}
+	return errorutil.WrapError(lastErr)
 }
 
 func IsRetryable(err error) bool {
+	if connectivityErr, ok := err.(*errorutil.ConnectivityError); ok {
+		if _, ok := connectivityErr.Inner.(*errorutil.CommitFailedDeadError); ok {
+			return false
+		}
+		return true
+	}
+	if _, ok := err.(*errorutil.PoolTimeout); ok {
+		return true
+	}
 	var dbError *db.Neo4jError
 	if !errors.As(err, &dbError) {
 		return false

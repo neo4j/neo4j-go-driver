@@ -21,13 +21,13 @@ package dbserver
 
 import (
 	"fmt"
+	"math"
 	"regexp"
 	"strconv"
 )
 
 const (
-	versionPattern = "(Neo4j/)?(\\d+)\\.(\\d+)(?:\\.)?(\\d*)(\\.|-|\\+)?([0-9A-Za-z-.]*)?"
-	versionInDev   = "Neo4j/dev"
+	versionPattern = "(Neo4j/)?(\\d+)\\.(\\d+|dev)(?:\\.)?(\\d*)(\\.|-|\\+)?([0-9A-Za-z-.]*)?"
 )
 
 var (
@@ -42,7 +42,6 @@ type Version struct {
 
 var (
 	noVersion      = Version{-1, -1, -1}
-	inDevVersion   = Version{0, 0, 0}
 	defaultVersion = Version{3, 0, 0}
 )
 
@@ -56,40 +55,13 @@ func VersionOf(server string) Version {
 		matches := versionMatcher.FindStringSubmatch(server)
 		if matches != nil {
 			major, _ := strconv.Atoi(matches[2])
-			minor, _ := strconv.Atoi(matches[3])
+			minor := parseMinor(matches[3])
 			patch, _ := strconv.Atoi(matches[4])
-
 			return Version{major, minor, patch}
-		} else if server == versionInDev {
-			return inDevVersion
 		}
 	}
 
 	return noVersion
-}
-
-func compareInt(num1 int, num2 int) int {
-	if num1 == num2 {
-		return 0
-	}
-
-	if num1 > num2 {
-		return 1
-	}
-
-	return -1
-}
-
-func compareVersions(version1 Version, version2 Version) int {
-	comp := compareInt(version1.major, version2.major)
-	if comp == 0 {
-		comp = compareInt(version1.minor, version2.minor)
-		if comp == 0 {
-			comp = compareInt(version1.patch, version2.patch)
-		}
-	}
-
-	return comp
 }
 
 func (version Version) String() string {
@@ -114,4 +86,34 @@ func (version Version) LessThan(other Version) bool {
 
 func (version Version) LessThanOrEqual(other Version) bool {
 	return compareVersions(version, other) <= 0
+}
+
+func parseMinor(rawMinor string) int {
+	if rawMinor == "dev" {
+		return math.MaxInt
+	}
+	result, _ := strconv.Atoi(rawMinor)
+	return result
+}
+
+func compareInt(num1 int, num2 int) int {
+	if num1 == num2 {
+		return 0
+	}
+
+	if num1 > num2 {
+		return 1
+	}
+
+	return -1
+}
+
+func compareVersions(version1 Version, version2 Version) int {
+	if comp := compareInt(version1.major, version2.major); comp != 0 {
+		return comp
+	}
+	if comp := compareInt(version1.minor, version2.minor); comp != 0 {
+		return comp
+	}
+	return compareInt(version1.patch, version2.patch)
 }

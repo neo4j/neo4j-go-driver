@@ -321,7 +321,7 @@ func (b *bolt5) TxBegin(
 // misuse from clients that stick to their connections when they shouldn't.
 func (b *bolt5) assertTxHandle(h1, h2 idb.TxHandle) error {
 	if h1 != h2 {
-		err := errors.New(InvalidTransactionError)
+		err := errors.New(errorutil.InvalidTransactionError)
 		b.log.Error(log.Bolt5, b.logId, err)
 		return err
 	}
