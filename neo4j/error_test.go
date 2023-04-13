@@ -22,7 +22,7 @@ package neo4j
 import (
 	"fmt"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/db"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/retry"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/errorutil"
 	"testing"
 )
 
@@ -34,7 +34,7 @@ func TestIsRetryable(outer *testing.T) {
 
 	testCases := []retryableTestCase{
 		{true, &ConnectivityError{
-			inner: fmt.Errorf("hello, is it me you are looking for"),
+			Inner: fmt.Errorf("hello, is it me you are looking for"),
 		}},
 		{true, &db.Neo4jError{
 			Code: "Neo.TransientError.No.Stress",
@@ -50,7 +50,7 @@ func TestIsRetryable(outer *testing.T) {
 		}},
 		{false, nil},
 		{false, &ConnectivityError{
-			inner: &retry.CommitFailedDeadError{},
+			Inner: &errorutil.CommitFailedDeadError{},
 		}},
 		{false, &db.Neo4jError{
 			Code: "Neo.TransientError.Transaction.Terminated",
@@ -68,7 +68,7 @@ func TestIsRetryable(outer *testing.T) {
 	}
 
 	for _, testCase := range testCases {
-		outer.Run(fmt.Sprintf("is error %s retryable?", testCase.err), func(t *testing.T) {
+		outer.Run(fmt.Sprintf("is error %v retryable?", testCase.err), func(t *testing.T) {
 			expected := testCase.isRetryable
 
 			actual := IsRetryable(testCase.err)

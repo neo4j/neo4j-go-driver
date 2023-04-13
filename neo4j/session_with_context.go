@@ -280,14 +280,14 @@ func (s *sessionWithContext) BeginTransaction(ctx context.Context, configurers .
 	// Get a connection from the pool. This could fail in clustered environment.
 	conn, err := s.getConnection(ctx, s.defaultMode, pool.DefaultLivenessCheckThreshold)
 	if err != nil {
-		return nil, wrapError(err)
+		return nil, errorutil.WrapError(err)
 	}
 
 	// Begin transaction
 	beginBookmarks, err := s.getBookmarks(ctx)
 	if err != nil {
 		_ = s.pool.Return(ctx, conn)
-		return nil, wrapError(err)
+		return nil, errorutil.WrapError(err)
 	}
 	txHandle, err := conn.TxBegin(ctx,
 		idb.TxConfig{
@@ -303,7 +303,7 @@ func (s *sessionWithContext) BeginTransaction(ctx context.Context, configurers .
 		})
 	if err != nil {
 		_ = s.pool.Return(ctx, conn)
-		return nil, wrapError(err)
+		return nil, errorutil.WrapError(err)
 	}
 
 	// Create transaction wrapper
@@ -383,26 +383,13 @@ func (s *sessionWithContext) runRetriable(
 		},
 	}
 	for state.Continue() {
-		if tryAgain, result := s.executeTransactionFunction(ctx, mode, config, &state, work); tryAgain {
-			continue
-		} else {
+		if hasCompleted, result := s.executeTransactionFunction(ctx, mode, config, &state, work); hasCompleted {
 			return result, nil
 		}
 	}
 
-	// When retries has occurred wrap the error, the last error is always added but
-	// cause is only set when the retry logic could detect something strange.
-	if state.LastErrWasRetryable {
-		err := newTransactionExecutionLimit(state.Errs, state.Causes)
-		s.log.Error(log.Session, s.logId, err)
-		return nil, err
-	}
-	// Wrap and log the error if it belongs to the driver
-	err := wrapError(state.LastErr)
-	switch err.(type) {
-	case *UsageError, *ConnectivityError:
-		s.log.Error(log.Session, s.logId, err)
-	}
+	err := state.ProduceError()
+	s.log.Error(log.Session, s.logId, err)
 	return nil, err
 }
 
@@ -415,8 +402,8 @@ func (s *sessionWithContext) executeTransactionFunction(
 
 	conn, err := s.getConnection(ctx, mode, pool.DefaultLivenessCheckThreshold)
 	if err != nil {
-		state.OnFailure(ctx, conn, err, false)
-		return true, nil
+		state.OnFailure(ctx, err, conn, false)
+		return false, nil
 	}
 
 	// handle transaction function panic as well
@@ -426,8 +413,8 @@ func (s *sessionWithContext) executeTransactionFunction(
 
 	beginBookmarks, err := s.getBookmarks(ctx)
 	if err != nil {
-		state.OnFailure(ctx, conn, err, false)
-		return true, nil
+		state.OnFailure(ctx, err, conn, false)
+		return false, nil
 	}
 	txHandle, err := conn.TxBegin(ctx,
 		idb.TxConfig{
@@ -442,8 +429,8 @@ func (s *sessionWithContext) executeTransactionFunction(
 			},
 		})
 	if err != nil {
-		state.OnFailure(ctx, conn, err, false)
-		return true, nil
+		state.OnFailure(ctx, err, conn, false)
+		return false, nil
 	}
 
 	tx := managedTransaction{conn: conn, fetchSize: s.fetchSize, txHandle: txHandle}
@@ -453,14 +440,14 @@ func (s *sessionWithContext) executeTransactionFunction(
 		// client wants to rollback. We don't do an explicit rollback here
 		// but instead rely on the pool invoking reset on the connection,
 		// that will do an implicit rollback.
-		state.OnFailure(ctx, conn, err, false)
-		return true, nil
+		state.OnFailure(ctx, err, conn, false)
+		return false, nil
 	}
 
 	err = conn.TxCommit(ctx, txHandle)
 	if err != nil {
-		state.OnFailure(ctx, conn, err, true)
-		return true, nil
+		state.OnFailure(ctx, err, conn, true)
+		return false, nil
 	}
 
 	// transaction has been committed so let's ignore (ie just log) the error
@@ -468,7 +455,7 @@ func (s *sessionWithContext) executeTransactionFunction(
 		s.log.Warnf(log.Session, s.logId, "could not retrieve bookmarks after successful commit: %s\n"+
 			"the results of this transaction may not be visible to subsequent operations", err.Error())
 	}
-	return false, x
+	return true, x
 }
 
 func (s *sessionWithContext) getServers(ctx context.Context, mode idb.AccessMode) ([]string, error) {
@@ -495,16 +482,16 @@ func (s *sessionWithContext) getConnection(ctx context.Context, mode idb.AccessM
 	}
 
 	if err := s.resolveHomeDatabase(ctx); err != nil {
-		return nil, wrapError(err)
+		return nil, errorutil.WrapError(err)
 	}
 	servers, err := s.getServers(ctx, mode)
 	if err != nil {
-		return nil, wrapError(err)
+		return nil, errorutil.WrapError(err)
 	}
 
 	conn, err := s.pool.Borrow(ctx, servers, s.driverConfig.ConnectionAcquisitionTimeout != 0, s.config.BoltLogger, livenessCheckThreshold)
 	if err != nil {
-		return nil, wrapError(err)
+		return nil, errorutil.WrapError(err)
 	}
 
 	// Select database on server
@@ -557,13 +544,13 @@ func (s *sessionWithContext) Run(ctx context.Context,
 
 	conn, err := s.getConnection(ctx, s.defaultMode, pool.DefaultLivenessCheckThreshold)
 	if err != nil {
-		return nil, wrapError(err)
+		return nil, errorutil.WrapError(err)
 	}
 
 	runBookmarks, err := s.getBookmarks(ctx)
 	if err != nil {
 		_ = s.pool.Return(ctx, conn)
-		return nil, wrapError(err)
+		return nil, errorutil.WrapError(err)
 	}
 	stream, err := conn.Run(
 		ctx,
@@ -586,7 +573,7 @@ func (s *sessionWithContext) Run(ctx context.Context,
 	)
 	if err != nil {
 		_ = s.pool.Return(ctx, conn)
-		return nil, wrapError(err)
+		return nil, errorutil.WrapError(err)
 	}
 
 	s.autocommitTx = &autocommitTransaction{
@@ -634,15 +621,15 @@ func (s *sessionWithContext) legacy() Session {
 
 func (s *sessionWithContext) getServerInfo(ctx context.Context) (ServerInfo, error) {
 	if err := s.resolveHomeDatabase(ctx); err != nil {
-		return nil, wrapError(err)
+		return nil, errorutil.WrapError(err)
 	}
 	servers, err := s.getServers(ctx, idb.ReadMode)
 	if err != nil {
-		return nil, wrapError(err)
+		return nil, errorutil.WrapError(err)
 	}
 	conn, err := s.pool.Borrow(ctx, servers, s.driverConfig.ConnectionAcquisitionTimeout != 0, s.config.BoltLogger, 0)
 	if err != nil {
-		return nil, wrapError(err)
+		return nil, errorutil.WrapError(err)
 	}
 	defer s.pool.Return(ctx, conn)
 	return &simpleServerInfo{

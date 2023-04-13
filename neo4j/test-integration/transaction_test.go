@@ -59,7 +59,6 @@ func TestTransaction(outer *testing.T) {
 			times := 0
 			_, err = session.ExecuteWrite(ctx, func(transaction neo4j.ManagedTransaction) (any, error) {
 				times++
-				time.Sleep(1 * time.Second)
 				return nil, transientError
 			})
 
@@ -71,7 +70,6 @@ func TestTransaction(outer *testing.T) {
 			times := 0
 			_, err = session.ExecuteRead(ctx, func(transaction neo4j.ManagedTransaction) (any, error) {
 				times++
-				time.Sleep(1 * time.Second)
 				return nil, transientError
 			})
 

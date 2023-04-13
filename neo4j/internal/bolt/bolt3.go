@@ -24,6 +24,7 @@ import (
 	"errors"
 	"fmt"
 	idb "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/errorutil"
 	"net"
 	"time"
 
@@ -271,7 +272,7 @@ func (b *bolt3) TxBegin(
 // misuse from clients that stick to their connections when they shouldn't.
 func (b *bolt3) assertTxHandle(h1, h2 idb.TxHandle) error {
 	if h1 != h2 {
-		err := errors.New(InvalidTransactionError)
+		err := errors.New(errorutil.InvalidTransactionError)
 		b.log.Error(log.Bolt3, b.logId, err)
 		return err
 	}

@@ -24,6 +24,7 @@ import (
 	"errors"
 	"fmt"
 	idb "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/errorutil"
 	"io"
 	"reflect"
 	"sync"
@@ -31,7 +32,6 @@ import (
 	"time"
 
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/db"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/retry"
 	. "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/testutil"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/log"
 )
@@ -50,7 +50,7 @@ func TestSession(outer *testing.T) {
 	}
 
 	createSession := func() (*RouterFake, *PoolFake, *sessionWithContext) {
-		conf := Config{MaxTransactionRetryTime: 3 * time.Millisecond}
+		conf := Config{MaxTransactionRetryTime: 3 * time.Millisecond, MaxConnectionPoolSize: 100}
 		router := RouterFake{}
 		pool := PoolFake{}
 		sessConfig := SessionConfig{AccessMode: AccessModeRead, BoltLogger: boltLogger}
@@ -125,7 +125,7 @@ func TestSession(outer *testing.T) {
 			assertCleanSessionState(t, sess)
 		})
 
-		// Check that sesssion is in clean state after connection fails to commit.
+		// Check that session is in clean state after connection fails to commit.
 		inner.Run("Failed commit", func(t *testing.T) {
 			_, pool, sess := createSession()
 			pool.BorrowConn = &ConnFake{Alive: false, TxCommitErr: io.EOF}
@@ -139,7 +139,7 @@ func TestSession(outer *testing.T) {
 			}
 			// Should not be a TransactionExecutionLimitError here
 			AssertTrue(t, IsConnectivityError(err))
-			AssertSameType(t, err.(*ConnectivityError).inner, &retry.CommitFailedDeadError{})
+			AssertSameType(t, err.(*ConnectivityError).Inner, &errorutil.CommitFailedDeadError{})
 			assertCleanSessionState(t, sess)
 		})
 

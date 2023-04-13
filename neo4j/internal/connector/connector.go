@@ -26,6 +26,7 @@ import (
 	"errors"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/config"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/errorutil"
 	"io"
 	"net"
 	"time"
@@ -96,7 +97,7 @@ func (c Connector) Connect(ctx context.Context, address string, boltLogger log.B
 			err = errors.New("remote end closed the connection, check that TLS is enabled on the server")
 		}
 		conn.Close()
-		return nil, &TlsError{inner: err}
+		return nil, &errorutil.TlsError{Inner: err}
 	}
 	connection, err := bolt.Connect(ctx,
 		address,
@@ -140,16 +141,4 @@ func (c Connector) tlsConfig(serverName string) *tls.Config {
 	config.InsecureSkipVerify = c.SkipVerify
 	config.ServerName = serverName
 	return config
-}
-
-// TlsError encapsulates all errors related to TLS connection creation
-// This is needed since the tls package does not provide a common error type
-// à la net.Error, and a common type is needed to properly classify the error
-// for Testkit
-type TlsError struct {
-	inner error
-}
-
-func (e *TlsError) Error() string {
-	return e.inner.Error()
 }
