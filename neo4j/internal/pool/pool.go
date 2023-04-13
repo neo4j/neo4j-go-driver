@@ -518,6 +518,11 @@ func (p *Pool) OnConnectionError(ctx context.Context, connection idb.Connection,
 			if err := manager.OnTokenExpired(ctx, token); err != nil {
 				return err
 			}
+			if _, isStaticToken := manager.(auth.Token); isStaticToken {
+				return nil
+			} else {
+				error.MarkRetriable()
+			}
 		}
 	}
 	return nil

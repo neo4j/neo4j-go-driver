@@ -77,7 +77,7 @@ func WrapError(err error) error {
 		return &ConnectivityError{Inner: err}
 	case *db.Neo4jError:
 		if e.Code == "Neo.ClientError.Security.TokenExpired" {
-			return &TokenExpiredError{Code: e.Code, Message: e.Msg}
+			return &TokenExpiredError{Code: e.Code, Message: e.Msg, cause: e}
 		}
 	}
 	if err != nil && err.Error() == InvalidTransactionError {
@@ -111,6 +111,11 @@ func (e *ConnectivityError) Error() string {
 type TokenExpiredError struct {
 	Code    string
 	Message string
+	cause   *db.Neo4jError
+}
+
+func (e *TokenExpiredError) Unwrap() error {
+	return e.cause
 }
 
 func (e *TokenExpiredError) Error() string {

@@ -146,5 +146,5 @@ func IsRetryable(err error) bool {
 	if !errors.As(err, &dbError) {
 		return false
 	}
-	return dbError.IsRetriableTransient() || dbError.IsRetriableCluster()
+	return dbError.IsRetriable()
 }

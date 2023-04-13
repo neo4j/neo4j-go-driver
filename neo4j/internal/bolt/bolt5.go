@@ -1106,7 +1106,7 @@ func (b *bolt5) onFailure(ctx context.Context, failure *db.Neo4jError) {
 	var err error
 	err = failure
 	if callbackErr := b.onNeo4jError(ctx, b, failure); callbackErr != nil {
-		err = errorutil.CombineErrors(failure, callbackErr)
+		err = errorutil.CombineErrors(callbackErr, failure)
 	}
 	b.setError(err, isFatalError(failure))
 }
