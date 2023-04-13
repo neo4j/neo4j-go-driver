@@ -22,7 +22,9 @@ package router
 import (
 	"context"
 	"errors"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/db"
+	idb "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/errorutil"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/racing"
 	"time"
 
@@ -34,7 +36,7 @@ const missingReaderRetries = 100
 
 type databaseRouter struct {
 	dueUnix int64
-	table   *db.RoutingTable
+	table   *idb.RoutingTable
 }
 
 // Router is thread safe
@@ -56,8 +58,8 @@ type Pool interface {
 	// If all connections are busy and the pool is full, calls to Borrow may wait for a connection to become idle
 	// If a connection has been idle for longer than idlenessThreshold, it will be reset
 	// to check if it's still alive.
-	Borrow(ctx context.Context, servers []string, wait bool, boltLogger log.BoltLogger, idlenessThreshold time.Duration) (db.Connection, error)
-	Return(ctx context.Context, c db.Connection) error
+	Borrow(ctx context.Context, servers []string, wait bool, boltLogger log.BoltLogger, idlenessThreshold time.Duration) (idb.Connection, error)
+	Return(ctx context.Context, c idb.Connection) error
 }
 
 func New(rootRouter string, getRouters func() []string, routerContext map[string]string, pool Pool, logger log.Logger, logId string, timer *func() time.Time) *Router {
@@ -77,9 +79,9 @@ func New(rootRouter string, getRouters func() []string, routerContext map[string
 	return r
 }
 
-func (r *Router) readTable(ctx context.Context, dbRouter *databaseRouter, bookmarks []string, database, impersonatedUser string, boltLogger log.BoltLogger) (*db.RoutingTable, error) {
+func (r *Router) readTable(ctx context.Context, dbRouter *databaseRouter, bookmarks []string, database, impersonatedUser string, boltLogger log.BoltLogger) (*idb.RoutingTable, error) {
 	var (
-		table *db.RoutingTable
+		table *idb.RoutingTable
 		err   error
 	)
 
@@ -117,7 +119,7 @@ func (r *Router) readTable(ctx context.Context, dbRouter *databaseRouter, bookma
 	return table, nil
 }
 
-func (r *Router) getOrReadTable(ctx context.Context, bookmarksFn func(context.Context) ([]string, error), database string, boltLogger log.BoltLogger) (*db.RoutingTable, error) {
+func (r *Router) getOrReadTable(ctx context.Context, bookmarksFn func(context.Context) ([]string, error), database string, boltLogger log.BoltLogger) (*idb.RoutingTable, error) {
 	now := (*r.now)()
 
 	if !r.dbRoutersMut.TryLock(ctx) {
@@ -205,7 +207,7 @@ func (r *Router) Writers(ctx context.Context, bookmarks func(context.Context) ([
 }
 
 func (r *Router) GetNameOfDefaultDatabase(ctx context.Context, bookmarks []string, user string, boltLogger log.BoltLogger) (string, error) {
-	table, err := r.readTable(ctx, nil, bookmarks, db.DefaultDatabase, user, boltLogger)
+	table, err := r.readTable(ctx, nil, bookmarks, idb.DefaultDatabase, user, boltLogger)
 	if err != nil {
 		return "", err
 	}
@@ -294,10 +296,19 @@ func (r *Router) CleanUp(ctx context.Context) error {
 	return nil
 }
 
-func (r *Router) storeRoutingTable(database string, table *db.RoutingTable, now time.Time) {
+func (r *Router) storeRoutingTable(database string, table *idb.RoutingTable, now time.Time) {
 	r.dbRouters[database] = &databaseRouter{
 		table:   table,
 		dueUnix: now.Add(time.Duration(table.TimeToLive) * time.Second).Unix(),
 	}
 	r.log.Debugf(log.Router, r.logId, "New routing table for '%s', TTL %d", database, table.TimeToLive)
+}
+
+func wrapError(server string, err error) error {
+	// Preserve error originating from the database, wrap other errors
+	_, isNeo4jErr := err.(*db.Neo4jError)
+	if isNeo4jErr {
+		return err
+	}
+	return &errorutil.ReadRoutingTableError{Server: server, Err: err}
 }

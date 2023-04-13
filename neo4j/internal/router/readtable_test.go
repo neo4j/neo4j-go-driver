@@ -23,6 +23,7 @@ import (
 	"context"
 	"errors"
 	idb "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/errorutil"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/log"
 	"testing"
 
@@ -54,9 +55,9 @@ func TestReadTableTable(ot *testing.T) {
 	}
 
 	assertRoutingTableError := func(t *testing.T, err error) {
-		_, is := err.(*ReadRoutingTableError)
+		_, is := err.(*errorutil.ReadRoutingTableError)
 		if !is {
-			r := &ReadRoutingTableError{}
+			r := &errorutil.ReadRoutingTableError{}
 			t.Errorf("Error should be %T but was %T", r, err)
 		}
 	}

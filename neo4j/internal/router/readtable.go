@@ -22,6 +22,7 @@ package router
 import (
 	"context"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/errorutil"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/pool"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/log"
 )
@@ -31,7 +32,7 @@ import (
 func readTable(ctx context.Context, connectionPool Pool, routers []string, routerContext map[string]string, bookmarks []string,
 	database, impersonatedUser string, boltLogger log.BoltLogger) (*db.RoutingTable, error) {
 	// Preserve last error to be returned, set a default for case of no routers
-	var err error = &ReadRoutingTableError{}
+	var err error = &errorutil.ReadRoutingTableError{}
 
 	// Try the routers one at the time since some of them might no longer support routing and we
 	// can't force the pool to not re-use these when putting them back in the pool and retrieving

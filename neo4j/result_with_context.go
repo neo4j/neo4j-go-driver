@@ -23,6 +23,7 @@ import (
 	"context"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/db"
 	idb "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/errorutil"
 )
 
 type ResultWithContext interface {
@@ -126,7 +127,7 @@ func (r *resultWithContext) Peek(ctx context.Context) bool {
 }
 
 func (r *resultWithContext) Err() error {
-	return wrapError(r.err)
+	return errorutil.WrapError(r.err)
 }
 
 func (r *resultWithContext) Record() *Record {
@@ -145,7 +146,7 @@ func (r *resultWithContext) Collect(ctx context.Context) ([]*Record, error) {
 		}
 	}
 	if r.err != nil {
-		return nil, wrapError(r.err)
+		return nil, errorutil.WrapError(r.err)
 	}
 	r.callAfterConsumptionHook()
 	return recs, nil
@@ -155,7 +156,7 @@ func (r *resultWithContext) Single(ctx context.Context) (*Record, error) {
 	// Try retrieving the single record
 	r.advance(ctx)
 	if r.err != nil {
-		return nil, wrapError(r.err)
+		return nil, errorutil.WrapError(r.err)
 	}
 	if r.summary != nil {
 		r.err = &UsageError{Message: "Result contains no more records"}
@@ -178,7 +179,7 @@ func (r *resultWithContext) Single(ctx context.Context) (*Record, error) {
 	if r.err != nil {
 		// Might be more records or not, anyway something is bad.
 		// Both r.record and r.summary are nil at this point which is good.
-		return nil, wrapError(r.err)
+		return nil, errorutil.WrapError(r.err)
 	}
 	// We got the expected summary
 	// r.record contains the single record and r.summary the summary.
@@ -192,13 +193,13 @@ func (r *resultWithContext) Consume(ctx context.Context) (ResultSummary, error) 
 	// set by Single to indicate some kind of usage error that "destroyed"
 	// the result.
 	if r.err != nil {
-		return nil, wrapError(r.err)
+		return nil, errorutil.WrapError(r.err)
 	}
 
 	r.record = nil
 	r.summary, r.err = r.conn.Consume(ctx, r.streamHandle)
 	if r.err != nil {
-		return nil, wrapError(r.err)
+		return nil, errorutil.WrapError(r.err)
 	}
 	r.callAfterConsumptionHook()
 	return r.toResultSummary(), nil

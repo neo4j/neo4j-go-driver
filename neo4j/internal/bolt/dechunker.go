@@ -22,6 +22,7 @@ package bolt
 import (
 	"context"
 	"encoding/binary"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/errorutil"
 	rio "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/racing"
 	"net"
 	"time"
@@ -86,16 +87,16 @@ func newContext(ctx context.Context, readTimeout time.Duration) (context.Context
 }
 
 func processReadError(err error, ctx context.Context, readTimeout time.Duration) error {
-	if IsTimeoutError(err) {
-		return &ConnectionReadTimeout{
-			userContext: ctx,
-			readTimeout: readTimeout,
-			err:         err,
+	if errorutil.IsTimeoutError(err) {
+		return &errorutil.ConnectionReadTimeout{
+			UserContext: ctx,
+			ReadTimeout: readTimeout,
+			Err:         err,
 		}
 	}
 	if err == context.Canceled {
-		return &ConnectionReadCanceled{
-			err: err,
+		return &errorutil.ConnectionReadCanceled{
+			Err: err,
 		}
 	}
 	return err
