@@ -4,9 +4,15 @@ set -Eeuo pipefail
 
 grep_not(){ ! grep "${@}"; return $?;}
 
+go_version=$(go version)
+staticcheck_version="latest"
+if [[ "${go_version}" == *"go1.18"* ]]; then
+	staticcheck_version="0.3.3"
+fi
+
 echo "# pre-commit hook"
 printf '%-15s' "## staticcheck "
-cd "$(mktemp -d)" && go install honnef.co/go/tools/cmd/staticcheck@v0.3.3 && cd - > /dev/null
+cd "$(mktemp -d)" && go install honnef.co/go/tools/cmd/staticcheck@"${staticcheck_version}" && cd - > /dev/null
 "${GOBIN:-$(go env GOPATH)/bin}"/staticcheck -tags internal_testkit ./...
 echo "✅"
 
