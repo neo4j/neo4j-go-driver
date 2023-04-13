@@ -68,7 +68,7 @@ func (t *Timer) Now() time.Time {
 }
 
 func (t *Timer) Tick(duration time.Duration) {
-	t.now.Add(duration)
+	t.now = t.now.Add(duration)
 }
 
 // To implement transactional functions a bit of extra state is needed on the
