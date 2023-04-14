@@ -1,3 +1,22 @@
+/*
+ * Copyright (c) "Neo4j"
+ * Neo4j Sweden AB [https://neo4j.com]
+ *
+ * This file is part of Neo4j.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package neo4j
 
 import (
@@ -182,7 +201,7 @@ func TestDriverExecuteQuery(outer *testing.T) {
 					summary:     summary,
 				}},
 			expectedSessionConfig: defaultSessionConfig,
-			expectedErr:           fmt.Errorf("unsupported routing control, expected 0 (Writers) or 1 (Readers) but got: 42"),
+			expectedErr:           fmt.Errorf("unsupported routing control, expected 0 (Write) or 1 (Read) but got: 42"),
 		},
 		{
 			description:       "returns error when result transformer function is nil",
@@ -397,8 +416,8 @@ func TestDriverExecuteQuery(outer *testing.T) {
 					return testCase.createSession
 				},
 				delegate: &driverWithContext{
-					defaultExecuteQueryBookmarkManager: defaultBookmarkManager,
-					mut:                                racing.NewMutex(),
+					executeQueryBookmarkManager: defaultBookmarkManager,
+					mut:                         racing.NewMutex(),
 				},
 			}
 
@@ -431,7 +450,7 @@ func TestDriverExecuteQuery(outer *testing.T) {
 				callExecuteQueryOrBookmarkManagerGetter(driver, i)
 				storeBookmarkManagerAddress(
 					&bookmarkManagerAddresses,
-					driver.delegate.defaultExecuteQueryBookmarkManager.(*bookmarkManager))
+					driver.delegate.executeQueryBookmarkManager.(*bookmarkManager))
 				wait.Done()
 			}(i)
 		}
@@ -445,7 +464,7 @@ func TestDriverExecuteQuery(outer *testing.T) {
 		if len(addressCounts) != 1 {
 			t.Errorf("expected exactly 1 bookmark manager pointer to have been created, got %v", addressCounts)
 		}
-		address := uintptr(unsafe.Pointer(driver.delegate.defaultExecuteQueryBookmarkManager.(*bookmarkManager)))
+		address := uintptr(unsafe.Pointer(driver.delegate.executeQueryBookmarkManager.(*bookmarkManager)))
 		if count, found := addressCounts[address]; !found || count != int32(goroutineCount) {
 			t.Errorf("expected pointer address %v to be seen %d time(s), got these instead %v", address, count, addressCounts)
 		}
@@ -455,7 +474,7 @@ func TestDriverExecuteQuery(outer *testing.T) {
 func callExecuteQueryOrBookmarkManagerGetter(driver DriverWithContext, i int) {
 	if i%2 == 0 {
 		// this lazily initializes the default bookmark manager
-		_ = driver.DefaultExecuteQueryBookmarkManager()
+		_ = driver.ExecuteQueryBookmarkManager()
 	} else {
 		// this as well
 		_, _ = ExecuteQuery[*EagerResult](context.Background(), driver, "RETURN 42", nil, EagerResultTransformer)
@@ -500,8 +519,8 @@ type driverDelegate struct {
 	newSession func(context.Context, SessionConfig) SessionWithContext
 }
 
-func (d *driverDelegate) DefaultExecuteQueryBookmarkManager() BookmarkManager {
-	return d.delegate.DefaultExecuteQueryBookmarkManager()
+func (d *driverDelegate) ExecuteQueryBookmarkManager() BookmarkManager {
+	return d.delegate.ExecuteQueryBookmarkManager()
 }
 
 func (d *driverDelegate) Target() url.URL {

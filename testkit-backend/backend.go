@@ -8,13 +8,13 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      https://www.apache.org/licenses/LICENSE-2.0
+ *     https://www.apache.org/licenses/LICENSE-2.0
  *
- *  Unless required by applicable law or agreed to in writing, software
- *  distributed under the License is distributed on an "AS IS" BASIS,
- *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *  See the License for the specific language governing permissions and
- *  limitations under the License.
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 
 package main
@@ -226,7 +226,7 @@ func (b *backend) process() bool {
 func (b *backend) writeResponse(name string, data any) {
 	response := map[string]any{"name": name, "data": data}
 	responseJson, err := json.Marshal(response)
-	fmt.Printf("RES: %s\n", name) //string(responseJson))
+	fmt.Printf("RES: %s %s\n", name, string(responseJson))
 	if err != nil {
 		panic(err.Error())
 	}
@@ -395,7 +395,13 @@ func (b *backend) handleRequest(req map[string]any) {
 	name := req["name"].(string)
 	data := req["data"].(map[string]any)
 
-	fmt.Printf("REQ: %s\n", name)
+	dataJson, err := json.Marshal(data)
+	if err != nil {
+		// This data comes from a json decoder. So it better be serializable.
+		panic(err)
+	}
+
+	fmt.Printf("REQ: %s %s\n", name, dataJson)
 	switch name {
 
 	case "ResolverResolutionCompleted":
@@ -534,9 +540,9 @@ func (b *backend) handleRequest(req map[string]any) {
 				if routing != nil {
 					switch routing {
 					case "r":
-						config.Routing = neo4j.Readers
+						config.Routing = neo4j.Read
 					case "w":
-						config.Routing = neo4j.Writers
+						config.Routing = neo4j.Write
 					default:
 						b.writeError(fmt.Errorf("unexpected executequery routing value: %v", routing))
 						return
