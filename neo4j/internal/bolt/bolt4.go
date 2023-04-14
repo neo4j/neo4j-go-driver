@@ -917,7 +917,9 @@ func (b *bolt4) Close(ctx context.Context) {
 		b.queue.appendGoodbye()
 		b.queue.send(ctx)
 	}
-	_ = b.conn.Close()
+	if err := b.conn.Close(); err != nil {
+		b.log.Warnf(log.Driver, b.serverName, "could not close underlying socket")
+	}
 	b.state = bolt4_dead
 }
 

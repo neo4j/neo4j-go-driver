@@ -103,6 +103,7 @@ func Connect(
 		return nil, fmt.Errorf("server responded with unsupported version %d.%d", major, minor)
 	}
 	if err = boltConn.Connect(ctx, int(minor), auth, userAgent, routingContext, notificationConfig); err != nil {
+		boltConn.Close(ctx)
 		return nil, err
 	}
 	return boltConn, nil

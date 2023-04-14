@@ -77,9 +77,6 @@ func (c Connector) Connect(ctx context.Context, address string, auth *db.ReAuthT
 			notificationConfig,
 		)
 		if err != nil {
-			if connErr := conn.Close(); connErr != nil {
-				c.Log.Warnf(log.Driver, address, "could not close underlying socket after Bolt handshake error")
-			}
 			return nil, err
 		}
 		return connection, nil
@@ -113,9 +110,6 @@ func (c Connector) Connect(ctx context.Context, address string, auth *db.ReAuthT
 		notificationConfig,
 	)
 	if err != nil {
-		if connErr := conn.Close(); connErr != nil {
-			c.Log.Warnf(log.Driver, address, "could not close underlying socket after Bolt handshake error")
-		}
 		return nil, err
 	}
 	return connection, nil
