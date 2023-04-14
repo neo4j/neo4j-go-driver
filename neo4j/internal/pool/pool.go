@@ -45,7 +45,6 @@ import (
 const DefaultLivenessCheckThreshold = math.MaxInt64
 
 type Connect func(context.Context, string, *idb.ReAuthToken, bolt.Neo4jErrorCallback, log.BoltLogger) (idb.Connection, error)
-type OnTokenExpired func(context.Context, auth.Token) error
 
 type qitem struct {
 	servers []string
@@ -54,17 +53,16 @@ type qitem struct {
 }
 
 type Pool struct {
-	config         *config.Config
-	connect        Connect
-	onTokenExpired OnTokenExpired
-	servers        map[string]*server
-	serversMut     racing.Mutex
-	queueMut       racing.Mutex
-	queue          list.List
-	now            func() time.Time
-	closed         bool
-	log            log.Logger
-	logId          string
+	config     *config.Config
+	connect    Connect
+	servers    map[string]*server
+	serversMut racing.Mutex
+	queueMut   racing.Mutex
+	queue      list.List
+	now        func() time.Time
+	closed     bool
+	log        log.Logger
+	logId      string
 }
 
 type serverPenalty struct {
@@ -72,25 +70,18 @@ type serverPenalty struct {
 	penalty uint32
 }
 
-func New(
-	config *config.Config,
-	connect Connect,
-	expiredCallback OnTokenExpired,
-	logger log.Logger,
-	logId string,
-) *Pool {
+func New(config *config.Config, connect Connect, logger log.Logger, logId string) *Pool {
 	// Means infinite life, simplifies checking later on
 
 	p := &Pool{
-		config:         config,
-		connect:        connect,
-		onTokenExpired: expiredCallback,
-		servers:        make(map[string]*server),
-		serversMut:     racing.NewMutex(),
-		queueMut:       racing.NewMutex(),
-		now:            time.Now,
-		logId:          logId,
-		log:            logger,
+		config:     config,
+		connect:    connect,
+		servers:    make(map[string]*server),
+		serversMut: racing.NewMutex(),
+		queueMut:   racing.NewMutex(),
+		now:        time.Now,
+		logId:      logId,
+		log:        logger,
 	}
 	p.log.Infof(log.Pool, p.logId, "Created")
 	return p
