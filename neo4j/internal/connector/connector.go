@@ -47,7 +47,13 @@ type Connector struct {
 	SupplyConnection func(context.Context, string) (net.Conn, error)
 }
 
-func (c Connector) Connect(ctx context.Context, address string, auth *db.ReAuthToken, callback bolt.Neo4jErrorCallback, boltLogger log.BoltLogger) (db.Connection, error) {
+func (c Connector) Connect(
+	ctx context.Context,
+	address string,
+	auth *db.ReAuthToken,
+	callback bolt.Neo4jErrorCallback,
+	boltLogger log.BoltLogger,
+) (connection db.Connection, err error) {
 	if c.SupplyConnection == nil {
 		c.SupplyConnection = c.createConnection
 	}
@@ -56,6 +62,14 @@ func (c Connector) Connect(ctx context.Context, address string, auth *db.ReAuthT
 	if err != nil {
 		return nil, err
 	}
+
+	defer func() {
+		if err != nil && connection == nil {
+			if err := conn.Close(); err != nil {
+				c.Log.Warnf(log.Driver, address, "could not close socket after failed connection")
+			}
+		}
+	}()
 
 	notificationConfig := db.NotificationConfig{
 		MinSev:  c.Config.NotificationsMinSeverity,
@@ -85,7 +99,6 @@ func (c Connector) Connect(ctx context.Context, address string, auth *db.ReAuthT
 	// TLS requested, continue with handshake
 	serverName, _, err := net.SplitHostPort(address)
 	if err != nil {
-		conn.Close()
 		return nil, err
 	}
 	tlsConn := tls.Client(conn, c.tlsConfig(serverName))
@@ -95,10 +108,9 @@ func (c Connector) Connect(ctx context.Context, address string, auth *db.ReAuthT
 			// Give a bit nicer error message
 			err = errors.New("remote end closed the connection, check that TLS is enabled on the server")
 		}
-		conn.Close()
 		return nil, &errorutil.TlsError{Inner: err}
 	}
-	connection, err := bolt.Connect(ctx,
+	connection, err = bolt.Connect(ctx,
 		address,
 		tlsConn,
 		auth,
@@ -112,7 +124,7 @@ func (c Connector) Connect(ctx context.Context, address string, auth *db.ReAuthT
 	if err != nil {
 		return nil, err
 	}
-	return connection, nil
+	return
 }
 
 func (c Connector) createConnection(ctx context.Context, address string) (net.Conn, error) {

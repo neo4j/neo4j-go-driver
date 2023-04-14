@@ -170,7 +170,7 @@ func TestBolt3(outer *testing.T) {
 			nil,
 			idb.NotificationConfig{},
 		)
-		AssertNil(t, bolt)
+		AssertNotNil(t, bolt)
 		AssertError(t, err)
 		dbErr := err.(*db.Neo4jError)
 		if !dbErr.IsAuthenticationFailed() {

@@ -40,10 +40,6 @@ var logger = &log.Void{}
 var ctx = context.Background()
 var reAuthToken = &db.ReAuthToken{FromSession: false, Manager: iauth.Token{Tokens: map[string]any{"scheme": "none"}}}
 
-func onTokenExpired(ctx context.Context, token iauth.Token) error {
-	return nil
-}
-
 func TestPoolBorrowReturn(outer *testing.T) {
 	maxAge := 1 * time.Second
 	birthdate := time.Now()
