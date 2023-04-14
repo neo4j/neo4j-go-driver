@@ -491,7 +491,7 @@ func (p *Pool) Return(ctx context.Context, c idb.Connection) error {
 }
 
 func (p *Pool) OnConnectionError(ctx context.Context, connection idb.Connection, error *db.Neo4jError) error {
-	if error.Code == "ClientError.Security.AuthorizationExpired" {
+	if error.Code == "Neo.ClientError.Security.AuthorizationExpired" {
 		serverName := connection.ServerName()
 		if !p.serversMut.TryLock(ctx) {
 			return racing.LockTimeoutError(fmt.Sprintf(
