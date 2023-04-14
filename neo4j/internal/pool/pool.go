@@ -233,20 +233,13 @@ func (p *Pool) Borrow(ctx context.Context, serverNames []string, wait bool, bolt
 			return conn, nil
 		}
 
-		alive := false
-		if conn != nil {
-			alive = conn.IsAlive()
-			_ = p.unreg(ctx, s.name, conn, p.now())
-		}
-
 		if errorutil.IsTimeoutError(err) {
 			p.log.Warnf(log.Pool, p.logId, "Borrow time-out")
 			return nil, &errorutil.PoolTimeout{Servers: serverNames, Err: err}
 		}
-		if alive {
+		if errorutil.IsFatalDuringDiscovery(err) {
 			return nil, err
 		}
-
 	}
 
 	anyConnection, anyConnectionErr := p.anyExistingConnectionsOnServers(ctx, serverNames)
