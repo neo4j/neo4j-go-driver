@@ -45,6 +45,7 @@ type Connector struct {
 	Network          string
 	Config           *config.Config
 	SupplyConnection func(context.Context, string) (net.Conn, error)
+	Now              *func() time.Time
 }
 
 func (c Connector) Connect(
@@ -89,6 +90,7 @@ func (c Connector) Connect(
 			c.Log,
 			boltLogger,
 			notificationConfig,
+			c.Now,
 		)
 		if err != nil {
 			return nil, err
@@ -120,6 +122,7 @@ func (c Connector) Connect(
 		c.Log,
 		boltLogger,
 		notificationConfig,
+		c.Now,
 	)
 	if err != nil {
 		return nil, err

@@ -31,6 +31,7 @@ import (
 	"net/url"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/connector"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/pool"
@@ -125,7 +126,7 @@ func NewDriverWithContext(target string, auth auth.TokenManager, configurers ...
 		return nil, err
 	}
 
-	d := driverWithContext{target: parsed, mut: racing.NewMutex()}
+	d := driverWithContext{target: parsed, mut: racing.NewMutex(), now: time.Now}
 
 	routing := true
 	d.connector.Network = "tcp"
@@ -201,9 +202,10 @@ func NewDriverWithContext(target string, auth auth.TokenManager, configurers ...
 	d.connector.Auth = auth
 	d.connector.RoutingContext = routingContext
 	d.connector.Config = d.config
+	d.connector.Now = &d.now
 
 	// Let the pool use the same log ID as the driver to simplify log reading.
-	d.pool = pool.New(d.config, d.connector.Connect, d.log, d.logId)
+	d.pool = pool.New(d.config, d.connector.Connect, d.log, d.logId, &d.now)
 
 	if !routing {
 		d.router = &directRouter{address: address}
@@ -221,7 +223,7 @@ func NewDriverWithContext(target string, auth auth.TokenManager, configurers ...
 			}
 		}
 		// Let the router use the same log ID as the driver to simplify log reading.
-		d.router = router.New(address, routersResolver, routingContext, d.pool, d.log, d.logId)
+		d.router = router.New(address, routersResolver, routingContext, d.pool, d.log, d.logId, &d.now)
 	}
 
 	d.log.Infof(log.Driver, d.logId, "Created { target: %s }", address)
@@ -297,6 +299,7 @@ type driverWithContext struct {
 	// instance of the bookmark manager only used by default by managed sessions of ExecuteQuery
 	// this is *not* used by default by user-created session (see NewSession)
 	executeQueryBookmarkManager BookmarkManager
+	now                                func() time.Time
 }
 
 func (d *driverWithContext) Target() url.URL {
@@ -333,7 +336,7 @@ func (d *driverWithContext) NewSession(ctx context.Context, config SessionConfig
 		return &erroredSessionWithContext{
 			err: &UsageError{Message: "Trying to create session on closed driver"}}
 	}
-	return newSessionWithContext(d.config, config, d.router, d.pool, d.log, reAuthToken)
+	return newSessionWithContext(d.config, config, d.router, d.pool, d.log, reAuthToken, &d.now)
 }
 
 func (d *driverWithContext) VerifyConnectivity(ctx context.Context) error {

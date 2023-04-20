@@ -24,6 +24,7 @@ import (
 	iauth "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/auth"
 	idb "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
 	"testing"
+	"time"
 
 	. "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/testutil"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/log"
@@ -55,6 +56,7 @@ func TestConnect(ot *testing.T) {
 			srv.closeConnection()
 		}()
 
+		timer := time.Now
 		_, err := Connect(
 			context.Background(),
 			"servername",
@@ -66,6 +68,7 @@ func TestConnect(ot *testing.T) {
 			logger,
 			nil,
 			idb.NotificationConfig{},
+			&timer,
 		)
 		AssertError(t, err)
 	})
@@ -81,6 +84,7 @@ func TestConnect(ot *testing.T) {
 			srv.acceptVersion(1, 0)
 		}()
 
+		timer := time.Now
 		boltconn, err := Connect(
 			context.Background(),
 			"servername",
@@ -92,6 +96,7 @@ func TestConnect(ot *testing.T) {
 			logger,
 			nil,
 			idb.NotificationConfig{},
+			&timer,
 		)
 		AssertError(t, err)
 		if boltconn != nil {

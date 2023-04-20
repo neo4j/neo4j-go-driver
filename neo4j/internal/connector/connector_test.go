@@ -41,10 +41,12 @@ func TestConnect(outer *testing.T) {
 			server.acceptVersion(1, 0)
 		}()
 		connectionDelegate := &ConnDelegate{Delegate: clientConnection}
+		timer := time.Now
 		connector := &connector.Connector{
 			SupplyConnection: supplyThis(connectionDelegate),
 			SkipEncryption:   true,
 			Config:           &config.Config{},
+			Now:              &timer,
 		}
 
 		connection, err := connector.Connect(ctx, "irrelevant", nil, nil, nil)
@@ -60,10 +62,12 @@ func TestConnect(outer *testing.T) {
 			server.failAcceptingVersion()
 		}()
 		connectionDelegate := &ConnDelegate{Delegate: clientConnection}
+		timer := time.Now
 		connector := &connector.Connector{
 			SupplyConnection: supplyThis(connectionDelegate),
 			SkipEncryption:   true,
 			Config:           &config.Config{},
+			Now:              &timer,
 		}
 
 		connection, err := connector.Connect(ctx, "irrelevant", nil, nil, nil)

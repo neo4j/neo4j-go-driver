@@ -108,10 +108,18 @@ type bolt4 struct {
 	authManager   auth.TokenManager
 	resetAuth     bool
 	onNeo4jError  Neo4jErrorCallback
+	now           *func() time.Time
 }
 
-func NewBolt4(serverName string, conn net.Conn, callback Neo4jErrorCallback, logger log.Logger, boltLog log.BoltLogger) *bolt4 {
-	now := time.Now()
+func NewBolt4(
+	serverName string,
+	conn net.Conn,
+	callback Neo4jErrorCallback,
+	timer *func() time.Time,
+	logger log.Logger,
+	boltLog log.BoltLogger,
+) *bolt4 {
+	now := (*timer)()
 	b := &bolt4{
 		state:        bolt4_unauthorized,
 		conn:         conn,
@@ -122,6 +130,7 @@ func NewBolt4(serverName string, conn net.Conn, callback Neo4jErrorCallback, log
 		streams:      openstreams{},
 		lastQid:      -1,
 		onNeo4jError: callback,
+		now: 		  timer,
 	}
 	b.queue = newMessageQueue(
 		conn,
@@ -1122,7 +1131,7 @@ func (b *bolt4) expectedSuccessHandler(onSuccess func(*success)) responseHandler
 }
 
 func (b *bolt4) onNextMessage() {
-	b.idleDate = time.Now()
+	b.idleDate = (*b.now)()
 }
 
 func (b *bolt4) onNextMessageError(err error) {

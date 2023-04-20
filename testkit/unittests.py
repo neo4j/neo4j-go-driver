@@ -23,7 +23,8 @@ if __name__ == "__main__":
     if os.environ.get("TEST_IN_TEAMCITY", False):
         cmd = cmd + ["-v", "-json"]
 
-    run(cmd + ["-buildvcs=false", "-short", "./..."])
+    path = os.path.join(".", "neo4j", "...")
+    run(cmd + ["-buildvcs=false", "-short", path])
 
     # Repeat racing tests
     run(cmd + ["-buildvcs=false", "-race", "-count", "50",

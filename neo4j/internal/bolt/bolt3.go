@@ -92,10 +92,18 @@ type bolt3 struct {
 	authManager   auth.TokenManager
 	resetAuth     bool
 	onNeo4jError  Neo4jErrorCallback
+	now           *func() time.Time
 }
 
-func NewBolt3(serverName string, conn net.Conn, callback Neo4jErrorCallback, logger log.Logger, boltLog log.BoltLogger) *bolt3 {
-	now := time.Now()
+func NewBolt3(
+	serverName string,
+	conn net.Conn,
+	callback Neo4jErrorCallback,
+	timer *func() time.Time,
+	logger log.Logger,
+	boltLog log.BoltLogger,
+) *bolt3 {
+	now := (*timer)()
 	b := &bolt3{
 		state:      bolt3_unauthorized,
 		conn:       conn,
@@ -112,6 +120,7 @@ func NewBolt3(serverName string, conn net.Conn, callback Neo4jErrorCallback, log
 		idleDate:     now,
 		log:          logger,
 		onNeo4jError: callback,
+		now:          timer,
 	}
 	b.out = &outgoing{
 		chunker: newChunker(),
@@ -148,7 +157,7 @@ func (b *bolt3) receiveMsg(ctx context.Context) any {
 		b.state = bolt3_dead
 		return nil
 	}
-	b.idleDate = time.Now()
+	b.idleDate = (*b.now)()
 	return msg
 }
 

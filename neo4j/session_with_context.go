@@ -192,6 +192,7 @@ type sessionWithContext struct {
 	explicitTx    *explicitTransaction
 	autocommitTx  *autocommitTransaction
 	sleep         func(d time.Duration)
+	now           *func() time.Time
 	logId         string
 	log           log.Logger
 	throttleTime  time.Duration
@@ -200,7 +201,15 @@ type sessionWithContext struct {
 	auth          *idb.ReAuthToken
 }
 
-func newSessionWithContext(config *Config, sessConfig SessionConfig, router sessionRouter, pool sessionPool, logger log.Logger, token *idb.ReAuthToken) *sessionWithContext {
+func newSessionWithContext(
+	config *Config,
+	sessConfig SessionConfig,
+	router sessionRouter,
+	pool sessionPool,
+	logger log.Logger,
+	token *idb.ReAuthToken,
+	now *func() time.Time,
+) *sessionWithContext {
 	logId := log.NewId()
 	logger.Debugf(log.Session, logId, "Created with context")
 
@@ -218,6 +227,7 @@ func newSessionWithContext(config *Config, sessConfig SessionConfig, router sess
 		config:        sessConfig,
 		resolveHomeDb: sessConfig.DatabaseName == "",
 		sleep:         time.Sleep,
+		now:           now,
 		log:           logger,
 		logId:         logId,
 		throttleTime:  time.Second * 1,
@@ -367,7 +377,7 @@ func (s *sessionWithContext) runRetriable(
 		Log:                     s.log,
 		LogName:                 log.Session,
 		LogId:                   s.logId,
-		Now:                     s.pool.Now,
+		Now:                     s.now,
 		Sleep:                   s.sleep,
 		Throttle:                retry.Throttler(s.throttleTime),
 		MaxDeadConnections:      s.driverConfig.MaxConnectionPoolSize,

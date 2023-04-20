@@ -59,7 +59,7 @@ type Pool struct {
 	serversMut racing.Mutex
 	queueMut   racing.Mutex
 	queue      list.List
-	now        func() time.Time
+	now        *func() time.Time
 	closed     bool
 	log        log.Logger
 	logId      string
@@ -70,7 +70,7 @@ type serverPenalty struct {
 	penalty uint32
 }
 
-func New(config *config.Config, connect Connect, logger log.Logger, logId string) *Pool {
+func New(config *config.Config, connect Connect, logger log.Logger, logId string, now *func() time.Time) *Pool {
 	// Means infinite life, simplifies checking later on
 
 	p := &Pool{
@@ -79,7 +79,7 @@ func New(config *config.Config, connect Connect, logger log.Logger, logId string
 		servers:    make(map[string]*server),
 		serversMut: racing.NewMutex(),
 		queueMut:   racing.NewMutex(),
-		now:        time.Now,
+		now:        now,
 		logId:      logId,
 		log:        logger,
 	}
@@ -155,7 +155,7 @@ func (p *Pool) CleanUp(ctx context.Context) error {
 		return fmt.Errorf("could not acquire server lock in time when cleaning up pool")
 	}
 	defer p.serversMut.Unlock()
-	now := p.now()
+	now := (*p.now)()
 	for n, s := range p.servers {
 		s.removeIdleOlderThan(ctx, now, p.config.MaxConnectionLifetime)
 		if s.size() == 0 && !s.hasFailedConnect(now) {
@@ -166,7 +166,7 @@ func (p *Pool) CleanUp(ctx context.Context) error {
 }
 
 func (p *Pool) Now() time.Time {
-	return p.now()
+	return (*p.now)()
 }
 
 func (p *Pool) getPenaltiesForServers(ctx context.Context, serverNames []string) ([]serverPenalty, error) {
@@ -177,7 +177,7 @@ func (p *Pool) getPenaltiesForServers(ctx context.Context, serverNames []string)
 
 	// Retrieve penalty for each server
 	penalties := make([]serverPenalty, len(serverNames))
-	now := p.now()
+	now := (*p.now)()
 	for i, n := range serverNames {
 		s := p.servers[n]
 		penalties[i].name = n
@@ -381,7 +381,7 @@ func (p *Pool) tryBorrow(ctx context.Context, serverName string, boltLogger log.
 		// - FeatureNotSupportedError(session auth)
 		// - general auth errors (LOGON or HELLO)
 		// Failed to connect, keep track that it was bad for a while
-		srv.notifyFailedConnect(p.now())
+		srv.notifyFailedConnect((*p.now)())
 		p.serversMut.Unlock()
 		p.log.Warnf(log.Pool, p.logId, "Failed to connect to %s: %s", serverName, err)
 		return nil, err
@@ -450,7 +450,7 @@ func (p *Pool) Return(ctx context.Context, c idb.Connection) error {
 	// If the connection is dead, remove all other idle connections on the same server that older
 	// or of the same age as the dead connection, otherwise perform normal cleanup of old connections
 	maxAge := p.config.MaxConnectionLifetime
-	now := p.now()
+	now := (*p.now)()
 	age := now.Sub(c.Birthdate())
 	if !isAlive {
 		// Since this connection has died all other connections that connected before this one

@@ -61,6 +61,19 @@ type backend struct {
 	suppliedBookmarks       map[string]neo4j.Bookmarks
 	consumedBookmarks       map[string]struct{}
 	bookmarkManagers        map[string]neo4j.BookmarkManager
+	timer                   *Timer
+}
+
+type Timer struct {
+	now time.Time
+}
+
+func (t *Timer) Now() time.Time {
+	return t.now
+}
+
+func (t *Timer) Tick(duration time.Duration) {
+	t.now = t.now.Add(duration)
 }
 
 // To implement transactional functions a bit of extra state is needed on the
@@ -496,6 +509,9 @@ func (b *backend) handleRequest(req map[string]any) {
 			b.writeError(err)
 			return
 		}
+		if b.timer != nil {
+			neo4j.SetTimer(driver, b.timer.Now)
+		}
 		idKey := b.nextId()
 		b.drivers[idKey] = driver
 		b.writeResponse("Driver", map[string]any{"id": idKey})
@@ -861,6 +877,27 @@ func (b *backend) handleRequest(req map[string]any) {
 		}
 		b.writeResponse("Driver", map[string]any{"id": driverId})
 
+	case "FakeTimeInstall":
+		b.timer = &Timer{
+			now: time.Now(),
+		}
+		for _, driver := range b.drivers {
+			neo4j.SetTimer(driver, b.timer.Now)
+		}
+		b.writeResponse("FakeTimeAck", nil)
+
+	case "FakeTimeUninstall":
+		b.timer = nil
+		for _, driver := range b.drivers {
+			neo4j.ResetTime(driver)
+		}
+		b.writeResponse("FakeTimeAck", nil)
+
+	case "FakeTimeTick":
+		milliseconds := asInt64(data["increment_ms"].(json.Number))
+		b.timer.Tick(time.Duration(milliseconds) * time.Millisecond)
+		b.writeResponse("FakeTimeAck", nil)
+
 	case "VerifyAuthentication":
 		driverId := data["driverId"].(string)
 		var token *neo4j.AuthToken
@@ -979,6 +1016,7 @@ func (b *backend) handleRequest(req map[string]any) {
 		b.writeResponse("FeatureList", map[string]any{
 			"features": []string{
 				"AuthorizationExpiredTreatment",
+				"Backend:MockTime",
 				"ConfHint:connection.recv_timeout_seconds",
 				"Detail:ClosedDriverIsEncrypted",
 				"Feature:API:BookmarkManager",

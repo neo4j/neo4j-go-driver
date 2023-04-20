@@ -160,8 +160,9 @@ func TestState(outer *testing.T) {
 	for i, testCase := range testCases {
 		outer.Run(i, func(t *testing.T) {
 			now := baseTime
+			timer := func() time.Time { return now }
 			state := State{
-				Now:                     func() time.Time { return now },
+				Now:                     &timer,
 				Log:                     &log.Void{},
 				LogName:                 "TEST",
 				LogId:                   "State",

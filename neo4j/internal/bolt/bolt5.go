@@ -109,10 +109,18 @@ type bolt5 struct {
 	authManager   auth.TokenManager
 	resetAuth     bool
 	onNeo4jError  Neo4jErrorCallback
+	now           *func() time.Time
 }
 
-func NewBolt5(serverName string, conn net.Conn, callback Neo4jErrorCallback, logger log.Logger, boltLog log.BoltLogger) *bolt5 {
-	now := time.Now()
+func NewBolt5(
+	serverName string,
+	conn net.Conn,
+	callback Neo4jErrorCallback,
+	timer *func() time.Time,
+	logger log.Logger,
+	boltLog log.BoltLogger,
+) *bolt5 {
+	now := (*timer)()
 	b := &bolt5{
 		state:        bolt5Unauthorized,
 		conn:         conn,
@@ -123,6 +131,7 @@ func NewBolt5(serverName string, conn net.Conn, callback Neo4jErrorCallback, log
 		streams:      openstreams{},
 		lastQid:      -1,
 		onNeo4jError: callback,
+		now:          timer,
 	}
 	b.queue = newMessageQueue(
 		conn,
@@ -1097,7 +1106,7 @@ func (b *bolt5) onCommitSuccess(commitSuccess *success) {
 }
 
 func (b *bolt5) onNextMessage() {
-	b.idleDate = time.Now()
+	b.idleDate = (*b.now)()
 }
 
 func (b *bolt5) onNextMessageError(err error) {
