@@ -978,6 +978,7 @@ func (b *backend) handleRequest(req map[string]any) {
 	case "GetFeatures":
 		b.writeResponse("FeatureList", map[string]any{
 			"features": []string{
+				"AuthorizationExpiredTreatment",
 				"ConfHint:connection.recv_timeout_seconds",
 				"Detail:ClosedDriverIsEncrypted",
 				"Feature:API:BookmarkManager",
