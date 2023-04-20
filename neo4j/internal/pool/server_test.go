@@ -8,13 +8,13 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      https://www.apache.org/licenses/LICENSE-2.0
+ *     https://www.apache.org/licenses/LICENSE-2.0
  *
- *  Unless required by applicable law or agreed to in writing, software
- *  distributed under the License is distributed on an "AS IS" BASIS,
- *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *  See the License for the specific language governing permissions and
- *  limitations under the License.
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 
 package pool
@@ -22,7 +22,6 @@ package pool
 import (
 	"context"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
-	"math"
 	"testing"
 	"time"
 
@@ -76,13 +75,13 @@ func TestServer(ot *testing.T) {
 		c1 := &testutil.ConnFake{Alive: true}
 		registerIdle(s, c1)
 
-		c2, _, _ := s.getIdle(context.Background(), DefaultLivenessCheckThreshold, nil, nil)
+		c2 := s.getIdle()
 		assertConnection(t, c2)
-		c3, _, _ := s.getIdle(context.Background(), DefaultLivenessCheckThreshold, nil, nil)
+		c3 := s.getIdle()
 		assertNilConnection(t, c3)
 
 		s.returnBusy(c2)
-		c3, _, _ = s.getIdle(context.Background(), DefaultLivenessCheckThreshold, nil, nil)
+		c3 = s.getIdle()
 		assertConnection(t, c3)
 	})
 
@@ -102,13 +101,12 @@ func TestServer(ot *testing.T) {
 		s.removeIdleOlderThan(context.Background(), now, 10*time.Second)
 		assertSize(t, s, 2)
 
-		ctx := context.Background()
 		// Should be able to borrow twice
-		b1, _, _ := s.getIdle(ctx, DefaultLivenessCheckThreshold, nil, nil)
+		b1 := s.getIdle()
 		assertConnection(t, b1)
-		b2, _, _ := s.getIdle(ctx, DefaultLivenessCheckThreshold, nil, nil)
+		b2 := s.getIdle()
 		assertConnection(t, b2)
-		b3, _, _ := s.getIdle(ctx, DefaultLivenessCheckThreshold, nil, nil)
+		b3 := s.getIdle()
 		assertNilConnection(t, b3)
 
 		// Return the connections and let all of them be too old
@@ -119,7 +117,7 @@ func TestServer(ot *testing.T) {
 		s.removeIdleOlderThan(context.Background(), now, 10*time.Second)
 
 		// Shouldn't be able to borrow anything and size should be zero
-		b1, _, _ = s.getIdle(ctx, DefaultLivenessCheckThreshold, nil, nil)
+		b1 = s.getIdle()
 		assertNilConnection(t, b1)
 		assertSize(t, s, 0)
 	})
@@ -160,8 +158,7 @@ func TestServerPenalty(t *testing.T) {
 	assertPenaltiesGreaterThan(srv2, srv1, now)
 
 	// Get the connection from srv1 and return it, now srv1 should have higher penalty.
-	ctx := context.Background()
-	idle, _, _ := srv1.getIdle(ctx, DefaultLivenessCheckThreshold, nil, nil)
+	idle := srv1.getIdle()
 	testutil.AssertDeepEquals(t, idle, c11)
 	srv1.returnBusy(c11)
 	assertPenaltiesGreaterThan(srv1, srv2, now)
@@ -175,15 +172,15 @@ func TestServerPenalty(t *testing.T) {
 	// Both servers have two idle connections, srv2 was last used, so it should have higher penalty.
 	assertPenaltiesGreaterThan(srv2, srv1, now)
 	// Get both idle connections from srv1
-	srv1.getIdle(ctx, DefaultLivenessCheckThreshold, nil, nil)
-	srv1.getIdle(ctx, DefaultLivenessCheckThreshold, nil, nil)
+	srv1.getIdle()
+	srv1.getIdle()
 	// Get one idle connection from srv2
-	srv2.getIdle(ctx, DefaultLivenessCheckThreshold, nil, nil)
+	srv2.getIdle()
 	// Since more connections are in use on srv1, it should have higher penalty even though
 	// srv2 was last used
 	assertPenaltiesGreaterThan(srv1, srv2, now)
 	// Return the connections
-	srv2.getIdle(ctx, DefaultLivenessCheckThreshold, nil, nil)
+	srv2.getIdle()
 	srv2.returnBusy(c21)
 	srv2.returnBusy(c22)
 	srv1.returnBusy(c11)
@@ -198,8 +195,8 @@ func TestServerPenalty(t *testing.T) {
 	testutil.AssertTrue(t, srv1.hasFailedConnect(now))
 	testutil.AssertFalse(t, srv2.hasFailedConnect(now))
 	// Use srv2 to the max
-	srv2.getIdle(ctx, DefaultLivenessCheckThreshold, nil, nil)
-	srv2.getIdle(ctx, DefaultLivenessCheckThreshold, nil, nil)
+	srv2.getIdle()
+	srv2.getIdle()
 	// Even at this point we should prefer srv2
 	assertPenaltiesGreaterThan(srv1, srv2, now)
 
@@ -225,9 +222,8 @@ func TestIdlenessThreshold(outer *testing.T) {
 		srv := NewServer()
 		registerIdle(srv, connection)
 
-		idleConnection, _, found := srv.getIdle(context.Background(), math.MaxInt64, nil, nil)
+		idleConnection := srv.getIdle()
 
-		testutil.AssertTrue(t, found)
 		testutil.AssertFalse(t, resetCalled)
 		testutil.AssertDeepEquals(t, connection, idleConnection)
 		testutil.AssertIntEqual(t, srv.size(), 1)
@@ -247,9 +243,8 @@ func TestIdlenessThreshold(outer *testing.T) {
 		srv := NewServer()
 		registerIdle(srv, connection)
 
-		idleConnection, _, found := srv.getIdle(context.Background(), 1*time.Hour, nil, nil)
+		idleConnection := srv.getIdle()
 
-		testutil.AssertTrue(t, found)
 		testutil.AssertTrue(t, resetCalled)
 		testutil.AssertDeepEquals(t, connection, idleConnection)
 		testutil.AssertIntEqual(t, srv.size(), 1)
@@ -268,9 +263,8 @@ func TestIdlenessThreshold(outer *testing.T) {
 		srv := NewServer()
 		registerIdle(srv, connection)
 
-		idleConnection, _, found := srv.getIdle(context.Background(), 1*time.Hour, nil, nil)
+		idleConnection := srv.getIdle()
 
-		testutil.AssertTrue(t, found)
 		testutil.AssertNil(t, idleConnection)
 		testutil.AssertFalse(t, connection.IsAlive())
 		testutil.AssertIntEqual(t, srv.size(), 0)
