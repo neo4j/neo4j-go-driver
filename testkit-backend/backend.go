@@ -884,6 +884,9 @@ func (b *backend) handleRequest(req map[string]any) {
 		for _, driver := range b.drivers {
 			neo4j.SetTimer(driver, b.timer.Now)
 		}
+		for _, manager := range b.authTokenManagers {
+			auth.SetTimer(manager, b.timer.Now)
+		}
 		b.writeResponse("FakeTimeAck", nil)
 
 	case "FakeTimeUninstall":
@@ -891,10 +894,13 @@ func (b *backend) handleRequest(req map[string]any) {
 		for _, driver := range b.drivers {
 			neo4j.ResetTime(driver)
 		}
+		for _, manager := range b.authTokenManagers {
+			auth.ResetTime(manager)
+		}
 		b.writeResponse("FakeTimeAck", nil)
 
 	case "FakeTimeTick":
-		milliseconds := asInt64(data["increment_ms"].(json.Number))
+		milliseconds := asInt64(data["incrementMs"].(json.Number))
 		b.timer.Tick(time.Duration(milliseconds) * time.Millisecond)
 		b.writeResponse("FakeTimeAck", nil)
 
@@ -959,7 +965,6 @@ func (b *backend) handleRequest(req map[string]any) {
 		}
 		b.authTokenManagers[managerId] = manager
 		b.writeResponse("AuthTokenManager", map[string]any{"id": managerId})
-		// TODO
 	case "AuthTokenManagerGetAuthCompleted":
 		id := data["requestId"].(string)
 		token, err := getAuth(data["auth"].(map[string]any)["data"].(map[string]any))
@@ -973,7 +978,8 @@ func (b *backend) handleRequest(req map[string]any) {
 		b.resolvedOnTokenExpiries[id] = true
 	case "NewExpirationBasedAuthTokenManager":
 		managerId := b.nextId()
-		b.authTokenManagers[managerId] = auth.ExpirationBasedTokenManager(
+
+		manager := auth.ExpirationBasedTokenManager(
 			func(context.Context) (neo4j.AuthToken, *time.Time, error) {
 				id := b.nextId()
 				b.writeResponse(
@@ -990,6 +996,10 @@ func (b *backend) handleRequest(req map[string]any) {
 					}
 				}
 			})
+		if b.timer != nil {
+			auth.SetTimer(manager, b.timer.Now)
+		}
+		b.authTokenManagers[managerId] = manager
 		b.writeResponse("ExpirationBasedAuthTokenManager", map[string]any{"id": managerId})
 	case "ExpirationBasedAuthTokenProviderCompleted":
 		id := data["requestId"].(string)
@@ -1000,10 +1010,16 @@ func (b *backend) handleRequest(req map[string]any) {
 			return
 		}
 		var expiration *time.Time
+		var now func() time.Time
+		if b.timer != nil {
+			now = b.timer.Now
+		} else {
+			now = time.Now
+		}
 		expiresInRaw := expiringToken["expiresInMs"]
 		if expiresInRaw != nil {
 			expiresIn := time.Millisecond * time.Duration(asInt64(expiringToken["expiresInMs"].(json.Number)))
-			expirationTime := time.Now().Add(expiresIn)
+			expirationTime := now().Add(expiresIn)
 			expiration = &expirationTime
 		}
 		b.resolvedExpiringTokens[id] = AuthTokenAndExpiration{token, expiration}

@@ -39,6 +39,7 @@ type expirationBasedTokenManager struct {
 	token      *auth.Token
 	expiration *time.Time
 	mutex      racing.Mutex
+	now        *func() time.Time
 }
 
 func (m *expirationBasedTokenManager) GetAuthToken(ctx context.Context) (auth.Token, error) {
@@ -47,7 +48,7 @@ func (m *expirationBasedTokenManager) GetAuthToken(ctx context.Context) (auth.To
 			"could not acquire lock in time when getting token in ExpirationBasedTokenManager")
 	}
 	defer m.mutex.Unlock()
-	if m.token == nil || m.expiration != nil && time.Now().After(*m.expiration) {
+	if m.token == nil || m.expiration != nil && (*m.now)().After(*m.expiration) {
 		token, expiration, err := m.provider(ctx)
 		if err != nil {
 			return auth.Token{}, err
@@ -72,5 +73,6 @@ func (m *expirationBasedTokenManager) OnTokenExpired(ctx context.Context, token 
 
 // ExpirationBasedTokenManager TODO docs
 func ExpirationBasedTokenManager(provider authTokenWithExpirationProvider) TokenManager {
-	return &expirationBasedTokenManager{provider: provider, mutex: racing.NewMutex()}
+	now := time.Now
+	return &expirationBasedTokenManager{provider: provider, mutex: racing.NewMutex(), now: &now}
 }
