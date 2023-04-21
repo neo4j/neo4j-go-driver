@@ -35,6 +35,7 @@ import (
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/racing"
 	"math"
 	"sort"
+	"sync"
 	"time"
 
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/log"
@@ -196,6 +197,8 @@ func (p *Pool) tryAnyIdle(ctx context.Context, serverNames []string, idlenessThr
 	if !p.serversMut.TryLock(ctx) {
 		return nil, racing.LockTimeoutError("could not acquire server lock in time when getting idle connection")
 	}
+	var unlock = new(sync.Once)
+	defer unlock.Do(p.serversMut.Unlock)
 serverLoop:
 	for _, serverName := range serverNames {
 		for {
@@ -205,7 +208,7 @@ serverLoop:
 				if conn == nil {
 					continue serverLoop
 				}
-				p.serversMut.Unlock()
+				unlock.Do(p.serversMut.Unlock)
 				healthy, err := srv.healthCheck(ctx, conn, idlenessThreshold, auth, logger)
 				if healthy {
 					return conn, nil
@@ -220,10 +223,10 @@ serverLoop:
 				if !p.serversMut.TryLock(ctx) {
 					return nil, racing.LockTimeoutError("could not acquire lock in time when borrowing a connection")
 				}
+				*unlock = sync.Once{}
 			}
 		}
 	}
-	p.serversMut.Unlock()
 	return nil, nil
 }
 
@@ -331,6 +334,8 @@ func (p *Pool) tryBorrow(ctx context.Context, serverName string, boltLogger log.
 	if !p.serversMut.TryLock(ctx) {
 		return nil, racing.LockTimeoutError("could not acquire lock in time when borrowing a connection")
 	}
+	var unlock = new(sync.Once)
+	defer unlock.Do(p.serversMut.Unlock)
 
 	srv := p.servers[serverName]
 	for {
@@ -338,12 +343,11 @@ func (p *Pool) tryBorrow(ctx context.Context, serverName string, boltLogger log.
 			connection := srv.getIdle()
 			if connection == nil {
 				if srv.size() >= p.config.MaxConnectionPoolSize {
-					p.serversMut.Unlock()
 					return nil, &errorutil.PoolFull{Servers: []string{serverName}}
 				}
 				break
 			}
-			p.serversMut.Unlock()
+			unlock.Do(p.serversMut.Unlock)
 			healthy, err := srv.healthCheck(ctx, connection, idlenessThreshold, auth, boltLogger)
 			if healthy {
 				return connection, nil
@@ -358,6 +362,7 @@ func (p *Pool) tryBorrow(ctx context.Context, serverName string, boltLogger log.
 			if !p.serversMut.TryLock(ctx) {
 				return nil, racing.LockTimeoutError("could not acquire lock in time when borrowing a connection")
 			}
+			*unlock = sync.Once{}
 			srv = p.servers[serverName]
 		} else {
 			// Make sure that there is a server in the map
@@ -368,7 +373,7 @@ func (p *Pool) tryBorrow(ctx context.Context, serverName string, boltLogger log.
 	}
 
 	srv.reservations++
-	p.serversMut.Unlock()
+	unlock.Do(p.serversMut.Unlock)
 
 	// No idle connection, try to connect
 	p.log.Infof(log.Pool, p.logId, "Connecting to %s", serverName)
@@ -376,6 +381,7 @@ func (p *Pool) tryBorrow(ctx context.Context, serverName string, boltLogger log.
 	if !p.serversMut.TryLock(context.Background()) {
 		panic("lock with Background context should never time out")
 	}
+	*unlock = sync.Once{}
 	srv.reservations--
 	if err != nil {
 		// TODO: think about not penalizing the server for:
@@ -383,7 +389,6 @@ func (p *Pool) tryBorrow(ctx context.Context, serverName string, boltLogger log.
 		// - general auth errors (LOGON or HELLO)
 		// Failed to connect, keep track that it was bad for a while
 		srv.notifyFailedConnect((*p.now)())
-		p.serversMut.Unlock()
 		p.log.Warnf(log.Pool, p.logId, "Failed to connect to %s: %s", serverName, err)
 		return nil, err
 	}
@@ -391,7 +396,6 @@ func (p *Pool) tryBorrow(ctx context.Context, serverName string, boltLogger log.
 	// Ok, got a connection, register the connection
 	srv.registerBusy(c)
 	srv.notifySuccessfulConnect()
-	p.serversMut.Unlock()
 	return c, nil
 }
 
