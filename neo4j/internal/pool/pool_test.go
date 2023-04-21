@@ -253,6 +253,7 @@ func TestPoolBorrowReturn(outer *testing.T) {
 	})
 
 	outer.Run("Borrows new connection if resets of all long-idle connections fail", func(t *testing.T) {
+		serverName := "a server"
 		idlenessThreshold := 1 * time.Hour
 		idleness := time.Now().Add(-2 * idlenessThreshold)
 		deadAfterReset1 := deadConnectionAfterForceReset("deadAfterReset1", idleness)
@@ -263,12 +264,14 @@ func TestPoolBorrowReturn(outer *testing.T) {
 		timer := time.Now
 		conf := config.Config{MaxConnectionLifetime: maxAge, MaxConnectionPoolSize: 1}
 		pool := New(&conf, connectTo(healthyConnection), logger, "pool id", &timer)
-		setIdleConnections(pool, map[string][]db.Connection{"a server": {deadAfterReset1, deadAfterReset2}})
+		setIdleConnections(pool, map[string][]db.Connection{serverName: {deadAfterReset1, deadAfterReset2}})
 
-		result, err := pool.tryBorrow(ctx, "a server", nil, idlenessThreshold, reAuthToken)
+		result, err := pool.tryBorrow(ctx, serverName, nil, idlenessThreshold, reAuthToken)
 
 		testutil.AssertNil(t, err)
 		testutil.AssertDeepEquals(t, result, healthyConnection)
+		testutil.AssertIntEqual(t, pool.servers[serverName].numIdle(), 0)
+		testutil.AssertIntEqual(t, pool.servers[serverName].numBusy(), 1)
 	})
 }
 

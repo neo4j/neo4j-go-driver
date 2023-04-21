@@ -285,8 +285,6 @@ func TestIdlenessThreshold(outer *testing.T) {
 		testutil.AssertIntEqual(t, srv.size(), 1)
 		testutil.AssertIntEqual(t, srv.numIdle(), 0)
 		testutil.AssertIntEqual(t, srv.numBusy(), 1)
-		// TODO: add a unit tests that makes sure all functions using srv.healthCheck
-		//       properly unregister unhealthy connections
 	})
 }
 
