@@ -158,7 +158,9 @@ func TestServerPenalty(t *testing.T) {
 	assertPenaltiesGreaterThan(srv2, srv1, now)
 
 	// Get the connection from srv1 and return it, now srv1 should have higher penalty.
+	ctx := context.Background()
 	idle := srv1.getIdle()
+	_, _ = srv1.healthCheck(ctx, idle, DefaultLivenessCheckThreshold, nil, nil)
 	testutil.AssertDeepEquals(t, idle, c11)
 	srv1.returnBusy(c11)
 	assertPenaltiesGreaterThan(srv1, srv2, now)
@@ -172,15 +174,19 @@ func TestServerPenalty(t *testing.T) {
 	// Both servers have two idle connections, srv2 was last used, so it should have higher penalty.
 	assertPenaltiesGreaterThan(srv2, srv1, now)
 	// Get both idle connections from srv1
-	srv1.getIdle()
-	srv1.getIdle()
+	idle = srv1.getIdle()
+	_, _ = srv1.healthCheck(ctx, idle, DefaultLivenessCheckThreshold, nil, nil)
+	idle = srv1.getIdle()
+	_, _ = srv1.healthCheck(ctx, idle, DefaultLivenessCheckThreshold, nil, nil)
 	// Get one idle connection from srv2
-	srv2.getIdle()
+	idle = srv2.getIdle()
+	_, _ = srv2.healthCheck(ctx, idle, DefaultLivenessCheckThreshold, nil, nil)
 	// Since more connections are in use on srv1, it should have higher penalty even though
 	// srv2 was last used
 	assertPenaltiesGreaterThan(srv1, srv2, now)
 	// Return the connections
-	srv2.getIdle()
+	idle = srv2.getIdle()
+	_, _ = srv2.healthCheck(ctx, idle, DefaultLivenessCheckThreshold, nil, nil)
 	srv2.returnBusy(c21)
 	srv2.returnBusy(c22)
 	srv1.returnBusy(c11)
@@ -195,8 +201,10 @@ func TestServerPenalty(t *testing.T) {
 	testutil.AssertTrue(t, srv1.hasFailedConnect(now))
 	testutil.AssertFalse(t, srv2.hasFailedConnect(now))
 	// Use srv2 to the max
-	srv2.getIdle()
-	srv2.getIdle()
+	idle = srv2.getIdle()
+	_, _ = srv2.healthCheck(ctx, idle, DefaultLivenessCheckThreshold, nil, nil)
+	idle = srv2.getIdle()
+	_, _ = srv2.healthCheck(ctx, idle, DefaultLivenessCheckThreshold, nil, nil)
 	// Even at this point we should prefer srv2
 	assertPenaltiesGreaterThan(srv1, srv2, now)
 
@@ -244,7 +252,11 @@ func TestIdlenessThreshold(outer *testing.T) {
 		registerIdle(srv, connection)
 
 		idleConnection := srv.getIdle()
+		testutil.AssertNotNil(t, idleConnection)
+		healthy, err := srv.healthCheck(context.Background(), idleConnection, 1*time.Hour, nil, nil)
 
+		testutil.AssertNil(t, err)
+		testutil.AssertTrue(t, healthy)
 		testutil.AssertTrue(t, resetCalled)
 		testutil.AssertDeepEquals(t, connection, idleConnection)
 		testutil.AssertIntEqual(t, srv.size(), 1)
@@ -264,12 +276,17 @@ func TestIdlenessThreshold(outer *testing.T) {
 		registerIdle(srv, connection)
 
 		idleConnection := srv.getIdle()
+		testutil.AssertNotNil(t, idleConnection)
+		healthy, err := srv.healthCheck(context.Background(), idleConnection, 1*time.Hour, nil, nil)
 
-		testutil.AssertNil(t, idleConnection)
+		testutil.AssertNil(t, err)
+		testutil.AssertFalse(t, healthy)
 		testutil.AssertFalse(t, connection.IsAlive())
-		testutil.AssertIntEqual(t, srv.size(), 0)
+		testutil.AssertIntEqual(t, srv.size(), 1)
 		testutil.AssertIntEqual(t, srv.numIdle(), 0)
-		testutil.AssertIntEqual(t, srv.numBusy(), 0)
+		testutil.AssertIntEqual(t, srv.numBusy(), 1)
+		// TODO: add a unit tests that makes sure all functions using srv.healthCheck
+		//       properly unregister unhealthy connections
 	})
 }
 

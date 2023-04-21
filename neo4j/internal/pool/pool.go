@@ -223,6 +223,7 @@ serverLoop:
 			}
 		}
 	}
+	p.serversMut.Unlock()
 	return nil, nil
 }
 

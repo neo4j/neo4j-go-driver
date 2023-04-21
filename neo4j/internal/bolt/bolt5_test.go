@@ -396,7 +396,7 @@ func TestBolt5(outer *testing.T) {
 			idb.NotificationConfig{},
 			&timer,
 		)
-		AssertNotNil(t, bolt)
+		AssertNil(t, bolt)
 		AssertError(t, err)
 		dbErr, isDbErr := err.(*db.Neo4jError)
 		if !isDbErr {
@@ -433,7 +433,7 @@ func TestBolt5(outer *testing.T) {
 			idb.NotificationConfig{},
 			&timer,
 		)
-		AssertNotNil(t, bolt)
+		AssertNil(t, bolt)
 		AssertError(t, err)
 		dbErr, isDbErr := err.(*db.Neo4jError)
 		if !isDbErr {

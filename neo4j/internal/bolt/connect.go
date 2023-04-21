@@ -104,7 +104,7 @@ func Connect(ctx context.Context,
 	}
 	if err = boltConn.Connect(ctx, int(minor), auth, userAgent, routingContext, notificationConfig); err != nil {
 		boltConn.Close(ctx)
-		return boltConn, err
+		return nil, err
 	}
 	return boltConn, nil
 }
