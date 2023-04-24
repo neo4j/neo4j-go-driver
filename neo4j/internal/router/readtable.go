@@ -67,6 +67,9 @@ func readTable(
 		if err == nil {
 			return table, nil
 		}
+		if errorutil.IsFatalDuringDiscovery(err) {
+			return nil, err
+		}
 		err = wrapError(router, err)
 	}
 	return nil, err

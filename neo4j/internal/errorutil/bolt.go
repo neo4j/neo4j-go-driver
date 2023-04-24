@@ -106,5 +106,9 @@ func IsFatalDuringDiscovery(err error) bool {
 			return true
 		}
 	}
+	if err == context.DeadlineExceeded ||
+		err == context.Canceled {
+		return true
+	}
 	return false
 }

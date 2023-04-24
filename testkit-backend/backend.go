@@ -879,7 +879,7 @@ func (b *backend) handleRequest(req map[string]any) {
 
 	case "FakeTimeInstall":
 		b.timer = &Timer{
-			now: time.Now(),
+			now: time.Unix(0, 0),
 		}
 		for _, driver := range b.drivers {
 			neo4j.SetTimer(driver, b.timer.Now)

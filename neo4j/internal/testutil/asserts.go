@@ -203,6 +203,16 @@ func AssertIntEqual(t *testing.T, ai, ei int) {
 	}
 }
 
+func AssertBoolEqual(t *testing.T, ai, ei bool) {
+	t.Helper()
+	if ai != ei {
+		t.Errorf("%t != %t", ai, ei)
+	}
+	if !reflect.DeepEqual(ai, ei) {
+		t.Errorf("Differs %+v vs %+v", ai, ei)
+	}
+}
+
 func AssertSameType(t *testing.T, x, y any) {
 	t.Helper()
 	t1 := reflect.TypeOf(x)

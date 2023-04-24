@@ -8,13 +8,13 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      https://www.apache.org/licenses/LICENSE-2.0
+ *     https://www.apache.org/licenses/LICENSE-2.0
  *
- *  Unless required by applicable law or agreed to in writing, software
- *  distributed under the License is distributed on an "AS IS" BASIS,
- *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *  See the License for the specific language governing permissions and
- *  limitations under the License.
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 
 package router
@@ -99,11 +99,19 @@ func (r *Router) readTable(
 		r.log.Infof(log.Router, r.logId, "Reading routing table for '%s' from previously known routers: %v", database, routers)
 		table, err = readTable(ctx, r.pool, routers, r.routerContext, bookmarks, database, impersonatedUser, auth, boltLogger)
 	}
+	if errorutil.IsFatalDuringDiscovery(err) {
+		r.log.Error(log.Router, r.logId, err)
+		return nil, err
+	}
 
 	// Try initial router if no routers or failed
 	if table == nil {
 		r.log.Infof(log.Router, r.logId, "Reading routing table from initial router: %s", r.rootRouter)
 		table, err = readTable(ctx, r.pool, []string{r.rootRouter}, r.routerContext, bookmarks, database, impersonatedUser, auth, boltLogger)
+	}
+	if errorutil.IsFatalDuringDiscovery(err) {
+		r.log.Error(log.Router, r.logId, err)
+		return nil, err
 	}
 
 	// Use hook to retrieve possibly different set of routers and retry
@@ -111,6 +119,10 @@ func (r *Router) readTable(
 		routers := r.getRouters()
 		r.log.Infof(log.Router, r.logId, "Reading routing table for '%s' from custom routers: %v", routers)
 		table, err = readTable(ctx, r.pool, routers, r.routerContext, bookmarks, database, impersonatedUser, auth, boltLogger)
+	}
+	if errorutil.IsFatalDuringDiscovery(err) {
+		r.log.Error(log.Router, r.logId, err)
+		return nil, err
 	}
 
 	if err != nil {

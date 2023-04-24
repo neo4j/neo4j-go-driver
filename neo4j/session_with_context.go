@@ -676,7 +676,7 @@ func (s *sessionWithContext) verifyAuthentication(ctx context.Context) error {
 		s.driverConfig.ConnectionAcquisitionTimeout != 0,
 		s.config.BoltLogger,
 		0,
-		s.auth) // TODO: force re-auth (and wait for result)
+		s.auth)
 	if err != nil {
 		return errorutil.WrapError(err)
 	}

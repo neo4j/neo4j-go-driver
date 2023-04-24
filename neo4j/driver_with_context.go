@@ -277,7 +277,6 @@ type sessionRouter interface {
 	// GetNameOfDefaultDatabase returns the name of the default database for the specified user.
 	// The correct database name is needed when requesting readers or writers.
 	// the bookmarks are eagerly provided since this method always fetches a new routing table
-	// TODO: update docs
 	GetNameOfDefaultDatabase(ctx context.Context, bookmarks []string, user string, auth *idb.ReAuthToken, boltLogger log.BoltLogger) (string, error)
 	Invalidate(ctx context.Context, database string) error
 	CleanUp(ctx context.Context) error
@@ -299,7 +298,7 @@ type driverWithContext struct {
 	// instance of the bookmark manager only used by default by managed sessions of ExecuteQuery
 	// this is *not* used by default by user-created session (see NewSession)
 	executeQueryBookmarkManager BookmarkManager
-	now                                func() time.Time
+	now                         func() time.Time
 }
 
 func (d *driverWithContext) Target() url.URL {
