@@ -151,7 +151,7 @@ func NewDriverWithContext(target string, auth auth.TokenManager, configurers ...
 		return nil, err
 	}
 
-	d := driverWithContext{target: parsed, mut: racing.NewMutex(), now: time.Now}
+	d := driverWithContext{target: parsed, mut: racing.NewMutex(), now: time.Now, auth: auth}
 
 	routing := true
 	d.connector.Network = "tcp"
@@ -224,7 +224,6 @@ func NewDriverWithContext(target string, auth auth.TokenManager, configurers ...
 	}
 
 	d.connector.Log = d.log
-	d.connector.Auth = auth
 	d.connector.RoutingContext = routingContext
 	d.connector.Config = d.config
 	d.connector.Now = &d.now
@@ -323,6 +322,7 @@ type driverWithContext struct {
 	// instance of the bookmark manager only used by default by managed sessions of ExecuteQuery
 	// this is *not* used by default by user-created session (see NewSession)
 	executeQueryBookmarkManager BookmarkManager
+	auth                        auth.TokenManager
 	now                         func() time.Time
 }
 
@@ -338,8 +338,7 @@ func (d *driverWithContext) NewSession(ctx context.Context, config SessionConfig
 	var reAuthToken *idb.ReAuthToken
 	if config.Auth == nil {
 		reAuthToken = &idb.ReAuthToken{
-			// TODO: move Auth field to driverWithContext struct
-			Manager:     d.connector.Auth,
+			Manager:     d.auth,
 			FromSession: false,
 			ForceReAuth: config.forceReAuth,
 		}

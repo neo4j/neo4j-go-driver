@@ -24,7 +24,6 @@ import (
 	"context"
 	"crypto/tls"
 	"errors"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/auth"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/config"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/errorutil"
@@ -39,7 +38,6 @@ import (
 type Connector struct {
 	SkipEncryption   bool
 	SkipVerify       bool
-	Auth             auth.TokenManager
 	Log              log.Logger
 	RoutingContext   map[string]string
 	Network          string
