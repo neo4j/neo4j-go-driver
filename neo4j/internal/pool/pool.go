@@ -384,11 +384,10 @@ func (p *Pool) tryBorrow(ctx context.Context, serverName string, boltLogger log.
 	*unlock = sync.Once{}
 	srv.reservations--
 	if err != nil {
-		// TODO: think about not penalizing the server for:
-		// - FeatureNotSupportedError(session auth)
-		// - general auth errors (LOGON or HELLO)
-		// Failed to connect, keep track that it was bad for a while
-		srv.notifyFailedConnect((*p.now)())
+		// FeatureNotSupportedError is not the server fault, don't penalize it
+		if _, ok := err.(*db.FeatureNotSupportedError); !ok {
+			srv.notifyFailedConnect((*p.now)())
+		}
 		p.log.Warnf(log.Pool, p.logId, "Failed to connect to %s: %s", serverName, err)
 		return nil, err
 	}
