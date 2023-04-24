@@ -73,8 +73,21 @@ type DriverWithContext interface {
 	// or error describing the problem.
 	// Contexts terminating too early negatively affect connection pooling and degrade the driver performance.
 	VerifyConnectivity(ctx context.Context) error
-	// VerifyAuthentication TODO docs
-	// nil: use driver's auth token
+	// VerifyAuthentication verifies that the authentication information is valid.
+	//
+	// It's much like `DriverWithContext.VerifyConnectivity`, but for checking authentication.
+	//
+	// Passing `nil` as `auth` will use the authentication information that was used to create the driver.
+	//
+	// Tries to establish a working read connection to the remote server or a member of a cluster and exchange some data.
+	// In a cluster, there is no guarantee about which server will be contacted.
+	// If the data exchange is successful, the authentication information is valid no error is returned.
+	// Otherwise, the error will be matched against a list of known authentication errors.
+	// If the error is on that list, an `neo4j.InvalidAuthenticationError` is returned.
+	// Otherwise, the original error is returned.
+	//
+	// VerifyAuthentication is part of the re-authentication preview feature
+	// (see README on what it means in terms of support and compatibility guarantees)
 	VerifyAuthentication(ctx context.Context, auth *AuthToken) error
 	// Close the driver and all underlying connections
 	Close(ctx context.Context) error
@@ -101,8 +114,8 @@ type ResultTransformer[T any] interface {
 }
 
 // NewDriverWithContext is the entry point to the neo4j driver to create an instance of a Driver. It is the first function to
-// be called in order to establish a connection to a neo4j database. It requires a Bolt URI and an authentication
-// token as parameters and can also take optional configuration function(s) as variadic parameters.
+// be called in order to establish a connection to a neo4j database. It requires a Bolt URI and authentication
+// as parameters and can also take optional configuration function(s) as variadic parameters.
 //
 // In order to connect to a single instance database, you need to pass a URI with scheme 'bolt', 'bolt+s' or 'bolt+ssc'.
 //
@@ -119,7 +132,19 @@ type ResultTransformer[T any] interface {
 //		config.MaxConnectionPoolSize = 10
 //	})
 //
-// TODO: docs for auth (+ nil == NoAuth)
+// The authentication can be nil, in which case the driver will not authenticate with the server.
+// Else, an implementation of `auth.TokenManager` is required.
+// The `neo4j` package provides default implementations of `auth.TokenManager` for common authentication schemes:
+//   - `neo4j.NoAuth` (equivalent to `nil`)
+//   - `neo4j.BasicAuth`
+//   - `neo4j.KerberosAuth`
+//   - `neo4j.BearerAuth`
+//   - `neo4j.CustomAuth`
+//
+// `TokenManager` is part of the re-authentication preview feature
+// (see README on what it means in terms of support and compatibility guarantees).
+// The pre-defined auth mechanisms listed above however are guaranteed to be supported
+// as `auth` argument to this function.
 func NewDriverWithContext(target string, auth auth.TokenManager, configurers ...func(*Config)) (DriverWithContext, error) {
 	parsed, err := url.Parse(target)
 	if err != nil {

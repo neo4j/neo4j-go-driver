@@ -152,7 +152,12 @@ type Connection interface {
 	GetRoutingTable(ctx context.Context, context map[string]string, bookmarks []string, database, impersonatedUser string) (*RoutingTable, error)
 	// SetBoltLogger sets Bolt message logger on already initialized connections
 	SetBoltLogger(boltLogger log.BoltLogger)
-	// ReAuth TODO: docs
+	// ReAuth enqueues a `LOGOFF` and `LOGON` message if the passed credentials differ
+	// or `ReAuthToken.ForceReAuth` is `true`.
+	// If `ReAuthToken.ForceReAuth` is `true` the messages will be sent and their responses received.
+	// If `ReAuthToken.FromSession` is `false`, the credentials changed, and the protocol version does not support
+	// re-auth (bolt 5.1 and earlier) the connection will be closed.
+	// If it's `true` (under otherwise same conditions) a `FeatureNotSupportedError` will be returned.
 	ReAuth(context.Context, *ReAuthToken) error
 	// Version returns the protocol version of the connection
 	Version() db.ProtocolVersion

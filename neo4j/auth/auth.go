@@ -27,6 +27,22 @@ import (
 	"time"
 )
 
+// TokenManager is an interface for components that can provide auth tokens.
+// The `neo4j` package provides default implementations of `auth.TokenManager` for common authentication schemes.
+// See `neo4j.NewDriverWithContext`.
+// Custom implementations of this class can be used to provide more complex authentication refresh functionality.
+//
+// WARNING:
+//
+//	The manager *must not* interact with the driver in any way as this can cause deadlocks and undefined behaviour.
+//
+//	Furthermore, the manager is expected to be thread-safe.
+//
+//	The token returned must always belong to the same identity.
+//	Switching identities using the `TokenManager` is undefined behavior.
+//
+// TokenManager is part of the re-authentication preview feature
+// (see README on what it means in terms of support and compatibility guarantees)
 type TokenManager interface {
 	GetAuthToken(ctx context.Context) (auth.Token, error)
 	OnTokenExpired(context.Context, auth.Token) error
@@ -71,7 +87,21 @@ func (m *expirationBasedTokenManager) OnTokenExpired(ctx context.Context, token 
 	return nil
 }
 
-// ExpirationBasedTokenManager TODO docs
+// ExpirationBasedTokenManager creates a token manager for potentially expiring auth info.
+//
+// The first and only argument is a provider function that returns auth information and an optional expiration time.
+// If the expiration time is nil, the auth info is assumed to never expire.
+//
+// WARNING:
+//
+//	The provider function *must not* interact with the driver in any way as this can cause deadlocks and undefined
+//	behaviour.
+//
+//	The provider function only ever return auth information belonging to the same identity.
+//	Switching identities is undefined behavior.
+//
+// ExpirationBasedTokenManager is part of the re-authentication preview feature
+// (see README on what it means in terms of support and compatibility guarantees)
 func ExpirationBasedTokenManager(provider authTokenWithExpirationProvider) TokenManager {
 	now := time.Now
 	return &expirationBasedTokenManager{provider: provider, mutex: racing.NewMutex(), now: &now}

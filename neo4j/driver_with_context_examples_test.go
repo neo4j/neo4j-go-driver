@@ -21,6 +21,7 @@ package neo4j
 
 import (
 	"context"
+	"errors"
 	"fmt"
 )
 
@@ -47,7 +48,7 @@ func ExampleExecuteQuery() {
 	fmt.Printf("Hit database is: %s\n", summary.Database().Name())
 }
 
-func ExampleExecuteQuery_self_causal_consistency() {
+func ExampleExecuteQuery_selfCausalConsistency() {
 	query := "CREATE (n:Example)"
 	params := map[string]any{"value": 42}
 	_, err := ExecuteQuery[*EagerResult](
@@ -73,7 +74,7 @@ func ExampleExecuteQuery_self_causal_consistency() {
 	}
 }
 
-func ExampleExecuteQuery_default_bookmark_manager_explicit_reuse() {
+func ExampleExecuteQuery_defaultBookmarkManagerExplicitReuse() {
 	query := "CREATE (n:Example)"
 	params := map[string]any{"value": 42}
 	_, err := ExecuteQuery[*EagerResult](
@@ -102,6 +103,41 @@ func ExampleExecuteQuery_default_bookmark_manager_explicit_reuse() {
 	})
 	handleError(err)
 	fmt.Println(count)
+}
+
+func ExampleDriverWithContext_verifyAuthentication() {
+	driver, err := NewDriverWithContext(getUrl(), NoAuth())
+	handleError(err)
+	someToken := BasicAuth("neo4j", "password", "")
+	// verify `someToken` is valid
+	err = driver.VerifyAuthentication(context.Background(), &someToken)
+	if err == nil {
+		return // authentication is valid
+	}
+	var invalidAuth *InvalidAuthenticationError
+	if errors.As(err, &invalidAuth) {
+		// handle the issue
+		panic("authentication is invalid")
+	}
+	// some other error occurred
+	handleError(err)
+}
+
+func ExampleDriverWithContext_verifyAuthenticationDriverLevel() {
+	driver, err := NewDriverWithContext(getUrl(), NoAuth())
+	handleError(err)
+	// verify `NoAuth()` configured at driver creation is valid
+	err = driver.VerifyAuthentication(context.Background(), nil)
+	if err == nil {
+		return // authentication is valid
+	}
+	var invalidAuth *InvalidAuthenticationError
+	if errors.As(err, &invalidAuth) {
+		// handle the issue
+		panic("authentication is invalid")
+	}
+	// some other error occurred
+	handleError(err)
 }
 
 func handleError(err error) {

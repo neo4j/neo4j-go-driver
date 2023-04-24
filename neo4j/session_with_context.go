@@ -162,7 +162,18 @@ type SessionConfig struct {
 	// By default, the driver's settings are used.
 	// Else, this option overrides the driver's settings.
 	NotificationsDisabledCategories notifications.NotificationDisabledCategories
-	// Auth TODO: docs
+	// Auth is used to overwrite the authentication information for the session.
+	// This requires the server to support re-authentication on the protocol level.
+	// `nil` will make the driver use the authentication information from the driver configuration.
+	// The `neo4j` package provides factory functions for common authentication schemes:
+	//   - `neo4j.NoAuth`
+	//   - `neo4j.BasicAuth`
+	//   - `neo4j.KerberosAuth`
+	//   - `neo4j.BearerAuth`
+	//   - `neo4j.CustomAuth`
+	//
+	// Session auth is part of the re-authentication preview feature
+	// (see README on what it means in terms of support and compatibility guarantees).
 	Auth *AuthToken
 
 	forceReAuth bool
