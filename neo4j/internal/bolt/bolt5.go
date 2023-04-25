@@ -238,8 +238,6 @@ func (b *bolt5) Connect(
 	b.auth = token.Tokens
 	b.authManager = auth.Manager
 
-	b.minor = minor
-
 	hello := map[string]any{
 		"user_agent": userAgent,
 	}

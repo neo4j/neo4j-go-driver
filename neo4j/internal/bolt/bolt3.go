@@ -212,8 +212,6 @@ func (b *bolt3) Connect(
 		return err
 	}
 
-	b.minor = minor
-
 	hello := map[string]any{
 		"user_agent": userAgent,
 	}

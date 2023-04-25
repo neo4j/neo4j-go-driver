@@ -130,7 +130,7 @@ func NewBolt4(
 		streams:      openstreams{},
 		lastQid:      -1,
 		onNeo4jError: callback,
-		now: 		  timer,
+		now:          timer,
 	}
 	b.queue = newMessageQueue(
 		conn,
@@ -229,8 +229,6 @@ func (b *bolt4) Connect(
 	if err := checkReAuth(auth, b); err != nil {
 		return err
 	}
-
-	b.minor = minor
 
 	// Prepare hello message
 	hello := map[string]any{
