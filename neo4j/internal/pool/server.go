@@ -36,7 +36,7 @@ type server struct {
 	busy            list.List
 	reservations    int
 	failedConnectAt time.Time
-	roundRobin      uint32
+	roundRobin      atomic.Uint32
 }
 
 func NewServer() *server {
@@ -46,7 +46,7 @@ func NewServer() *server {
 	}
 }
 
-var sharedRoundRobin uint32
+var sharedRoundRobin atomic.Uint32
 
 const rememberFailedConnectDuration = 3 * time.Minute
 
@@ -86,7 +86,7 @@ func (s *server) healthCheck(
 	}
 	// Update round-robin counter every time we give away a connection and keep track
 	// of our own round-robin index
-	s.roundRobin = atomic.AddUint32(&sharedRoundRobin, 1)
+	s.roundRobin.Store(sharedRoundRobin.Add(1))
 	return true, nil
 }
 
@@ -130,8 +130,9 @@ func (s *server) calculatePenalty(now time.Time) uint32 {
 	// Use last round-robin value as lowest priority penalty, so when all other is equal we will
 	// make sure to spread usage among the servers. And yes it will wrap around once in a while
 	// but since number of busy servers weights higher it will even out pretty fast.
-	penalty |= s.roundRobin & 0xff
 
+	roundRobin := s.roundRobin.Load()
+	penalty |= roundRobin & 0xff
 	return penalty
 }
 
@@ -154,7 +155,7 @@ func (s *server) numBusy() int {
 // Adds a db to busy list
 func (s *server) registerBusy(c db.Connection) {
 	// Update round-robin to indicate when this server was last used.
-	s.roundRobin = atomic.AddUint32(&sharedRoundRobin, 1)
+	s.roundRobin.Store(sharedRoundRobin.Add(1))
 	s.busy.PushFront(c)
 }
 
