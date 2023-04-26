@@ -8,13 +8,13 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      https://www.apache.org/licenses/LICENSE-2.0
+ *     https://www.apache.org/licenses/LICENSE-2.0
  *
- *  Unless required by applicable law or agreed to in writing, software
- *  distributed under the License is distributed on an "AS IS" BASIS,
- *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *  See the License for the specific language governing permissions and
- *  limitations under the License.
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 
 package connector_test
@@ -41,13 +41,15 @@ func TestConnect(outer *testing.T) {
 			server.acceptVersion(1, 0)
 		}()
 		connectionDelegate := &ConnDelegate{Delegate: clientConnection}
+		timer := time.Now
 		connector := &connector.Connector{
 			SupplyConnection: supplyThis(connectionDelegate),
 			SkipEncryption:   true,
 			Config:           &config.Config{},
+			Now:              &timer,
 		}
 
-		connection, err := connector.Connect(ctx, "irrelevant", nil)
+		connection, err := connector.Connect(ctx, "irrelevant", nil, nil, nil)
 
 		AssertNil(t, connection)
 		AssertErrorMessageContains(t, err, "unsupported version 1.0")
@@ -60,13 +62,15 @@ func TestConnect(outer *testing.T) {
 			server.failAcceptingVersion()
 		}()
 		connectionDelegate := &ConnDelegate{Delegate: clientConnection}
+		timer := time.Now
 		connector := &connector.Connector{
 			SupplyConnection: supplyThis(connectionDelegate),
 			SkipEncryption:   true,
 			Config:           &config.Config{},
+			Now:              &timer,
 		}
 
-		connection, err := connector.Connect(ctx, "irrelevant", nil)
+		connection, err := connector.Connect(ctx, "irrelevant", nil, nil, nil)
 
 		AssertNil(t, connection)
 		AssertError(t, err)

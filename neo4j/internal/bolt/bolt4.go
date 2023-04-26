@@ -8,13 +8,13 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      https://www.apache.org/licenses/LICENSE-2.0
+ *     https://www.apache.org/licenses/LICENSE-2.0
  *
- *  Unless required by applicable law or agreed to in writing, software
- *  distributed under the License is distributed on an "AS IS" BASIS,
- *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *  See the License for the specific language governing permissions and
- *  limitations under the License.
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 
 package bolt
@@ -23,10 +23,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/auth"
+	iauth "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/auth"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/collections"
 	idb "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/errorutil"
 	"net"
+	"reflect"
 	"time"
 
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/db"
@@ -101,19 +104,33 @@ type bolt4 struct {
 	lastQid       int64 // Last seen qid
 	idleDate      time.Time
 	queue         messageQueue
+	auth          map[string]any
+	authManager   auth.TokenManager
+	resetAuth     bool
+	onNeo4jError  Neo4jErrorCallback
+	now           *func() time.Time
 }
 
-func NewBolt4(serverName string, conn net.Conn, logger log.Logger, boltLog log.BoltLogger) *bolt4 {
-	now := time.Now()
+func NewBolt4(
+	serverName string,
+	conn net.Conn,
+	callback Neo4jErrorCallback,
+	timer *func() time.Time,
+	logger log.Logger,
+	boltLog log.BoltLogger,
+) *bolt4 {
+	now := (*timer)()
 	b := &bolt4{
-		state:      bolt4_unauthorized,
-		conn:       conn,
-		serverName: serverName,
-		birthDate:  now,
-		idleDate:   now,
-		log:        logger,
-		streams:    openstreams{},
-		lastQid:    -1,
+		state:        bolt4_unauthorized,
+		conn:         conn,
+		serverName:   serverName,
+		birthDate:    now,
+		idleDate:     now,
+		log:          logger,
+		streams:      openstreams{},
+		lastQid:      -1,
+		onNeo4jError: callback,
+		now:          timer,
 	}
 	b.queue = newMessageQueue(
 		conn,
@@ -198,7 +215,7 @@ func (b *bolt4) setError(err error, fatal bool) {
 func (b *bolt4) Connect(
 	ctx context.Context,
 	minor int,
-	auth map[string]any,
+	auth *idb.ReAuthToken,
 	userAgent string,
 	routingContext map[string]string,
 	notificationConfig idb.NotificationConfig,
@@ -208,6 +225,10 @@ func (b *bolt4) Connect(
 	}
 
 	b.minor = minor
+
+	if err := checkReAuth(auth, b); err != nil {
+		return err
+	}
 
 	// Prepare hello message
 	hello := map[string]any{
@@ -224,7 +245,13 @@ func (b *bolt4) Connect(
 		hello["patch_bolt"] = []string{"utc"}
 	}
 	// Merge authentication keys into hello, avoid overwriting existing keys
-	for k, v := range auth {
+	token, err := auth.Manager.GetAuthToken(ctx)
+	if err != nil {
+		return err
+	}
+	b.auth = token.Tokens
+	b.authManager = auth.Manager
+	for k, v := range token.Tokens {
 		_, exists := hello[k]
 		if !exists {
 			hello[k] = v
@@ -897,7 +924,9 @@ func (b *bolt4) Close(ctx context.Context) {
 		b.queue.appendGoodbye()
 		b.queue.send(ctx)
 	}
-	_ = b.conn.Close()
+	if err := b.conn.Close(); err != nil {
+		b.log.Warnf(log.Driver, b.serverName, "could not close underlying socket")
+	}
 	b.state = bolt4_dead
 }
 
@@ -909,11 +938,40 @@ func (b *bolt4) SetBoltLogger(boltLogger log.BoltLogger) {
 	b.queue.setBoltLogger(boltLogger)
 }
 
+func (b *bolt4) ReAuth(ctx context.Context, auth *idb.ReAuthToken) error {
+	if err := checkReAuth(auth, b); err != nil {
+		return err
+	}
+	if b.resetAuth {
+		b.log.Infof(log.Bolt4, b.logId, "Closing connection because auth token expired (informed by other connection)")
+		b.Close(ctx)
+		return nil
+	}
+	token, err := auth.Manager.GetAuthToken(ctx)
+	if err != nil {
+		return err
+	}
+	if !reflect.DeepEqual(b.auth, token.Tokens) {
+		b.log.Infof(log.Bolt4, b.logId, "Closing connection because auth token expired (informed by auth manager)")
+		b.Close(ctx)
+	}
+	return nil
+}
+
 func (b *bolt4) Version() db.ProtocolVersion {
 	return db.ProtocolVersion{
 		Major: 4,
 		Minor: b.minor,
 	}
+}
+
+func (b *bolt4) ResetAuth() {
+	b.resetAuth = true
+}
+
+func (b *bolt4) GetCurrentAuth() (auth.TokenManager, iauth.Token) {
+	token := iauth.Token{Tokens: b.auth}
+	return b.authManager, token
 }
 
 func (b *bolt4) helloResponseHandler(checkUtcPatch bool) responseHandler {
@@ -952,9 +1010,9 @@ func (b *bolt4) discardResponseHandler(stream *stream) responseHandler {
 			b.streams.remove(stream)
 			b.checkStreams()
 		},
-		onFailure: func(failure *db.Neo4jError) {
+		onFailure: func(ctx context.Context, failure *db.Neo4jError) {
 			stream.err = failure
-			b.setError(failure, isFatalError(failure)) // Will detach the stream
+			b.onFailure(ctx, failure) // Will detach the stream
 		},
 		onUnknown: func(msg any) {
 			b.setError(fmt.Errorf("unknown response %v", msg), true)
@@ -994,9 +1052,9 @@ func (b *bolt4) pullResponseHandler(stream *stream) responseHandler {
 			b.streams.remove(stream)
 			b.checkStreams()
 		},
-		onFailure: func(failure *db.Neo4jError) {
+		onFailure: func(ctx context.Context, failure *db.Neo4jError) {
 			stream.err = failure
-			b.setError(failure, isFatalError(failure)) // Will detach the stream
+			b.onFailure(ctx, failure) // will detach the stream
 		},
 		onUnknown: func(msg any) {
 			b.setError(fmt.Errorf("unknown response %v", msg), true)
@@ -1022,7 +1080,8 @@ func (b *bolt4) resetResponseHandler() responseHandler {
 		onSuccess: func(resetSuccess *success) {
 			b.state = bolt4_ready
 		},
-		onFailure: func(*db.Neo4jError) {
+		onFailure: func(ctx context.Context, failure *db.Neo4jError) {
+			_ = b.onNeo4jError(ctx, b, failure)
 			b.state = bolt4_dead
 		},
 		onUnknown: func(any) {
@@ -1070,15 +1129,20 @@ func (b *bolt4) expectedSuccessHandler(onSuccess func(*success)) responseHandler
 }
 
 func (b *bolt4) onNextMessage() {
-	b.idleDate = time.Now()
+	b.idleDate = (*b.now)()
 }
 
 func (b *bolt4) onNextMessageError(err error) {
 	b.setError(err, true)
 }
 
-func (b *bolt4) onFailure(err *db.Neo4jError) {
-	b.setError(err, isFatalError(err))
+func (b *bolt4) onFailure(ctx context.Context, failure *db.Neo4jError) {
+	var err error
+	err = failure
+	if callbackErr := b.onNeo4jError(ctx, b, failure); callbackErr != nil {
+		err = errorutil.CombineErrors(failure, callbackErr)
+	}
+	b.setError(err, isFatalError(failure))
 }
 
 func (b *bolt4) onUnknown(msg any) {

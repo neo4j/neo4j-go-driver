@@ -8,13 +8,13 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      https://www.apache.org/licenses/LICENSE-2.0
+ *     https://www.apache.org/licenses/LICENSE-2.0
  *
- *  Unless required by applicable law or agreed to in writing, software
- *  distributed under the License is distributed on an "AS IS" BASIS,
- *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *  See the License for the specific language governing permissions and
- *  limitations under the License.
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 
 package bolt
@@ -23,9 +23,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/auth"
+	iauth "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/auth"
 	idb "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/errorutil"
 	"net"
+	"reflect"
 	"time"
 
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/db"
@@ -102,19 +105,33 @@ type bolt5 struct {
 	minor         int
 	lastQid       int64 // Last seen qid
 	idleDate      time.Time
+	auth          map[string]any
+	authManager   auth.TokenManager
+	resetAuth     bool
+	onNeo4jError  Neo4jErrorCallback
+	now           *func() time.Time
 }
 
-func NewBolt5(serverName string, conn net.Conn, logger log.Logger, boltLog log.BoltLogger) *bolt5 {
-	now := time.Now()
+func NewBolt5(
+	serverName string,
+	conn net.Conn,
+	callback Neo4jErrorCallback,
+	timer *func() time.Time,
+	logger log.Logger,
+	boltLog log.BoltLogger,
+) *bolt5 {
+	now := (*timer)()
 	b := &bolt5{
-		state:      bolt5Unauthorized,
-		conn:       conn,
-		serverName: serverName,
-		birthDate:  now,
-		idleDate:   now,
-		log:        logger,
-		streams:    openstreams{},
-		lastQid:    -1,
+		state:        bolt5Unauthorized,
+		conn:         conn,
+		serverName:   serverName,
+		birthDate:    now,
+		idleDate:     now,
+		log:          logger,
+		streams:      openstreams{},
+		lastQid:      -1,
+		onNeo4jError: callback,
+		now:          timer,
 	}
 	b.queue = newMessageQueue(
 		conn,
@@ -200,7 +217,7 @@ func (b *bolt5) setError(err error, fatal bool) {
 func (b *bolt5) Connect(
 	ctx context.Context,
 	minor int,
-	auth map[string]any,
+	auth *idb.ReAuthToken,
 	userAgent string,
 	routingContext map[string]string,
 	notificationConfig idb.NotificationConfig,
@@ -211,6 +228,16 @@ func (b *bolt5) Connect(
 
 	b.minor = minor
 
+	if err := checkReAuth(auth, b); err != nil {
+		return err
+	}
+	token, err := auth.Manager.GetAuthToken(ctx)
+	if err != nil {
+		return err
+	}
+	b.auth = token.Tokens
+	b.authManager = auth.Manager
+
 	hello := map[string]any{
 		"user_agent": userAgent,
 	}
@@ -219,7 +246,7 @@ func (b *bolt5) Connect(
 	}
 	if b.minor == 0 {
 		// Merge authentication keys into hello, avoid overwriting existing keys
-		for k, v := range auth {
+		for k, v := range token.Tokens {
 			_, exists := hello[k]
 			if !exists {
 				hello[k] = v
@@ -233,7 +260,7 @@ func (b *bolt5) Connect(
 	notificationConfig.ToMeta(hello)
 	b.queue.appendHello(hello, b.helloResponseHandler())
 	if b.minor > 0 {
-		b.queue.appendLogon(auth, b.logonResponseHandler())
+		b.queue.appendLogon(token.Tokens, b.logonResponseHandler())
 	}
 	if b.queue.send(ctx); b.err != nil {
 		return b.err
@@ -523,12 +550,14 @@ func (b *bolt5) run(ctx context.Context, cypher string, params map[string]any, r
 		return nil, b.err
 	}
 	// only read response for RUN
-	if err := b.queue.receive(ctx); err != nil {
-		// rely on RESET to deal with unhandled PULL response
-		return nil, err
-	}
-	if b.err != nil {
-		return nil, b.err
+	for !stream.attached {
+		if err := b.queue.receive(ctx); err != nil {
+			// rely on RESET to deal with unhandled PULL response
+			return nil, err
+		}
+		if b.err != nil {
+			return nil, b.err
+		}
 	}
 
 	if b.state == bolt5Ready {
@@ -803,6 +832,76 @@ func (b *bolt5) SetBoltLogger(boltLogger log.BoltLogger) {
 	b.queue.setBoltLogger(boltLogger)
 }
 
+func (b *bolt5) ReAuth(ctx context.Context, auth *idb.ReAuthToken) error {
+	if b.minor == 0 {
+		return b.fallbackReAuth(ctx, auth)
+	}
+	return b.reAuth(ctx, auth)
+}
+
+func (b *bolt5) fallbackReAuth(ctx context.Context, auth *idb.ReAuthToken) error {
+	if err := checkReAuth(auth, b); err != nil {
+		return err
+	}
+	if b.resetAuth {
+		b.log.Infof(log.Bolt5, b.logId, "Closing connection because auth token expired (informed by other connection)")
+		b.Close(ctx)
+		return nil
+	}
+	token, err := auth.Manager.GetAuthToken(ctx)
+	if err != nil {
+		return err
+	}
+	if !reflect.DeepEqual(b.auth, token.Tokens) {
+		b.log.Infof(log.Bolt5, b.logId, "Closing connection because auth token expired (informed by auth manager)")
+		b.Close(ctx)
+	}
+	return nil
+}
+
+func (b *bolt5) reAuth(ctx context.Context, auth *idb.ReAuthToken) error {
+	token, err := auth.Manager.GetAuthToken(ctx)
+	if err != nil {
+		return err
+	}
+	if b.resetAuth {
+		b.log.Infof(
+			log.Bolt5, b.logId,
+			"Re-authenticating connection because auth token expired (informed by other connection)")
+		b.queue.appendLogoff(b.logoffResponseHandler())
+		b.queue.appendLogon(token.Tokens, b.logonResponseHandler())
+	} else if !reflect.DeepEqual(b.auth, token.Tokens) {
+		b.log.Infof(
+			log.Bolt5, b.logId,
+			"Re-authenticating connection because auth token expired (informed by auth manager)")
+		b.queue.appendLogoff(b.logoffResponseHandler())
+		b.queue.appendLogon(token.Tokens, b.logonResponseHandler())
+	} else if auth.ForceReAuth {
+		b.log.Infof(
+			log.Bolt5, b.logId,
+			"Re-authenticating connection because auth token expired (forced by verifyAuthentication)")
+		b.queue.appendLogoff(b.logoffResponseHandler())
+		b.queue.appendLogon(token.Tokens, b.logonResponseHandler())
+	} else {
+		return nil
+	}
+
+	if b.queue.send(ctx); b.err != nil {
+		return b.err
+	}
+	b.auth = token.Tokens
+	b.authManager = auth.Manager
+	if auth.ForceReAuth {
+		if err := b.queue.receiveAll(ctx); err != nil {
+			return err
+		}
+		if b.err != nil {
+			return b.err
+		}
+	}
+	return nil
+}
+
 // Close closes the underlying connection.
 // Beware: could be called on another thread when driver is closed.
 func (b *bolt5) Close(ctx context.Context) {
@@ -811,7 +910,9 @@ func (b *bolt5) Close(ctx context.Context) {
 		b.queue.appendGoodbye()
 		b.queue.send(ctx)
 	}
-	_ = b.conn.Close()
+	if err := b.conn.Close(); err != nil {
+		b.log.Warnf(log.Driver, b.serverName, "could not close underlying socket")
+	}
 	b.state = bolt5Dead
 }
 
@@ -824,6 +925,15 @@ func (b *bolt5) Version() db.ProtocolVersion {
 		Major: 5,
 		Minor: b.minor,
 	}
+}
+
+func (b *bolt5) ResetAuth() {
+	b.resetAuth = true
+}
+
+func (b *bolt5) GetCurrentAuth() (auth.TokenManager, iauth.Token) {
+	token := iauth.Token{Tokens: b.auth}
+	return b.authManager, token
 }
 
 func (b *bolt5) appendPullN(stream *stream) {
@@ -842,6 +952,10 @@ func (b *bolt5) helloResponseHandler() responseHandler {
 	return b.expectedSuccessHandler(b.onHelloSuccess)
 }
 
+func (b *bolt5) logoffResponseHandler() responseHandler {
+	return b.expectedSuccessHandler(onSuccessNoOp)
+}
+
 func (b *bolt5) logonResponseHandler() responseHandler {
 	return b.expectedSuccessHandler(onSuccessNoOp)
 }
@@ -858,6 +972,7 @@ func (b *bolt5) beginResponseHandler() responseHandler {
 
 func (b *bolt5) runResponseHandler(stream *stream) responseHandler {
 	return b.expectedSuccessHandler(func(runSuccess *success) {
+		stream.attached = true
 		stream.keys = runSuccess.fields
 		stream.qid = runSuccess.qid
 		stream.tfirst = runSuccess.tfirst
@@ -896,9 +1011,9 @@ func (b *bolt5) discardResponseHandler(stream *stream) responseHandler {
 			b.streams.remove(stream)
 			b.checkStreams()
 		},
-		onFailure: func(failure *db.Neo4jError) {
+		onFailure: func(ctx context.Context, failure *db.Neo4jError) {
 			stream.err = failure
-			b.setError(failure, isFatalError(failure)) // Will detach the stream
+			b.onFailure(ctx, failure) // Will detach the stream
 		},
 		onUnknown: func(msg any) {
 			b.setError(fmt.Errorf("unknown response %v", msg), true)
@@ -938,9 +1053,9 @@ func (b *bolt5) pullResponseHandler(stream *stream) responseHandler {
 			b.streams.remove(stream)
 			b.checkStreams()
 		},
-		onFailure: func(failure *db.Neo4jError) {
+		onFailure: func(ctx context.Context, failure *db.Neo4jError) {
 			stream.err = failure
-			b.setError(failure, isFatalError(failure)) // Will detach the stream
+			b.onFailure(ctx, failure) // Will detach the stream
 		},
 		onUnknown: func(msg any) {
 			b.setError(fmt.Errorf("unknown response %v", msg), true)
@@ -953,7 +1068,8 @@ func (b *bolt5) resetResponseHandler() responseHandler {
 		onSuccess: func(resetSuccess *success) {
 			b.state = bolt5Ready
 		},
-		onFailure: func(*db.Neo4jError) {
+		onFailure: func(ctx context.Context, failure *db.Neo4jError) {
+			_ = b.onNeo4jError(ctx, b, failure)
 			b.state = bolt5Dead
 		},
 		onUnknown: func(any) {
@@ -988,15 +1104,20 @@ func (b *bolt5) onCommitSuccess(commitSuccess *success) {
 }
 
 func (b *bolt5) onNextMessage() {
-	b.idleDate = time.Now()
+	b.idleDate = (*b.now)()
 }
 
 func (b *bolt5) onNextMessageError(err error) {
 	b.setError(err, true)
 }
 
-func (b *bolt5) onFailure(err *db.Neo4jError) {
-	b.setError(err, isFatalError(err))
+func (b *bolt5) onFailure(ctx context.Context, failure *db.Neo4jError) {
+	var err error
+	err = failure
+	if callbackErr := b.onNeo4jError(ctx, b, failure); callbackErr != nil {
+		err = errorutil.CombineErrors(callbackErr, failure)
+	}
+	b.setError(err, isFatalError(failure))
 }
 
 func (b *bolt5) onUnknown(msg any) {

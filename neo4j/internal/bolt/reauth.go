@@ -17,26 +17,26 @@
  *  limitations under the License.
  */
 
-package router
+package bolt
 
 import (
-	"context"
+	idb "github.com/neo4j/neo4j-go-driver/v5/neo4j/db"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/log"
-	"time"
 )
 
-type poolFake struct {
-	borrow   func(names []string, cancel context.CancelFunc, logger log.BoltLogger) (db.Connection, error)
-	returned []db.Connection
-	cancel   context.CancelFunc
-}
-
-func (p *poolFake) Borrow(_ context.Context, servers []string, _ bool, logger log.BoltLogger, _ time.Duration, _ *db.ReAuthToken) (db.Connection, error) {
-	return p.borrow(servers, p.cancel, logger)
-}
-
-func (p *poolFake) Return(_ context.Context, c db.Connection) error {
-	p.returned = append(p.returned, c)
+func checkReAuth(auth *db.ReAuthToken, connection db.Connection) error {
+	fromSession := auth.FromSession
+	version := connection.Version()
+	if !fromSession {
+		return nil
+	}
+	if version.Major < 5 || (version.Major == 5 && version.Minor == 0) {
+		serverName := connection.ServerName()
+		return &idb.FeatureNotSupportedError{
+			Server:  serverName,
+			Feature: "session auth",
+			Reason:  "requires least server v5.5",
+		}
+	}
 	return nil
 }

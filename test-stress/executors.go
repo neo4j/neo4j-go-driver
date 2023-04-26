@@ -91,9 +91,10 @@ func ReadQueryExecutor(ctx context.Context, driver neo4j.DriverWithContext, useB
 
 			_, ok := nodeInt.(neo4j.Node)
 			ExpectTrue(ok)
+			ExpectNil(result.Err())
+			ExpectFalse(result.Next(ctx))
 		}
 		ExpectNil(result.Err())
-		ExpectFalse(result.Next(ctx))
 
 		summary, err := result.Consume(ctx)
 		ExpectNoError(err)
@@ -122,9 +123,10 @@ func ReadQueryInTxExecutor(ctx context.Context, driver neo4j.DriverWithContext, 
 
 			_, ok := nodeInt.(neo4j.Node)
 			ExpectTrue(ok)
+			ExpectNil(result.Err())
+			ExpectFalse(result.Next(ctx))
 		}
 		ExpectNil(result.Err())
-		ExpectFalse(result.Next(ctx))
 
 		summary, err := result.Consume(ctx)
 		ExpectNoError(err)
@@ -202,6 +204,31 @@ func WriteQueryInTxExecutor(ctx context.Context, driver neo4j.DriverWithContext,
 		summary, err := result.Consume(ctx)
 		ExpectNoError(err)
 		ExpectInt(summary.Counters().NodesCreated(), 1)
+
+		err = tx.Commit(ctx)
+		ExpectNoError(err)
+
+		testContext.setBookmarks(session.LastBookmarks())
+
+		testContext.addCreated()
+	}
+}
+
+// VaccuumQueryInTxExecutor returns a new test executor which deletes all data
+func VaccuumQueryInTxExecutor(ctx context.Context, driver neo4j.DriverWithContext, useBookmark bool) func(*TestContext) {
+	return func(testContext *TestContext) {
+		session := newStressSession(ctx, driver, useBookmark, neo4j.AccessModeWrite, testContext)
+		defer session.Close(ctx)
+
+		tx, err := session.BeginTransaction(ctx)
+		ExpectNoError(err)
+		defer tx.Close(ctx)
+
+		result, err := tx.Run(ctx, "MATCH (n) DETACH DELETE n", nil)
+		ExpectNoError(err)
+
+		_, err = result.Consume(ctx)
+		ExpectNoError(err)
 
 		err = tx.Commit(ctx)
 		ExpectNoError(err)

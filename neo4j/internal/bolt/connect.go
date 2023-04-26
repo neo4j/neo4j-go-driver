@@ -8,13 +8,13 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      https://www.apache.org/licenses/LICENSE-2.0
+ *     https://www.apache.org/licenses/LICENSE-2.0
  *
- *  Unless required by applicable law or agreed to in writing, software
- *  distributed under the License is distributed on an "AS IS" BASIS,
- *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *  See the License for the specific language governing permissions and
- *  limitations under the License.
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 
 // Package bolt contains implementations of the database functionality.
@@ -26,6 +26,7 @@ import (
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/racing"
 	"net"
+	"time"
 
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/log"
 )
@@ -46,17 +47,17 @@ var versions = [4]protocolVersion{
 
 // Connect initiates the negotiation of the Bolt protocol version.
 // Returns the instance of bolt protocol implementing the low-level Connection interface.
-func Connect(
-	ctx context.Context,
+func Connect(ctx context.Context,
 	serverName string,
 	conn net.Conn,
-	auth map[string]any,
+	auth *db.ReAuthToken,
 	userAgent string,
 	routingContext map[string]string,
+	callback Neo4jErrorCallback,
 	logger log.Logger,
-	boltLog log.BoltLogger,
+	boltLogger log.BoltLogger,
 	notificationConfig db.NotificationConfig,
-) (db.Connection, error) {
+	timer *func() time.Time) (db.Connection, error) {
 	// Perform Bolt handshake to negotiate version
 	// Send handshake to server
 	handshake := []byte{
@@ -66,9 +67,9 @@ func Connect(
 		0x00, versions[2].back, versions[2].minor, versions[2].major,
 		0x00, versions[3].back, versions[3].minor, versions[3].major,
 	}
-	if boltLog != nil {
-		boltLog.LogClientMessage("", "<MAGIC> %#010X", handshake[0:4])
-		boltLog.LogClientMessage("", "<HANDSHAKE> %#010X %#010X %#010X %#010X", handshake[4:8], handshake[8:12], handshake[12:16], handshake[16:20])
+	if boltLogger != nil {
+		boltLogger.LogClientMessage("", "<MAGIC> %#010X", handshake[0:4])
+		boltLogger.LogClientMessage("", "<HANDSHAKE> %#010X %#010X %#010X %#010X", handshake[4:8], handshake[8:12], handshake[12:16], handshake[16:20])
 	}
 	_, err := racing.NewRacingWriter(conn).Write(ctx, handshake)
 	if err != nil {
@@ -82,8 +83,8 @@ func Connect(
 		return nil, err
 	}
 
-	if boltLog != nil {
-		boltLog.LogServerMessage("", "<HANDSHAKE> %#010X", buf)
+	if boltLogger != nil {
+		boltLogger.LogServerMessage("", "<HANDSHAKE> %#010X", buf)
 	}
 
 	major := buf[3]
@@ -91,17 +92,18 @@ func Connect(
 	var boltConn db.Connection
 	switch major {
 	case 3:
-		boltConn = NewBolt3(serverName, conn, logger, boltLog)
+		boltConn = NewBolt3(serverName, conn, callback, timer, logger, boltLogger)
 	case 4:
-		boltConn = NewBolt4(serverName, conn, logger, boltLog)
+		boltConn = NewBolt4(serverName, conn, callback, timer, logger, boltLogger)
 	case 5:
-		boltConn = NewBolt5(serverName, conn, logger, boltLog)
+		boltConn = NewBolt5(serverName, conn, callback, timer, logger, boltLogger)
 	case 0:
 		return nil, fmt.Errorf("server did not accept any of the requested Bolt versions (%#v)", versions)
 	default:
 		return nil, fmt.Errorf("server responded with unsupported version %d.%d", major, minor)
 	}
 	if err = boltConn.Connect(ctx, int(minor), auth, userAgent, routingContext, notificationConfig); err != nil {
+		boltConn.Close(ctx)
 		return nil, err
 	}
 	return boltConn, nil

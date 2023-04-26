@@ -8,13 +8,13 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      https://www.apache.org/licenses/LICENSE-2.0
+ *     https://www.apache.org/licenses/LICENSE-2.0
  *
- *  Unless required by applicable law or agreed to in writing, software
- *  distributed under the License is distributed on an "AS IS" BASIS,
- *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *  See the License for the specific language governing permissions and
- *  limitations under the License.
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 
 package bolt
@@ -23,9 +23,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/auth"
+	iauth "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/auth"
 	idb "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/errorutil"
 	"net"
+	"reflect"
 	"time"
 
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/db"
@@ -85,10 +88,22 @@ type bolt3 struct {
 	err           error // Last fatal error
 	minor         int
 	idleDate      time.Time
+	auth          map[string]any
+	authManager   auth.TokenManager
+	resetAuth     bool
+	onNeo4jError  Neo4jErrorCallback
+	now           *func() time.Time
 }
 
-func NewBolt3(serverName string, conn net.Conn, logger log.Logger, boltLog log.BoltLogger) *bolt3 {
-	now := time.Now()
+func NewBolt3(
+	serverName string,
+	conn net.Conn,
+	callback Neo4jErrorCallback,
+	timer *func() time.Time,
+	logger log.Logger,
+	boltLog log.BoltLogger,
+) *bolt3 {
+	now := (*timer)()
 	b := &bolt3{
 		state:      bolt3_unauthorized,
 		conn:       conn,
@@ -101,9 +116,11 @@ func NewBolt3(serverName string, conn net.Conn, logger log.Logger, boltLog log.B
 			},
 			connReadTimeout: -1,
 		},
-		birthDate: now,
-		idleDate:  now,
-		log:       logger,
+		birthDate:    now,
+		idleDate:     now,
+		log:          logger,
+		onNeo4jError: callback,
+		now:          timer,
 	}
 	b.out = &outgoing{
 		chunker: newChunker(),
@@ -140,7 +157,7 @@ func (b *bolt3) receiveMsg(ctx context.Context) any {
 		b.state = bolt3_dead
 		return nil
 	}
-	b.idleDate = time.Now()
+	b.idleDate = (*b.now)()
 	return msg
 }
 
@@ -148,17 +165,20 @@ func (b *bolt3) receiveMsg(ctx context.Context) any {
 // to a sent command.
 // Sets b.err and b.state on failure
 func (b *bolt3) receiveSuccess(ctx context.Context) *success {
-	switch v := b.receiveMsg(ctx).(type) {
+	switch message := b.receiveMsg(ctx).(type) {
 	case *success:
-		return v
+		return message
 	case *db.Neo4jError:
 		b.state = bolt3_failed
-		b.err = v
-		if v.Classification() == "ClientError" {
+		b.err = message
+		if message.Classification() == "ClientError" {
 			// These could include potentially large cypher statement, only log to debug
-			b.log.Debugf(log.Bolt3, b.logId, "%s", v)
+			b.log.Debugf(log.Bolt3, b.logId, "%s", message)
 		} else {
-			b.log.Error(log.Bolt3, b.logId, v)
+			b.log.Error(log.Bolt3, b.logId, message)
+		}
+		if err := b.onNeo4jError(ctx, b, message); err != nil {
+			b.err = errorutil.CombineErrors(message, b.err)
 		}
 		return nil
 	default:
@@ -177,7 +197,7 @@ func (b *bolt3) receiveSuccess(ctx context.Context) *success {
 func (b *bolt3) Connect(
 	ctx context.Context,
 	minor int,
-	auth map[string]any,
+	auth *idb.ReAuthToken,
 	userAgent string,
 	_ map[string]string,
 	notificationConfig idb.NotificationConfig,
@@ -188,11 +208,21 @@ func (b *bolt3) Connect(
 
 	b.minor = minor
 
+	if err := checkReAuth(auth, b); err != nil {
+		return err
+	}
+
 	hello := map[string]any{
 		"user_agent": userAgent,
 	}
 	// Merge authentication info into hello message
-	for k, v := range auth {
+	token, err := auth.Manager.GetAuthToken(ctx)
+	if err != nil {
+		return err
+	}
+	b.auth = token.Tokens
+	b.authManager = auth.Manager
+	for k, v := range token.Tokens {
 		_, exists := hello[k]
 		if exists {
 			continue
@@ -584,13 +614,13 @@ func (b *bolt3) receiveNext(ctx context.Context) (*db.Record, *db.Summary, error
 		return nil, nil, b.err
 	}
 
-	switch x := res.(type) {
+	switch message := res.(type) {
 	case *db.Record:
-		x.Keys = b.currStream.keys
-		return x, nil, nil
+		message.Keys = b.currStream.keys
+		return message, nil, nil
 	case *success:
 		// End of stream, parse summary
-		sum := x.summary()
+		sum := message.summary()
 		if sum == nil {
 			b.state = bolt3_dead
 			b.err = errors.New("failed to parse summary")
@@ -618,17 +648,20 @@ func (b *bolt3) receiveNext(ctx context.Context) (*db.Record, *db.Summary, error
 		b.currStream = nil
 		return nil, sum, nil
 	case *db.Neo4jError:
-		b.err = x
+		b.err = message
 		b.currStream.err = b.err
 		b.currStream = nil
 		b.state = bolt3_failed
-		if x.Classification() == "ClientError" {
+		if message.Classification() == "ClientError" {
 			// These could include potentially large cypher statement, only log to debug
-			b.log.Debugf(log.Bolt3, b.logId, "%s", x)
+			b.log.Debugf(log.Bolt3, b.logId, "%s", message)
 		} else {
-			b.log.Error(log.Bolt3, b.logId, x)
+			b.log.Error(log.Bolt3, b.logId, message)
 		}
-		return nil, nil, x
+		if err := b.onNeo4jError(ctx, b, message); err != nil {
+			return nil, nil, errorutil.CombineErrors(message, err)
+		}
+		return nil, nil, message
 	default:
 		b.state = bolt3_dead
 		b.err = errors.New("unknown response")
@@ -779,7 +812,9 @@ func (b *bolt3) Close(ctx context.Context) {
 		b.out.appendGoodbye()
 		b.out.send(ctx, b.conn)
 	}
-	b.conn.Close()
+	if err := b.conn.Close(); err != nil {
+		b.log.Warnf(log.Driver, b.serverName, "could not close underlying socket")
+	}
 	b.state = bolt3_dead
 }
 
@@ -788,9 +823,38 @@ func (b *bolt3) SetBoltLogger(boltLogger log.BoltLogger) {
 	b.out.boltLogger = boltLogger
 }
 
+func (b *bolt3) ReAuth(ctx context.Context, auth *idb.ReAuthToken) error {
+	if err := checkReAuth(auth, b); err != nil {
+		return err
+	}
+	if b.resetAuth {
+		b.log.Infof(log.Bolt4, b.logId, "Closing connection because auth token expired (informed by other connection)")
+		b.Close(ctx)
+		return nil
+	}
+	token, err := auth.Manager.GetAuthToken(ctx)
+	if err != nil {
+		return err
+	}
+	if !reflect.DeepEqual(b.auth, token.Tokens) {
+		b.log.Infof(log.Bolt4, b.logId, "Closing connection because auth token expired (informed by auth manager)")
+		b.Close(ctx)
+	}
+	return nil
+}
+
 func (b *bolt3) Version() db.ProtocolVersion {
 	return db.ProtocolVersion{
 		Major: 3,
 		Minor: b.minor,
 	}
+}
+
+func (b *bolt3) ResetAuth() {
+	b.resetAuth = true
+}
+
+func (b *bolt3) GetCurrentAuth() (auth.TokenManager, iauth.Token) {
+	token := iauth.Token{Tokens: b.auth}
+	return b.authManager, token
 }

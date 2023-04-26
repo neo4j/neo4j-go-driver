@@ -21,6 +21,7 @@ package neo4j
 
 import (
 	"context"
+	"fmt"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/db"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/errorutil"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/retry"
@@ -47,6 +48,18 @@ type UsageError = errorutil.UsageError
 type ConnectivityError = errorutil.ConnectivityError
 
 type TransactionExecutionLimit = errorutil.TransactionExecutionLimit
+
+type InvalidAuthenticationError struct {
+	inner error
+}
+
+func (i *InvalidAuthenticationError) Error() string {
+	return fmt.Sprintf("InvalidAuthenticationError: %s", i.inner.Error())
+}
+
+func (i *InvalidAuthenticationError) Unwrap() error {
+	return i.inner
+}
 
 // IsNeo4jError returns true if the provided error is an instance of Neo4jError.
 func IsNeo4jError(err error) bool {

@@ -42,7 +42,7 @@ type State struct {
 	Log                     log.Logger
 	LogName                 string
 	LogId                   string
-	Now                     func() time.Time
+	Now                     *func() time.Time
 	Sleep                   func(time.Duration)
 	Throttle                Throttler
 	MaxDeadConnections      int
@@ -84,7 +84,7 @@ func (s *State) OnFailure(ctx context.Context, err error, conn idb.Connection, i
 
 func (s *State) Continue() bool {
 	if s.start.IsZero() {
-		s.start = s.Now()
+		s.start = (*s.Now)()
 	}
 
 	if len(s.Errs) == 0 {
@@ -96,7 +96,7 @@ func (s *State) Continue() bool {
 		return false
 	}
 
-	if s.Now().Sub(s.start) > s.MaxTransactionRetryTime {
+	if (*s.Now)().Sub(s.start) > s.MaxTransactionRetryTime {
 		s.Errs = []error{&errorutil.TransactionExecutionLimit{
 			Cause:  fmt.Sprintf("timeout (exceeded max retry time: %s)", s.MaxTransactionRetryTime.String()),
 			Errors: s.Errs,
@@ -146,5 +146,5 @@ func IsRetryable(err error) bool {
 	if !errors.As(err, &dbError) {
 		return false
 	}
-	return dbError.IsRetriableTransient() || dbError.IsRetriableCluster()
+	return dbError.IsRetriable()
 }

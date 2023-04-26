@@ -74,6 +74,7 @@ type SessionWithContext interface {
 
 	legacy() Session
 	getServerInfo(ctx context.Context) (ServerInfo, error)
+	verifyAuthentication(ctx context.Context) error
 }
 
 // SessionConfig is used to configure a new session, its zero value uses safe defaults.
@@ -161,6 +162,21 @@ type SessionConfig struct {
 	// By default, the driver's settings are used.
 	// Else, this option overrides the driver's settings.
 	NotificationsDisabledCategories notifications.NotificationDisabledCategories
+	// Auth is used to overwrite the authentication information for the session.
+	// This requires the server to support re-authentication on the protocol level.
+	// `nil` will make the driver use the authentication information from the driver configuration.
+	// The `neo4j` package provides factory functions for common authentication schemes:
+	//   - `neo4j.NoAuth`
+	//   - `neo4j.BasicAuth`
+	//   - `neo4j.KerberosAuth`
+	//   - `neo4j.BearerAuth`
+	//   - `neo4j.CustomAuth`
+	//
+	// Session auth is part of the re-authentication preview feature
+	// (see README on what it means in terms of support and compatibility guarantees).
+	Auth *AuthToken
+
+	forceReAuth bool
 }
 
 // FetchAll turns off fetching records in batches.
@@ -171,9 +187,10 @@ const FetchDefault = 0
 
 // Connection pool as seen by the session.
 type sessionPool interface {
-	Borrow(ctx context.Context, serverNames []string, wait bool, boltLogger log.BoltLogger, livenessCheckThreshold time.Duration) (idb.Connection, error)
+	Borrow(ctx context.Context, serverNames []string, wait bool, boltLogger log.BoltLogger, livenessCheckThreshold time.Duration, auth *idb.ReAuthToken) (idb.Connection, error)
 	Return(ctx context.Context, c idb.Connection) error
 	CleanUp(ctx context.Context) error
+	Now() time.Time
 }
 
 type sessionWithContext struct {
@@ -186,15 +203,24 @@ type sessionWithContext struct {
 	explicitTx    *explicitTransaction
 	autocommitTx  *autocommitTransaction
 	sleep         func(d time.Duration)
-	now           func() time.Time
+	now           *func() time.Time
 	logId         string
 	log           log.Logger
 	throttleTime  time.Duration
 	fetchSize     int
 	config        SessionConfig
+	auth          *idb.ReAuthToken
 }
 
-func newSessionWithContext(config *Config, sessConfig SessionConfig, router sessionRouter, pool sessionPool, logger log.Logger) *sessionWithContext {
+func newSessionWithContext(
+	config *Config,
+	sessConfig SessionConfig,
+	router sessionRouter,
+	pool sessionPool,
+	logger log.Logger,
+	token *idb.ReAuthToken,
+	now *func() time.Time,
+) *sessionWithContext {
 	logId := log.NewId()
 	logger.Debugf(log.Session, logId, "Created with context")
 
@@ -212,11 +238,12 @@ func newSessionWithContext(config *Config, sessConfig SessionConfig, router sess
 		config:        sessConfig,
 		resolveHomeDb: sessConfig.DatabaseName == "",
 		sleep:         time.Sleep,
-		now:           time.Now,
+		now:           now,
 		log:           logger,
 		logId:         logId,
 		throttleTime:  time.Second * 1,
 		fetchSize:     fetchSize,
+		auth:          token,
 	}
 }
 
@@ -458,9 +485,9 @@ func (s *sessionWithContext) executeTransactionFunction(
 
 func (s *sessionWithContext) getServers(ctx context.Context, mode idb.AccessMode) ([]string, error) {
 	if mode == idb.ReadMode {
-		return s.router.Readers(ctx, s.getBookmarks, s.config.DatabaseName, s.config.BoltLogger)
+		return s.router.Readers(ctx, s.getBookmarks, s.config.DatabaseName, s.auth, s.config.BoltLogger)
 	} else {
-		return s.router.Writers(ctx, s.getBookmarks, s.config.DatabaseName, s.config.BoltLogger)
+		return s.router.Writers(ctx, s.getBookmarks, s.config.DatabaseName, s.auth, s.config.BoltLogger)
 	}
 }
 
@@ -487,7 +514,13 @@ func (s *sessionWithContext) getConnection(ctx context.Context, mode idb.AccessM
 		return nil, errorutil.WrapError(err)
 	}
 
-	conn, err := s.pool.Borrow(ctx, servers, s.driverConfig.ConnectionAcquisitionTimeout != 0, s.config.BoltLogger, livenessCheckThreshold)
+	conn, err := s.pool.Borrow(
+		ctx,
+		servers,
+		s.driverConfig.ConnectionAcquisitionTimeout != 0,
+		s.config.BoltLogger,
+		livenessCheckThreshold,
+		s.auth)
 	if err != nil {
 		return nil, errorutil.WrapError(err)
 	}
@@ -625,7 +658,13 @@ func (s *sessionWithContext) getServerInfo(ctx context.Context) (ServerInfo, err
 	if err != nil {
 		return nil, errorutil.WrapError(err)
 	}
-	conn, err := s.pool.Borrow(ctx, servers, s.driverConfig.ConnectionAcquisitionTimeout != 0, s.config.BoltLogger, 0)
+	conn, err := s.pool.Borrow(
+		ctx,
+		servers,
+		s.driverConfig.ConnectionAcquisitionTimeout != 0,
+		s.config.BoltLogger,
+		0,
+		s.auth)
 	if err != nil {
 		return nil, errorutil.WrapError(err)
 	}
@@ -637,6 +676,25 @@ func (s *sessionWithContext) getServerInfo(ctx context.Context) (ServerInfo, err
 	}, nil
 }
 
+func (s *sessionWithContext) verifyAuthentication(ctx context.Context) error {
+	servers, err := s.getServers(ctx, idb.ReadMode)
+	if err != nil {
+		return errorutil.WrapError(err)
+	}
+	conn, err := s.pool.Borrow(
+		ctx,
+		servers,
+		s.driverConfig.ConnectionAcquisitionTimeout != 0,
+		s.config.BoltLogger,
+		0,
+		s.auth)
+	if err != nil {
+		return errorutil.WrapError(err)
+	}
+	defer s.pool.Return(ctx, conn)
+	return nil
+}
+
 func (s *sessionWithContext) resolveHomeDatabase(ctx context.Context) error {
 	if !s.resolveHomeDb {
 		return nil
@@ -646,7 +704,12 @@ func (s *sessionWithContext) resolveHomeDatabase(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	defaultDb, err := s.router.GetNameOfDefaultDatabase(ctx, bookmarks, s.config.ImpersonatedUser, s.config.BoltLogger)
+	defaultDb, err := s.router.GetNameOfDefaultDatabase(
+		ctx,
+		bookmarks,
+		s.config.ImpersonatedUser,
+		s.auth,
+		s.config.BoltLogger)
 	if err != nil {
 		return err
 	}
@@ -697,6 +760,10 @@ func (s *erroredSessionWithContext) legacy() Session {
 }
 func (s *erroredSessionWithContext) getServerInfo(context.Context) (ServerInfo, error) {
 	return nil, s.err
+}
+
+func (s *erroredSessionWithContext) verifyAuthentication(context.Context) error {
+	return s.err
 }
 
 func defaultTransactionConfig() TransactionConfig {

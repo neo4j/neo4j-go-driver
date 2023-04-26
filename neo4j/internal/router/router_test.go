@@ -50,29 +50,29 @@ func TestMultithreading(t *testing.T) {
 		},
 	}
 	n := time.Now()
-	router := New("router", func() []string { return []string{} }, nil, pool, logger, "routerid")
 	mut := sync.Mutex{}
-	router.now = func() time.Time {
+	timer := func() time.Time {
 		// Need to lock here to make race detector happy
 		mut.Lock()
 		defer mut.Unlock()
 		n = n.Add(time.Duration(table.TimeToLive) * time.Second * 2)
 		return n
 	}
+	router := New("router", func() []string { return []string{} }, nil, pool, logger, "routerid", &timer)
 
 	dbName := "dbname"
 	wg := sync.WaitGroup{}
 	wg.Add(2)
 	consumer := func() {
 		for i := 0; i < 30; i++ {
-			readers, err := router.Readers(context.Background(), nilBookmarks, dbName, nil)
+			readers, err := router.Readers(context.Background(), nilBookmarks, dbName, nil, nil)
 			if len(readers) != 2 {
 				t.Error("Wrong number of readers")
 			}
 			if err != nil {
 				t.Error(err)
 			}
-			writers, err := router.Writers(context.Background(), nilBookmarks, dbName, nil)
+			writers, err := router.Writers(context.Background(), nilBookmarks, dbName, nil, nil)
 			if len(writers) != 1 {
 				t.Error("Wrong number of writers")
 			}
@@ -107,34 +107,34 @@ func TestRespectsTimeToLiveAndInvalidate(t *testing.T) {
 	}
 	nzero := time.Now()
 	n := nzero
-	router := New("router", func() []string { return []string{} }, nil, pool, logger, "routerid")
-	router.now = func() time.Time {
+	timer := func() time.Time {
 		return n
 	}
+	router := New("router", func() []string { return []string{} }, nil, pool, logger, "routerid", &timer)
 	dbName := "dbname"
 
 	// First access should trigger initial table read
 	ctx := context.Background()
-	if _, err := router.Readers(ctx, nilBookmarks, dbName, nil); err != nil {
+	if _, err := router.Readers(ctx, nilBookmarks, dbName, nil, nil); err != nil {
 		testutil.AssertNoError(t, err)
 	}
 	assertNum(t, numfetch, 1, "Should have fetched initial")
 
 	// Second access with time set to same should not trigger a read
-	if _, err := router.Readers(ctx, nilBookmarks, dbName, nil); err != nil {
+	if _, err := router.Readers(ctx, nilBookmarks, dbName, nil, nil); err != nil {
 		testutil.AssertNoError(t, err)
 	}
 	assertNum(t, numfetch, 1, "Should not have have fetched")
 
 	// Third access with time passed table due should trigger fetch
 	n = n.Add(2 * time.Second)
-	if _, err := router.Readers(ctx, nilBookmarks, dbName, nil); err != nil {
+	if _, err := router.Readers(ctx, nilBookmarks, dbName, nil, nil); err != nil {
 		testutil.AssertNoError(t, err)
 	}
 	assertNum(t, numfetch, 2, "Should have have fetched")
 
 	// Just another one to make sure we're cached
-	if _, err := router.Readers(ctx, nilBookmarks, dbName, nil); err != nil {
+	if _, err := router.Readers(ctx, nilBookmarks, dbName, nil, nil); err != nil {
 		testutil.AssertNoError(t, err)
 	}
 	assertNum(t, numfetch, 2, "Should not have have fetched")
@@ -143,7 +143,7 @@ func TestRespectsTimeToLiveAndInvalidate(t *testing.T) {
 	if err := router.Invalidate(ctx, dbName); err != nil {
 		testutil.AssertNoError(t, err)
 	}
-	if _, err := router.Readers(ctx, nilBookmarks, dbName, nil); err != nil {
+	if _, err := router.Readers(ctx, nilBookmarks, dbName, nil, nil); err != nil {
 		testutil.AssertNoError(t, err)
 	}
 	assertNum(t, numfetch, 3, "Should have have fetched")
@@ -166,14 +166,14 @@ func TestUsesRootRouterWhenPreviousRoutersFails(t *testing.T) {
 	}
 	nzero := time.Now()
 	n := nzero
-	router := New("rootRouter", func() []string { return []string{} }, nil, pool, logger, "routerid")
-	router.now = func() time.Time {
+	timer := func() time.Time {
 		return n
 	}
+	router := New("rootRouter", func() []string { return []string{} }, nil, pool, logger, "routerid", &timer)
 	dbName := "dbname"
 
 	// First access should trigger initial table read from root router
-	if _, err := router.Readers(context.Background(), nilBookmarks, dbName, nil); err != nil {
+	if _, err := router.Readers(context.Background(), nilBookmarks, dbName, nil, nil); err != nil {
 		testutil.AssertNoError(t, err)
 	}
 	if borrows[0][0] != "rootRouter" {
@@ -181,7 +181,7 @@ func TestUsesRootRouterWhenPreviousRoutersFails(t *testing.T) {
 	}
 	// Next access should go to otherRouter
 	n = n.Add(2 * time.Second)
-	if _, err := router.Readers(context.Background(), nilBookmarks, dbName, nil); err != nil {
+	if _, err := router.Readers(context.Background(), nilBookmarks, dbName, nil, nil); err != nil {
 		testutil.AssertNoError(t, err)
 	}
 	if borrows[1][0] != "otherRouter" {
@@ -208,7 +208,7 @@ func TestUsesRootRouterWhenPreviousRoutersFails(t *testing.T) {
 		return &testutil.ConnFake{Table: &db.RoutingTable{TimeToLive: 1, Readers: []string{"aReader"}}}, nil
 	}
 	n = n.Add(2 * time.Second)
-	readers, err := router.Readers(context.Background(), nilBookmarks, dbName, nil)
+	readers, err := router.Readers(context.Background(), nilBookmarks, dbName, nil, nil)
 	if err != nil {
 		t.Error(err)
 	}
@@ -232,11 +232,12 @@ func TestUseGetRoutersHookWhenInitialRouterFails(t *testing.T) {
 	}
 	rootRouter := "rootRouter"
 	backupRouters := []string{"bup1", "bup2"}
-	router := New(rootRouter, func() []string { return backupRouters }, nil, pool, logger, "routerid")
+	timer := time.Now
+	router := New(rootRouter, func() []string { return backupRouters }, nil, pool, logger, "routerid", &timer)
 	dbName := "dbname"
 
 	// Trigger read of routing table
-	_, err := router.Readers(context.Background(), nilBookmarks, dbName, nil)
+	_, err := router.Readers(context.Background(), nilBookmarks, dbName, nil, nil)
 	testutil.AssertStringContain(t, err.Error(), "Unable to retrieve routing table")
 
 	expected := []string{rootRouter}
@@ -258,14 +259,15 @@ func TestWritersFailAfterNRetries(t *testing.T) {
 		},
 	}
 	numsleep := 0
-	router := New("router", func() []string { return []string{} }, nil, pool, logger, "routerid")
+	timer := time.Now
+	router := New("router", func() []string { return []string{} }, nil, pool, logger, "routerid", &timer)
 	router.sleep = func(time.Duration) {
 		numsleep++
 	}
 	dbName := "dbname"
 
 	// Should trigger a lot of retries to get a writer until it finally fails
-	writers, err := router.Writers(context.Background(), nilBookmarks, dbName, nil)
+	writers, err := router.Writers(context.Background(), nilBookmarks, dbName, nil, nil)
 	if err == nil {
 		t.Error("Should have failed")
 	}
@@ -295,7 +297,8 @@ func TestWritersRetriesWhenNoWriters(t *testing.T) {
 		},
 	}
 	numsleep := 0
-	router := New("router", func() []string { return []string{} }, nil, pool, logger, "routerid")
+	timer := time.Now
+	router := New("router", func() []string { return []string{} }, nil, pool, logger, "routerid", &timer)
 	router.sleep = func(time.Duration) {
 		numsleep++
 	}
@@ -303,7 +306,7 @@ func TestWritersRetriesWhenNoWriters(t *testing.T) {
 
 	// Should trigger initial table read that contains no writers and a second table read
 	// that gets the writers
-	writers, err := router.Writers(context.Background(), nilBookmarks, dbName, nil)
+	writers, err := router.Writers(context.Background(), nilBookmarks, dbName, nil, nil)
 	if err != nil {
 		t.Errorf("Got error: %s", err)
 	}
@@ -333,7 +336,8 @@ func TestReadersRetriesWhenNoReaders(t *testing.T) {
 		},
 	}
 	numsleep := 0
-	router := New("router", func() []string { return []string{} }, nil, pool, logger, "routerid")
+	timer := time.Now
+	router := New("router", func() []string { return []string{} }, nil, pool, logger, "routerid", &timer)
 	router.sleep = func(time.Duration) {
 		numsleep++
 	}
@@ -341,7 +345,7 @@ func TestReadersRetriesWhenNoReaders(t *testing.T) {
 
 	// Should trigger initial table read that contains no readers and a second table read
 	// that gets the readers
-	readers, err := router.Readers(context.Background(), nilBookmarks, dbName, nil)
+	readers, err := router.Readers(context.Background(), nilBookmarks, dbName, nil, nil)
 	if err != nil {
 		t.Errorf("Got error: %s", err)
 	}
@@ -366,14 +370,14 @@ func TestCleanUp(t *testing.T) {
 		},
 	}
 	now := time.Now()
-	router := New("router", func() []string { return []string{} }, nil, pool, logger, "routerid")
-	router.now = func() time.Time { return now }
+	timer := func() time.Time { return now }
+	router := New("router", func() []string { return []string{} }, nil, pool, logger, "routerid", &timer)
 
 	ctx := context.Background()
-	if _, err := router.Readers(ctx, nilBookmarks, "db1", nil); err != nil {
+	if _, err := router.Readers(ctx, nilBookmarks, "db1", nil, nil); err != nil {
 		testutil.AssertNoError(t, err)
 	}
-	if _, err := router.Readers(ctx, nilBookmarks, "db2", nil); err != nil {
+	if _, err := router.Readers(ctx, nilBookmarks, "db2", nil, nil); err != nil {
 		testutil.AssertNoError(t, err)
 	}
 
@@ -390,7 +394,7 @@ func TestCleanUp(t *testing.T) {
 		t.Fatal("Should not have removed routing tables")
 	}
 
-	router.now = func() time.Time { return now.Add(1 * time.Minute) }
+	timer = func() time.Time { return now.Add(1 * time.Minute) }
 	if err := router.CleanUp(ctx); err != nil {
 		testutil.AssertNoError(t, err)
 	}

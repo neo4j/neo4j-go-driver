@@ -8,13 +8,13 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      https://www.apache.org/licenses/LICENSE-2.0
+ *     https://www.apache.org/licenses/LICENSE-2.0
  *
- *  Unless required by applicable law or agreed to in writing, software
- *  distributed under the License is distributed on an "AS IS" BASIS,
- *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *  See the License for the specific language governing permissions and
- *  limitations under the License.
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 
 package db
@@ -33,6 +33,7 @@ type Neo4jError struct {
 	classification string
 	category       string
 	title          string
+	retriable      bool
 }
 
 func (e *Neo4jError) Error() string {
@@ -56,9 +57,10 @@ func (e *Neo4jError) Title() string {
 
 // parse code from Neo4j into usable parts.
 // Code Neo.ClientError.General.ForbiddenReadOnlyDatabase is split into:
-//   Classification: ClientError
-//   Category: General
-//   Title: ForbiddenReadOnlyDatabase
+//
+//	Classification: ClientError
+//	Category: General
+//	Title: ForbiddenReadOnlyDatabase
 func (e *Neo4jError) parse() {
 	if e.parsed {
 		return
@@ -90,6 +92,13 @@ func (e *Neo4jError) IsAuthenticationFailed() bool {
 	return e.Code == "Neo.ClientError.Security.Unauthorized"
 }
 
+func (e *Neo4jError) IsRetriable() bool {
+	return e.retriable ||
+		e.IsRetriableTransient() ||
+		e.IsRetriableCluster() ||
+		e.Code == "Neo.ClientError.Security.AuthorizationExpired"
+}
+
 func (e *Neo4jError) IsRetriableTransient() bool {
 	e.parse()
 	return e.classification == "TransientError"
@@ -101,6 +110,10 @@ func (e *Neo4jError) IsRetriableCluster() bool {
 		return true
 	}
 	return false
+}
+
+func (e *Neo4jError) MarkRetriable() {
+	e.retriable = true
 }
 
 type FeatureNotSupportedError struct {

@@ -8,13 +8,13 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      https://www.apache.org/licenses/LICENSE-2.0
+ *     https://www.apache.org/licenses/LICENSE-2.0
  *
- *  Unless required by applicable law or agreed to in writing, software
- *  distributed under the License is distributed on an "AS IS" BASIS,
- *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *  See the License for the specific language governing permissions and
- *  limitations under the License.
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 
 // Tool used for verifying driver under load.
@@ -24,7 +24,6 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/config"
 	"math/rand"
 	"sync"
 	"time"
@@ -52,9 +51,13 @@ func stressTest(ctx *TestContext, duration time.Duration,
 			var executor func(*TestContext)
 			for !ctx.ShouldStop() {
 				if rand.Intn(10) < 7 {
-					executor = successfulExecutors[rand.Intn(successfulExecutorsLen)]
+					succExecIndex := rand.Intn(successfulExecutorsLen)
+					fmt.Printf("Running successful executor at index %d\n", succExecIndex)
+					executor = successfulExecutors[succExecIndex]
 				} else {
-					executor = failingExecutors[rand.Intn(failingExecutorsLen)]
+					failExecIndex := rand.Intn(failingExecutorsLen)
+					fmt.Printf("Running failing executor at index %d\n", failExecIndex)
+					executor = failingExecutors[failExecIndex]
 				}
 
 				executor(ctx)
@@ -94,9 +97,7 @@ func main() {
 
 	ctx := context.Background()
 	auth := neo4j.BasicAuth(user, password, "")
-	driver, err := neo4j.NewDriverWithContext(uri, auth, func(conf *config.Config) {
-		conf.Log = neo4j.ConsoleLogger(neo4j.WARNING)
-	})
+	driver, err := neo4j.NewDriverWithContext(uri, auth)
 	if err != nil {
 		panic(err)
 	}
@@ -136,6 +137,7 @@ func main() {
 			ReadQueryExecutor(ctx, driver, true),
 			ReadQueryExecutor(ctx, driver, false),
 			WriteQueryInTxExecutor(ctx, driver, true),
+			VaccuumQueryInTxExecutor(ctx, driver, true),
 			WriteQueryInTxExecutor(ctx, driver, false),
 			ReadQueryInTxExecutor(ctx, driver, true),
 			ReadQueryInTxExecutor(ctx, driver, false),

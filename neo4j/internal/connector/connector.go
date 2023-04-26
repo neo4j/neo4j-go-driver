@@ -8,13 +8,13 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      https://www.apache.org/licenses/LICENSE-2.0
+ *     https://www.apache.org/licenses/LICENSE-2.0
  *
- *  Unless required by applicable law or agreed to in writing, software
- *  distributed under the License is distributed on an "AS IS" BASIS,
- *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *  See the License for the specific language governing permissions and
- *  limitations under the License.
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 
 // Package connector is responsible for connecting to a database server.
@@ -38,15 +38,21 @@ import (
 type Connector struct {
 	SkipEncryption   bool
 	SkipVerify       bool
-	Auth             map[string]any
 	Log              log.Logger
 	RoutingContext   map[string]string
 	Network          string
 	Config           *config.Config
 	SupplyConnection func(context.Context, string) (net.Conn, error)
+	Now              *func() time.Time
 }
 
-func (c Connector) Connect(ctx context.Context, address string, boltLogger log.BoltLogger) (db.Connection, error) {
+func (c Connector) Connect(
+	ctx context.Context,
+	address string,
+	auth *db.ReAuthToken,
+	callback bolt.Neo4jErrorCallback,
+	boltLogger log.BoltLogger,
+) (connection db.Connection, err error) {
 	if c.SupplyConnection == nil {
 		c.SupplyConnection = c.createConnection
 	}
@@ -55,6 +61,14 @@ func (c Connector) Connect(ctx context.Context, address string, boltLogger log.B
 	if err != nil {
 		return nil, err
 	}
+
+	defer func() {
+		if err != nil && connection == nil {
+			if err := conn.Close(); err != nil {
+				c.Log.Warnf(log.Driver, address, "could not close socket after failed connection")
+			}
+		}
+	}()
 
 	notificationConfig := db.NotificationConfig{
 		MinSev:  c.Config.NotificationsMinSeverity,
@@ -67,17 +81,16 @@ func (c Connector) Connect(ctx context.Context, address string, boltLogger log.B
 			ctx,
 			address,
 			conn,
-			c.Auth,
+			auth,
 			c.Config.UserAgent,
 			c.RoutingContext,
+			callback,
 			c.Log,
 			boltLogger,
 			notificationConfig,
+			c.Now,
 		)
 		if err != nil {
-			if connErr := conn.Close(); connErr != nil {
-				c.Log.Warnf(log.Driver, address, "could not close underlying socket after Bolt handshake error")
-			}
 			return nil, err
 		}
 		return connection, nil
@@ -86,7 +99,6 @@ func (c Connector) Connect(ctx context.Context, address string, boltLogger log.B
 	// TLS requested, continue with handshake
 	serverName, _, err := net.SplitHostPort(address)
 	if err != nil {
-		conn.Close()
 		return nil, err
 	}
 	tlsConn := tls.Client(conn, c.tlsConfig(serverName))
@@ -96,26 +108,24 @@ func (c Connector) Connect(ctx context.Context, address string, boltLogger log.B
 			// Give a bit nicer error message
 			err = errors.New("remote end closed the connection, check that TLS is enabled on the server")
 		}
-		conn.Close()
 		return nil, &errorutil.TlsError{Inner: err}
 	}
-	connection, err := bolt.Connect(ctx,
+	connection, err = bolt.Connect(ctx,
 		address,
 		tlsConn,
-		c.Auth,
+		auth,
 		c.Config.UserAgent,
 		c.RoutingContext,
+		callback,
 		c.Log,
 		boltLogger,
 		notificationConfig,
+		c.Now,
 	)
 	if err != nil {
-		if connErr := conn.Close(); connErr != nil {
-			c.Log.Warnf(log.Driver, address, "could not close underlying socket after Bolt handshake error")
-		}
 		return nil, err
 	}
-	return connection, nil
+	return
 }
 
 func (c Connector) createConnection(ctx context.Context, address string) (net.Conn, error) {

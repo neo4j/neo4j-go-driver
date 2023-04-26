@@ -8,13 +8,13 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      https://www.apache.org/licenses/LICENSE-2.0
+ *     https://www.apache.org/licenses/LICENSE-2.0
  *
- *  Unless required by applicable law or agreed to in writing, software
- *  distributed under the License is distributed on an "AS IS" BASIS,
- *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *  See the License for the specific language governing permissions and
- *  limitations under the License.
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 
 package testutil
@@ -34,7 +34,7 @@ type PoolFake struct {
 	BorrowHook  func() (db.Connection, error)
 }
 
-func (p *PoolFake) Borrow(context.Context, []string, bool, log.BoltLogger, time.Duration) (db.Connection, error) {
+func (p *PoolFake) Borrow(context.Context, []string, bool, log.BoltLogger, time.Duration, *db.ReAuthToken) (db.Connection, error) {
 	if p.BorrowHook != nil && (p.BorrowConn != nil || p.BorrowErr != nil) {
 		panic("either use the hook or the desired return values, but not both")
 	}
@@ -56,4 +56,8 @@ func (p *PoolFake) CleanUp(context.Context) error {
 		p.CleanUpHook()
 	}
 	return nil
+}
+
+func (p *PoolFake) Now() time.Time {
+	return time.Now()
 }

@@ -55,10 +55,12 @@ func WrapError(err error) error {
 		return &ConnectivityError{Inner: err}
 	}
 	switch e := err.(type) {
-	case *db.UnsupportedTypeError, *db.FeatureNotSupportedError:
+	case *db.UnsupportedTypeError:
 		// Usage of a type not supported by database network protocol or feature
 		// not supported by current version or edition.
 		return &UsageError{Message: err.Error()}
+	case *db.FeatureNotSupportedError:
+		return &UsageError{Message: fmt.Sprintf("feature not supported: %s", err.Error())}
 	case *PoolClosed:
 		return &UsageError{Message: err.Error()}
 	case *TlsError, net.Error:
@@ -75,7 +77,7 @@ func WrapError(err error) error {
 		return &ConnectivityError{Inner: err}
 	case *db.Neo4jError:
 		if e.Code == "Neo.ClientError.Security.TokenExpired" {
-			return &TokenExpiredError{Code: e.Code, Message: e.Msg}
+			return &TokenExpiredError{Code: e.Code, Message: e.Msg, cause: e}
 		}
 	}
 	if err != nil && err.Error() == InvalidTransactionError {
@@ -109,6 +111,11 @@ func (e *ConnectivityError) Error() string {
 type TokenExpiredError struct {
 	Code    string
 	Message string
+	cause   *db.Neo4jError
+}
+
+func (e *TokenExpiredError) Unwrap() error {
+	return e.cause
 }
 
 func (e *TokenExpiredError) Error() string {

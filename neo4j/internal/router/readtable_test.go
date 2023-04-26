@@ -22,6 +22,7 @@ package router
 import (
 	"context"
 	"errors"
+	iauth "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/auth"
 	idb "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/errorutil"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/log"
@@ -176,7 +177,16 @@ func TestReadTableTable(ot *testing.T) {
 		ot.Run(c.name, func(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			c.pool.cancel = cancel
-			table, err := readTable(ctx, c.pool, c.routers, nil, nil, "dbname", "", nil)
+			table, err := readTable(
+				ctx,
+				c.pool,
+				c.routers,
+				nil,
+				nil,
+				"dbname",
+				"",
+				&idb.ReAuthToken{Manager: iauth.Token{Tokens: map[string]any{"scheme": "none"}}},
+				nil)
 			c.assert(t, table, err)
 			if err != nil && c.assertErr != nil {
 				c.assertErr(t, err)

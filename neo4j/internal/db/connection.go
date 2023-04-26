@@ -8,13 +8,13 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      https://www.apache.org/licenses/LICENSE-2.0
+ *     https://www.apache.org/licenses/LICENSE-2.0
  *
- *  Unless required by applicable law or agreed to in writing, software
- *  distributed under the License is distributed on an "AS IS" BASIS,
- *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *  See the License for the specific language governing permissions and
- *  limitations under the License.
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 
 // Package db defines generic database functionality.
@@ -22,7 +22,9 @@ package db
 
 import (
 	"context"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/auth"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/db"
+	iauth "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/auth"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/log"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/notifications"
 	"math"
@@ -87,7 +89,7 @@ type Connection interface {
 	Connect(
 		ctx context.Context,
 		minor int,
-		auth map[string]any,
+		auth *ReAuthToken,
 		userAgent string,
 		routingContext map[string]string,
 		notificationConfig NotificationConfig,
@@ -150,8 +152,19 @@ type Connection interface {
 	GetRoutingTable(ctx context.Context, context map[string]string, bookmarks []string, database, impersonatedUser string) (*RoutingTable, error)
 	// SetBoltLogger sets Bolt message logger on already initialized connections
 	SetBoltLogger(boltLogger log.BoltLogger)
+	// ReAuth enqueues a `LOGOFF` and `LOGON` message if the passed credentials differ
+	// or `ReAuthToken.ForceReAuth` is `true`.
+	// If `ReAuthToken.ForceReAuth` is `true` the messages will be sent and their responses received.
+	// If `ReAuthToken.FromSession` is `false`, the credentials changed, and the protocol version does not support
+	// re-auth (bolt 5.1 and earlier) the connection will be closed.
+	// If it's `true` (under otherwise same conditions) a `FeatureNotSupportedError` will be returned.
+	ReAuth(context.Context, *ReAuthToken) error
 	// Version returns the protocol version of the connection
 	Version() db.ProtocolVersion
+	// ResetAuth clears any authentication token held by this connection
+	ResetAuth()
+	// GetCurrentAuth returns the current authentication manager and token that this connection is authenticated with
+	GetCurrentAuth() (auth.TokenManager, iauth.Token)
 }
 
 type RoutingTable struct {

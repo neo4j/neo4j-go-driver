@@ -1,3 +1,5 @@
+//go:build internal_testkit
+
 /*
  * Copyright (c) "Neo4j"
  * Neo4j Sweden AB [https://neo4j.com]
@@ -17,26 +19,16 @@
  *  limitations under the License.
  */
 
-package router
+package neo4j
 
-import (
-	"context"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/log"
-	"time"
-)
+import "time"
 
-type poolFake struct {
-	borrow   func(names []string, cancel context.CancelFunc, logger log.BoltLogger) (db.Connection, error)
-	returned []db.Connection
-	cancel   context.CancelFunc
+func SetTimer(d DriverWithContext, timer func() time.Time) {
+	driver := d.(*driverWithContext)
+	driver.now = timer
 }
 
-func (p *poolFake) Borrow(_ context.Context, servers []string, _ bool, logger log.BoltLogger, _ time.Duration, _ *db.ReAuthToken) (db.Connection, error) {
-	return p.borrow(servers, p.cancel, logger)
-}
-
-func (p *poolFake) Return(_ context.Context, c db.Connection) error {
-	p.returned = append(p.returned, c)
-	return nil
+func ResetTime(d DriverWithContext) {
+	driver := d.(*driverWithContext)
+	driver.now = time.Now
 }

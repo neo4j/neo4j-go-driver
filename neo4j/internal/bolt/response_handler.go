@@ -1,13 +1,14 @@
 package bolt
 
 import (
+	"context"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/db"
 )
 
 type responseHandler struct {
 	onSuccess func(*success)
 	onRecord  func(*db.Record)
-	onFailure func(*db.Neo4jError)
+	onFailure func(context.Context, *db.Neo4jError)
 	onUnknown func(any)
 	onIgnored func(*ignored)
 }

@@ -169,16 +169,16 @@ most accurate information about Neo4j releases.
 |---------------------|-----|-----|-------|-------|---------|-------|-------|-------|-------|-------|-------|-------|-------|
 | Neo4j 3.5 (EOL)     | Yes | Yes | (Yes) | (Yes) | (Yes)   | (Yes) | (Yes) | (Yes) | (Yes) | (Yes) | (Yes) | (Yes) | (Yes) |
 | Neo4j 4.0 (EOL)     | Yes | Yes | Yes   | Yes   | Yes     | (Yes) | (Yes) | (Yes) | (Yes) | (Yes) | (Yes) | (Yes) | (Yes) |
-| Neo4j 4.1 (EOL)     | ?   | Yes | Yes   | Yes   | Yes     | (Yes) | (Yes) | (Yes) | (Yes) | (Yes) | (Yes) | (Yes) | (Yes) | 
-| Neo4j 4.2 (EOL)     | ?   | ?   | Yes   | Yes   | Yes     | (Yes) | (Yes) | (Yes) | (Yes) | (Yes) | (Yes) | (Yes) | (Yes) | 
-| Neo4j 4.3 (EOL)     | ?   | ?   | Yes   | Yes   | Yes     | (Yes) | (Yes) | (Yes) | (Yes) | (Yes) | (Yes) | (Yes) | (Yes) | 
-| **Neo4j 4.4 (LTS)** | ?   | ?   | ?     | Yes   | Yes     | Yes   | Yes   | Yes   | Yes   | Yes   | Yes   | Yes   | (Yes) | 
-| Neo4j 5.0 (HO)      | ?   | ?   | ?     | ?     | Yes     | Yes   | Yes   | Yes   | Yes   | Yes   | Yes   | Yes   | (Yes) | 
-| Neo4j 5.1 (HO)      | ?   | ?   | ?     | ?     | (Yes)   | Yes   | Yes   | Yes   | Yes   | Yes   | Yes   | Yes   | (Yes) | 
-| Neo4j 5.2 (HO)      | ?   | ?   | ?     | ?     | (Yes)   | Yes   | Yes   | Yes   | Yes   | Yes   | Yes   | Yes   | (Yes) | 
-| Neo4j 5.3 (HO)      | ?   | ?   | ?     | ?     | (Yes)   | Yes   | Yes   | Yes   | Yes   | Yes   | Yes   | Yes   | (Yes) | 
-| Neo4j 5.4 (HO)      | ?   | ?   | ?     | ?     | (Yes)   | Yes   | Yes   | Yes   | Yes   | Yes   | Yes   | Yes   | (Yes) | 
-| Neo4j 5.5 (HO)      | ?   | ?   | ?     | ?     | (Yes)   | Yes   | Yes   | Yes   | Yes   | Yes   | Yes   | Yes   | (Yes) | 
+| Neo4j 4.1 (EOL)     | ?   | Yes | Yes   | Yes   | Yes     | (Yes) | (Yes) | (Yes) | (Yes) | (Yes) | (Yes) | (Yes) | (Yes) |
+| Neo4j 4.2 (EOL)     | ?   | ?   | Yes   | Yes   | Yes     | (Yes) | (Yes) | (Yes) | (Yes) | (Yes) | (Yes) | (Yes) | (Yes) |
+| Neo4j 4.3 (EOL)     | ?   | ?   | Yes   | Yes   | Yes     | (Yes) | (Yes) | (Yes) | (Yes) | (Yes) | (Yes) | (Yes) | (Yes) |
+| **Neo4j 4.4 (LTS)** | ?   | ?   | ?     | Yes   | Yes     | Yes   | Yes   | Yes   | Yes   | Yes   | Yes   | Yes   | (Yes) |
+| Neo4j 5.0 (HO)      | ?   | ?   | ?     | ?     | Yes     | Yes   | Yes   | Yes   | Yes   | Yes   | Yes   | Yes   | (Yes) |
+| Neo4j 5.1 (HO)      | ?   | ?   | ?     | ?     | (Yes)   | Yes   | Yes   | Yes   | Yes   | Yes   | Yes   | Yes   | (Yes) |
+| Neo4j 5.2 (HO)      | ?   | ?   | ?     | ?     | (Yes)   | Yes   | Yes   | Yes   | Yes   | Yes   | Yes   | Yes   | (Yes) |
+| Neo4j 5.3 (HO)      | ?   | ?   | ?     | ?     | (Yes)   | Yes   | Yes   | Yes   | Yes   | Yes   | Yes   | Yes   | (Yes) |
+| Neo4j 5.4 (HO)      | ?   | ?   | ?     | ?     | (Yes)   | Yes   | Yes   | Yes   | Yes   | Yes   | Yes   | Yes   | (Yes) |
+| Neo4j 5.5 (HO)      | ?   | ?   | ?     | ?     | (Yes)   | Yes   | Yes   | Yes   | Yes   | Yes   | Yes   | Yes   | (Yes) |
 | Neo4j 5.6           | ?   | ?   | ?     | ?     | (Yes)   | Yes   | Yes   | Yes   | Yes   | Yes   | Yes   | Yes   | (Yes) |
 | Neo4j 5.7           | ?   | ?   | ?     | ?     | (Yes)   | Yes   | Yes   | Yes   | Yes   | Yes   | Yes   | Yes   | Yes   |
 

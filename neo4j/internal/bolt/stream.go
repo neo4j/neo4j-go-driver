@@ -29,6 +29,7 @@ import (
 )
 
 type stream struct {
+	attached   bool
 	keys       []string
 	fifo       list.List
 	sum        *db.Summary

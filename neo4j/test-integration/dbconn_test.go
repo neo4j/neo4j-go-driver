@@ -8,13 +8,13 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      https://www.apache.org/licenses/LICENSE-2.0
+ *     https://www.apache.org/licenses/LICENSE-2.0
  *
- *  Unless required by applicable law or agreed to in writing, software
- *  distributed under the License is distributed on an "AS IS" BASIS,
- *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *  See the License for the specific language governing permissions and
- *  limitations under the License.
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 
 package test_integration
@@ -24,6 +24,7 @@ import (
 	"crypto/rand"
 	"fmt"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/db"
+	iauth "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/auth"
 	idb "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
 	"math"
 	"math/big"
@@ -39,6 +40,10 @@ import (
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/test-integration/dbserver"
 )
 
+func noopOnNeo4jError(context.Context, idb.Connection, *db.Neo4jError) error {
+	return nil
+}
+
 func makeRawConnection(ctx context.Context, logger log.Logger, boltLogger log.BoltLogger) (
 	dbserver.DbServer, idb.Connection) {
 	server := dbserver.GetDbServer(ctx)
@@ -53,22 +58,30 @@ func makeRawConnection(ctx context.Context, logger log.Logger, boltLogger log.Bo
 		panic(err)
 	}
 
-	authMap := map[string]any{
-		"scheme":      "basic",
-		"principal":   server.Username,
-		"credentials": server.Password,
+	auth := &idb.ReAuthToken{
+		FromSession: false,
+		Manager: iauth.Token{
+			Tokens: map[string]any{
+				"scheme":      "basic",
+				"principal":   server.Username,
+				"credentials": server.Password,
+			},
+		},
 	}
 
+	timer := time.Now
 	boltConn, err := bolt.Connect(
 		context.Background(),
 		parsedUri.Host,
 		tcpConn,
-		authMap,
+		auth,
 		"007",
 		nil,
+		noopOnNeo4jError,
 		logger,
 		boltLogger,
 		idb.NotificationConfig{},
+		&timer,
 	)
 	if err != nil {
 		panic(err)

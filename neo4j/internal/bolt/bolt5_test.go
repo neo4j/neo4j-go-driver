@@ -8,13 +8,13 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      https://www.apache.org/licenses/LICENSE-2.0
+ *     https://www.apache.org/licenses/LICENSE-2.0
  *
- *  Unless required by applicable law or agreed to in writing, software
- *  distributed under the License is distributed on an "AS IS" BASIS,
- *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *  See the License for the specific language governing permissions and
- *  limitations under the License.
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 
 package bolt
@@ -22,6 +22,7 @@ package bolt
 import (
 	"context"
 	"fmt"
+	iauth "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/auth"
 	idb "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/notifications"
 	"io"
@@ -70,10 +71,13 @@ func TestBolt5(outer *testing.T) {
 		},
 	}
 
-	auth := map[string]any{
-		"scheme":      "basic",
-		"principal":   "neo4j",
-		"credentials": "pass",
+	auth := &idb.ReAuthToken{
+		FromSession: false,
+		Manager: iauth.Token{Tokens: map[string]any{
+			"scheme":      "basic",
+			"principal":   "neo4j",
+			"credentials": "pass",
+		}},
 	}
 
 	assertBoltState := func(t *testing.T, expected int, bolt *bolt5) {
@@ -106,6 +110,7 @@ func TestBolt5(outer *testing.T) {
 		tcpConn, srv, cleanup := setupBolt5Pipe(t)
 		go serverJob(srv)
 
+		timer := time.Now
 		c, err := Connect(
 			context.Background(),
 			"serverName",
@@ -113,9 +118,11 @@ func TestBolt5(outer *testing.T) {
 			auth,
 			"007",
 			nil,
+			noopOnNeo4jError,
 			logger,
 			nil,
 			idb.NotificationConfig{},
+			&timer,
 		)
 		if err != nil {
 			t.Fatal(err)
@@ -249,6 +256,7 @@ func TestBolt5(outer *testing.T) {
 			}
 			srv.acceptHello()
 		}()
+		timer := time.Now
 		bolt, err := Connect(
 			context.Background(),
 			"serverName",
@@ -256,9 +264,11 @@ func TestBolt5(outer *testing.T) {
 			auth,
 			"007",
 			routingContext,
+			nil,
 			logger,
 			nil,
 			idb.NotificationConfig{},
+			&timer,
 		)
 		AssertNoError(t, err)
 		bolt.Close(context.Background())
@@ -280,6 +290,7 @@ func TestBolt5(outer *testing.T) {
 			srv.waitForLogon()
 			srv.acceptLogon()
 		}()
+		timer := time.Now
 		bolt, err := Connect(
 			context.Background(),
 			"serverName",
@@ -287,9 +298,11 @@ func TestBolt5(outer *testing.T) {
 			auth,
 			"007",
 			routingContext,
+			nil,
 			logger,
 			nil,
 			idb.NotificationConfig{},
+			&timer,
 		)
 		AssertNoError(t, err)
 		bolt.Close(context.Background())
@@ -308,6 +321,7 @@ func TestBolt5(outer *testing.T) {
 			}
 			srv.acceptHello()
 		}()
+		timer := time.Now
 		bolt, err := Connect(
 			context.Background(),
 			"serverName",
@@ -315,9 +329,11 @@ func TestBolt5(outer *testing.T) {
 			auth,
 			"007",
 			nil,
+			nil,
 			logger,
 			nil,
 			idb.NotificationConfig{},
+			&timer,
 		)
 		AssertNoError(t, err)
 		bolt.Close(context.Background())
@@ -338,6 +354,7 @@ func TestBolt5(outer *testing.T) {
 			srv.waitForLogon()
 			srv.acceptLogon()
 		}()
+		timer := time.Now
 		bolt, err := Connect(
 			context.Background(),
 			"serverName",
@@ -345,9 +362,11 @@ func TestBolt5(outer *testing.T) {
 			auth,
 			"007",
 			nil,
+			nil,
 			logger,
 			nil,
 			idb.NotificationConfig{},
+			&timer,
 		)
 		AssertNoError(t, err)
 		bolt.Close(context.Background())
@@ -363,6 +382,7 @@ func TestBolt5(outer *testing.T) {
 			srv.waitForHello()
 			srv.rejectHelloUnauthorized()
 		}()
+		timer := time.Now
 		bolt, err := Connect(
 			context.Background(),
 			"serverName",
@@ -370,9 +390,11 @@ func TestBolt5(outer *testing.T) {
 			auth,
 			"007",
 			nil,
+			noopOnNeo4jError,
 			logger,
 			nil,
 			idb.NotificationConfig{},
+			&timer,
 		)
 		AssertNil(t, bolt)
 		AssertError(t, err)
@@ -397,6 +419,7 @@ func TestBolt5(outer *testing.T) {
 			srv.waitForLogon()
 			srv.rejectLogonWithoutAuthToken()
 		}()
+		timer := time.Now
 		bolt, err := Connect(
 			context.Background(),
 			"serverName",
@@ -404,9 +427,11 @@ func TestBolt5(outer *testing.T) {
 			auth,
 			"007",
 			nil,
+			noopOnNeo4jError,
 			logger,
 			nil,
 			idb.NotificationConfig{},
+			&timer,
 		)
 		AssertNil(t, bolt)
 		AssertError(t, err)

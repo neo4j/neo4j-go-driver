@@ -21,6 +21,7 @@ package testutil
 
 import (
 	"context"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/log"
 )
 
@@ -55,21 +56,21 @@ func (r *RouterFake) Invalidate(ctx context.Context, database string) error {
 	return nil
 }
 
-func (r *RouterFake) Readers(ctx context.Context, bookmarksFn func(context.Context) ([]string, error), database string, log log.BoltLogger) ([]string, error) {
+func (r *RouterFake) Readers(_ context.Context, bookmarksFn func(context.Context) ([]string, error), database string, _ *db.ReAuthToken, _ log.BoltLogger) ([]string, error) {
 	if r.ReadersHook != nil {
 		return r.ReadersHook(bookmarksFn, database)
 	}
 	return r.ReadersRet, r.Err
 }
 
-func (r *RouterFake) Writers(ctx context.Context, bookmarksFn func(context.Context) ([]string, error), database string, log log.BoltLogger) ([]string, error) {
+func (r *RouterFake) Writers(_ context.Context, bookmarksFn func(context.Context) ([]string, error), database string, _ *db.ReAuthToken, _ log.BoltLogger) ([]string, error) {
 	if r.WritersHook != nil {
 		return r.WritersHook(bookmarksFn, database)
 	}
 	return r.WritersRet, r.Err
 }
 
-func (r *RouterFake) GetNameOfDefaultDatabase(ctx context.Context, bookmarks []string, user string, boltLogger log.BoltLogger) (string, error) {
+func (r *RouterFake) GetNameOfDefaultDatabase(_ context.Context, _ []string, user string, _ *db.ReAuthToken, _ log.BoltLogger) (string, error) {
 	if r.GetNameOfDefaultDbHook != nil {
 		return r.GetNameOfDefaultDbHook(user)
 	}

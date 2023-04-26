@@ -8,13 +8,13 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      https://www.apache.org/licenses/LICENSE-2.0
+ *     https://www.apache.org/licenses/LICENSE-2.0
  *
- *  Unless required by applicable law or agreed to in writing, software
- *  distributed under the License is distributed on an "AS IS" BASIS,
- *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *  See the License for the specific language governing permissions and
- *  limitations under the License.
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 
 package pool
@@ -23,6 +23,7 @@ import (
 	"container/list"
 	"context"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/log"
 	"sync/atomic"
 	"time"
 )
@@ -33,6 +34,7 @@ import (
 type server struct {
 	idle            list.List
 	busy            list.List
+	reservations    int
 	failedConnectAt time.Time
 	roundRobin      uint32
 }
@@ -49,25 +51,43 @@ var sharedRoundRobin uint32
 const rememberFailedConnectDuration = 3 * time.Minute
 
 // Returns an idle connection if any
-func (s *server) getIdle(ctx context.Context, idlenessThreshold time.Duration) (db.Connection, bool) {
+func (s *server) getIdle() db.Connection {
 	availableConnection := s.idle.Front()
 	found := availableConnection != nil
 	if found {
 		idleConnection := s.idle.Remove(availableConnection)
 		connection := idleConnection.(db.Connection)
-		if time.Since(connection.IdleDate()) > idlenessThreshold {
-			connection.ForceReset(ctx)
-			if !connection.IsAlive() {
-				return nil, found
-			}
-		}
 		s.busy.PushFront(idleConnection)
-		// Update round-robin counter every time we give away a connection and keep track
-		// of our own round-robin index
-		s.roundRobin = atomic.AddUint32(&sharedRoundRobin, 1)
-		return connection, found
+		return connection
 	}
-	return nil, found
+	return nil
+}
+
+// Returns an idle connection if any
+func (s *server) healthCheck(
+	ctx context.Context,
+	connection db.Connection,
+	idlenessThreshold time.Duration,
+	auth *db.ReAuthToken,
+	boltLogger log.BoltLogger) (healthy bool, _ error) {
+
+	connection.SetBoltLogger(boltLogger)
+	if time.Since(connection.IdleDate()) > idlenessThreshold {
+		connection.ForceReset(ctx)
+		if !connection.IsAlive() {
+			return false, nil
+		}
+	}
+	if err := connection.ReAuth(ctx, auth); err != nil {
+		return false, err
+	}
+	if !connection.IsAlive() {
+		return false, nil
+	}
+	// Update round-robin counter every time we give away a connection and keep track
+	// of our own round-robin index
+	atomic.StoreUint32(&s.roundRobin, atomic.AddUint32(&sharedRoundRobin, 1))
+	return true, nil
 }
 
 func (s *server) notifyFailedConnect(now time.Time) {
@@ -110,8 +130,9 @@ func (s *server) calculatePenalty(now time.Time) uint32 {
 	// Use last round-robin value as lowest priority penalty, so when all other is equal we will
 	// make sure to spread usage among the servers. And yes it will wrap around once in a while
 	// but since number of busy servers weights higher it will even out pretty fast.
-	penalty |= s.roundRobin & 0xff
 
+	roundRobin := atomic.LoadUint32(&s.roundRobin)
+	penalty |= roundRobin & 0xff
 	return penalty
 }
 
@@ -122,19 +143,19 @@ func (s *server) returnBusy(c db.Connection) {
 }
 
 // Number of idle connections
-func (s server) numIdle() int {
+func (s *server) numIdle() int {
 	return s.idle.Len()
 }
 
 // Number of busy connections
-func (s server) numBusy() int {
+func (s *server) numBusy() int {
 	return s.busy.Len()
 }
 
 // Adds a db to busy list
 func (s *server) registerBusy(c db.Connection) {
 	// Update round-robin to indicate when this server was last used.
-	s.roundRobin = atomic.AddUint32(&sharedRoundRobin, 1)
+	atomic.StoreUint32(&s.roundRobin, atomic.AddUint32(&sharedRoundRobin, 1))
 	s.busy.PushFront(c)
 }
 
@@ -151,7 +172,7 @@ func (s *server) unregisterBusy(c db.Connection) {
 }
 
 func (s *server) size() int {
-	return s.busy.Len() + s.idle.Len()
+	return s.busy.Len() + s.idle.Len() + s.reservations
 }
 
 func (s *server) removeIdleOlderThan(ctx context.Context, now time.Time, maxAge time.Duration) {
@@ -174,6 +195,15 @@ func (s *server) closeAll(ctx context.Context) {
 	closeAndEmptyConnections(ctx, s.idle)
 	// Closing the busy connections could mean here that we do close from another thread.
 	closeAndEmptyConnections(ctx, s.busy)
+}
+
+func (s *server) executeForAllConnections(callback func(c db.Connection)) {
+	for item := s.busy.Front(); item != nil; item = item.Next() {
+		callback(item.Value.(db.Connection))
+	}
+	for item := s.idle.Front(); item != nil; item = item.Next() {
+		callback(item.Value.(db.Connection))
+	}
 }
 
 func closeAndEmptyConnections(ctx context.Context, l list.List) {

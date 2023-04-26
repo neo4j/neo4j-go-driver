@@ -535,6 +535,10 @@ func (d *driverDelegate) VerifyConnectivity(ctx context.Context) error {
 	return d.delegate.VerifyConnectivity(ctx)
 }
 
+func (d *driverDelegate) VerifyAuthentication(ctx context.Context, auth *AuthToken) error {
+	return d.delegate.VerifyAuthentication(ctx, auth)
+}
+
 func (d *driverDelegate) Close(ctx context.Context) error {
 	return d.delegate.Close(ctx)
 }
@@ -601,6 +605,10 @@ func (s *fakeSession) legacy() Session {
 }
 
 func (s *fakeSession) getServerInfo(context.Context) (ServerInfo, error) {
+	panic("implement me")
+}
+
+func (s *fakeSession) verifyAuthentication(context.Context) error {
 	panic("implement me")
 }
 

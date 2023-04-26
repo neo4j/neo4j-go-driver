@@ -60,6 +60,10 @@ func (q *messageQueue) appendHello(hello map[string]any, helloHandler responseHa
 	q.enqueueCallback(helloHandler)
 }
 
+func (q *messageQueue) appendLogoff(logoffHandler responseHandler) {
+	q.out.appendLogoff()
+	q.enqueueCallback(logoffHandler)
+}
 func (q *messageQueue) appendLogon(token map[string]any, logonHandler responseHandler) {
 	q.out.appendLogon(token)
 	q.enqueueCallback(logonHandler)
@@ -156,7 +160,7 @@ func (q *messageQueue) receive(ctx context.Context) error {
 	case *success:
 		callback.onSuccess(message)
 	case *db.Neo4jError:
-		callback.onFailure(message)
+		callback.onFailure(ctx, message)
 		return message
 	case *ignored:
 		callback.onIgnored(message)

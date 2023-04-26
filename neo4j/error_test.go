@@ -20,6 +20,7 @@
 package neo4j
 
 import (
+	"errors"
 	"fmt"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/db"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/errorutil"
@@ -48,6 +49,14 @@ func TestIsRetryable(outer *testing.T) {
 			Code: "Neo.ClientError.General.ForbiddenOnReadOnlyDatabase",
 			Msg:  "One does not simply write to a read-only database.",
 		}},
+		{true, errorutil.CombineErrors(&db.Neo4jError{
+			Code: "Neo.ClientError.General.ForbiddenOnReadOnlyDatabase",
+			Msg:  "One does not simply write to a read-only database.",
+		}, errors.New("another error"))},
+		{true, errorutil.CombineAllErrors(&db.Neo4jError{
+			Code: "Neo.ClientError.General.ForbiddenOnReadOnlyDatabase",
+			Msg:  "One does not simply write to a read-only database.",
+		}, errors.New("another error"))},
 		{false, nil},
 		{false, &ConnectivityError{
 			Inner: &errorutil.CommitFailedDeadError{},

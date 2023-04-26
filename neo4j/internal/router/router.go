@@ -8,13 +8,13 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      https://www.apache.org/licenses/LICENSE-2.0
+ *     https://www.apache.org/licenses/LICENSE-2.0
  *
- *  Unless required by applicable law or agreed to in writing, software
- *  distributed under the License is distributed on an "AS IS" BASIS,
- *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *  See the License for the specific language governing permissions and
- *  limitations under the License.
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 
 package router
@@ -45,7 +45,7 @@ type Router struct {
 	pool          Pool
 	dbRouters     map[string]*databaseRouter
 	dbRoutersMut  racing.Mutex
-	now           func() time.Time
+	now           *func() time.Time
 	sleep         func(time.Duration)
 	rootRouter    string
 	getRouters    func() []string
@@ -58,11 +58,11 @@ type Pool interface {
 	// If all connections are busy and the pool is full, calls to Borrow may wait for a connection to become idle
 	// If a connection has been idle for longer than idlenessThreshold, it will be reset
 	// to check if it's still alive.
-	Borrow(ctx context.Context, servers []string, wait bool, boltLogger log.BoltLogger, idlenessThreshold time.Duration) (idb.Connection, error)
+	Borrow(ctx context.Context, servers []string, wait bool, boltLogger log.BoltLogger, idlenessThreshold time.Duration, auth *idb.ReAuthToken) (idb.Connection, error)
 	Return(ctx context.Context, c idb.Connection) error
 }
 
-func New(rootRouter string, getRouters func() []string, routerContext map[string]string, pool Pool, logger log.Logger, logId string) *Router {
+func New(rootRouter string, getRouters func() []string, routerContext map[string]string, pool Pool, logger log.Logger, logId string, timer *func() time.Time) *Router {
 	r := &Router{
 		rootRouter:    rootRouter,
 		getRouters:    getRouters,
@@ -70,7 +70,7 @@ func New(rootRouter string, getRouters func() []string, routerContext map[string
 		pool:          pool,
 		dbRouters:     make(map[string]*databaseRouter),
 		dbRoutersMut:  racing.NewMutex(),
-		now:           time.Now,
+		now:           timer,
 		sleep:         time.Sleep,
 		log:           logger,
 		logId:         logId,
@@ -79,7 +79,15 @@ func New(rootRouter string, getRouters func() []string, routerContext map[string
 	return r
 }
 
-func (r *Router) readTable(ctx context.Context, dbRouter *databaseRouter, bookmarks []string, database, impersonatedUser string, boltLogger log.BoltLogger) (*idb.RoutingTable, error) {
+func (r *Router) readTable(
+	ctx context.Context,
+	dbRouter *databaseRouter,
+	bookmarks []string,
+	database,
+	impersonatedUser string,
+	auth *idb.ReAuthToken,
+	boltLogger log.BoltLogger,
+) (*idb.RoutingTable, error) {
 	var (
 		table *idb.RoutingTable
 		err   error
@@ -89,20 +97,32 @@ func (r *Router) readTable(ctx context.Context, dbRouter *databaseRouter, bookma
 	if dbRouter != nil && len(dbRouter.table.Routers) > 0 {
 		routers := dbRouter.table.Routers
 		r.log.Infof(log.Router, r.logId, "Reading routing table for '%s' from previously known routers: %v", database, routers)
-		table, err = readTable(ctx, r.pool, routers, r.routerContext, bookmarks, database, impersonatedUser, boltLogger)
+		table, err = readTable(ctx, r.pool, routers, r.routerContext, bookmarks, database, impersonatedUser, auth, boltLogger)
+	}
+	if errorutil.IsFatalDuringDiscovery(err) {
+		r.log.Error(log.Router, r.logId, err)
+		return nil, err
 	}
 
 	// Try initial router if no routers or failed
 	if table == nil {
 		r.log.Infof(log.Router, r.logId, "Reading routing table from initial router: %s", r.rootRouter)
-		table, err = readTable(ctx, r.pool, []string{r.rootRouter}, r.routerContext, bookmarks, database, impersonatedUser, boltLogger)
+		table, err = readTable(ctx, r.pool, []string{r.rootRouter}, r.routerContext, bookmarks, database, impersonatedUser, auth, boltLogger)
+	}
+	if errorutil.IsFatalDuringDiscovery(err) {
+		r.log.Error(log.Router, r.logId, err)
+		return nil, err
 	}
 
 	// Use hook to retrieve possibly different set of routers and retry
 	if table == nil && r.getRouters != nil {
 		routers := r.getRouters()
 		r.log.Infof(log.Router, r.logId, "Reading routing table for '%s' from custom routers: %v", routers)
-		table, err = readTable(ctx, r.pool, routers, r.routerContext, bookmarks, database, impersonatedUser, boltLogger)
+		table, err = readTable(ctx, r.pool, routers, r.routerContext, bookmarks, database, impersonatedUser, auth, boltLogger)
+	}
+	if errorutil.IsFatalDuringDiscovery(err) {
+		r.log.Error(log.Router, r.logId, err)
+		return nil, err
 	}
 
 	if err != nil {
@@ -119,8 +139,8 @@ func (r *Router) readTable(ctx context.Context, dbRouter *databaseRouter, bookma
 	return table, nil
 }
 
-func (r *Router) getOrReadTable(ctx context.Context, bookmarksFn func(context.Context) ([]string, error), database string, boltLogger log.BoltLogger) (*idb.RoutingTable, error) {
-	now := r.now()
+func (r *Router) getOrReadTable(ctx context.Context, bookmarksFn func(context.Context) ([]string, error), database string, auth *idb.ReAuthToken, boltLogger log.BoltLogger) (*idb.RoutingTable, error) {
+	now := (*r.now)()
 
 	if !r.dbRoutersMut.TryLock(ctx) {
 		return nil, racing.LockTimeoutError("could not acquire router lock in time when getting routing table")
@@ -136,7 +156,7 @@ func (r *Router) getOrReadTable(ctx context.Context, bookmarksFn func(context.Co
 	if err != nil {
 		return nil, err
 	}
-	table, err := r.readTable(ctx, dbRouter, bookmarks, database, "", boltLogger)
+	table, err := r.readTable(ctx, dbRouter, bookmarks, database, "", auth, boltLogger)
 	if err != nil {
 		return nil, err
 	}
@@ -146,8 +166,8 @@ func (r *Router) getOrReadTable(ctx context.Context, bookmarksFn func(context.Co
 	return table, nil
 }
 
-func (r *Router) Readers(ctx context.Context, bookmarks func(context.Context) ([]string, error), database string, boltLogger log.BoltLogger) ([]string, error) {
-	table, err := r.getOrReadTable(ctx, bookmarks, database, boltLogger)
+func (r *Router) Readers(ctx context.Context, bookmarks func(context.Context) ([]string, error), database string, auth *idb.ReAuthToken, boltLogger log.BoltLogger) ([]string, error) {
+	table, err := r.getOrReadTable(ctx, bookmarks, database, auth, boltLogger)
 	if err != nil {
 		return nil, err
 	}
@@ -164,7 +184,7 @@ func (r *Router) Readers(ctx context.Context, bookmarks func(context.Context) ([
 			return nil, err
 		}
 		r.sleep(100 * time.Millisecond)
-		table, err = r.getOrReadTable(ctx, bookmarks, database, boltLogger)
+		table, err = r.getOrReadTable(ctx, bookmarks, database, auth, boltLogger)
 		if err != nil {
 			return nil, err
 		}
@@ -176,8 +196,8 @@ func (r *Router) Readers(ctx context.Context, bookmarks func(context.Context) ([
 	return table.Readers, nil
 }
 
-func (r *Router) Writers(ctx context.Context, bookmarks func(context.Context) ([]string, error), database string, boltLogger log.BoltLogger) ([]string, error) {
-	table, err := r.getOrReadTable(ctx, bookmarks, database, boltLogger)
+func (r *Router) Writers(ctx context.Context, bookmarks func(context.Context) ([]string, error), database string, auth *idb.ReAuthToken, boltLogger log.BoltLogger) ([]string, error) {
+	table, err := r.getOrReadTable(ctx, bookmarks, database, auth, boltLogger)
 	if err != nil {
 		return nil, err
 	}
@@ -194,7 +214,7 @@ func (r *Router) Writers(ctx context.Context, bookmarks func(context.Context) ([
 			return nil, err
 		}
 		r.sleep(100 * time.Millisecond)
-		table, err = r.getOrReadTable(ctx, bookmarks, database, boltLogger)
+		table, err = r.getOrReadTable(ctx, bookmarks, database, auth, boltLogger)
 		if err != nil {
 			return nil, err
 		}
@@ -206,13 +226,13 @@ func (r *Router) Writers(ctx context.Context, bookmarks func(context.Context) ([
 	return table.Writers, nil
 }
 
-func (r *Router) GetNameOfDefaultDatabase(ctx context.Context, bookmarks []string, user string, boltLogger log.BoltLogger) (string, error) {
-	table, err := r.readTable(ctx, nil, bookmarks, idb.DefaultDatabase, user, boltLogger)
+func (r *Router) GetNameOfDefaultDatabase(ctx context.Context, bookmarks []string, user string, auth *idb.ReAuthToken, boltLogger log.BoltLogger) (string, error) {
+	table, err := r.readTable(ctx, nil, bookmarks, idb.DefaultDatabase, user, auth, boltLogger)
 	if err != nil {
 		return "", err
 	}
 	// Store the fresh routing table as well to avoid another roundtrip to receive servers from session.
-	now := r.now()
+	now := (*r.now)()
 	if !r.dbRoutersMut.TryLock(ctx) {
 		return "", racing.LockTimeoutError("could not acquire router lock in time when resolving home database")
 	}
@@ -282,7 +302,7 @@ func (r *Router) InvalidateReader(ctx context.Context, db string, server string)
 
 func (r *Router) CleanUp(ctx context.Context) error {
 	r.log.Debugf(log.Router, r.logId, "Cleaning up")
-	now := r.now().Unix()
+	now := (*r.now)().Unix()
 	if !r.dbRoutersMut.TryLock(ctx) {
 		return racing.LockTimeoutError("could not acquire router lock in time when invalidating reader")
 	}
