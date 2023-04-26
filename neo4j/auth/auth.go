@@ -35,16 +35,24 @@ import (
 // WARNING:
 //
 //	The manager *must not* interact with the driver in any way as this can cause deadlocks and undefined behaviour.
-//
 //	Furthermore, the manager is expected to be thread-safe.
-//
-//	The token returned must always belong to the same identity.
-//	Switching identities using the `TokenManager` is undefined behavior.
 //
 // TokenManager is part of the re-authentication preview feature
 // (see README on what it means in terms of support and compatibility guarantees)
 type TokenManager interface {
+	// GetAuthToken retrieves an auth.Token or returns an error if the retrieval fails.
+	// auth.Token can be created with built-in functions such as:
+	//   - `neo4j.NoAuth`
+	//   - `neo4j.BasicAuth`
+	//   - `neo4j.KerberosAuth`
+	//   - `neo4j.BearerAuth`
+	//   - `neo4j.CustomAuth`
+	//
+	// The token returned must always belong to the same identity.
+	// Switching identities using the `TokenManager` is undefined behavior.
 	GetAuthToken(ctx context.Context) (auth.Token, error)
+	// OnTokenExpired is called by the driver when the provided token expires
+	// OnTokenExpired should invalidate the current token if it matches the provided one
 	OnTokenExpired(context.Context, auth.Token) error
 }
 
