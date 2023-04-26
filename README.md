@@ -106,47 +106,28 @@ func main() {
 }
 
 func insertItem(ctx context.Context, driver neo4j.DriverWithContext) (*Item, error) {
-    // Sessions are short-lived, cheap to create and NOT thread safe. Typically, create one or more sessions
-    // per request in your web application. Make sure to call Close on the session when done.
-    // For multi-database support, set `SessionConfig.DatabaseName` to target a specific database
-    // Session config will default to write mode. If only reads are to be used, configure `SessionConfig.AccessMode`.
-    session := driver.NewSession(ctx, neo4j.SessionConfig{})
-    defer session.Close(ctx)
-    // The generic neo4j.ExecuteRead API is also available should you only need to read data
-    // The non-generic session.ExecuteWrite and session.ExecuteRead are also available
-    return neo4j.ExecuteWrite[*Item](ctx, session, createItemFn(ctx))
-}
-
-func createItemFn(ctx context.Context) neo4j.ManagedTransactionWorkT[*Item] {
-    return func(tx neo4j.ManagedTransaction) (*Item, error) {
-        records, err := tx.Run(ctx, "CREATE (n:Item { id: $id, name: $name }) RETURN n", map[string]any{
+    result, err := neo4j.ExecuteQuery(ctx, driver,
+        "CREATE (n:Item { id: $id, name: $name }) RETURN n",
+        map[string]any{
             "id":   1,
             "name": "Item 1",
-        })
-        // In face of driver native errors, make sure to return them directly.
-        // Depending on the error, the driver may try to execute the function again.
-        if err != nil {
-            return nil, err
-        }
-        record, err := records.Single(ctx)
-        if err != nil {
-            return nil, err
-        }
-        //  The second returned value (ignored here) is only useful to disambiguate default primitive values (see Godoc)
-        itemNode, _, err := neo4j.GetRecordValue[neo4j.Node](record, "n")
-        if err != nil {
-            return nil, fmt.Errorf("could not find node n")
-        }
-        id, err := neo4j.GetProperty[int64](itemNode, "id")
-        if err != nil {
-            return nil, err
-        }
-        name, err := neo4j.GetProperty[string](itemNode, "name")
-        if err != nil {
-            return nil, err
-        }
-        return &Item{Id: id, Name: name}, nil
+        }, neo4j.EagerResultTransformer)
+    if err != nil {
+        return nil, err
     }
+    itemNode, _, err := neo4j.GetRecordValue[neo4j.Node](result.Records[0], "n")
+    if err != nil {
+        return nil, fmt.Errorf("could not find node n")
+    }
+    id, err := neo4j.GetProperty[int64](itemNode, "id")
+    if err != nil {
+        return nil, err
+    }
+    name, err := neo4j.GetProperty[string](itemNode, "name")
+    if err != nil {
+        return nil, err
+    }
+    return &Item{Id: id, Name: name}, nil
 }
 
 type Item struct {
