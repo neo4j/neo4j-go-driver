@@ -141,7 +141,7 @@ func (i *Item) String() string {
 
 ```
 
-## Sever/Driver compatibility
+## Server/Driver compatibility
 
 Starting with 5.0, the Neo4j Drivers will be moving to a monthly release cadence.
 A minor version will be released on the last Friday of each month so as to maintain versioning consistency with the core product (Neo4j DBMS) which has also moved to a monthly cadence.
