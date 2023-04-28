@@ -141,35 +141,17 @@ func (i *Item) String() string {
 
 ```
 
-## Neo4j and Bolt protocol versions
+## Sever/Driver compatibility
 
-Please look at the [supported version's documentation](https://neo4j.com/developer/kb/neo4j-supported-versions/) for the
-most accurate information about Neo4j releases.
+Starting with 5.0, the Neo4j Drivers will be moving to a monthly release cadence.
+A minor version will be released on the last Friday of each month so as to maintain versioning consistency with the core product (Neo4j DBMS) which has also moved to a monthly cadence.
 
-| Server \\ Driver    | 1.7 | 4.0 | 4.2   | 4.3   | **4.4** | 5.0   | 5.1   | 5.2   | 5.3   | 5.4   | 5.5   | 5.6   | 5.7   |
-|---------------------|-----|-----|-------|-------|---------|-------|-------|-------|-------|-------|-------|-------|-------|
-| Neo4j 3.5 (EOL)     | Yes | Yes | (Yes) | (Yes) | (Yes)   | (Yes) | (Yes) | (Yes) | (Yes) | (Yes) | (Yes) | (Yes) | (Yes) |
-| Neo4j 4.0 (EOL)     | Yes | Yes | Yes   | Yes   | Yes     | (Yes) | (Yes) | (Yes) | (Yes) | (Yes) | (Yes) | (Yes) | (Yes) |
-| Neo4j 4.1 (EOL)     | ?   | Yes | Yes   | Yes   | Yes     | (Yes) | (Yes) | (Yes) | (Yes) | (Yes) | (Yes) | (Yes) | (Yes) |
-| Neo4j 4.2 (EOL)     | ?   | ?   | Yes   | Yes   | Yes     | (Yes) | (Yes) | (Yes) | (Yes) | (Yes) | (Yes) | (Yes) | (Yes) |
-| Neo4j 4.3 (EOL)     | ?   | ?   | Yes   | Yes   | Yes     | (Yes) | (Yes) | (Yes) | (Yes) | (Yes) | (Yes) | (Yes) | (Yes) |
-| **Neo4j 4.4 (LTS)** | ?   | ?   | ?     | Yes   | Yes     | Yes   | Yes   | Yes   | Yes   | Yes   | Yes   | Yes   | (Yes) |
-| Neo4j 5.0 (HO)      | ?   | ?   | ?     | ?     | Yes     | Yes   | Yes   | Yes   | Yes   | Yes   | Yes   | Yes   | (Yes) |
-| Neo4j 5.1 (HO)      | ?   | ?   | ?     | ?     | (Yes)   | Yes   | Yes   | Yes   | Yes   | Yes   | Yes   | Yes   | (Yes) |
-| Neo4j 5.2 (HO)      | ?   | ?   | ?     | ?     | (Yes)   | Yes   | Yes   | Yes   | Yes   | Yes   | Yes   | Yes   | (Yes) |
-| Neo4j 5.3 (HO)      | ?   | ?   | ?     | ?     | (Yes)   | Yes   | Yes   | Yes   | Yes   | Yes   | Yes   | Yes   | (Yes) |
-| Neo4j 5.4 (HO)      | ?   | ?   | ?     | ?     | (Yes)   | Yes   | Yes   | Yes   | Yes   | Yes   | Yes   | Yes   | (Yes) |
-| Neo4j 5.5 (HO)      | ?   | ?   | ?     | ?     | (Yes)   | Yes   | Yes   | Yes   | Yes   | Yes   | Yes   | Yes   | (Yes) |
-| Neo4j 5.6           | ?   | ?   | ?     | ?     | (Yes)   | Yes   | Yes   | Yes   | Yes   | Yes   | Yes   | Yes   | (Yes) |
-| Neo4j 5.7           | ?   | ?   | ?     | ?     | (Yes)   | Yes   | Yes   | Yes   | Yes   | Yes   | Yes   | Yes   | Yes   |
+As a policy, patch versions will not be released except on rare occasions.
+Bug fixes and updates will go into the latest minor version and users should upgrade to that.
+Driver upgrades within a major version will never contain breaking API changes.
 
-- `(EOL)`: End Of Life, a server version is marked as such when it is not supported anymore
-- `(HO)`: Hotfixes only, a server version is marked as such when it is only updated for security patches
-- `(LTS)`: Long Term Support, a server version is marked as such when it actively receives updates over an extended
-  period of time
-- `Yes`: this driver/server version combination is supported across all official drivers
-- `(Yes)`: this driver/server version combination is supported by this driver, potentially with a subset of features
-- `?`: this driver/server version combination may or may not work at all
+See also: https://neo4j.com/developer/kb/neo4j-supported-versions/
+
 
 ## Connecting to a causal cluster
 
