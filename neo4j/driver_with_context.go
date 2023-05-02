@@ -117,6 +117,10 @@ type ResultTransformer[T any] interface {
 // be called in order to establish a connection to a neo4j database. It requires a Bolt URI and authentication
 // as parameters and can also take optional configuration function(s) as variadic parameters.
 //
+// No connectivity happens when NewDriverWithContext is called.
+// Call DriverWithContext.VerifyConnectivity once the driver is created if you want to eagerly check that the provided
+// URI and credentials are correct.
+//
 // In order to connect to a single instance database, you need to pass a URI with scheme 'bolt', 'bolt+s' or 'bolt+ssc'.
 //
 //	driver, err = NewDriverWithContext("bolt://db.server:7687", BasicAuth(username, password))
