@@ -239,6 +239,14 @@ func AssertDeepEquals(t *testing.T, values ...any) {
 	}
 }
 
+func AssertNotDeepEquals(t *testing.T, value1, value2 any) {
+	t.Helper()
+	if reflect.DeepEqual(value1, value2) {
+		t.Errorf("Expected value %v to not equal value %v", value1, value2)
+		return
+	}
+}
+
 func AssertAfter(t *testing.T, t1, t2 time.Time) {
 	t.Helper()
 	if !t1.After(t2) {

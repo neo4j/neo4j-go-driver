@@ -8,13 +8,13 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      https://www.apache.org/licenses/LICENSE-2.0
+ *     https://www.apache.org/licenses/LICENSE-2.0
  *
- *  Unless required by applicable law or agreed to in writing, software
- *  distributed under the License is distributed on an "AS IS" BASIS,
- *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *  See the License for the specific language governing permissions and
- *  limitations under the License.
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 
 // Package router handles routing of commands to different database servers part of a cluster.
@@ -65,14 +65,14 @@ func TestMultithreading(t *testing.T) {
 	wg.Add(2)
 	consumer := func() {
 		for i := 0; i < 30; i++ {
-			readers, err := router.Readers(context.Background(), nilBookmarks, dbName, nil, nil)
+			readers, err := router.GetOrUpdateReaders(context.Background(), nilBookmarks, dbName, nil, nil)
 			if len(readers) != 2 {
 				t.Error("Wrong number of readers")
 			}
 			if err != nil {
 				t.Error(err)
 			}
-			writers, err := router.Writers(context.Background(), nilBookmarks, dbName, nil, nil)
+			writers, err := router.GetOrUpdateWriters(context.Background(), nilBookmarks, dbName, nil, nil)
 			if len(writers) != 1 {
 				t.Error("Wrong number of writers")
 			}
@@ -115,26 +115,26 @@ func TestRespectsTimeToLiveAndInvalidate(t *testing.T) {
 
 	// First access should trigger initial table read
 	ctx := context.Background()
-	if _, err := router.Readers(ctx, nilBookmarks, dbName, nil, nil); err != nil {
+	if _, err := router.GetOrUpdateReaders(ctx, nilBookmarks, dbName, nil, nil); err != nil {
 		testutil.AssertNoError(t, err)
 	}
 	assertNum(t, numfetch, 1, "Should have fetched initial")
 
 	// Second access with time set to same should not trigger a read
-	if _, err := router.Readers(ctx, nilBookmarks, dbName, nil, nil); err != nil {
+	if _, err := router.GetOrUpdateReaders(ctx, nilBookmarks, dbName, nil, nil); err != nil {
 		testutil.AssertNoError(t, err)
 	}
 	assertNum(t, numfetch, 1, "Should not have have fetched")
 
 	// Third access with time passed table due should trigger fetch
 	n = n.Add(2 * time.Second)
-	if _, err := router.Readers(ctx, nilBookmarks, dbName, nil, nil); err != nil {
+	if _, err := router.GetOrUpdateReaders(ctx, nilBookmarks, dbName, nil, nil); err != nil {
 		testutil.AssertNoError(t, err)
 	}
 	assertNum(t, numfetch, 2, "Should have have fetched")
 
 	// Just another one to make sure we're cached
-	if _, err := router.Readers(ctx, nilBookmarks, dbName, nil, nil); err != nil {
+	if _, err := router.GetOrUpdateReaders(ctx, nilBookmarks, dbName, nil, nil); err != nil {
 		testutil.AssertNoError(t, err)
 	}
 	assertNum(t, numfetch, 2, "Should not have have fetched")
@@ -143,7 +143,7 @@ func TestRespectsTimeToLiveAndInvalidate(t *testing.T) {
 	if err := router.Invalidate(ctx, dbName); err != nil {
 		testutil.AssertNoError(t, err)
 	}
-	if _, err := router.Readers(ctx, nilBookmarks, dbName, nil, nil); err != nil {
+	if _, err := router.GetOrUpdateReaders(ctx, nilBookmarks, dbName, nil, nil); err != nil {
 		testutil.AssertNoError(t, err)
 	}
 	assertNum(t, numfetch, 3, "Should have have fetched")
@@ -173,7 +173,7 @@ func TestUsesRootRouterWhenPreviousRoutersFails(t *testing.T) {
 	dbName := "dbname"
 
 	// First access should trigger initial table read from root router
-	if _, err := router.Readers(context.Background(), nilBookmarks, dbName, nil, nil); err != nil {
+	if _, err := router.GetOrUpdateReaders(context.Background(), nilBookmarks, dbName, nil, nil); err != nil {
 		testutil.AssertNoError(t, err)
 	}
 	if borrows[0][0] != "rootRouter" {
@@ -181,7 +181,7 @@ func TestUsesRootRouterWhenPreviousRoutersFails(t *testing.T) {
 	}
 	// Next access should go to otherRouter
 	n = n.Add(2 * time.Second)
-	if _, err := router.Readers(context.Background(), nilBookmarks, dbName, nil, nil); err != nil {
+	if _, err := router.GetOrUpdateReaders(context.Background(), nilBookmarks, dbName, nil, nil); err != nil {
 		testutil.AssertNoError(t, err)
 	}
 	if borrows[1][0] != "otherRouter" {
@@ -208,7 +208,7 @@ func TestUsesRootRouterWhenPreviousRoutersFails(t *testing.T) {
 		return &testutil.ConnFake{Table: &db.RoutingTable{TimeToLive: 1, Readers: []string{"aReader"}}}, nil
 	}
 	n = n.Add(2 * time.Second)
-	readers, err := router.Readers(context.Background(), nilBookmarks, dbName, nil, nil)
+	readers, err := router.GetOrUpdateReaders(context.Background(), nilBookmarks, dbName, nil, nil)
 	if err != nil {
 		t.Error(err)
 	}
@@ -237,7 +237,7 @@ func TestUseGetRoutersHookWhenInitialRouterFails(t *testing.T) {
 	dbName := "dbname"
 
 	// Trigger read of routing table
-	_, err := router.Readers(context.Background(), nilBookmarks, dbName, nil, nil)
+	_, err := router.GetOrUpdateReaders(context.Background(), nilBookmarks, dbName, nil, nil)
 	testutil.AssertStringContain(t, err.Error(), "Unable to retrieve routing table")
 
 	expected := []string{rootRouter}
@@ -267,7 +267,7 @@ func TestWritersFailAfterNRetries(t *testing.T) {
 	dbName := "dbname"
 
 	// Should trigger a lot of retries to get a writer until it finally fails
-	writers, err := router.Writers(context.Background(), nilBookmarks, dbName, nil, nil)
+	writers, err := router.GetOrUpdateWriters(context.Background(), nilBookmarks, dbName, nil, nil)
 	if err == nil {
 		t.Error("Should have failed")
 	}
@@ -306,7 +306,7 @@ func TestWritersRetriesWhenNoWriters(t *testing.T) {
 
 	// Should trigger initial table read that contains no writers and a second table read
 	// that gets the writers
-	writers, err := router.Writers(context.Background(), nilBookmarks, dbName, nil, nil)
+	writers, err := router.GetOrUpdateWriters(context.Background(), nilBookmarks, dbName, nil, nil)
 	if err != nil {
 		t.Errorf("Got error: %s", err)
 	}
@@ -345,7 +345,7 @@ func TestReadersRetriesWhenNoReaders(t *testing.T) {
 
 	// Should trigger initial table read that contains no readers and a second table read
 	// that gets the readers
-	readers, err := router.Readers(context.Background(), nilBookmarks, dbName, nil, nil)
+	readers, err := router.GetOrUpdateReaders(context.Background(), nilBookmarks, dbName, nil, nil)
 	if err != nil {
 		t.Errorf("Got error: %s", err)
 	}
@@ -374,10 +374,10 @@ func TestCleanUp(t *testing.T) {
 	router := New("router", func() []string { return []string{} }, nil, pool, logger, "routerid", &timer)
 
 	ctx := context.Background()
-	if _, err := router.Readers(ctx, nilBookmarks, "db1", nil, nil); err != nil {
+	if _, err := router.GetOrUpdateReaders(ctx, nilBookmarks, "db1", nil, nil); err != nil {
 		testutil.AssertNoError(t, err)
 	}
-	if _, err := router.Readers(ctx, nilBookmarks, "db2", nil, nil); err != nil {
+	if _, err := router.GetOrUpdateReaders(ctx, nilBookmarks, "db2", nil, nil); err != nil {
 		testutil.AssertNoError(t, err)
 	}
 
