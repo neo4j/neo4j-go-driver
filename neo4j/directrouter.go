@@ -38,11 +38,19 @@ func (r *directRouter) InvalidateReader(context.Context, string, string) error {
 	return nil
 }
 
-func (r *directRouter) Readers(context.Context, func(context.Context) ([]string, error), string, *db.ReAuthToken, log.BoltLogger) ([]string, error) {
+func (r *directRouter) GetOrUpdateReaders(context.Context, func(context.Context) ([]string, error), string, *db.ReAuthToken, log.BoltLogger) ([]string, error) {
 	return []string{r.address}, nil
 }
 
-func (r *directRouter) Writers(context.Context, func(context.Context) ([]string, error), string, *db.ReAuthToken, log.BoltLogger) ([]string, error) {
+func (r *directRouter) Readers(context.Context, string) ([]string, error) {
+	return []string{r.address}, nil
+}
+
+func (r *directRouter) GetOrUpdateWriters(context.Context, func(context.Context) ([]string, error), string, *db.ReAuthToken, log.BoltLogger) ([]string, error) {
+	return []string{r.address}, nil
+}
+
+func (r *directRouter) Writers(context.Context, string) ([]string, error) {
 	return []string{r.address}, nil
 }
 

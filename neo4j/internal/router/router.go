@@ -58,7 +58,7 @@ type Pool interface {
 	// If all connections are busy and the pool is full, calls to Borrow may wait for a connection to become idle
 	// If a connection has been idle for longer than idlenessThreshold, it will be reset
 	// to check if it's still alive.
-	Borrow(ctx context.Context, servers []string, wait bool, boltLogger log.BoltLogger, idlenessThreshold time.Duration, auth *idb.ReAuthToken) (idb.Connection, error)
+	Borrow(ctx context.Context, getServers func(context.Context) ([]string, error), wait bool, boltLogger log.BoltLogger, idlenessThreshold time.Duration, auth *idb.ReAuthToken) (idb.Connection, error)
 	Return(ctx context.Context, c idb.Connection) error
 }
 
@@ -139,7 +139,17 @@ func (r *Router) readTable(
 	return table, nil
 }
 
-func (r *Router) getOrReadTable(ctx context.Context, bookmarksFn func(context.Context) ([]string, error), database string, auth *idb.ReAuthToken, boltLogger log.BoltLogger) (*idb.RoutingTable, error) {
+func (r *Router) getTable(ctx context.Context, database string) (*idb.RoutingTable, error) {
+	if !r.dbRoutersMut.TryLock(ctx) {
+		return nil, racing.LockTimeoutError("could not acquire router lock in time when getting routing table")
+	}
+	defer r.dbRoutersMut.Unlock()
+
+	dbRouter := r.dbRouters[database]
+	return r.getTableLocked(dbRouter, (*r.now)()), nil
+}
+
+func (r *Router) getOrUpdateTable(ctx context.Context, bookmarksFn func(context.Context) ([]string, error), database string, auth *idb.ReAuthToken, boltLogger log.BoltLogger) (*idb.RoutingTable, error) {
 	now := (*r.now)()
 
 	if !r.dbRoutersMut.TryLock(ctx) {
@@ -148,10 +158,21 @@ func (r *Router) getOrReadTable(ctx context.Context, bookmarksFn func(context.Co
 	defer r.dbRoutersMut.Unlock()
 
 	dbRouter := r.dbRouters[database]
-	if dbRouter != nil && now.Unix() < dbRouter.dueUnix {
-		return dbRouter.table, nil
+	if table := r.getTableLocked(dbRouter, now); table != nil {
+		return table, nil
 	}
 
+	return r.updateTable(ctx, bookmarksFn, database, auth, boltLogger, dbRouter, now)
+}
+
+func (r *Router) getTableLocked(dbRouter *databaseRouter, now time.Time) *idb.RoutingTable {
+	if dbRouter != nil && now.Unix() < dbRouter.dueUnix {
+		return dbRouter.table
+	}
+	return nil
+}
+
+func (r *Router) updateTable(ctx context.Context, bookmarksFn func(context.Context) ([]string, error), database string, auth *idb.ReAuthToken, boltLogger log.BoltLogger, dbRouter *databaseRouter, now time.Time) (*idb.RoutingTable, error) {
 	bookmarks, err := bookmarksFn(ctx)
 	if err != nil {
 		return nil, err
@@ -166,8 +187,8 @@ func (r *Router) getOrReadTable(ctx context.Context, bookmarksFn func(context.Co
 	return table, nil
 }
 
-func (r *Router) Readers(ctx context.Context, bookmarks func(context.Context) ([]string, error), database string, auth *idb.ReAuthToken, boltLogger log.BoltLogger) ([]string, error) {
-	table, err := r.getOrReadTable(ctx, bookmarks, database, auth, boltLogger)
+func (r *Router) GetOrUpdateReaders(ctx context.Context, bookmarks func(context.Context) ([]string, error), database string, auth *idb.ReAuthToken, boltLogger log.BoltLogger) ([]string, error) {
+	table, err := r.getOrUpdateTable(ctx, bookmarks, database, auth, boltLogger)
 	if err != nil {
 		return nil, err
 	}
@@ -184,7 +205,7 @@ func (r *Router) Readers(ctx context.Context, bookmarks func(context.Context) ([
 			return nil, err
 		}
 		r.sleep(100 * time.Millisecond)
-		table, err = r.getOrReadTable(ctx, bookmarks, database, auth, boltLogger)
+		table, err = r.getOrUpdateTable(ctx, bookmarks, database, auth, boltLogger)
 		if err != nil {
 			return nil, err
 		}
@@ -196,8 +217,19 @@ func (r *Router) Readers(ctx context.Context, bookmarks func(context.Context) ([
 	return table.Readers, nil
 }
 
-func (r *Router) Writers(ctx context.Context, bookmarks func(context.Context) ([]string, error), database string, auth *idb.ReAuthToken, boltLogger log.BoltLogger) ([]string, error) {
-	table, err := r.getOrReadTable(ctx, bookmarks, database, auth, boltLogger)
+func (r *Router) Readers(ctx context.Context, database string) ([]string, error) {
+	table, err := r.getTable(ctx, database)
+	if err != nil {
+		return nil, err
+	}
+	if table == nil {
+		return nil, nil
+	}
+	return table.Readers, nil
+}
+
+func (r *Router) GetOrUpdateWriters(ctx context.Context, bookmarks func(context.Context) ([]string, error), database string, auth *idb.ReAuthToken, boltLogger log.BoltLogger) ([]string, error) {
+	table, err := r.getOrUpdateTable(ctx, bookmarks, database, auth, boltLogger)
 	if err != nil {
 		return nil, err
 	}
@@ -214,7 +246,7 @@ func (r *Router) Writers(ctx context.Context, bookmarks func(context.Context) ([
 			return nil, err
 		}
 		r.sleep(100 * time.Millisecond)
-		table, err = r.getOrReadTable(ctx, bookmarks, database, auth, boltLogger)
+		table, err = r.getOrUpdateTable(ctx, bookmarks, database, auth, boltLogger)
 		if err != nil {
 			return nil, err
 		}
@@ -223,6 +255,17 @@ func (r *Router) Writers(ctx context.Context, bookmarks func(context.Context) ([
 		return nil, wrapError(r.rootRouter, errors.New("no writers"))
 	}
 
+	return table.Writers, nil
+}
+
+func (r *Router) Writers(ctx context.Context, database string) ([]string, error) {
+	table, err := r.getTable(ctx, database)
+	if err != nil {
+		return nil, err
+	}
+	if table == nil {
+		return nil, nil
+	}
 	return table.Writers, nil
 }
 

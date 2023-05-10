@@ -187,7 +187,7 @@ const FetchDefault = 0
 
 // Connection pool as seen by the session.
 type sessionPool interface {
-	Borrow(ctx context.Context, serverNames []string, wait bool, boltLogger log.BoltLogger, livenessCheckThreshold time.Duration, auth *idb.ReAuthToken) (idb.Connection, error)
+	Borrow(ctx context.Context, getServers func(context.Context) ([]string, error), wait bool, boltLogger log.BoltLogger, livenessCheckThreshold time.Duration, auth *idb.ReAuthToken) (idb.Connection, error)
 	Return(ctx context.Context, c idb.Connection) error
 	CleanUp(ctx context.Context) error
 	Now() time.Time
@@ -483,11 +483,21 @@ func (s *sessionWithContext) executeTransactionFunction(
 	return true, x
 }
 
-func (s *sessionWithContext) getServers(ctx context.Context, mode idb.AccessMode) ([]string, error) {
+func (s *sessionWithContext) getOrUpdateServers(ctx context.Context, mode idb.AccessMode) ([]string, error) {
 	if mode == idb.ReadMode {
-		return s.router.Readers(ctx, s.getBookmarks, s.config.DatabaseName, s.auth, s.config.BoltLogger)
+		return s.router.GetOrUpdateReaders(ctx, s.getBookmarks, s.config.DatabaseName, s.auth, s.config.BoltLogger)
 	} else {
-		return s.router.Writers(ctx, s.getBookmarks, s.config.DatabaseName, s.auth, s.config.BoltLogger)
+		return s.router.GetOrUpdateWriters(ctx, s.getBookmarks, s.config.DatabaseName, s.auth, s.config.BoltLogger)
+	}
+}
+
+func (s *sessionWithContext) getServers(mode idb.AccessMode) func(context.Context) ([]string, error) {
+	return func(ctx context.Context) ([]string, error) {
+		if mode == idb.ReadMode {
+			return s.router.Readers(ctx, s.config.DatabaseName)
+		} else {
+			return s.router.Writers(ctx, s.config.DatabaseName)
+		}
 	}
 }
 
@@ -509,14 +519,14 @@ func (s *sessionWithContext) getConnection(ctx context.Context, mode idb.AccessM
 	if err := s.resolveHomeDatabase(ctx); err != nil {
 		return nil, errorutil.WrapError(err)
 	}
-	servers, err := s.getServers(ctx, mode)
+	_, err := s.getOrUpdateServers(ctx, mode)
 	if err != nil {
 		return nil, errorutil.WrapError(err)
 	}
 
 	conn, err := s.pool.Borrow(
 		ctx,
-		servers,
+		s.getServers(mode),
 		s.driverConfig.ConnectionAcquisitionTimeout != 0,
 		s.config.BoltLogger,
 		livenessCheckThreshold,
@@ -654,13 +664,13 @@ func (s *sessionWithContext) getServerInfo(ctx context.Context) (ServerInfo, err
 	if err := s.resolveHomeDatabase(ctx); err != nil {
 		return nil, errorutil.WrapError(err)
 	}
-	servers, err := s.getServers(ctx, idb.ReadMode)
+	_, err := s.getOrUpdateServers(ctx, idb.ReadMode)
 	if err != nil {
 		return nil, errorutil.WrapError(err)
 	}
 	conn, err := s.pool.Borrow(
 		ctx,
-		servers,
+		s.getServers(idb.ReadMode),
 		s.driverConfig.ConnectionAcquisitionTimeout != 0,
 		s.config.BoltLogger,
 		0,
@@ -677,13 +687,13 @@ func (s *sessionWithContext) getServerInfo(ctx context.Context) (ServerInfo, err
 }
 
 func (s *sessionWithContext) verifyAuthentication(ctx context.Context) error {
-	servers, err := s.getServers(ctx, idb.ReadMode)
+	_, err := s.getOrUpdateServers(ctx, idb.ReadMode)
 	if err != nil {
 		return errorutil.WrapError(err)
 	}
 	conn, err := s.pool.Borrow(
 		ctx,
-		servers,
+		s.getServers(idb.ReadMode),
 		s.driverConfig.ConnectionAcquisitionTimeout != 0,
 		s.config.BoltLogger,
 		0,

@@ -8,13 +8,13 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      https://www.apache.org/licenses/LICENSE-2.0
+ *     https://www.apache.org/licenses/LICENSE-2.0
  *
- *  Unless required by applicable law or agreed to in writing, software
- *  distributed under the License is distributed on an "AS IS" BASIS,
- *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *  See the License for the specific language governing permissions and
- *  limitations under the License.
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 
 package testutil
@@ -28,10 +28,10 @@ import (
 type RouterFake struct {
 	Invalidated            bool
 	InvalidatedDb          string
-	ReadersRet             []string
-	ReadersHook            func(bookmarks func(context.Context) ([]string, error), database string) ([]string, error)
-	WritersRet             []string
-	WritersHook            func(bookmarks func(context.Context) ([]string, error), database string) ([]string, error)
+	GetOrUpdateReadersRet  []string
+	GetOrUpdateReadersHook func(bookmarks func(context.Context) ([]string, error), database string) ([]string, error)
+	GetOrUpdateWritersRet  []string
+	GetOrUpdateWritersHook func(bookmarks func(context.Context) ([]string, error), database string) ([]string, error)
 	Err                    error
 	CleanUpHook            func()
 	GetNameOfDefaultDbHook func(user string) (string, error)
@@ -56,18 +56,26 @@ func (r *RouterFake) Invalidate(ctx context.Context, database string) error {
 	return nil
 }
 
-func (r *RouterFake) Readers(_ context.Context, bookmarksFn func(context.Context) ([]string, error), database string, _ *db.ReAuthToken, _ log.BoltLogger) ([]string, error) {
-	if r.ReadersHook != nil {
-		return r.ReadersHook(bookmarksFn, database)
+func (r *RouterFake) GetOrUpdateReaders(_ context.Context, bookmarksFn func(context.Context) ([]string, error), database string, _ *db.ReAuthToken, _ log.BoltLogger) ([]string, error) {
+	if r.GetOrUpdateReadersHook != nil {
+		return r.GetOrUpdateReadersHook(bookmarksFn, database)
 	}
-	return r.ReadersRet, r.Err
+	return r.GetOrUpdateReadersRet, r.Err
 }
 
-func (r *RouterFake) Writers(_ context.Context, bookmarksFn func(context.Context) ([]string, error), database string, _ *db.ReAuthToken, _ log.BoltLogger) ([]string, error) {
-	if r.WritersHook != nil {
-		return r.WritersHook(bookmarksFn, database)
+func (r *RouterFake) Readers(context.Context, string) ([]string, error) {
+	return nil, nil
+}
+
+func (r *RouterFake) GetOrUpdateWriters(_ context.Context, bookmarksFn func(context.Context) ([]string, error), database string, _ *db.ReAuthToken, _ log.BoltLogger) ([]string, error) {
+	if r.GetOrUpdateWritersHook != nil {
+		return r.GetOrUpdateWritersHook(bookmarksFn, database)
 	}
-	return r.WritersRet, r.Err
+	return r.GetOrUpdateWritersRet, r.Err
+}
+
+func (r *RouterFake) Writers(context.Context, string) ([]string, error) {
+	return nil, nil
 }
 
 func (r *RouterFake) GetNameOfDefaultDatabase(_ context.Context, _ []string, user string, _ *db.ReAuthToken, _ log.BoltLogger) (string, error) {

@@ -73,6 +73,7 @@ type ConnFake struct {
 	Idle               time.Time
 	ServerVersionValue string
 	ForceResetHook     func()
+	ReAuthHook         func(context.Context, *idb.ReAuthToken) error
 }
 
 func (c *ConnFake) Connect(
@@ -195,7 +196,10 @@ func (c *ConnFake) SelectDatabase(database string) {
 func (c *ConnFake) SetBoltLogger(log.BoltLogger) {
 }
 
-func (c *ConnFake) ReAuth(context.Context, *idb.ReAuthToken) error {
+func (c *ConnFake) ReAuth(ctx context.Context, token *idb.ReAuthToken) error {
+	if c.ReAuthHook != nil {
+		return c.ReAuthHook(ctx, token)
+	}
 	return nil
 }
 
