@@ -169,6 +169,15 @@ func TestGetProperty(outer *testing.T) {
 				AssertNoError(t, err)
 			})
 
+			inner.Run("datetimes", func(t *testing.T) {
+				entity := test.make(singleProp("k", now))
+
+				prop, err := neo4j.GetProperty[time.Time](entity, "k")
+
+				AssertDeepEquals(t, prop, now)
+				AssertNoError(t, err)
+			})
+
 			inner.Run("durations", func(t *testing.T) {
 				entity := test.make(singleProp("k", neo4j.DurationOf(5, 4, 3, 2)))
 

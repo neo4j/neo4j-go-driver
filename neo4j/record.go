@@ -19,12 +19,15 @@
 
 package neo4j
 
-import "fmt"
+import (
+	"fmt"
+	"time"
+)
 
 type RecordValue interface {
 	bool | int64 | float64 | string |
 		Point2D | Point3D |
-		Date | LocalTime | LocalDateTime | Time | Duration | /* OffsetTime == Time == dbtype.Time */
+		Date | LocalTime | LocalDateTime | Time | Duration | time.Time | /* OffsetTime == Time == dbtype.Time */
 		[]byte | []any | map[string]any |
 		Node | Relationship | Path
 }
