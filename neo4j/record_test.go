@@ -168,6 +168,16 @@ func TestGetRecordValue(outer *testing.T) {
 			AssertNoError(t, err)
 		})
 
+		inner.Run("datetimes", func(t *testing.T) {
+			entity := record("k", now)
+
+			value, isNil, err := neo4j.GetRecordValue[time.Time](entity, "k")
+
+			AssertDeepEquals(t, value, now)
+			AssertFalse(t, isNil)
+			AssertNoError(t, err)
+		})
+
 		inner.Run("durations", func(t *testing.T) {
 			entity := record("k", neo4j.DurationOf(5, 4, 3, 2))
 

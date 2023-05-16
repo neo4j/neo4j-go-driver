@@ -21,12 +21,13 @@ package neo4j
 
 import (
 	"fmt"
+	"time"
 )
 
 type PropertyValue interface {
 	bool | int64 | float64 | string |
 		Point2D | Point3D |
-		Date | LocalTime | LocalDateTime | Time | Duration | /* OffsetTime == Time == dbtype.Time */
+		Date | LocalTime | LocalDateTime | Time | Duration | time.Time | /* OffsetTime == Time == dbtype.Time */
 		[]byte | []any
 }
 
