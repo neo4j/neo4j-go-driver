@@ -80,8 +80,12 @@ func (tx *explicitTransaction) Run(ctx context.Context, cypher string, params ma
 }
 
 func (tx *explicitTransaction) Commit(ctx context.Context) error {
-	if err := tx.checkCompleted(); err != nil {
-		return err
+	if tx.runFailed {
+		tx.runFailed = false
+		return tx.err
+	}
+	if tx.conn == nil {
+		return transactionAlreadyCompletedError()
 	}
 	tx.err = tx.conn.TxCommit(ctx, tx.txHandle)
 	tx.onClosed(tx)
@@ -97,8 +101,12 @@ func (tx *explicitTransaction) Close(ctx context.Context) error {
 }
 
 func (tx *explicitTransaction) Rollback(ctx context.Context) error {
-	if err := tx.checkCompleted(); err != nil {
-		return err
+	if tx.runFailed {
+		tx.runFailed = false
+		return nil
+	}
+	if tx.conn == nil {
+		return transactionAlreadyCompletedError()
 	}
 	if !tx.conn.IsAlive() || tx.conn.HasFailed() {
 		// tx implicitly rolled back by having failed
@@ -108,17 +116,6 @@ func (tx *explicitTransaction) Rollback(ctx context.Context) error {
 	}
 	tx.onClosed(tx)
 	return errorutil.WrapError(tx.err)
-}
-
-func (tx *explicitTransaction) checkCompleted() error {
-	if tx.runFailed {
-		tx.runFailed = false
-		return tx.err
-	}
-	if tx.conn == nil {
-		return transactionAlreadyCompletedError()
-	}
-	return nil
 }
 
 func (tx *explicitTransaction) legacy() Transaction {
