@@ -308,7 +308,6 @@ func (s *sessionWithContext) BeginTransaction(ctx context.Context, configurers .
 		return nil, errorutil.WrapError(err)
 	}
 
-	// Begin transaction
 	beginBookmarks, err := s.getBookmarks(ctx)
 	if err != nil {
 		_ = s.pool.Return(ctx, conn)
@@ -337,10 +336,14 @@ func (s *sessionWithContext) BeginTransaction(ctx context.Context, configurers .
 		fetchSize: s.fetchSize,
 		txHandle:  txHandle,
 		onClosed: func(tx *explicitTransaction) {
-			// On transaction closed (rolled back or committed)
-			bookmarkErr := s.retrieveBookmarks(ctx, conn, beginBookmarks)
-			poolErr := s.pool.Return(ctx, conn)
+			if tx.conn == nil {
+				return
+			}
+			// On run failure, transaction closed (rolled back or committed)
+			bookmarkErr := s.retrieveBookmarks(ctx, tx.conn, beginBookmarks)
+			poolErr := s.pool.Return(ctx, tx.conn)
 			tx.err = errorutil.CombineAllErrors(tx.err, bookmarkErr, poolErr)
+			tx.conn = nil
 			s.explicitTx = nil
 		},
 	}

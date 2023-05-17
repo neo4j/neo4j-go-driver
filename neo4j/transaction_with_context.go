@@ -59,14 +59,15 @@ type explicitTransaction struct {
 	conn      db.Connection
 	fetchSize int
 	txHandle  db.TxHandle
-	done      bool
 	runFailed bool
 	err       error
 	onClosed  func(*explicitTransaction)
 }
 
-func (tx *explicitTransaction) Run(ctx context.Context, cypher string,
-	params map[string]any) (ResultWithContext, error) {
+func (tx *explicitTransaction) Run(ctx context.Context, cypher string, params map[string]any) (ResultWithContext, error) {
+	if tx.conn == nil {
+		return nil, transactionAlreadyCompletedError()
+	}
 	stream, err := tx.conn.RunTx(ctx, tx.txHandle, db.Command{Cypher: cypher, Params: params, FetchSize: tx.fetchSize})
 	if err != nil {
 		tx.err = err
@@ -79,21 +80,16 @@ func (tx *explicitTransaction) Run(ctx context.Context, cypher string,
 }
 
 func (tx *explicitTransaction) Commit(ctx context.Context) error {
-	if tx.runFailed {
-		tx.runFailed, tx.done = false, true
-		return tx.err
-	}
-	if tx.done {
-		return transactionAlreadyCompletedError()
+	if err := tx.checkCompleted(); err != nil {
+		return err
 	}
 	tx.err = tx.conn.TxCommit(ctx, tx.txHandle)
-	tx.done = true
 	tx.onClosed(tx)
 	return errorutil.WrapError(tx.err)
 }
 
 func (tx *explicitTransaction) Close(ctx context.Context) error {
-	if tx.done {
+	if tx.conn == nil {
 		// repeated calls to Close => NOOP
 		return nil
 	}
@@ -101,12 +97,8 @@ func (tx *explicitTransaction) Close(ctx context.Context) error {
 }
 
 func (tx *explicitTransaction) Rollback(ctx context.Context) error {
-	if tx.runFailed {
-		tx.done, tx.runFailed = true, false
-		return nil
-	}
-	if tx.done {
-		return transactionAlreadyCompletedError()
+	if err := tx.checkCompleted(); err != nil {
+		return err
 	}
 	if !tx.conn.IsAlive() || tx.conn.HasFailed() {
 		// tx implicitly rolled back by having failed
@@ -114,9 +106,19 @@ func (tx *explicitTransaction) Rollback(ctx context.Context) error {
 	} else {
 		tx.err = tx.conn.TxRollback(ctx, tx.txHandle)
 	}
-	tx.done = true
 	tx.onClosed(tx)
 	return errorutil.WrapError(tx.err)
+}
+
+func (tx *explicitTransaction) checkCompleted() error {
+	if tx.runFailed {
+		tx.runFailed = false
+		return tx.err
+	}
+	if tx.conn == nil {
+		return transactionAlreadyCompletedError()
+	}
+	return nil
 }
 
 func (tx *explicitTransaction) legacy() Transaction {
@@ -189,5 +191,5 @@ func (tx *autocommitTransaction) discard(ctx context.Context) {
 }
 
 func transactionAlreadyCompletedError() *UsageError {
-	return &UsageError{Message: "commit or rollback already called once on this transaction"}
+	return &UsageError{Message: "cannot use this transaction, because it has been committed or rolled back either because of an error or explicit termination"}
 }
