@@ -63,7 +63,7 @@ type NotificationMinimumSeverityLevel string
 
 const (
 	DefaultLevel     NotificationMinimumSeverityLevel = ""
-	DisabledLevel    NotificationMinimumSeverityLevel = "DISABLED"
+	DisabledLevel    NotificationMinimumSeverityLevel = "OFF"
 	WarningLevel     NotificationMinimumSeverityLevel = "WARNING"
 	InformationLevel NotificationMinimumSeverityLevel = "INFORMATION"
 )
