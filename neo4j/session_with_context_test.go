@@ -655,6 +655,7 @@ func TestSession(outer *testing.T) {
 			sess.Close(context.Background())
 			wg.Wait()
 		})
+
 		ct.Run("Cleans up router async", func(t *testing.T) {
 			router, _, sess := createSession()
 			wg := sync.WaitGroup{}
@@ -665,7 +666,81 @@ func TestSession(outer *testing.T) {
 			sess.Close(context.Background())
 			wg.Wait()
 		})
+
+		ct.Run("Does not put back connection twice to the pool", func(inner *testing.T) {
+			type testCase struct {
+				name       string
+				completeTx func(context.Context, SessionWithContext, ExplicitTransaction) error
+			}
+			cases := []testCase{
+				{
+					name: "session close",
+					completeTx: func(ctx context.Context, session SessionWithContext, _ ExplicitTransaction) error {
+						return session.Close(ctx)
+					},
+				},
+				{
+					name: "tx commit",
+					completeTx: func(ctx context.Context, _ SessionWithContext, transaction ExplicitTransaction) error {
+						return transaction.Commit(ctx)
+					},
+				},
+				{
+					name: "tx rollback",
+					completeTx: func(ctx context.Context, _ SessionWithContext, transaction ExplicitTransaction) error {
+						return transaction.Rollback(ctx)
+					},
+				},
+				{
+					name: "tx close",
+					completeTx: func(ctx context.Context, _ SessionWithContext, transaction ExplicitTransaction) error {
+						return transaction.Close(ctx)
+					},
+				},
+			}
+
+			for _, test := range cases {
+				inner.Run(fmt.Sprintf("after %s", test.name), func(t *testing.T) {
+					_, pool, session := createSession()
+					conn := &ConnFake{Alive: true, RunTxErr: errors.New("invalid transaction handle")}
+					poolReturnsCalls := 0
+					pool.BorrowConn = conn
+					pool.ReturnHook = func() {
+						poolReturnsCalls++
+					}
+					tx, err := session.BeginTransaction(ctx)
+
+					AssertNoError(t, err)
+					AssertNoError(t, test.completeTx(ctx, session, tx))
+					AssertIntEqual(t, poolReturnsCalls, 1)
+					_, err = tx.Run(ctx, "RETURN 42", nil)
+					AssertErrorMessageContains(t, err, "cannot use this transaction")
+					AssertIntEqual(t, poolReturnsCalls, 1) // pool.Return must not be called again
+				})
+			}
+		})
+
+		ct.Run("Does not put back connection twice to the pool after second failed run", func(t *testing.T) {
+			_, pool, session := createSession()
+			runTxErr := errors.New("oopsie")
+			conn := &ConnFake{Alive: true, RunTxErr: runTxErr}
+			poolReturnsCalls := 0
+			pool.BorrowConn = conn
+			pool.ReturnHook = func() {
+				poolReturnsCalls++
+			}
+			tx, err := session.BeginTransaction(ctx)
+
+			AssertNoError(t, err)
+			_, err = tx.Run(ctx, "RETURN 42", nil)
+			AssertDeepEquals(t, err, runTxErr)
+			AssertIntEqual(t, poolReturnsCalls, 1)
+			_, err = tx.Run(ctx, "RETURN 42", nil)
+			AssertErrorMessageContains(t, err, "cannot use this transaction")
+			AssertIntEqual(t, poolReturnsCalls, 1) // pool.Return must not be called again
+		})
 	})
+
 }
 
 func assertTokenExpiredError(t *testing.T, err error) {
