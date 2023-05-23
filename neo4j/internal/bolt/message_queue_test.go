@@ -43,12 +43,12 @@ func TestMessageQueue(outer *testing.T) {
 			msgHello:    {onSuccess: func(*success) {}},
 			msgLogon:    {onFailure: func(context.Context, *db.Neo4jError) {}},
 			msgRoute:    {onIgnored: func(*ignored) {}},
-			msgBegin:    {onUnknown: func(any) {}},
+			msgBegin:    {onSuccess: func(*success) {}},
 			msgRun:      {onRecord: func(*db.Record) {}},
 			msgPullN:    {onSuccess: func(*success) {}},
 			msgCommit:   {onFailure: func(context.Context, *db.Neo4jError) {}},
 			msgRollback: {onIgnored: func(*ignored) {}},
-			msgDiscardN: {onUnknown: func(any) {}},
+			msgDiscardN: {onSuccess: func(*success) {}},
 			msgReset:    {onRecord: func(*db.Record) {}},
 			msgGoodbye:  {onSuccess: func(*success) {}},
 		}
@@ -246,9 +246,6 @@ func assertEqualResponseHandlers(t *testing.T, handler1, handler2 responseHandle
 	}
 	if !functionEqual(handler1.onFailure, handler2.onFailure) {
 		t.Errorf("expected onFailure callbacks to be equal")
-	}
-	if !functionEqual(handler1.onUnknown, handler2.onUnknown) {
-		t.Errorf("expected onUnknown callbacks to be equal")
 	}
 }
 

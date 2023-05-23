@@ -23,6 +23,7 @@ import (
 	"container/list"
 	"context"
 	"errors"
+	"fmt"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/db"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/log"
 	"net"
@@ -165,7 +166,7 @@ func (q *messageQueue) receive(ctx context.Context) error {
 	case *ignored:
 		callback.onIgnored(message)
 	default:
-		callback.onUnknown(message)
+		panic(fmt.Errorf("did not expect message %v", res))
 	}
 	return nil
 }
