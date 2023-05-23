@@ -159,32 +159,32 @@ func (q *messageQueue) receive(ctx context.Context) error {
 	case *db.Record:
 		onRecord := handler.onRecord
 		if onRecord == nil {
-			return errors.New("this response handler does not support RECORD")
+			return errors.New("protocol violation: the server sent an unexpected RECORD response")
 		}
 		onRecord(message)
 	case *success:
 		onSuccess := handler.onSuccess
 		if onSuccess == nil {
-			return errors.New("this response handler does not support SUCCESS")
+			return errors.New("protocol violation: the server sent an unexpected SUCCESS response")
 		}
 		onSuccess(message)
 	case *db.Neo4jError:
 		onFailure := handler.onFailure
 		if onFailure == nil {
-			return errors.New("this response handler does not support FAILURE")
+			return errors.New("protocol violation: the server sent an unexpected FAILURE response")
 		}
 		onFailure(ctx, message)
 		return message
 	case *ignored:
 		onIgnored := handler.onIgnored
 		if onIgnored == nil {
-			return errors.New("this response handler does not support IGNORED")
+			return errors.New("protocol violation: the server sent an unexpected IGNORED response")
 		}
 		onIgnored(message)
 	default:
 		onUnknown := handler.onUnknown
 		if onUnknown == nil {
-			return fmt.Errorf("this response handler does not support unknown %v", message)
+			return fmt.Errorf("protocol violation: the server sent an unknown %v response", message)
 		}
 		onUnknown(message)
 	}

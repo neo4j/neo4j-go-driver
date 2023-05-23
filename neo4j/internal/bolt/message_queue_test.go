@@ -245,7 +245,7 @@ func TestMessageQueue(outer *testing.T) {
 						writer.appendX(msgRecord, []any{})
 						writer.send(ctx, server)
 					},
-					expectedErrorMsg: "this response handler does not support RECORD",
+					expectedErrorMsg: "protocol violation: the server sent an unexpected RECORD response",
 				},
 				{
 					description: "SUCCESS",
@@ -253,7 +253,7 @@ func TestMessageQueue(outer *testing.T) {
 						writer.appendX(msgSuccess, map[string]any{})
 						writer.send(ctx, server)
 					},
-					expectedErrorMsg: "this response handler does not support SUCCESS",
+					expectedErrorMsg: "protocol violation: the server sent an unexpected SUCCESS response",
 				},
 				{
 					description: "FAILURE",
@@ -261,7 +261,7 @@ func TestMessageQueue(outer *testing.T) {
 						writer.appendX(msgFailure, map[string]any{})
 						writer.send(ctx, server)
 					},
-					expectedErrorMsg: "this response handler does not support FAILURE",
+					expectedErrorMsg: "protocol violation: the server sent an unexpected FAILURE response",
 				},
 				{
 					description: "IGNORED",
@@ -269,7 +269,7 @@ func TestMessageQueue(outer *testing.T) {
 						writer.appendX(msgIgnored)
 						writer.send(ctx, server)
 					},
-					expectedErrorMsg: "this response handler does not support IGNORED",
+					expectedErrorMsg: "protocol violation: the server sent an unexpected IGNORED response",
 				},
 			}
 
@@ -281,7 +281,7 @@ func TestMessageQueue(outer *testing.T) {
 					go func() {
 						err := queue.receive(ctx)
 
-						AssertErrorMessageContains(inner, err, test.expectedErrorMsg)
+						AssertErrorMessageContains(t, err, test.expectedErrorMsg)
 						done <- struct{}{}
 					}()
 
