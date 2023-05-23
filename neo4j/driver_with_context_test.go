@@ -471,6 +471,43 @@ func TestDriverExecuteQuery(outer *testing.T) {
 	})
 }
 
+func TestEagerResult(outer *testing.T) {
+	outer.Parallel()
+
+	outer.Run("returns single result", func(t *testing.T) {
+		result := &EagerResult{Records: []*Record{{
+			Keys:   []string{"1", "2", "3"},
+			Values: []any{1, 2, 3},
+		}}}
+
+		record, err := result.Single()
+
+		AssertNoError(t, err)
+
+		AssertDeepEquals(t, record.Keys, []string{"1", "2", "3"})
+		AssertDeepEquals(t, record.Values, []any{1, 2, 3})
+	})
+
+	outer.Run("fails to return result with 0 records", func(t *testing.T) {
+		result := &EagerResult{}
+
+		_, err := result.Single()
+
+		AssertErrorMessageContains(t, err, "result does not contain any records")
+	})
+
+	outer.Run("fails to return result with 2 records", func(t *testing.T) {
+		result := &EagerResult{Records: []*Record{
+			{Keys: []string{"1"}, Values: []any{1}},
+			{Keys: []string{"2"}, Values: []any{2}},
+		}}
+
+		_, err := result.Single()
+
+		AssertErrorMessageContains(t, err, "result contains more than one record")
+	})
+}
+
 func callExecuteQueryOrBookmarkManagerGetter(driver DriverWithContext, i int) {
 	if i%2 == 0 {
 		// this lazily initializes the default bookmark manager

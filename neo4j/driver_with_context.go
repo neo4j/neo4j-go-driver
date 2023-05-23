@@ -22,6 +22,7 @@ package neo4j
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/auth"
 	idb "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
@@ -715,4 +716,15 @@ type EagerResult struct {
 	Keys    []string
 	Records []*Record
 	Summary ResultSummary
+}
+
+func (r *EagerResult) Single() (*Record, error) {
+	count := len(r.Records)
+	if count == 0 {
+		return nil, errors.New("result does not contain any records")
+	}
+	if count > 1 {
+		return nil, errors.New("result contains more than one record")
+	}
+	return r.Records[0], nil
 }
