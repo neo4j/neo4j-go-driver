@@ -105,14 +105,7 @@ func TestPoolBorrowReturn(outer *testing.T) {
 			wg.Done()
 		}()
 
-		// Wait until entered queue
-		for {
-			if size, err := p.queueSize(ctx); err != nil {
-				t.Errorf("should not fail computing queue size, got: %v", err)
-			} else if size > 0 {
-				break
-			}
-		}
+		waitForBorrowers(t, p, 1)
 
 		// Give back the connection
 		if err := p.Return(ctx, c1); err != nil {
@@ -209,14 +202,7 @@ func TestPoolBorrowReturn(outer *testing.T) {
 			wg.Done()
 		}()
 
-		// Wait until entered queue
-		for {
-			if size, err := p.queueSize(cancelableCtx); err != nil {
-				t.Errorf("should not fail computing queue size, got: %v", err)
-			} else if size > 0 {
-				break
-			}
-		}
+		waitForBorrowers(t, p, 1)
 		cancel()
 		wg.Wait()
 		if err := p.Return(ctx, c1); err != nil {
@@ -290,14 +276,7 @@ func TestPoolBorrowReturn(outer *testing.T) {
 			wg.Done()
 		}()
 
-		// Wait until entered queue
-		for {
-			if size, err := p.queueSize(ctx); err != nil {
-				t.Errorf("should not fail computing queue size, got: %v", err)
-			} else if size > 0 {
-				break
-			}
-		}
+		waitForBorrowers(t, p, 1)
 		// break the connection. then it shouldn't be picked up by the waiting borrow
 		c1.(*testutil.ConnFake).Alive = false
 		err = p.Return(ctx, c1)
@@ -325,14 +304,7 @@ func TestPoolBorrowReturn(outer *testing.T) {
 			wg.Done()
 		}()
 
-		// Wait until entered queue
-		for {
-			if size, err := p.queueSize(ctx); err != nil {
-				t.Errorf("should not fail computing queue size, got: %v", err)
-			} else if size > 0 {
-				break
-			}
-		}
+		waitForBorrowers(t, p, 1)
 		reAuthCalled := false
 		c1.(*testutil.ConnFake).ReAuthHook = func(_ context.Context, token *db.ReAuthToken) error {
 			testutil.AssertDeepEquals(t, token.Manager, token2)
@@ -603,6 +575,34 @@ func TestPoolCleanup(ot *testing.T) {
 		}
 		assertNumberOfServers(t, ctx, p, 0)
 	})
+
+	ot.Run("wakes up borrowers when closing", func(t *testing.T) {
+		timer := func() time.Time { return birthdate }
+		conf := config.Config{
+			ConnectionAcquisitionTimeout: 10 * time.Second,
+			MaxConnectionLifetime:        maxLife,
+			MaxConnectionPoolSize:        1,
+		}
+		p := New(&conf, succeedingConnect, logger, "pool id", &timer)
+		servers := getServers([]string{"example.com"})
+		conn, err := p.Borrow(ctx, servers, false, nil, DefaultLivenessCheckThreshold, reAuthToken)
+		assertConnection(t, conn, err)
+		borrowErrChan := make(chan error)
+		go func() {
+			_, err := p.Borrow(ctx, servers, true, nil, DefaultLivenessCheckThreshold, reAuthToken)
+			borrowErrChan <- err
+		}()
+		waitForBorrowers(t, p, 1)
+
+		testutil.AssertNoError(t, p.Close(ctx))
+
+		select {
+		case err := <-borrowErrChan:
+			testutil.AssertErrorMessageContains(t, err, "Pool closed")
+		case <-time.After(5 * time.Second):
+			t.Errorf("timed out waiting for borrow error")
+		}
+	})
 }
 
 func connectTo(singleConnection *testutil.ConnFake) func(ctx context.Context, name string, _ *db.ReAuthToken, _ bolt.Neo4jErrorCallback, _ log.BoltLogger) (db.Connection, error) {
@@ -636,5 +636,15 @@ func deadConnectionAfterForceReset(name string, idleness time.Time) *testutil.Co
 func getServers(servers []string) func(context.Context) ([]string, error) {
 	return func(context.Context) ([]string, error) {
 		return servers, nil
+	}
+}
+
+func waitForBorrowers(t *testing.T, p *Pool, minBorrowers int) {
+	for {
+		if size, err := p.queueSize(ctx); err != nil {
+			t.Errorf("should not fail computing queue size, got: %v", err)
+		} else if size >= minBorrowers {
+			break
+		}
 	}
 }
