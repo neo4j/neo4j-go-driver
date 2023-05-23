@@ -140,9 +140,11 @@ type Config struct {
 	FetchSize int
 	// NotificationsMinSeverity defines the minimum severity level of notifications the server should send.
 	// By default, the server's settings are used.
+	// Disabling severities allows the server to skip analysis for those, which can speed up query execution.
 	NotificationsMinSeverity notifications.NotificationMinimumSeverityLevel
 	// NotificationsDisabledCategories defines the categories of notifications the server should not send.
 	// By default, the server's settings are used.
+	// Disabling categories allows the server to skip analysis for those, which can speed up query execution.
 	NotificationsDisabledCategories notifications.NotificationDisabledCategories
 }
 

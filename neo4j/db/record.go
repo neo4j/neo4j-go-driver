@@ -42,3 +42,12 @@ func (r Record) Get(key string) (any, bool) {
 	}
 	return nil, false
 }
+
+// AsMap returns a dictionary copy made of the record keys and the corresponding values
+func (r Record) AsMap() map[string]any {
+	result := make(map[string]any, len(r.Keys))
+	for i, key := range r.Keys {
+		result[key] = r.Values[i]
+	}
+	return result
+}

@@ -157,10 +157,12 @@ type SessionConfig struct {
 	// NotificationsMinSeverity defines the minimum severity level of notifications the server should send.
 	// By default, the driver's settings are used.
 	// Else, this option overrides the driver's settings.
+	// Disabling severities allows the server to skip analysis for those, which can speed up query execution.
 	NotificationsMinSeverity notifications.NotificationMinimumSeverityLevel
 	// NotificationsDisabledCategories defines the categories of notifications the server should not send.
 	// By default, the driver's settings are used.
 	// Else, this option overrides the driver's settings.
+	// Disabling categories allows the server to skip analysis for those, which can speed up query execution.
 	NotificationsDisabledCategories notifications.NotificationDisabledCategories
 	// Auth is used to overwrite the authentication information for the session.
 	// This requires the server to support re-authentication on the protocol level.
