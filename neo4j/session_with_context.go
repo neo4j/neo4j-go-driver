@@ -511,12 +511,9 @@ func (s *sessionWithContext) getConnection(ctx context.Context, mode idb.AccessM
 		if cancel != nil {
 			defer cancel()
 		}
-		s.log.Debugf(log.Session, s.logId, "connection acquisition timeout is: %s",
-			s.driverConfig.ConnectionAcquisitionTimeout.String())
-		if deadline, ok := ctx.Deadline(); ok {
-			s.log.Debugf(log.Session, s.logId, "connection acquisition resolved deadline is: %s",
-				deadline.String())
-		}
+	}
+	if deadline, ok := ctx.Deadline(); ok {
+		s.log.Debugf(log.Session, s.logId, "connection acquisition resolved deadline is: %s", deadline.String())
 	}
 
 	if err := s.resolveHomeDatabase(ctx); err != nil {
