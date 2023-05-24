@@ -26,7 +26,7 @@ import (
 )
 
 var myDriver DriverWithContext
-var ctx context.Context
+var ctx = context.Background()
 
 func ExampleExecuteQuery() {
 	query := "RETURN $value AS val"

@@ -154,17 +154,33 @@ func (q *messageQueue) receive(ctx context.Context) error {
 	if q.handlers.Len() == 0 {
 		return errors.New("no more response callback to apply")
 	}
-	callback := q.pop()
+	handler := q.pop()
 	switch message := res.(type) {
 	case *db.Record:
-		callback.onRecord(message)
+		onRecord := handler.onRecord
+		if onRecord == nil {
+			return errors.New("protocol violation: the server sent an unexpected RECORD response")
+		}
+		onRecord(message)
 	case *success:
-		callback.onSuccess(message)
+		onSuccess := handler.onSuccess
+		if onSuccess == nil {
+			return errors.New("protocol violation: the server sent an unexpected SUCCESS response")
+		}
+		onSuccess(message)
 	case *db.Neo4jError:
-		callback.onFailure(ctx, message)
+		onFailure := handler.onFailure
+		if onFailure == nil {
+			return errors.New("protocol violation: the server sent an unexpected FAILURE response")
+		}
+		onFailure(ctx, message)
 		return message
 	case *ignored:
-		callback.onIgnored(message)
+		onIgnored := handler.onIgnored
+		if onIgnored == nil {
+			return errors.New("protocol violation: the server sent an unexpected IGNORED response")
+		}
+		onIgnored(message)
 	default:
 		panic(fmt.Errorf("did not expect message %v", res))
 	}
@@ -196,8 +212,8 @@ func (q *messageQueue) receiveMsg(ctx context.Context) any {
 	return msg
 }
 
-func (q *messageQueue) enqueueCallback(callbacks responseHandler) {
-	q.handlers.PushBack(callbacks)
+func (q *messageQueue) enqueueCallback(handler responseHandler) {
+	q.handlers.PushBack(handler)
 }
 
 func (q *messageQueue) setLogId(logId string) {

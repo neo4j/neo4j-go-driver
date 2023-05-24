@@ -224,7 +224,7 @@ func newSessionWithContext(
 	now *func() time.Time,
 ) *sessionWithContext {
 	logId := log.NewId()
-	logger.Debugf(log.Session, logId, "Created with context")
+	logger.Debugf(log.Session, logId, "Created")
 
 	fetchSize := config.FetchSize
 	if sessConfig.FetchSize != FetchDefault {
@@ -507,18 +507,17 @@ func (s *sessionWithContext) getServers(mode idb.AccessMode) func(context.Contex
 }
 
 func (s *sessionWithContext) getConnection(ctx context.Context, mode idb.AccessMode, livenessCheckThreshold time.Duration) (idb.Connection, error) {
-	if s.driverConfig.ConnectionAcquisitionTimeout > 0 {
+	timeout := s.driverConfig.ConnectionAcquisitionTimeout
+	if timeout > 0 {
 		var cancel context.CancelFunc
-		ctx, cancel = context.WithTimeout(ctx, s.driverConfig.ConnectionAcquisitionTimeout)
+		ctx, cancel = context.WithTimeout(ctx, timeout)
 		if cancel != nil {
 			defer cancel()
 		}
-		s.log.Debugf(log.Session, s.logId, "connection acquisition timeout is: %s",
-			s.driverConfig.ConnectionAcquisitionTimeout.String())
-		if deadline, ok := ctx.Deadline(); ok {
-			s.log.Debugf(log.Session, s.logId, "connection acquisition resolved deadline is: %s",
-				deadline.String())
-		}
+		deadline, _ := ctx.Deadline()
+		s.log.Debugf(log.Session, s.logId, "connection acquisition timeout is %s, resolved deadline is: %s", timeout, deadline)
+	} else if deadline, ok := ctx.Deadline(); ok {
+		s.log.Debugf(log.Session, s.logId, "connection acquisition user-provided deadline is: %s", deadline)
 	}
 
 	if err := s.resolveHomeDatabase(ctx); err != nil {
@@ -532,7 +531,7 @@ func (s *sessionWithContext) getConnection(ctx context.Context, mode idb.AccessM
 	conn, err := s.pool.Borrow(
 		ctx,
 		s.getServers(mode),
-		s.driverConfig.ConnectionAcquisitionTimeout != 0,
+		timeout != 0,
 		s.config.BoltLogger,
 		livenessCheckThreshold,
 		s.auth)

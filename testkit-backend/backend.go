@@ -493,7 +493,12 @@ func (b *backend) handleRequest(req map[string]any) {
 				c.SocketConnectTimeout = time.Millisecond * time.Duration(asInt64(data["connectionTimeoutMs"].(json.Number)))
 			}
 			if data["notificationsMinSeverity"] != nil {
-				c.NotificationsMinSeverity = notifications.NotificationMinimumSeverityLevel(data["notificationsMinSeverity"].(string))
+				minSeverity, err := mapNotificationMinSeverityLevel(data["notificationsMinSeverity"].(string))
+				if err != nil {
+					b.writeError(err)
+					return
+				}
+				c.NotificationsMinSeverity = minSeverity
 			}
 			if data["notificationsDisabledCategories"] != nil {
 				notiDisCats := data["notificationsDisabledCategories"].([]any)
@@ -644,7 +649,12 @@ func (b *backend) handleRequest(req map[string]any) {
 		}
 
 		if data["notificationsMinSeverity"] != nil {
-			sessionConfig.NotificationsMinSeverity = notifications.NotificationMinimumSeverityLevel(data["notificationsMinSeverity"].(string))
+			minSeverity, err := mapNotificationMinSeverityLevel(data["notificationsMinSeverity"].(string))
+			if err != nil {
+				b.writeError(err)
+				return
+			}
+			sessionConfig.NotificationsMinSeverity = minSeverity
 		}
 		if data["notificationsDisabledCategories"] != nil {
 			notiDisCats := data["notificationsDisabledCategories"].([]any)
@@ -1519,4 +1529,16 @@ func convertSlice[T any](slice []any, transform func(any) T) []T {
 		res[i] = transform(cat)
 	}
 	return res
+}
+
+func mapNotificationMinSeverityLevel(rawMinSeverityLevel string) (notifications.NotificationMinimumSeverityLevel, error) {
+	switch rawMinSeverityLevel {
+	case "OFF":
+		return notifications.DisabledLevel, nil
+	case "WARNING":
+		return notifications.WarningLevel, nil
+	case "INFORMATION":
+		return notifications.InformationLevel, nil
+	}
+	return "", fmt.Errorf("unknown min severity level %s", rawMinSeverityLevel)
 }

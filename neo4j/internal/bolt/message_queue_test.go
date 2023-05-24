@@ -22,6 +22,7 @@ package bolt
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/db"
 	. "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/testutil"
 	"net"
@@ -227,7 +228,70 @@ func TestMessageQueue(outer *testing.T) {
 			writer.send(ctx, server)
 			<-done
 		})
+
+		inner.Run("returns error when nil callback called for", func(inner *testing.T) {
+			inner.Parallel()
+
+			type testCase struct {
+				description      string
+				writerWork       func(*outgoing)
+				expectedErrorMsg string
+			}
+
+			testCases := []testCase{
+				{
+					description: "RECORD",
+					writerWork: func(o *outgoing) {
+						writer.appendX(msgRecord, []any{})
+						writer.send(ctx, server)
+					},
+					expectedErrorMsg: "protocol violation: the server sent an unexpected RECORD response",
+				},
+				{
+					description: "SUCCESS",
+					writerWork: func(o *outgoing) {
+						writer.appendX(msgSuccess, map[string]any{})
+						writer.send(ctx, server)
+					},
+					expectedErrorMsg: "protocol violation: the server sent an unexpected SUCCESS response",
+				},
+				{
+					description: "FAILURE",
+					writerWork: func(o *outgoing) {
+						writer.appendX(msgFailure, map[string]any{})
+						writer.send(ctx, server)
+					},
+					expectedErrorMsg: "protocol violation: the server sent an unexpected FAILURE response",
+				},
+				{
+					description: "IGNORED",
+					writerWork: func(o *outgoing) {
+						writer.appendX(msgIgnored)
+						writer.send(ctx, server)
+					},
+					expectedErrorMsg: "protocol violation: the server sent an unexpected IGNORED response",
+				},
+			}
+
+			for _, test := range testCases {
+				inner.Run(fmt.Sprintf("%s response", test.description), func(t *testing.T) {
+					done := make(chan any)
+					queue.enqueueCallback(responseHandler{})
+
+					go func() {
+						err := queue.receive(ctx)
+
+						AssertErrorMessageContains(t, err, test.expectedErrorMsg)
+						done <- struct{}{}
+					}()
+
+					test.writerWork(writer)
+					<-done
+				})
+			}
+		})
 	})
+
 }
 
 func assertEqualResponseHandlers(t *testing.T, handler1, handler2 responseHandler) {
