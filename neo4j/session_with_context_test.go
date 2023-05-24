@@ -729,7 +729,7 @@ func TestSession(outer *testing.T) {
 			pool.ReturnHook = func() {
 				poolReturnsCalls++
 			}
-			tx, err := session.BeginTransaction(ctx)
+			tx, err := session.BeginTransaction(context.Background())
 
 			AssertNoError(t, err)
 			_, err = tx.Run(ctx, "RETURN 42", nil)
