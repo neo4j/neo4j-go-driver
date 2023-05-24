@@ -88,11 +88,14 @@ func New(config *config.Config, connect Connect, logger log.Logger, logId string
 
 func (p *Pool) Close(ctx context.Context) error {
 	p.closed = true
-	// Cancel everything in the queue by just emptying at and let all callers timeout
 	if !p.queueMut.TryLock(ctx) {
 		return racing.LockTimeoutError("could not acquire queue lock in time when closing pool")
 	}
-	p.queue.Init()
+	for e := p.queue.Front(); e != nil; e = e.Next() {
+		queuedRequest := e.Value.(*qitem)
+		p.queue.Remove(e)
+		queuedRequest.wakeup <- true
+	}
 	p.queueMut.Unlock()
 	// Go through each server and close all connections to it
 	if !p.serversMut.TryLock(ctx) {
@@ -213,11 +216,10 @@ serverLoop:
 }
 
 func (p *Pool) Borrow(ctx context.Context, getServerNames func(context.Context) ([]string, error), wait bool, boltLogger log.BoltLogger, idlenessThreshold time.Duration, auth *idb.ReAuthToken) (idb.Connection, error) {
-	if p.closed {
-		return nil, &errorutil.PoolClosed{}
-	}
-
 	for {
+		if p.closed {
+			return nil, &errorutil.PoolClosed{}
+		}
 		serverNames, err := getServerNames(ctx)
 		if err != nil {
 			return nil, err
