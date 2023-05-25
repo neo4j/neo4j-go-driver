@@ -9,7 +9,6 @@ type responseHandler struct {
 	onSuccess func(*success)
 	onRecord  func(*db.Record)
 	onFailure func(context.Context, *db.Neo4jError)
-	onUnknown func(any)
 	onIgnored func(*ignored)
 }
 

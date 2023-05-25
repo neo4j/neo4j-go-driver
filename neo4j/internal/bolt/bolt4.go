@@ -1014,9 +1014,6 @@ func (b *bolt4) discardResponseHandler(stream *stream) responseHandler {
 			stream.err = failure
 			b.onFailure(ctx, failure) // Will detach the stream
 		},
-		onUnknown: func(msg any) {
-			b.setError(fmt.Errorf("unknown response %v", msg), true)
-		},
 	}
 }
 
@@ -1056,9 +1053,6 @@ func (b *bolt4) pullResponseHandler(stream *stream) responseHandler {
 			stream.err = failure
 			b.onFailure(ctx, failure) // will detach the stream
 		},
-		onUnknown: func(msg any) {
-			b.setError(fmt.Errorf("unknown response %v", msg), true)
-		},
 	}
 
 }
@@ -1082,9 +1076,6 @@ func (b *bolt4) resetResponseHandler() responseHandler {
 		},
 		onFailure: func(ctx context.Context, failure *db.Neo4jError) {
 			_ = b.onNeo4jError(ctx, b, failure)
-			b.state = bolt4_dead
-		},
-		onUnknown: func(any) {
 			b.state = bolt4_dead
 		},
 	}
@@ -1123,7 +1114,6 @@ func (b *bolt4) expectedSuccessHandler(onSuccess func(*success)) responseHandler
 	return responseHandler{
 		onSuccess: onSuccess,
 		onFailure: b.onFailure,
-		onUnknown: b.onUnknown,
 		onIgnored: onIgnoredNoOp,
 	}
 }
@@ -1143,10 +1133,6 @@ func (b *bolt4) onFailure(ctx context.Context, failure *db.Neo4jError) {
 		err = errorutil.CombineErrors(failure, callbackErr)
 	}
 	b.setError(err, isFatalError(failure))
-}
-
-func (b *bolt4) onUnknown(msg any) {
-	b.setError(fmt.Errorf("expected success or database error, got %v", msg), true)
 }
 
 const readTimeoutHintName = "connection.recv_timeout_seconds"

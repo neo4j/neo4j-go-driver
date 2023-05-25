@@ -182,11 +182,7 @@ func (q *messageQueue) receive(ctx context.Context) error {
 		}
 		onIgnored(message)
 	default:
-		onUnknown := handler.onUnknown
-		if onUnknown == nil {
-			return fmt.Errorf("protocol violation: the server sent an unknown %v response", message)
-		}
-		onUnknown(message)
+		panic(fmt.Errorf("did not expect message %v", res))
 	}
 	return nil
 }
