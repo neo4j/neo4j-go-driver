@@ -41,7 +41,7 @@ go get github.com/neo4j/neo4j-go-driver
 ## Documentation
 
 Drivers manual that describes general driver concepts in depth [here](https://neo4j.com/docs/go-manual/current/).
-Go package API documentation [here](https://pkg.go.dev/github.com/neo4j/neo4j-go-driver/v5).
+Go package API documentation [here](https://pkg.go.dev/github.com/neo4j/neo4j-go-driver/v5/neo4j).
 
 ## Preview Features
 
