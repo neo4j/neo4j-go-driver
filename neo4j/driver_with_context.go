@@ -397,9 +397,9 @@ func (d *driverWithContext) Close(ctx context.Context) error {
 		if err := d.pool.Close(ctx); err != nil {
 			return err
 		}
+		d.pool = nil
+		d.log.Infof(log.Driver, d.logId, "Closed")
 	}
-	d.pool = nil
-	d.log.Infof(log.Driver, d.logId, "Closed")
 	return nil
 }
 
