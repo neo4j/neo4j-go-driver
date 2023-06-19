@@ -23,6 +23,7 @@ import (
 	"context"
 	"fmt"
 	iauth "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/auth"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/boltagent"
 	idb "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/notifications"
 	"io"
@@ -158,6 +159,32 @@ func TestBolt5(outer *testing.T) {
 			AssertVersionInHandshake(t, handshake, 5, 1)
 			srv.acceptVersion(5, 1)
 			srv.waitForHelloWithoutAuthToken()
+			srv.acceptHello()
+
+			srv.waitForLogon()
+			srv.acceptLogon()
+		})
+		defer cleanup()
+		defer bolt.Close(context.Background())
+
+		// Check Bolt properties
+		AssertStringEqual(t, bolt.ServerName(), "serverName")
+		AssertTrue(t, bolt.IsAlive())
+		AssertTrue(t, reflect.DeepEqual(bolt.queue.in.connReadTimeout, time.Duration(-1)))
+	})
+
+	outer.Run("Connect success in 5.3", func(t *testing.T) {
+		bolt, cleanup := connectToServer(t, func(srv *bolt5server) {
+			handshake := srv.waitForHandshake()
+			AssertVersionInHandshake(t, handshake, 5, 3)
+			srv.acceptVersion(5, 3)
+			// 5.3+ hello must contain mandatory bolt_agent dictionary and mandatory product field
+			hmap := srv.waitForHelloWithoutAuthToken()
+			boltAgent, exists := hmap["bolt_agent"].(map[string]any)
+			if !exists {
+				panic("Missing bolt_agent in hello")
+			}
+			AssertStringEqual(t, boltAgent["product"].(string), boltagent.Product)
 			srv.acceptHello()
 
 			srv.waitForLogon()
