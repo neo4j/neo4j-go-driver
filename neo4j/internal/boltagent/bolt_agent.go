@@ -21,15 +21,14 @@ package boltagent
 
 import (
 	"fmt"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/metadata"
 	"runtime"
 )
 
-const Product = "neo4j-go/" + internal.DriverVersion
-
 var os = runtime.GOOS
 var arch = runtime.GOARCH
-var version = runtime.Version()
+var goVersion = runtime.Version()
+var driverVersion = metadata.DriverVersion
 
 type BoltAgent struct {
 	product  string
@@ -40,9 +39,9 @@ type BoltAgent struct {
 // New returns a BoltAgent containing immutable, preformatted driver information.
 func New() *BoltAgent {
 	return &BoltAgent{
-		product:  Product,
+		product:  fmt.Sprintf("neo4j-go/%s", driverVersion),
 		platform: fmt.Sprintf("%s; %s", os, arch),
-		language: fmt.Sprintf("Go/%s", version),
+		language: fmt.Sprintf("Go/%s", goVersion),
 	}
 }
 
