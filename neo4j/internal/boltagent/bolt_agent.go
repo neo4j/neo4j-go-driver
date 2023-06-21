@@ -17,10 +17,42 @@
  * limitations under the License.
  */
 
-package neo4j
+package boltagent
 
 import (
+	"fmt"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/metadata"
+	"runtime"
 )
 
-const UserAgent = "Go Driver/" + metadata.DriverVersion
+var os = runtime.GOOS
+var arch = runtime.GOARCH
+var goVersion = runtime.Version()
+var driverVersion = metadata.DriverVersion
+
+type BoltAgent struct {
+	product  string
+	platform string
+	language string
+}
+
+// New returns a BoltAgent containing immutable, preformatted driver information.
+func New() *BoltAgent {
+	return &BoltAgent{
+		product:  fmt.Sprintf("neo4j-go/%s", driverVersion),
+		platform: fmt.Sprintf("%s; %s", os, arch),
+		language: fmt.Sprintf("Go/%s", goVersion),
+	}
+}
+
+func (b *BoltAgent) Product() string {
+	return b.product
+}
+
+func (b *BoltAgent) Platform() string {
+	return b.platform
+}
+
+func (b *BoltAgent) Language() string {
+	return b.language
+}

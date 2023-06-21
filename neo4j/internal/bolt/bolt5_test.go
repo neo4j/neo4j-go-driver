@@ -172,6 +172,30 @@ func TestBolt5(outer *testing.T) {
 		AssertTrue(t, reflect.DeepEqual(bolt.queue.in.connReadTimeout, time.Duration(-1)))
 	})
 
+	outer.Run("Connect success in 5.3", func(t *testing.T) {
+		bolt, cleanup := connectToServer(t, func(srv *bolt5server) {
+			handshake := srv.waitForHandshake()
+			AssertVersionInHandshake(t, handshake, 5, 3)
+			srv.acceptVersion(5, 3)
+			// 5.3 hello must contain mandatory bolt_agent dictionary and mandatory product field
+			hmap := srv.waitForHelloWithoutAuthToken()
+			boltAgent, exists := hmap["bolt_agent"]
+			AssertTrue(t, exists)
+			AssertStringContain(t, boltAgent.(map[string]any)["product"].(string), "neo4j-go/")
+			srv.acceptHello()
+
+			srv.waitForLogon()
+			srv.acceptLogon()
+		})
+		defer cleanup()
+		defer bolt.Close(context.Background())
+
+		// Check Bolt properties
+		AssertStringEqual(t, bolt.ServerName(), "serverName")
+		AssertTrue(t, bolt.IsAlive())
+		AssertTrue(t, reflect.DeepEqual(bolt.queue.in.connReadTimeout, time.Duration(-1)))
+	})
+
 	outer.Run("Connect success with timeout hint", func(t *testing.T) {
 		bolt, cleanup := connectToServer(t, func(srv *bolt5server) {
 			srv.waitForHandshake()

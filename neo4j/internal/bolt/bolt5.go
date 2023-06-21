@@ -25,6 +25,7 @@ import (
 	"fmt"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/auth"
 	iauth "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/auth"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/boltagent"
 	idb "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/errorutil"
 	"net"
@@ -243,6 +244,15 @@ func (b *bolt5) Connect(
 	}
 	if routingContext != nil {
 		hello["routing"] = routingContext
+	}
+	// On bolt >= 5.3 add bolt agent information to hello
+	if b.minor >= 3 {
+		info := boltagent.New()
+		hello["bolt_agent"] = map[string]string{
+			"product":  info.Product(),
+			"platform": info.Platform(),
+			"language": info.Language(),
+		}
 	}
 	if b.minor == 0 {
 		// Merge authentication keys into hello, avoid overwriting existing keys
