@@ -218,9 +218,8 @@ type Notification interface {
 	// Not all notifications have a unique position to point to and in that case the position would be set to nil.
 	Position() InputPosition
 	// Severity returns the severity level of this notification.
-	// Please rely on SeverityLevel (or RawSeverityLevel) instead.
 	//
-	// Deprecated: Severity will be removed in 6.0.
+	// Deprecated: please use SeverityLevel (or RawSeverityLevel) instead. Severity will be removed in 6.0.
 	Severity() string
 	// RawSeverityLevel returns the unmapped severity level of this notification.
 	// This is useful when the driver cannot interpret the severity level returned by the server
