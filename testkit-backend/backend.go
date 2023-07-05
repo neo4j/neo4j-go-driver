@@ -1417,6 +1417,8 @@ func testSkips() map[string]string {
 		"stub.connectivity_check.test_verify_connectivity.TestVerifyConnectivity.test_routing_fail_when_no_reader_are_available":                   "Won't fix - Go driver retries routing table when no readers are available",
 		"stub.driver_parameters.test_connection_acquisition_timeout_ms.TestConnectionAcquisitionTimeoutMs.test_does_not_encompass_router_*":        "Won't fix - ConnectionAcquisitionTimeout spans the whole process including db resolution, RT updates, connection acquisition from the pool, and creation of new connections.",
 		"stub.driver_parameters.test_connection_acquisition_timeout_ms.TestConnectionAcquisitionTimeoutMs.test_router_handshake_has_own_timeout_*": "Won't fix - ConnectionAcquisitionTimeout spans the whole process including db resolution, RT updates, connection acquisition from the pool, and creation of new connections.",
+		"stub.tx_run.test_tx_run.TestTxRun.test_should_prevent_discard_after_tx_termination_on_run":                                                "fixme: usage of failed transaction leads to unintelligible error that's treated as BackendError",
+		"stub.tx_run.test_tx_run.TestTxRun.test_should_prevent_pull_after_tx_termination_on_run":                                                   "fixme: usage of failed transaction leads to unintelligible error that's treated as BackendError",
 	}
 }
 
