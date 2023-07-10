@@ -94,7 +94,7 @@ func (r *Router) readTable(ctx context.Context, dbRouter *databaseRouter, bookma
 	// Use hook to retrieve possibly different set of routers and retry
 	if table == nil && r.getRouters != nil {
 		routers := r.getRouters()
-		r.log.Infof(log.Router, r.logId, "Reading routing table for '%s' from custom routers: %v", routers)
+		r.log.Infof(log.Router, r.logId, "Reading routing table for '%s' from custom routers: %v", database, routers)
 		table, err = readTable(ctx, r.pool, routers, r.routerContext, bookmarks, database, impersonatedUser, boltLogger)
 	}
 
