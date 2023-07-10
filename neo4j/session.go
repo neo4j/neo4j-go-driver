@@ -282,6 +282,9 @@ func (s *session) runRetriable(
 	for state.Continue() {
 		if workResult, successfullyCompleted := s.tryRun(&state, mode, &config, work); successfullyCompleted {
 			return workResult, nil
+		} else {
+			// Force refresh table routing
+			s.router.Invalidate(s.databaseName)
 		}
 	}
 
