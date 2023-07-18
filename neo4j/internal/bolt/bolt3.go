@@ -53,7 +53,7 @@ type internalTx3 struct {
 	txMeta    map[string]any
 }
 
-func (i *internalTx3) toMeta() map[string]any {
+func (i *internalTx3) toMeta(logger log.Logger, logId string) map[string]any {
 	meta := map[string]any{}
 	if i.mode == idb.ReadMode {
 		meta["mode"] = "r"
@@ -61,7 +61,11 @@ func (i *internalTx3) toMeta() map[string]any {
 	if len(i.bookmarks) > 0 {
 		meta["bookmarks"] = i.bookmarks
 	}
-	ms := int(i.timeout.Nanoseconds() / 1e6)
+	ms := i.timeout.Milliseconds()
+	if i.timeout.Nanoseconds()%int64(time.Millisecond) > 0 {
+		ms++
+		logger.Infof(log.Bolt5, logId, "The transaction timeout was rounded up to the next millisecond due to a fractional millisecond value in the config.")
+	}
 	if ms > 0 {
 		meta["tx_timeout"] = ms
 	}
@@ -286,7 +290,7 @@ func (b *bolt3) TxBegin(
 		txMeta:    txConfig.Meta,
 	}
 
-	b.out.appendBegin(tx.toMeta())
+	b.out.appendBegin(tx.toMeta(b.log, b.logId))
 	if b.out.send(ctx, b.conn); b.err != nil {
 		return 0, b.err
 	}
@@ -459,7 +463,7 @@ func (b *bolt3) run(ctx context.Context, cypher string, params map[string]any, t
 
 	var meta map[string]any
 	if tx != nil {
-		meta = tx.toMeta()
+		meta = tx.toMeta(b.log, b.logId)
 	}
 
 	// Append run message
