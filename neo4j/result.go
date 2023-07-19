@@ -23,7 +23,7 @@ import (
 	"context"
 )
 
-// Result is created via the context-aware Session type.
+// Result is created via the Session type.
 //
 // Deprecated: use ResultWithContext instead.
 type Result interface {
