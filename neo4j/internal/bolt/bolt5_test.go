@@ -1681,7 +1681,6 @@ func TestBolt5(outer *testing.T) {
 		{
 			description: "tx_timeout should not be present",
 			input:       0,
-			output:      0,
 			omitted:     true,
 		},
 		{
