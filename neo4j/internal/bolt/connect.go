@@ -24,6 +24,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/errorutil"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/racing"
 	"net"
 	"time"
@@ -100,7 +101,11 @@ func Connect(ctx context.Context,
 	case 0:
 		return nil, fmt.Errorf("server did not accept any of the requested Bolt versions (%#v)", versions)
 	default:
-		return nil, fmt.Errorf("server responded with unsupported version %d.%d", major, minor)
+		if major == 80 && minor == 84 {
+			return nil, &errorutil.UsageError{Message: "server responded HTTP. Make sure you are not trying to connect to the http endpoint " +
+				"(HTTP defaults to port 7474 whereas BOLT defaults to port 7687)"}
+		}
+		return nil, &errorutil.UsageError{Message: fmt.Sprintf("server responded with unsupported version %d.%d", major, minor)}
 	}
 	if err = boltConn.Connect(ctx, int(minor), auth, userAgent, routingContext, notificationConfig); err != nil {
 		boltConn.Close(ctx)
