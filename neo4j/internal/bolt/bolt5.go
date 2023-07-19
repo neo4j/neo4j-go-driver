@@ -25,6 +25,7 @@ import (
 	"fmt"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/auth"
 	iauth "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/auth"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/boltagent"
 	idb "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/errorutil"
 	"net"
@@ -59,7 +60,7 @@ type internalTx5 struct {
 	notificationConfig idb.NotificationConfig
 }
 
-func (i *internalTx5) toMeta() map[string]any {
+func (i *internalTx5) toMeta(logger log.Logger, logId string) map[string]any {
 	if i == nil {
 		return nil
 	}
@@ -70,7 +71,11 @@ func (i *internalTx5) toMeta() map[string]any {
 	if len(i.bookmarks) > 0 {
 		meta["bookmarks"] = i.bookmarks
 	}
-	ms := int(i.timeout.Nanoseconds() / 1e6)
+	ms := i.timeout.Milliseconds()
+	if i.timeout.Nanoseconds()%int64(time.Millisecond) > 0 {
+		ms++
+		logger.Infof(log.Bolt5, logId, "The transaction timeout was rounded up to the next millisecond due to a fractional millisecond value in the config.")
+	}
 	if ms > 0 {
 		meta["tx_timeout"] = ms
 	}
@@ -244,6 +249,15 @@ func (b *bolt5) Connect(
 	if routingContext != nil {
 		hello["routing"] = routingContext
 	}
+	// On bolt >= 5.3 add bolt agent information to hello
+	if b.minor >= 3 {
+		info := boltagent.New()
+		hello["bolt_agent"] = map[string]string{
+			"product":  info.Product(),
+			"platform": info.Platform(),
+			"language": info.Language(),
+		}
+	}
 	if b.minor == 0 {
 		// Merge authentication keys into hello, avoid overwriting existing keys
 		for k, v := range token.Tokens {
@@ -308,7 +322,7 @@ func (b *bolt5) TxBegin(
 		notificationConfig: txConfig.NotificationConfig,
 	}
 
-	b.queue.appendBegin(tx.toMeta(), b.beginResponseHandler())
+	b.queue.appendBegin(tx.toMeta(b.log, b.logId), b.beginResponseHandler())
 	if b.queue.send(ctx); b.err != nil {
 		return 0, b.err
 	}
@@ -544,7 +558,7 @@ func (b *bolt5) run(ctx context.Context, cypher string, params map[string]any, r
 
 	fetchSize := b.normalizeFetchSize(rawFetchSize)
 	stream := &stream{fetchSize: fetchSize}
-	b.queue.appendRun(cypher, params, tx.toMeta(), b.runResponseHandler(stream))
+	b.queue.appendRun(cypher, params, tx.toMeta(b.log, b.logId), b.runResponseHandler(stream))
 	b.queue.appendPullN(fetchSize, b.pullResponseHandler(stream))
 	if b.queue.send(ctx); b.err != nil {
 		return nil, b.err
