@@ -1102,7 +1102,9 @@ func (b *backend) handleRequest(req map[string]any) {
 
 				// === BACKEND FEATURES FOR TESTING ===
 				"Backend:MockTime",
+				// No GetRoutingTable support - too tricky to implement in Go for now
 				//"Backend:RTFetch",
+				// No ForcedRoutingTableUpdate support - too tricky to implement in Go for now
 				//"Backend:RTForceUpdate",
 
 			},
@@ -1413,33 +1415,27 @@ func firstRecordInvalidValue(record *db.Record) *neo4j.InvalidValue {
 // you can use '*' as wildcards anywhere in the qualified test name (useful to exclude a whole class e.g.)
 func testSkips() map[string]string {
 	return map[string]string{
-		"stub.disconnects.test_disconnects.TestDisconnects.test_fail_on_reset":                                                   "It is not resetting driver when put back to pool",
-		"stub.routing.test_routing_v3.RoutingV3.test_should_use_resolver_during_rediscovery_when_existing_routers_fail":          "It needs investigation - custom resolver does not seem to be called",
-		"stub.routing.test_routing_v4x1.RoutingV4x1.test_should_use_resolver_during_rediscovery_when_existing_routers_fail":      "It needs investigation - custom resolver does not seem to be called",
-		"stub.routing.test_routing_v4x3.RoutingV4x3.test_should_use_resolver_during_rediscovery_when_existing_routers_fail":      "It needs investigation - custom resolver does not seem to be called",
-		"stub.routing.test_routing_v4x4.RoutingV4x4.test_should_use_resolver_during_rediscovery_when_existing_routers_fail":      "It needs investigation - custom resolver does not seem to be called",
-		"stub.routing.test_routing_v5x0.RoutingV5x0.test_should_use_resolver_during_rediscovery_when_existing_routers_fail":      "It needs investigation - custom resolver does not seem to be called",
+		// Won't fix - accepted/idiomatic behavioral differences
+		"stub.iteration.test_result_scope.TestResultScope.*":                                                                                       "Won't fix - Results are always valid but don't return records when out of scope",
+		"stub.connectivity_check.test_get_server_info.TestGetServerInfo.test_routing_fail_when_no_reader_are_available":                            "Won't fix - Go driver retries routing table when no readers are available",
+		"stub.connectivity_check.test_verify_connectivity.TestVerifyConnectivity.test_routing_fail_when_no_reader_are_available":                   "Won't fix - Go driver retries routing table when no readers are available",
+		"stub.driver_parameters.test_connection_acquisition_timeout_ms.TestConnectionAcquisitionTimeoutMs.test_does_not_encompass_router_*":        "Won't fix - ConnectionAcquisitionTimeout spans the whole process including db resolution, RT updates, connection acquisition from the pool, and creation of new connections.",
+		"stub.driver_parameters.test_connection_acquisition_timeout_ms.TestConnectionAcquisitionTimeoutMs.test_router_handshake_has_own_timeout_*": "Won't fix - ConnectionAcquisitionTimeout spans the whole process including db resolution, RT updates, connection acquisition from the pool, and creation of new connections.",
+
+		// Missing message support in testkit backend
+		"stub.routing.*.*.test_should_request_rt_from_all_initial_routers_until_successful_on_unknown_failure":       "Add DNS resolver TestKit message and connection timeout support",
+		"stub.routing.*.*.test_should_request_rt_from_all_initial_routers_until_successful_on_authorization_expired": "Add DNS resolver TestKit message and connection timeout support",
+		"stub.routing.*.test_should_drop_connections_failing_liveness_check":                                         "Needs support for GetConnectionPoolMetrics",
+
+		// To fix/to decide whether to fix
 		"stub.routing.test_routing_v3.RoutingV3.test_should_revert_to_initial_router_if_known_router_throws_protocol_errors":     "It needs investigation - custom resolver does not seem to be called",
 		"stub.routing.test_routing_v4x1.RoutingV4x1.test_should_revert_to_initial_router_if_known_router_throws_protocol_errors": "It needs investigation - custom resolver does not seem to be called",
 		"stub.routing.test_routing_v4x3.RoutingV4x3.test_should_revert_to_initial_router_if_known_router_throws_protocol_errors": "It needs investigation - custom resolver does not seem to be called",
 		"stub.routing.test_routing_v4x4.RoutingV4x4.test_should_revert_to_initial_router_if_known_router_throws_protocol_errors": "It needs investigation - custom resolver does not seem to be called",
 		"stub.routing.test_routing_v5x0.RoutingV5x0.test_should_revert_to_initial_router_if_known_router_throws_protocol_errors": "It needs investigation - custom resolver does not seem to be called",
-		"stub.configuration_hints.test_connection_recv_timeout_seconds.TestRoutingConnectionRecvTimeout.*":                       "No GetRoutingTable support - too tricky to implement in Go",
 		"stub.homedb.test_homedb.TestHomeDb.test_session_should_cache_home_db_despite_new_rt":                                    "Driver does not remove servers from RT when connection breaks.",
-		"stub.iteration.test_result_scope.TestResultScope.*":                                                                     "Results are always valid but don't return records when out of scope",
-		"stub.*.test_0_timeout":        "Driver omits 0 as tx timeout value",
-		"stub.*.test_negative_timeout": "Driver omits negative tx timeout values",
-		"stub.routing.*.*.test_should_request_rt_from_all_initial_routers_until_successful_on_unknown_failure":                                     "Add DNS resolver TestKit message and connection timeout support",
-		"stub.routing.*.*.test_should_request_rt_from_all_initial_routers_until_successful_on_authorization_expired":                               "Add DNS resolver TestKit message and connection timeout support",
-		"stub.summary.test_summary.TestSummary.test_server_info":                                                                                   "Needs some kind of server address DNS resolution",
-		"stub.summary.test_summary.TestSummary.test_invalid_query_type":                                                                            "Driver does not verify query type returned from server.",
-		"stub.routing.*.test_should_drop_connections_failing_liveness_check":                                                                       "Needs support for GetConnectionPoolMetrics",
-		"stub.connectivity_check.test_get_server_info.TestGetServerInfo.test_routing_fail_when_no_reader_are_available":                            "Won't fix - Go driver retries routing table when no readers are available",
-		"stub.connectivity_check.test_verify_connectivity.TestVerifyConnectivity.test_routing_fail_when_no_reader_are_available":                   "Won't fix - Go driver retries routing table when no readers are available",
-		"stub.driver_parameters.test_connection_acquisition_timeout_ms.TestConnectionAcquisitionTimeoutMs.test_does_not_encompass_router_*":        "Won't fix - ConnectionAcquisitionTimeout spans the whole process including db resolution, RT updates, connection acquisition from the pool, and creation of new connections.",
-		"stub.driver_parameters.test_connection_acquisition_timeout_ms.TestConnectionAcquisitionTimeoutMs.test_router_handshake_has_own_timeout_*": "Won't fix - ConnectionAcquisitionTimeout spans the whole process including db resolution, RT updates, connection acquisition from the pool, and creation of new connections.",
-		"stub.tx_run.test_tx_run.TestTxRun.test_should_prevent_discard_after_tx_termination_on_run":                                                "fixme: usage of failed transaction leads to unintelligible error that's treated as BackendError",
-		"stub.tx_run.test_tx_run.TestTxRun.test_should_prevent_pull_after_tx_termination_on_run":                                                   "fixme: usage of failed transaction leads to unintelligible error that's treated as BackendError",
+		"stub.tx_run.test_tx_run.TestTxRun.test_should_prevent_discard_after_tx_termination_on_run":                              "fixme: usage of failed transaction leads to unintelligible error that's treated as BackendError",
+		"stub.tx_run.test_tx_run.TestTxRun.test_should_prevent_pull_after_tx_termination_on_run":                                 "fixme: usage of failed transaction leads to unintelligible error that's treated as BackendError",
 	}
 }
 
