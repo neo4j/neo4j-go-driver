@@ -1669,4 +1669,69 @@ func TestBolt5(outer *testing.T) {
 		AssertIntEqual(t, int(summary1.TFirst), 10)
 		AssertIntEqual(t, int(summary2.TFirst), 20)
 	})
+
+	type txTimeoutTestCase struct {
+		description string
+		input       time.Duration
+		output      int
+		omitted     bool
+	}
+
+	txTimeoutTestCases := []txTimeoutTestCase{
+		{
+			description: "tx_timeout should not be present",
+			input:       0,
+			omitted:     true,
+		},
+		{
+			description: "tx_timeout should round 1ns to 1ms",
+			input:       time.Nanosecond,
+			output:      1,
+		},
+		{
+			description: "tx_timeout should round 999µs to 1ms",
+			input:       time.Millisecond - time.Microsecond,
+			output:      1,
+		},
+		{
+			description: "tx_timeout should round 1ms to 1ms",
+			input:       time.Millisecond,
+			output:      1,
+		},
+		{
+			description: "tx_timeout should round 1.001ms to 2ms",
+			input:       time.Millisecond + time.Microsecond,
+			output:      2,
+		},
+		{
+			description: "tx_timeout should round 1.999ms to 2ms",
+			input:       time.Millisecond*2 - time.Microsecond,
+			output:      2,
+		},
+		{
+			description: "tx_timeout should round 2ms to 2ms",
+			input:       time.Millisecond * 2,
+			output:      2,
+		},
+	}
+
+	for _, test := range txTimeoutTestCases {
+		outer.Run(test.description, func(t *testing.T) {
+			tx := internalTx5{timeout: test.input}
+
+			actual, ok := tx.toMeta(logger, "")["tx_timeout"]
+			if test.omitted {
+				if ok {
+					t.Errorf("tx_timeout was present but should be omitted")
+				}
+				return
+			}
+
+			if ok {
+				AssertIntEqual(t, int(actual.(int64)), test.output)
+			} else {
+				t.Errorf("missing tx_timout: expected %vms for value %v", test.input, test.output)
+			}
+		})
+	}
 }
