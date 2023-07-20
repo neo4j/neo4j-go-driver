@@ -1041,10 +1041,7 @@ func (b *backend) handleRequest(req map[string]any) {
 	case "GetFeatures":
 		b.writeResponse("FeatureList", map[string]any{
 			"features": []string{
-				"AuthorizationExpiredTreatment",
-				"Backend:MockTime",
-				"ConfHint:connection.recv_timeout_seconds",
-				"Detail:ClosedDriverIsEncrypted",
+				// === FUNCTIONAL FEATURES ===
 				"Feature:API:BookmarkManager",
 				"Feature:API:ConnectionAcquisitionTimeout",
 				"Feature:API:Driver.ExecuteQuery",
@@ -1053,15 +1050,20 @@ func (b *backend) handleRequest(req map[string]any) {
 				"Feature:API:Driver:NotificationsConfig",
 				"Feature:API:Driver.VerifyAuthentication",
 				"Feature:API:Driver.VerifyConnectivity",
+				//"Feature:API:Driver.SupportsSessionAuth",
 				"Feature:API:Liveness.Check",
 				"Feature:API:Result.List",
 				"Feature:API:Result.Peek",
+				//"Feature:API:Result.Single",
+				//"Feature:API:Result.SingleOptional",
 				"Feature:API:Session:AuthConfig",
-				"Feature:API:Session:NotificationsConfig",
+				//"Feature:API:Session:NotificationsConfig",
+				//"Feature:API:SSLConfig",
+				//"Feature:API:SSLSchemes",
 				"Feature:API:Type.Spatial",
 				"Feature:API:Type.Temporal",
-				"Feature:Auth:Custom",
 				"Feature:Auth:Bearer",
+				"Feature:Auth:Custom",
 				"Feature:Auth:Kerberos",
 				"Feature:Auth:Managed",
 				"Feature:Bolt:3.0",
@@ -1075,15 +1077,34 @@ func (b *backend) handleRequest(req map[string]any) {
 				"Feature:Bolt:5.3",
 				"Feature:Bolt:Patch:UTC",
 				"Feature:Impersonation",
+				//"Feature:TLS:1.1",
 				"Feature:TLS:1.2",
 				"Feature:TLS:1.3",
-				"Optimization:AuthPipelining",
+
+				// === OPTIMIZATIONS ===
+				"AuthorizationExpiredTreatment",
 				"Optimization:ConnectionReuse",
 				"Optimization:EagerTransactionBegin",
 				"Optimization:ImplicitDefaultArguments",
 				"Optimization:MinimalBookmarksSet",
 				"Optimization:MinimalResets",
+				//"Optimization:MinimalVerifyAuthentication",
+				"Optimization:AuthPipelining",
 				"Optimization:PullPipelining",
+				//"Optimization:ResultListFetchAll",
+
+				// === IMPLEMENTATION DETAILS ===
+				"Detail:ClosedDriverIsEncrypted",
+				"Detail:DefaultSecurityConfigValueEquality",
+
+				// === CONFIGURATION HINTS (BOLT 4.3+) ===
+				"ConfHint:connection.recv_timeout_seconds",
+
+				// === BACKEND FEATURES FOR TESTING ===
+				"Backend:MockTime",
+				//"Backend:RTFetch",
+				//"Backend:RTForceUpdate",
+
 			},
 		})
 
