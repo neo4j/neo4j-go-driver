@@ -1051,7 +1051,8 @@ func (b *backend) handleRequest(req map[string]any) {
 				"Feature:API:Driver.VerifyAuthentication",
 				"Feature:API:Driver.VerifyConnectivity",
 				//"Feature:API:Driver.SupportsSessionAuth",
-				"Feature:API:Liveness.Check",
+				// Go driver does not support LivenessCheckTimeout yet
+				//"Feature:API:Liveness.Check",
 				"Feature:API:Result.List",
 				"Feature:API:Result.Peek",
 				//"Feature:API:Result.Single",
@@ -1425,7 +1426,6 @@ func testSkips() map[string]string {
 		// Missing message support in testkit backend
 		"stub.routing.*.*.test_should_request_rt_from_all_initial_routers_until_successful_on_unknown_failure":       "Add DNS resolver TestKit message and connection timeout support",
 		"stub.routing.*.*.test_should_request_rt_from_all_initial_routers_until_successful_on_authorization_expired": "Add DNS resolver TestKit message and connection timeout support",
-		"stub.routing.*.test_should_drop_connections_failing_liveness_check":                                         "Needs support for GetConnectionPoolMetrics",
 
 		// To fix/to decide whether to fix
 		"stub.routing.test_routing_v3.RoutingV3.test_should_revert_to_initial_router_if_known_router_throws_protocol_errors":     "It needs investigation - custom resolver does not seem to be called",
