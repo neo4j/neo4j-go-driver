@@ -25,10 +25,11 @@ import (
 
 // Session represents a logical connection (which is not tied to a physical connection)
 // to the server
-// Deprecated: use SessionWithContext instead.
+//
 // SessionWithContext is created via the context-aware driver returned
 // by NewDriverWithContext.
-// Session will be removed in 6.0.
+//
+// Deprecated: use SessionWithContext instead. Session will be removed in 6.0.
 type Session interface {
 	// LastBookmarks returns the bookmark received following the last successfully completed transaction.
 	// If no bookmark was received or if this transaction was rolled back, the initial set of bookmarks will be
@@ -36,9 +37,10 @@ type Session interface {
 	LastBookmarks() Bookmarks
 	// LastBookmark returns the bookmark received following the last successfully completed transaction.
 	// If no bookmark was received or if this transaction was rolled back, the bookmark value will not be changed.
-	// Deprecated: since version 5.0. Will be removed in 6.0. Use LastBookmarks instead.
 	// Warning: this method can lead to unexpected behaviour if the session has not yet successfully completed a
 	// transaction.
+	//
+	// Deprecated: since version 5.0. Will be removed in 6.0. Use LastBookmarks instead.
 	LastBookmark() string
 	// BeginTransaction starts a new explicit transaction on this session
 	BeginTransaction(configurers ...func(*TransactionConfig)) (Transaction, error)

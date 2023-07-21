@@ -36,10 +36,10 @@ import (
 
 // TransactionWork represents a unit of work that will be executed against the provided
 // transaction
-// Deprecated: use ManagedTransactionWork instead.
 // ManagedTransactionWork is created via the context-aware driver returned
 // by NewDriverWithContext.
-// TransactionWork will be removed in 6.0.
+//
+// Deprecated: use ManagedTransactionWork instead. TransactionWork will be removed in 6.0.
 type TransactionWork func(tx Transaction) (any, error)
 
 // ManagedTransactionWork represents a unit of work that will be executed against the provided

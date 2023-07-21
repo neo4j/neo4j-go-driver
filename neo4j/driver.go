@@ -27,6 +27,7 @@ import (
 
 // Driver represents a pool(s) of connections to a neo4j server or cluster. It's
 // safe for concurrent use.
+//
 // Deprecated: please use DriverWithContext instead. This interface will be removed in 6.0.
 type Driver interface {
 	// Target returns the url this driver is bootstrapped
