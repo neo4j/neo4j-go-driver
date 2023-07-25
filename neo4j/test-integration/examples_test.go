@@ -260,7 +260,7 @@ func TestExamples(outer *testing.T) {
 			fieldCartesian, _ := field.(dbtype.Point2D)
 
 			// Serializing
-			_ = fieldCartesian.String() // Point{srId=7203, x=2.500000, y=-2.000000}
+			_ = fieldCartesian.String() // Point{SpatialReferenceId=7203, X=2.500000, Y=-2.000000}
 
 			// Acessing members
 			print(fieldCartesian.X)            // 2.500000
@@ -272,7 +272,7 @@ func TestExamples(outer *testing.T) {
 			fieldWgs84 := field.(dbtype.Point2D)
 
 			// Serializing
-			_ = fieldWgs84.String() // Point{srId=4326, x=-1.500000, y=1.00000}
+			_ = fieldWgs84.String() // Point{SpatialReferenceId=4326, X=-1.500000, Y=1.00000}
 
 			// Acessing members
 			print(fieldWgs84.X)            // -1.500000
@@ -280,12 +280,12 @@ func TestExamples(outer *testing.T) {
 			print(fieldWgs84.SpatialRefId) // 4326
 			// end::geospatial-types-point2d[]
 
-			assertEquals(t, fieldCartesian.String(), "Point{srId=7203, x=2.500000, y=-2.000000}")
+			assertEquals(t, fieldCartesian.String(), "Point{SpatialReferenceId=7203, X=2.500000, Y=-2.000000}")
 			assertEquals(t, fieldCartesian.X, cartesian.X)
 			assertEquals(t, fieldCartesian.Y, cartesian.Y)
 			assertEquals(t, fieldCartesian.SpatialRefId, cartesian.SpatialRefId)
 
-			assertEquals(t, fieldWgs84.String(), "Point{srId=4326, x=-1.500000, y=1.000000}")
+			assertEquals(t, fieldWgs84.String(), "Point{SpatialReferenceId=4326, X=-1.500000, Y=1.000000}")
 			assertEquals(t, fieldWgs84.X, wgs84.X)
 			assertEquals(t, fieldWgs84.Y, wgs84.Y)
 			assertEquals(t, fieldWgs84.SpatialRefId, wgs84.SpatialRefId)
@@ -334,7 +334,7 @@ func TestExamples(outer *testing.T) {
 			fieldCartesian := field.(dbtype.Point3D)
 
 			// Serializing
-			_ = fieldCartesian.String() // Point{srId=9157, x=2.500000, y=-2.000000, z=2.000000}
+			_ = fieldCartesian.String() // Point{SpatialReferenceId=9157, X=2.500000, Y=-2.000000, Z=2.000000}
 
 			// Accessing members
 			print(fieldCartesian.X)            // 2.500000
@@ -347,7 +347,7 @@ func TestExamples(outer *testing.T) {
 			fieldWgs84 := field.(dbtype.Point3D)
 
 			// Serializing
-			_ = fieldWgs84.String() // Point{srId=4979, x=-1.500000, y=1.00000, z=3.000000}
+			_ = fieldWgs84.String() // Point{SpatialReferenceId=4979, X=-1.500000, Y=1.00000, Z=3.000000}
 
 			// Accessing members
 			print(fieldWgs84.X)            // -1.500000
@@ -356,13 +356,13 @@ func TestExamples(outer *testing.T) {
 			print(fieldWgs84.SpatialRefId) // 4979
 			// end::geospatial-types-point3d[]
 
-			assertEquals(t, fieldCartesian.String(), "Point{srId=9157, x=2.500000, y=-2.000000, z=2.000000}")
+			assertEquals(t, fieldCartesian.String(), "Point{SpatialReferenceId=9157, X=2.500000, Y=-2.000000, Z=2.000000}")
 			assertEquals(t, fieldCartesian.X, cartesian.X)
 			assertEquals(t, fieldCartesian.Y, cartesian.Y)
 			assertEquals(t, fieldCartesian.Z, cartesian.Z)
 			assertEquals(t, fieldCartesian.SpatialRefId, cartesian.SpatialRefId)
 
-			assertEquals(t, fieldWgs84.String(), "Point{srId=4979, x=-1.500000, y=1.000000, z=3.000000}")
+			assertEquals(t, fieldWgs84.String(), "Point{SpatialReferenceId=4979, X=-1.500000, Y=1.000000, Z=3.000000}")
 			assertEquals(t, fieldWgs84.X, wgs84.X)
 			assertEquals(t, fieldWgs84.Y, wgs84.Y)
 			assertEquals(t, fieldWgs84.Z, wgs84.Z)
