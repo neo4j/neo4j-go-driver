@@ -27,7 +27,7 @@ func TestSpatialTypes(t *testing.T) {
 	t.Run("String representation of Point2D", func(t *testing.T) {
 		point := Point2D{SpatialRefId: 1, X: 1.0, Y: 2.0}
 		actual := point.String()
-		expect := "Point{srId=1, x=1.000000, y=2.000000}"
+		expect := "Point{SpatialRefId=1, X=1.000000, Y=2.000000}"
 		if actual != expect {
 			t.Errorf("Expected %s but was %s", expect, actual)
 		}
@@ -36,7 +36,7 @@ func TestSpatialTypes(t *testing.T) {
 	t.Run("String representation of Point3D", func(t *testing.T) {
 		point := Point3D{SpatialRefId: 1, X: 1.0, Y: 2.0, Z: 3.0}
 		actual := point.String()
-		expect := "Point{srId=1, x=1.000000, y=2.000000, z=3.000000}"
+		expect := "Point{SpatialRefId=1, X=1.000000, Y=2.000000, Z=3.000000}"
 		if actual != expect {
 			t.Errorf("Expected %s but was %s", expect, actual)
 		}
