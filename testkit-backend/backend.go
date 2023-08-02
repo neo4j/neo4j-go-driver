@@ -150,6 +150,7 @@ func (b *backend) writeLine(s string) error {
 func (b *backend) writeLineLocked(s string) error {
 	b.wrLock.Lock()
 	defer b.wrLock.Unlock()
+	fmt.Println(s)
 	return b.writeLine(s)
 }
 
@@ -608,7 +609,7 @@ func (b *backend) handleRequest(req map[string]any) {
 	case "NewSession":
 		driver := b.drivers[data["driverId"].(string)]
 		sessionConfig := neo4j.SessionConfig{
-			BoltLogger: neo4j.ConsoleBoltLogger(),
+			BoltLogger: &streamLog{writeLine: b.writeLineLocked},
 		}
 		if data["accessMode"] != nil {
 			switch data["accessMode"].(string) {
