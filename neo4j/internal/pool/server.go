@@ -37,6 +37,7 @@ type server struct {
 	reservations    int
 	failedConnectAt time.Time
 	roundRobin      uint32
+	closing         bool
 }
 
 func NewServer() *server {
@@ -137,9 +138,13 @@ func (s *server) calculatePenalty(now time.Time) uint32 {
 }
 
 // Returns a busy connection, makes it idle
-func (s *server) returnBusy(c db.Connection) {
+func (s *server) returnBusy(ctx context.Context, c db.Connection) {
 	s.unregisterBusy(c)
-	s.idle.PushFront(c)
+	if s.closing {
+		c.Close(ctx)
+	} else {
+		s.idle.PushFront(c)
+	}
 }
 
 // Number of idle connections
@@ -206,10 +211,15 @@ func (s *server) executeForAllConnections(callback func(c db.Connection)) {
 	}
 }
 
+func (s *server) startClosing(ctx context.Context) {
+	s.closing = true
+	closeAndEmptyConnections(ctx, s.idle)
+}
+
 func closeAndEmptyConnections(ctx context.Context, l list.List) {
 	for e := l.Front(); e != nil; e = e.Next() {
 		c := e.Value.(db.Connection)
-		c.Close(ctx)
+		go c.Close(ctx)
 	}
 	l.Init()
 }

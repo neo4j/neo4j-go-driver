@@ -918,17 +918,21 @@ func (b *bolt5) reAuth(ctx context.Context, auth *idb.ReAuthToken) error {
 func (b *bolt5) Close(ctx context.Context) {
 	b.log.Infof(log.Bolt5, b.logId, "Close")
 	if b.state != bolt5Dead {
+		b.state = bolt5Dead
 		b.queue.appendGoodbye()
 		b.queue.send(ctx)
 	}
 	if err := b.conn.Close(); err != nil {
 		b.log.Warnf(log.Driver, b.serverName, "could not close underlying socket")
 	}
-	b.state = bolt5Dead
 }
 
 func (b *bolt5) SelectDatabase(database string) {
 	b.databaseName = database
+}
+
+func (b *bolt5) SelectedDatabase() string {
+	return b.databaseName
 }
 
 func (b *bolt5) Version() db.ProtocolVersion {
