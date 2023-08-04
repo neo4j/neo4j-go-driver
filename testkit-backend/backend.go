@@ -1429,14 +1429,8 @@ func testSkips() map[string]string {
 		"stub.routing.*.*.test_should_request_rt_from_all_initial_routers_until_successful_on_authorization_expired": "Add DNS resolver TestKit message and connection timeout support",
 
 		// To fix/to decide whether to fix
-		"stub.routing.test_routing_v3.RoutingV3.test_should_revert_to_initial_router_if_known_router_throws_protocol_errors":     "It needs investigation - custom resolver does not seem to be called",
-		"stub.routing.test_routing_v4x1.RoutingV4x1.test_should_revert_to_initial_router_if_known_router_throws_protocol_errors": "It needs investigation - custom resolver does not seem to be called",
-		"stub.routing.test_routing_v4x3.RoutingV4x3.test_should_revert_to_initial_router_if_known_router_throws_protocol_errors": "It needs investigation - custom resolver does not seem to be called",
-		"stub.routing.test_routing_v4x4.RoutingV4x4.test_should_revert_to_initial_router_if_known_router_throws_protocol_errors": "It needs investigation - custom resolver does not seem to be called",
-		"stub.routing.test_routing_v5x0.RoutingV5x0.test_should_revert_to_initial_router_if_known_router_throws_protocol_errors": "It needs investigation - custom resolver does not seem to be called",
-		"stub.homedb.test_homedb.TestHomeDb.test_session_should_cache_home_db_despite_new_rt":                                    "Driver does not remove servers from RT when connection breaks.",
-		"stub.tx_run.test_tx_run.TestTxRun.test_should_prevent_discard_after_tx_termination_on_run":                              "fixme: usage of failed transaction leads to unintelligible error that's treated as BackendError",
-		"stub.tx_run.test_tx_run.TestTxRun.test_should_prevent_pull_after_tx_termination_on_run":                                 "fixme: usage of failed transaction leads to unintelligible error that's treated as BackendError",
+		"stub.tx_run.test_tx_run.TestTxRun.test_should_prevent_discard_after_tx_termination_on_run": "fixme: usage of failed transaction leads to unintelligible error that's treated as BackendError",
+		"stub.tx_run.test_tx_run.TestTxRun.test_should_prevent_pull_after_tx_termination_on_run":    "fixme: usage of failed transaction leads to unintelligible error that's treated as BackendError",
 	}
 }
 

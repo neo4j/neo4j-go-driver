@@ -254,6 +254,8 @@ func NewDriverWithContext(target string, auth auth.TokenManager, configurers ...
 		d.router = router.New(address, routersResolver, routingContext, d.pool, d.log, d.logId, &d.now)
 	}
 
+	d.pool.SetRouter(d.router)
+
 	d.log.Infof(log.Driver, d.logId, "Created { target: %s }", address)
 	return &d, nil
 }
@@ -310,10 +312,11 @@ type sessionRouter interface {
 	// The correct database name is needed when requesting readers or writers.
 	// the bookmarks are eagerly provided since this method always fetches a new routing table
 	GetNameOfDefaultDatabase(ctx context.Context, bookmarks []string, user string, auth *idb.ReAuthToken, boltLogger log.BoltLogger) (string, error)
-	Invalidate(ctx context.Context, database string) error
+	Invalidate(ctx context.Context, db string) error
 	CleanUp(ctx context.Context) error
-	InvalidateWriter(ctx context.Context, name string, server string) error
-	InvalidateReader(ctx context.Context, name string, server string) error
+	InvalidateWriter(ctx context.Context, db string, server string) error
+	InvalidateReader(ctx context.Context, db string, server string) error
+	InvalidateServer(ctx context.Context, server string) error
 }
 
 type driverWithContext struct {

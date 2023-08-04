@@ -22,13 +22,29 @@ package connector_test
 import (
 	"context"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/config"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/db"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/connector"
+	idb "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
 	. "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/testutil"
 	"io"
 	"net"
 	"testing"
 	"time"
 )
+
+type noopErrorListener struct{}
+
+func (n noopErrorListener) OnNeo4jError(context.Context, idb.Connection, *db.Neo4jError) error {
+	return nil
+}
+
+func (n noopErrorListener) OnIoError(context.Context, idb.Connection, error) error {
+	return nil
+}
+
+func (n noopErrorListener) OnDialError(context.Context, string, error) error {
+	return nil
+}
 
 func TestConnect(outer *testing.T) {
 	outer.Parallel()
@@ -49,7 +65,7 @@ func TestConnect(outer *testing.T) {
 			Now:              &timer,
 		}
 
-		connection, err := connector.Connect(ctx, "irrelevant", nil, nil, nil)
+		connection, err := connector.Connect(ctx, "irrelevant", nil, noopErrorListener{}, nil)
 
 		AssertNil(t, connection)
 		AssertErrorMessageContains(t, err, "unsupported version 1.0")
@@ -70,7 +86,7 @@ func TestConnect(outer *testing.T) {
 			Now:              &timer,
 		}
 
-		connection, err := connector.Connect(ctx, "irrelevant", nil, nil, nil)
+		connection, err := connector.Connect(ctx, "irrelevant", nil, noopErrorListener{}, nil)
 
 		AssertNil(t, connection)
 		AssertError(t, err)

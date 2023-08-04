@@ -40,8 +40,20 @@ import (
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/test-integration/dbserver"
 )
 
-func noopOnNeo4jError(context.Context, idb.Connection, *db.Neo4jError) error {
-	return nil
+type noopErrorListener struct{}
+
+func (n noopErrorListener) OnNeo4jError(_ context.Context, _ idb.Connection, e *db.Neo4jError) error {
+	fmt.Println("OnNeo4jError", e)
+	return e
+}
+
+func (n noopErrorListener) OnIoError(_ context.Context, _ idb.Connection, e error) error {
+	fmt.Println("OnIoError", e)
+	return e
+}
+
+func (n noopErrorListener) OnDialError(_ context.Context, _ string, err error) error {
+	return err
 }
 
 func makeRawConnection(ctx context.Context, logger log.Logger, boltLogger log.BoltLogger) (
@@ -77,7 +89,7 @@ func makeRawConnection(ctx context.Context, logger log.Logger, boltLogger log.Bo
 		auth,
 		"007",
 		nil,
-		noopOnNeo4jError,
+		noopErrorListener{},
 		logger,
 		boltLogger,
 		idb.NotificationConfig{},

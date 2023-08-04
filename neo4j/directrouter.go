@@ -38,6 +38,10 @@ func (r *directRouter) InvalidateReader(context.Context, string, string) error {
 	return nil
 }
 
+func (r *directRouter) InvalidateServer(context.Context, string) error {
+	return nil
+}
+
 func (r *directRouter) GetOrUpdateReaders(context.Context, func(context.Context) ([]string, error), string, *db.ReAuthToken, log.BoltLogger) ([]string, error) {
 	return []string{r.address}, nil
 }

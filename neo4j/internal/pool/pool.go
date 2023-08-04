@@ -45,7 +45,13 @@ import (
 // Liveness checks are performed before a connection is deemed idle enough to be reset
 const DefaultLivenessCheckThreshold = math.MaxInt64
 
-type Connect func(context.Context, string, *idb.ReAuthToken, bolt.Neo4jErrorCallback, log.BoltLogger) (idb.Connection, error)
+type Connect func(context.Context, string, *idb.ReAuthToken, bolt.ConnectionErrorListener, log.BoltLogger) (idb.Connection, error)
+
+type poolRouter interface {
+	InvalidateWriter(ctx context.Context, db string, server string) error
+	InvalidateReader(ctx context.Context, db string, server string) error
+	InvalidateServer(ctx context.Context, server string) error
+}
 
 type qitem struct {
 	wakeup chan bool
@@ -54,6 +60,7 @@ type qitem struct {
 type Pool struct {
 	config     *config.Config
 	connect    Connect
+	router     poolRouter
 	servers    map[string]*server
 	serversMut racing.Mutex
 	queueMut   racing.Mutex
@@ -75,6 +82,7 @@ func New(config *config.Config, connect Connect, logger log.Logger, logId string
 	p := &Pool{
 		config:     config,
 		connect:    connect,
+		router:     nil,
 		servers:    make(map[string]*server),
 		serversMut: racing.NewMutex(),
 		queueMut:   racing.NewMutex(),
@@ -84,6 +92,10 @@ func New(config *config.Config, connect Connect, logger log.Logger, logId string
 	}
 	p.log.Infof(log.Pool, p.logId, "Created")
 	return p
+}
+
+func (p *Pool) SetRouter(router poolRouter) {
+	p.router = router
 }
 
 func (p *Pool) Close(ctx context.Context) error {
@@ -355,19 +367,21 @@ func (p *Pool) tryBorrow(ctx context.Context, serverName string, boltLogger log.
 
 	// No idle connection, try to connect
 	p.log.Infof(log.Pool, p.logId, "Connecting to %s", serverName)
-	c, err := p.connect(ctx, serverName, auth, p.OnConnectionError, boltLogger)
+	c, err := p.connect(ctx, serverName, auth, p, boltLogger)
 	if !p.serversMut.TryLock(context.Background()) {
 		panic("lock with Background context should never time out")
 	}
 	*unlock = sync.Once{}
 	srv.reservations--
 	if err != nil {
+		var err2 error
+		p.log.Warnf(log.Pool, p.logId, "Failed to connect to %s: %s", serverName, err)
 		// FeatureNotSupportedError is not the server fault, don't penalize it
 		if _, ok := err.(*db.FeatureNotSupportedError); !ok {
 			srv.notifyFailedConnect((*p.now)())
+			err2 = p.deactivate(ctx, serverName)
 		}
-		p.log.Warnf(log.Pool, p.logId, "Failed to connect to %s: %s", serverName, err)
-		return nil, err
+		return nil, errorutil.CombineAllErrors(err, err2)
 	}
 
 	// Ok, got a connection, register the connection
@@ -491,7 +505,7 @@ func (p *Pool) Return(ctx context.Context, c idb.Connection) error {
 	return nil
 }
 
-func (p *Pool) OnConnectionError(ctx context.Context, connection idb.Connection, error *db.Neo4jError) error {
+func (p *Pool) OnNeo4jError(ctx context.Context, connection idb.Connection, error *db.Neo4jError) error {
 	if error.Code == "Neo.ClientError.Security.AuthorizationExpired" {
 		serverName := connection.ServerName()
 		if !p.serversMut.TryLock(ctx) {
@@ -516,6 +530,21 @@ func (p *Pool) OnConnectionError(ctx context.Context, connection idb.Connection,
 				error.MarkRetriable()
 			}
 		}
+	} else if error.Code == "Neo.TransientError.General.DatabaseUnavailable" {
+		return p.deactivate(ctx, connection.ServerName())
 	}
 	return nil
+}
+
+func (p *Pool) OnIoError(ctx context.Context, connection idb.Connection, error error) error {
+	return p.deactivate(ctx, connection.ServerName())
+}
+
+func (p *Pool) OnDialError(ctx context.Context, serverName string, error error) error {
+	return p.deactivate(ctx, serverName)
+}
+
+func (p *Pool) deactivate(ctx context.Context, serverName string) error {
+	p.log.Debugf(log.Pool, p.logId, "Deactivating server %s", serverName)
+	return p.router.InvalidateServer(ctx, serverName)
 }

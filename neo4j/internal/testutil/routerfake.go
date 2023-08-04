@@ -50,6 +50,10 @@ func (r *RouterFake) InvalidateWriter(context.Context, string, string) error {
 	return nil
 }
 
+func (r *RouterFake) InvalidateServer(context.Context, string) error {
+	return nil
+}
+
 func (r *RouterFake) Invalidate(ctx context.Context, database string) error {
 	r.InvalidatedDb = database
 	r.Invalidated = true

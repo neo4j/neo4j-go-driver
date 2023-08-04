@@ -109,30 +109,30 @@ type bolt5 struct {
 	auth          map[string]any
 	authManager   auth.TokenManager
 	resetAuth     bool
-	onNeo4jError  Neo4jErrorCallback
+	errorListener ConnectionErrorListener
 	now           *func() time.Time
 }
 
 func NewBolt5(
 	serverName string,
 	conn net.Conn,
-	callback Neo4jErrorCallback,
+	errorListener ConnectionErrorListener,
 	timer *func() time.Time,
 	logger log.Logger,
 	boltLog log.BoltLogger,
 ) *bolt5 {
 	now := (*timer)()
 	b := &bolt5{
-		state:        bolt5Unauthorized,
-		conn:         conn,
-		serverName:   serverName,
-		birthDate:    now,
-		idleDate:     now,
-		log:          logger,
-		streams:      openstreams{},
-		lastQid:      -1,
-		onNeo4jError: callback,
-		now:          timer,
+		state:         bolt5Unauthorized,
+		conn:          conn,
+		serverName:    serverName,
+		birthDate:     now,
+		idleDate:      now,
+		log:           logger,
+		streams:       openstreams{},
+		lastQid:       -1,
+		errorListener: errorListener,
+		now:           timer,
 	}
 	b.queue = newMessageQueue(
 		conn,
@@ -148,12 +148,13 @@ func NewBolt5(
 		&outgoing{
 			chunker:    newChunker(),
 			packer:     packstream.Packer{},
-			onErr:      func(err error) { b.setError(err, true) },
+			onPackErr:  func(err error) { b.setError(err, true) },
+			onIoErr:    b.onIoError,
 			boltLogger: boltLog,
 			useUtc:     true,
 		},
 		b.onNextMessage,
-		b.onNextMessageError,
+		b.onIoError,
 	)
 	return b
 }
@@ -1073,7 +1074,7 @@ func (b *bolt5) resetResponseHandler() responseHandler {
 			b.state = bolt5Ready
 		},
 		onFailure: func(ctx context.Context, failure *db.Neo4jError) {
-			_ = b.onNeo4jError(ctx, b, failure)
+			_ = b.errorListener.OnNeo4jError(ctx, b, failure)
 			b.state = bolt5Dead
 		},
 	}
@@ -1107,17 +1108,26 @@ func (b *bolt5) onNextMessage() {
 	b.idleDate = (*b.now)()
 }
 
-func (b *bolt5) onNextMessageError(err error) {
-	b.setError(err, true)
-}
-
 func (b *bolt5) onFailure(ctx context.Context, failure *db.Neo4jError) {
 	var err error
 	err = failure
-	if callbackErr := b.onNeo4jError(ctx, b, failure); callbackErr != nil {
+	if callbackErr := b.errorListener.OnNeo4jError(ctx, b, failure); callbackErr != nil {
 		err = errorutil.CombineErrors(callbackErr, failure)
 	}
 	b.setError(err, isFatalError(failure))
+}
+
+func (b *bolt5) onIoError(ctx context.Context, failure error) {
+	var err error
+	err = failure
+	if b.state != bolt5Failed && b.state != bolt5Dead {
+		// Don't call callback when connections break after sending RESET.
+		// The server chooses to close the connection on some errors.
+		if callbackErr := b.errorListener.OnIoError(ctx, b, failure); callbackErr != nil {
+			err = errorutil.CombineErrors(callbackErr, failure)
+		}
+	}
+	b.setError(err, true)
 }
 
 func (b *bolt5) initializeReadTimeoutHint(hints map[string]any) {

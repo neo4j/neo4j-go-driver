@@ -25,6 +25,16 @@ import (
 	idb "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
 )
 
-func noopOnNeo4jError(context.Context, idb.Connection, *db.Neo4jError) error {
+type noopErrorListener struct{}
+
+func (n noopErrorListener) OnNeo4jError(context.Context, idb.Connection, *db.Neo4jError) error {
+	return nil
+}
+
+func (n noopErrorListener) OnIoError(context.Context, idb.Connection, error) error {
+	return nil
+}
+
+func (n noopErrorListener) OnDialError(context.Context, string, error) error {
 	return nil
 }

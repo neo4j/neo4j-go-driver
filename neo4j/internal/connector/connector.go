@@ -50,7 +50,7 @@ func (c Connector) Connect(
 	ctx context.Context,
 	address string,
 	auth *db.ReAuthToken,
-	callback bolt.Neo4jErrorCallback,
+	errorListener bolt.ConnectionErrorListener,
 	boltLogger log.BoltLogger,
 ) (connection db.Connection, err error) {
 	if c.SupplyConnection == nil {
@@ -59,7 +59,8 @@ func (c Connector) Connect(
 
 	conn, err := c.SupplyConnection(ctx, address)
 	if err != nil {
-		return nil, err
+		err2 := errorListener.OnDialError(ctx, address, err)
+		return nil, errorutil.CombineAllErrors(err, err2)
 	}
 
 	defer func() {
@@ -84,14 +85,15 @@ func (c Connector) Connect(
 			auth,
 			c.Config.UserAgent,
 			c.RoutingContext,
-			callback,
+			errorListener,
 			c.Log,
 			boltLogger,
 			notificationConfig,
 			c.Now,
 		)
 		if err != nil {
-			return nil, err
+			err2 := errorListener.OnDialError(ctx, address, err)
+			return nil, errorutil.CombineAllErrors(err, err2)
 		}
 		return connection, nil
 	}
@@ -99,7 +101,8 @@ func (c Connector) Connect(
 	// TLS requested, continue with handshake
 	serverName, _, err := net.SplitHostPort(address)
 	if err != nil {
-		return nil, err
+		err2 := errorListener.OnDialError(ctx, address, err)
+		return nil, errorutil.CombineAllErrors(err, err2)
 	}
 	tlsConn := tls.Client(conn, c.tlsConfig(serverName))
 	err = tlsConn.HandshakeContext(ctx)
@@ -108,7 +111,9 @@ func (c Connector) Connect(
 			// Give a bit nicer error message
 			err = errors.New("remote end closed the connection, check that TLS is enabled on the server")
 		}
-		return nil, &errorutil.TlsError{Inner: err}
+		err = &errorutil.TlsError{Inner: err}
+		err2 := errorListener.OnDialError(ctx, address, err)
+		return nil, errorutil.CombineAllErrors(err, err2)
 	}
 	connection, err = bolt.Connect(ctx,
 		address,
@@ -116,7 +121,7 @@ func (c Connector) Connect(
 		auth,
 		c.Config.UserAgent,
 		c.RoutingContext,
-		callback,
+		errorListener,
 		c.Log,
 		boltLogger,
 		notificationConfig,
