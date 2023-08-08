@@ -845,6 +845,50 @@ func (b *backend) handleRequest(req map[string]any) {
 		}
 		b.writeResponse("Summary", serializeSummary(summary))
 
+	case "ForcedRoutingTableUpdate":
+		databaseRaw := data["database"]
+		var database string
+		if databaseRaw != nil {
+			database = databaseRaw.(string)
+		}
+		var bookmarks []string
+		bookmarksRaw := data["bookmarks"]
+		if bookmarksRaw != nil {
+			bookmarksSlice := bookmarksRaw.([]any)
+			bookmarks = make([]string, len(bookmarksSlice))
+			for i, bookmark := range bookmarksSlice {
+				bookmarks[i] = bookmark.(string)
+			}
+		}
+		driverId := data["driverId"].(string)
+		driver := b.drivers[driverId]
+		err := neo4j.ForceRoutingTableUpdate(driver, database, bookmarks, &streamLog{writeLine: b.writeLineLocked})
+		if err != nil {
+			b.writeError(err)
+			return
+		}
+		b.writeResponse("Driver", map[string]any{"id": driverId})
+
+	case "GetRoutingTable":
+		driver := b.drivers[data["driverId"].(string)]
+		databaseRaw := data["database"]
+		var database string
+		if databaseRaw != nil {
+			database = databaseRaw.(string)
+		}
+		table, err := neo4j.GetRoutingTable(driver, database)
+		if err != nil {
+			b.writeError(err)
+			return
+		}
+		b.writeResponse("RoutingTable", map[string]any{
+			"database": table.DatabaseName,
+			"ttl":      table.TimeToLive,
+			"routers":  table.Routers,
+			"readers":  table.Readers,
+			"writers":  table.Writers,
+		})
+
 	case "CheckMultiDBSupport":
 		driver := b.drivers[data["driverId"].(string)]
 		session := driver.NewSession(ctx, neo4j.SessionConfig{
@@ -1104,11 +1148,8 @@ func (b *backend) handleRequest(req map[string]any) {
 
 				// === BACKEND FEATURES FOR TESTING ===
 				"Backend:MockTime",
-				// No GetRoutingTable support - too tricky to implement in Go for now
-				//"Backend:RTFetch",
-				// No ForcedRoutingTableUpdate support - too tricky to implement in Go for now
-				//"Backend:RTForceUpdate",
-
+				"Backend:RTFetch",
+				"Backend:RTForceUpdate",
 			},
 		})
 
@@ -1423,14 +1464,25 @@ func testSkips() map[string]string {
 		"stub.connectivity_check.test_verify_connectivity.TestVerifyConnectivity.test_routing_fail_when_no_reader_are_available":                   "Won't fix - Go driver retries routing table when no readers are available",
 		"stub.driver_parameters.test_connection_acquisition_timeout_ms.TestConnectionAcquisitionTimeoutMs.test_does_not_encompass_router_*":        "Won't fix - ConnectionAcquisitionTimeout spans the whole process including db resolution, RT updates, connection acquisition from the pool, and creation of new connections.",
 		"stub.driver_parameters.test_connection_acquisition_timeout_ms.TestConnectionAcquisitionTimeoutMs.test_router_handshake_has_own_timeout_*": "Won't fix - ConnectionAcquisitionTimeout spans the whole process including db resolution, RT updates, connection acquisition from the pool, and creation of new connections.",
+		"stub.routing.test_routing_v*.RoutingV*.test_should_successfully_check_if_support_for_multi_db_is_available":                               "Won't fix - driver.SupportsMultiDb() is not implemented",
+		"stub.routing.test_no_routing_v*.NoRoutingV*.test_should_check_multi_db_support":                                                           "Won't fix - driver.SupportsMultiDb() is not implemented",
+		"stub.routing.test_routing_v3.RoutingV3.test_should_fail_discovery_when_router_fails_with_procedure_not_found_code":                        "Won't fix - only Bolt 3 affected (not officially supported by this driver) + this is only a difference in how errors are surfaced",
 
 		// Missing message support in testkit backend
 		"stub.routing.*.*.test_should_request_rt_from_all_initial_routers_until_successful_on_unknown_failure":       "Add DNS resolver TestKit message and connection timeout support",
 		"stub.routing.*.*.test_should_request_rt_from_all_initial_routers_until_successful_on_authorization_expired": "Add DNS resolver TestKit message and connection timeout support",
 
 		// To fix/to decide whether to fix
-		"stub.tx_run.test_tx_run.TestTxRun.test_should_prevent_discard_after_tx_termination_on_run": "fixme: usage of failed transaction leads to unintelligible error that's treated as BackendError",
-		"stub.tx_run.test_tx_run.TestTxRun.test_should_prevent_pull_after_tx_termination_on_run":    "fixme: usage of failed transaction leads to unintelligible error that's treated as BackendError",
+		"stub.tx_run.test_tx_run.TestTxRun.test_should_prevent_discard_after_tx_termination_on_run":                          "fixme: usage of failed transaction leads to unintelligible error that's treated as BackendError",
+		"stub.tx_run.test_tx_run.TestTxRun.test_should_prevent_pull_after_tx_termination_on_run":                             "fixme: usage of failed transaction leads to unintelligible error that's treated as BackendError",
+		"stub.tx_run.test_tx_run.TestTxRun.test_should_prevent_commit_after_tx_termination":                                  "fixme: usage of failed transaction leads to unintelligible error that's treated as BackendError",
+		"stub.routing.test_routing_v*.RoutingV*.test_should_revert_to_initial_router_if_known_router_throws_protocol_errors": "Driver always uses configured URL first and custom resolver only if that fails",
+		"stub.routing.test_routing_v*.RoutingV*.test_should_read_successfully_from_reachable_db_after_trying_unreachable_db": "Driver retries to fetch a routing table up to 100 times if it's emtpy",
+		"stub.routing.test_routing_v*.RoutingV*.test_should_write_successfully_after_leader_switch_using_tx_run":             "Driver retries to fetch a routing table up to 100 times if it's emtpy",
+		"stub.routing.test_routing_v*.RoutingV*.test_should_fail_when_writing_without_writers_using_session_run":             "Driver retries to fetch a routing table up to 100 times if it's emtpy",
+		"stub.routing.test_routing_v*.RoutingV*.test_should_accept_routing_table_without_writers_and_then_rediscover":        "Driver retries to fetch a routing table up to 100 times if it's emtpy",
+		"stub.routing.test_routing_v*.RoutingV*.test_should_fail_on_routing_table_with_no_reader":                            "Driver retries to fetch a routing table up to 100 times if it's emtpy",
+		"stub.routing.test_routing_v*.RoutingV*.test_should_fail_discovery_when_router_fails_with_unknown_code":              "Unify: other drivers have a list of fast failing errors during discover: on anything else, the driver will try the next router",
 	}
 }
 
