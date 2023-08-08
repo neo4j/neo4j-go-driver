@@ -40,10 +40,10 @@ type Point3D struct {
 
 // String returns string representation of this point.
 func (p Point2D) String() string {
-	return fmt.Sprintf("Point{srId=%d, x=%f, y=%f}", p.SpatialRefId, p.X, p.Y)
+	return fmt.Sprintf("Point{SpatialRefId=%d, X=%f, Y=%f}", p.SpatialRefId, p.X, p.Y)
 }
 
 // String returns string representation of this point.
 func (p Point3D) String() string {
-	return fmt.Sprintf("Point{srId=%d, x=%f, y=%f, z=%f}", p.SpatialRefId, p.X, p.Y, p.Z)
+	return fmt.Sprintf("Point{SpatialRefId=%d, X=%f, Y=%f, Z=%f}", p.SpatialRefId, p.X, p.Y, p.Z)
 }
