@@ -46,16 +46,16 @@ func (r *directRouter) GetOrUpdateReaders(context.Context, func(context.Context)
 	return []string{r.address}, nil
 }
 
-func (r *directRouter) Readers(context.Context, string) ([]string, error) {
-	return []string{r.address}, nil
+func (r *directRouter) Readers(string) []string {
+	return []string{r.address}
 }
 
 func (r *directRouter) GetOrUpdateWriters(context.Context, func(context.Context) ([]string, error), string, *db.ReAuthToken, log.BoltLogger) ([]string, error) {
 	return []string{r.address}, nil
 }
 
-func (r *directRouter) Writers(context.Context, string) ([]string, error) {
-	return []string{r.address}, nil
+func (r *directRouter) Writers(string) []string {
+	return []string{r.address}
 }
 
 func (r *directRouter) GetNameOfDefaultDatabase(context.Context, []string, string, *db.ReAuthToken, log.BoltLogger) (string, error) {
@@ -66,6 +66,4 @@ func (r *directRouter) Invalidate(context.Context, string) error {
 	return nil
 }
 
-func (r *directRouter) CleanUp(context.Context) error {
-	return nil
-}
+func (r *directRouter) CleanUp() {}

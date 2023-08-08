@@ -32,10 +32,6 @@ import (
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/log"
 )
 
-type Router interface {
-	Invalidate(ctx context.Context, database string) error
-}
-
 type State struct {
 	Errs                    []error
 	MaxTransactionRetryTime time.Duration
@@ -46,24 +42,20 @@ type State struct {
 	Sleep                   func(time.Duration)
 	Throttle                Throttler
 	MaxDeadConnections      int
-	Router                  Router
 	DatabaseName            string
 
-	start            time.Time
-	cause            string
-	deadErrors       int
-	skipSleep        bool
-	OnDeadConnection func(server string) error
+	start      time.Time
+	cause      string
+	deadErrors int
+	skipSleep  bool
 }
 
-func (s *State) OnFailure(ctx context.Context, err error, conn idb.Connection, isCommitting bool) {
+func (s *State) OnFailure(_ context.Context, err error, conn idb.Connection, isCommitting bool) {
 	if conn != nil && !conn.IsAlive() {
 		if isCommitting {
+			// FIXME: CommitFailedDeadError should be returned even when not using transaction functions
 			s.Errs = append(s.Errs, &errorutil.CommitFailedDeadError{Inner: err})
 		} else {
-			s.Errs = append(s.Errs, err)
-		}
-		if err := s.OnDeadConnection(conn.ServerName()); err != nil {
 			s.Errs = append(s.Errs, err)
 		}
 		s.deadErrors += 1
@@ -73,13 +65,6 @@ func (s *State) OnFailure(ctx context.Context, err error, conn idb.Connection, i
 
 	s.Errs = append(s.Errs, err)
 	s.skipSleep = false
-
-	if dbErr, isDbErr := err.(*db.Neo4jError); isDbErr && dbErr.IsRetriableCluster() {
-		if err := s.Router.Invalidate(ctx, s.DatabaseName); err != nil {
-			s.Errs = append(s.Errs, err)
-		}
-	}
-
 }
 
 func (s *State) Continue() bool {

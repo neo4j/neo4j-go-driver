@@ -28,6 +28,8 @@ import (
 type RouterFake struct {
 	Invalidated            bool
 	InvalidatedDb          string
+	InvalidateMode         string
+	InvalidatedServer      string
 	GetOrUpdateReadersRet  []string
 	GetOrUpdateReadersHook func(bookmarks func(context.Context) ([]string, error), database string) ([]string, error)
 	GetOrUpdateWritersRet  []string
@@ -35,7 +37,6 @@ type RouterFake struct {
 	Err                    error
 	CleanUpHook            func()
 	GetNameOfDefaultDbHook func(user string) (string, error)
-	InvalidatedServer      string
 }
 
 func (r *RouterFake) InvalidateReader(ctx context.Context, database string, server string) error {
@@ -43,18 +44,26 @@ func (r *RouterFake) InvalidateReader(ctx context.Context, database string, serv
 		return err
 	}
 	r.InvalidatedServer = server
+	r.InvalidateMode = "reader"
 	return nil
 }
 
-func (r *RouterFake) InvalidateWriter(context.Context, string, string) error {
+func (r *RouterFake) InvalidateWriter(ctx context.Context, database string, server string) error {
+	if err := r.Invalidate(ctx, database); err != nil {
+		return err
+	}
+	r.InvalidatedServer = server
+	r.InvalidateMode = "writer"
 	return nil
 }
 
-func (r *RouterFake) InvalidateServer(context.Context, string) error {
+func (r *RouterFake) InvalidateServer(_ context.Context, server string) error {
+	r.Invalidated = true
+	r.InvalidatedServer = server
 	return nil
 }
 
-func (r *RouterFake) Invalidate(ctx context.Context, database string) error {
+func (r *RouterFake) Invalidate(_ context.Context, database string) error {
 	r.InvalidatedDb = database
 	r.Invalidated = true
 	return nil
@@ -67,8 +76,8 @@ func (r *RouterFake) GetOrUpdateReaders(_ context.Context, bookmarksFn func(cont
 	return r.GetOrUpdateReadersRet, r.Err
 }
 
-func (r *RouterFake) Readers(context.Context, string) ([]string, error) {
-	return nil, nil
+func (r *RouterFake) Readers(string) []string {
+	return nil
 }
 
 func (r *RouterFake) GetOrUpdateWriters(_ context.Context, bookmarksFn func(context.Context) ([]string, error), database string, _ *db.ReAuthToken, _ log.BoltLogger) ([]string, error) {
@@ -78,8 +87,8 @@ func (r *RouterFake) GetOrUpdateWriters(_ context.Context, bookmarksFn func(cont
 	return r.GetOrUpdateWritersRet, r.Err
 }
 
-func (r *RouterFake) Writers(context.Context, string) ([]string, error) {
-	return nil, nil
+func (r *RouterFake) Writers(string) []string {
+	return nil
 }
 
 func (r *RouterFake) GetNameOfDefaultDatabase(_ context.Context, _ []string, user string, _ *db.ReAuthToken, _ log.BoltLogger) (string, error) {
@@ -89,9 +98,8 @@ func (r *RouterFake) GetNameOfDefaultDatabase(_ context.Context, _ []string, use
 	return "", nil
 }
 
-func (r *RouterFake) CleanUp(ctx context.Context) error {
+func (r *RouterFake) CleanUp() {
 	if r.CleanUpHook != nil {
 		r.CleanUpHook()
 	}
-	return nil
 }

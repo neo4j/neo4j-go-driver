@@ -66,7 +66,7 @@ func (c Connector) Connect(
 	defer func() {
 		if err != nil && connection == nil {
 			if err := conn.Close(); err != nil {
-				c.Log.Warnf(log.Driver, address, "could not close socket after failed connection")
+				c.Log.Warnf(log.Driver, address, "could not close socket after failed connection %s", err)
 			}
 		}
 	}()
@@ -92,8 +92,7 @@ func (c Connector) Connect(
 			c.Now,
 		)
 		if err != nil {
-			err2 := errorListener.OnDialError(ctx, address, err)
-			return nil, errorutil.CombineAllErrors(err, err2)
+			return nil, err
 		}
 		return connection, nil
 	}

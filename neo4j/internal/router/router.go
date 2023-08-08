@@ -45,7 +45,8 @@ type Router struct {
 	routerContext map[string]string
 	pool          Pool
 	dbRouters     map[string]*databaseRouter
-	dbRoutersMut  racing.Mutex
+	updating      map[string][]chan struct{}
+	dbRoutersMut  sync.Mutex
 	now           *func() time.Time
 	sleep         func(time.Duration)
 	rootRouter    string
@@ -59,8 +60,8 @@ type Pool interface {
 	// If all connections are busy and the pool is full, calls to Borrow may wait for a connection to become idle
 	// If a connection has been idle for longer than idlenessThreshold, it will be reset
 	// to check if it's still alive.
-	Borrow(ctx context.Context, getServers func(context.Context) ([]string, error), wait bool, boltLogger log.BoltLogger, idlenessThreshold time.Duration, auth *idb.ReAuthToken) (idb.Connection, error)
-	Return(ctx context.Context, c idb.Connection) error
+	Borrow(ctx context.Context, getServers func() []string, wait bool, boltLogger log.BoltLogger, idlenessThreshold time.Duration, auth *idb.ReAuthToken) (idb.Connection, error)
+	Return(ctx context.Context, c idb.Connection)
 }
 
 func New(rootRouter string, getRouters func() []string, routerContext map[string]string, pool Pool, logger log.Logger, logId string, timer *func() time.Time) *Router {
@@ -70,7 +71,8 @@ func New(rootRouter string, getRouters func() []string, routerContext map[string
 		routerContext: routerContext,
 		pool:          pool,
 		dbRouters:     make(map[string]*databaseRouter),
-		dbRoutersMut:  racing.NewMutex(),
+		updating:      make(map[string][]chan struct{}),
+		dbRoutersMut:  sync.Mutex{},
 		now:           timer,
 		sleep:         time.Sleep,
 		log:           logger,
@@ -140,43 +142,64 @@ func (r *Router) readTable(
 	return table, nil
 }
 
-func (r *Router) getTable(ctx context.Context, database string) (*idb.RoutingTable, error) {
-	if !r.dbRoutersMut.TryLock(ctx) {
-		return nil, racing.LockTimeoutError("could not acquire router lock in time when getting routing table")
-	}
+func (r *Router) getTable(database string) *idb.RoutingTable {
+	r.dbRoutersMut.Lock()
 	defer r.dbRoutersMut.Unlock()
 
 	dbRouter := r.dbRouters[database]
-	return r.getTableLocked(dbRouter, (*r.now)()), nil
+	return r.getTableLocked(dbRouter)
 }
 
 func (r *Router) getOrUpdateTable(ctx context.Context, bookmarksFn func(context.Context) ([]string, error), database string, auth *idb.ReAuthToken, boltLogger log.BoltLogger) (*idb.RoutingTable, error) {
-	now := (*r.now)()
-
+	r.dbRoutersMut.Lock()
 	var unlock = new(sync.Once)
-
-	if !r.dbRoutersMut.TryLock(ctx) {
-		return nil, racing.LockTimeoutError("could not acquire router lock in time when getting routing table")
-	}
 	defer unlock.Do(r.dbRoutersMut.Unlock)
+	for {
+		dbRouter := r.dbRouters[database]
+		if table := r.getTableLocked(dbRouter); table != nil {
+			return table, nil
+		}
+		waiters, ok := r.updating[database]
+		if ok {
+			// Wait for the table to be updated by other goroutine
+			ch := make(chan struct{})
+			r.updating[database] = append(waiters, ch)
+			unlock.Do(r.dbRoutersMut.Unlock)
+			select {
+			case <-ctx.Done():
+				return nil, racing.LockTimeoutError("timed out waiting for other goroutine to update routing table")
+			case <-ch:
+				unlock.Do(r.dbRoutersMut.Unlock)
+				r.dbRoutersMut.Lock()
+				*unlock = sync.Once{}
+				continue
+			}
+		}
+		// this goroutine will update the table
+		r.updating[database] = make([]chan struct{}, 0)
+		unlock.Do(r.dbRoutersMut.Unlock)
 
-	dbRouter := r.dbRouters[database]
-	if table := r.getTableLocked(dbRouter, now); table != nil {
-		return table, nil
+		table, err := r.updateTable(ctx, bookmarksFn, database, auth, boltLogger, dbRouter)
+		r.dbRoutersMut.Lock()
+		*unlock = sync.Once{}
+		// notify all waiters
+		for _, waiter := range r.updating[database] {
+			waiter <- struct{}{}
+		}
+		delete(r.updating, database)
+		return table, err
 	}
-
-	unlock.Do(r.dbRoutersMut.Unlock)
-	return r.updateTable(ctx, bookmarksFn, database, auth, boltLogger, dbRouter, now)
 }
 
-func (r *Router) getTableLocked(dbRouter *databaseRouter, now time.Time) *idb.RoutingTable {
+func (r *Router) getTableLocked(dbRouter *databaseRouter) *idb.RoutingTable {
+	now := (*r.now)()
 	if dbRouter != nil && now.Unix() < dbRouter.dueUnix {
 		return dbRouter.table
 	}
 	return nil
 }
 
-func (r *Router) updateTable(ctx context.Context, bookmarksFn func(context.Context) ([]string, error), database string, auth *idb.ReAuthToken, boltLogger log.BoltLogger, dbRouter *databaseRouter, now time.Time) (*idb.RoutingTable, error) {
+func (r *Router) updateTable(ctx context.Context, bookmarksFn func(context.Context) ([]string, error), database string, auth *idb.ReAuthToken, boltLogger log.BoltLogger, dbRouter *databaseRouter) (*idb.RoutingTable, error) {
 	bookmarks, err := bookmarksFn(ctx)
 	if err != nil {
 		return nil, err
@@ -186,7 +209,7 @@ func (r *Router) updateTable(ctx context.Context, bookmarksFn func(context.Conte
 		return nil, err
 	}
 
-	err = r.storeRoutingTable(ctx, database, table, now)
+	err = r.storeRoutingTable(ctx, database, table, (*r.now)())
 	if err != nil {
 		return nil, err
 	}
@@ -224,15 +247,12 @@ func (r *Router) GetOrUpdateReaders(ctx context.Context, bookmarks func(context.
 	return table.Readers, nil
 }
 
-func (r *Router) Readers(ctx context.Context, database string) ([]string, error) {
-	table, err := r.getTable(ctx, database)
-	if err != nil {
-		return nil, err
-	}
+func (r *Router) Readers(database string) []string {
+	table := r.getTable(database)
 	if table == nil {
-		return nil, nil
+		return nil
 	}
-	return table.Readers, nil
+	return table.Readers
 }
 
 func (r *Router) GetOrUpdateWriters(ctx context.Context, bookmarks func(context.Context) ([]string, error), database string, auth *idb.ReAuthToken, boltLogger log.BoltLogger) ([]string, error) {
@@ -265,18 +285,16 @@ func (r *Router) GetOrUpdateWriters(ctx context.Context, bookmarks func(context.
 	return table.Writers, nil
 }
 
-func (r *Router) Writers(ctx context.Context, database string) ([]string, error) {
-	table, err := r.getTable(ctx, database)
-	if err != nil {
-		return nil, err
-	}
+func (r *Router) Writers(database string) []string {
+	table := r.getTable(database)
 	if table == nil {
-		return nil, nil
+		return nil
 	}
-	return table.Writers, nil
+	return table.Writers
 }
 
 func (r *Router) GetNameOfDefaultDatabase(ctx context.Context, bookmarks []string, user string, auth *idb.ReAuthToken, boltLogger log.BoltLogger) (string, error) {
+	// FIXME: this seems to indirectly cache the home db for the routing table's TTL
 	table, err := r.readTable(ctx, nil, bookmarks, idb.DefaultDatabase, user, auth, boltLogger)
 	if err != nil {
 		return "", err
@@ -296,9 +314,7 @@ func (r *Router) Context() map[string]string {
 
 func (r *Router) Invalidate(ctx context.Context, database string) error {
 	r.log.Infof(log.Router, r.logId, "Invalidating routing table for '%s'", database)
-	if !r.dbRoutersMut.TryLock(ctx) {
-		return racing.LockTimeoutError("could not acquire router lock in time when invalidating database router")
-	}
+	r.dbRoutersMut.Lock()
 	defer r.dbRoutersMut.Unlock()
 	// Reset due time to the 70s, this will make next access refresh the routing table using
 	// last set of routers instead of the original one.
@@ -310,9 +326,7 @@ func (r *Router) Invalidate(ctx context.Context, database string) error {
 }
 
 func (r *Router) InvalidateWriter(ctx context.Context, db string, server string) error {
-	if !r.dbRoutersMut.TryLock(ctx) {
-		return racing.LockTimeoutError("could not acquire router lock in time when getting routing table")
-	}
+	r.dbRoutersMut.Lock()
 	defer r.dbRoutersMut.Unlock()
 
 	router := r.dbRouters[db]
@@ -330,9 +344,7 @@ func (r *Router) InvalidateWriter(ctx context.Context, db string, server string)
 }
 
 func (r *Router) InvalidateReader(ctx context.Context, db string, server string) error {
-	if !r.dbRoutersMut.TryLock(ctx) {
-		return racing.LockTimeoutError("could not acquire router lock in time when invalidating reader")
-	}
+	r.dbRoutersMut.Lock()
 	defer r.dbRoutersMut.Unlock()
 
 	router := r.dbRouters[db]
@@ -350,9 +362,7 @@ func (r *Router) InvalidateReader(ctx context.Context, db string, server string)
 }
 
 func (r *Router) InvalidateServer(ctx context.Context, server string) error {
-	if !r.dbRoutersMut.TryLock(ctx) {
-		return racing.LockTimeoutError("could not acquire router lock in time when invalidating server")
-	}
+	r.dbRoutersMut.Lock()
 	defer r.dbRoutersMut.Unlock()
 	for _, routing := range r.dbRouters {
 		routers := routing.table.Routers
@@ -380,12 +390,10 @@ func (r *Router) InvalidateServer(ctx context.Context, server string) error {
 	return nil
 }
 
-func (r *Router) CleanUp(ctx context.Context) error {
+func (r *Router) CleanUp() {
 	r.log.Debugf(log.Router, r.logId, "Cleaning up")
 	now := (*r.now)().Unix()
-	if !r.dbRoutersMut.TryLock(ctx) {
-		return racing.LockTimeoutError("could not acquire router lock in time when invalidating reader")
-	}
+	r.dbRoutersMut.Lock()
 	defer r.dbRoutersMut.Unlock()
 
 	for dbName, dbRouter := range r.dbRouters {
@@ -393,13 +401,10 @@ func (r *Router) CleanUp(ctx context.Context) error {
 			delete(r.dbRouters, dbName)
 		}
 	}
-	return nil
 }
 
 func (r *Router) storeRoutingTable(ctx context.Context, database string, table *idb.RoutingTable, now time.Time) error {
-	if !r.dbRoutersMut.TryLock(ctx) {
-		return racing.LockTimeoutError("could not acquire router lock in time when storing routing table")
-	}
+	r.dbRoutersMut.Lock()
 	defer r.dbRoutersMut.Unlock()
 	r.dbRouters[database] = &databaseRouter{
 		table:   table,
