@@ -1310,9 +1310,10 @@ func serializeNotifications(slice []neo4j.Notification) []map[string]any {
 	var res []map[string]any
 	for i, notification := range slice {
 		res = append(res, map[string]any{
-			"code":             notification.Code(),
-			"title":            notification.Title(),
-			"description":      notification.Description(),
+			"code":        notification.Code(),
+			"title":       notification.Title(),
+			"description": notification.Description(),
+			//lint:ignore SA1019 Severity is supported at least until 6.0
 			"severity":         notification.Severity(),
 			"severityLevel":    string(notification.SeverityLevel()),
 			"rawSeverityLevel": notification.RawSeverityLevel(),
@@ -1475,7 +1476,7 @@ func testSkips() map[string]string {
 		// To fix/to decide whether to fix
 		"stub.tx_run.test_tx_run.TestTxRun.test_should_prevent_discard_after_tx_termination_on_run":                          "fixme: usage of failed transaction leads to unintelligible error that's treated as BackendError",
 		"stub.tx_run.test_tx_run.TestTxRun.test_should_prevent_pull_after_tx_termination_on_run":                             "fixme: usage of failed transaction leads to unintelligible error that's treated as BackendError",
-		"stub.tx_run.test_tx_run.TestTxRun.test_should_prevent_commit_after_tx_termination":                                  "fixme: usage of failed transaction leads to unintelligible error that's treated as BackendError",
+		"stub.tx_run.test_tx_run.TestTxRun.test_should_prevent_commit_after_tx_termination":                                  "fixme: commit is still sent when transaction is terminated",
 		"stub.routing.test_routing_v*.RoutingV*.test_should_revert_to_initial_router_if_known_router_throws_protocol_errors": "Driver always uses configured URL first and custom resolver only if that fails",
 		"stub.routing.test_routing_v*.RoutingV*.test_should_read_successfully_from_reachable_db_after_trying_unreachable_db": "Driver retries to fetch a routing table up to 100 times if it's emtpy",
 		"stub.routing.test_routing_v*.RoutingV*.test_should_write_successfully_after_leader_switch_using_tx_run":             "Driver retries to fetch a routing table up to 100 times if it's emtpy",

@@ -24,11 +24,11 @@ import (
 )
 
 // Transaction represents a transaction in the Neo4j database
-// Deprecated: use ExplicitTransaction instead.
 // ExplicitTransaction is available via SessionWithContext.
 // SessionWithContext is available via the context-aware driver/returned
 // by NewDriverWithContext.
-// Transaction will be removed in 6.0.
+//
+// Deprecated: use ExplicitTransaction instead. Transaction will be removed in 6.0.
 type Transaction interface {
 	// Run executes a statement on this transaction and returns a result
 	Run(cypher string, params map[string]any) (Result, error)

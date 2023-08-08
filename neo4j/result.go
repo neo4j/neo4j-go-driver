@@ -23,8 +23,9 @@ import (
 	"context"
 )
 
+// Result is created via the Session type.
+//
 // Deprecated: use ResultWithContext instead.
-// ResultWithContext is created via the context-aware SessionWithContext type.
 type Result interface {
 	// Keys returns the keys available on the result set.
 	Keys() ([]string, error)

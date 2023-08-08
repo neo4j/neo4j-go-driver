@@ -331,11 +331,13 @@ This is **disabled** by default.
 For simplicity, we provide a predefined console logger which can be constructed by `neo4j.ConsoleBoltLogger`.
 
 ```go
-session := driver.NewSession(neo4j.SessionConfig{
-	BoltLogger: neo4j.ConsoleBoltLogger(),
-})
-defer session.Close()
-// [...]
+boltLogger := neo4j.ConsoleBoltLogger()
+
+# for ExecuteQuery
+result, err := neo4j.ExecuteQuery(ctx, driver, query, params, transformer, neo4j.ExecuteQueryWithBoltLogger(boltLogger))
+
+# for the regular session APIs (session.Run, session.BeginTransaction, session.ExecuteRead, session.ExecuteWrite)
+session := driver.NewSession(neo4j.SessionConfig{BoltLogger: boltLogger})
 ```
 
 ### Custom Bolt Logger
