@@ -46,7 +46,7 @@ func ResetTime(d DriverWithContext) {
 func ForceRoutingTableUpdate(d DriverWithContext, database string, bookmarks []string, logger log.BoltLogger) error {
 	driver := d.(*driverWithContext)
 	ctx := context.Background()
-	err := driver.router.Invalidate(ctx, database)
+	err := driver.router.Invalidate(database)
 	if err != nil {
 		return err
 	}

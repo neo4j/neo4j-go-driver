@@ -46,9 +46,9 @@ const DefaultLivenessCheckThreshold = math.MaxInt64
 type Connect func(context.Context, string, *idb.ReAuthToken, bolt.ConnectionErrorListener, log.BoltLogger) (idb.Connection, error)
 
 type poolRouter interface {
-	InvalidateWriter(ctx context.Context, db string, server string) error
-	InvalidateReader(ctx context.Context, db string, server string) error
-	InvalidateServer(ctx context.Context, server string) error
+	InvalidateWriter(db string, server string) error
+	InvalidateReader(db string, server string) error
+	InvalidateServer(server string) error
 }
 
 type qitem struct {
@@ -501,7 +501,7 @@ func (p *Pool) OnDialError(ctx context.Context, serverName string, _ error) erro
 
 func (p *Pool) deactivate(ctx context.Context, serverName string) error {
 	p.log.Debugf(log.Pool, p.logId, "Deactivating server %s", serverName)
-	err := p.router.InvalidateServer(ctx, serverName)
+	err := p.router.InvalidateServer(serverName)
 	if err != nil {
 		return err
 	}
@@ -516,5 +516,5 @@ func (p *Pool) deactivate(ctx context.Context, serverName string) error {
 
 func (p *Pool) deactivateWriter(ctx context.Context, serverName string, db string) error {
 	p.log.Debugf(log.Pool, p.logId, "Deactivating writer %s for database %s", serverName, db)
-	return p.router.InvalidateWriter(ctx, db, serverName)
+	return p.router.InvalidateWriter(db, serverName)
 }

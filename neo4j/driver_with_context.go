@@ -312,11 +312,11 @@ type sessionRouter interface {
 	// The correct database name is needed when requesting readers or writers.
 	// the bookmarks are eagerly provided since this method always fetches a new routing table
 	GetNameOfDefaultDatabase(ctx context.Context, bookmarks []string, user string, auth *idb.ReAuthToken, boltLogger log.BoltLogger) (string, error)
-	Invalidate(ctx context.Context, db string) error
+	Invalidate(db string) error
 	CleanUp()
-	InvalidateWriter(ctx context.Context, db string, server string) error
-	InvalidateReader(ctx context.Context, db string, server string) error
-	InvalidateServer(ctx context.Context, server string) error
+	InvalidateWriter(db string, server string) error
+	InvalidateReader(db string, server string) error
+	InvalidateServer(server string) error
 }
 
 type driverWithContext struct {

@@ -39,8 +39,8 @@ type RouterFake struct {
 	GetNameOfDefaultDbHook func(user string) (string, error)
 }
 
-func (r *RouterFake) InvalidateReader(ctx context.Context, database string, server string) error {
-	if err := r.Invalidate(ctx, database); err != nil {
+func (r *RouterFake) InvalidateReader(database string, server string) error {
+	if err := r.Invalidate(database); err != nil {
 		return err
 	}
 	r.InvalidatedServer = server
@@ -48,8 +48,8 @@ func (r *RouterFake) InvalidateReader(ctx context.Context, database string, serv
 	return nil
 }
 
-func (r *RouterFake) InvalidateWriter(ctx context.Context, database string, server string) error {
-	if err := r.Invalidate(ctx, database); err != nil {
+func (r *RouterFake) InvalidateWriter(database string, server string) error {
+	if err := r.Invalidate(database); err != nil {
 		return err
 	}
 	r.InvalidatedServer = server
@@ -57,13 +57,13 @@ func (r *RouterFake) InvalidateWriter(ctx context.Context, database string, serv
 	return nil
 }
 
-func (r *RouterFake) InvalidateServer(_ context.Context, server string) error {
+func (r *RouterFake) InvalidateServer(server string) error {
 	r.Invalidated = true
 	r.InvalidatedServer = server
 	return nil
 }
 
-func (r *RouterFake) Invalidate(_ context.Context, database string) error {
+func (r *RouterFake) Invalidate(database string) error {
 	r.InvalidatedDb = database
 	r.Invalidated = true
 	return nil

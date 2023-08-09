@@ -231,7 +231,7 @@ func (r *Router) GetOrUpdateReaders(ctx context.Context, bookmarks func(context.
 			break
 		}
 		r.log.Infof(log.Router, r.logId, "Invalidating routing table, no readers")
-		if err := r.Invalidate(ctx, table.DatabaseName); err != nil {
+		if err := r.Invalidate(table.DatabaseName); err != nil {
 			return nil, err
 		}
 		r.sleep(100 * time.Millisecond)
@@ -269,7 +269,7 @@ func (r *Router) GetOrUpdateWriters(ctx context.Context, bookmarks func(context.
 			break
 		}
 		r.log.Infof(log.Router, r.logId, "Invalidating routing table, no writers")
-		if err := r.Invalidate(ctx, database); err != nil {
+		if err := r.Invalidate(database); err != nil {
 			return nil, err
 		}
 		r.sleep(100 * time.Millisecond)
@@ -312,7 +312,7 @@ func (r *Router) Context() map[string]string {
 	return r.routerContext
 }
 
-func (r *Router) Invalidate(ctx context.Context, database string) error {
+func (r *Router) Invalidate(database string) error {
 	r.log.Infof(log.Router, r.logId, "Invalidating routing table for '%s'", database)
 	r.dbRoutersMut.Lock()
 	defer r.dbRoutersMut.Unlock()
@@ -325,7 +325,7 @@ func (r *Router) Invalidate(ctx context.Context, database string) error {
 	return nil
 }
 
-func (r *Router) InvalidateWriter(ctx context.Context, db string, server string) error {
+func (r *Router) InvalidateWriter(db string, server string) error {
 	r.dbRoutersMut.Lock()
 	defer r.dbRoutersMut.Unlock()
 
@@ -343,7 +343,7 @@ func (r *Router) InvalidateWriter(ctx context.Context, db string, server string)
 	return nil
 }
 
-func (r *Router) InvalidateReader(ctx context.Context, db string, server string) error {
+func (r *Router) InvalidateReader(db string, server string) error {
 	r.dbRoutersMut.Lock()
 	defer r.dbRoutersMut.Unlock()
 
@@ -361,7 +361,7 @@ func (r *Router) InvalidateReader(ctx context.Context, db string, server string)
 	return nil
 }
 
-func (r *Router) InvalidateServer(ctx context.Context, server string) error {
+func (r *Router) InvalidateServer(server string) error {
 	r.dbRoutersMut.Lock()
 	defer r.dbRoutersMut.Unlock()
 	for _, routing := range r.dbRouters {

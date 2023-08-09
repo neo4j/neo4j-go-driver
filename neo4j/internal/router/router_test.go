@@ -140,7 +140,7 @@ func TestRespectsTimeToLiveAndInvalidate(t *testing.T) {
 	assertNum(t, numfetch, 2, "Should not have have fetched")
 
 	// Invalidate should force fetching
-	if err := router.Invalidate(ctx, dbName); err != nil {
+	if err := router.Invalidate(dbName); err != nil {
 		testutil.AssertNoError(t, err)
 	}
 	if _, err := router.GetOrUpdateReaders(ctx, nilBookmarks, dbName, nil, nil); err != nil {

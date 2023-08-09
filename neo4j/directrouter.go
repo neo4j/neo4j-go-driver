@@ -30,15 +30,15 @@ type directRouter struct {
 	address string
 }
 
-func (r *directRouter) InvalidateWriter(context.Context, string, string) error {
+func (r *directRouter) InvalidateWriter(string, string) error {
 	return nil
 }
 
-func (r *directRouter) InvalidateReader(context.Context, string, string) error {
+func (r *directRouter) InvalidateReader(string, string) error {
 	return nil
 }
 
-func (r *directRouter) InvalidateServer(context.Context, string) error {
+func (r *directRouter) InvalidateServer(string) error {
 	return nil
 }
 
@@ -62,7 +62,7 @@ func (r *directRouter) GetNameOfDefaultDatabase(context.Context, []string, strin
 	return db.DefaultDatabase, nil
 }
 
-func (r *directRouter) Invalidate(context.Context, string) error {
+func (r *directRouter) Invalidate(string) error {
 	return nil
 }
 
