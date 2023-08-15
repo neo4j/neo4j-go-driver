@@ -484,7 +484,7 @@ func (p *Pool) OnNeo4jError(ctx context.Context, connection idb.Connection, erro
 			if dbSelector, ok := connection.(idb.DatabaseSelector); ok {
 				database = dbSelector.SelectedDatabase()
 			}
-			return p.deactivateWriter(ctx, connection.ServerName(), database)
+			return p.deactivateWriter(connection.ServerName(), database)
 		}
 	}
 
@@ -514,7 +514,7 @@ func (p *Pool) deactivate(ctx context.Context, serverName string) error {
 	return nil
 }
 
-func (p *Pool) deactivateWriter(ctx context.Context, serverName string, db string) error {
+func (p *Pool) deactivateWriter(serverName string, db string) error {
 	p.log.Debugf(log.Pool, p.logId, "Deactivating writer %s for database %s", serverName, db)
 	return p.router.InvalidateWriter(db, serverName)
 }
