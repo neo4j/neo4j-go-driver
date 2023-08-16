@@ -169,7 +169,6 @@ func (r *Router) getOrUpdateTable(ctx context.Context, bookmarksFn func(context.
 			case <-ctx.Done():
 				return nil, racing.LockTimeoutError("timed out waiting for other goroutine to update routing table")
 			case <-ch:
-				unlock.Do(r.dbRoutersMut.Unlock)
 				r.dbRoutersMut.Lock()
 				*unlock = sync.Once{}
 				continue
