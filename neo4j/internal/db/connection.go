@@ -184,5 +184,5 @@ type DatabaseSelector interface {
 	// SelectDatabase should be called immediately after Reset. Not allowed to call multiple times with different
 	// databases without a reset in-between.
 	SelectDatabase(database string)
-	SelectedDatabase() string
+	Database() string
 }

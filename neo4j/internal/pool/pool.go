@@ -478,7 +478,7 @@ func (p *Pool) OnNeo4jError(ctx context.Context, connection idb.Connection, erro
 		if error.IsRetriableCluster() {
 			var database string
 			if dbSelector, ok := connection.(idb.DatabaseSelector); ok {
-				database = dbSelector.SelectedDatabase()
+				database = dbSelector.Database()
 			}
 			p.deactivateWriter(connection.ServerName(), database)
 		}

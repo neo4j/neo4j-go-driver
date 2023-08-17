@@ -939,7 +939,7 @@ func (b *bolt4) SelectDatabase(database string) {
 	b.databaseName = database
 }
 
-func (b *bolt4) SelectedDatabase() string {
+func (b *bolt4) Database() string {
 	return b.databaseName
 }
 
