@@ -230,9 +230,7 @@ func (r *Router) GetOrUpdateReaders(ctx context.Context, bookmarks func(context.
 			break
 		}
 		r.log.Infof(log.Router, r.logId, "Invalidating routing table, no readers")
-		if err := r.Invalidate(table.DatabaseName); err != nil {
-			return nil, err
-		}
+		r.Invalidate(table.DatabaseName)
 		r.sleep(100 * time.Millisecond)
 		table, err = r.getOrUpdateTable(ctx, bookmarks, database, auth, boltLogger)
 		if err != nil {
@@ -268,9 +266,7 @@ func (r *Router) GetOrUpdateWriters(ctx context.Context, bookmarks func(context.
 			break
 		}
 		r.log.Infof(log.Router, r.logId, "Invalidating routing table, no writers")
-		if err := r.Invalidate(database); err != nil {
-			return nil, err
-		}
+		r.Invalidate(database)
 		r.sleep(100 * time.Millisecond)
 		table, err = r.getOrUpdateTable(ctx, bookmarks, database, auth, boltLogger)
 		if err != nil {
@@ -311,7 +307,7 @@ func (r *Router) Context() map[string]string {
 	return r.routerContext
 }
 
-func (r *Router) Invalidate(database string) error {
+func (r *Router) Invalidate(database string) {
 	r.log.Infof(log.Router, r.logId, "Invalidating routing table for '%s'", database)
 	r.dbRoutersMut.Lock()
 	defer r.dbRoutersMut.Unlock()
@@ -321,72 +317,47 @@ func (r *Router) Invalidate(database string) error {
 	if dbRouter != nil {
 		dbRouter.dueUnix = 0
 	}
-	return nil
 }
 
-func (r *Router) InvalidateWriter(db string, server string) error {
+func (r *Router) InvalidateWriter(db string, server string) {
 	r.dbRoutersMut.Lock()
 	defer r.dbRoutersMut.Unlock()
 
 	router := r.dbRouters[db]
 	if router == nil {
-		return nil
+		return
 	}
-	writers := router.table.Writers
-	for i, writer := range writers {
-		if writer == server {
-			router.table.Writers = append(writers[0:i], writers[i+1:]...)
-			return nil
-		}
-	}
-	return nil
+	router.table.Readers = removeServerFromList(router.table.Readers, server)
 }
 
-func (r *Router) InvalidateReader(db string, server string) error {
+func (r *Router) InvalidateReader(db string, server string) {
 	r.dbRoutersMut.Lock()
 	defer r.dbRoutersMut.Unlock()
 
 	router := r.dbRouters[db]
 	if router == nil {
-		return nil
+		return
 	}
-	readers := router.table.Readers
-	for i, reader := range readers {
-		if reader == server {
-			router.table.Readers = append(readers[0:i], readers[i+1:]...)
-			return nil
-		}
-	}
-	return nil
+	router.table.Readers = removeServerFromList(router.table.Readers, server)
 }
 
-func (r *Router) InvalidateServer(server string) error {
+func (r *Router) InvalidateServer(server string) {
 	r.dbRoutersMut.Lock()
 	defer r.dbRoutersMut.Unlock()
 	for _, routing := range r.dbRouters {
-		routers := routing.table.Routers
-		for i, router := range routers {
-			if router == server {
-				routing.table.Routers = append(routers[0:i], routers[i+1:]...)
-				return nil
-			}
-		}
-		readers := routing.table.Readers
-		for i, router := range readers {
-			if router == server {
-				routing.table.Readers = append(readers[0:i], readers[i+1:]...)
-				return nil
-			}
-		}
-		writers := routing.table.Writers
-		for i, router := range writers {
-			if router == server {
-				routing.table.Writers = append(writers[0:i], writers[i+1:]...)
-				return nil
-			}
+		routing.table.Routers = removeServerFromList(routing.table.Routers, server)
+		routing.table.Readers = removeServerFromList(routing.table.Readers, server)
+		routing.table.Writers = removeServerFromList(routing.table.Writers, server)
+	}
+}
+
+func removeServerFromList(list []string, server string) []string {
+	for i, s := range list {
+		if s == server {
+			return append(list[0:i], list[i+1:]...)
 		}
 	}
-	return nil
+	return list
 }
 
 func (r *Router) CleanUp() {

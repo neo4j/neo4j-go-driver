@@ -39,34 +39,26 @@ type RouterFake struct {
 	GetNameOfDefaultDbHook func(user string) (string, error)
 }
 
-func (r *RouterFake) InvalidateReader(database string, server string) error {
-	if err := r.Invalidate(database); err != nil {
-		return err
-	}
+func (r *RouterFake) InvalidateReader(database string, server string) {
+	r.Invalidate(database)
 	r.InvalidatedServer = server
 	r.InvalidateMode = "reader"
-	return nil
 }
 
-func (r *RouterFake) InvalidateWriter(database string, server string) error {
-	if err := r.Invalidate(database); err != nil {
-		return err
-	}
+func (r *RouterFake) InvalidateWriter(database string, server string) {
+	r.Invalidate(database)
 	r.InvalidatedServer = server
 	r.InvalidateMode = "writer"
-	return nil
 }
 
-func (r *RouterFake) InvalidateServer(server string) error {
+func (r *RouterFake) InvalidateServer(server string) {
 	r.Invalidated = true
 	r.InvalidatedServer = server
-	return nil
 }
 
-func (r *RouterFake) Invalidate(database string) error {
+func (r *RouterFake) Invalidate(database string) {
 	r.InvalidatedDb = database
 	r.Invalidated = true
-	return nil
 }
 
 func (r *RouterFake) GetOrUpdateReaders(_ context.Context, bookmarksFn func(context.Context) ([]string, error), database string, _ *db.ReAuthToken, _ log.BoltLogger) ([]string, error) {

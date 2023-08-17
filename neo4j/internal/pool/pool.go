@@ -46,9 +46,9 @@ const DefaultLivenessCheckThreshold = math.MaxInt64
 type Connect func(context.Context, string, *idb.ReAuthToken, bolt.ConnectionErrorListener, log.BoltLogger) (idb.Connection, error)
 
 type poolRouter interface {
-	InvalidateWriter(db string, server string) error
-	InvalidateReader(db string, server string) error
-	InvalidateServer(server string) error
+	InvalidateWriter(db string, server string)
+	InvalidateReader(db string, server string)
+	InvalidateServer(server string)
 }
 
 type qitem struct {
@@ -462,29 +462,25 @@ func (p *Pool) OnNeo4jError(ctx context.Context, connection idb.Connection, erro
 		server.executeForAllConnections(func(c idb.Connection) {
 			c.ResetAuth()
 		})
-		return nil
 	case "Neo.ClientError.Security.TokenExpired":
 		manager, token := connection.GetCurrentAuth()
 		if manager != nil {
 			if err := manager.OnTokenExpired(ctx, token); err != nil {
 				return err
 			}
-			if _, isStaticToken := manager.(auth.Token); isStaticToken {
-				return nil
-			} else {
+			if _, isStaticToken := manager.(auth.Token); !isStaticToken {
 				error.MarkRetriable()
 			}
 		}
-		return nil
 	case "Neo.TransientError.General.DatabaseUnavailable":
-		return p.deactivate(ctx, connection.ServerName())
+		p.deactivate(ctx, connection.ServerName())
 	default:
 		if error.IsRetriableCluster() {
 			var database string
 			if dbSelector, ok := connection.(idb.DatabaseSelector); ok {
 				database = dbSelector.SelectedDatabase()
 			}
-			return p.deactivateWriter(connection.ServerName(), database)
+			p.deactivateWriter(connection.ServerName(), database)
 		}
 	}
 
@@ -492,29 +488,27 @@ func (p *Pool) OnNeo4jError(ctx context.Context, connection idb.Connection, erro
 }
 
 func (p *Pool) OnIoError(ctx context.Context, connection idb.Connection, _ error) error {
-	return p.deactivate(ctx, connection.ServerName())
+	p.deactivate(ctx, connection.ServerName())
+	return nil
 }
 
 func (p *Pool) OnDialError(ctx context.Context, serverName string, _ error) error {
-	return p.deactivate(ctx, serverName)
+	p.deactivate(ctx, serverName)
+	return nil
 }
 
-func (p *Pool) deactivate(ctx context.Context, serverName string) error {
+func (p *Pool) deactivate(ctx context.Context, serverName string) {
 	p.log.Debugf(log.Pool, p.logId, "Deactivating server %s", serverName)
-	err := p.router.InvalidateServer(serverName)
-	if err != nil {
-		return err
-	}
+	p.router.InvalidateServer(serverName)
 	p.serversMut.Lock()
 	defer p.serversMut.Unlock()
 	server := p.servers[serverName]
 	if server != nil {
 		server.startClosing(ctx)
 	}
-	return nil
 }
 
-func (p *Pool) deactivateWriter(serverName string, db string) error {
+func (p *Pool) deactivateWriter(serverName string, db string) {
 	p.log.Debugf(log.Pool, p.logId, "Deactivating writer %s for database %s", serverName, db)
-	return p.router.InvalidateWriter(db, serverName)
+	p.router.InvalidateWriter(db, serverName)
 }

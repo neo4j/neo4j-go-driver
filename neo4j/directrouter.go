@@ -30,17 +30,11 @@ type directRouter struct {
 	address string
 }
 
-func (r *directRouter) InvalidateWriter(string, string) error {
-	return nil
-}
+func (r *directRouter) InvalidateWriter(string, string) {}
 
-func (r *directRouter) InvalidateReader(string, string) error {
-	return nil
-}
+func (r *directRouter) InvalidateReader(string, string) {}
 
-func (r *directRouter) InvalidateServer(string) error {
-	return nil
-}
+func (r *directRouter) InvalidateServer(string) {}
 
 func (r *directRouter) GetOrUpdateReaders(context.Context, func(context.Context) ([]string, error), string, *db.ReAuthToken, log.BoltLogger) ([]string, error) {
 	return []string{r.address}, nil
@@ -62,8 +56,6 @@ func (r *directRouter) GetNameOfDefaultDatabase(context.Context, []string, strin
 	return db.DefaultDatabase, nil
 }
 
-func (r *directRouter) Invalidate(string) error {
-	return nil
-}
+func (r *directRouter) Invalidate(string) {}
 
 func (r *directRouter) CleanUp() {}

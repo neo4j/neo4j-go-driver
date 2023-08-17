@@ -46,10 +46,7 @@ func ResetTime(d DriverWithContext) {
 func ForceRoutingTableUpdate(d DriverWithContext, database string, bookmarks []string, logger log.BoltLogger) error {
 	driver := d.(*driverWithContext)
 	ctx := context.Background()
-	err := driver.router.Invalidate(database)
-	if err != nil {
-		return err
-	}
+	driver.router.Invalidate(database)
 	getBookmarks := func(context.Context) ([]string, error) {
 		return bookmarks, nil
 	}
@@ -58,7 +55,7 @@ func ForceRoutingTableUpdate(d DriverWithContext, database string, bookmarks []s
 		FromSession: false,
 		ForceReAuth: false,
 	}
-	_, err = driver.router.GetOrUpdateReaders(ctx, getBookmarks, database, auth, logger)
+	_, err := driver.router.GetOrUpdateReaders(ctx, getBookmarks, database, auth, logger)
 	if err != nil {
 		return errorutil.WrapError(err)
 	}
