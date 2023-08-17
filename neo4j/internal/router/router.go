@@ -327,7 +327,7 @@ func (r *Router) InvalidateWriter(db string, server string) {
 	if router == nil {
 		return
 	}
-	router.table.Readers = removeServerFromList(router.table.Readers, server)
+	router.table.Writers = removeServerFromList(router.table.Writers, server)
 }
 
 func (r *Router) InvalidateReader(db string, server string) {
