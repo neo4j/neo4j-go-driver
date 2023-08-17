@@ -881,8 +881,12 @@ func (b *backend) handleRequest(req map[string]any) {
 			b.writeError(err)
 			return
 		}
+		var databaseName any = table.DatabaseName
+		if databaseName == "" {
+			databaseName = nil
+		}
 		b.writeResponse("RoutingTable", map[string]any{
-			"database": table.DatabaseName,
+			"database": databaseName,
 			"ttl":      table.TimeToLive,
 			"routers":  table.Routers,
 			"readers":  table.Readers,
