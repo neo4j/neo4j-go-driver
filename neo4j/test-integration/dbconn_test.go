@@ -44,16 +44,15 @@ type noopErrorListener struct{}
 
 func (n noopErrorListener) OnNeo4jError(_ context.Context, _ idb.Connection, e *db.Neo4jError) error {
 	fmt.Println("OnNeo4jError", e)
-	return e
+	return nil
 }
 
-func (n noopErrorListener) OnIoError(_ context.Context, _ idb.Connection, e error) error {
+func (n noopErrorListener) OnIoError(_ context.Context, _ idb.Connection, e error) {
 	fmt.Println("OnIoError", e)
-	return e
 }
 
-func (n noopErrorListener) OnDialError(_ context.Context, _ string, err error) error {
-	return err
+func (n noopErrorListener) OnDialError(_ context.Context, _ string, e error) {
+	fmt.Println("OnDialError", e)
 }
 
 func makeRawConnection(ctx context.Context, logger log.Logger, boltLogger log.BoltLogger) (

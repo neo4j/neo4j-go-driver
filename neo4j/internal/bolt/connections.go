@@ -29,8 +29,8 @@ import (
 
 type ConnectionErrorListener interface {
 	OnNeo4jError(context.Context, idb.Connection, *db.Neo4jError) error
-	OnIoError(context.Context, idb.Connection, error) error
-	OnDialError(context.Context, string, error) error
+	OnIoError(context.Context, idb.Connection, error)
+	OnDialError(context.Context, string, error)
 }
 
 func handleTerminatedContextError(err error, connection net.Conn) error {

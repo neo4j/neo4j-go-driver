@@ -563,21 +563,24 @@ func TestPoolErrorHanding(ot *testing.T) {
 		{
 			name: "should invalidate server on io error",
 			errorCall: func(listener bolt.ConnectionErrorListener, conn idb.Connection) error {
-				return listener.OnIoError(ctx, conn, errors.New("an error"))
+				listener.OnIoError(ctx, conn, errors.New("an error"))
+				return nil
 			},
 			expectedInvalidatedServer: ServerName,
 		},
 		{
 			name: "should invalidate server on dial error",
 			errorCall: func(listener bolt.ConnectionErrorListener, _ idb.Connection) error {
-				return listener.OnDialError(ctx, "what ever server", errors.New("an error"))
+				listener.OnDialError(ctx, "what ever server", errors.New("an error"))
+				return nil
 			},
 			expectedInvalidatedServer: "what ever server",
 		},
 		{
 			name: "should invalidate server on dial error",
 			errorCall: func(listener bolt.ConnectionErrorListener, _ idb.Connection) error {
-				return listener.OnDialError(ctx, ServerName, errors.New("an error"))
+				listener.OnDialError(ctx, ServerName, errors.New("an error"))
+				return nil
 			},
 			expectedInvalidatedServer: ServerName,
 		},

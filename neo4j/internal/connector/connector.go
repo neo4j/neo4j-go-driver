@@ -59,8 +59,8 @@ func (c Connector) Connect(
 
 	conn, err := c.SupplyConnection(ctx, address)
 	if err != nil {
-		err2 := errorListener.OnDialError(ctx, address, err)
-		return nil, errorutil.CombineAllErrors(err, err2)
+		errorListener.OnDialError(ctx, address, err)
+		return nil, err
 	}
 
 	defer func() {
@@ -100,8 +100,8 @@ func (c Connector) Connect(
 	// TLS requested, continue with handshake
 	serverName, _, err := net.SplitHostPort(address)
 	if err != nil {
-		err2 := errorListener.OnDialError(ctx, address, err)
-		return nil, errorutil.CombineAllErrors(err, err2)
+		errorListener.OnDialError(ctx, address, err)
+		return nil, err
 	}
 	tlsConn := tls.Client(conn, c.tlsConfig(serverName))
 	err = tlsConn.HandshakeContext(ctx)
@@ -111,8 +111,8 @@ func (c Connector) Connect(
 			err = errors.New("remote end closed the connection, check that TLS is enabled on the server")
 		}
 		err = &errorutil.TlsError{Inner: err}
-		err2 := errorListener.OnDialError(ctx, address, err)
-		return nil, errorutil.CombineAllErrors(err, err2)
+		errorListener.OnDialError(ctx, address, err)
+		return nil, err
 	}
 	connection, err = bolt.Connect(ctx,
 		address,

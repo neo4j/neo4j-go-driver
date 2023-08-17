@@ -1125,15 +1125,11 @@ func (b *bolt5) onFailure(ctx context.Context, failure *db.Neo4jError) {
 	b.setError(err, isFatalError(failure))
 }
 
-func (b *bolt5) onIoError(ctx context.Context, failure error) {
-	var err error
-	err = failure
+func (b *bolt5) onIoError(ctx context.Context, err error) {
 	if b.state != bolt5Failed && b.state != bolt5Dead {
 		// Don't call callback when connections break after sending RESET.
 		// The server chooses to close the connection on some errors.
-		if callbackErr := b.errorListener.OnIoError(ctx, b, failure); callbackErr != nil {
-			err = errorutil.CombineErrors(callbackErr, failure)
-		}
+		b.errorListener.OnIoError(ctx, b, err)
 	}
 	b.setError(err, true)
 }

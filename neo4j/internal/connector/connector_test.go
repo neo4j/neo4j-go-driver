@@ -38,13 +38,9 @@ func (n noopErrorListener) OnNeo4jError(context.Context, idb.Connection, *db.Neo
 	return nil
 }
 
-func (n noopErrorListener) OnIoError(context.Context, idb.Connection, error) error {
-	return nil
-}
+func (n noopErrorListener) OnIoError(context.Context, idb.Connection, error) {}
 
-func (n noopErrorListener) OnDialError(context.Context, string, error) error {
-	return nil
-}
+func (n noopErrorListener) OnDialError(context.Context, string, error) {}
 
 func TestConnect(outer *testing.T) {
 	outer.Parallel()

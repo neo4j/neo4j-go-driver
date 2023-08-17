@@ -487,14 +487,12 @@ func (p *Pool) OnNeo4jError(ctx context.Context, connection idb.Connection, erro
 	return nil
 }
 
-func (p *Pool) OnIoError(ctx context.Context, connection idb.Connection, _ error) error {
+func (p *Pool) OnIoError(ctx context.Context, connection idb.Connection, _ error) {
 	p.deactivate(ctx, connection.ServerName())
-	return nil
 }
 
-func (p *Pool) OnDialError(ctx context.Context, serverName string, _ error) error {
+func (p *Pool) OnDialError(ctx context.Context, serverName string, _ error) {
 	p.deactivate(ctx, serverName)
-	return nil
 }
 
 func (p *Pool) deactivate(ctx context.Context, serverName string) {

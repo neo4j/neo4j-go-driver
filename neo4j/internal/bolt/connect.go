@@ -74,16 +74,16 @@ func Connect(ctx context.Context,
 	}
 	_, err := racing.NewRacingWriter(conn).Write(ctx, handshake)
 	if err != nil {
-		err2 := errorListener.OnDialError(ctx, serverName, err)
-		return nil, errorutil.CombineAllErrors(err, err2)
+		errorListener.OnDialError(ctx, serverName, err)
+		return nil, err
 	}
 
 	// Receive accepted server version
 	buf := make([]byte, 4)
 	_, err = racing.NewRacingReader(conn).ReadFull(ctx, buf)
 	if err != nil {
-		err2 := errorListener.OnDialError(ctx, serverName, err)
-		return nil, errorutil.CombineAllErrors(err, err2)
+		errorListener.OnDialError(ctx, serverName, err)
+		return nil, err
 	}
 
 	if boltLogger != nil {
