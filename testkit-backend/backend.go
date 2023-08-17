@@ -1472,6 +1472,9 @@ func testSkips() map[string]string {
 		"stub.routing.test_routing_v*.RoutingV*.test_should_successfully_check_if_support_for_multi_db_is_available":                               "Won't fix - driver.SupportsMultiDb() is not implemented",
 		"stub.routing.test_no_routing_v*.NoRoutingV*.test_should_check_multi_db_support":                                                           "Won't fix - driver.SupportsMultiDb() is not implemented",
 		"stub.routing.test_routing_v3.RoutingV3.test_should_fail_discovery_when_router_fails_with_procedure_not_found_code":                        "Won't fix - only Bolt 3 affected (not officially supported by this driver) + this is only a difference in how errors are surfaced",
+		"stub.routing.test_routing_v3.RoutingV3.test_should_fail_when_writing_on_unexpectedly_interrupting_writer_on_pull_using_tx_run":            "Won't fix - only Bolt 3 affected (not officially supported by this driver): broken servers are not removed from routing table",
+		"stub.routing.test_routing_v3.RoutingV3.test_should_fail_when_writing_on_unexpectedly_interrupting_writer_on_run_using_tx_run":             "Won't fix - only Bolt 3 affected (not officially supported by this driver): broken servers are not removed from routing table",
+		"stub.routing.test_routing_v3.RoutingV3.test_should_fail_when_writing_on_unexpectedly_interrupting_writer_using_tx_run":                    "Won't fix - only Bolt 3 affected (not officially supported by this driver): broken servers are not removed from routing table",
 
 		// Missing message support in testkit backend
 		"stub.routing.*.*.test_should_request_rt_from_all_initial_routers_until_successful_on_unknown_failure":       "Add DNS resolver TestKit message and connection timeout support",
@@ -1488,6 +1491,8 @@ func testSkips() map[string]string {
 		"stub.routing.test_routing_v*.RoutingV*.test_should_accept_routing_table_without_writers_and_then_rediscover":        "Driver retries to fetch a routing table up to 100 times if it's emtpy",
 		"stub.routing.test_routing_v*.RoutingV*.test_should_fail_on_routing_table_with_no_reader":                            "Driver retries to fetch a routing table up to 100 times if it's emtpy",
 		"stub.routing.test_routing_v*.RoutingV*.test_should_fail_discovery_when_router_fails_with_unknown_code":              "Unify: other drivers have a list of fast failing errors during discover: on anything else, the driver will try the next router",
+		"stub.*.test_0_timeout":                                  "Fixme: driver omits 0 as tx timeout value",
+		"stub.summary.test_summary.TestSummary.test_server_info": "pending unification: should the server address be pre or post DNS resolution?",
 	}
 }
 
