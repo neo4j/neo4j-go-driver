@@ -23,7 +23,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/auth"
 	iauth "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/auth"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/collections"
