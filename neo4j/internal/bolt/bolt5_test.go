@@ -649,6 +649,7 @@ func TestBolt5(outer *testing.T) {
 								DisCats: test.DisCats,
 							},
 						},
+						true,
 					)
 				}
 			})
@@ -734,6 +735,7 @@ func TestBolt5(outer *testing.T) {
 								DisCats: test.DisCats,
 							},
 						},
+						true,
 					)
 				}
 				if test.ExpectError {
@@ -755,7 +757,7 @@ func TestBolt5(outer *testing.T) {
 		defer bolt.Close(context.Background())
 
 		tx, err := bolt.TxBegin(context.Background(),
-			idb.TxConfig{Mode: idb.ReadMode})
+			idb.TxConfig{Mode: idb.ReadMode}, true)
 		AssertNoError(t, err)
 		// Lazy start of transaction when no bookmark
 		assertBoltState(t, bolt5Tx, bolt)
@@ -804,7 +806,7 @@ func TestBolt5(outer *testing.T) {
 		defer bolt.Close(context.Background())
 
 		tx, err := bolt.TxBegin(context.Background(),
-			idb.TxConfig{Mode: idb.ReadMode})
+			idb.TxConfig{Mode: idb.ReadMode}, true)
 		AssertNoError(t, err)
 		_, err = bolt.RunTx(context.Background(), tx,
 			idb.Command{Cypher: "Whatever", FetchSize: 1})
@@ -846,7 +848,7 @@ func TestBolt5(outer *testing.T) {
 		defer bolt.Close(context.Background())
 
 		tx, err := bolt.TxBegin(context.Background(),
-			idb.TxConfig{Mode: idb.ReadMode})
+			idb.TxConfig{Mode: idb.ReadMode}, true)
 		AssertNoError(t, err)
 		s, err := bolt.RunTx(context.Background(), tx,
 			idb.Command{Cypher: "Whatever", FetchSize: 1})
@@ -874,7 +876,7 @@ func TestBolt5(outer *testing.T) {
 		defer bolt.Close(context.Background())
 
 		tx, err := bolt.TxBegin(context.Background(),
-			idb.TxConfig{Mode: idb.ReadMode, Bookmarks: []string{"bm1"}})
+			idb.TxConfig{Mode: idb.ReadMode, Bookmarks: []string{"bm1"}}, true)
 		AssertNoError(t, err)
 		assertBoltState(t, bolt5Tx, bolt)
 		_, _ = bolt.RunTx(context.Background(), tx, idb.Command{Cypher: "MATCH (" +
@@ -896,7 +898,7 @@ func TestBolt5(outer *testing.T) {
 		defer bolt.Close(context.Background())
 
 		_, err := bolt.TxBegin(context.Background(),
-			idb.TxConfig{Mode: idb.ReadMode, Bookmarks: []string{"bm1"}})
+			idb.TxConfig{Mode: idb.ReadMode, Bookmarks: []string{"bm1"}}, true)
 		assertBoltState(t, bolt5Failed, bolt)
 		AssertError(t, err)
 		bookmark := bolt.Bookmark()
@@ -912,7 +914,7 @@ func TestBolt5(outer *testing.T) {
 		defer bolt.Close(context.Background())
 
 		tx, err := bolt.TxBegin(context.Background(),
-			idb.TxConfig{Mode: idb.ReadMode})
+			idb.TxConfig{Mode: idb.ReadMode}, true)
 		AssertNoError(t, err)
 		assertBoltState(t, bolt5Tx, bolt)
 		str, err := bolt.RunTx(context.Background(), tx,
@@ -999,7 +1001,7 @@ func TestBolt5(outer *testing.T) {
 		defer bolt.Close(context.Background())
 
 		tx, err := bolt.TxBegin(context.Background(),
-			idb.TxConfig{Mode: idb.ReadMode})
+			idb.TxConfig{Mode: idb.ReadMode}, true)
 		AssertNoError(t, err)
 		_, err = bolt.RunTx(context.Background(), tx,
 			idb.Command{Cypher: "MATCH (n) RETURN n"})
@@ -1452,7 +1454,7 @@ func TestBolt5(outer *testing.T) {
 				},
 				client: func(t *testing.T, cli *bolt5) {
 					idleDate := cli.IdleDate()
-					_, _ = cli.TxBegin(ctx, idb.TxConfig{})
+					_, _ = cli.TxBegin(ctx, idb.TxConfig{}, true)
 					AssertAfter(t, cli.IdleDate(), idleDate)
 				},
 			},
@@ -1464,7 +1466,7 @@ func TestBolt5(outer *testing.T) {
 				},
 				client: func(t *testing.T, cli *bolt5) {
 					idleDate := cli.IdleDate()
-					_, _ = cli.TxBegin(ctx, idb.TxConfig{})
+					_, _ = cli.TxBegin(ctx, idb.TxConfig{}, true)
 					AssertAfter(t, cli.IdleDate(), idleDate)
 				},
 			},
@@ -1476,7 +1478,7 @@ func TestBolt5(outer *testing.T) {
 				},
 				client: func(t *testing.T, cli *bolt5) {
 					idleDate := cli.IdleDate()
-					_, _ = cli.TxBegin(ctx, idb.TxConfig{})
+					_, _ = cli.TxBegin(ctx, idb.TxConfig{}, true)
 					AssertDeepEquals(t, cli.IdleDate(), idleDate)
 				},
 			},
@@ -1489,7 +1491,7 @@ func TestBolt5(outer *testing.T) {
 					srv.sendSuccess(map[string]any{})
 				},
 				client: func(t *testing.T, cli *bolt5) {
-					tx, _ := cli.TxBegin(ctx, idb.TxConfig{})
+					tx, _ := cli.TxBegin(ctx, idb.TxConfig{}, true)
 					idleDate := cli.IdleDate()
 					_ = cli.TxCommit(ctx, tx)
 					AssertAfter(t, cli.IdleDate(), idleDate)
@@ -1504,7 +1506,7 @@ func TestBolt5(outer *testing.T) {
 					srv.sendFailureMsg("o.o.p.s", "commit failed")
 				},
 				client: func(t *testing.T, cli *bolt5) {
-					tx, _ := cli.TxBegin(ctx, idb.TxConfig{})
+					tx, _ := cli.TxBegin(ctx, idb.TxConfig{}, true)
 					idleDate := cli.IdleDate()
 					_ = cli.TxCommit(ctx, tx)
 					AssertAfter(t, cli.IdleDate(), idleDate)
@@ -1519,7 +1521,7 @@ func TestBolt5(outer *testing.T) {
 					srv.closeConnection()
 				},
 				client: func(t *testing.T, cli *bolt5) {
-					tx, _ := cli.TxBegin(ctx, idb.TxConfig{})
+					tx, _ := cli.TxBegin(ctx, idb.TxConfig{}, true)
 					idleDate := cli.IdleDate()
 					_ = cli.TxCommit(ctx, tx)
 					AssertDeepEquals(t, cli.IdleDate(), idleDate)
@@ -1534,7 +1536,7 @@ func TestBolt5(outer *testing.T) {
 					srv.sendSuccess(map[string]any{})
 				},
 				client: func(t *testing.T, cli *bolt5) {
-					tx, _ := cli.TxBegin(ctx, idb.TxConfig{})
+					tx, _ := cli.TxBegin(ctx, idb.TxConfig{}, true)
 					idleDate := cli.IdleDate()
 					_ = cli.TxRollback(ctx, tx)
 					AssertAfter(t, cli.IdleDate(), idleDate)
@@ -1549,7 +1551,7 @@ func TestBolt5(outer *testing.T) {
 					srv.sendFailureMsg("o.o.p.s", "rollback failed")
 				},
 				client: func(t *testing.T, cli *bolt5) {
-					tx, _ := cli.TxBegin(ctx, idb.TxConfig{})
+					tx, _ := cli.TxBegin(ctx, idb.TxConfig{}, true)
 					idleDate := cli.IdleDate()
 					_ = cli.TxRollback(ctx, tx)
 					AssertAfter(t, cli.IdleDate(), idleDate)
@@ -1564,7 +1566,7 @@ func TestBolt5(outer *testing.T) {
 					srv.closeConnection()
 				},
 				client: func(t *testing.T, cli *bolt5) {
-					tx, _ := cli.TxBegin(ctx, idb.TxConfig{})
+					tx, _ := cli.TxBegin(ctx, idb.TxConfig{}, true)
 					idleDate := cli.IdleDate()
 					_ = cli.TxRollback(ctx, tx)
 					AssertDeepEquals(t, cli.IdleDate(), idleDate)
@@ -1660,7 +1662,7 @@ func TestBolt5(outer *testing.T) {
 		defer cleanup()
 		defer bolt.Close(ctx)
 
-		tx1, _ := bolt.TxBegin(ctx, idb.TxConfig{Mode: idb.ReadMode})
+		tx1, _ := bolt.TxBegin(ctx, idb.TxConfig{Mode: idb.ReadMode}, true)
 		results1, _ := bolt.RunTx(ctx, tx1, idb.Command{Cypher: "UNWIND [1,2] AS x RETURN x", FetchSize: 1})
 		results2, _ := bolt.RunTx(ctx, tx1, idb.Command{Cypher: "UNWIND [3,4] AS x RETURN x", FetchSize: -1})
 		summary2, _ := bolt.Consume(ctx, results2)
