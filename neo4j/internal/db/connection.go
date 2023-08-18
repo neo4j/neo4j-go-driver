@@ -95,7 +95,7 @@ type Connection interface {
 		notificationConfig NotificationConfig,
 	) error
 
-	TxBegin(ctx context.Context, txConfig TxConfig) (TxHandle, error)
+	TxBegin(ctx context.Context, txConfig TxConfig, syncMessages bool) (TxHandle, error)
 	TxRollback(ctx context.Context, tx TxHandle) error
 	TxCommit(ctx context.Context, tx TxHandle) error
 	Run(ctx context.Context, cmd Command, txConfig TxConfig) (StreamHandle, error)

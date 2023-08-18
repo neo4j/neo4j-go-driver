@@ -296,6 +296,7 @@ func (b *bolt5) Connect(
 func (b *bolt5) TxBegin(
 	ctx context.Context,
 	txConfig idb.TxConfig,
+	syncMessages bool,
 ) (idb.TxHandle, error) {
 	// Ok, to begin transaction while streaming auto-commit, just empty the stream and continue.
 	if b.state == bolt5Streaming {
@@ -324,14 +325,16 @@ func (b *bolt5) TxBegin(
 	}
 
 	b.queue.appendBegin(tx.toMeta(b.log, b.logId), b.beginResponseHandler())
-	if b.queue.send(ctx); b.err != nil {
-		return 0, b.err
-	}
-	if err := b.queue.receiveAll(ctx); err != nil {
-		return 0, err
-	}
-	if b.err != nil { // onNextMessageErr kicked in
-		return 0, b.err
+	if syncMessages {
+		if b.queue.send(ctx); b.err != nil {
+			return 0, b.err
+		}
+		if err := b.queue.receiveAll(ctx); err != nil {
+			return 0, err
+		}
+		if b.err != nil { // onNextMessageErr kicked in
+			return 0, b.err
+		}
 	}
 
 	b.state = bolt5Tx

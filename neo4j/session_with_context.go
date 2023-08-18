@@ -71,7 +71,8 @@ type SessionWithContext interface {
 	// Close closes any open resources and marks this session as unusable
 	// Contexts terminating too early negatively affect connection pooling and degrade the driver performance.
 	Close(ctx context.Context) error
-
+	pipelinedRead(ctx context.Context, work ManagedTransactionWork, configurers ...func(*TransactionConfig)) (any, error)
+	pipelinedWrite(ctx context.Context, work ManagedTransactionWork, configurers ...func(*TransactionConfig)) (any, error)
 	legacy() Session
 	getServerInfo(ctx context.Context) (ServerInfo, error)
 	verifyAuthentication(ctx context.Context) error
@@ -326,7 +327,7 @@ func (s *sessionWithContext) BeginTransaction(ctx context.Context, configurers .
 				MinSev:  s.config.NotificationsMinSeverity,
 				DisCats: s.config.NotificationsDisabledCategories,
 			},
-		})
+		}, true)
 	if err != nil {
 		s.pool.Return(ctx, conn)
 		return nil, errorutil.WrapError(err)
@@ -356,19 +357,33 @@ func (s *sessionWithContext) BeginTransaction(ctx context.Context, configurers .
 func (s *sessionWithContext) ExecuteRead(ctx context.Context,
 	work ManagedTransactionWork, configurers ...func(*TransactionConfig)) (any, error) {
 
-	return s.runRetriable(ctx, idb.ReadMode, work, configurers...)
+	return s.runRetriable(ctx, idb.ReadMode, work, true, configurers...)
 }
 
 func (s *sessionWithContext) ExecuteWrite(ctx context.Context,
 	work ManagedTransactionWork, configurers ...func(*TransactionConfig)) (any, error) {
 
-	return s.runRetriable(ctx, idb.WriteMode, work, configurers...)
+	return s.runRetriable(ctx, idb.WriteMode, work, true, configurers...)
+}
+
+func (s *sessionWithContext) pipelinedRead(ctx context.Context,
+	work ManagedTransactionWork, configurers ...func(*TransactionConfig)) (any, error) {
+
+	return s.runRetriable(ctx, idb.ReadMode, work, false, configurers...)
+}
+
+func (s *sessionWithContext) pipelinedWrite(ctx context.Context,
+	work ManagedTransactionWork, configurers ...func(*TransactionConfig)) (any, error) {
+
+	return s.runRetriable(ctx, idb.WriteMode, work, false, configurers...)
 }
 
 func (s *sessionWithContext) runRetriable(
 	ctx context.Context,
 	mode idb.AccessMode,
-	work ManagedTransactionWork, configurers ...func(*TransactionConfig)) (any, error) {
+	work ManagedTransactionWork,
+	blockingTxBegin bool,
+	configurers ...func(*TransactionConfig)) (any, error) {
 
 	// Guard for more than one transaction per session
 	if s.explicitTx != nil {
@@ -400,7 +415,7 @@ func (s *sessionWithContext) runRetriable(
 		DatabaseName:            s.config.DatabaseName,
 	}
 	for state.Continue() {
-		if hasCompleted, result := s.executeTransactionFunction(ctx, mode, config, &state, work); hasCompleted {
+		if hasCompleted, result := s.executeTransactionFunction(ctx, mode, config, &state, work, blockingTxBegin); hasCompleted {
 			return result, nil
 		}
 	}
@@ -415,7 +430,8 @@ func (s *sessionWithContext) executeTransactionFunction(
 	mode idb.AccessMode,
 	config TransactionConfig,
 	state *retry.State,
-	work ManagedTransactionWork) (bool, any) {
+	work ManagedTransactionWork,
+	blockingTxBegin bool) (bool, any) {
 
 	conn, err := s.getConnection(ctx, mode, pool.DefaultLivenessCheckThreshold)
 	if err != nil {
@@ -444,7 +460,8 @@ func (s *sessionWithContext) executeTransactionFunction(
 				MinSev:  s.config.NotificationsMinSeverity,
 				DisCats: s.config.NotificationsDisabledCategories,
 			},
-		})
+		},
+		blockingTxBegin)
 	if err != nil {
 		state.OnFailure(ctx, err, conn, false)
 		return false, nil
@@ -752,6 +769,12 @@ func (s *erroredSessionWithContext) ExecuteRead(context.Context, ManagedTransact
 	return nil, s.err
 }
 func (s *erroredSessionWithContext) ExecuteWrite(context.Context, ManagedTransactionWork, ...func(*TransactionConfig)) (any, error) {
+	return nil, s.err
+}
+func (s *erroredSessionWithContext) pipelinedRead(context.Context, ManagedTransactionWork, ...func(*TransactionConfig)) (any, error) {
+	return nil, s.err
+}
+func (s *erroredSessionWithContext) pipelinedWrite(context.Context, ManagedTransactionWork, ...func(*TransactionConfig)) (any, error) {
 	return nil, s.err
 }
 func (s *erroredSessionWithContext) Run(context.Context, string, map[string]any, ...func(*TransactionConfig)) (ResultWithContext, error) {
