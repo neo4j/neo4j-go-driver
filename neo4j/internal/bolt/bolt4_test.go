@@ -688,6 +688,21 @@ func TestBolt4(outer *testing.T) {
 		AssertNotDeepEquals(t, id, 0)
 	})
 
+	outer.Run("Begin Pipelined handles unserializable tx metadata", func(t *testing.T) {
+		bolt, cleanup := connectToServer(t, func(srv *bolt4server) {
+			srv.accept(4)
+		})
+		defer cleanup()
+		defer bolt.Close(context.Background())
+
+		unserializable := func() {}
+
+		_, err := bolt.TxBegin(context.Background(),
+			idb.TxConfig{Mode: idb.ReadMode, Bookmarks: []string{"bm1"}, Meta: map[string]any{"foo": unserializable}},
+			false)
+		AssertErrorMessageContains(t, err, "Usage of type '%s' is not supported", reflect.TypeOf(unserializable))
+	})
+
 	outer.Run("Begin Pipelined", func(t *testing.T) {
 		bolt, cleanup := connectToServer(t, func(srv *bolt4server) {
 			srv.accept(4)
