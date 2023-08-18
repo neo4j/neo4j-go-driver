@@ -17,20 +17,12 @@
  * limitations under the License.
  */
 
-package bolt
+//go:build internal_testkit
 
-import (
-	"context"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/db"
-	idb "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
-)
+package router
 
-type noopErrorListener struct{}
+import idb "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
 
-func (n noopErrorListener) OnNeo4jError(context.Context, idb.Connection, *db.Neo4jError) error {
-	return nil
+func (r *Router) GetTable(database string) *idb.RoutingTable {
+	return r.getTable(database)
 }
-
-func (n noopErrorListener) OnIoError(context.Context, idb.Connection, error) {}
-
-func (n noopErrorListener) OnDialError(context.Context, string, error) {}

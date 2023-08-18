@@ -254,6 +254,8 @@ func NewDriverWithContext(target string, auth auth.TokenManager, configurers ...
 		d.router = router.New(address, routersResolver, routingContext, d.pool, d.log, d.logId, &d.now)
 	}
 
+	d.pool.SetRouter(d.router)
+
 	d.log.Infof(log.Driver, d.logId, "Created { target: %s }", address)
 	return &d, nil
 }
@@ -300,20 +302,21 @@ type sessionRouter interface {
 	// they should not be called when it is not needed (e.g. when a routing table is cached)
 	GetOrUpdateReaders(ctx context.Context, bookmarks func(context.Context) ([]string, error), database string, auth *idb.ReAuthToken, boltLogger log.BoltLogger) ([]string, error)
 	// Readers returns the list of servers that can serve reads on the requested database.
-	Readers(ctx context.Context, database string) ([]string, error)
+	Readers(database string) []string
 	// GetOrUpdateWriters returns the list of servers that can serve writes on the requested database.
 	// note: bookmarks are lazily supplied, see Readers documentation to learn why
 	GetOrUpdateWriters(ctx context.Context, bookmarks func(context.Context) ([]string, error), database string, auth *idb.ReAuthToken, boltLogger log.BoltLogger) ([]string, error)
 	// Writers returns the list of servers that can serve writes on the requested database.
-	Writers(ctx context.Context, database string) ([]string, error)
+	Writers(database string) []string
 	// GetNameOfDefaultDatabase returns the name of the default database for the specified user.
 	// The correct database name is needed when requesting readers or writers.
 	// the bookmarks are eagerly provided since this method always fetches a new routing table
 	GetNameOfDefaultDatabase(ctx context.Context, bookmarks []string, user string, auth *idb.ReAuthToken, boltLogger log.BoltLogger) (string, error)
-	Invalidate(ctx context.Context, database string) error
-	CleanUp(ctx context.Context) error
-	InvalidateWriter(ctx context.Context, name string, server string) error
-	InvalidateReader(ctx context.Context, name string, server string) error
+	Invalidate(db string)
+	CleanUp()
+	InvalidateWriter(db string, server string)
+	InvalidateReader(db string, server string)
+	InvalidateServer(server string)
 }
 
 type driverWithContext struct {
@@ -394,9 +397,7 @@ func (d *driverWithContext) Close(ctx context.Context) error {
 	defer d.mut.Unlock()
 	// Safeguard against closing more than once
 	if d.pool != nil {
-		if err := d.pool.Close(ctx); err != nil {
-			return err
-		}
+		d.pool.Close(ctx)
 		d.pool = nil
 		d.log.Infof(log.Driver, d.logId, "Closed")
 	}

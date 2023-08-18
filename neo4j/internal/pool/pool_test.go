@@ -23,9 +23,10 @@ import (
 	"context"
 	"errors"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/config"
+	db "github.com/neo4j/neo4j-go-driver/v5/neo4j/db"
 	iauth "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/auth"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/bolt"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
+	idb "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/errorutil"
 	"math/rand"
 	"sync"
@@ -38,18 +39,18 @@ import (
 
 var logger = &log.Void{}
 var ctx = context.Background()
-var reAuthToken = &db.ReAuthToken{FromSession: false, Manager: iauth.Token{Tokens: map[string]any{"scheme": "none"}}}
+var reAuthToken = &idb.ReAuthToken{FromSession: false, Manager: iauth.Token{Tokens: map[string]any{"scheme": "none"}}}
 
 func TestPoolBorrowReturn(outer *testing.T) {
 	maxAge := 1 * time.Second
 	birthdate := time.Now()
 
-	succeedingConnect := func(_ context.Context, s string, _ *db.ReAuthToken, _ bolt.Neo4jErrorCallback, _ log.BoltLogger) (db.Connection, error) {
+	succeedingConnect := func(_ context.Context, s string, _ *idb.ReAuthToken, _ bolt.ConnectionErrorListener, _ log.BoltLogger) (idb.Connection, error) {
 		return &ConnFake{Name: s, Alive: true, Birth: birthdate}, nil
 	}
 
 	failingError := errors.New("whatever")
-	failingConnect := func(_ context.Context, s string, _ *db.ReAuthToken, _ bolt.Neo4jErrorCallback, _ log.BoltLogger) (db.Connection, error) {
+	failingConnect := func(_ context.Context, s string, _ *idb.ReAuthToken, _ bolt.ConnectionErrorListener, _ log.BoltLogger) (idb.Connection, error) {
 		return nil, failingError
 	}
 
@@ -58,19 +59,15 @@ func TestPoolBorrowReturn(outer *testing.T) {
 		conf := config.Config{MaxConnectionLifetime: maxAge, MaxConnectionPoolSize: 1}
 		p := New(&conf, succeedingConnect, logger, "pool id", &timer)
 		defer func() {
-			if err := p.Close(ctx); err != nil {
-				t.Errorf("Should not fail closing the pool, but got: %v", err)
-			}
+			p.Close(ctx)
 		}()
 		serverNames := []string{"srv1"}
 		conn, err := p.Borrow(ctx, getServers(serverNames), true, nil, DefaultLivenessCheckThreshold, reAuthToken)
 		assertConnection(t, conn, err)
-		if err := p.Return(ctx, conn); err != nil {
-			t.Errorf("Should not fail returning connection to pool, but got: %v", err)
-		}
+		p.Return(ctx, conn)
 
 		// Make sure that connection actually returned
-		servers, err := p.getServers(ctx)
+		servers := p.getServers()
 		if err != nil {
 			t.Errorf("Should not fail retrieving servers, got: %v", err)
 		}
@@ -84,9 +81,7 @@ func TestPoolBorrowReturn(outer *testing.T) {
 		conf := config.Config{MaxConnectionLifetime: maxAge, MaxConnectionPoolSize: 1}
 		p := New(&conf, succeedingConnect, logger, "pool id", &timer)
 		defer func() {
-			if err := p.Close(ctx); err != nil {
-				t.Errorf("Should not fail closing the pool, but got: %v", err)
-			}
+			p.Close(ctx)
 		}()
 		serverNames := []string{"srv1"}
 		wg := sync.WaitGroup{}
@@ -105,12 +100,10 @@ func TestPoolBorrowReturn(outer *testing.T) {
 			wg.Done()
 		}()
 
-		waitForBorrowers(t, p, 1)
+		waitForBorrowers(p, 1)
 
 		// Give back the connection
-		if err := p.Return(ctx, c1); err != nil {
-			t.Errorf("Should not fail returning connection to pool, but got: %v", err)
-		}
+		p.Return(ctx, c1)
 		wg.Wait()
 	})
 
@@ -119,9 +112,7 @@ func TestPoolBorrowReturn(outer *testing.T) {
 		conf := config.Config{MaxConnectionLifetime: maxAge, MaxConnectionPoolSize: 1}
 		p := New(&conf, succeedingConnect, logger, "pool id", &timer)
 		defer func() {
-			if err := p.Close(ctx); err != nil {
-				t.Errorf("Should not fail closing the pool, but got: %v", err)
-			}
+			p.Close(ctx)
 		}()
 		serverNames := []string{"srv1"}
 
@@ -151,9 +142,7 @@ func TestPoolBorrowReturn(outer *testing.T) {
 				c, err := p.Borrow(ctx, getServers(serverNames), true, nil, DefaultLivenessCheckThreshold, reAuthToken)
 				assertConnection(t, c, err)
 				time.Sleep(time.Duration(rand.Int()%7) * time.Millisecond)
-				if err := p.Return(ctx, c); err != nil {
-					t.Errorf("Should not fail returning connection to pool, but got: %v", err)
-				}
+				p.Return(ctx, c)
 			}
 			wg.Done()
 		}
@@ -164,10 +153,7 @@ func TestPoolBorrowReturn(outer *testing.T) {
 		wg.Wait()
 
 		// Everything should be freed up, it's ok if there isn't a server as well...
-		servers, err := p.getServers(ctx)
-		if err != nil {
-			t.Errorf("Should not fail retrieving server, but got: %v", err)
-		}
+		servers := p.getServers()
 		for _, v := range servers {
 			if v.numIdle() != maxConnections {
 				t.Error("A connection is still in use in the server")
@@ -179,6 +165,7 @@ func TestPoolBorrowReturn(outer *testing.T) {
 		timer := func() time.Time { return birthdate }
 		conf := config.Config{MaxConnectionLifetime: maxAge, MaxConnectionPoolSize: 2}
 		p := New(&conf, failingConnect, logger, "pool id", &timer)
+		p.SetRouter(&RouterFake{})
 		serverNames := []string{"srv1"}
 		c, err := p.Borrow(ctx, getServers(serverNames), true, nil, DefaultLivenessCheckThreshold, reAuthToken)
 		assertNoConnection(t, c, err)
@@ -202,12 +189,10 @@ func TestPoolBorrowReturn(outer *testing.T) {
 			wg.Done()
 		}()
 
-		waitForBorrowers(t, p, 1)
+		waitForBorrowers(p, 1)
 		cancel()
 		wg.Wait()
-		if err := p.Return(ctx, c1); err != nil {
-			t.Errorf("Should not fail returning connection to pool, but got: %v", err)
-		}
+		p.Return(ctx, c1)
 		if err == nil {
 			t.Error("There should be an error due to cancelling")
 		}
@@ -226,7 +211,7 @@ func TestPoolBorrowReturn(outer *testing.T) {
 		timer := time.Now
 		conf := config.Config{MaxConnectionLifetime: maxAge, MaxConnectionPoolSize: 1}
 		pool := New(&conf, nil, logger, "pool id", &timer)
-		setIdleConnections(pool, map[string][]db.Connection{"a server": {
+		setIdleConnections(pool, map[string][]idb.Connection{"a server": {
 			deadAfterReset,
 			stayingAlive,
 			whatATimeToBeAlive,
@@ -250,7 +235,7 @@ func TestPoolBorrowReturn(outer *testing.T) {
 		timer := time.Now
 		conf := config.Config{MaxConnectionLifetime: maxAge, MaxConnectionPoolSize: 1}
 		pool := New(&conf, connectTo(healthyConnection), logger, "pool id", &timer)
-		setIdleConnections(pool, map[string][]db.Connection{serverName: {deadAfterReset1, deadAfterReset2}})
+		setIdleConnections(pool, map[string][]idb.Connection{serverName: {deadAfterReset1, deadAfterReset2}})
 
 		result, err := pool.tryBorrow(ctx, serverName, nil, idlenessThreshold, reAuthToken)
 
@@ -276,10 +261,10 @@ func TestPoolBorrowReturn(outer *testing.T) {
 			wg.Done()
 		}()
 
-		waitForBorrowers(t, p, 1)
+		waitForBorrowers(p, 1)
 		// break the connection. then it shouldn't be picked up by the waiting borrow
 		c1.(*ConnFake).Alive = false
-		err = p.Return(ctx, c1)
+		p.Return(ctx, c1)
 		AssertNoError(t, err)
 		wg.Wait()
 	})
@@ -288,7 +273,7 @@ func TestPoolBorrowReturn(outer *testing.T) {
 		token2 := iauth.Token{Tokens: map[string]any{"scheme": "foobar"}}
 		// sanity check
 		AssertNotDeepEquals(t, reAuthToken.Manager, token2)
-		reAuthToken2 := &db.ReAuthToken{FromSession: false, Manager: token2}
+		reAuthToken2 := &idb.ReAuthToken{FromSession: false, Manager: token2}
 		timer := func() time.Time { return birthdate }
 		conf := config.Config{MaxConnectionLifetime: maxAge, MaxConnectionPoolSize: 1}
 		p := New(&conf, succeedingConnect, logger, "pool id", &timer)
@@ -304,14 +289,14 @@ func TestPoolBorrowReturn(outer *testing.T) {
 			wg.Done()
 		}()
 
-		waitForBorrowers(t, p, 1)
+		waitForBorrowers(p, 1)
 		reAuthCalled := false
-		c1.(*ConnFake).ReAuthHook = func(_ context.Context, token *db.ReAuthToken) error {
+		c1.(*ConnFake).ReAuthHook = func(_ context.Context, token *idb.ReAuthToken) error {
 			AssertDeepEquals(t, token.Manager, token2)
 			reAuthCalled = true
 			return nil
 		}
-		err = p.Return(ctx, c1)
+		p.Return(ctx, c1)
 		AssertNoError(t, err)
 		wg.Wait()
 		AssertTrue(t, reAuthCalled)
@@ -323,7 +308,7 @@ func TestPoolResourceUsage(ot *testing.T) {
 	maxAge := 1 * time.Second
 	birthdate := time.Now()
 
-	succeedingConnect := func(_ context.Context, s string, _ *db.ReAuthToken, _ bolt.Neo4jErrorCallback, _ log.BoltLogger) (db.Connection, error) {
+	succeedingConnect := func(_ context.Context, s string, _ *idb.ReAuthToken, _ bolt.ConnectionErrorListener, _ log.BoltLogger) (idb.Connection, error) {
 		return &ConnFake{Name: s, Alive: true, Birth: birthdate}, nil
 	}
 
@@ -332,9 +317,7 @@ func TestPoolResourceUsage(ot *testing.T) {
 		conf := config.Config{MaxConnectionLifetime: maxAge, MaxConnectionPoolSize: 1}
 		p := New(&conf, succeedingConnect, logger, "pool id", &timer)
 		defer func() {
-			if err := p.Close(ctx); err != nil {
-				t.Errorf("Should not fail closing the pool, but got: %v", err)
-			}
+			p.Close(ctx)
 		}()
 		serverNames := []string{"srvA", "srvB", "srvC", "srvD"}
 		c, _ := p.Borrow(ctx, getServers(serverNames), true, nil, DefaultLivenessCheckThreshold, reAuthToken)
@@ -348,20 +331,13 @@ func TestPoolResourceUsage(ot *testing.T) {
 		conf := config.Config{MaxConnectionLifetime: maxAge, MaxConnectionPoolSize: 2}
 		p := New(&conf, succeedingConnect, logger, "pool id", &timer)
 		defer func() {
-			if err := p.Close(ctx); err != nil {
-				t.Errorf("Should not fail closing the pool, but got: %v", err)
-			}
+			p.Close(ctx)
 		}()
 		serverNames := []string{"srvA"}
 		c, _ := p.Borrow(ctx, getServers(serverNames), true, nil, DefaultLivenessCheckThreshold, reAuthToken)
 		c.(*ConnFake).Alive = false
-		if err := p.Return(ctx, c); err != nil {
-			t.Errorf("Should not fail returning connection to pool, but got: %v", err)
-		}
-		servers, err := p.getServers(ctx)
-		if err != nil {
-			t.Errorf("Should not fail retrieving server but got: %v", err)
-		}
+		p.Return(ctx, c)
+		servers := p.getServers()
 		if len(servers) > 0 && servers[serverNames[0]].size() > 0 {
 			t.Errorf("Should have either removed the server or kept it but emptied it")
 		}
@@ -372,19 +348,12 @@ func TestPoolResourceUsage(ot *testing.T) {
 		conf := config.Config{MaxConnectionLifetime: maxAge, MaxConnectionPoolSize: 2}
 		p := New(&conf, succeedingConnect, logger, "pool id", &timer)
 		defer func() {
-			if err := p.Close(ctx); err != nil {
-				t.Errorf("Should not fail closing the pool, but got: %v", err)
-			}
+			p.Close(ctx)
 		}()
 		serverNames := []string{"srvA"}
 		c, _ := p.Borrow(ctx, getServers(serverNames), true, nil, DefaultLivenessCheckThreshold, reAuthToken)
-		if err := p.Return(ctx, c); err != nil {
-			t.Errorf("Should not fail returning connection to pool, but got: %v", err)
-		}
-		servers, err := p.getServers(ctx)
-		if err != nil {
-			t.Errorf("Should not fail retrieving server but got: %v", err)
-		}
+		p.Return(ctx, c)
+		servers := p.getServers()
 		if len(servers) > 0 && servers[serverNames[0]].size() > 0 {
 			t.Errorf("Should have either removed the server or kept it but emptied it")
 		}
@@ -407,20 +376,14 @@ func TestPoolResourceUsage(ot *testing.T) {
 		c3.(*ConnFake).Birth = nowTime.Add(1 * time.Second)
 		c3.(*ConnFake).Id = 3
 		// Return the old and young connections to make them idle
-		if err := p.Return(ctx, c1); err != nil {
-			t.Errorf("Should not fail returning connection to pool, but got: %v", err)
-		}
-		if err := p.Return(ctx, c3); err != nil {
-			t.Errorf("Should not fail returning connection to pool, but got: %v", err)
-		}
-		assertNumberOfServers(t, ctx, p, 1)
-		assertNumberOfIdle(t, ctx, p, "A", 2)
+		p.Return(ctx, c1)
+		p.Return(ctx, c3)
+		assertNumberOfServers(t, p, 1)
+		assertNumberOfIdle(t, p, "A", 2)
 		// Kill the middle-aged connection and return it
 		c2.(*ConnFake).Alive = false
-		if err := p.Return(ctx, c2); err != nil {
-			t.Errorf("Should not fail returning connection to pool, but got: %v", err)
-		}
-		assertNumberOfIdle(t, ctx, p, "A", 1)
+		p.Return(ctx, c2)
+		assertNumberOfIdle(t, p, "A", 1)
 	})
 
 	ot.Run("Do not borrow too old connections", func(t *testing.T) {
@@ -434,17 +397,13 @@ func TestPoolResourceUsage(ot *testing.T) {
 		conf := config.Config{MaxConnectionLifetime: maxAge, MaxConnectionPoolSize: 1}
 		p := New(&conf, succeedingConnect, logger, "pool id", &timer)
 		defer func() {
-			if err := p.Close(ctx); err != nil {
-				t.Errorf("Should not fail closing the pool, but got: %v", err)
-			}
+			p.Close(ctx)
 		}()
 		serverNames := []string{"srvA"}
 		c1, _ := p.Borrow(ctx, getServers(serverNames), true, nil, DefaultLivenessCheckThreshold, reAuthToken)
 		c1.(*ConnFake).Id = 123
 		// It's alive when returning it
-		if err := p.Return(ctx, c1); err != nil {
-			t.Errorf("Should not fail returning connection to pool, but got: %v", err)
-		}
+		p.Return(ctx, c1)
 		nowMut.Lock()
 		now = now.Add(2 * maxAge)
 		nowMut.Unlock()
@@ -460,27 +419,25 @@ func TestPoolResourceUsage(ot *testing.T) {
 		conf := config.Config{MaxConnectionLifetime: maxAge, MaxConnectionPoolSize: 1}
 		p := New(&conf, succeedingConnect, logger, "pool id", &timer)
 		defer func() {
-			if err := p.Close(ctx); err != nil {
-				t.Errorf("Should not fail closing the pool, but got: %v", err)
-			}
+			p.Close(ctx)
 		}()
 		c1, err := p.Borrow(ctx, getServers([]string{"A"}), true, nil, DefaultLivenessCheckThreshold, reAuthToken)
 		assertConnection(t, c1, err)
 		c2, err := p.Borrow(ctx, getServers([]string{"B"}), true, nil, DefaultLivenessCheckThreshold, reAuthToken)
 		assertConnection(t, c2, err)
-		assertNumberOfServers(t, ctx, p, 2)
+		assertNumberOfServers(t, p, 2)
 	})
 }
 
 func TestPoolCleanup(ot *testing.T) {
 	birthdate := time.Now()
 	maxLife := 1 * time.Second
-	succeedingConnect := func(_ context.Context, s string, _ *db.ReAuthToken, _ bolt.Neo4jErrorCallback, _ log.BoltLogger) (db.Connection, error) {
+	succeedingConnect := func(_ context.Context, s string, _ *idb.ReAuthToken, _ bolt.ConnectionErrorListener, _ log.BoltLogger) (idb.Connection, error) {
 		return &ConnFake{Name: s, Alive: true, Birth: birthdate}, nil
 	}
 
 	// Borrows a connection in server A and another in server B
-	borrowConnections := func(t *testing.T, p *Pool) (db.Connection, db.Connection) {
+	borrowConnections := func(t *testing.T, p *Pool) (idb.Connection, idb.Connection) {
 		c1, err := p.Borrow(ctx, getServers([]string{"A"}), true, nil, DefaultLivenessCheckThreshold, reAuthToken)
 		assertConnection(t, c1, err)
 		c2, err := p.Borrow(ctx, getServers([]string{"B"}), true, nil, DefaultLivenessCheckThreshold, reAuthToken)
@@ -493,27 +450,19 @@ func TestPoolCleanup(ot *testing.T) {
 		conf := config.Config{MaxConnectionLifetime: maxLife, MaxConnectionPoolSize: 0}
 		p := New(&conf, succeedingConnect, logger, "pool id", &timer)
 		defer func() {
-			if err := p.Close(ctx); err != nil {
-				t.Errorf("Should not fail closing the pool, but got: %v", err)
-			}
+			p.Close(ctx)
 		}()
 		c1, c2 := borrowConnections(t, p)
-		if err := p.Return(ctx, c1); err != nil {
-			t.Errorf("Should not fail returning connection to pool, but got: %v", err)
-		}
-		if err := p.Return(ctx, c2); err != nil {
-			t.Errorf("Should not fail returning connection to pool, but got: %v", err)
-		}
-		assertNumberOfServers(t, ctx, p, 2)
-		assertNumberOfIdle(t, ctx, p, "A", 1)
-		assertNumberOfIdle(t, ctx, p, "B", 1)
+		p.Return(ctx, c1)
+		p.Return(ctx, c2)
+		assertNumberOfServers(t, p, 2)
+		assertNumberOfIdle(t, p, "A", 1)
+		assertNumberOfIdle(t, p, "B", 1)
 
 		// Now go into the future and cleanup, should remove both servers and close the connections
 		timer = func() time.Time { return birthdate.Add(maxLife).Add(1 * time.Second) }
-		if err := p.CleanUp(ctx); err != nil {
-			t.Errorf("Should not fail cleaning up the pool, but got: %v", err)
-		}
-		assertNumberOfServers(t, ctx, p, 0)
+		p.CleanUp(ctx)
+		assertNumberOfServers(t, p, 0)
 	})
 
 	ot.Run("Should not remove servers with busy connections", func(t *testing.T) {
@@ -521,59 +470,48 @@ func TestPoolCleanup(ot *testing.T) {
 		conf := config.Config{MaxConnectionLifetime: maxLife, MaxConnectionPoolSize: 0}
 		p := New(&conf, succeedingConnect, logger, "pool id", &timer)
 		defer func() {
-			if err := p.Close(ctx); err != nil {
-				t.Errorf("Should not fail closing the pool, but got: %v", err)
-			}
+			p.Close(ctx)
 		}()
 		_, c2 := borrowConnections(t, p)
-		if err := p.Return(ctx, c2); err != nil {
-			t.Errorf("Should not fail returning connection to pool, but got: %v", err)
-		}
-		assertNumberOfServers(t, ctx, p, 2)
-		assertNumberOfIdle(t, ctx, p, "A", 0)
-		assertNumberOfIdle(t, ctx, p, "B", 1)
+		p.Return(ctx, c2)
+		assertNumberOfServers(t, p, 2)
+		assertNumberOfIdle(t, p, "A", 0)
+		assertNumberOfIdle(t, p, "B", 1)
 
 		// Now go into the future and cleanup, should only remove B
 		timer = func() time.Time { return birthdate.Add(maxLife).Add(1 * time.Second) }
-		if err := p.CleanUp(ctx); err != nil {
-			t.Errorf("Should not fail cleaning up the pool, but got: %v", err)
-		}
-		assertNumberOfServers(t, ctx, p, 1)
+		p.CleanUp(ctx)
+		assertNumberOfServers(t, p, 1)
 	})
 
 	ot.Run("Should not remove servers with only idle connections but with recent connect failures ", func(t *testing.T) {
-		failingConnect := func(_ context.Context, s string, _ *db.ReAuthToken, _ bolt.Neo4jErrorCallback, _ log.BoltLogger) (db.Connection, error) {
+		failingConnect := func(_ context.Context, s string, _ *idb.ReAuthToken, _ bolt.ConnectionErrorListener, _ log.BoltLogger) (idb.Connection, error) {
 			return nil, errors.New("an error")
 		}
 		timer := time.Now
 		conf := config.Config{MaxConnectionLifetime: maxLife, MaxConnectionPoolSize: 0}
 		p := New(&conf, failingConnect, logger, "pool id", &timer)
+		p.SetRouter(&RouterFake{})
 		defer func() {
-			if err := p.Close(ctx); err != nil {
-				t.Errorf("Should not fail closing the pool, but got: %v", err)
-			}
+			p.Close(ctx)
 		}()
 		c1, err := p.Borrow(ctx, getServers([]string{"A"}), true, nil, DefaultLivenessCheckThreshold, reAuthToken)
 		assertNoConnection(t, c1, err)
-		assertNumberOfServers(t, ctx, p, 1)
-		assertNumberOfIdle(t, ctx, p, "A", 0)
+		assertNumberOfServers(t, p, 1)
+		assertNumberOfIdle(t, p, "A", 0)
 
 		// Now go into the future and cleanup, should not remove server A even if it has no connections since
 		// we should remember the failure a bit longer
 		timer = func() time.Time { return birthdate.Add(maxLife).Add(1 * time.Second) }
-		if err := p.CleanUp(ctx); err != nil {
-			t.Errorf("Should not fail cleaning up the pool, but got: %v", err)
-		}
-		assertNumberOfServers(t, ctx, p, 1)
+		p.CleanUp(ctx)
+		assertNumberOfServers(t, p, 1)
 
 		// Further in the future, the failure should have been forgotten
 		timer = func() time.Time {
 			return birthdate.Add(maxLife).Add(rememberFailedConnectDuration).Add(1 * time.Second)
 		}
-		if err := p.CleanUp(ctx); err != nil {
-			t.Errorf("Should not fail cleaning up the pool, but got: %v", err)
-		}
-		assertNumberOfServers(t, ctx, p, 0)
+		p.CleanUp(ctx)
+		assertNumberOfServers(t, p, 0)
 	})
 
 	ot.Run("wakes up borrowers when closing", func(t *testing.T) {
@@ -592,9 +530,9 @@ func TestPoolCleanup(ot *testing.T) {
 			_, err := p.Borrow(ctx, servers, true, nil, DefaultLivenessCheckThreshold, reAuthToken)
 			borrowErrChan <- err
 		}()
-		waitForBorrowers(t, p, 1)
+		waitForBorrowers(p, 1)
 
-		AssertNoError(t, p.Close(ctx))
+		p.Close(ctx)
 
 		select {
 		case err := <-borrowErrChan:
@@ -605,13 +543,115 @@ func TestPoolCleanup(ot *testing.T) {
 	})
 }
 
-func connectTo(singleConnection *ConnFake) func(ctx context.Context, name string, _ *db.ReAuthToken, _ bolt.Neo4jErrorCallback, _ log.BoltLogger) (db.Connection, error) {
-	return func(ctx context.Context, name string, _ *db.ReAuthToken, _ bolt.Neo4jErrorCallback, _ log.BoltLogger) (db.Connection, error) {
+func TestPoolErrorHanding(ot *testing.T) {
+	const ServerName = "A"
+	const DbName = "some database"
+
+	type TestCase struct {
+		name                      string
+		errorCall                 func(bolt.ConnectionErrorListener, idb.Connection) error
+		expectedInvalidateMode    string
+		expectedInvalidatedServer string
+		expectedInvalidatedDb     string
+	}
+
+	dbUnavailableErr := db.Neo4jError{Code: "Neo.TransientError.General.DatabaseUnavailable"}
+	notALeaderErr := db.Neo4jError{Code: "Neo.ClientError.Cluster.NotALeader"}
+	forbiddenRoDbError := db.Neo4jError{Code: "Neo.ClientError.General.ForbiddenOnReadOnlyDatabase"}
+
+	cases := []TestCase{
+		{
+			name: "should invalidate server on io error",
+			errorCall: func(listener bolt.ConnectionErrorListener, conn idb.Connection) error {
+				listener.OnIoError(ctx, conn, errors.New("an error"))
+				return nil
+			},
+			expectedInvalidatedServer: ServerName,
+		},
+		{
+			name: "should invalidate server on dial error",
+			errorCall: func(listener bolt.ConnectionErrorListener, _ idb.Connection) error {
+				listener.OnDialError(ctx, "what ever server", errors.New("an error"))
+				return nil
+			},
+			expectedInvalidatedServer: "what ever server",
+		},
+		{
+			name: "should invalidate server on dial error",
+			errorCall: func(listener bolt.ConnectionErrorListener, _ idb.Connection) error {
+				listener.OnDialError(ctx, ServerName, errors.New("an error"))
+				return nil
+			},
+			expectedInvalidatedServer: ServerName,
+		},
+		{
+			name: "should invalidate server on db unavailable error",
+			errorCall: func(listener bolt.ConnectionErrorListener, conn idb.Connection) error {
+				return listener.OnNeo4jError(ctx, conn, &dbUnavailableErr)
+			},
+			expectedInvalidatedServer: ServerName,
+		},
+		{
+			name: "should invalidate writer for db on not a leader error",
+			errorCall: func(listener bolt.ConnectionErrorListener, conn idb.Connection) error {
+				return listener.OnNeo4jError(ctx, conn, &notALeaderErr)
+			},
+			expectedInvalidateMode:    "writer",
+			expectedInvalidatedServer: ServerName,
+			expectedInvalidatedDb:     DbName,
+		},
+		{
+			name: "should invalidate writer for db on forbidden error",
+			errorCall: func(listener bolt.ConnectionErrorListener, conn idb.Connection) error {
+				return listener.OnNeo4jError(ctx, conn, &forbiddenRoDbError)
+			},
+			expectedInvalidateMode:    "writer",
+			expectedInvalidatedServer: ServerName,
+			expectedInvalidatedDb:     DbName,
+		},
+	}
+
+	for _, testCase := range cases {
+		ot.Run(testCase.name, func(t *testing.T) {
+			errorListeners := make([]bolt.ConnectionErrorListener, 0)
+			connections := make([]*ConnFake, 0)
+			succeedingConnect := func(_ context.Context, s string, _ *idb.ReAuthToken, errorListener bolt.ConnectionErrorListener, _ log.BoltLogger) (idb.Connection, error) {
+				errorListeners = append(errorListeners, errorListener)
+				connection := ConnFake{Name: s, Alive: true, DatabaseName: DbName}
+				connections = append(connections, &connection)
+				return &connection, nil
+			}
+
+			now := time.Now
+			router := RouterFake{}
+			p := New(&config.Config{}, succeedingConnect, logger, "pool id", &now)
+			p.SetRouter(&router)
+			defer p.Close(ctx)
+			conn, err := p.Borrow(ctx, getServers([]string{ServerName}), false, nil, DefaultLivenessCheckThreshold, reAuthToken)
+			assertConnection(t, conn, err)
+			AssertLen(t, errorListeners, 1)
+			AssertLen(t, connections, 1)
+			errorListener := errorListeners[0]
+			connection := connections[0]
+			AssertFalse(t, router.Invalidated)
+
+			err = testCase.errorCall(errorListener, connection)
+			AssertNoError(t, err)
+			AssertTrue(t, router.Invalidated)
+			AssertStringEqual(t, router.InvalidateMode, testCase.expectedInvalidateMode)
+			AssertStringEqual(t, router.InvalidatedServer, testCase.expectedInvalidatedServer)
+			AssertStringEqual(t, router.InvalidatedDb, testCase.expectedInvalidatedDb)
+		})
+	}
+}
+
+func connectTo(singleConnection *ConnFake) func(ctx context.Context, name string, _ *idb.ReAuthToken, _ bolt.ConnectionErrorListener, _ log.BoltLogger) (idb.Connection, error) {
+	return func(ctx context.Context, name string, _ *idb.ReAuthToken, _ bolt.ConnectionErrorListener, _ log.BoltLogger) (idb.Connection, error) {
 		return singleConnection, nil
 	}
 }
 
-func setIdleConnections(pool *Pool, servers map[string][]db.Connection) {
+func setIdleConnections(pool *Pool, servers map[string][]idb.Connection) {
 	poolServers := make(map[string]*server, len(servers))
 	for serverName, connections := range servers {
 		srv := NewServer()
@@ -633,18 +673,14 @@ func deadConnectionAfterForceReset(name string, idleness time.Time) *ConnFake {
 	return result
 }
 
-func getServers(servers []string) func(context.Context) ([]string, error) {
-	return func(context.Context) ([]string, error) {
-		return servers, nil
+func getServers(servers []string) func() []string {
+	return func() []string {
+		return servers
 	}
 }
 
-func waitForBorrowers(t *testing.T, p *Pool, minBorrowers int) {
-	for {
-		if size, err := p.queueSize(ctx); err != nil {
-			t.Errorf("should not fail computing queue size, got: %v", err)
-		} else if size >= minBorrowers {
-			break
-		}
+func waitForBorrowers(p *Pool, minBorrowers int) {
+	for p.queueSize() < minBorrowers {
+		// still waiting
 	}
 }

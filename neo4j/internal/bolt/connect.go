@@ -54,7 +54,7 @@ func Connect(ctx context.Context,
 	auth *db.ReAuthToken,
 	userAgent string,
 	routingContext map[string]string,
-	callback Neo4jErrorCallback,
+	errorListener ConnectionErrorListener,
 	logger log.Logger,
 	boltLogger log.BoltLogger,
 	notificationConfig db.NotificationConfig,
@@ -74,6 +74,7 @@ func Connect(ctx context.Context,
 	}
 	_, err := racing.NewRacingWriter(conn).Write(ctx, handshake)
 	if err != nil {
+		errorListener.OnDialError(ctx, serverName, err)
 		return nil, err
 	}
 
@@ -81,6 +82,7 @@ func Connect(ctx context.Context,
 	buf := make([]byte, 4)
 	_, err = racing.NewRacingReader(conn).ReadFull(ctx, buf)
 	if err != nil {
+		errorListener.OnDialError(ctx, serverName, err)
 		return nil, err
 	}
 
@@ -93,11 +95,11 @@ func Connect(ctx context.Context,
 	var boltConn db.Connection
 	switch major {
 	case 3:
-		boltConn = NewBolt3(serverName, conn, callback, timer, logger, boltLogger)
+		boltConn = NewBolt3(serverName, conn, errorListener, timer, logger, boltLogger)
 	case 4:
-		boltConn = NewBolt4(serverName, conn, callback, timer, logger, boltLogger)
+		boltConn = NewBolt4(serverName, conn, errorListener, timer, logger, boltLogger)
 	case 5:
-		boltConn = NewBolt5(serverName, conn, callback, timer, logger, boltLogger)
+		boltConn = NewBolt5(serverName, conn, errorListener, timer, logger, boltLogger)
 	case 0:
 		return nil, fmt.Errorf("server did not accept any of the requested Bolt versions (%#v)", versions)
 	default:

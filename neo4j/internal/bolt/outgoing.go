@@ -8,13 +8,13 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      https://www.apache.org/licenses/LICENSE-2.0
+ *     https://www.apache.org/licenses/LICENSE-2.0
  *
- *  Unless required by applicable law or agreed to in writing, software
- *  distributed under the License is distributed on an "AS IS" BASIS,
- *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *  See the License for the specific language governing permissions and
- *  limitations under the License.
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 
 package bolt
@@ -35,7 +35,8 @@ import (
 type outgoing struct {
 	chunker    chunker
 	packer     packstream.Packer
-	onErr      func(err error)
+	onPackErr  func(error)
+	onIoErr    func(context.Context, error)
 	boltLogger log.BoltLogger
 	logId      string
 	useUtc     bool
@@ -51,7 +52,7 @@ func (o *outgoing) end() {
 	o.chunker.buf = buf
 	o.chunker.endMessage()
 	if err != nil {
-		o.onErr(err)
+		o.onPackErr(err)
 	}
 }
 
@@ -259,7 +260,7 @@ func (o *outgoing) appendX(tag byte, fields ...any) {
 func (o *outgoing) send(ctx context.Context, wr io.Writer) {
 	err := o.chunker.send(ctx, wr)
 	if err != nil {
-		o.onErr(err)
+		o.onIoErr(ctx, err)
 	}
 }
 
@@ -347,7 +348,7 @@ func (o *outgoing) packStruct(x any) {
 		o.packer.Int64(v.Seconds)
 		o.packer.Int(v.Nanos)
 	default:
-		o.onErr(&db.UnsupportedTypeError{Type: reflect.TypeOf(x)})
+		o.onPackErr(&db.UnsupportedTypeError{Type: reflect.TypeOf(x)})
 	}
 }
 
@@ -416,7 +417,7 @@ func (o *outgoing) packX(x any) {
 		default:
 			t := reflect.TypeOf(x)
 			if t.Key().Kind() != reflect.String {
-				o.onErr(&db.UnsupportedTypeError{Type: reflect.TypeOf(x)})
+				o.onPackErr(&db.UnsupportedTypeError{Type: reflect.TypeOf(x)})
 				return
 			}
 			o.packer.MapHeader(v.Len())
@@ -427,7 +428,7 @@ func (o *outgoing) packX(x any) {
 			}
 		}
 	default:
-		o.onErr(&db.UnsupportedTypeError{Type: reflect.TypeOf(x)})
+		o.onPackErr(&db.UnsupportedTypeError{Type: reflect.TypeOf(x)})
 	}
 }
 

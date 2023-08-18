@@ -189,9 +189,9 @@ const FetchDefault = 0
 
 // Connection pool as seen by the session.
 type sessionPool interface {
-	Borrow(ctx context.Context, getServers func(context.Context) ([]string, error), wait bool, boltLogger log.BoltLogger, livenessCheckThreshold time.Duration, auth *idb.ReAuthToken) (idb.Connection, error)
-	Return(ctx context.Context, c idb.Connection) error
-	CleanUp(ctx context.Context) error
+	Borrow(ctx context.Context, getServerNames func() []string, wait bool, boltLogger log.BoltLogger, livenessCheckThreshold time.Duration, auth *idb.ReAuthToken) (idb.Connection, error)
+	Return(ctx context.Context, c idb.Connection)
+	CleanUp(ctx context.Context)
 	Now() time.Time
 }
 
@@ -312,7 +312,7 @@ func (s *sessionWithContext) BeginTransaction(ctx context.Context, configurers .
 
 	beginBookmarks, err := s.getBookmarks(ctx)
 	if err != nil {
-		_ = s.pool.Return(ctx, conn)
+		s.pool.Return(ctx, conn)
 		return nil, errorutil.WrapError(err)
 	}
 	txHandle, err := conn.TxBegin(ctx,
@@ -328,7 +328,7 @@ func (s *sessionWithContext) BeginTransaction(ctx context.Context, configurers .
 			},
 		})
 	if err != nil {
-		_ = s.pool.Return(ctx, conn)
+		s.pool.Return(ctx, conn)
 		return nil, errorutil.WrapError(err)
 	}
 
@@ -343,8 +343,8 @@ func (s *sessionWithContext) BeginTransaction(ctx context.Context, configurers .
 			}
 			// On run failure, transaction closed (rolled back or committed)
 			bookmarkErr := s.retrieveBookmarks(ctx, tx.conn, beginBookmarks)
-			poolErr := s.pool.Return(ctx, tx.conn)
-			tx.err = errorutil.CombineAllErrors(tx.err, bookmarkErr, poolErr)
+			s.pool.Return(ctx, tx.conn)
+			tx.err = errorutil.CombineAllErrors(tx.err, bookmarkErr)
 			tx.conn = nil
 			s.explicitTx = nil
 		},
@@ -397,20 +397,7 @@ func (s *sessionWithContext) runRetriable(
 		Sleep:                   s.sleep,
 		Throttle:                retry.Throttler(s.throttleTime),
 		MaxDeadConnections:      s.driverConfig.MaxConnectionPoolSize,
-		Router:                  s.router,
 		DatabaseName:            s.config.DatabaseName,
-		OnDeadConnection: func(server string) error {
-			if mode == idb.WriteMode {
-				if err := s.router.InvalidateWriter(ctx, s.config.DatabaseName, server); err != nil {
-					return err
-				}
-			} else {
-				if err := s.router.InvalidateReader(ctx, s.config.DatabaseName, server); err != nil {
-					return err
-				}
-			}
-			return nil
-		},
 	}
 	for state.Continue() {
 		if hasCompleted, result := s.executeTransactionFunction(ctx, mode, config, &state, work); hasCompleted {
@@ -438,7 +425,7 @@ func (s *sessionWithContext) executeTransactionFunction(
 
 	// handle transaction function panic as well
 	defer func() {
-		_ = s.pool.Return(ctx, conn)
+		s.pool.Return(ctx, conn)
 	}()
 
 	beginBookmarks, err := s.getBookmarks(ctx)
@@ -496,12 +483,12 @@ func (s *sessionWithContext) getOrUpdateServers(ctx context.Context, mode idb.Ac
 	}
 }
 
-func (s *sessionWithContext) getServers(mode idb.AccessMode) func(context.Context) ([]string, error) {
-	return func(ctx context.Context) ([]string, error) {
+func (s *sessionWithContext) getServers(mode idb.AccessMode) func() []string {
+	return func() []string {
 		if mode == idb.ReadMode {
-			return s.router.Readers(ctx, s.config.DatabaseName)
+			return s.router.Readers(s.config.DatabaseName)
 		} else {
-			return s.router.Writers(ctx, s.config.DatabaseName)
+			return s.router.Writers(s.config.DatabaseName)
 		}
 	}
 }
@@ -594,7 +581,7 @@ func (s *sessionWithContext) Run(ctx context.Context,
 
 	runBookmarks, err := s.getBookmarks(ctx)
 	if err != nil {
-		_ = s.pool.Return(ctx, conn)
+		s.pool.Return(ctx, conn)
 		return nil, errorutil.WrapError(err)
 	}
 	stream, err := conn.Run(
@@ -617,7 +604,7 @@ func (s *sessionWithContext) Run(ctx context.Context,
 		},
 	)
 	if err != nil {
-		_ = s.pool.Return(ctx, conn)
+		s.pool.Return(ctx, conn)
 		return nil, errorutil.WrapError(err)
 	}
 
@@ -630,7 +617,7 @@ func (s *sessionWithContext) Run(ctx context.Context,
 			}
 		}),
 		onClosed: func() {
-			_ = s.pool.Return(ctx, conn)
+			s.pool.Return(ctx, conn)
 			s.autocommitTx = nil
 		},
 	}
@@ -649,15 +636,19 @@ func (s *sessionWithContext) Close(ctx context.Context) error {
 	}
 
 	defer s.log.Debugf(log.Session, s.logId, "Closed")
-	poolErrChan := make(chan error, 1)
-	routerErrChan := make(chan error, 1)
+	poolCleanUpChan := make(chan struct{}, 1)
+	routerCleanUpChan := make(chan struct{}, 1)
 	go func() {
-		poolErrChan <- s.pool.CleanUp(ctx)
+		s.pool.CleanUp(ctx)
+		poolCleanUpChan <- struct{}{}
 	}()
 	go func() {
-		routerErrChan <- s.router.CleanUp(ctx)
+		s.router.CleanUp()
+		routerCleanUpChan <- struct{}{}
 	}()
-	return errorutil.CombineAllErrors(txErr, <-poolErrChan, <-routerErrChan)
+	<-poolCleanUpChan
+	<-routerCleanUpChan
+	return txErr
 }
 
 func (s *sessionWithContext) legacy() Session {

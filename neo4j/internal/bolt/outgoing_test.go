@@ -8,13 +8,13 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      https://www.apache.org/licenses/LICENSE-2.0
+ *     https://www.apache.org/licenses/LICENSE-2.0
  *
- *  Unless required by applicable law or agreed to in writing, software
- *  distributed under the License is distributed on an "AS IS" BASIS,
- *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *  See the License for the specific language governing permissions and
- *  limitations under the License.
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 
 package bolt
@@ -91,9 +91,12 @@ func TestOutgoing(ot *testing.T) {
 	// Utility to unpack through dechunking and a custom build func
 	dechunkAndUnpack := func(t *testing.T, build func(*testing.T, *outgoing)) any {
 		out := &outgoing{
-			chunker: newChunker(),
-			packer:  packstream.Packer{},
-			onErr:   func(e error) { err = e },
+			chunker:   newChunker(),
+			packer:    packstream.Packer{},
+			onPackErr: func(e error) { err = e },
+			onIoErr: func(_ context.Context, err error) {
+				ot.Fatalf("Should be no io errors in this test: %s", err)
+			},
 		}
 		serv, cli := net.Pipe()
 		defer func() {
@@ -584,9 +587,12 @@ func TestOutgoing(ot *testing.T) {
 	for _, c := range paramErrorCases {
 		var err error
 		out := &outgoing{
-			chunker: newChunker(),
-			packer:  packstream.Packer{},
-			onErr:   func(e error) { err = e },
+			chunker:   newChunker(),
+			packer:    packstream.Packer{},
+			onPackErr: func(e error) { err = e },
+			onIoErr: func(_ context.Context, err error) {
+				ot.Fatalf("Should be no io errors in this test: %s", err)
+			},
 		}
 		ot.Run(c.name, func(t *testing.T) {
 			out.begin()

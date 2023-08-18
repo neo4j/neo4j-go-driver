@@ -193,6 +193,10 @@ func (c *ConnFake) SelectDatabase(database string) {
 	c.DatabaseName = database
 }
 
+func (c *ConnFake) Database() string {
+	return c.DatabaseName
+}
+
 func (c *ConnFake) SetBoltLogger(log.BoltLogger) {
 }
 

@@ -140,9 +140,7 @@ func TestRespectsTimeToLiveAndInvalidate(t *testing.T) {
 	assertNum(t, numfetch, 2, "Should not have have fetched")
 
 	// Invalidate should force fetching
-	if err := router.Invalidate(ctx, dbName); err != nil {
-		testutil.AssertNoError(t, err)
-	}
+	router.Invalidate(dbName)
 	if _, err := router.GetOrUpdateReaders(ctx, nilBookmarks, dbName, nil, nil); err != nil {
 		testutil.AssertNoError(t, err)
 	}
@@ -387,17 +385,13 @@ func TestCleanUp(t *testing.T) {
 	}
 
 	// Should not remove these since they still have time to live
-	if err := router.CleanUp(ctx); err != nil {
-		testutil.AssertNoError(t, err)
-	}
+	router.CleanUp()
 	if len(router.dbRouters) != 2 {
 		t.Fatal("Should not have removed routing tables")
 	}
 
 	timer = func() time.Time { return now.Add(1 * time.Minute) }
-	if err := router.CleanUp(ctx); err != nil {
-		testutil.AssertNoError(t, err)
-	}
+	router.CleanUp()
 	if len(router.dbRouters) != 0 {
 		t.Fatal("Should have cleaned up")
 	}
