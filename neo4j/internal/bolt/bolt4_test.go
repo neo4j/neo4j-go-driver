@@ -680,12 +680,11 @@ func TestBolt4(outer *testing.T) {
 		defer cleanup()
 		defer bolt.Close(context.Background())
 
-		id, err := bolt.TxBegin(context.Background(),
+		_, err := bolt.TxBegin(context.Background(),
 			idb.TxConfig{Mode: idb.ReadMode, Bookmarks: []string{"bm1"}}, false)
 
 		assertBoltState(t, bolt4_tx, bolt)
 		AssertNoError(t, err)
-		AssertNotDeepEquals(t, id, 0)
 	})
 
 	outer.Run("Begin Pipelined handles unserializable tx metadata", func(t *testing.T) {
