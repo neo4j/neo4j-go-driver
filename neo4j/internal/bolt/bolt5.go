@@ -23,14 +23,15 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net"
+	"reflect"
+	"time"
+
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/auth"
 	iauth "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/auth"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/boltagent"
 	idb "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/errorutil"
-	"net"
-	"reflect"
-	"time"
 
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/db"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/packstream"
@@ -332,9 +333,10 @@ func (b *bolt5) TxBegin(
 		if err := b.queue.receiveAll(ctx); err != nil {
 			return 0, err
 		}
-		if b.err != nil { // onNextMessageErr kicked in
-			return 0, b.err
-		}
+	}
+
+	if b.err != nil { // onNextMessageErr kicked in
+		return 0, b.err
 	}
 
 	b.state = bolt5Tx

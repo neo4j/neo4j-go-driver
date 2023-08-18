@@ -22,14 +22,15 @@ package bolt
 import (
 	"context"
 	"fmt"
-	iauth "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/auth"
-	idb "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/notifications"
 	"io"
 	"reflect"
 	"sync"
 	"testing"
 	"time"
+
+	iauth "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/auth"
+	idb "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/notifications"
 
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/db"
 	. "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/testutil"
@@ -903,6 +904,42 @@ func TestBolt5(outer *testing.T) {
 		AssertError(t, err)
 		bookmark := bolt.Bookmark()
 		AssertStringEqual(t, "", bookmark)
+	})
+
+	outer.Run("Begin transaction lazy with syncMessages false", func(t *testing.T) {
+		bolt, cleanup := connectToServer(t, func(srv *bolt5server) {
+			srv.accept(5)
+			srv.waitForTxBegin(nil)
+			srv.sendFailureMsg("code", "Driver didn't lazily send begin")
+		})
+		defer cleanup()
+		defer bolt.Close(context.Background())
+
+		id, err := bolt.TxBegin(context.Background(),
+			idb.TxConfig{Mode: idb.ReadMode, Bookmarks: []string{"bm1"}}, false)
+
+		assertBoltState(t, bolt5Tx, bolt)
+		AssertNoError(t, err)
+		AssertNotDeepEquals(t, id, 0)
+	})
+
+	outer.Run("Begin Pipelined", func(t *testing.T) {
+		bolt, cleanup := connectToServer(t, func(srv *bolt5server) {
+			srv.accept(5)
+			srv.waitForTxBegin(nil)
+			srv.waitForRun(nil)
+			srv.waitForPullN(1000)
+			srv.sendSuccess(nil)
+			srv.sendSuccess(nil)
+			srv.sendSuccess(nil)
+		})
+		defer cleanup()
+		defer bolt.Close(context.Background())
+
+		tx, _ := bolt.TxBegin(context.Background(),
+			idb.TxConfig{Mode: idb.ReadMode, Bookmarks: []string{"bm1"}}, false)
+		_, err := bolt.RunTx(context.Background(), tx, idb.Command{})
+		AssertNoError(t, err)
 	})
 
 	outer.Run("Run transactional rollback", func(t *testing.T) {
