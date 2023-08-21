@@ -271,6 +271,7 @@ func (b *bolt3) Connect(
 func (b *bolt3) TxBegin(
 	ctx context.Context,
 	txConfig idb.TxConfig,
+	_ bool,
 ) (idb.TxHandle, error) {
 	// Ok, to begin transaction while streaming auto-commit, just empty the stream and continue.
 	if b.state == bolt3_streaming {

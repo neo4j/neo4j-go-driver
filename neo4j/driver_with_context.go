@@ -703,9 +703,9 @@ type transactionFunction func(context.Context, ManagedTransactionWork, ...func(*
 func (c *ExecuteQueryConfiguration) selectTxFunctionApi(session SessionWithContext) (transactionFunction, error) {
 	switch c.Routing {
 	case Read:
-		return session.ExecuteRead, nil
+		return session.pipelinedRead, nil
 	case Write:
-		return session.ExecuteWrite, nil
+		return session.pipelinedWrite, nil
 	}
 	return nil, fmt.Errorf("unsupported routing control, expected %d (Write) or %d (Read) "+
 		"but got: %d", Write, Read, c.Routing)

@@ -591,7 +591,23 @@ func (s *fakeSession) ExecuteWrite(_ context.Context, callback ManagedTransactio
 	}
 	return callback(&fakeManagedTransaction{result: result, err: err})
 }
+func (s *fakeSession) pipelinedRead(_ context.Context, callback ManagedTransactionWork, _ ...func(*TransactionConfig)) (any, error) {
+	return callback(&fakeManagedTransaction{
+		result: s.executeReadTransactionResult,
+		err:    s.executeReadErr,
+	})
+}
 
+func (s *fakeSession) pipelinedWrite(_ context.Context, callback ManagedTransactionWork, _ ...func(*TransactionConfig)) (any, error) {
+	result := s.executeWriteTransactionResult
+	err := s.executeWriteErr
+	if s.executeWriteErrs != nil {
+		result = s.executeWriteTransactionResults[s.executeWriteIndex]
+		err = s.executeWriteErrs[s.executeWriteIndex]
+		s.executeWriteIndex++
+	}
+	return callback(&fakeManagedTransaction{result: result, err: err})
+}
 func (s *fakeSession) Run(context.Context, string, map[string]any, ...func(*TransactionConfig)) (ResultWithContext, error) {
 	panic("implement me")
 }

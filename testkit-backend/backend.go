@@ -1135,6 +1135,7 @@ func (b *backend) handleRequest(req map[string]any) {
 				"AuthorizationExpiredTreatment",
 				"Optimization:ConnectionReuse",
 				"Optimization:EagerTransactionBegin",
+				"Optimization:ExecuteQueryPipelining",
 				"Optimization:ImplicitDefaultArguments",
 				"Optimization:MinimalBookmarksSet",
 				"Optimization:MinimalResets",
