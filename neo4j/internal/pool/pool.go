@@ -28,7 +28,6 @@ import (
 	"fmt"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/config"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/db"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/auth"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/bolt"
 	idb "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/errorutil"
@@ -504,15 +503,15 @@ func (p *Pool) OnConnectionError(ctx context.Context, connection idb.Connection,
 		server.executeForAllConnections(func(c idb.Connection) {
 			c.ResetAuth()
 		})
-	} else if error.Code == "Neo.ClientError.Security.TokenExpired" {
+	}
+	if error.HasSecurityCode() {
 		manager, token := connection.GetCurrentAuth()
 		if manager != nil {
-			if err := manager.OnTokenExpired(ctx, token); err != nil {
+			handled, err := manager.HandleSecurityException(ctx, token, error)
+			if err != nil {
 				return err
 			}
-			if _, isStaticToken := manager.(auth.Token); isStaticToken {
-				return nil
-			} else {
+			if handled {
 				error.MarkRetriable()
 			}
 		}

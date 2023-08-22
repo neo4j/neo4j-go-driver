@@ -19,7 +19,10 @@
 
 package auth
 
-import "context"
+import (
+	"context"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/db"
+)
 
 type Token struct {
 	Tokens map[string]any
@@ -29,4 +32,6 @@ func (a Token) GetAuthToken(context.Context) (Token, error) {
 	return a, nil
 }
 
-func (a Token) OnTokenExpired(context.Context, Token) error { return nil }
+func (a Token) HandleSecurityException(context.Context, Token, *db.Neo4jError) (bool, error) {
+	return false, nil
+}

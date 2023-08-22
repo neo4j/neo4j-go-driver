@@ -28,15 +28,26 @@ import (
 	"time"
 )
 
-func ExampleExpirationBasedTokenManager() {
-	myProvider := func(ctx context.Context) (neo4j.AuthToken, *time.Time, error) {
+func ExampleBasic() {
+	fetchBasicAuthToken := func(ctx context.Context) (neo4j.AuthToken, error) {
+		username, password, realm, err := getBasicAuth()
+		if err != nil {
+			return neo4j.AuthToken{}, err
+		}
+		return neo4j.BasicAuth(username, password, realm), nil
+	}
+
+	_, _ = neo4j.NewDriverWithContext(getUrl(), auth.Basic(fetchBasicAuthToken))
+}
+
+func ExampleBearer() {
+	fetchAuthTokenFromMyProvider := func(ctx context.Context) (neo4j.AuthToken, *time.Time, error) {
 		// some way to getting a token
 		token, err := getSsoToken(ctx)
 		if err != nil {
 			return neo4j.AuthToken{}, nil, err
 		}
 		// assume we know our tokens expire every 60 seconds
-
 		expiresIn := time.Now().Add(60 * time.Second)
 		// Include a little buffer so that we fetch a new token *before* the old one expires
 		expiresIn = expiresIn.Add(-10 * time.Second)
@@ -44,7 +55,12 @@ func ExampleExpirationBasedTokenManager() {
 		return token, &expiresIn, nil
 	}
 
-	_, _ = neo4j.NewDriverWithContext(getUrl(), auth.ExpirationBasedTokenManager(myProvider))
+	_, _ = neo4j.NewDriverWithContext(getUrl(), auth.Bearer(fetchAuthTokenFromMyProvider))
+}
+
+func getBasicAuth() (username, password, realm string, error error) {
+	username, password, realm = "username", "password", "realm"
+	return
 }
 
 func getSsoToken(context.Context) (neo4j.AuthToken, error) {
