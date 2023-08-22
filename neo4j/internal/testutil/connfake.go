@@ -146,7 +146,7 @@ func (c *ConnFake) GetRoutingTable(_ context.Context, _ map[string]string, _ []s
 	return c.Table, c.Err
 }
 
-func (c *ConnFake) TxBegin(_ context.Context, txConfig idb.TxConfig) (idb.TxHandle, error) {
+func (c *ConnFake) TxBegin(_ context.Context, txConfig idb.TxConfig, syncMessages bool) (idb.TxHandle, error) {
 	c.RecordedTxs = append(c.RecordedTxs, RecordedTx{Origin: "TxBegin", Mode: txConfig.Mode, Bookmarks: txConfig.Bookmarks, Timeout: txConfig.Timeout, Meta: txConfig.Meta})
 	return c.TxBeginHandle, c.TxBeginErr
 }
@@ -191,6 +191,10 @@ func (c *ConnFake) Next(context.Context, idb.StreamHandle) (*db.Record, *db.Summ
 
 func (c *ConnFake) SelectDatabase(database string) {
 	c.DatabaseName = database
+}
+
+func (c *ConnFake) Database() string {
+	return c.DatabaseName
 }
 
 func (c *ConnFake) SetBoltLogger(log.BoltLogger) {

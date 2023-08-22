@@ -40,8 +40,19 @@ import (
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/test-integration/dbserver"
 )
 
-func noopOnNeo4jError(context.Context, idb.Connection, *db.Neo4jError) error {
+type noopErrorListener struct{}
+
+func (n noopErrorListener) OnNeo4jError(_ context.Context, _ idb.Connection, e *db.Neo4jError) error {
+	fmt.Println("OnNeo4jError", e)
 	return nil
+}
+
+func (n noopErrorListener) OnIoError(_ context.Context, _ idb.Connection, e error) {
+	fmt.Println("OnIoError", e)
+}
+
+func (n noopErrorListener) OnDialError(_ context.Context, _ string, e error) {
+	fmt.Println("OnDialError", e)
 }
 
 func makeRawConnection(ctx context.Context, logger log.Logger, boltLogger log.BoltLogger) (
@@ -77,7 +88,7 @@ func makeRawConnection(ctx context.Context, logger log.Logger, boltLogger log.Bo
 		auth,
 		"007",
 		nil,
-		noopOnNeo4jError,
+		noopErrorListener{},
 		logger,
 		boltLogger,
 		idb.NotificationConfig{},
@@ -170,7 +181,8 @@ func TestConnectionConformance(outer *testing.T) {
 				fun: func(t *testing.T, c idb.Connection) {
 					txHandle, err := c.TxBegin(context.Background(),
 						idb.TxConfig{Mode: idb.WriteMode,
-							Timeout: 10 * time.Minute})
+							Timeout: 10 * time.Minute},
+						true)
 					AssertNoError(t, err)
 					r := randInt()
 					s, err := c.RunTx(context.Background(), txHandle,
@@ -199,7 +211,8 @@ func TestConnectionConformance(outer *testing.T) {
 				fun: func(t *testing.T, c idb.Connection) {
 					txHandle, err := c.TxBegin(context.Background(),
 						idb.TxConfig{Mode: idb.WriteMode,
-							Timeout: 10 * time.Minute})
+							Timeout: 10 * time.Minute},
+						true)
 					AssertNoError(t, err)
 					r := randInt()
 					_, err = c.RunTx(context.Background(), txHandle,
@@ -224,7 +237,8 @@ func TestConnectionConformance(outer *testing.T) {
 				fun: func(t *testing.T, c idb.Connection) {
 					txHandle, err := c.TxBegin(context.Background(),
 						idb.TxConfig{Mode: idb.WriteMode,
-							Timeout: 10 * time.Minute})
+							Timeout: 10 * time.Minute},
+						true)
 					AssertNoError(t, err)
 					r := randInt()
 					s, err := c.RunTx(context.Background(), txHandle,
@@ -252,7 +266,8 @@ func TestConnectionConformance(outer *testing.T) {
 				fun: func(t *testing.T, c idb.Connection) {
 					txHandle, err := c.TxBegin(context.Background(),
 						idb.TxConfig{Mode: idb.WriteMode,
-							Timeout: 10 * time.Minute})
+							Timeout: 10 * time.Minute},
+						true)
 					AssertNoError(t, err)
 					r := randInt()
 					_, err = c.RunTx(context.Background(), txHandle,
@@ -274,7 +289,8 @@ func TestConnectionConformance(outer *testing.T) {
 				name: "Nested results in transaction, iterate outer result",
 				fun: func(t *testing.T, c idb.Connection) {
 					tx, err := c.TxBegin(context.Background(),
-						idb.TxConfig{Mode: idb.ReadMode})
+						idb.TxConfig{Mode: idb.ReadMode},
+						true)
 					AssertNoError(t, err)
 					r1, err := c.RunTx(context.Background(), tx,
 						idb.Command{Cypher: "UNWIND RANGE(0, 100) AS n RETURN n"})
@@ -323,7 +339,8 @@ func TestConnectionConformance(outer *testing.T) {
 				fun: func(t *testing.T, c idb.Connection) {
 					txHandle, err := c.TxBegin(context.Background(),
 						idb.TxConfig{Mode: idb.WriteMode,
-							Timeout: 10 * time.Minute})
+							Timeout: 10 * time.Minute},
+						true)
 					AssertNoError(t, err)
 					defer c.TxRollback(context.Background(), txHandle)
 					s, err := c.Run(context.Background(),
@@ -432,7 +449,8 @@ func TestConnectionConformance(outer *testing.T) {
 				name: "Set connection in transaction mode",
 				fun: func(t *testing.T, c idb.Connection) {
 					_, err := c.TxBegin(context.Background(),
-						idb.TxConfig{Mode: idb.WriteMode})
+						idb.TxConfig{Mode: idb.WriteMode},
+						true)
 					AssertNoError(t, err)
 				},
 			},
@@ -441,7 +459,8 @@ func TestConnectionConformance(outer *testing.T) {
 				name: "Set connection in transaction mode",
 				fun: func(t *testing.T, c idb.Connection) {
 					tx, _ := c.TxBegin(context.Background(),
-						idb.TxConfig{Mode: idb.WriteMode})
+						idb.TxConfig{Mode: idb.WriteMode},
+						true)
 					_, err := c.RunTx(context.Background(), tx,
 						idb.Command{Cypher: "UNWIND [1] AS n RETURN n"})
 					AssertNoError(t, err)
@@ -463,7 +482,8 @@ func TestConnectionConformance(outer *testing.T) {
 				name: "Streaming big stream (explicit tx)",
 				fun: func(t *testing.T, c idb.Connection) {
 					tx, _ := c.TxBegin(context.Background(),
-						idb.TxConfig{Mode: idb.WriteMode})
+						idb.TxConfig{Mode: idb.WriteMode},
+						true)
 					_, err := c.RunTx(context.Background(), tx,
 						idb.Command{Cypher: "UNWIND RANGE (0, 1000000) AS n RETURN n"})
 					AssertNoError(t, err)
@@ -620,7 +640,8 @@ func TestConnectionConformance(outer *testing.T) {
 		})
 		tt.Run("Commit", func(t *testing.T) {
 			tx, _ := boltConn.TxBegin(context.Background(),
-				idb.TxConfig{Mode: idb.WriteMode})
+				idb.TxConfig{Mode: idb.WriteMode},
+				true)
 			s, _ := boltConn.RunTx(context.Background(), tx, idb.Command{
 				Cypher: "CREATE (n:BmRand {x: $rand}) RETURN n", Params: map[string]any{"rand": randInt()}})
 			boltConn.Next(context.Background(), s)
@@ -631,7 +652,8 @@ func TestConnectionConformance(outer *testing.T) {
 		})
 		tt.Run("Rollback", func(t *testing.T) {
 			tx, _ := boltConn.TxBegin(context.Background(),
-				idb.TxConfig{Mode: idb.WriteMode})
+				idb.TxConfig{Mode: idb.WriteMode},
+				true)
 			s, _ := boltConn.RunTx(context.Background(), tx, idb.Command{
 				Cypher: "CREATE (n:BmRand {x: $rand}) RETURN n", Params: map[string]any{"rand": randInt()}})
 			boltConn.Next(context.Background(), s)

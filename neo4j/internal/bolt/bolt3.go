@@ -95,14 +95,14 @@ type bolt3 struct {
 	auth          map[string]any
 	authManager   auth.TokenManager
 	resetAuth     bool
-	onNeo4jError  Neo4jErrorCallback
+	errorListener ConnectionErrorListener
 	now           *func() time.Time
 }
 
 func NewBolt3(
 	serverName string,
 	conn net.Conn,
-	callback Neo4jErrorCallback,
+	errorListener ConnectionErrorListener,
 	timer *func() time.Time,
 	logger log.Logger,
 	boltLog log.BoltLogger,
@@ -120,16 +120,22 @@ func NewBolt3(
 			},
 			connReadTimeout: -1,
 		},
-		birthDate:    now,
-		idleDate:     now,
-		log:          logger,
-		onNeo4jError: callback,
-		now:          timer,
+		birthDate:     now,
+		idleDate:      now,
+		log:           logger,
+		errorListener: errorListener,
+		now:           timer,
 	}
 	b.out = &outgoing{
 		chunker: newChunker(),
 		packer:  packstream.Packer{},
-		onErr: func(err error) {
+		onPackErr: func(err error) {
+			if b.err == nil {
+				b.err = err
+			}
+			b.state = bolt3_dead
+		},
+		onIoErr: func(ctx context.Context, err error) {
 			if b.err == nil {
 				b.err = err
 			}
@@ -181,7 +187,7 @@ func (b *bolt3) receiveSuccess(ctx context.Context) *success {
 		} else {
 			b.log.Error(log.Bolt3, b.logId, message)
 		}
-		if err := b.onNeo4jError(ctx, b, message); err != nil {
+		if err := b.errorListener.OnNeo4jError(ctx, b, message); err != nil {
 			b.err = errorutil.CombineErrors(message, b.err)
 		}
 		return nil
@@ -265,6 +271,7 @@ func (b *bolt3) Connect(
 func (b *bolt3) TxBegin(
 	ctx context.Context,
 	txConfig idb.TxConfig,
+	_ bool,
 ) (idb.TxHandle, error) {
 	// Ok, to begin transaction while streaming auto-commit, just empty the stream and continue.
 	if b.state == bolt3_streaming {
@@ -662,7 +669,7 @@ func (b *bolt3) receiveNext(ctx context.Context) (*db.Record, *db.Summary, error
 		} else {
 			b.log.Error(log.Bolt3, b.logId, message)
 		}
-		if err := b.onNeo4jError(ctx, b, message); err != nil {
+		if err := b.errorListener.OnNeo4jError(ctx, b, message); err != nil {
 			return nil, nil, errorutil.CombineErrors(message, err)
 		}
 		return nil, nil, message

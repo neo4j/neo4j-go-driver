@@ -71,7 +71,8 @@ type SessionWithContext interface {
 	// Close closes any open resources and marks this session as unusable
 	// Contexts terminating too early negatively affect connection pooling and degrade the driver performance.
 	Close(ctx context.Context) error
-
+	pipelinedRead(ctx context.Context, work ManagedTransactionWork, configurers ...func(*TransactionConfig)) (any, error)
+	pipelinedWrite(ctx context.Context, work ManagedTransactionWork, configurers ...func(*TransactionConfig)) (any, error)
 	legacy() Session
 	getServerInfo(ctx context.Context) (ServerInfo, error)
 	verifyAuthentication(ctx context.Context) error
@@ -189,9 +190,9 @@ const FetchDefault = 0
 
 // Connection pool as seen by the session.
 type sessionPool interface {
-	Borrow(ctx context.Context, getServers func(context.Context) ([]string, error), wait bool, boltLogger log.BoltLogger, livenessCheckThreshold time.Duration, auth *idb.ReAuthToken) (idb.Connection, error)
-	Return(ctx context.Context, c idb.Connection) error
-	CleanUp(ctx context.Context) error
+	Borrow(ctx context.Context, getServerNames func() []string, wait bool, boltLogger log.BoltLogger, livenessCheckThreshold time.Duration, auth *idb.ReAuthToken) (idb.Connection, error)
+	Return(ctx context.Context, c idb.Connection)
+	CleanUp(ctx context.Context)
 	Now() time.Time
 }
 
@@ -312,7 +313,7 @@ func (s *sessionWithContext) BeginTransaction(ctx context.Context, configurers .
 
 	beginBookmarks, err := s.getBookmarks(ctx)
 	if err != nil {
-		_ = s.pool.Return(ctx, conn)
+		s.pool.Return(ctx, conn)
 		return nil, errorutil.WrapError(err)
 	}
 	txHandle, err := conn.TxBegin(ctx,
@@ -326,9 +327,9 @@ func (s *sessionWithContext) BeginTransaction(ctx context.Context, configurers .
 				MinSev:  s.config.NotificationsMinSeverity,
 				DisCats: s.config.NotificationsDisabledCategories,
 			},
-		})
+		}, true)
 	if err != nil {
-		_ = s.pool.Return(ctx, conn)
+		s.pool.Return(ctx, conn)
 		return nil, errorutil.WrapError(err)
 	}
 
@@ -343,8 +344,8 @@ func (s *sessionWithContext) BeginTransaction(ctx context.Context, configurers .
 			}
 			// On run failure, transaction closed (rolled back or committed)
 			bookmarkErr := s.retrieveBookmarks(ctx, tx.conn, beginBookmarks)
-			poolErr := s.pool.Return(ctx, tx.conn)
-			tx.err = errorutil.CombineAllErrors(tx.err, bookmarkErr, poolErr)
+			s.pool.Return(ctx, tx.conn)
+			tx.err = errorutil.CombineAllErrors(tx.err, bookmarkErr)
 			tx.conn = nil
 			s.explicitTx = nil
 		},
@@ -356,19 +357,33 @@ func (s *sessionWithContext) BeginTransaction(ctx context.Context, configurers .
 func (s *sessionWithContext) ExecuteRead(ctx context.Context,
 	work ManagedTransactionWork, configurers ...func(*TransactionConfig)) (any, error) {
 
-	return s.runRetriable(ctx, idb.ReadMode, work, configurers...)
+	return s.runRetriable(ctx, idb.ReadMode, work, true, configurers...)
 }
 
 func (s *sessionWithContext) ExecuteWrite(ctx context.Context,
 	work ManagedTransactionWork, configurers ...func(*TransactionConfig)) (any, error) {
 
-	return s.runRetriable(ctx, idb.WriteMode, work, configurers...)
+	return s.runRetriable(ctx, idb.WriteMode, work, true, configurers...)
+}
+
+func (s *sessionWithContext) pipelinedRead(ctx context.Context,
+	work ManagedTransactionWork, configurers ...func(*TransactionConfig)) (any, error) {
+
+	return s.runRetriable(ctx, idb.ReadMode, work, false, configurers...)
+}
+
+func (s *sessionWithContext) pipelinedWrite(ctx context.Context,
+	work ManagedTransactionWork, configurers ...func(*TransactionConfig)) (any, error) {
+
+	return s.runRetriable(ctx, idb.WriteMode, work, false, configurers...)
 }
 
 func (s *sessionWithContext) runRetriable(
 	ctx context.Context,
 	mode idb.AccessMode,
-	work ManagedTransactionWork, configurers ...func(*TransactionConfig)) (any, error) {
+	work ManagedTransactionWork,
+	blockingTxBegin bool,
+	configurers ...func(*TransactionConfig)) (any, error) {
 
 	// Guard for more than one transaction per session
 	if s.explicitTx != nil {
@@ -397,23 +412,10 @@ func (s *sessionWithContext) runRetriable(
 		Sleep:                   s.sleep,
 		Throttle:                retry.Throttler(s.throttleTime),
 		MaxDeadConnections:      s.driverConfig.MaxConnectionPoolSize,
-		Router:                  s.router,
 		DatabaseName:            s.config.DatabaseName,
-		OnDeadConnection: func(server string) error {
-			if mode == idb.WriteMode {
-				if err := s.router.InvalidateWriter(ctx, s.config.DatabaseName, server); err != nil {
-					return err
-				}
-			} else {
-				if err := s.router.InvalidateReader(ctx, s.config.DatabaseName, server); err != nil {
-					return err
-				}
-			}
-			return nil
-		},
 	}
 	for state.Continue() {
-		if hasCompleted, result := s.executeTransactionFunction(ctx, mode, config, &state, work); hasCompleted {
+		if hasCompleted, result := s.executeTransactionFunction(ctx, mode, config, &state, work, blockingTxBegin); hasCompleted {
 			return result, nil
 		}
 	}
@@ -428,7 +430,8 @@ func (s *sessionWithContext) executeTransactionFunction(
 	mode idb.AccessMode,
 	config TransactionConfig,
 	state *retry.State,
-	work ManagedTransactionWork) (bool, any) {
+	work ManagedTransactionWork,
+	blockingTxBegin bool) (bool, any) {
 
 	conn, err := s.getConnection(ctx, mode, pool.DefaultLivenessCheckThreshold)
 	if err != nil {
@@ -438,7 +441,7 @@ func (s *sessionWithContext) executeTransactionFunction(
 
 	// handle transaction function panic as well
 	defer func() {
-		_ = s.pool.Return(ctx, conn)
+		s.pool.Return(ctx, conn)
 	}()
 
 	beginBookmarks, err := s.getBookmarks(ctx)
@@ -457,7 +460,8 @@ func (s *sessionWithContext) executeTransactionFunction(
 				MinSev:  s.config.NotificationsMinSeverity,
 				DisCats: s.config.NotificationsDisabledCategories,
 			},
-		})
+		},
+		blockingTxBegin)
 	if err != nil {
 		state.OnFailure(ctx, err, conn, false)
 		return false, nil
@@ -496,12 +500,12 @@ func (s *sessionWithContext) getOrUpdateServers(ctx context.Context, mode idb.Ac
 	}
 }
 
-func (s *sessionWithContext) getServers(mode idb.AccessMode) func(context.Context) ([]string, error) {
-	return func(ctx context.Context) ([]string, error) {
+func (s *sessionWithContext) getServers(mode idb.AccessMode) func() []string {
+	return func() []string {
 		if mode == idb.ReadMode {
-			return s.router.Readers(ctx, s.config.DatabaseName)
+			return s.router.Readers(s.config.DatabaseName)
 		} else {
-			return s.router.Writers(ctx, s.config.DatabaseName)
+			return s.router.Writers(s.config.DatabaseName)
 		}
 	}
 }
@@ -594,7 +598,7 @@ func (s *sessionWithContext) Run(ctx context.Context,
 
 	runBookmarks, err := s.getBookmarks(ctx)
 	if err != nil {
-		_ = s.pool.Return(ctx, conn)
+		s.pool.Return(ctx, conn)
 		return nil, errorutil.WrapError(err)
 	}
 	stream, err := conn.Run(
@@ -617,7 +621,7 @@ func (s *sessionWithContext) Run(ctx context.Context,
 		},
 	)
 	if err != nil {
-		_ = s.pool.Return(ctx, conn)
+		s.pool.Return(ctx, conn)
 		return nil, errorutil.WrapError(err)
 	}
 
@@ -630,7 +634,7 @@ func (s *sessionWithContext) Run(ctx context.Context,
 			}
 		}),
 		onClosed: func() {
-			_ = s.pool.Return(ctx, conn)
+			s.pool.Return(ctx, conn)
 			s.autocommitTx = nil
 		},
 	}
@@ -649,15 +653,19 @@ func (s *sessionWithContext) Close(ctx context.Context) error {
 	}
 
 	defer s.log.Debugf(log.Session, s.logId, "Closed")
-	poolErrChan := make(chan error, 1)
-	routerErrChan := make(chan error, 1)
+	poolCleanUpChan := make(chan struct{}, 1)
+	routerCleanUpChan := make(chan struct{}, 1)
 	go func() {
-		poolErrChan <- s.pool.CleanUp(ctx)
+		s.pool.CleanUp(ctx)
+		poolCleanUpChan <- struct{}{}
 	}()
 	go func() {
-		routerErrChan <- s.router.CleanUp(ctx)
+		s.router.CleanUp()
+		routerCleanUpChan <- struct{}{}
 	}()
-	return errorutil.CombineAllErrors(txErr, <-poolErrChan, <-routerErrChan)
+	<-poolCleanUpChan
+	<-routerCleanUpChan
+	return txErr
 }
 
 func (s *sessionWithContext) legacy() Session {
@@ -761,6 +769,12 @@ func (s *erroredSessionWithContext) ExecuteRead(context.Context, ManagedTransact
 	return nil, s.err
 }
 func (s *erroredSessionWithContext) ExecuteWrite(context.Context, ManagedTransactionWork, ...func(*TransactionConfig)) (any, error) {
+	return nil, s.err
+}
+func (s *erroredSessionWithContext) pipelinedRead(context.Context, ManagedTransactionWork, ...func(*TransactionConfig)) (any, error) {
+	return nil, s.err
+}
+func (s *erroredSessionWithContext) pipelinedWrite(context.Context, ManagedTransactionWork, ...func(*TransactionConfig)) (any, error) {
 	return nil, s.err
 }
 func (s *erroredSessionWithContext) Run(context.Context, string, map[string]any, ...func(*TransactionConfig)) (ResultWithContext, error) {

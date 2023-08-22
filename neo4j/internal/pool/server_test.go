@@ -80,7 +80,7 @@ func TestServer(ot *testing.T) {
 		c3 := s.getIdle()
 		assertNilConnection(t, c3)
 
-		s.returnBusy(c2)
+		s.returnBusy(context.Background(), c2)
 		c3 = s.getIdle()
 		assertConnection(t, c3)
 	})
@@ -110,8 +110,8 @@ func TestServer(ot *testing.T) {
 		assertNilConnection(t, b3)
 
 		// Return the connections and let all of them be too old
-		s.returnBusy(b1)
-		s.returnBusy(b2)
+		s.returnBusy(context.Background(), b1)
+		s.returnBusy(context.Background(), b2)
 		conns[0].Birth = now.Add(-20 * time.Second)
 		conns[2].Birth = now.Add(-20 * time.Second)
 		s.removeIdleOlderThan(context.Background(), now, 10*time.Second)
@@ -146,7 +146,7 @@ func TestServerPenalty(t *testing.T) {
 	// Return the busy connection to srv1
 	// Now srv2 should have higher penalty than srv1 since using srv2 would require a new
 	// connection.
-	srv1.returnBusy(c11)
+	srv1.returnBusy(context.Background(), c11)
 	assertPenaltiesGreaterThan(srv2, srv1, now)
 
 	// Add an idle connection to srv2 to make both servers have one idle connection each.
@@ -162,7 +162,7 @@ func TestServerPenalty(t *testing.T) {
 	idle := srv1.getIdle()
 	_, _ = srv1.healthCheck(ctx, idle, DefaultLivenessCheckThreshold, nil, nil)
 	testutil.AssertDeepEquals(t, idle, c11)
-	srv1.returnBusy(c11)
+	srv1.returnBusy(context.Background(), c11)
 	assertPenaltiesGreaterThan(srv1, srv2, now)
 
 	// Add one more connection each to the servers
@@ -187,10 +187,10 @@ func TestServerPenalty(t *testing.T) {
 	// Return the connections
 	idle = srv2.getIdle()
 	_, _ = srv2.healthCheck(ctx, idle, DefaultLivenessCheckThreshold, nil, nil)
-	srv2.returnBusy(c21)
-	srv2.returnBusy(c22)
-	srv1.returnBusy(c11)
-	srv1.returnBusy(c12)
+	srv2.returnBusy(context.Background(), c21)
+	srv2.returnBusy(context.Background(), c22)
+	srv1.returnBusy(context.Background(), c11)
+	srv1.returnBusy(context.Background(), c12)
 	// Everything returned, srv2 should have higher penalty since it was last used
 	assertPenaltiesGreaterThan(srv2, srv1, now)
 
@@ -290,5 +290,5 @@ func TestIdlenessThreshold(outer *testing.T) {
 
 func registerIdle(srv *server, connection db.Connection) {
 	srv.registerBusy(connection)
-	srv.returnBusy(connection)
+	srv.returnBusy(context.Background(), connection)
 }

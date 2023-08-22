@@ -111,30 +111,30 @@ type bolt4 struct {
 	auth          map[string]any
 	authManager   auth.TokenManager
 	resetAuth     bool
-	onNeo4jError  Neo4jErrorCallback
+	errorListener ConnectionErrorListener
 	now           *func() time.Time
 }
 
 func NewBolt4(
 	serverName string,
 	conn net.Conn,
-	callback Neo4jErrorCallback,
+	errorListener ConnectionErrorListener,
 	timer *func() time.Time,
 	logger log.Logger,
 	boltLog log.BoltLogger,
 ) *bolt4 {
 	now := (*timer)()
 	b := &bolt4{
-		state:        bolt4_unauthorized,
-		conn:         conn,
-		serverName:   serverName,
-		birthDate:    now,
-		idleDate:     now,
-		log:          logger,
-		streams:      openstreams{},
-		lastQid:      -1,
-		onNeo4jError: callback,
-		now:          timer,
+		state:         bolt4_unauthorized,
+		conn:          conn,
+		serverName:    serverName,
+		birthDate:     now,
+		idleDate:      now,
+		log:           logger,
+		streams:       openstreams{},
+		lastQid:       -1,
+		errorListener: errorListener,
+		now:           timer,
 	}
 	b.queue = newMessageQueue(
 		conn,
@@ -149,11 +149,12 @@ func NewBolt4(
 		&outgoing{
 			chunker:    newChunker(),
 			packer:     packstream.Packer{},
-			onErr:      func(err error) { b.setError(err, true) },
+			onPackErr:  func(err error) { b.setError(err, true) },
+			onIoErr:    b.onIoError,
 			boltLogger: boltLog,
 		},
 		b.onNextMessage,
-		b.onNextMessageError,
+		b.onIoError,
 	)
 
 	return b
@@ -294,6 +295,7 @@ func (b *bolt4) checkImpersonationAndVersion(impersonatedUser string) error {
 func (b *bolt4) TxBegin(
 	ctx context.Context,
 	txConfig idb.TxConfig,
+	syncMessages bool,
 ) (idb.TxHandle, error) {
 	// Ok, to begin transaction while streaming auto-commit, just empty the stream and continue.
 	if b.state == bolt4_streaming {
@@ -324,12 +326,15 @@ func (b *bolt4) TxBegin(
 	}
 
 	b.queue.appendBegin(tx.toMeta(b.log, b.logId), b.beginResponseHandler())
-	if b.queue.send(ctx); b.err != nil {
-		return 0, b.err
+	if syncMessages {
+		if b.queue.send(ctx); b.err != nil {
+			return 0, b.err
+		}
+		if err := b.queue.receiveAll(ctx); err != nil {
+			return 0, err
+		}
 	}
-	if err := b.queue.receiveAll(ctx); err != nil {
-		return 0, err
-	}
+
 	if b.err != nil { // onNextMessageErr kicked in
 		return 0, b.err
 	}
@@ -938,6 +943,10 @@ func (b *bolt4) SelectDatabase(database string) {
 	b.databaseName = database
 }
 
+func (b *bolt4) Database() string {
+	return b.databaseName
+}
+
 func (b *bolt4) SetBoltLogger(boltLogger log.BoltLogger) {
 	b.queue.setBoltLogger(boltLogger)
 }
@@ -1079,7 +1088,7 @@ func (b *bolt4) resetResponseHandler() responseHandler {
 			b.state = bolt4_ready
 		},
 		onFailure: func(ctx context.Context, failure *db.Neo4jError) {
-			_ = b.onNeo4jError(ctx, b, failure)
+			_ = b.errorListener.OnNeo4jError(ctx, b, failure)
 			b.state = bolt4_dead
 		},
 	}
@@ -1126,17 +1135,22 @@ func (b *bolt4) onNextMessage() {
 	b.idleDate = (*b.now)()
 }
 
-func (b *bolt4) onNextMessageError(err error) {
-	b.setError(err, true)
-}
-
 func (b *bolt4) onFailure(ctx context.Context, failure *db.Neo4jError) {
 	var err error
 	err = failure
-	if callbackErr := b.onNeo4jError(ctx, b, failure); callbackErr != nil {
+	if callbackErr := b.errorListener.OnNeo4jError(ctx, b, failure); callbackErr != nil {
 		err = errorutil.CombineErrors(failure, callbackErr)
 	}
 	b.setError(err, isFatalError(failure))
+}
+
+func (b *bolt4) onIoError(ctx context.Context, err error) {
+	if b.state != bolt4_failed && b.state != bolt4_dead {
+		// Don't call callback when connections break after sending RESET.
+		// The server chooses to close the connection on some errors.
+		b.errorListener.OnIoError(ctx, b, err)
+	}
+	b.setError(err, true)
 }
 
 const readTimeoutHintName = "connection.recv_timeout_seconds"

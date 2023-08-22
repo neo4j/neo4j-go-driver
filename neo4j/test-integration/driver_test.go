@@ -40,7 +40,7 @@ func TestDriver(outer *testing.T) {
 	outer.Run("VerifyConnectivity", func(inner *testing.T) {
 		inner.Run("should return nil upon good connection", func(t *testing.T) {
 			driver := server.Driver()
-			defer driver.Close(ctx)
+			defer func() { _ = driver.Close(ctx) }()
 			assertNil(t, driver.VerifyConnectivity(ctx))
 		})
 
@@ -48,7 +48,7 @@ func TestDriver(outer *testing.T) {
 			auth := neo4j.BasicAuth("bad user", "bad pass", "bad area")
 			driver, err := neo4j.NewDriverWithContext(server.BoltURI(), auth, server.ConfigFunc())
 			assertNil(t, err)
-			defer driver.Close(ctx)
+			defer func() { _ = driver.Close(ctx) }()
 			err = driver.VerifyConnectivity(ctx)
 			assertNotNil(t, err)
 		})
@@ -64,11 +64,11 @@ func TestDriver(outer *testing.T) {
 
 		tearDown := func(driver neo4j.DriverWithContext, session neo4j.SessionWithContext) {
 			if session != nil {
-				session.Close(ctx)
+				_ = session.Close(ctx)
 			}
 
 			if driver != nil {
-				driver.Close(ctx)
+				_ = driver.Close(ctx)
 			}
 		}
 
@@ -126,7 +126,7 @@ func TestDriver(outer *testing.T) {
 
 		defer func() {
 			if driver != nil {
-				driver.Close(ctx)
+				_ = driver.Close(ctx)
 			}
 		}()
 
@@ -165,7 +165,7 @@ func TestDriver(outer *testing.T) {
 
 		defer func() {
 			if driver != nil {
-				driver.Close(ctx)
+				_ = driver.Close(ctx)
 			}
 		}()
 

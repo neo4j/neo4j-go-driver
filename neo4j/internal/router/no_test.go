@@ -32,15 +32,11 @@ type poolFake struct {
 	cancel   context.CancelFunc
 }
 
-func (p *poolFake) Borrow(ctx context.Context, getServers func(context.Context) ([]string, error), _ bool, logger log.BoltLogger, _ time.Duration, _ *db.ReAuthToken) (db.Connection, error) {
-	servers, err := getServers(ctx)
-	if err != nil {
-		return nil, err
-	}
+func (p *poolFake) Borrow(_ context.Context, getServers func() []string, _ bool, logger log.BoltLogger, _ time.Duration, _ *db.ReAuthToken) (db.Connection, error) {
+	servers := getServers()
 	return p.borrow(servers, p.cancel, logger)
 }
 
-func (p *poolFake) Return(_ context.Context, c db.Connection) error {
+func (p *poolFake) Return(_ context.Context, c db.Connection) {
 	p.returned = append(p.returned, c)
-	return nil
 }

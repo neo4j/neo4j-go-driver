@@ -34,7 +34,7 @@ type PoolFake struct {
 	BorrowHook  func() (db.Connection, error)
 }
 
-func (p *PoolFake) Borrow(context.Context, func(context.Context) ([]string, error), bool, log.BoltLogger, time.Duration, *db.ReAuthToken) (db.Connection, error) {
+func (p *PoolFake) Borrow(context.Context, func() []string, bool, log.BoltLogger, time.Duration, *db.ReAuthToken) (db.Connection, error) {
 	if p.BorrowHook != nil && (p.BorrowConn != nil || p.BorrowErr != nil) {
 		panic("either use the hook or the desired return values, but not both")
 	}
@@ -44,18 +44,16 @@ func (p *PoolFake) Borrow(context.Context, func(context.Context) ([]string, erro
 	return p.BorrowConn, p.BorrowErr
 }
 
-func (p *PoolFake) Return(context.Context, db.Connection) error {
+func (p *PoolFake) Return(context.Context, db.Connection) {
 	if p.ReturnHook != nil {
 		p.ReturnHook()
 	}
-	return nil
 }
 
-func (p *PoolFake) CleanUp(context.Context) error {
+func (p *PoolFake) CleanUp(context.Context) {
 	if p.CleanUpHook != nil {
 		p.CleanUpHook()
 	}
-	return nil
 }
 
 func (p *PoolFake) Now() time.Time {
