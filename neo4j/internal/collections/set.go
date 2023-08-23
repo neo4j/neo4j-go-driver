@@ -75,10 +75,6 @@ func (set Set[T]) Copy() Set[T] {
 }
 
 func (set Set[T]) Contains(value T) bool {
-	for _, a := range set.Values() {
-		if a == value {
-			return true
-		}
-	}
-	return false
+	_, ok := set[value]
+	return ok
 }

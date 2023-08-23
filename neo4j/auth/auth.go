@@ -63,7 +63,7 @@ type authTokenProvider = func(context.Context) (auth.Token, error)
 
 type authTokenWithExpirationProvider = func(context.Context) (auth.Token, *time.Time, error)
 
-type expirationBasedTokenManager struct {
+type neo4jAuthTokenManager struct {
 	provider             authTokenWithExpirationProvider
 	token                *auth.Token
 	expiration           *time.Time
@@ -72,10 +72,10 @@ type expirationBasedTokenManager struct {
 	handledSecurityCodes collections.Set[string]
 }
 
-func (m *expirationBasedTokenManager) GetAuthToken(ctx context.Context) (auth.Token, error) {
+func (m *neo4jAuthTokenManager) GetAuthToken(ctx context.Context) (auth.Token, error) {
 	if !m.mutex.TryLock(ctx) {
 		return auth.Token{}, racing.LockTimeoutError(
-			"could not acquire lock in time when getting token in ExpirationBasedTokenManager")
+			"could not acquire lock in time when getting token in neo4jAuthTokenManager")
 	}
 	defer m.mutex.Unlock()
 	if m.token == nil || m.expiration != nil && (*m.now)().After(*m.expiration) {
@@ -89,13 +89,13 @@ func (m *expirationBasedTokenManager) GetAuthToken(ctx context.Context) (auth.To
 	return *m.token, nil
 }
 
-func (m *expirationBasedTokenManager) HandleSecurityException(ctx context.Context, token auth.Token, securityException *db.Neo4jError) (bool, error) {
+func (m *neo4jAuthTokenManager) HandleSecurityException(ctx context.Context, token auth.Token, securityException *db.Neo4jError) (bool, error) {
 	if !m.handledSecurityCodes.Contains(securityException.Code) {
 		return false, nil
 	}
 	if !m.mutex.TryLock(ctx) {
 		return false, racing.LockTimeoutError(
-			"could not acquire lock in time when handling token expiration in expirationBasedTokenManager")
+			"could not acquire lock in time when handling security exception in neo4jAuthTokenManager")
 	}
 	defer m.mutex.Unlock()
 	if m.token != nil && reflect.DeepEqual(token.Tokens, m.token.Tokens) {
@@ -104,8 +104,9 @@ func (m *expirationBasedTokenManager) HandleSecurityException(ctx context.Contex
 	return true, nil
 }
 
-// Basic creates a TokenManager handling basic auth password rotation.
-// The provider function returns basic auth information and is assumed to never expire.
+// BasicTokenManager generates a TokenManager to manage basic auth password rotation.
+// The provider is invoked solely when a new token instance is required, triggered by server
+// rejection of the current token due to an authentication exception.
 //
 // WARNING:
 //
@@ -115,11 +116,11 @@ func (m *expirationBasedTokenManager) HandleSecurityException(ctx context.Contex
 // The provider function must only ever return auth information belonging to the same identity.
 // Switching identities is undefined behavior.
 //
-// Basic is part of the re-authentication preview feature
+// BasicTokenManager is part of the re-authentication preview feature
 // (see README on what it means in terms of support and compatibility guarantees)
-func Basic(provider authTokenProvider) TokenManager {
+func BasicTokenManager(provider authTokenProvider) TokenManager {
 	now := time.Now
-	return &expirationBasedTokenManager{
+	return &neo4jAuthTokenManager{
 		provider: wrapWithNilExpiration(provider),
 		mutex:    racing.NewMutex(),
 		now:      &now,
@@ -129,9 +130,10 @@ func Basic(provider authTokenProvider) TokenManager {
 	}
 }
 
-// Bearer creates a TokenManager handling potentially expiring auth information.
-// The provider function returns auth information and an optional expiration time.
-// If the expiration time is nil, the auth information is assumed to never expire.
+// BearerTokenManager generates a TokenManager to manage possibly expiring authentication details.
+//
+// The provider is invoked when a new token instance is required, triggered by server
+// rejection of the current token due to authentication or token expiration exceptions.
 //
 // WARNING:
 //
@@ -141,11 +143,11 @@ func Basic(provider authTokenProvider) TokenManager {
 // The provider function must only ever return auth information belonging to the same identity.
 // Switching identities is undefined behavior.
 //
-// Bearer is part of the re-authentication preview feature
+// BearerTokenManager is part of the re-authentication preview feature
 // (see README on what it means in terms of support and compatibility guarantees)
-func Bearer(provider authTokenWithExpirationProvider) TokenManager {
+func BearerTokenManager(provider authTokenWithExpirationProvider) TokenManager {
 	now := time.Now
-	return &expirationBasedTokenManager{
+	return &neo4jAuthTokenManager{
 		provider: provider,
 		mutex:    racing.NewMutex(),
 		now:      &now,

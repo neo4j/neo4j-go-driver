@@ -1,3 +1,5 @@
+//go:build internal_testkit
+
 /*
  * Copyright (c) "Neo4j"
  * Neo4j Sweden AB [https://neo4j.com]
@@ -17,20 +19,18 @@
  * limitations under the License.
  */
 
-//go:build internal_testkit
-
 package auth
 
 import "time"
 
 func SetTimer(t TokenManager, timer func() time.Time) {
-	if t, ok := t.(*expirationBasedTokenManager); ok {
+	if t, ok := t.(*neo4jAuthTokenManager); ok {
 		t.now = &timer
 	}
 }
 
 func ResetTime(t TokenManager) {
-	if t, ok := t.(*expirationBasedTokenManager); ok {
+	if t, ok := t.(*neo4jAuthTokenManager); ok {
 		now := time.Now
 		t.now = &now
 	}

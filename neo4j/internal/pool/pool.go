@@ -461,6 +461,16 @@ func (p *Pool) OnNeo4jError(ctx context.Context, connection idb.Connection, erro
 			c.ResetAuth()
 		})
 	}
+	if error.Code == "Neo.TransientError.General.DatabaseUnavailable" {
+		p.deactivate(ctx, connection.ServerName())
+	}
+	if error.IsRetriableCluster() {
+		var database string
+		if dbSelector, ok := connection.(idb.DatabaseSelector); ok {
+			database = dbSelector.Database()
+		}
+		p.deactivateWriter(connection.ServerName(), database)
+	}
 	if error.HasSecurityCode() {
 		manager, token := connection.GetCurrentAuth()
 		if manager != nil {
@@ -472,16 +482,6 @@ func (p *Pool) OnNeo4jError(ctx context.Context, connection idb.Connection, erro
 				error.MarkRetriable()
 			}
 		}
-	}
-	if error.Code == "Neo.TransientError.General.DatabaseUnavailable" {
-		p.deactivate(ctx, connection.ServerName())
-	}
-	if error.IsRetriableCluster() {
-		var database string
-		if dbSelector, ok := connection.(idb.DatabaseSelector); ok {
-			database = dbSelector.Database()
-		}
-		p.deactivateWriter(connection.ServerName(), database)
 	}
 
 	return nil

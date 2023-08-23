@@ -155,7 +155,18 @@ func TestSet(outer *testing.T) {
 		})
 		expected := "golang"
 		if found := strings.Contains(expected); !found {
-			t.Errorf("Set does not contain %v", expected)
+			t.Errorf("Set should have contained %v", expected)
+		}
+	})
+
+	outer.Run("does not contain", func(t *testing.T) {
+		strings := collections.NewSet([]string{
+			"golang",
+			"neo4j",
+		})
+		expected := "foobar"
+		if found := strings.Contains(expected); found {
+			t.Errorf("Set should not have contain %v", expected)
 		}
 	})
 }

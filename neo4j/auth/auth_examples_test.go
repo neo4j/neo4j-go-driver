@@ -28,21 +28,23 @@ import (
 	"time"
 )
 
-func ExampleBasic() {
+func ExampleBasicTokenManager() {
 	fetchBasicAuthToken := func(ctx context.Context) (neo4j.AuthToken, error) {
+		// some way of getting basic authentication information
 		username, password, realm, err := getBasicAuth()
 		if err != nil {
 			return neo4j.AuthToken{}, err
 		}
+		// create and return a basic authentication token with provided username, password and realm
 		return neo4j.BasicAuth(username, password, realm), nil
 	}
-
-	_, _ = neo4j.NewDriverWithContext(getUrl(), auth.Basic(fetchBasicAuthToken))
+	// create a new driver with a basic token manager which uses provider to handle basic auth password rotation.
+	_, _ = neo4j.NewDriverWithContext(getUrl(), auth.BasicTokenManager(fetchBasicAuthToken))
 }
 
-func ExampleBearer() {
+func ExampleBearerTokenManager() {
 	fetchAuthTokenFromMyProvider := func(ctx context.Context) (neo4j.AuthToken, *time.Time, error) {
-		// some way to getting a token
+		// some way of getting a token
 		token, err := getSsoToken(ctx)
 		if err != nil {
 			return neo4j.AuthToken{}, nil, err
@@ -54,8 +56,8 @@ func ExampleBearer() {
 		// or return nil instead of `&expiresIn` if we don't expect it to expire
 		return token, &expiresIn, nil
 	}
-
-	_, _ = neo4j.NewDriverWithContext(getUrl(), auth.Bearer(fetchAuthTokenFromMyProvider))
+	// create a new driver with a bearer token manager which uses provider to handle possibly expiring auth tokens.
+	_, _ = neo4j.NewDriverWithContext(getUrl(), auth.BearerTokenManager(fetchAuthTokenFromMyProvider))
 }
 
 func getBasicAuth() (username, password, realm string, error error) {
