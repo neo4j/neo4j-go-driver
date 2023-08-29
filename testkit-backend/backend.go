@@ -178,13 +178,17 @@ func (b *backend) writeError(err error) {
 	// track of this error so that we can reuse the real thing within a retryable tx
 	fmt.Printf("Error: %s (%T)\n", err.Error(), err)
 	code := ""
+	retriable := false
 	_, isHydrationError := err.(*db.ProtocolError)
 	tokenErr, isTokenExpiredErr := err.(*neo4j.TokenExpiredError)
 	if isTokenExpiredErr {
 		code = tokenErr.Code
+		cause := tokenErr.Unwrap().(*db.Neo4jError)
+		retriable = cause.IsRetriable()
 	}
 	if neo4j.IsNeo4jError(err) {
 		code = err.(*db.Neo4jError).Code
+		retriable = err.(*db.Neo4jError).IsRetriable()
 	}
 	isDriverError := isHydrationError ||
 		isTokenExpiredErr ||
@@ -199,7 +203,9 @@ func (b *backend) writeError(err error) {
 			"id":        id,
 			"errorType": strings.Split(err.Error(), ":")[0],
 			"msg":       err.Error(),
-			"code":      code})
+			"code":      code,
+			"retryable": retriable,
+		})
 		return
 	}
 
@@ -1143,7 +1149,7 @@ func (b *backend) handleRequest(req map[string]any) {
 				"Feature:API:Result.Peek",
 				//"Feature:API:Result.Single",
 				//"Feature:API:Result.SingleOptional",
-				//"Feature:API:RetryableExceptions", TODO enable this
+				"Feature:API:RetryableExceptions",
 				"Feature:API:Session:AuthConfig",
 				//"Feature:API:Session:NotificationsConfig",
 				//"Feature:API:SSLConfig",
