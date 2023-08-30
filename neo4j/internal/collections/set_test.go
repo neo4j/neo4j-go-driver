@@ -147,6 +147,28 @@ func TestSet(outer *testing.T) {
 			t.Error(err)
 		}
 	})
+
+	outer.Run("contains", func(t *testing.T) {
+		strings := collections.NewSet([]string{
+			"golang",
+			"neo4j",
+		})
+		expected := "golang"
+		if found := strings.Contains(expected); !found {
+			t.Errorf("Set should have contained %v", expected)
+		}
+	})
+
+	outer.Run("does not contain", func(t *testing.T) {
+		strings := collections.NewSet([]string{
+			"golang",
+			"neo4j",
+		})
+		expected := "foobar"
+		if found := strings.Contains(expected); found {
+			t.Errorf("Set should not have contain %v", expected)
+		}
+	})
 }
 
 func containsExactlyOnce[T comparable](values collections.Set[T], search T) bool {

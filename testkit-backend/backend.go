@@ -43,25 +43,26 @@ import (
 // Handles a testkit backend session.
 // Tracks all objects (and errors) that is created by testkit frontend.
 type backend struct {
-	rd                      *bufio.Reader // Socket to read requests from
-	wr                      io.Writer     // Socket to write responses (and logs) on, don't buffer (WriteString on bufio was weird...)
-	drivers                 map[string]neo4j.DriverWithContext
-	sessionStates           map[string]*sessionState
-	results                 map[string]neo4j.ResultWithContext
-	managedTransactions     map[string]neo4j.ManagedTransaction
-	explicitTransactions    map[string]neo4j.ExplicitTransaction
-	recordedErrors          map[string]error
-	resolvedAddresses       map[string][]any
-	authTokenManagers       map[string]auth.TokenManager
-	resolvedGetAuthTokens   map[string]neo4j.AuthToken
-	resolvedOnTokenExpiries map[string]bool
-	resolvedExpiringTokens  map[string]AuthTokenAndExpiration
-	id                      int // ID to use for next object created by frontend
-	wrLock                  sync.Mutex
-	suppliedBookmarks       map[string]neo4j.Bookmarks
-	consumedBookmarks       map[string]struct{}
-	bookmarkManagers        map[string]neo4j.BookmarkManager
-	timer                   *Timer
+	rd                              *bufio.Reader // Socket to read requests from
+	wr                              io.Writer     // Socket to write responses (and logs) on, don't buffer (WriteString on bufio was weird...)
+	drivers                         map[string]neo4j.DriverWithContext
+	sessionStates                   map[string]*sessionState
+	results                         map[string]neo4j.ResultWithContext
+	managedTransactions             map[string]neo4j.ManagedTransaction
+	explicitTransactions            map[string]neo4j.ExplicitTransaction
+	recordedErrors                  map[string]error
+	resolvedAddresses               map[string][]any
+	authTokenManagers               map[string]auth.TokenManager
+	resolvedGetAuthTokens           map[string]neo4j.AuthToken
+	resolvedHandleSecurityException map[string]bool
+	resolvedBasicTokens             map[string]AuthToken
+	resolvedBearerTokens            map[string]AuthTokenAndExpiration
+	id                              int // ID to use for next object created by frontend
+	wrLock                          sync.Mutex
+	suppliedBookmarks               map[string]neo4j.Bookmarks
+	consumedBookmarks               map[string]struct{}
+	bookmarkManagers                map[string]neo4j.BookmarkManager
+	timer                           *Timer
 }
 
 type Timer struct {
@@ -85,8 +86,12 @@ type sessionState struct {
 }
 
 type GenericTokenManager struct {
-	GetAuthTokenFunc   func() neo4j.AuthToken
-	OnTokenExpiredFunc func(neo4j.AuthToken)
+	GetAuthTokenFunc            func() neo4j.AuthToken
+	HandleSecurityExceptionFunc func(neo4j.AuthToken, *db.Neo4jError) bool
+}
+
+type AuthToken struct {
+	token neo4j.AuthToken
 }
 
 type AuthTokenAndExpiration struct {
@@ -98,9 +103,9 @@ func (g GenericTokenManager) GetAuthToken(_ context.Context) (neo4j.AuthToken, e
 	return g.GetAuthTokenFunc(), nil
 }
 
-func (g GenericTokenManager) OnTokenExpired(_ context.Context, token neo4j.AuthToken) error {
-	g.OnTokenExpiredFunc(token)
-	return nil
+func (g GenericTokenManager) HandleSecurityException(_ context.Context, token neo4j.AuthToken, securityException *db.Neo4jError) (bool, error) {
+	handled := g.HandleSecurityExceptionFunc(token, securityException)
+	return handled, nil
 }
 
 const (
@@ -113,23 +118,24 @@ var ctx = context.Background()
 
 func newBackend(rd *bufio.Reader, wr io.Writer) *backend {
 	return &backend{
-		rd:                      rd,
-		wr:                      wr,
-		drivers:                 make(map[string]neo4j.DriverWithContext),
-		sessionStates:           make(map[string]*sessionState),
-		results:                 make(map[string]neo4j.ResultWithContext),
-		managedTransactions:     make(map[string]neo4j.ManagedTransaction),
-		explicitTransactions:    make(map[string]neo4j.ExplicitTransaction),
-		recordedErrors:          make(map[string]error),
-		resolvedAddresses:       make(map[string][]any),
-		authTokenManagers:       make(map[string]auth.TokenManager),
-		resolvedGetAuthTokens:   make(map[string]neo4j.AuthToken),
-		resolvedOnTokenExpiries: make(map[string]bool),
-		resolvedExpiringTokens:  make(map[string]AuthTokenAndExpiration),
-		id:                      0,
-		bookmarkManagers:        make(map[string]neo4j.BookmarkManager),
-		suppliedBookmarks:       make(map[string]neo4j.Bookmarks),
-		consumedBookmarks:       make(map[string]struct{}),
+		rd:                              rd,
+		wr:                              wr,
+		drivers:                         make(map[string]neo4j.DriverWithContext),
+		sessionStates:                   make(map[string]*sessionState),
+		results:                         make(map[string]neo4j.ResultWithContext),
+		managedTransactions:             make(map[string]neo4j.ManagedTransaction),
+		explicitTransactions:            make(map[string]neo4j.ExplicitTransaction),
+		recordedErrors:                  make(map[string]error),
+		resolvedAddresses:               make(map[string][]any),
+		authTokenManagers:               make(map[string]auth.TokenManager),
+		resolvedGetAuthTokens:           make(map[string]neo4j.AuthToken),
+		resolvedHandleSecurityException: make(map[string]bool),
+		resolvedBasicTokens:             make(map[string]AuthToken),
+		resolvedBearerTokens:            make(map[string]AuthTokenAndExpiration),
+		id:                              0,
+		bookmarkManagers:                make(map[string]neo4j.BookmarkManager),
+		suppliedBookmarks:               make(map[string]neo4j.Bookmarks),
+		consumedBookmarks:               make(map[string]struct{}),
 	}
 }
 
@@ -172,6 +178,7 @@ func (b *backend) writeError(err error) {
 	// track of this error so that we can reuse the real thing within a retryable tx
 	fmt.Printf("Error: %s (%T)\n", err.Error(), err)
 	code := ""
+	retriable := neo4j.IsRetryable(err)
 	_, isHydrationError := err.(*db.ProtocolError)
 	tokenErr, isTokenExpiredErr := err.(*neo4j.TokenExpiredError)
 	if isTokenExpiredErr {
@@ -193,7 +200,9 @@ func (b *backend) writeError(err error) {
 			"id":        id,
 			"errorType": strings.Split(err.Error(), ":")[0],
 			"msg":       err.Error(),
-			"code":      code})
+			"code":      code,
+			"retryable": retriable,
+		})
 		return
 	}
 
@@ -1004,20 +1013,21 @@ func (b *backend) handleRequest(req map[string]any) {
 					}
 				}
 			},
-			OnTokenExpiredFunc: func(token neo4j.AuthToken) {
+			HandleSecurityExceptionFunc: func(token neo4j.AuthToken, error *db.Neo4jError) bool {
 				id := b.nextId()
 				b.writeResponse(
-					"AuthTokenManagerOnAuthExpiredRequest",
+					"AuthTokenManagerHandleSecurityExceptionRequest",
 					map[string]any{
 						"id":                 id,
 						"authTokenManagerId": managerId,
 						"auth":               serializeAuth(token),
+						"errorCode":          error.Code,
 					})
 				for {
 					b.process()
-					if _, ok := b.resolvedOnTokenExpiries[id]; ok {
-						delete(b.resolvedOnTokenExpiries, id)
-						return
+					if handled, ok := b.resolvedHandleSecurityException[id]; ok {
+						delete(b.resolvedHandleSecurityException, id)
+						return handled
 					}
 				}
 			},
@@ -1032,26 +1042,27 @@ func (b *backend) handleRequest(req map[string]any) {
 			return
 		}
 		b.resolvedGetAuthTokens[id] = token
-	case "AuthTokenManagerOnAuthExpiredCompleted":
+	case "AuthTokenManagerHandleSecurityExceptionCompleted":
+		handled := data["handled"].(bool)
 		id := data["requestId"].(string)
-		b.resolvedOnTokenExpiries[id] = true
-	case "NewExpirationBasedAuthTokenManager":
+		b.resolvedHandleSecurityException[id] = handled
+	case "NewBasicAuthTokenManager":
 		managerId := b.nextId()
 
-		manager := auth.ExpirationBasedTokenManager(
-			func(context.Context) (neo4j.AuthToken, *time.Time, error) {
+		manager := auth.BasicTokenManager(
+			func(context.Context) (neo4j.AuthToken, error) {
 				id := b.nextId()
 				b.writeResponse(
-					"ExpirationBasedAuthTokenProviderRequest",
+					"BasicAuthTokenProviderRequest",
 					map[string]any{
-						"id":                                id,
-						"expirationBasedAuthTokenManagerId": managerId,
+						"id":                      id,
+						"basicAuthTokenManagerId": managerId,
 					})
 				for {
 					b.process()
-					if expiringToken, ok := b.resolvedExpiringTokens[id]; ok {
-						delete(b.resolvedExpiringTokens, id)
-						return expiringToken.token, expiringToken.expiration, nil
+					if basicToken, ok := b.resolvedBasicTokens[id]; ok {
+						delete(b.resolvedBasicTokens, id)
+						return basicToken.token, nil
 					}
 				}
 			})
@@ -1059,11 +1070,40 @@ func (b *backend) handleRequest(req map[string]any) {
 			auth.SetTimer(manager, b.timer.Now)
 		}
 		b.authTokenManagers[managerId] = manager
-		b.writeResponse("ExpirationBasedAuthTokenManager", map[string]any{"id": managerId})
-	case "ExpirationBasedAuthTokenProviderCompleted":
+		b.writeResponse("BasicAuthTokenManager", map[string]any{"id": managerId})
+	case "BasicAuthTokenProviderCompleted":
 		id := data["requestId"].(string)
-		expiringToken := data["auth"].(map[string]any)["data"].(map[string]any)
-		token, err := getAuth(expiringToken["auth"].(map[string]any)["data"].(map[string]any))
+		token, _ := getAuth(data["auth"].(map[string]any)["data"].(map[string]any))
+		b.resolvedBasicTokens[id] = AuthToken{token}
+	case "NewBearerAuthTokenManager":
+		managerId := b.nextId()
+
+		manager := auth.BearerTokenManager(
+			func(context.Context) (neo4j.AuthToken, *time.Time, error) {
+				id := b.nextId()
+				b.writeResponse(
+					"BearerAuthTokenProviderRequest",
+					map[string]any{
+						"id":                       id,
+						"bearerAuthTokenManagerId": managerId,
+					})
+				for {
+					b.process()
+					if bearerToken, ok := b.resolvedBearerTokens[id]; ok {
+						delete(b.resolvedBearerTokens, id)
+						return bearerToken.token, bearerToken.expiration, nil
+					}
+				}
+			})
+		if b.timer != nil {
+			auth.SetTimer(manager, b.timer.Now)
+		}
+		b.authTokenManagers[managerId] = manager
+		b.writeResponse("BearerAuthTokenManager", map[string]any{"id": managerId})
+	case "BearerAuthTokenProviderCompleted":
+		id := data["requestId"].(string)
+		bearerToken := data["auth"].(map[string]any)["data"].(map[string]any)
+		token, err := getAuth(bearerToken["auth"].(map[string]any)["data"].(map[string]any))
 		if err != nil {
 			b.writeError(err)
 			return
@@ -1075,13 +1115,13 @@ func (b *backend) handleRequest(req map[string]any) {
 		} else {
 			now = time.Now
 		}
-		expiresInRaw := expiringToken["expiresInMs"]
+		expiresInRaw := bearerToken["expiresInMs"]
 		if expiresInRaw != nil {
-			expiresIn := time.Millisecond * time.Duration(asInt64(expiringToken["expiresInMs"].(json.Number)))
+			expiresIn := time.Millisecond * time.Duration(asInt64(bearerToken["expiresInMs"].(json.Number)))
 			expirationTime := now().Add(expiresIn)
 			expiration = &expirationTime
 		}
-		b.resolvedExpiringTokens[id] = AuthTokenAndExpiration{token, expiration}
+		b.resolvedBearerTokens[id] = AuthTokenAndExpiration{token, expiration}
 	case "AuthTokenManagerClose":
 		id := data["id"].(string)
 		delete(b.authTokenManagers, id)
@@ -1106,6 +1146,7 @@ func (b *backend) handleRequest(req map[string]any) {
 				"Feature:API:Result.Peek",
 				//"Feature:API:Result.Single",
 				//"Feature:API:Result.SingleOptional",
+				"Feature:API:RetryableExceptions",
 				"Feature:API:Session:AuthConfig",
 				//"Feature:API:Session:NotificationsConfig",
 				//"Feature:API:SSLConfig",

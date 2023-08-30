@@ -27,7 +27,6 @@ import (
 	"context"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/config"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/db"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/auth"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/bolt"
 	idb "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/errorutil"
@@ -453,8 +452,7 @@ func (p *Pool) Return(ctx context.Context, c idb.Connection) {
 }
 
 func (p *Pool) OnNeo4jError(ctx context.Context, connection idb.Connection, error *db.Neo4jError) error {
-	switch error.Code {
-	case "Neo.ClientError.Security.AuthorizationExpired":
+	if error.Code == "Neo.ClientError.Security.AuthorizationExpired" {
 		serverName := connection.ServerName()
 		p.serversMut.Lock()
 		defer p.serversMut.Unlock()
@@ -462,25 +460,27 @@ func (p *Pool) OnNeo4jError(ctx context.Context, connection idb.Connection, erro
 		server.executeForAllConnections(func(c idb.Connection) {
 			c.ResetAuth()
 		})
-	case "Neo.ClientError.Security.TokenExpired":
+	}
+	if error.Code == "Neo.TransientError.General.DatabaseUnavailable" {
+		p.deactivate(ctx, connection.ServerName())
+	}
+	if error.IsRetriableCluster() {
+		var database string
+		if dbSelector, ok := connection.(idb.DatabaseSelector); ok {
+			database = dbSelector.Database()
+		}
+		p.deactivateWriter(connection.ServerName(), database)
+	}
+	if error.HasSecurityCode() {
 		manager, token := connection.GetCurrentAuth()
 		if manager != nil {
-			if err := manager.OnTokenExpired(ctx, token); err != nil {
+			handled, err := manager.HandleSecurityException(ctx, token, error)
+			if err != nil {
 				return err
 			}
-			if _, isStaticToken := manager.(auth.Token); !isStaticToken {
+			if handled {
 				error.MarkRetriable()
 			}
-		}
-	case "Neo.TransientError.General.DatabaseUnavailable":
-		p.deactivate(ctx, connection.ServerName())
-	default:
-		if error.IsRetriableCluster() {
-			var database string
-			if dbSelector, ok := connection.(idb.DatabaseSelector); ok {
-				database = dbSelector.Database()
-			}
-			p.deactivateWriter(connection.ServerName(), database)
 		}
 	}
 

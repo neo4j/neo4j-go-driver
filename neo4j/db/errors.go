@@ -88,6 +88,10 @@ func (e *Neo4jError) reclassify() {
 	}
 }
 
+func (e *Neo4jError) HasSecurityCode() bool {
+	return strings.HasPrefix(e.Code, "Neo.ClientError.Security.")
+}
+
 func (e *Neo4jError) IsAuthenticationFailed() bool {
 	return e.Code == "Neo.ClientError.Security.Unauthorized"
 }

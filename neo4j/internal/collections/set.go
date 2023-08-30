@@ -73,3 +73,8 @@ func (set Set[T]) Copy() Set[T] {
 	}
 	return result
 }
+
+func (set Set[T]) Contains(value T) bool {
+	_, ok := set[value]
+	return ok
+}
