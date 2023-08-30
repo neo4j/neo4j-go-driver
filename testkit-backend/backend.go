@@ -178,17 +178,14 @@ func (b *backend) writeError(err error) {
 	// track of this error so that we can reuse the real thing within a retryable tx
 	fmt.Printf("Error: %s (%T)\n", err.Error(), err)
 	code := ""
-	retriable := false
+	retriable := neo4j.IsRetryable(err)
 	_, isHydrationError := err.(*db.ProtocolError)
 	tokenErr, isTokenExpiredErr := err.(*neo4j.TokenExpiredError)
 	if isTokenExpiredErr {
 		code = tokenErr.Code
-		cause := tokenErr.Unwrap().(*db.Neo4jError)
-		retriable = cause.IsRetriable()
 	}
 	if neo4j.IsNeo4jError(err) {
 		code = err.(*db.Neo4jError).Code
-		retriable = err.(*db.Neo4jError).IsRetriable()
 	}
 	isDriverError := isHydrationError ||
 		isTokenExpiredErr ||
