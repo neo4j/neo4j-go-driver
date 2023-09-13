@@ -15,7 +15,7 @@ To help us understand your issue, please specify important details, primarily:
 
 - Neo4j version: Community/Enterprise X.Y.Z
 - Neo4j Mode: Single instance/HA cluster with X members/Casual cluster with X core Y read-replica
-- Driver version: X lanaguage driver X.Y.Z (If you use some other library that wraps around this driver, you might want to raise an issue there first)
+- Driver version: X language driver X.Y.Z (If you use some other library that wraps around this driver, you might want to raise an issue there first)
 - Operating system: (for example Windows 10/Ubuntu 16.10 on AWS)
 - **Steps to reproduce**
 - Expected behavior
@@ -23,7 +23,7 @@ To help us understand your issue, please specify important details, primarily:
 
 Additionally, include (as appropriate) log-files, stacktraces, and other debug output.
 Always check the server logs to see if there is any stacktrace related to the driver error too.
-Aslo add any solutions you've tried to solve the problem yourself.
+Also add any solutions you've tried to solve the problem yourself.
 
 ## Example bug report
 
