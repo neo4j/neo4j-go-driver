@@ -28,6 +28,7 @@ import (
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/boltagent"
 	idb "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/errorutil"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/telemetry"
 	"net"
 	"reflect"
 	"time"
@@ -960,9 +961,9 @@ func (b *bolt5) GetCurrentAuth() (auth.TokenManager, iauth.Token) {
 	return b.authManager, token
 }
 
-func (b *bolt5) Telemetry(api int, onSuccess func()) {
+func (b *bolt5) Telemetry(api telemetry.API, onSuccess func()) {
 	if b.telemetryEnabled && b.Version().Minor >= 4 {
-		b.queue.appendTelemetry(api, b.telemetryResponseHandler(func(*success) {
+		b.queue.appendTelemetry(api.AsInt(), b.telemetryResponseHandler(func(*success) {
 			if onSuccess != nil {
 				onSuccess()
 			}

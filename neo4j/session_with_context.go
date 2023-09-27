@@ -313,7 +313,7 @@ func (s *sessionWithContext) BeginTransaction(ctx context.Context, configurers .
 	}
 
 	if !s.driverConfig.TelemetryDisabled {
-		conn.Telemetry(telemetry.UNMANAGED_TRANSACTION, nil)
+		conn.Telemetry(telemetry.UnmanagedTransaction, nil)
 	}
 
 	beginBookmarks, err := s.getBookmarks(ctx)
@@ -362,25 +362,25 @@ func (s *sessionWithContext) BeginTransaction(ctx context.Context, configurers .
 func (s *sessionWithContext) ExecuteRead(ctx context.Context,
 	work ManagedTransactionWork, configurers ...func(*TransactionConfig)) (any, error) {
 
-	return s.runRetriable(ctx, idb.ReadMode, work, true, telemetry.MANAGED_TRANSACTION, configurers...)
+	return s.runRetriable(ctx, idb.ReadMode, work, true, telemetry.ManagedTransaction, configurers...)
 }
 
 func (s *sessionWithContext) ExecuteWrite(ctx context.Context,
 	work ManagedTransactionWork, configurers ...func(*TransactionConfig)) (any, error) {
 
-	return s.runRetriable(ctx, idb.WriteMode, work, true, telemetry.MANAGED_TRANSACTION, configurers...)
+	return s.runRetriable(ctx, idb.WriteMode, work, true, telemetry.ManagedTransaction, configurers...)
 }
 
 func (s *sessionWithContext) executeQueryRead(ctx context.Context,
 	work ManagedTransactionWork, configurers ...func(*TransactionConfig)) (any, error) {
 
-	return s.runRetriable(ctx, idb.ReadMode, work, false, telemetry.EXECUTE_QUERY, configurers...)
+	return s.runRetriable(ctx, idb.ReadMode, work, false, telemetry.ExecuteQuery, configurers...)
 }
 
 func (s *sessionWithContext) executeQueryWrite(ctx context.Context,
 	work ManagedTransactionWork, configurers ...func(*TransactionConfig)) (any, error) {
 
-	return s.runRetriable(ctx, idb.WriteMode, work, false, telemetry.EXECUTE_QUERY, configurers...)
+	return s.runRetriable(ctx, idb.WriteMode, work, false, telemetry.ExecuteQuery, configurers...)
 }
 
 func (s *sessionWithContext) runRetriable(
@@ -388,7 +388,7 @@ func (s *sessionWithContext) runRetriable(
 	mode idb.AccessMode,
 	work ManagedTransactionWork,
 	blockingTxBegin bool,
-	telemetryApi int,
+	api telemetry.API,
 	configurers ...func(*TransactionConfig)) (any, error) {
 
 	// Guard for more than one transaction per session
@@ -421,7 +421,7 @@ func (s *sessionWithContext) runRetriable(
 		DatabaseName:            s.config.DatabaseName,
 	}
 	for state.Continue() {
-		if hasCompleted, result := s.executeTransactionFunction(ctx, mode, config, &state, work, blockingTxBegin, telemetryApi); hasCompleted {
+		if hasCompleted, result := s.executeTransactionFunction(ctx, mode, config, &state, work, blockingTxBegin, api); hasCompleted {
 			return result, nil
 		}
 	}
@@ -438,7 +438,7 @@ func (s *sessionWithContext) executeTransactionFunction(
 	state *retry.State,
 	work ManagedTransactionWork,
 	blockingTxBegin bool,
-	telemetryApi int) (bool, any) {
+	api telemetry.API) (bool, any) {
 
 	conn, err := s.getConnection(ctx, mode, pool.DefaultLivenessCheckThreshold)
 	if err != nil {
@@ -447,7 +447,7 @@ func (s *sessionWithContext) executeTransactionFunction(
 	}
 
 	if !s.driverConfig.TelemetryDisabled && !state.TelemetrySent {
-		conn.Telemetry(telemetryApi, func() {
+		conn.Telemetry(api, func() {
 			state.TelemetrySent = true
 		})
 	}
@@ -610,7 +610,7 @@ func (s *sessionWithContext) Run(ctx context.Context,
 	}
 
 	if !s.driverConfig.TelemetryDisabled {
-		conn.Telemetry(telemetry.AUTO_COMMIT_TRANSACTION, nil)
+		conn.Telemetry(telemetry.AutoCommitTransaction, nil)
 	}
 
 	runBookmarks, err := s.getBookmarks(ctx)

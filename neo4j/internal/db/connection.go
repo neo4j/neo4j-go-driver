@@ -25,6 +25,7 @@ import (
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/auth"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/db"
 	iauth "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/auth"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/telemetry"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/log"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/notifications"
 	"math"
@@ -166,7 +167,7 @@ type Connection interface {
 	// GetCurrentAuth returns the current authentication manager and token that this connection is authenticated with
 	GetCurrentAuth() (auth.TokenManager, iauth.Token)
 	// Telemetry sends telemetry information about the API usage to the server.
-	Telemetry(api int, onSuccess func())
+	Telemetry(api telemetry.API, onSuccess func())
 }
 
 type RoutingTable struct {

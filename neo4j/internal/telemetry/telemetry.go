@@ -19,9 +19,15 @@
 
 package telemetry
 
+type API int
+
 const (
-	MANAGED_TRANSACTION     int = 0
-	UNMANAGED_TRANSACTION   int = 1
-	AUTO_COMMIT_TRANSACTION int = 2
-	EXECUTE_QUERY           int = 3
+	ManagedTransaction    API = 0
+	UnmanagedTransaction  API = 1
+	AutoCommitTransaction API = 2
+	ExecuteQuery          API = 3
 )
+
+func (a API) AsInt() int {
+	return int(a)
+}

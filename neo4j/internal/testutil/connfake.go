@@ -24,6 +24,7 @@ import (
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/auth"
 	iauth "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/auth"
 	idb "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/telemetry"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/log"
 	"time"
 
@@ -218,4 +219,4 @@ func (c *ConnFake) GetCurrentAuth() (auth.TokenManager, iauth.Token) {
 	return nil, iauth.Token{}
 }
 
-func (c *ConnFake) Telemetry(int, func()) {}
+func (c *ConnFake) Telemetry(telemetry.API, func()) {}
