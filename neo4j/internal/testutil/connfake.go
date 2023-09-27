@@ -217,3 +217,5 @@ func (c *ConnFake) ResetAuth() {
 func (c *ConnFake) GetCurrentAuth() (auth.TokenManager, iauth.Token) {
 	return nil, iauth.Token{}
 }
+
+func (c *ConnFake) Telemetry(int, func()) {}
