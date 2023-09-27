@@ -34,11 +34,11 @@ type TransactionConfig struct {
 // WithTxTimeout returns a transaction configuration function that applies a timeout to a transaction.
 //
 // Transactions that execute longer than the configured timeout will be terminated by the database.
-// This functionality allows to limit query/transaction execution time.
+// This functionality allows user code to limit query/transaction execution time.
 // The Specified timeout overrides the default timeout configured in the database using the `db.transaction.timeout`
 // setting (`dbms.transaction.timeout` before Neo4j 5.0).
-// Values higher than `db.transaction.timeout` will be ignored and will fall back to the default for server versions 4.2
-// to including 5.2.
+// Values higher than `db.transaction.timeout` will be ignored and will fall back to the default for server versions
+// between 4.2 and 5.2 (inclusive).
 // A `0` duration will make the transaction execute indefinitely.
 // `math.MinInt` will use the default timeout configured on the server.
 // Other negative durations are invalid.
