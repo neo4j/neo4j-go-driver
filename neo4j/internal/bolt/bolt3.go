@@ -872,5 +872,4 @@ func (b *bolt3) GetCurrentAuth() (auth.TokenManager, iauth.Token) {
 
 func (b *bolt3) Telemetry(int, func()) {
 	// TELEMETRY not support by this protocol version, so we ignore it.
-	return
 }

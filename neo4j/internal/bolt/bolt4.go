@@ -989,7 +989,6 @@ func (b *bolt4) GetCurrentAuth() (auth.TokenManager, iauth.Token) {
 
 func (b *bolt4) Telemetry(int, func()) {
 	// TELEMETRY not support by this protocol version, so we ignore it.
-	return
 }
 
 func (b *bolt4) helloResponseHandler(checkUtcPatch bool) responseHandler {
