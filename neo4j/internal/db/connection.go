@@ -165,6 +165,8 @@ type Connection interface {
 	ResetAuth()
 	// GetCurrentAuth returns the current authentication manager and token that this connection is authenticated with
 	GetCurrentAuth() (auth.TokenManager, iauth.Token)
+	// Telemetry sends telemetry information about the API usage to the server.
+	Telemetry(api int, onSuccess func())
 }
 
 type RoutingTable struct {

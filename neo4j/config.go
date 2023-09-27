@@ -50,6 +50,7 @@ func defaultConfig() *Config {
 		FetchSize:                       FetchDefault,
 		NotificationsMinSeverity:        notifications.DefaultLevel,
 		NotificationsDisabledCategories: notifications.NotificationDisabledCategories{},
+		TelemetryDisabled:               false,
 	}
 }
 

@@ -146,6 +146,22 @@ type Config struct {
 	// By default, the server's settings are used.
 	// Disabling categories allows the server to skip analysis for those, which can speed up query execution.
 	NotificationsDisabledCategories notifications.NotificationDisabledCategories
+	// By default, if the server requests it, the driver will automatically transmit anonymous usage
+	// statistics to the server it is connected to.
+	//
+	// By configuring TelemetryDisabled=True, the driver will refrain from transmitting any telemetry data.
+	//
+	// Each time one of the specified APIs is utilized to execute a query for the first time, the driver
+	// informs the server of this action without providing additional details such as arguments or client identifiers:
+	//
+	//   DriverWithContext.ExecuteQuery
+	//   SessionWithContext.Run
+	//   SessionWithContext.BeginTransaction
+	//   SessionWithContext.ExecuteRead
+	//   SessionWithContext.ExecuteWrite
+	//
+	// default: true
+	TelemetryDisabled bool
 }
 
 // ServerAddressResolver is a function type that defines the resolver function used by the routing driver to
