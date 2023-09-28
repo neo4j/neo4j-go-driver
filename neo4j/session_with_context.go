@@ -26,6 +26,7 @@ import (
 	idb "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/errorutil"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/pool"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/telemetry"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/notifications"
 	"math"
 	"time"
@@ -71,8 +72,8 @@ type SessionWithContext interface {
 	// Close closes any open resources and marks this session as unusable
 	// Contexts terminating too early negatively affect connection pooling and degrade the driver performance.
 	Close(ctx context.Context) error
-	pipelinedRead(ctx context.Context, work ManagedTransactionWork, configurers ...func(*TransactionConfig)) (any, error)
-	pipelinedWrite(ctx context.Context, work ManagedTransactionWork, configurers ...func(*TransactionConfig)) (any, error)
+	executeQueryRead(ctx context.Context, work ManagedTransactionWork, configurers ...func(*TransactionConfig)) (any, error)
+	executeQueryWrite(ctx context.Context, work ManagedTransactionWork, configurers ...func(*TransactionConfig)) (any, error)
 	legacy() Session
 	getServerInfo(ctx context.Context) (ServerInfo, error)
 	verifyAuthentication(ctx context.Context) error
@@ -311,6 +312,10 @@ func (s *sessionWithContext) BeginTransaction(ctx context.Context, configurers .
 		return nil, errorutil.WrapError(err)
 	}
 
+	if !s.driverConfig.TelemetryDisabled {
+		conn.Telemetry(telemetry.UnmanagedTransaction, nil)
+	}
+
 	beginBookmarks, err := s.getBookmarks(ctx)
 	if err != nil {
 		s.pool.Return(ctx, conn)
@@ -357,25 +362,25 @@ func (s *sessionWithContext) BeginTransaction(ctx context.Context, configurers .
 func (s *sessionWithContext) ExecuteRead(ctx context.Context,
 	work ManagedTransactionWork, configurers ...func(*TransactionConfig)) (any, error) {
 
-	return s.runRetriable(ctx, idb.ReadMode, work, true, configurers...)
+	return s.runRetriable(ctx, idb.ReadMode, work, true, telemetry.ManagedTransaction, configurers...)
 }
 
 func (s *sessionWithContext) ExecuteWrite(ctx context.Context,
 	work ManagedTransactionWork, configurers ...func(*TransactionConfig)) (any, error) {
 
-	return s.runRetriable(ctx, idb.WriteMode, work, true, configurers...)
+	return s.runRetriable(ctx, idb.WriteMode, work, true, telemetry.ManagedTransaction, configurers...)
 }
 
-func (s *sessionWithContext) pipelinedRead(ctx context.Context,
+func (s *sessionWithContext) executeQueryRead(ctx context.Context,
 	work ManagedTransactionWork, configurers ...func(*TransactionConfig)) (any, error) {
 
-	return s.runRetriable(ctx, idb.ReadMode, work, false, configurers...)
+	return s.runRetriable(ctx, idb.ReadMode, work, false, telemetry.ExecuteQuery, configurers...)
 }
 
-func (s *sessionWithContext) pipelinedWrite(ctx context.Context,
+func (s *sessionWithContext) executeQueryWrite(ctx context.Context,
 	work ManagedTransactionWork, configurers ...func(*TransactionConfig)) (any, error) {
 
-	return s.runRetriable(ctx, idb.WriteMode, work, false, configurers...)
+	return s.runRetriable(ctx, idb.WriteMode, work, false, telemetry.ExecuteQuery, configurers...)
 }
 
 func (s *sessionWithContext) runRetriable(
@@ -383,6 +388,7 @@ func (s *sessionWithContext) runRetriable(
 	mode idb.AccessMode,
 	work ManagedTransactionWork,
 	blockingTxBegin bool,
+	api telemetry.API,
 	configurers ...func(*TransactionConfig)) (any, error) {
 
 	// Guard for more than one transaction per session
@@ -415,7 +421,7 @@ func (s *sessionWithContext) runRetriable(
 		DatabaseName:            s.config.DatabaseName,
 	}
 	for state.Continue() {
-		if hasCompleted, result := s.executeTransactionFunction(ctx, mode, config, &state, work, blockingTxBegin); hasCompleted {
+		if hasCompleted, result := s.executeTransactionFunction(ctx, mode, config, &state, work, blockingTxBegin, api); hasCompleted {
 			return result, nil
 		}
 	}
@@ -431,12 +437,19 @@ func (s *sessionWithContext) executeTransactionFunction(
 	config TransactionConfig,
 	state *retry.State,
 	work ManagedTransactionWork,
-	blockingTxBegin bool) (bool, any) {
+	blockingTxBegin bool,
+	api telemetry.API) (bool, any) {
 
 	conn, err := s.getConnection(ctx, mode, pool.DefaultLivenessCheckThreshold)
 	if err != nil {
 		state.OnFailure(ctx, err, conn, false)
 		return false, nil
+	}
+
+	if !s.driverConfig.TelemetryDisabled && !state.TelemetrySent {
+		conn.Telemetry(api, func() {
+			state.TelemetrySent = true
+		})
 	}
 
 	// handle transaction function panic as well
@@ -594,6 +607,10 @@ func (s *sessionWithContext) Run(ctx context.Context,
 	conn, err := s.getConnection(ctx, s.defaultMode, pool.DefaultLivenessCheckThreshold)
 	if err != nil {
 		return nil, errorutil.WrapError(err)
+	}
+
+	if !s.driverConfig.TelemetryDisabled {
+		conn.Telemetry(telemetry.AutoCommitTransaction, nil)
 	}
 
 	runBookmarks, err := s.getBookmarks(ctx)
@@ -771,10 +788,10 @@ func (s *erroredSessionWithContext) ExecuteRead(context.Context, ManagedTransact
 func (s *erroredSessionWithContext) ExecuteWrite(context.Context, ManagedTransactionWork, ...func(*TransactionConfig)) (any, error) {
 	return nil, s.err
 }
-func (s *erroredSessionWithContext) pipelinedRead(context.Context, ManagedTransactionWork, ...func(*TransactionConfig)) (any, error) {
+func (s *erroredSessionWithContext) executeQueryRead(context.Context, ManagedTransactionWork, ...func(*TransactionConfig)) (any, error) {
 	return nil, s.err
 }
-func (s *erroredSessionWithContext) pipelinedWrite(context.Context, ManagedTransactionWork, ...func(*TransactionConfig)) (any, error) {
+func (s *erroredSessionWithContext) executeQueryWrite(context.Context, ManagedTransactionWork, ...func(*TransactionConfig)) (any, error) {
 	return nil, s.err
 }
 func (s *erroredSessionWithContext) Run(context.Context, string, map[string]any, ...func(*TransactionConfig)) (ResultWithContext, error) {

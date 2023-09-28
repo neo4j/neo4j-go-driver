@@ -28,6 +28,7 @@ import (
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/collections"
 	idb "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/errorutil"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/telemetry"
 	"net"
 	"reflect"
 	"time"
@@ -985,6 +986,10 @@ func (b *bolt4) ResetAuth() {
 func (b *bolt4) GetCurrentAuth() (auth.TokenManager, iauth.Token) {
 	token := iauth.Token{Tokens: b.auth}
 	return b.authManager, token
+}
+
+func (b *bolt4) Telemetry(telemetry.API, func()) {
+	// TELEMETRY not support by this protocol version, so we ignore it.
 }
 
 func (b *bolt4) helloResponseHandler(checkUtcPatch bool) responseHandler {

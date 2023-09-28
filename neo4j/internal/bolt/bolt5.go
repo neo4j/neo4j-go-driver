@@ -28,6 +28,7 @@ import (
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/boltagent"
 	idb "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/errorutil"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/telemetry"
 	"net"
 	"reflect"
 	"time"
@@ -93,28 +94,29 @@ func (i *internalTx5) toMeta(logger log.Logger, logId string) map[string]any {
 }
 
 type bolt5 struct {
-	state         int
-	txId          idb.TxHandle
-	streams       openstreams
-	conn          net.Conn
-	serverName    string
-	queue         messageQueue
-	connId        string
-	logId         string
-	serverVersion string
-	bookmark      string // Last bookmark
-	birthDate     time.Time
-	log           log.Logger
-	databaseName  string
-	err           error // Last fatal error
-	minor         int
-	lastQid       int64 // Last seen qid
-	idleDate      time.Time
-	auth          map[string]any
-	authManager   auth.TokenManager
-	resetAuth     bool
-	errorListener ConnectionErrorListener
-	now           *func() time.Time
+	state            int
+	txId             idb.TxHandle
+	streams          openstreams
+	conn             net.Conn
+	serverName       string
+	queue            messageQueue
+	connId           string
+	logId            string
+	serverVersion    string
+	bookmark         string // Last bookmark
+	birthDate        time.Time
+	log              log.Logger
+	databaseName     string
+	err              error // Last fatal error
+	minor            int
+	lastQid          int64 // Last seen qid
+	idleDate         time.Time
+	auth             map[string]any
+	authManager      auth.TokenManager
+	resetAuth        bool
+	errorListener    ConnectionErrorListener
+	now              *func() time.Time
+	telemetryEnabled bool
 }
 
 func NewBolt5(
@@ -959,6 +961,16 @@ func (b *bolt5) GetCurrentAuth() (auth.TokenManager, iauth.Token) {
 	return b.authManager, token
 }
 
+func (b *bolt5) Telemetry(api telemetry.API, onSuccess func()) {
+	if b.telemetryEnabled && b.Version().Minor >= 4 {
+		b.queue.appendTelemetry(api.AsInt(), b.telemetryResponseHandler(func(*success) {
+			if onSuccess != nil {
+				onSuccess()
+			}
+		}))
+	}
+}
+
 func (b *bolt5) appendPullN(stream *stream) {
 	if b.state == bolt5Streaming {
 		b.queue.appendPullN(stream.fetchSize, b.pullResponseHandler(stream))
@@ -1092,6 +1104,10 @@ func (b *bolt5) resetResponseHandler() responseHandler {
 	}
 }
 
+func (b *bolt5) telemetryResponseHandler(onSuccess func(*success)) responseHandler {
+	return b.expectedSuccessHandler(onSuccess)
+}
+
 func (b *bolt5) expectedSuccessHandler(onSuccess func(*success)) responseHandler {
 	return responseHandler{
 		onSuccess: onSuccess,
@@ -1108,6 +1124,7 @@ func (b *bolt5) onHelloSuccess(helloSuccess *success) {
 	b.logId = connectionLogId
 	b.queue.setLogId(connectionLogId)
 	b.initializeReadTimeoutHint(helloSuccess.configurationHints)
+	b.initializeTelemetryHint(helloSuccess.configurationHints)
 }
 
 func (b *bolt5) onCommitSuccess(commitSuccess *success) {
@@ -1153,6 +1170,21 @@ func (b *bolt5) initializeReadTimeoutHint(hints map[string]any) {
 		return
 	}
 	b.queue.in.connReadTimeout = time.Duration(readTimeout) * time.Second
+}
+
+const readTelemetryHintName = "telemetry.enabled"
+
+func (b *bolt5) initializeTelemetryHint(hints map[string]any) {
+	readTelemetryHint, ok := hints[readTelemetryHintName]
+	if !ok {
+		return
+	}
+	readTelemetry, ok := readTelemetryHint.(bool)
+	if !ok {
+		b.log.Infof(log.Bolt5, b.logId, `invalid %q value: %v, ignoring hint. Only boolean values are accepted`, readTelemetryHintName, readTelemetryHint)
+		return
+	}
+	b.telemetryEnabled = readTelemetry
 }
 
 func (b *bolt5) extractSummary(success *success, stream *stream) *db.Summary {

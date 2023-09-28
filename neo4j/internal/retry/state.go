@@ -43,6 +43,7 @@ type State struct {
 	Throttle                Throttler
 	MaxDeadConnections      int
 	DatabaseName            string
+	TelemetrySent           bool
 
 	start      time.Time
 	cause      string
