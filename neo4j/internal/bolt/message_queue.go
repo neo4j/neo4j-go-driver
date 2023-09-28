@@ -130,6 +130,11 @@ func (q *messageQueue) appendGoodbye() {
 	// no response expected here
 }
 
+func (q *messageQueue) appendTelemetry(api int, handler responseHandler) {
+	q.out.appendTelemetry(api)
+	q.enqueueCallback(handler)
+}
+
 func (q *messageQueue) send(ctx context.Context) {
 	q.out.send(ctx, q.targetConnection)
 }

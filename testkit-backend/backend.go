@@ -519,6 +519,9 @@ func (b *backend) handleRequest(req map[string]any) {
 					c.NotificationsDisabledCategories = notifications.DisableCategories(cats...)
 				}
 			}
+			if data["telemetryDisabled"] != nil {
+				c.TelemetryDisabled = data["telemetryDisabled"].(bool)
+			}
 		})
 		if err != nil {
 			b.writeError(err)
@@ -1166,6 +1169,7 @@ func (b *backend) handleRequest(req map[string]any) {
 				"Feature:Bolt:5.1",
 				"Feature:Bolt:5.2",
 				"Feature:Bolt:5.3",
+				"Feature:Bolt:5.4",
 				"Feature:Bolt:Patch:UTC",
 				"Feature:Impersonation",
 				//"Feature:TLS:1.1",

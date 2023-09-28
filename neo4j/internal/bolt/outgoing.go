@@ -61,7 +61,7 @@ func (o *outgoing) appendHello(hello map[string]any) {
 		o.boltLogger.LogClientMessage(o.logId, "HELLO %s", loggableDictionary(hello))
 	}
 	o.begin()
-	o.packer.StructHeader(byte(msgHello), 1)
+	o.packer.StructHeader(msgHello, 1)
 	o.packMap(hello)
 	o.end()
 }
@@ -90,7 +90,7 @@ func (o *outgoing) appendBegin(meta map[string]any) {
 		o.boltLogger.LogClientMessage(o.logId, "BEGIN %s", loggableDictionary(meta))
 	}
 	o.begin()
-	o.packer.StructHeader(byte(msgBegin), 1)
+	o.packer.StructHeader(msgBegin, 1)
 	o.packMap(meta)
 	o.end()
 }
@@ -100,7 +100,7 @@ func (o *outgoing) appendCommit() {
 		o.boltLogger.LogClientMessage(o.logId, "COMMIT")
 	}
 	o.begin()
-	o.packer.StructHeader(byte(msgCommit), 0)
+	o.packer.StructHeader(msgCommit, 0)
 	o.end()
 }
 
@@ -109,7 +109,7 @@ func (o *outgoing) appendRollback() {
 		o.boltLogger.LogClientMessage(o.logId, "ROLLBACK")
 	}
 	o.begin()
-	o.packer.StructHeader(byte(msgRollback), 0)
+	o.packer.StructHeader(msgRollback, 0)
 	o.end()
 }
 
@@ -118,7 +118,7 @@ func (o *outgoing) appendRun(cypher string, params, meta map[string]any) {
 		o.boltLogger.LogClientMessage(o.logId, "RUN %q %s %s", cypher, loggableDictionary(params), loggableDictionary(meta))
 	}
 	o.begin()
-	o.packer.StructHeader(byte(msgRun), 3)
+	o.packer.StructHeader(msgRun, 3)
 	o.packer.String(cypher)
 	o.packMap(params)
 	o.packMap(meta)
@@ -130,7 +130,7 @@ func (o *outgoing) appendPullN(n int) {
 		o.boltLogger.LogClientMessage(o.logId, "PULL %s", loggableDictionary{"n": n})
 	}
 	o.begin()
-	o.packer.StructHeader(byte(msgPullN), 1)
+	o.packer.StructHeader(msgPullN, 1)
 	o.packer.MapHeader(1)
 	o.packer.String("n")
 	o.packer.Int(n)
@@ -142,7 +142,7 @@ func (o *outgoing) appendPullNQid(n int, qid int64) {
 		o.boltLogger.LogClientMessage(o.logId, "PULL %s", loggableDictionary{"n": n, "qid": qid})
 	}
 	o.begin()
-	o.packer.StructHeader(byte(msgPullN), 1)
+	o.packer.StructHeader(msgPullN, 1)
 	o.packer.MapHeader(2)
 	o.packer.String("n")
 	o.packer.Int(n)
@@ -156,7 +156,7 @@ func (o *outgoing) appendDiscardN(n int) {
 		o.boltLogger.LogClientMessage(o.logId, "DISCARD %s", loggableDictionary{"n": n})
 	}
 	o.begin()
-	o.packer.StructHeader(byte(msgDiscardN), 1)
+	o.packer.StructHeader(msgDiscardN, 1)
 	o.packer.MapHeader(1)
 	o.packer.String("n")
 	o.packer.Int(n)
@@ -168,7 +168,7 @@ func (o *outgoing) appendDiscardNQid(n int, qid int64) {
 		o.boltLogger.LogClientMessage(o.logId, "DISCARD %s", loggableDictionary{"n": n, "qid": qid})
 	}
 	o.begin()
-	o.packer.StructHeader(byte(msgDiscardN), 1)
+	o.packer.StructHeader(msgDiscardN, 1)
 	o.packer.MapHeader(2)
 	o.packer.String("n")
 	o.packer.Int(n)
@@ -182,7 +182,7 @@ func (o *outgoing) appendPullAll() {
 		o.boltLogger.LogClientMessage(o.logId, "PULL ALL")
 	}
 	o.begin()
-	o.packer.StructHeader(byte(msgPullAll), 0)
+	o.packer.StructHeader(msgPullAll, 0)
 	o.end()
 }
 
@@ -192,7 +192,7 @@ func (o *outgoing) appendRouteToV43(context map[string]string, bookmarks []strin
 		o.boltLogger.LogClientMessage(o.logId, "ROUTE %s %s %q", loggableStringDictionary(context), loggableStringList(bookmarks), database)
 	}
 	o.begin()
-	o.packer.StructHeader(byte(msgRoute), 3)
+	o.packer.StructHeader(msgRoute, 3)
 	o.packer.MapHeader(len(context))
 	for k, v := range context {
 		o.packer.String(k)
@@ -215,7 +215,7 @@ func (o *outgoing) appendRoute(context map[string]string, bookmarks []string, wh
 		o.boltLogger.LogClientMessage(o.logId, "ROUTE %s %s %s", loggableStringDictionary(context), loggableStringList(bookmarks), loggableDictionary(what))
 	}
 	o.begin()
-	o.packer.StructHeader(byte(msgRoute), 3)
+	o.packer.StructHeader(msgRoute, 3)
 	o.packer.MapHeader(len(context))
 	for k, v := range context {
 		o.packer.String(k)
@@ -234,7 +234,7 @@ func (o *outgoing) appendReset() {
 		o.boltLogger.LogClientMessage(o.logId, "RESET")
 	}
 	o.begin()
-	o.packer.StructHeader(byte(msgReset), 0)
+	o.packer.StructHeader(msgReset, 0)
 	o.end()
 }
 
@@ -243,7 +243,17 @@ func (o *outgoing) appendGoodbye() {
 		o.boltLogger.LogClientMessage(o.logId, "GOODBYE")
 	}
 	o.begin()
-	o.packer.StructHeader(byte(msgGoodbye), 0)
+	o.packer.StructHeader(msgGoodbye, 0)
+	o.end()
+}
+
+func (o *outgoing) appendTelemetry(api int) {
+	if o.boltLogger != nil {
+		o.boltLogger.LogClientMessage(o.logId, "TELEMETRY %d", api)
+	}
+	o.begin()
+	o.packer.StructHeader(msgTelemetry, 1)
+	o.packer.Int(api)
 	o.end()
 }
 
