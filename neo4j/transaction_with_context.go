@@ -75,9 +75,9 @@ func (tx *explicitTransaction) Run(ctx context.Context, cypher string, params ma
 		tx.runFailed = true
 		// TODO fixes test_should_prevent_discard_after_tx_termination_on_run
 		// TODO fixes test_should_prevent_pull_after_tx_termination_on_run
-		for _, r := range tx.results {
+		for _, result := range tx.results {
 			// TODO possibly replace err with the a new 'ResultInvalid' error
-			r.onTxError(err)
+			result.onTxError(err)
 		}
 		tx.onClosed(tx)
 		return nil, errorutil.WrapError(tx.err)
