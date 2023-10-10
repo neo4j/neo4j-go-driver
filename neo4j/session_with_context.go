@@ -352,8 +352,11 @@ func (s *sessionWithContext) BeginTransaction(ctx context.Context, configurers .
 			s.pool.Return(ctx, tx.conn)
 			tx.err = errorutil.CombineAllErrors(tx.err, bookmarkErr)
 			tx.conn = nil
+			// TODO not sure if clearing the results here is necessary.
+			tx.results = nil
 			s.explicitTx = nil
 		},
+		results: make([]ResultWithContext, 0),
 	}
 
 	return s.explicitTx, nil

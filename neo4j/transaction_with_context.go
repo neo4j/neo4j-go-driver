@@ -62,6 +62,7 @@ type explicitTransaction struct {
 	runFailed bool
 	err       error
 	onClosed  func(*explicitTransaction)
+	results   []ResultWithContext
 }
 
 func (tx *explicitTransaction) Run(ctx context.Context, cypher string, params map[string]any) (ResultWithContext, error) {
@@ -72,14 +73,32 @@ func (tx *explicitTransaction) Run(ctx context.Context, cypher string, params ma
 	if err != nil {
 		tx.err = err
 		tx.runFailed = true
+		// TODO fixes test_should_prevent_discard_after_tx_termination_on_run
+		// TODO fixes test_should_prevent_pull_after_tx_termination_on_run
+		for _, r := range tx.results {
+			// TODO possibly replace err with the a new 'ResultInvalid' error
+			r.onTxError(err)
+		}
 		tx.onClosed(tx)
 		return nil, errorutil.WrapError(tx.err)
 	}
 	// no result consumption hook here since bookmarks are sent after commit, not after pulling results
-	return newResultWithContext(tx.conn, stream, cypher, params, nil), nil
+	result := newResultWithContext(tx.conn, stream, cypher, params, nil)
+	tx.results = append(tx.results, result)
+	return result, nil
 }
 
 func (tx *explicitTransaction) Commit(ctx context.Context) error {
+	// TODO fixes test_should_prevent_commit_after_tx_termination # tx_error_on_run.script
+	if tx.err != nil {
+		return transactionAlreadyCompletedError()
+	}
+	// TODO fixes test_should_prevent_commit_after_tx_termination # tx_error_on_pull.script
+	for _, r := range tx.results {
+		if r.Err() != nil {
+			return transactionAlreadyCompletedError()
+		}
+	}
 	if tx.runFailed {
 		tx.runFailed = false
 		return tx.err

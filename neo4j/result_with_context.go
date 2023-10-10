@@ -57,6 +57,7 @@ type ResultWithContext interface {
 	IsOpen() bool
 	buffer(ctx context.Context)
 	legacy() Result
+	onTxError(err error)
 }
 
 const consumedResultError = "result cursor is not available anymore"
@@ -261,4 +262,8 @@ func (r *resultWithContext) callAfterConsumptionHook() {
 	}
 	r.afterConsumptionHook()
 	r.afterConsumptionHook = nil
+}
+
+func (r *resultWithContext) onTxError(err error) {
+	r.err = err
 }
