@@ -28,6 +28,10 @@ const (
 	Performance  NotificationCategory = "PERFORMANCE"
 	Deprecation  NotificationCategory = "DEPRECATION"
 	Generic      NotificationCategory = "GENERIC"
+	// Security requires server version 5.14 or newer.
+	Security NotificationCategory = "SECURITY"
+	// Topology requires server version 5.14 or newer.
+	Topology NotificationCategory = "TOPOLOGY"
 )
 
 type NotificationDisabledCategories struct {
