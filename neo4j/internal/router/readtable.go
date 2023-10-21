@@ -21,10 +21,10 @@ package router
 
 import (
 	"context"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/errorutil"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/pool"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/log"
+	"github.com/DaChartreux/neo4j-go-driver/v5/neo4j/internal/db"
+	"github.com/DaChartreux/neo4j-go-driver/v5/neo4j/internal/errorutil"
+	"github.com/DaChartreux/neo4j-go-driver/v5/neo4j/internal/pool"
+	"github.com/DaChartreux/neo4j-go-driver/v5/neo4j/log"
 )
 
 // Tries to read routing table from any of the specified routers using new or existing connection

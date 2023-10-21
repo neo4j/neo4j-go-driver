@@ -22,14 +22,14 @@ package router
 import (
 	"context"
 	"errors"
-	iauth "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/auth"
-	idb "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/errorutil"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/log"
+	iauth "github.com/DaChartreux/neo4j-go-driver/v5/neo4j/internal/auth"
+	idb "github.com/DaChartreux/neo4j-go-driver/v5/neo4j/internal/db"
+	"github.com/DaChartreux/neo4j-go-driver/v5/neo4j/internal/errorutil"
+	"github.com/DaChartreux/neo4j-go-driver/v5/neo4j/log"
 	"testing"
 
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/db"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/testutil"
+	"github.com/DaChartreux/neo4j-go-driver/v5/neo4j/db"
+	"github.com/DaChartreux/neo4j-go-driver/v5/neo4j/internal/testutil"
 )
 
 func TestReadTableTable(ot *testing.T) {

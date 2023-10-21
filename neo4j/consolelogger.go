@@ -20,7 +20,7 @@
 package neo4j
 
 import (
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/log"
+	"github.com/DaChartreux/neo4j-go-driver/v5/neo4j/log"
 )
 
 // LogLevel is the type that default logging implementations use for available

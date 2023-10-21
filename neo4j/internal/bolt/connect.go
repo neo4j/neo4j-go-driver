@@ -23,13 +23,13 @@ package bolt
 import (
 	"context"
 	"fmt"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/errorutil"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/racing"
+	"github.com/DaChartreux/neo4j-go-driver/v5/neo4j/internal/db"
+	"github.com/DaChartreux/neo4j-go-driver/v5/neo4j/internal/errorutil"
+	"github.com/DaChartreux/neo4j-go-driver/v5/neo4j/internal/racing"
 	"net"
 	"time"
 
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/log"
+	"github.com/DaChartreux/neo4j-go-driver/v5/neo4j/log"
 )
 
 type protocolVersion struct {

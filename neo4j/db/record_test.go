@@ -20,8 +20,8 @@
 package db_test
 
 import (
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/db"
-	. "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/testutil"
+	"github.com/DaChartreux/neo4j-go-driver/v5/neo4j/db"
+	. "github.com/DaChartreux/neo4j-go-driver/v5/neo4j/internal/testutil"
 	"testing"
 	"testing/quick"
 )

@@ -1,3 +1,5 @@
+//go:build internal_testkit
+
 /*
  * Copyright (c) "Neo4j"
  * Neo4j Sweden AB [https://neo4j.com]
@@ -17,11 +19,9 @@
  * limitations under the License.
  */
 
-//go:build internal_testkit
-
 package router
 
-import idb "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
+import idb "github.com/DaChartreux/neo4j-go-driver/v5/neo4j/internal/db"
 
 func (r *Router) GetTable(database string) *idb.RoutingTable {
 	return r.getTable(database)

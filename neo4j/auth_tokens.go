@@ -19,7 +19,7 @@
 
 package neo4j
 
-import "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/auth"
+import "github.com/DaChartreux/neo4j-go-driver/v5/neo4j/internal/auth"
 
 // AuthToken contains credentials to be sent over to the neo4j server.
 type AuthToken = auth.Token

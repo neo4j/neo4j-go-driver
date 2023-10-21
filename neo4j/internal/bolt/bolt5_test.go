@@ -22,17 +22,17 @@ package bolt
 import (
 	"context"
 	"fmt"
-	iauth "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/auth"
-	idb "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/notifications"
+	iauth "github.com/DaChartreux/neo4j-go-driver/v5/neo4j/internal/auth"
+	idb "github.com/DaChartreux/neo4j-go-driver/v5/neo4j/internal/db"
+	"github.com/DaChartreux/neo4j-go-driver/v5/neo4j/notifications"
 	"io"
 	"reflect"
 	"sync"
 	"testing"
 	"time"
 
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/db"
-	. "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/testutil"
+	"github.com/DaChartreux/neo4j-go-driver/v5/neo4j/db"
+	. "github.com/DaChartreux/neo4j-go-driver/v5/neo4j/internal/testutil"
 )
 
 // bolt5.Connect is tested through Connect, no need to test it here

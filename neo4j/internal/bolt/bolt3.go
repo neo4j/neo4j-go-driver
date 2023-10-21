@@ -23,18 +23,18 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/auth"
-	iauth "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/auth"
-	idb "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/errorutil"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/telemetry"
+	"github.com/DaChartreux/neo4j-go-driver/v5/neo4j/auth"
+	iauth "github.com/DaChartreux/neo4j-go-driver/v5/neo4j/internal/auth"
+	idb "github.com/DaChartreux/neo4j-go-driver/v5/neo4j/internal/db"
+	"github.com/DaChartreux/neo4j-go-driver/v5/neo4j/internal/errorutil"
+	"github.com/DaChartreux/neo4j-go-driver/v5/neo4j/internal/telemetry"
 	"net"
 	"reflect"
 	"time"
 
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/db"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/packstream"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/log"
+	"github.com/DaChartreux/neo4j-go-driver/v5/neo4j/db"
+	"github.com/DaChartreux/neo4j-go-driver/v5/neo4j/internal/packstream"
+	"github.com/DaChartreux/neo4j-go-driver/v5/neo4j/log"
 )
 
 const (

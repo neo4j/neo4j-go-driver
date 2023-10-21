@@ -27,7 +27,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/packstream"
+	"github.com/DaChartreux/neo4j-go-driver/v5/neo4j/internal/packstream"
 )
 
 // Fake of bolt4 server.

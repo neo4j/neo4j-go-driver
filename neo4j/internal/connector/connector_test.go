@@ -21,11 +21,11 @@ package connector_test
 
 import (
 	"context"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/config"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/db"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/connector"
-	idb "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
-	. "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/testutil"
+	"github.com/DaChartreux/neo4j-go-driver/v5/neo4j/config"
+	"github.com/DaChartreux/neo4j-go-driver/v5/neo4j/db"
+	"github.com/DaChartreux/neo4j-go-driver/v5/neo4j/internal/connector"
+	idb "github.com/DaChartreux/neo4j-go-driver/v5/neo4j/internal/db"
+	. "github.com/DaChartreux/neo4j-go-driver/v5/neo4j/internal/testutil"
 	"io"
 	"net"
 	"testing"

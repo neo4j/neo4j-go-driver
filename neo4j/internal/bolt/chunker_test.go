@@ -25,7 +25,7 @@ import (
 	"net"
 	"testing"
 
-	. "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/testutil"
+	. "github.com/DaChartreux/neo4j-go-driver/v5/neo4j/internal/testutil"
 )
 
 func TestChunker(ot *testing.T) {

@@ -22,8 +22,8 @@ package neo4j
 import (
 	"time"
 
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/db"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/dbtype"
+	"github.com/DaChartreux/neo4j-go-driver/v5/neo4j/db"
+	"github.com/DaChartreux/neo4j-go-driver/v5/neo4j/dbtype"
 )
 
 // Aliases to simplify client usage (fewer imports) and to provide some backwards

@@ -23,8 +23,8 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/router"
-	. "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/testutil"
+	"github.com/DaChartreux/neo4j-go-driver/v5/neo4j/internal/router"
+	. "github.com/DaChartreux/neo4j-go-driver/v5/neo4j/internal/testutil"
 )
 
 func assertNoRouter(t *testing.T, d Driver) {

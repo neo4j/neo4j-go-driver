@@ -22,7 +22,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/dbtype"
+	"github.com/DaChartreux/neo4j-go-driver/v5/neo4j/dbtype"
 	"time"
 )
 

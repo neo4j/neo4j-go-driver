@@ -29,7 +29,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/db"
+	"github.com/DaChartreux/neo4j-go-driver/v5/neo4j/db"
 )
 
 func AssertNextOnlyRecord(t *testing.T, rec *db.Record, sum *db.Summary, err error) {

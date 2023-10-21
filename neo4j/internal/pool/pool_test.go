@@ -22,19 +22,19 @@ package pool
 import (
 	"context"
 	"errors"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/config"
-	db "github.com/neo4j/neo4j-go-driver/v5/neo4j/db"
-	iauth "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/auth"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/bolt"
-	idb "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/errorutil"
+	"github.com/DaChartreux/neo4j-go-driver/v5/neo4j/config"
+	db "github.com/DaChartreux/neo4j-go-driver/v5/neo4j/db"
+	iauth "github.com/DaChartreux/neo4j-go-driver/v5/neo4j/internal/auth"
+	"github.com/DaChartreux/neo4j-go-driver/v5/neo4j/internal/bolt"
+	idb "github.com/DaChartreux/neo4j-go-driver/v5/neo4j/internal/db"
+	"github.com/DaChartreux/neo4j-go-driver/v5/neo4j/internal/errorutil"
 	"math/rand"
 	"sync"
 	"testing"
 	"time"
 
-	. "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/testutil"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/log"
+	. "github.com/DaChartreux/neo4j-go-driver/v5/neo4j/internal/testutil"
+	"github.com/DaChartreux/neo4j-go-driver/v5/neo4j/log"
 )
 
 var logger = &log.Void{}

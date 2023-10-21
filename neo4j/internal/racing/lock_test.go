@@ -2,8 +2,8 @@ package racing_test
 
 import (
 	"context"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/racing"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/testutil"
+	"github.com/DaChartreux/neo4j-go-driver/v5/neo4j/internal/racing"
+	"github.com/DaChartreux/neo4j-go-driver/v5/neo4j/internal/testutil"
 	"testing"
 	"time"
 )
