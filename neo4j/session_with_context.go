@@ -343,6 +343,7 @@ func (s *sessionWithContext) BeginTransaction(ctx context.Context, configurers .
 		conn:      conn,
 		fetchSize: s.fetchSize,
 		txHandle:  txHandle,
+		txState:   newTransactionState(),
 		onClosed: func(tx *explicitTransaction) {
 			if tx.conn == nil {
 				return
@@ -350,13 +351,10 @@ func (s *sessionWithContext) BeginTransaction(ctx context.Context, configurers .
 			// On run failure, transaction closed (rolled back or committed)
 			bookmarkErr := s.retrieveBookmarks(ctx, tx.conn, beginBookmarks)
 			s.pool.Return(ctx, tx.conn)
-			tx.err = errorutil.CombineAllErrors(tx.err, bookmarkErr)
+			tx.txState.err = errorutil.CombineAllErrors(tx.txState.err, bookmarkErr)
 			tx.conn = nil
-			// TODO not sure if clearing the results here is necessary.
-			tx.results = nil
 			s.explicitTx = nil
 		},
-		results: make([]ResultWithContext, 0),
 	}
 
 	return s.explicitTx, nil
@@ -483,7 +481,7 @@ func (s *sessionWithContext) executeTransactionFunction(
 		return false, nil
 	}
 
-	tx := managedTransaction{conn: conn, fetchSize: s.fetchSize, txHandle: txHandle}
+	tx := managedTransaction{conn: conn, fetchSize: s.fetchSize, txHandle: txHandle, txState: newTransactionState()}
 	x, err := work(&tx)
 	if err != nil {
 		// If the client returns a client specific error that means that
@@ -647,7 +645,7 @@ func (s *sessionWithContext) Run(ctx context.Context,
 
 	s.autocommitTx = &autocommitTransaction{
 		conn: conn,
-		res: newResultWithContext(conn, stream, cypher, params, func() {
+		res: newResultWithContext(conn, stream, cypher, params, newTransactionState(), func() {
 			if err := s.retrieveBookmarks(ctx, conn, runBookmarks); err != nil {
 				s.log.Warnf(log.Session, s.logId, "could not retrieve bookmarks after result consumption: %s\n"+
 					"the result of the initiating auto-commit transaction may not be visible to subsequent operations", err.Error())

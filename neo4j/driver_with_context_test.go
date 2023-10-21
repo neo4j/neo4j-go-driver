@@ -651,10 +651,6 @@ type fakeResult struct {
 	summaryErr  error
 }
 
-func (f *fakeResult) onTxError(err error) {
-	panic("implement me")
-}
-
 func (f *fakeResult) Keys() ([]string, error) {
 	return f.keys, f.keysErr
 }
@@ -711,6 +707,10 @@ func (f *fakeResult) buffer(context.Context) {
 }
 
 func (f *fakeResult) legacy() Result {
+	panic("implement me")
+}
+
+func (f *fakeResult) errorHandler(err error) {
 	panic("implement me")
 }
 

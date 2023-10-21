@@ -57,10 +57,12 @@ type ResultWithContext interface {
 	IsOpen() bool
 	buffer(ctx context.Context)
 	legacy() Result
-	onTxError(err error)
+	errorHandler(err error)
 }
 
 const consumedResultError = "result cursor is not available anymore"
+
+const resultFailedError = "result failed due to invalid transaction"
 
 type resultWithContext struct {
 	conn                 idb.Connection
@@ -73,15 +75,23 @@ type resultWithContext struct {
 	peekedRecord         *Record
 	peekedSummary        *db.Summary
 	peeked               bool
+	txState              *transactionState
 	afterConsumptionHook func()
 }
 
-func newResultWithContext(connection idb.Connection, stream idb.StreamHandle, cypher string, params map[string]any, afterConsumptionHook func()) ResultWithContext {
+func newResultWithContext(
+	connection idb.Connection,
+	stream idb.StreamHandle,
+	cypher string,
+	params map[string]any,
+	txState *transactionState,
+	afterConsumptionHook func()) ResultWithContext {
 	return &resultWithContext{
 		conn:                 connection,
 		streamHandle:         stream,
 		cypher:               cypher,
 		params:               params,
+		txState:              txState,
 		afterConsumptionHook: afterConsumptionHook,
 	}
 }
@@ -99,6 +109,9 @@ func (r *resultWithContext) NextRecord(ctx context.Context, out **Record) bool {
 }
 
 func (r *resultWithContext) Next(ctx context.Context) bool {
+	if r.txState.err != nil {
+		r.err = &UsageError{Message: resultFailedError}
+	}
 	r.checkOpen()
 	if r.err != nil {
 		return false
@@ -119,6 +132,9 @@ func (r *resultWithContext) PeekRecord(ctx context.Context, out **Record) bool {
 }
 
 func (r *resultWithContext) Peek(ctx context.Context) bool {
+	if r.txState.err != nil {
+		r.err = &UsageError{Message: resultFailedError}
+	}
 	r.checkOpen()
 	if r.err != nil {
 		return false
@@ -132,6 +148,9 @@ func (r *resultWithContext) Err() error {
 }
 
 func (r *resultWithContext) Record() *Record {
+	if r.txState.err != nil {
+		r.err = &UsageError{Message: resultFailedError}
+	}
 	if r.peekedRecord != nil {
 		return r.peekedRecord
 	}
@@ -139,6 +158,10 @@ func (r *resultWithContext) Record() *Record {
 }
 
 func (r *resultWithContext) Collect(ctx context.Context) ([]*Record, error) {
+	if r.txState.err != nil {
+		r.err = &UsageError{Message: resultFailedError}
+		return nil, r.err
+	}
 	recs := make([]*Record, 0, 1024)
 	for r.summary == nil && r.err == nil {
 		r.advance(ctx)
@@ -154,6 +177,10 @@ func (r *resultWithContext) Collect(ctx context.Context) ([]*Record, error) {
 }
 
 func (r *resultWithContext) Single(ctx context.Context) (*Record, error) {
+	if r.txState.err != nil {
+		r.err = &UsageError{Message: resultFailedError}
+		return nil, r.err
+	}
 	// Try retrieving the single record
 	r.advance(ctx)
 	if r.err != nil {
@@ -190,6 +217,11 @@ func (r *resultWithContext) Single(ctx context.Context) (*Record, error) {
 }
 
 func (r *resultWithContext) Consume(ctx context.Context) (ResultSummary, error) {
+	if r.txState.err != nil {
+		r.err = &UsageError{Message: resultFailedError}
+		return nil, r.err
+	}
+
 	// Already failed, reuse the internal error, might have been
 	// set by Single to indicate some kind of usage error that "destroyed"
 	// the result.
@@ -264,6 +296,6 @@ func (r *resultWithContext) callAfterConsumptionHook() {
 	r.afterConsumptionHook = nil
 }
 
-func (r *resultWithContext) onTxError(err error) {
+func (r *resultWithContext) errorHandler(err error) {
 	r.err = err
 }
