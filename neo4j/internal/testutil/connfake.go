@@ -21,14 +21,14 @@ package testutil
 
 import (
 	"context"
-	"github.com/DaChartreux/neo4j-go-driver/v5/neo4j/auth"
-	iauth "github.com/DaChartreux/neo4j-go-driver/v5/neo4j/internal/auth"
-	idb "github.com/DaChartreux/neo4j-go-driver/v5/neo4j/internal/db"
-	"github.com/DaChartreux/neo4j-go-driver/v5/neo4j/internal/telemetry"
-	"github.com/DaChartreux/neo4j-go-driver/v5/neo4j/log"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/auth"
+	iauth "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/auth"
+	idb "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/telemetry"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/log"
 	"time"
 
-	"github.com/DaChartreux/neo4j-go-driver/v5/neo4j/db"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/db"
 )
 
 type Next struct {

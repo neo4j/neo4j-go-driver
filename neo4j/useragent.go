@@ -20,7 +20,7 @@
 package neo4j
 
 import (
-	"github.com/DaChartreux/neo4j-go-driver/v5/neo4j/internal/metadata"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/metadata"
 )
 
 const UserAgent = "Go Driver/" + metadata.DriverVersion

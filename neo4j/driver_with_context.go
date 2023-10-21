@@ -23,19 +23,19 @@ package neo4j
 import (
 	"context"
 	"fmt"
-	"github.com/DaChartreux/neo4j-go-driver/v5/neo4j/auth"
-	idb "github.com/DaChartreux/neo4j-go-driver/v5/neo4j/internal/db"
-	"github.com/DaChartreux/neo4j-go-driver/v5/neo4j/internal/errorutil"
-	"github.com/DaChartreux/neo4j-go-driver/v5/neo4j/internal/racing"
-	"github.com/DaChartreux/neo4j-go-driver/v5/neo4j/log"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/auth"
+	idb "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/errorutil"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/racing"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/log"
 	"net/url"
 	"strings"
 	"sync"
 	"time"
 
-	"github.com/DaChartreux/neo4j-go-driver/v5/neo4j/internal/connector"
-	"github.com/DaChartreux/neo4j-go-driver/v5/neo4j/internal/pool"
-	"github.com/DaChartreux/neo4j-go-driver/v5/neo4j/internal/router"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/connector"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/pool"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/router"
 )
 
 // AccessMode defines modes that routing driver decides to which cluster member

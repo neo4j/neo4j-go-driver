@@ -22,7 +22,7 @@ package bolt
 import (
 	"fmt"
 
-	"github.com/DaChartreux/neo4j-go-driver/v5/neo4j/internal/packstream"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/packstream"
 )
 
 type testStruct struct {

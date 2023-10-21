@@ -19,7 +19,7 @@ Make sure your application has been set up to use go modules (there should be a 
 Add the driver with:
 
 ```shell
-go get github.com/DaChartreux/neo4j-go-driver/v5
+go get github.com/neo4j/neo4j-go-driver/v5
 ```
 
 #### 4.x
@@ -41,7 +41,7 @@ go get github.com/neo4j/neo4j-go-driver
 ## Documentation
 
 Drivers manual that describes general driver concepts in depth [here](https://neo4j.com/docs/go-manual/current/).
-Go package API documentation [here](https://pkg.go.dev/github.com/DaChartreux/neo4j-go-driver/v5/neo4j).
+Go package API documentation [here](https://pkg.go.dev/github.com/neo4j/neo4j-go-driver/v5/neo4j).
 
 ## Preview Features
 
@@ -80,7 +80,7 @@ package main
 import (
     "context"
     "fmt"
-    "github.com/DaChartreux/neo4j-go-driver/v5/neo4j"
+    "github.com/neo4j/neo4j-go-driver/v5/neo4j"
 )
 
 func main() {

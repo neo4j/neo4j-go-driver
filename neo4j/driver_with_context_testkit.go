@@ -1,5 +1,3 @@
-//go:build internal_testkit
-
 /*
  * Copyright (c) "Neo4j"
  * Neo4j Sweden AB [https://neo4j.com]
@@ -19,15 +17,17 @@
  * limitations under the License.
  */
 
+//go:build internal_testkit
+
 package neo4j
 
 import (
 	"context"
 	"fmt"
-	idb "github.com/DaChartreux/neo4j-go-driver/v5/neo4j/internal/db"
-	"github.com/DaChartreux/neo4j-go-driver/v5/neo4j/internal/errorutil"
-	"github.com/DaChartreux/neo4j-go-driver/v5/neo4j/internal/router"
-	"github.com/DaChartreux/neo4j-go-driver/v5/neo4j/log"
+	idb "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/errorutil"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/router"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/log"
 	"time"
 )
 

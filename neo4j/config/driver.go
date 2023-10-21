@@ -22,8 +22,8 @@ package config
 import (
 	"crypto/tls"
 	"crypto/x509"
-	"github.com/DaChartreux/neo4j-go-driver/v5/neo4j/log"
-	"github.com/DaChartreux/neo4j-go-driver/v5/neo4j/notifications"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/log"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/notifications"
 	"time"
 )
 

@@ -22,16 +22,16 @@ package retry
 import (
 	"context"
 	"errors"
-	idb "github.com/DaChartreux/neo4j-go-driver/v5/neo4j/internal/db"
-	"github.com/DaChartreux/neo4j-go-driver/v5/neo4j/internal/errorutil"
+	idb "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/errorutil"
 	"io"
 	"reflect"
 	"testing"
 	"time"
 
-	"github.com/DaChartreux/neo4j-go-driver/v5/neo4j/db"
-	"github.com/DaChartreux/neo4j-go-driver/v5/neo4j/internal/testutil"
-	"github.com/DaChartreux/neo4j-go-driver/v5/neo4j/log"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/db"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/testutil"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/log"
 )
 
 type TStateInvocation struct {

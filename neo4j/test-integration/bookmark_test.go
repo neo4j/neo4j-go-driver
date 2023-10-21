@@ -24,8 +24,8 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/DaChartreux/neo4j-go-driver/v5/neo4j"
-	"github.com/DaChartreux/neo4j-go-driver/v5/neo4j/test-integration/dbserver"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/test-integration/dbserver"
 )
 
 func TestBookmark(outer *testing.T) {

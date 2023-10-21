@@ -2,9 +2,9 @@ package test_integration
 
 import (
 	"context"
-	"github.com/DaChartreux/neo4j-go-driver/v5/neo4j"
-	"github.com/DaChartreux/neo4j-go-driver/v5/neo4j/config"
-	"github.com/DaChartreux/neo4j-go-driver/v5/neo4j/test-integration/dbserver"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/config"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/test-integration/dbserver"
 	"testing"
 )
 

@@ -21,13 +21,13 @@ package bolt
 
 import (
 	"context"
-	iauth "github.com/DaChartreux/neo4j-go-driver/v5/neo4j/internal/auth"
-	idb "github.com/DaChartreux/neo4j-go-driver/v5/neo4j/internal/db"
+	iauth "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/auth"
+	idb "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
 	"testing"
 	"time"
 
-	. "github.com/DaChartreux/neo4j-go-driver/v5/neo4j/internal/testutil"
-	"github.com/DaChartreux/neo4j-go-driver/v5/neo4j/log"
+	. "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/testutil"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/log"
 )
 
 var logger = &log.Void{}

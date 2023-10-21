@@ -24,12 +24,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	idb "github.com/DaChartreux/neo4j-go-driver/v5/neo4j/internal/db"
-	"github.com/DaChartreux/neo4j-go-driver/v5/neo4j/internal/errorutil"
+	idb "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/errorutil"
 	"time"
 
-	"github.com/DaChartreux/neo4j-go-driver/v5/neo4j/db"
-	"github.com/DaChartreux/neo4j-go-driver/v5/neo4j/log"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/db"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/log"
 )
 
 type State struct {

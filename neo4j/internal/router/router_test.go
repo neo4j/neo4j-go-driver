@@ -23,14 +23,14 @@ package router
 import (
 	"context"
 	"errors"
-	"github.com/DaChartreux/neo4j-go-driver/v5/neo4j/internal/db"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
 	"reflect"
 	"sync"
 	"testing"
 	"time"
 
-	"github.com/DaChartreux/neo4j-go-driver/v5/neo4j/internal/testutil"
-	"github.com/DaChartreux/neo4j-go-driver/v5/neo4j/log"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/testutil"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/log"
 )
 
 var logger = &log.Void{}

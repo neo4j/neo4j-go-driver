@@ -22,8 +22,8 @@ package neo4j
 import (
 	"errors"
 	"fmt"
-	"github.com/DaChartreux/neo4j-go-driver/v5/neo4j/db"
-	"github.com/DaChartreux/neo4j-go-driver/v5/neo4j/internal/errorutil"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/db"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/errorutil"
 	"testing"
 )
 

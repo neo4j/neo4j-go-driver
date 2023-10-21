@@ -19,7 +19,7 @@
 
 package db
 
-import "github.com/DaChartreux/neo4j-go-driver/v5/neo4j/auth"
+import "github.com/neo4j/neo4j-go-driver/v5/neo4j/auth"
 
 type ReAuthToken struct {
 	Manager     auth.TokenManager

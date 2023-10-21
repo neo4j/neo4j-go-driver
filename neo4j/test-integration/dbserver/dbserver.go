@@ -23,12 +23,12 @@ package dbserver
 import (
 	"context"
 	"fmt"
-	"github.com/DaChartreux/neo4j-go-driver/v5/neo4j/config"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/config"
 	"os"
 	"strconv"
 	"sync"
 
-	"github.com/DaChartreux/neo4j-go-driver/v5/neo4j"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
 )
 
 var (

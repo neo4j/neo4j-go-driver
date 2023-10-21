@@ -25,8 +25,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/DaChartreux/neo4j-go-driver/v5/neo4j/config"
-	"github.com/DaChartreux/neo4j-go-driver/v5/neo4j/notifications"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/config"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/notifications"
 	"io"
 	"math"
 	"net/url"
@@ -35,9 +35,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/DaChartreux/neo4j-go-driver/v5/neo4j"
-	"github.com/DaChartreux/neo4j-go-driver/v5/neo4j/auth"
-	"github.com/DaChartreux/neo4j-go-driver/v5/neo4j/db"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/auth"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/db"
 )
 
 // Handles a testkit backend session.

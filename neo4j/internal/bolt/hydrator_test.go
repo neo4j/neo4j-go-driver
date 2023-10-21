@@ -25,11 +25,11 @@ import (
 	"testing"
 	"time"
 
-	idb "github.com/DaChartreux/neo4j-go-driver/v5/neo4j/internal/db"
+	idb "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
 
-	"github.com/DaChartreux/neo4j-go-driver/v5/neo4j/db"
-	"github.com/DaChartreux/neo4j-go-driver/v5/neo4j/dbtype"
-	"github.com/DaChartreux/neo4j-go-driver/v5/neo4j/internal/packstream"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/db"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/dbtype"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/packstream"
 )
 
 type hydratorTestCase struct {

@@ -21,7 +21,7 @@ package auth
 
 import (
 	"context"
-	"github.com/DaChartreux/neo4j-go-driver/v5/neo4j/db"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/db"
 )
 
 type Token struct {
