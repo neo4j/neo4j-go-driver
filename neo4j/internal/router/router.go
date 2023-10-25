@@ -183,7 +183,7 @@ func (r *Router) getOrUpdateTable(ctx context.Context, bookmarksFn func(context.
 		*unlock = sync.Once{}
 		// notify all waiters
 		for _, waiter := range r.updating[database] {
-			waiter <- struct{}{}
+			close(waiter)
 		}
 		delete(r.updating, database)
 		return table, err
