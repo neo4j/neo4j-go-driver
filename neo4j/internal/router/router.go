@@ -60,7 +60,7 @@ type Pool interface {
 	// If all connections are busy and the pool is full, calls to Borrow may wait for a connection to become idle
 	// If a connection has been idle for longer than idlenessThreshold, it will be reset
 	// to check if it's still alive.
-	Borrow(ctx context.Context, getServers func() []string, wait bool, boltLogger log.BoltLogger, idlenessThreshold time.Duration, auth *idb.ReAuthToken) (idb.Connection, error)
+	Borrow(ctx context.Context, getServers func(context.Context) ([]string, error), wait bool, boltLogger log.BoltLogger, idlenessThreshold time.Duration, auth *idb.ReAuthToken) (idb.Connection, error)
 	Return(ctx context.Context, c idb.Connection)
 }
 
@@ -156,7 +156,7 @@ func (r *Router) getOrUpdateTable(ctx context.Context, bookmarksFn func(context.
 	defer unlock.Do(r.dbRoutersMut.Unlock)
 	for {
 		dbRouter := r.dbRouters[database]
-		if table := r.getTableLocked(dbRouter); table != nil {
+		if table := r.getTableIfFreshLocked(dbRouter); table != nil {
 			return table, nil
 		}
 		waiters, ok := r.updating[database]
@@ -190,7 +190,19 @@ func (r *Router) getOrUpdateTable(ctx context.Context, bookmarksFn func(context.
 	}
 }
 
+// Keep using the routing table for up to 30 seconds after it expires.
+// This gives the driver time to hopefully get a new routing table in the meantime.
+const ttlBuffer = (int64)(30 * time.Second)
+
 func (r *Router) getTableLocked(dbRouter *databaseRouter) *idb.RoutingTable {
+	now := (*r.now)()
+	if dbRouter != nil && now.Unix() < dbRouter.dueUnix+ttlBuffer {
+		return dbRouter.table
+	}
+	return nil
+}
+
+func (r *Router) getTableIfFreshLocked(dbRouter *databaseRouter) *idb.RoutingTable {
 	now := (*r.now)()
 	if dbRouter != nil && now.Unix() < dbRouter.dueUnix {
 		return dbRouter.table

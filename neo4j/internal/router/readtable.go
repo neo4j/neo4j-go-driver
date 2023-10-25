@@ -49,10 +49,6 @@ func readTable(
 	for _, router := range routers {
 		var conn db.Connection
 		if conn, err = connectionPool.Borrow(ctx, getStaticServer(router), true, boltLogger, pool.DefaultLivenessCheckThreshold, auth); err != nil {
-			// Check if failed due to context timing out
-			if ctx.Err() != nil {
-				return nil, wrapError(router, ctx.Err())
-			}
 			if errorutil.IsFatalDuringDiscovery(err) {
 				return nil, err
 			}
@@ -75,8 +71,8 @@ func readTable(
 	return nil, err
 }
 
-func getStaticServer(server string) func() []string {
-	return func() []string {
-		return []string{server}
+func getStaticServer(server string) func(context.Context) ([]string, error) {
+	return func(context.Context) ([]string, error) {
+		return []string{server}, nil
 	}
 }

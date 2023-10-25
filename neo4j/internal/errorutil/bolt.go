@@ -21,6 +21,7 @@ package errorutil
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	idb "github.com/neo4j/neo4j-go-driver/v5/neo4j/db"
 	"strings"
@@ -81,7 +82,7 @@ type timeout interface {
 }
 
 func IsTimeoutError(err error) bool {
-	if err == context.DeadlineExceeded {
+	if errors.Is(err, context.DeadlineExceeded) {
 		return true
 	}
 	timeoutErr, ok := err.(timeout)
@@ -89,25 +90,27 @@ func IsTimeoutError(err error) bool {
 }
 
 func IsFatalDuringDiscovery(err error) bool {
-	if _, ok := err.(*idb.FeatureNotSupportedError); ok {
+	var featureNotSupportedError *idb.FeatureNotSupportedError
+	if errors.As(err, &featureNotSupportedError) {
 		return true
 	}
-	if err, ok := err.(*idb.Neo4jError); ok {
-		if err.Code == "Neo.ClientError.Database.DatabaseNotFound" ||
-			err.Code == "Neo.ClientError.Transaction.InvalidBookmark" ||
-			err.Code == "Neo.ClientError.Transaction.InvalidBookmarkMixture" ||
-			err.Code == "Neo.ClientError.Statement.TypeError" ||
-			err.Code == "Neo.ClientError.Statement.ArgumentError" ||
-			err.Code == "Neo.ClientError.Request.Invalid" {
+	var neo4jErr *idb.Neo4jError
+	if errors.As(err, &neo4jErr) {
+		if neo4jErr.Code == "Neo.ClientError.Database.DatabaseNotFound" ||
+			neo4jErr.Code == "Neo.ClientError.Transaction.InvalidBookmark" ||
+			neo4jErr.Code == "Neo.ClientError.Transaction.InvalidBookmarkMixture" ||
+			neo4jErr.Code == "Neo.ClientError.Statement.TypeError" ||
+			neo4jErr.Code == "Neo.ClientError.Statement.ArgumentError" ||
+			neo4jErr.Code == "Neo.ClientError.Request.Invalid" {
 			return true
 		}
-		if strings.HasPrefix(err.Code, "Neo.ClientError.Security.") &&
-			err.Code != "Neo.ClientError.Security.AuthorizationExpired" {
+		if strings.HasPrefix(neo4jErr.Code, "Neo.ClientError.Security.") &&
+			neo4jErr.Code != "Neo.ClientError.Security.AuthorizationExpired" {
 			return true
 		}
 	}
-	if err == context.DeadlineExceeded ||
-		err == context.Canceled {
+	if errors.Is(err, context.DeadlineExceeded) ||
+		errors.Is(err, context.Canceled) {
 		return true
 	}
 	return false

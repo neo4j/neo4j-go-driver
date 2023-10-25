@@ -673,9 +673,9 @@ func deadConnectionAfterForceReset(name string, idleness time.Time) *ConnFake {
 	return result
 }
 
-func getServers(servers []string) func() []string {
-	return func() []string {
-		return servers
+func getServers(servers []string) func(context.Context) ([]string, error) {
+	return func(context.Context) ([]string, error) {
+		return servers, nil
 	}
 }
 
