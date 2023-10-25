@@ -266,6 +266,8 @@ const (
 	Performance     NotificationCategory = "PERFORMANCE"
 	Deprecation     NotificationCategory = "DEPRECATION"
 	Generic         NotificationCategory = "GENERIC"
+	Security        NotificationCategory = "SECURITY"
+	Topology        NotificationCategory = "TOPOLOGY"
 	UnknownCategory NotificationCategory = "UNKNOWN"
 )
 
@@ -565,6 +567,10 @@ func (n *notification) Category() NotificationCategory {
 		return Performance
 	case "DEPRECATION":
 		return Deprecation
+	case "SECURITY":
+		return Security
+	case "TOPOLOGY":
+		return Topology
 	case "GENERIC":
 		return Generic
 	default:
