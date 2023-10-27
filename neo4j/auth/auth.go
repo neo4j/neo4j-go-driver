@@ -38,9 +38,6 @@ import (
 //
 //	The manager *must not* interact with the driver in any way as this can cause deadlocks and undefined behaviour.
 //	Furthermore, the manager is expected to be thread-safe.
-//
-// TokenManager is part of the re-authentication preview feature
-// (see README on what it means in terms of support and compatibility guarantees)
 type TokenManager interface {
 	// GetAuthToken retrieves an auth.Token or returns an error if the retrieval fails.
 	// auth.Token can be created with built-in functions such as:
@@ -115,9 +112,6 @@ func (m *neo4jAuthTokenManager) HandleSecurityException(ctx context.Context, tok
 //
 // The provider function must only ever return auth information belonging to the same identity.
 // Switching identities is undefined behavior.
-//
-// BasicTokenManager is part of the re-authentication preview feature
-// (see README on what it means in terms of support and compatibility guarantees)
 func BasicTokenManager(provider authTokenProvider) TokenManager {
 	now := time.Now
 	return &neo4jAuthTokenManager{
@@ -142,9 +136,6 @@ func BasicTokenManager(provider authTokenProvider) TokenManager {
 //
 // The provider function must only ever return auth information belonging to the same identity.
 // Switching identities is undefined behavior.
-//
-// BearerTokenManager is part of the re-authentication preview feature
-// (see README on what it means in terms of support and compatibility guarantees)
 func BearerTokenManager(provider authTokenWithExpirationProvider) TokenManager {
 	now := time.Now
 	return &neo4jAuthTokenManager{
