@@ -677,7 +677,7 @@ type RoutingControl int
 const (
 	// Write routes the query to execute to a writer member of the cluster
 	Write RoutingControl = iota
-	// Read routes the query to execute to a writer member of the cluster
+	// Read routes the query to execute to a reader member of the cluster
 	Read
 )
 
