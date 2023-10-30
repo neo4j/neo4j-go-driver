@@ -85,9 +85,6 @@ type DriverWithContext interface {
 	// Otherwise, the error will be matched against a list of known authentication errors.
 	// If the error is on that list, an `neo4j.InvalidAuthenticationError` is returned.
 	// Otherwise, the original error is returned.
-	//
-	// VerifyAuthentication is part of the re-authentication preview feature
-	// (see README on what it means in terms of support and compatibility guarantees)
 	VerifyAuthentication(ctx context.Context, auth *AuthToken) error
 	// Close the driver and all underlying connections
 	Close(ctx context.Context) error
@@ -144,11 +141,6 @@ type ResultTransformer[T any] interface {
 //   - `neo4j.KerberosAuth`
 //   - `neo4j.BearerAuth`
 //   - `neo4j.CustomAuth`
-//
-// `TokenManager` is part of the re-authentication preview feature
-// (see README on what it means in terms of support and compatibility guarantees).
-// The pre-defined auth mechanisms listed above however are guaranteed to be supported
-// as `auth` argument to this function.
 func NewDriverWithContext(target string, auth auth.TokenManager, configurers ...func(*Config)) (DriverWithContext, error) {
 	parsed, err := url.Parse(target)
 	if err != nil {
@@ -685,7 +677,7 @@ type RoutingControl int
 const (
 	// Write routes the query to execute to a writer member of the cluster
 	Write RoutingControl = iota
-	// Read routes the query to execute to a writer member of the cluster
+	// Read routes the query to execute to a reader member of the cluster
 	Read
 )
 

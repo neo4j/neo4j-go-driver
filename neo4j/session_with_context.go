@@ -175,9 +175,6 @@ type SessionConfig struct {
 	//   - `neo4j.KerberosAuth`
 	//   - `neo4j.BearerAuth`
 	//   - `neo4j.CustomAuth`
-	//
-	// Session auth is part of the re-authentication preview feature
-	// (see README on what it means in terms of support and compatibility guarantees).
 	Auth *AuthToken
 
 	forceReAuth bool
