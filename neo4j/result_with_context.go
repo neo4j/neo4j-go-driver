@@ -85,7 +85,8 @@ func newResultWithContext(
 	cypher string,
 	params map[string]any,
 	txState *transactionState,
-	afterConsumptionHook func()) ResultWithContext {
+	afterConsumptionHook func(),
+) ResultWithContext {
 	return &resultWithContext{
 		conn:                 connection,
 		streamHandle:         stream,
