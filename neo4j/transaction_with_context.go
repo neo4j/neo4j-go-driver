@@ -99,7 +99,7 @@ func (tx *explicitTransaction) Run(ctx context.Context, cypher string, params ma
 }
 
 func (tx *explicitTransaction) Commit(ctx context.Context) error {
-	if tx.conn == nil || tx.conn.HasFailed() {
+	if tx.conn == nil || !tx.conn.IsAlive() || tx.conn.HasFailed() {
 		return transactionAlreadyCompletedError()
 	}
 	tx.txState.err = tx.conn.TxCommit(ctx, tx.txHandle)
