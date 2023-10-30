@@ -710,7 +710,7 @@ func (f *fakeResult) legacy() Result {
 	panic("implement me")
 }
 
-func (f *fakeResult) errorHandler(err error) {
+func (f *fakeResult) errorHandler(error) {
 	panic("implement me")
 }
 
