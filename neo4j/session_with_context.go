@@ -342,7 +342,6 @@ func (s *sessionWithContext) BeginTransaction(ctx context.Context, configurers .
 		fetchSize: s.fetchSize,
 		txHandle:  txHandle,
 		txState:   txState,
-		onClosed:  nil,
 	}
 
 	onClose := func() {
@@ -356,9 +355,7 @@ func (s *sessionWithContext) BeginTransaction(ctx context.Context, configurers .
 		tx.conn = nil
 		s.explicitTx = nil
 	}
-
 	tx.onClosed = onClose
-
 	txState.resultErrorHandlers = append(txState.resultErrorHandlers, func(error) { onClose() })
 
 	s.explicitTx = tx

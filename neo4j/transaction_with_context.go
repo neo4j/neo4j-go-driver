@@ -71,7 +71,6 @@ func (t *transactionState) onError(err error) {
 	for _, resultErrorHandler := range t.resultErrorHandlers {
 		resultErrorHandler(err)
 	}
-	// onClosed()
 }
 
 // Transaction implementation when explicit transaction started
@@ -103,9 +102,6 @@ func (tx *explicitTransaction) Commit(ctx context.Context) error {
 	if tx.txState.err != nil {
 		return transactionAlreadyCompletedError()
 	}
-	//if tx.conn == nil || !tx.conn.IsAlive() || tx.conn.HasFailed() {
-	//	return transactionAlreadyCompletedError()
-	//}
 	if tx.conn == nil {
 		return transactionAlreadyCompletedError()
 	}
