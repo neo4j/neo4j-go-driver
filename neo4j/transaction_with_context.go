@@ -71,6 +71,7 @@ func (t *transactionState) onError(err error) {
 	for _, resultErrorHandler := range t.resultErrorHandlers {
 		resultErrorHandler(err)
 	}
+	// onClosed()
 }
 
 // Transaction implementation when explicit transaction started
@@ -99,7 +100,13 @@ func (tx *explicitTransaction) Run(ctx context.Context, cypher string, params ma
 }
 
 func (tx *explicitTransaction) Commit(ctx context.Context) error {
-	if tx.conn == nil || !tx.conn.IsAlive() || tx.conn.HasFailed() {
+	if tx.txState.err != nil {
+		return tx.txState.err
+	}
+	//if tx.conn == nil || !tx.conn.IsAlive() || tx.conn.HasFailed() {
+	//	return transactionAlreadyCompletedError()
+	//}
+	if tx.conn == nil {
 		return transactionAlreadyCompletedError()
 	}
 	tx.txState.err = tx.conn.TxCommit(ctx, tx.txHandle)

@@ -21,6 +21,7 @@ package neo4j
 
 import (
 	"context"
+	"fmt"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/db"
 	idb "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/errorutil"
@@ -110,9 +111,9 @@ func (r *resultWithContext) NextRecord(ctx context.Context, out **Record) bool {
 }
 
 func (r *resultWithContext) Next(ctx context.Context) bool {
-	if r.txState.err != nil {
-		r.err = &UsageError{Message: resultFailedError}
-	}
+	//if r.txState.err != nil {
+	//	r.err = &UsageError{Message: resultFailedError}
+	//}
 	r.checkOpen()
 	if r.err != nil {
 		return false
@@ -133,9 +134,9 @@ func (r *resultWithContext) PeekRecord(ctx context.Context, out **Record) bool {
 }
 
 func (r *resultWithContext) Peek(ctx context.Context) bool {
-	if r.txState.err != nil {
-		r.err = &UsageError{Message: resultFailedError}
-	}
+	//if r.txState.err != nil {
+	//	r.err = &UsageError{Message: resultFailedError}
+	//}
 	r.checkOpen()
 	if r.err != nil {
 		return false
@@ -149,9 +150,9 @@ func (r *resultWithContext) Err() error {
 }
 
 func (r *resultWithContext) Record() *Record {
-	if r.txState.err != nil {
-		r.err = &UsageError{Message: resultFailedError}
-	}
+	//if r.err != nil && r.txState.err != nil {
+	//	r.err = &UsageError{Message: resultFailedError}
+	//}
 	if r.peekedRecord != nil {
 		return r.peekedRecord
 	}
@@ -159,10 +160,10 @@ func (r *resultWithContext) Record() *Record {
 }
 
 func (r *resultWithContext) Collect(ctx context.Context) ([]*Record, error) {
-	if r.txState.err != nil {
-		r.err = &UsageError{Message: resultFailedError}
-		return nil, r.err
-	}
+	//if r.txState.err != nil {
+	//	//r.err = &UsageError{Message: resultFailedError}
+	//	return nil, r.err
+	//}
 	recs := make([]*Record, 0, 1024)
 	for r.summary == nil && r.err == nil {
 		r.advance(ctx)
@@ -178,10 +179,10 @@ func (r *resultWithContext) Collect(ctx context.Context) ([]*Record, error) {
 }
 
 func (r *resultWithContext) Single(ctx context.Context) (*Record, error) {
-	if r.txState.err != nil {
-		r.err = &UsageError{Message: resultFailedError}
-		return nil, r.err
-	}
+	//if r.txState.err != nil {
+	//	r.err = &UsageError{Message: resultFailedError}
+	//	return nil, r.err
+	//}
 	// Try retrieving the single record
 	r.advance(ctx)
 	if r.err != nil {
@@ -218,10 +219,10 @@ func (r *resultWithContext) Single(ctx context.Context) (*Record, error) {
 }
 
 func (r *resultWithContext) Consume(ctx context.Context) (ResultSummary, error) {
-	if r.txState.err != nil {
-		r.err = &UsageError{Message: resultFailedError}
-		return nil, r.err
-	}
+	//if r.txState.err != nil {
+	//	r.err = &UsageError{Message: resultFailedError}
+	//	return nil, r.err
+	//}
 
 	// Already failed, reuse the internal error, might have been
 	// set by Single to indicate some kind of usage error that "destroyed"
@@ -268,6 +269,13 @@ func (r *resultWithContext) advance(ctx context.Context) {
 		r.peeked = false
 	} else {
 		r.record, r.summary, r.err = r.conn.Next(ctx, r.streamHandle)
+		// TODO potential fix here, this will propagate to all other results
+		fmt.Println("ERROR IN RESULT: ", r.err)
+		if r.err != nil {
+			//err := r.err
+			r.txState.onError(r.err)
+			//r.err = err
+		}
 	}
 }
 
@@ -298,5 +306,7 @@ func (r *resultWithContext) callAfterConsumptionHook() {
 }
 
 func (r *resultWithContext) errorHandler(err error) {
-	r.err = err
+	if r.err == nil {
+		r.err = &UsageError{Message: resultFailedError}
+	}
 }
