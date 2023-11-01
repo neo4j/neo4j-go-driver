@@ -8,13 +8,13 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      https://www.apache.org/licenses/LICENSE-2.0
+ *     https://www.apache.org/licenses/LICENSE-2.0
  *
- *  Unless required by applicable law or agreed to in writing, software
- *  distributed under the License is distributed on an "AS IS" BASIS,
- *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *  See the License for the specific language governing permissions and
- *  limitations under the License.
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 
 package neo4j
@@ -80,7 +80,7 @@ type explicitTransaction struct {
 	fetchSize int
 	txHandle  db.TxHandle
 	txState   *transactionState
-	onClosed  func(*explicitTransaction)
+	onClosed  func()
 }
 
 func (tx *explicitTransaction) Run(ctx context.Context, cypher string, params map[string]any) (ResultWithContext, error) {
@@ -90,7 +90,7 @@ func (tx *explicitTransaction) Run(ctx context.Context, cypher string, params ma
 	stream, err := tx.conn.RunTx(ctx, tx.txHandle, db.Command{Cypher: cypher, Params: params, FetchSize: tx.fetchSize})
 	if err != nil {
 		tx.txState.onError(err)
-		tx.onClosed(tx)
+		tx.onClosed()
 		return nil, errorutil.WrapError(tx.txState.err)
 	}
 	// no result consumption hook here since bookmarks are sent after commit, not after pulling results
@@ -101,7 +101,7 @@ func (tx *explicitTransaction) Run(ctx context.Context, cypher string, params ma
 
 func (tx *explicitTransaction) Commit(ctx context.Context) error {
 	if tx.txState.err != nil {
-		return tx.txState.err
+		return transactionAlreadyCompletedError()
 	}
 	//if tx.conn == nil || !tx.conn.IsAlive() || tx.conn.HasFailed() {
 	//	return transactionAlreadyCompletedError()
@@ -110,7 +110,7 @@ func (tx *explicitTransaction) Commit(ctx context.Context) error {
 		return transactionAlreadyCompletedError()
 	}
 	tx.txState.err = tx.conn.TxCommit(ctx, tx.txHandle)
-	tx.onClosed(tx)
+	tx.onClosed()
 	return errorutil.WrapError(tx.txState.err)
 }
 
@@ -135,7 +135,7 @@ func (tx *explicitTransaction) Rollback(ctx context.Context) error {
 	} else {
 		tx.txState.err = tx.conn.TxRollback(ctx, tx.txHandle)
 	}
-	tx.onClosed(tx)
+	tx.onClosed()
 	return errorutil.WrapError(tx.txState.err)
 }
 

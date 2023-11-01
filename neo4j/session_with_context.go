@@ -336,23 +336,32 @@ func (s *sessionWithContext) BeginTransaction(ctx context.Context, configurers .
 	}
 
 	// Create transaction wrapper
-	s.explicitTx = &explicitTransaction{
+	txState := newTransactionState()
+	tx := &explicitTransaction{
 		conn:      conn,
 		fetchSize: s.fetchSize,
 		txHandle:  txHandle,
-		txState:   newTransactionState(),
-		onClosed: func(tx *explicitTransaction) {
-			if tx.conn == nil {
-				return
-			}
-			// On run failure, transaction closed (rolled back or committed)
-			bookmarkErr := s.retrieveBookmarks(ctx, tx.conn, beginBookmarks)
-			s.pool.Return(ctx, tx.conn)
-			tx.txState.err = errorutil.CombineAllErrors(tx.txState.err, bookmarkErr)
-			tx.conn = nil
-			s.explicitTx = nil
-		},
+		txState:   txState,
+		onClosed:  nil,
 	}
+
+	onClose := func() {
+		if tx.conn == nil {
+			return
+		}
+		// On run failure, transaction closed (rolled back or committed)
+		bookmarkErr := s.retrieveBookmarks(ctx, tx.conn, beginBookmarks)
+		s.pool.Return(ctx, tx.conn)
+		tx.txState.err = errorutil.CombineAllErrors(tx.txState.err, bookmarkErr)
+		tx.conn = nil
+		s.explicitTx = nil
+	}
+
+	tx.onClosed = onClose
+
+	txState.resultErrorHandlers = append(txState.resultErrorHandlers, func(error) { onClose() })
+
+	s.explicitTx = tx
 
 	return s.explicitTx, nil
 }
