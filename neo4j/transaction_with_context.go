@@ -89,7 +89,6 @@ func (tx *explicitTransaction) Run(ctx context.Context, cypher string, params ma
 	stream, err := tx.conn.RunTx(ctx, tx.txHandle, db.Command{Cypher: cypher, Params: params, FetchSize: tx.fetchSize})
 	if err != nil {
 		tx.txState.onError(err)
-		tx.onClosed()
 		return nil, errorutil.WrapError(tx.txState.err)
 	}
 	// no result consumption hook here since bookmarks are sent after commit, not after pulling results
