@@ -336,7 +336,7 @@ func (s *sessionWithContext) BeginTransaction(ctx context.Context, configurers .
 	}
 
 	// Create transaction wrapper
-	txState := newTransactionState()
+	txState := &transactionState{}
 	tx := &explicitTransaction{
 		conn:      conn,
 		fetchSize: s.fetchSize,
@@ -484,7 +484,7 @@ func (s *sessionWithContext) executeTransactionFunction(
 		return false, nil
 	}
 
-	tx := managedTransaction{conn: conn, fetchSize: s.fetchSize, txHandle: txHandle, txState: newTransactionState()}
+	tx := managedTransaction{conn: conn, fetchSize: s.fetchSize, txHandle: txHandle, txState: &transactionState{}}
 	x, err := work(&tx)
 	if err != nil {
 		// If the client returns a client specific error that means that
@@ -648,7 +648,7 @@ func (s *sessionWithContext) Run(ctx context.Context,
 
 	s.autocommitTx = &autocommitTransaction{
 		conn: conn,
-		res: newResultWithContext(conn, stream, cypher, params, newTransactionState(), func() {
+		res: newResultWithContext(conn, stream, cypher, params, &transactionState{}, func() {
 			if err := s.retrieveBookmarks(ctx, conn, runBookmarks); err != nil {
 				s.log.Warnf(log.Session, s.logId, "could not retrieve bookmarks after result consumption: %s\n"+
 					"the result of the initiating auto-commit transaction may not be visible to subsequent operations", err.Error())

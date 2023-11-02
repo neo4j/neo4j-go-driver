@@ -59,13 +59,6 @@ type transactionState struct {
 	resultErrorHandlers []func(error)
 }
 
-func newTransactionState() *transactionState {
-	return &transactionState{
-		err:                 nil,
-		resultErrorHandlers: make([]func(error), 0),
-	}
-}
-
 func (t *transactionState) onError(err error) {
 	t.err = err
 	for _, resultErrorHandler := range t.resultErrorHandlers {
