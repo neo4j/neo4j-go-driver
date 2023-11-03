@@ -710,6 +710,10 @@ func (f *fakeResult) legacy() Result {
 	panic("implement me")
 }
 
+func (f *fakeResult) errorHandler(error) {
+	panic("implement me")
+}
+
 type fakeSummary struct {
 	resultAvailableAfter time.Duration
 }

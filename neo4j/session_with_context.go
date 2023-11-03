@@ -336,22 +336,29 @@ func (s *sessionWithContext) BeginTransaction(ctx context.Context, configurers .
 	}
 
 	// Create transaction wrapper
-	s.explicitTx = &explicitTransaction{
+	txState := &transactionState{}
+	tx := &explicitTransaction{
 		conn:      conn,
 		fetchSize: s.fetchSize,
 		txHandle:  txHandle,
-		onClosed: func(tx *explicitTransaction) {
-			if tx.conn == nil {
-				return
-			}
-			// On run failure, transaction closed (rolled back or committed)
-			bookmarkErr := s.retrieveBookmarks(ctx, tx.conn, beginBookmarks)
-			s.pool.Return(ctx, tx.conn)
-			tx.err = errorutil.CombineAllErrors(tx.err, bookmarkErr)
-			tx.conn = nil
-			s.explicitTx = nil
-		},
+		txState:   txState,
 	}
+
+	onClose := func() {
+		if tx.conn == nil {
+			return
+		}
+		// On run failure, transaction closed (rolled back or committed)
+		bookmarkErr := s.retrieveBookmarks(ctx, tx.conn, beginBookmarks)
+		s.pool.Return(ctx, tx.conn)
+		tx.txState.err = errorutil.CombineAllErrors(tx.txState.err, bookmarkErr)
+		tx.conn = nil
+		s.explicitTx = nil
+	}
+	tx.onClosed = onClose
+	txState.resultErrorHandlers = append(txState.resultErrorHandlers, func(error) { onClose() })
+
+	s.explicitTx = tx
 
 	return s.explicitTx, nil
 }
@@ -477,7 +484,7 @@ func (s *sessionWithContext) executeTransactionFunction(
 		return false, nil
 	}
 
-	tx := managedTransaction{conn: conn, fetchSize: s.fetchSize, txHandle: txHandle}
+	tx := managedTransaction{conn: conn, fetchSize: s.fetchSize, txHandle: txHandle, txState: &transactionState{}}
 	x, err := work(&tx)
 	if err != nil {
 		// If the client returns a client specific error that means that
@@ -641,7 +648,7 @@ func (s *sessionWithContext) Run(ctx context.Context,
 
 	s.autocommitTx = &autocommitTransaction{
 		conn: conn,
-		res: newResultWithContext(conn, stream, cypher, params, func() {
+		res: newResultWithContext(conn, stream, cypher, params, &transactionState{}, func() {
 			if err := s.retrieveBookmarks(ctx, conn, runBookmarks); err != nil {
 				s.log.Warnf(log.Session, s.logId, "could not retrieve bookmarks after result consumption: %s\n"+
 					"the result of the initiating auto-commit transaction may not be visible to subsequent operations", err.Error())

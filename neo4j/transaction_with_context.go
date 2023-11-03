@@ -8,13 +8,13 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      https://www.apache.org/licenses/LICENSE-2.0
+ *     https://www.apache.org/licenses/LICENSE-2.0
  *
- *  Unless required by applicable law or agreed to in writing, software
- *  distributed under the License is distributed on an "AS IS" BASIS,
- *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *  See the License for the specific language governing permissions and
- *  limitations under the License.
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 
 package neo4j
@@ -54,14 +54,25 @@ type ExplicitTransaction interface {
 	legacy() Transaction
 }
 
+type transactionState struct {
+	err                 error
+	resultErrorHandlers []func(error)
+}
+
+func (t *transactionState) onError(err error) {
+	t.err = err
+	for _, resultErrorHandler := range t.resultErrorHandlers {
+		resultErrorHandler(err)
+	}
+}
+
 // Transaction implementation when explicit transaction started
 type explicitTransaction struct {
 	conn      db.Connection
 	fetchSize int
 	txHandle  db.TxHandle
-	runFailed bool
-	err       error
-	onClosed  func(*explicitTransaction)
+	txState   *transactionState
+	onClosed  func()
 }
 
 func (tx *explicitTransaction) Run(ctx context.Context, cypher string, params map[string]any) (ResultWithContext, error) {
@@ -70,26 +81,25 @@ func (tx *explicitTransaction) Run(ctx context.Context, cypher string, params ma
 	}
 	stream, err := tx.conn.RunTx(ctx, tx.txHandle, db.Command{Cypher: cypher, Params: params, FetchSize: tx.fetchSize})
 	if err != nil {
-		tx.err = err
-		tx.runFailed = true
-		tx.onClosed(tx)
-		return nil, errorutil.WrapError(tx.err)
+		tx.txState.onError(err)
+		return nil, errorutil.WrapError(tx.txState.err)
 	}
 	// no result consumption hook here since bookmarks are sent after commit, not after pulling results
-	return newResultWithContext(tx.conn, stream, cypher, params, nil), nil
+	result := newResultWithContext(tx.conn, stream, cypher, params, tx.txState, nil)
+	tx.txState.resultErrorHandlers = append(tx.txState.resultErrorHandlers, result.errorHandler)
+	return result, nil
 }
 
 func (tx *explicitTransaction) Commit(ctx context.Context) error {
-	if tx.runFailed {
-		tx.runFailed = false
-		return tx.err
+	if tx.txState.err != nil {
+		return transactionAlreadyCompletedError()
 	}
 	if tx.conn == nil {
 		return transactionAlreadyCompletedError()
 	}
-	tx.err = tx.conn.TxCommit(ctx, tx.txHandle)
-	tx.onClosed(tx)
-	return errorutil.WrapError(tx.err)
+	tx.txState.err = tx.conn.TxCommit(ctx, tx.txHandle)
+	tx.onClosed()
+	return errorutil.WrapError(tx.txState.err)
 }
 
 func (tx *explicitTransaction) Close(ctx context.Context) error {
@@ -101,8 +111,7 @@ func (tx *explicitTransaction) Close(ctx context.Context) error {
 }
 
 func (tx *explicitTransaction) Rollback(ctx context.Context) error {
-	if tx.runFailed {
-		tx.runFailed = false
+	if tx.txState.err != nil {
 		return nil
 	}
 	if tx.conn == nil {
@@ -110,12 +119,12 @@ func (tx *explicitTransaction) Rollback(ctx context.Context) error {
 	}
 	if !tx.conn.IsAlive() || tx.conn.HasFailed() {
 		// tx implicitly rolled back by having failed
-		tx.err = nil
+		tx.txState.err = nil
 	} else {
-		tx.err = tx.conn.TxRollback(ctx, tx.txHandle)
+		tx.txState.err = tx.conn.TxRollback(ctx, tx.txHandle)
 	}
-	tx.onClosed(tx)
-	return errorutil.WrapError(tx.err)
+	tx.onClosed()
+	return errorutil.WrapError(tx.txState.err)
 }
 
 func (tx *explicitTransaction) legacy() Transaction {
@@ -129,6 +138,7 @@ type managedTransaction struct {
 	conn      db.Connection
 	fetchSize int
 	txHandle  db.TxHandle
+	txState   *transactionState
 }
 
 func (tx *managedTransaction) Run(ctx context.Context, cypher string, params map[string]any) (ResultWithContext, error) {
@@ -137,7 +147,7 @@ func (tx *managedTransaction) Run(ctx context.Context, cypher string, params map
 		return nil, errorutil.WrapError(err)
 	}
 	// no result consumption hook here since bookmarks are sent after commit, not after pulling results
-	return newResultWithContext(tx.conn, stream, cypher, params, nil), nil
+	return newResultWithContext(tx.conn, stream, cypher, params, tx.txState, nil), nil
 }
 
 // legacy interop only - remove in 6.0
