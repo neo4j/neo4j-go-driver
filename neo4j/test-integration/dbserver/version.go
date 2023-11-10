@@ -46,19 +46,15 @@ var (
 )
 
 func VersionOf(server string) Version {
-	if server == "" {
-		return defaultVersion
-	} else {
-		if versionMatcher == nil {
-			versionMatcher = regexp.MustCompile(versionPattern)
-		}
-		matches := versionMatcher.FindStringSubmatch(server)
-		if matches != nil {
-			major, _ := strconv.Atoi(matches[2])
-			minor := parseMinor(matches[3])
-			patch, _ := strconv.Atoi(matches[4])
-			return Version{major, minor, patch}
-		}
+	if versionMatcher == nil {
+		versionMatcher = regexp.MustCompile(versionPattern)
+	}
+	matches := versionMatcher.FindStringSubmatch(server)
+	if matches != nil {
+		major, _ := strconv.Atoi(matches[2])
+		minor := parseMinor(matches[3])
+		patch, _ := strconv.Atoi(matches[4])
+		return Version{major, minor, patch}
 	}
 
 	return noVersion
