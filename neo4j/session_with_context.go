@@ -22,14 +22,16 @@ package neo4j
 import (
 	"context"
 	"fmt"
+	"math"
+	"time"
+
+	bm "github.com/neo4j/neo4j-go-driver/v5/neo4j/bookmarks"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/collections"
 	idb "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/errorutil"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/pool"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/telemetry"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/notifications"
-	"math"
-	"time"
 
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/retry"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/log"
@@ -53,7 +55,7 @@ type SessionWithContext interface {
 	// LastBookmarks returns the bookmark received following the last successfully completed transaction.
 	// If no bookmark was received or if this transaction was rolled back, the initial set of bookmarks will be
 	// returned.
-	LastBookmarks() Bookmarks
+	LastBookmarks() bm.Bookmarks
 	lastBookmark() string
 	// BeginTransaction starts a new explicit transaction on this session
 	// Contexts terminating too early negatively affect connection pooling and degrade the driver performance.
@@ -90,7 +92,7 @@ type SessionConfig struct {
 	// on the session the bookmark can be retrieved with Session.LastBookmark. All commands executing
 	// within the same session will automatically use the bookmark from the previous command in the
 	// session.
-	Bookmarks Bookmarks
+	Bookmarks bm.Bookmarks
 	// DatabaseName sets the target database name for the queries executed within the session created with this
 	// configuration.
 	// Usage of Cypher clauses like USE is not a replacement for this option.
@@ -155,7 +157,7 @@ type SessionConfig struct {
 	// and be notified of bookmark updates per database
 	// Since 5.0
 	// default: nil (no-op)
-	BookmarkManager BookmarkManager
+	BookmarkManager bm.BookmarkManager
 	// NotificationsMinSeverity defines the minimum severity level of notifications the server should send.
 	// By default, the driver's settings are used.
 	// Else, this option overrides the driver's settings.
@@ -265,7 +267,7 @@ func (s *sessionWithContext) lastBookmark() string {
 	return s.bookmarks.lastBookmark()
 }
 
-func (s *sessionWithContext) LastBookmarks() Bookmarks {
+func (s *sessionWithContext) LastBookmarks() bm.Bookmarks {
 	// Pick up bookmark from pending auto-commit if there is a bookmark on it
 	// Note: the bookmark manager should not be notified here because:
 	//  - the results of the autocommit transaction may have not been consumed
@@ -573,7 +575,7 @@ func (s *sessionWithContext) getConnection(ctx context.Context, mode idb.AccessM
 	return conn, nil
 }
 
-func (s *sessionWithContext) retrieveBookmarks(ctx context.Context, conn idb.Connection, sentBookmarks Bookmarks) error {
+func (s *sessionWithContext) retrieveBookmarks(ctx context.Context, conn idb.Connection, sentBookmarks bm.Bookmarks) error {
 	if conn == nil {
 		return nil
 	}
@@ -762,7 +764,7 @@ func (s *sessionWithContext) resolveHomeDatabase(ctx context.Context) error {
 	return nil
 }
 
-func (s *sessionWithContext) getBookmarks(ctx context.Context) (Bookmarks, error) {
+func (s *sessionWithContext) getBookmarks(ctx context.Context) (bm.Bookmarks, error) {
 	bookmarks, err := s.bookmarks.getBookmarks(ctx)
 	if err != nil {
 		return nil, err
@@ -776,7 +778,7 @@ type erroredSessionWithContext struct {
 	err error
 }
 
-func (s *erroredSessionWithContext) LastBookmarks() Bookmarks {
+func (s *erroredSessionWithContext) LastBookmarks() bm.Bookmarks {
 	return nil
 }
 

@@ -19,21 +19,25 @@
 
 package neo4j
 
-import "context"
+import (
+	"context"
+
+	bm "github.com/neo4j/neo4j-go-driver/v5/neo4j/bookmarks"
+)
 
 type sessionBookmarks struct {
-	bookmarkManager BookmarkManager
-	bookmarks       Bookmarks
+	bookmarkManager bm.BookmarkManager
+	bookmarks       bm.Bookmarks
 }
 
-func newSessionBookmarks(bookmarkManager BookmarkManager, bookmarks Bookmarks) *sessionBookmarks {
+func newSessionBookmarks(bookmarkManager bm.BookmarkManager, bookmarks bm.Bookmarks) *sessionBookmarks {
 	return &sessionBookmarks{
 		bookmarkManager: bookmarkManager,
 		bookmarks:       cleanupBookmarks(bookmarks),
 	}
 }
 
-func (sb *sessionBookmarks) currentBookmarks() Bookmarks {
+func (sb *sessionBookmarks) currentBookmarks() bm.Bookmarks {
 	return sb.bookmarks
 }
 
@@ -66,7 +70,7 @@ func (sb *sessionBookmarks) replaceSessionBookmarks(newBookmark string) {
 	sb.bookmarks = []string{newBookmark}
 }
 
-func (sb *sessionBookmarks) getBookmarks(ctx context.Context) (Bookmarks, error) {
+func (sb *sessionBookmarks) getBookmarks(ctx context.Context) (bm.Bookmarks, error) {
 	if sb.bookmarkManager == nil {
 		return nil, nil
 	}
@@ -75,7 +79,7 @@ func (sb *sessionBookmarks) getBookmarks(ctx context.Context) (Bookmarks, error)
 
 // Remove empty string bookmarks to check for "bad" callers
 // To avoid allocating, first check if this is a problem
-func cleanupBookmarks(bookmarks Bookmarks) Bookmarks {
+func cleanupBookmarks(bookmarks bm.Bookmarks) bm.Bookmarks {
 	hasBad := false
 	for _, b := range bookmarks {
 		if len(b) == 0 {
@@ -88,7 +92,7 @@ func cleanupBookmarks(bookmarks Bookmarks) Bookmarks {
 		return bookmarks
 	}
 
-	cleaned := make(Bookmarks, 0, len(bookmarks)-1)
+	cleaned := make(bm.Bookmarks, 0, len(bookmarks)-1)
 	for _, b := range bookmarks {
 		if len(b) > 0 {
 			cleaned = append(cleaned, b)
