@@ -22,9 +22,11 @@ package neo4j_test
 import (
 	"context"
 	"fmt"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
-	. "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/testutil"
 	"testing"
+
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
+	bm "github.com/neo4j/neo4j-go-driver/v5/neo4j/bookmarks"
+	. "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/testutil"
 )
 
 func TestExecuteRead(outer *testing.T) {
@@ -81,7 +83,7 @@ type fakeSession struct {
 	neo4j.SessionWithContext
 }
 
-func (f *fakeSession) LastBookmarks() neo4j.Bookmarks {
+func (f *fakeSession) LastBookmarks() bm.Bookmarks {
 	panic("implement me")
 }
 

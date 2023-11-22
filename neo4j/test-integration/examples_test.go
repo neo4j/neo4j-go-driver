@@ -23,9 +23,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/config"
 	"testing"
 	"time"
+
+	bm "github.com/neo4j/neo4j-go-driver/v5/neo4j/bookmarks"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/config"
 
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/dbtype"
@@ -724,7 +726,7 @@ func printFriendsTxFunc(ctx context.Context) neo4j.ManagedTransactionWork {
 	}
 }
 
-func addAndEmploy(ctx context.Context, driver neo4j.DriverWithContext, person string, company string) (neo4j.Bookmarks, error) {
+func addAndEmploy(ctx context.Context, driver neo4j.DriverWithContext, person string, company string) (bm.Bookmarks, error) {
 	session := driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
 	defer session.Close(ctx)
 
@@ -741,7 +743,7 @@ func addAndEmploy(ctx context.Context, driver neo4j.DriverWithContext, person st
 	return session.LastBookmarks(), nil
 }
 
-func makeFriend(ctx context.Context, driver neo4j.DriverWithContext, person1 string, person2 string, bookmarks neo4j.Bookmarks) (neo4j.Bookmarks, error) {
+func makeFriend(ctx context.Context, driver neo4j.DriverWithContext, person1 string, person2 string, bookmarks bm.Bookmarks) (bm.Bookmarks, error) {
 	session := driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite, Bookmarks: bookmarks})
 	defer session.Close(ctx)
 
@@ -753,7 +755,7 @@ func makeFriend(ctx context.Context, driver neo4j.DriverWithContext, person1 str
 }
 
 func addEmployAndMakeFriends(ctx context.Context, driver neo4j.DriverWithContext) error {
-	var bookmarks1, bookmarks2, bookmarks3 neo4j.Bookmarks
+	var bookmarks1, bookmarks2, bookmarks3 bm.Bookmarks
 	var err error
 
 	if bookmarks1, err = addAndEmploy(ctx, driver, "Alice", "Wayne Enterprises"); err != nil {
@@ -764,13 +766,13 @@ func addEmployAndMakeFriends(ctx context.Context, driver neo4j.DriverWithContext
 		return err
 	}
 
-	if bookmarks3, err = makeFriend(ctx, driver, "Bob", "Alice", neo4j.CombineBookmarks(bookmarks1, bookmarks2)); err != nil {
+	if bookmarks3, err = makeFriend(ctx, driver, "Bob", "Alice", bm.CombineBookmarks(bookmarks1, bookmarks2)); err != nil {
 		return err
 	}
 
 	session := driver.NewSession(ctx, neo4j.SessionConfig{
 		AccessMode: neo4j.AccessModeRead,
-		Bookmarks:  neo4j.CombineBookmarks(bookmarks1, bookmarks2, bookmarks3),
+		Bookmarks:  bm.CombineBookmarks(bookmarks1, bookmarks2, bookmarks3),
 	})
 	defer session.Close(ctx)
 
