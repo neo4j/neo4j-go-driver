@@ -2,8 +2,6 @@
  * Copyright (c) "Neo4j"
  * Neo4j Sweden AB [https://neo4j.com]
  *
- * This file is part of Neo4j.
- *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -51,16 +49,19 @@ type Driver interface {
 // token as parameters and can also take optional configuration function(s) as variadic parameters.
 //
 // In order to connect to a single instance database, you need to pass a URI with scheme 'bolt', 'bolt+s' or 'bolt+ssc'.
+//
 //	driver, err = NewDriver("bolt://db.server:7687", BasicAuth(username, password))
 //
 // In order to connect to a causal cluster database, you need to pass a URI with scheme 'neo4j', 'neo4j+s' or 'neo4j+ssc'
 // and its host part set to be one of the core cluster members.
+//
 //	driver, err = NewDriver("neo4j://core.db.server:7687", BasicAuth(username, password))
 //
 // You can override default configuration options by providing a configuration function(s)
+//
 //	driver, err = NewDriver(uri, BasicAuth(username, password), function (config *Config) {
-// 		config.MaxConnectionPoolSize = 10
-// 	})
+//		config.MaxConnectionPoolSize = 10
+//	})
 //
 // Deprecated: please use NewDriverWithContext instead. This function will be removed in 6.0.
 func NewDriver(target string, auth AuthToken, configurers ...func(*Config)) (Driver, error) {
