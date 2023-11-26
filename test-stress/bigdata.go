@@ -22,6 +22,7 @@ import (
 	"fmt"
 
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/config"
 )
 
 func nCopiesInt(n int, x int) []int {
@@ -105,7 +106,7 @@ func runBigDataThing(ctx context.Context, driver neo4j.DriverWithContext) {
 	const nodeCount = 30000
 
 	// Write nodes
-	session := driver.NewSession(ctx, neo4j.SessionConfig{})
+	session := driver.NewSession(ctx, config.SessionConfig{})
 	for index := 0; index < nodeCount; {
 		_, err := session.ExecuteWrite(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
 			batch := 0

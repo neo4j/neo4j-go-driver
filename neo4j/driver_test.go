@@ -22,6 +22,7 @@ import (
 	"testing"
 
 	bm "github.com/neo4j/neo4j-go-driver/v5/neo4j/bookmarks"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/config"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/router"
 	. "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/testutil"
 )
@@ -198,7 +199,7 @@ func TestNewDriverAndClose(t *testing.T) {
 	err = driver.Close()
 	AssertNoError(t, err)
 
-	session := driver.NewSession(SessionConfig{})
+	session := driver.NewSession(config.SessionConfig{})
 	_, err = session.Run("cypher", nil)
 	if !IsUsageError(err) {
 		t.Errorf("should not allow new session after driver being closed")
@@ -214,13 +215,13 @@ func TestDriverSessionCreation(t *testing.T) {
 	driverSessionCreationTests := []struct {
 		name      string
 		testing   string
-		mode      AccessMode
+		mode      config.AccessMode
 		bookmarks bm.Bookmarks
 	}{
-		{"Write", "bolt://localhost:7687", AccessModeWrite, []string(nil)},
-		{"Read", "bolt://localhost:7687", AccessModeRead, []string(nil)},
-		{"Write+bookmarks", "bolt://localhost:7687", AccessModeWrite, []string{"B1", "B2", "B3"}},
-		{"Read+bookmarks", "bolt://localhost:7687", AccessModeRead, []string{"B1", "B2", "B3", "B4"}},
+		{"Write", "bolt://localhost:7687", config.AccessModeWrite, []string(nil)},
+		{"Read", "bolt://localhost:7687", config.AccessModeWrite, []string(nil)},
+		{"Write+bookmarks", "bolt://localhost:7687", config.AccessModeWrite, []string{"B1", "B2", "B3"}},
+		{"Read+bookmarks", "bolt://localhost:7687", config.AccessModeWrite, []string{"B1", "B2", "B3", "B4"}},
 	}
 
 	for _, tt := range driverSessionCreationTests {
@@ -228,10 +229,10 @@ func TestDriverSessionCreation(t *testing.T) {
 			driver, err := NewDriver(tt.testing, NoAuth())
 			AssertNoError(t, err)
 
-			sessi := driver.NewSession(SessionConfig{AccessMode: tt.mode, Bookmarks: tt.bookmarks})
+			sessi := driver.NewSession(config.SessionConfig{AccessMode: tt.mode, Bookmarks: tt.bookmarks})
 			sess := sessi.(*session)
 
-			if AccessMode(sess.delegate.defaultMode) != tt.mode {
+			if config.AccessMode(sess.delegate.defaultMode) != tt.mode {
 				t.Errorf("the defaultMode was not correctly set %v", AccessMode(sess.delegate.defaultMode))
 			}
 

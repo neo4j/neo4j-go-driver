@@ -28,6 +28,7 @@ import (
 
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/auth"
 	bm "github.com/neo4j/neo4j-go-driver/v5/neo4j/bookmarks"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/config"
 	idb "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/errorutil"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/racing"
@@ -61,13 +62,13 @@ type DriverWithContext interface {
 	// 	// [...] do something with results and error
 	//	bookmarkManager := driver.ExecuteQueryBookmarkManager()
 	// 	// maintain consistency with sessions as well
-	//	session := driver.NewSession(ctx, neo4j.SessionConfig {BookmarkManager: bookmarkManager})
+	//	session := driver.NewSession(ctx, config.SessionConfig {BookmarkManager: bookmarkManager})
 	//	// [...] run something within the session
 	ExecuteQueryBookmarkManager() bm.BookmarkManager
 	// Target returns the url this driver is bootstrapped
 	Target() url.URL
 	// NewSession creates a new session based on the specified session configuration.
-	NewSession(ctx context.Context, config SessionConfig) SessionWithContext
+	NewSession(ctx context.Context, config config.SessionConfig) SessionWithContext
 	// VerifyConnectivity checks that the driver can connect to a remote server or cluster by
 	// establishing a network connection with the remote. Returns nil if successful
 	// or error describing the problem.
@@ -333,7 +334,7 @@ func (d *driverWithContext) Target() url.URL {
 	return *d.target
 }
 
-func (d *driverWithContext) NewSession(ctx context.Context, config SessionConfig) SessionWithContext {
+func (d *driverWithContext) NewSession(ctx context.Context, config config.SessionConfig) SessionWithContext {
 	if config.DatabaseName == "" {
 		config.DatabaseName = idb.DefaultDatabase
 	}
@@ -343,13 +344,13 @@ func (d *driverWithContext) NewSession(ctx context.Context, config SessionConfig
 		reAuthToken = &idb.ReAuthToken{
 			Manager:     d.auth,
 			FromSession: false,
-			ForceReAuth: config.forceReAuth,
+			ForceReAuth: config.ForceReAuth,
 		}
 	} else {
 		reAuthToken = &idb.ReAuthToken{
 			Manager:     config.Auth,
 			FromSession: true,
-			ForceReAuth: config.forceReAuth,
+			ForceReAuth: config.ForceReAuth,
 		}
 	}
 
@@ -375,7 +376,7 @@ func (d *driverWithContext) IsEncrypted() bool {
 }
 
 func (d *driverWithContext) GetServerInfo(ctx context.Context) (_ ServerInfo, err error) {
-	session := d.NewSession(ctx, SessionConfig{})
+	session := d.NewSession(ctx, config.SessionConfig{})
 	defer func() {
 		err = deferredClose(ctx, session, err)
 	}()
@@ -397,7 +398,7 @@ func (d *driverWithContext) Close(ctx context.Context) error {
 }
 
 func (d *driverWithContext) VerifyAuthentication(ctx context.Context, auth *AuthToken) (err error) {
-	session := d.NewSession(ctx, SessionConfig{Auth: auth, forceReAuth: true, DatabaseName: "system"})
+	session := d.NewSession(ctx, config.SessionConfig{Auth: auth, ForceReAuth: true, DatabaseName: "system"})
 	defer func() {
 		err = deferredClose(ctx, session, err)
 	}()
@@ -472,7 +473,7 @@ func (d *driverWithContext) VerifyAuthentication(ctx context.Context, auth *Auth
 // The equivalent functionality of ExecuteQuery can be replicated with pre-existing APIs as follows:
 //
 //	 // all the error handling bits have been omitted for brevity (do not do this in production!)
-//		session := driver.NewSession(ctx, neo4j.SessionConfig{
+//		session := driver.NewSession(ctx, config.SessionConfig{
 //			DatabaseName:     "<DATABASE>",
 //			ImpersonatedUser: "<USER>",
 //			BookmarkManager:  bookmarkManager,
@@ -681,8 +682,8 @@ const (
 	Read
 )
 
-func (c *ExecuteQueryConfiguration) toSessionConfig() SessionConfig {
-	return SessionConfig{
+func (c *ExecuteQueryConfiguration) toSessionConfig() config.SessionConfig {
+	return config.SessionConfig{
 		ImpersonatedUser: c.ImpersonatedUser,
 		DatabaseName:     c.Database,
 		BookmarkManager:  c.BookmarkManager,

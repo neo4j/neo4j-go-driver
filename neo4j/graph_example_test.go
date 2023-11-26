@@ -20,7 +20,9 @@ package neo4j_test
 import (
 	"context"
 	"fmt"
+
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/config"
 )
 
 func ExampleGetProperty() {
@@ -28,7 +30,7 @@ func ExampleGetProperty() {
 	driver, err := createDriver()
 	handleError(err)
 	defer handleClose(ctx, driver)
-	session := driver.NewSession(ctx, neo4j.SessionConfig{})
+	session := driver.NewSession(ctx, config.SessionConfig{})
 	defer handleClose(ctx, session)
 
 	result, err := session.Run(ctx, "MATCH (p:Person) RETURN p LIMIT 1", nil)

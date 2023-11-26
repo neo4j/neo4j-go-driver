@@ -19,9 +19,10 @@ package test_integration
 
 import (
 	"context"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/config"
 	"testing"
 	"time"
+
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/config"
 
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/test-integration/dbserver"
@@ -49,10 +50,10 @@ func TestTimeoutAndLifetime(outer *testing.T) {
 		assertNotNil(t, driver)
 		defer driver.Close(ctx)
 
-		session1, _ = newSessionAndTx(ctx, t, driver, neo4j.AccessModeRead)
+		session1, _ = newSessionAndTx(ctx, t, driver, config.AccessModeRead)
 		defer session1.Close(ctx)
 
-		session2 = driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead})
+		session2 = driver.NewSession(ctx, config.SessionConfig{AccessMode: config.AccessModeRead})
 		assertNotNil(t, session2)
 		defer session2.Close(ctx)
 
@@ -72,7 +73,7 @@ func TestTimeoutAndLifetime(outer *testing.T) {
 		assertNotNil(t, driver)
 		defer driver.Close(ctx)
 
-		session = driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead})
+		session = driver.NewSession(ctx, config.SessionConfig{AccessMode: config.AccessModeRead})
 		defer session.Close(ctx)
 
 		_, err = session.BeginTransaction(ctx)

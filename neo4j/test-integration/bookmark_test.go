@@ -24,6 +24,7 @@ import (
 
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
 	bm "github.com/neo4j/neo4j-go-driver/v5/neo4j/bookmarks"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/config"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/test-integration/dbserver"
 )
 
@@ -35,7 +36,7 @@ func TestBookmark(outer *testing.T) {
 	server := dbserver.GetDbServer(ctx)
 
 	createNodeInTx := func(driver neo4j.DriverWithContext) string {
-		session := driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
+		session := driver.NewSession(ctx, config.SessionConfig{AccessMode: config.AccessModeWrite})
 		defer session.Close(ctx)
 
 		_, err := session.ExecuteWrite(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
@@ -59,7 +60,7 @@ func TestBookmark(outer *testing.T) {
 	outer.Run("session constructed with no bookmarks", func(inner *testing.T) {
 		setUp := func() (neo4j.DriverWithContext, neo4j.SessionWithContext) {
 			driver := server.Driver()
-			session := driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
+			session := driver.NewSession(ctx, config.SessionConfig{AccessMode: config.AccessModeWrite})
 			return driver, session
 		}
 
@@ -212,8 +213,8 @@ func TestBookmark(outer *testing.T) {
 		setUp := func() (neo4j.DriverWithContext, neo4j.SessionWithContext, string) {
 			driver := server.Driver()
 			bookmark := createNodeInTx(driver)
-			session := driver.NewSession(ctx, neo4j.SessionConfig{
-				AccessMode: neo4j.AccessModeWrite,
+			session := driver.NewSession(ctx, config.SessionConfig{
+				AccessMode: config.AccessModeWrite,
 				Bookmarks:  bm.BookmarksFromRawValues(bookmark),
 			})
 			return driver, session, bookmark
@@ -312,8 +313,8 @@ func TestBookmark(outer *testing.T) {
 		bookmark2 = createNodeInTx(driver)
 		assertNotEquals(inner, bookmark1, bookmark2)
 
-		session = driver.NewSession(ctx, neo4j.SessionConfig{
-			AccessMode: neo4j.AccessModeWrite,
+		session = driver.NewSession(ctx, config.SessionConfig{
+			AccessMode: config.AccessModeWrite,
 			Bookmarks:  bm.BookmarksFromRawValues(bookmark1, bookmark2),
 		})
 
@@ -364,8 +365,8 @@ func TestBookmark(outer *testing.T) {
 
 			bookmark := createNodeInTx(driver)
 
-			session := driver.NewSession(ctx, neo4j.SessionConfig{
-				AccessMode: neo4j.AccessModeWrite,
+			session := driver.NewSession(ctx, config.SessionConfig{
+				AccessMode: config.AccessModeWrite,
 				Bookmarks:  bm.BookmarksFromRawValues(bookmark + "0"),
 			})
 			return driver, session, bookmark

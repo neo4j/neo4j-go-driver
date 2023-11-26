@@ -112,7 +112,7 @@ func NewBookmarkManager(config BookmarkManagerConfig) BookmarkManager {
 // Let s1, s2, s3 be Session interfaces. You can easily causally chain the sessions like so:
 // ```go
 //
-//	s4 := driver.NewSession(neo4j.SessionConfig{
+//	s4 := driver.NewSession(config.SessionConfig{
 //		Bookmarks: neo4j.CombineBookmarks(s1.LastBookmarks(), s2.LastBookmarks(), s3.LastBookmarks()),
 //	})
 //

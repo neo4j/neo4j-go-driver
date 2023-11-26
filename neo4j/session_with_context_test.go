@@ -28,6 +28,7 @@ import (
 	"time"
 
 	bm "github.com/neo4j/neo4j-go-driver/v5/neo4j/bookmarks"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/config"
 	idb "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/errorutil"
 
@@ -54,13 +55,13 @@ func TestSession(outer *testing.T) {
 		conf := Config{MaxTransactionRetryTime: 3 * time.Millisecond, MaxConnectionPoolSize: 100}
 		router := RouterFake{}
 		pool := PoolFake{}
-		sessConfig := SessionConfig{AccessMode: AccessModeRead, BoltLogger: boltLogger}
+		sessConfig := config.SessionConfig{AccessMode: config.AccessModeRead, BoltLogger: boltLogger}
 		sess := newSessionWithContext(&conf, sessConfig, &router, &pool, logger, nil, &now)
 		sess.throttleTime = time.Millisecond * 1
 		return &router, &pool, sess
 	}
 
-	createSessionFromConfig := func(sessConfig SessionConfig) (*RouterFake, *PoolFake, *sessionWithContext) {
+	createSessionFromConfig := func(sessConfig config.SessionConfig) (*RouterFake, *PoolFake, *sessionWithContext) {
 		conf := Config{MaxTransactionRetryTime: 3 * time.Millisecond}
 		router := RouterFake{}
 		pool := PoolFake{}
@@ -70,7 +71,7 @@ func TestSession(outer *testing.T) {
 	}
 
 	createSessionWithBookmarks := func(bookmarks bm.Bookmarks) (*RouterFake, *PoolFake, *sessionWithContext) {
-		sessConfig := SessionConfig{AccessMode: AccessModeRead, Bookmarks: bookmarks, BoltLogger: boltLogger}
+		sessConfig := config.SessionConfig{AccessMode: config.AccessModeRead, Bookmarks: bookmarks, BoltLogger: boltLogger}
 		return createSessionFromConfig(sessConfig)
 	}
 
@@ -145,7 +146,7 @@ func TestSession(outer *testing.T) {
 		})
 
 		inner.Run("Retrieves default database name for impersonated user", func(t *testing.T) {
-			sessConfig := SessionConfig{ImpersonatedUser: "me"}
+			sessConfig := config.SessionConfig{ImpersonatedUser: "me"}
 			router, pool, sess := createSessionFromConfig(sessConfig)
 			conn := &ConnFake{}
 			pool.BorrowConn = conn
@@ -176,7 +177,7 @@ func TestSession(outer *testing.T) {
 
 		for name, txFuncApi := range transactionFunctions {
 			inner.Run(fmt.Sprintf("Implicitly rolls back when a %s panics without retry", name), func(t *testing.T) {
-				_, pool, sess := createSessionFromConfig(SessionConfig{})
+				_, pool, sess := createSessionFromConfig(config.SessionConfig{})
 				pool.BorrowConn = &ConnFake{Alive: true}
 				poolReturnCalled := 0
 				pool.ReturnHook = func() {
@@ -328,7 +329,7 @@ func TestSession(outer *testing.T) {
 		})
 
 		inner.Run("Retrieves default database name for impersonated user", func(t *testing.T) {
-			sessConfig := SessionConfig{ImpersonatedUser: "me"}
+			sessConfig := config.SessionConfig{ImpersonatedUser: "me"}
 			router, pool, sess := createSessionFromConfig(sessConfig)
 			conn := &ConnFake{}
 			pool.BorrowConn = conn
@@ -496,7 +497,7 @@ func TestSession(outer *testing.T) {
 		})
 
 		inner.Run("Retrieves default database name for impersonated user", func(t *testing.T) {
-			sessConfig := SessionConfig{ImpersonatedUser: "me"}
+			sessConfig := config.SessionConfig{ImpersonatedUser: "me"}
 			router, pool, sess := createSessionFromConfig(sessConfig)
 			conn := &ConnFake{}
 			pool.BorrowConn = conn

@@ -27,11 +27,12 @@ import (
 
 	neo4j18 "github.com/neo4j/neo4j-go-driver/neo4j"
 	neo4j "github.com/neo4j/neo4j-go-driver/v5/neo4j"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/config"
 )
 
 func getSetup(driver neo4j.Driver) *neo4j.Node {
 	// Check if setup already built
-	sess := driver.NewSession(neo4j.SessionConfig{})
+	sess := driver.NewSession(config.SessionConfig{})
 	defer sess.Close()
 
 	result, err := sess.Run("MATCH (s:Setup) RETURN s", nil)
@@ -71,7 +72,7 @@ func getBoolProp(node *neo4j.Node, name string, dflt bool) bool {
 
 func buildSetup(driver neo4j.Driver, setup *neo4j.Node) {
 
-	sess := driver.NewSession(neo4j.SessionConfig{})
+	sess := driver.NewSession(config.SessionConfig{})
 	defer sess.Close()
 
 	if !getBoolProp(setup, "iterMxL", false) {
@@ -95,7 +96,7 @@ func buildSetup(driver neo4j.Driver, setup *neo4j.Node) {
 }
 
 func iterMxL(driver neo4j.Driver) {
-	sess := driver.NewSession(neo4j.SessionConfig{})
+	sess := driver.NewSession(config.SessionConfig{})
 	defer sess.Close()
 
 	result, err := sess.Run("MATCH (n:IterMxL) RETURN n", nil)
@@ -153,7 +154,7 @@ func buildParamsLMap() map[string]any {
 
 func params(driver neo4j.Driver, m map[string]any, n int) {
 	// Use same session for all of n, not part of measurement
-	session := driver.NewSession(neo4j.SessionConfig{})
+	session := driver.NewSession(config.SessionConfig{})
 	for i := 0; i < n; i++ {
 		_, err := session.Run("RETURN 0", m)
 		if err != nil {
@@ -179,7 +180,7 @@ func params18(driver neo4j18.Driver, m map[string]any, n int) {
 // Include session creation in measurement
 func getS(driver neo4j.Driver, n int) {
 	for i := 0; i < n; i++ {
-		session := driver.NewSession(neo4j.SessionConfig{})
+		session := driver.NewSession(config.SessionConfig{})
 		x, _ := session.ReadTransaction(func(tx neo4j.Transaction) (any, error) {
 			res, err := tx.Run("RETURN $i", map[string]any{"i": i})
 			if err != nil {

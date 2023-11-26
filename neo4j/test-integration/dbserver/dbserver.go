@@ -118,7 +118,7 @@ func setServerVersion(ctx context.Context, server *DbServer, envVersion Version)
 // this is used when the TEST_NEO4J_VERSION environment variable is not set.
 func (s *DbServer) getVersionFromDB(ctx context.Context) (Version, error) {
 	driver := s.Driver()
-	session := driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead})
+	session := driver.NewSession(ctx, config.SessionConfig{AccessMode: config.AccessModeRead})
 	defer session.Close(ctx)
 
 	result, err := session.Run(ctx, "CALL dbms.components() YIELD versions UNWIND versions AS version RETURN version;", nil)
@@ -146,7 +146,7 @@ func (s *DbServer) getVersionFromDB(ctx context.Context) (Version, error) {
 
 func (s DbServer) deleteData(ctx context.Context) {
 	driver := s.Driver()
-	session := driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
+	session := driver.NewSession(ctx, config.SessionConfig{AccessMode: config.AccessModeWrite})
 	defer session.Close(ctx)
 
 	for {

@@ -21,6 +21,8 @@ package neo4j
 import (
 	"context"
 	"net/url"
+
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/config"
 )
 
 // Driver represents a pool(s) of connections to a neo4j server or cluster. It's
@@ -31,7 +33,7 @@ type Driver interface {
 	// Target returns the url this driver is bootstrapped
 	Target() url.URL
 	// NewSession creates a new session based on the specified session configuration.
-	NewSession(config SessionConfig) Session
+	NewSession(config config.SessionConfig) Session
 	// VerifyConnectivity checks that the driver can connect to a remote server or cluster by
 	// establishing a network connection with the remote. Returns nil if succesful
 	// or error describing the problem.
@@ -80,7 +82,7 @@ func (d *driver) Target() url.URL {
 	return d.delegate.Target()
 }
 
-func (d *driver) NewSession(config SessionConfig) Session {
+func (d *driver) NewSession(config config.SessionConfig) Session {
 	return d.delegate.NewSession(context.Background(), config).legacy()
 }
 

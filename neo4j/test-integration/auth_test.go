@@ -22,6 +22,7 @@ import (
 	"testing"
 
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/config"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/test-integration/dbserver"
 )
 
@@ -39,7 +40,7 @@ func TestAuthentication(outer *testing.T) {
 			panic(err)
 		}
 
-		return driver, driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead})
+		return driver, driver.NewSession(ctx, config.SessionConfig{AccessMode: config.AccessModeRead})
 	}
 
 	outer.Run("when wrong credentials are provided, it should fail with authentication error", func(t *testing.T) {

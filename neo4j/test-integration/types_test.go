@@ -25,6 +25,7 @@ import (
 	"testing"
 
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/config"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/test-integration/dbserver"
 )
 
@@ -41,7 +42,7 @@ func TestTypes(outer *testing.T) {
 	var result neo4j.ResultWithContext
 
 	driver = server.Driver()
-	session = driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
+	session = driver.NewSession(ctx, config.SessionConfig{AccessMode: config.AccessModeWrite})
 	assertNotNil(outer, session)
 
 	defer func() {

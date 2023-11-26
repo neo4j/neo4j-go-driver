@@ -52,7 +52,7 @@ func TestResultSummary(outer *testing.T) {
 		}
 
 		inner.Run("does not include any database information", func(t *testing.T) {
-			session := driver.NewSession(ctx, neo4j.SessionConfig{Bookmarks: bm.BookmarksFromRawValues(bookmark)})
+			session := driver.NewSession(ctx, config.SessionConfig{Bookmarks: bm.BookmarksFromRawValues(bookmark)})
 			defer assertCloses(ctx, t, session)
 			result, err := session.Run(ctx, "RETURN 42", noParams)
 			assertNil(t, err)
@@ -72,7 +72,7 @@ func TestResultSummary(outer *testing.T) {
 			inner.Skip("Multi-tenancy is a Neo4j 4+ feature")
 		}
 
-		session := driver.NewSession(ctx, neo4j.SessionConfig{DatabaseName: "system", BoltLogger: neo4j.ConsoleBoltLogger()})
+		session := driver.NewSession(ctx, config.SessionConfig{DatabaseName: "system", BoltLogger: neo4j.ConsoleBoltLogger()})
 		defer assertCloses(ctx, inner, session)
 		res, err := session.Run(ctx, server.CreateDatabaseQuery(extraDatabase), map[string]any{})
 		assertNil(inner, err)
@@ -83,7 +83,7 @@ func TestResultSummary(outer *testing.T) {
 		bookmark = bookmarks[0]
 
 		defer func() {
-			session := driver.NewSession(ctx, neo4j.SessionConfig{DatabaseName: "system", Bookmarks: bm.BookmarksFromRawValues(bookmark)})
+			session := driver.NewSession(ctx, config.SessionConfig{DatabaseName: "system", Bookmarks: bm.BookmarksFromRawValues(bookmark)})
 			defer assertCloses(ctx, inner, session)
 			res, err := session.Run(ctx, server.DropDatabaseQuery(extraDatabase), map[string]any{})
 			assertNil(inner, err)
@@ -93,7 +93,7 @@ func TestResultSummary(outer *testing.T) {
 		}()
 
 		inner.Run("includes the default database information", func(t *testing.T) {
-			session := driver.NewSession(ctx, neo4j.SessionConfig{Bookmarks: bm.BookmarksFromRawValues(bookmark)})
+			session := driver.NewSession(ctx, config.SessionConfig{Bookmarks: bm.BookmarksFromRawValues(bookmark)})
 			defer assertCloses(ctx, t, session)
 			result, err := session.Run(ctx, "RETURN 42", noParams)
 			assertNil(t, err)
@@ -104,7 +104,7 @@ func TestResultSummary(outer *testing.T) {
 		})
 
 		inner.Run("includes the database information, based on session configuration", func(t *testing.T) {
-			session := driver.NewSession(ctx, neo4j.SessionConfig{DatabaseName: extraDatabase, Bookmarks: bm.BookmarksFromRawValues(bookmark)})
+			session := driver.NewSession(ctx, config.SessionConfig{DatabaseName: extraDatabase, Bookmarks: bm.BookmarksFromRawValues(bookmark)})
 			defer assertCloses(ctx, t, session)
 			result, err := session.Run(ctx, "RETURN 42", noParams)
 			assertNil(t, err)

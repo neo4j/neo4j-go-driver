@@ -20,8 +20,10 @@ package neo4j
 import (
 	"context"
 	"fmt"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/notifications"
 	"os"
+
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/config"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/notifications"
 )
 
 func ExampleConfig_disableNoCategories() {
@@ -49,7 +51,7 @@ func ExampleSessionConfig_disableNoCategories() {
 	handleError(err)
 	defer handleClose(ctx, driver)
 
-	session := driver.NewSession(ctx, SessionConfig{
+	session := driver.NewSession(ctx, config.SessionConfig{
 		// makes the server return all notification categories
 		// this overrides the driver level configuration of the same name
 		NotificationsDisabledCategories: notifications.DisableNoCategories(),
@@ -94,7 +96,7 @@ func ExampleSessionConfig_disableSomeCategories() {
 	handleError(err)
 	defer handleClose(ctx, driver)
 
-	session := driver.NewSession(ctx, SessionConfig{
+	session := driver.NewSession(ctx, config.SessionConfig{
 		// makes the server return all notification categories but deprecations
 		// this overrides the driver level configuration of the same name
 		NotificationsDisabledCategories: notifications.DisableCategories(notifications.Deprecation),
@@ -140,7 +142,7 @@ func ExampleSessionConfig_minimumSeverityLevel() {
 	handleError(err)
 	defer handleClose(ctx, driver)
 
-	session := driver.NewSession(ctx, SessionConfig{
+	session := driver.NewSession(ctx, config.SessionConfig{
 		// makes the server return only notifications with severity level warning or higher
 		// this overrides the driver level configuration of the same name
 		NotificationsMinSeverity: notifications.WarningLevel,

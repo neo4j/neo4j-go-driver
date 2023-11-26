@@ -620,15 +620,15 @@ func (b *backend) handleRequest(req map[string]any) {
 
 	case "NewSession":
 		driver := b.drivers[data["driverId"].(string)]
-		sessionConfig := neo4j.SessionConfig{
+		sessionConfig := config.SessionConfig{
 			BoltLogger: &streamLog{writeLine: b.writeLineLocked},
 		}
 		if data["accessMode"] != nil {
 			switch data["accessMode"].(string) {
 			case "r":
-				sessionConfig.AccessMode = neo4j.AccessModeRead
+				sessionConfig.AccessMode = config.AccessModeRead
 			case "w":
-				sessionConfig.AccessMode = neo4j.AccessModeWrite
+				sessionConfig.AccessMode = config.AccessModeWrite
 			default:
 				b.writeError(errors.New("Unknown access mode: " + data["accessMode"].(string)))
 				return
@@ -907,7 +907,7 @@ func (b *backend) handleRequest(req map[string]any) {
 
 	case "CheckMultiDBSupport":
 		driver := b.drivers[data["driverId"].(string)]
-		session := driver.NewSession(ctx, neo4j.SessionConfig{
+		session := driver.NewSession(ctx, config.SessionConfig{
 			BoltLogger: neo4j.ConsoleBoltLogger(),
 		})
 		result, err := session.Run(ctx, "RETURN 42", nil)

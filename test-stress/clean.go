@@ -19,11 +19,13 @@ package main
 
 import (
 	"context"
+
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/config"
 )
 
 func cleanDb(ctx context.Context, driver neo4j.DriverWithContext) {
-	session := driver.NewSession(ctx, neo4j.SessionConfig{})
+	session := driver.NewSession(ctx, config.SessionConfig{})
 	batch := 1000
 	for {
 		x, err := session.ExecuteWrite(ctx, func(tx neo4j.ManagedTransaction) (any, error) {

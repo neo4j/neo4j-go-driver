@@ -20,8 +20,10 @@ package neo4j_test
 import (
 	"context"
 	"fmt"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
 	"os"
+
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/config"
 )
 
 type Person struct {
@@ -45,7 +47,7 @@ func ExampleExecuteWrite() {
 	driver, err := createDriver()
 	handleError(err)
 	defer handleClose(ctx, driver)
-	session := driver.NewSession(ctx, neo4j.SessionConfig{})
+	session := driver.NewSession(ctx, config.SessionConfig{})
 	defer handleClose(ctx, session)
 
 	person := readPersonFromRequest()
@@ -84,7 +86,7 @@ func ExampleExecuteRead() {
 	driver, err := createDriver()
 	handleError(err)
 	defer handleClose(ctx, driver)
-	session := driver.NewSession(ctx, neo4j.SessionConfig{})
+	session := driver.NewSession(ctx, config.SessionConfig{})
 	defer handleClose(ctx, session)
 
 	personLogin := readPersonLoginFromRequest()

@@ -20,9 +20,10 @@ package test_integration
 import (
 	"context"
 	"fmt"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/config"
 	"testing"
 	"time"
+
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/config"
 
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/db"
@@ -50,7 +51,7 @@ func TestSession(outer *testing.T) {
 		})
 		assertNotNil(inner, driver)
 
-		session = driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead})
+		session = driver.NewSession(ctx, config.SessionConfig{AccessMode: config.AccessModeRead})
 		assertNotNil(inner, session)
 
 		defer func() {
@@ -172,7 +173,7 @@ func TestSession(outer *testing.T) {
 		)
 
 		driver = server.Driver()
-		session = driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
+		session = driver.NewSession(ctx, config.SessionConfig{AccessMode: config.AccessModeWrite})
 
 		defer func() {
 			if session != nil {
@@ -332,7 +333,7 @@ func TestSession(outer *testing.T) {
 			var err error
 
 			innerExecutor := func() error {
-				session = driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead})
+				session = driver.NewSession(ctx, config.SessionConfig{AccessMode: config.AccessModeRead})
 				defer session.Close(ctx)
 
 				if result, err = session.Run(ctx, "UNWIND RANGE(1,100) AS N RETURN N", nil); err != nil {
@@ -354,7 +355,7 @@ func TestSession(outer *testing.T) {
 			var err1, err2 error
 
 			innerExecutor := func() error {
-				session = driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead})
+				session = driver.NewSession(ctx, config.SessionConfig{AccessMode: config.AccessModeRead})
 				defer session.Close(ctx)
 
 				if result1, err1 = session.Run(ctx, "UNWIND RANGE(1,100) AS N RETURN N", nil); err != nil {
@@ -391,7 +392,7 @@ func TestSession(outer *testing.T) {
 			innerExecutor := func() error {
 				var tx neo4j.ExplicitTransaction
 
-				session = driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
+				session = driver.NewSession(ctx, config.SessionConfig{AccessMode: config.AccessModeWrite})
 				defer session.Close(ctx)
 
 				if tx, err = session.BeginTransaction(ctx); err != nil {
@@ -426,7 +427,7 @@ func TestSession(outer *testing.T) {
 			assertEquals(t, records2[99].Values[0], 100)
 			assertEquals(t, records2[99].Values[1], "Text 100")
 
-			newSession := driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead})
+			newSession := driver.NewSession(ctx, config.SessionConfig{AccessMode: config.AccessModeRead})
 			assertNotNil(t, newSession)
 			defer newSession.Close(ctx)
 
@@ -449,7 +450,7 @@ func TestSession(outer *testing.T) {
 			inner.Skip("this test is targeted for server version after neo4j 3.5.0")
 		}
 
-		session = driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
+		session = driver.NewSession(ctx, config.SessionConfig{AccessMode: config.AccessModeWrite})
 		assertNotNil(inner, session)
 
 		defer func() {
@@ -515,12 +516,12 @@ func TestSession(outer *testing.T) {
 		inner.Run("should set transaction timeout", func(t *testing.T) {
 			createNode(ctx, t, session, "RunTxTimeOut", nil)
 
-			session2, tx2 := newSessionAndTx(ctx, t, driver, neo4j.AccessModeWrite)
+			session2, tx2 := newSessionAndTx(ctx, t, driver, config.AccessModeWrite)
 			defer session2.Close(ctx)
 			defer tx2.Close(ctx)
 			updateNodeInTx(ctx, t, tx2, "RunTxTimeOut", map[string]any{"id": 1})
 
-			session3 := driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
+			session3 := driver.NewSession(ctx, config.SessionConfig{AccessMode: config.AccessModeWrite})
 
 			result3, err := session3.Run(ctx, "MATCH (n:RunTxTimeOut) SET n.id = 2", nil, neo4j.WithTxTimeout(1*time.Second))
 			// Up to db to determine when error occurs
@@ -542,12 +543,12 @@ func TestSession(outer *testing.T) {
 		inner.Run("should set transaction timeout on ExecuteWrite", func(t *testing.T) {
 			createNode(ctx, t, session, "WriteTransactionTxTimeOut", nil)
 
-			session2, tx2 := newSessionAndTx(ctx, t, driver, neo4j.AccessModeWrite)
+			session2, tx2 := newSessionAndTx(ctx, t, driver, config.AccessModeWrite)
 			defer session2.Close(ctx)
 			defer tx2.Close(ctx)
 			updateNodeInTx(ctx, t, tx2, "WriteTransactionTxTimeOut", map[string]any{"id": 1})
 
-			session3 := driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
+			session3 := driver.NewSession(ctx, config.SessionConfig{AccessMode: config.AccessModeWrite})
 
 			_, err := session3.ExecuteWrite(ctx, updateNodeWork(ctx, t, "WriteTransactionTxTimeOut", map[string]any{"id": 2}), neo4j.WithTxTimeout(1*time.Second))
 			assertNotNil(t, err)

@@ -20,10 +20,12 @@ package test_integration
 import (
 	"context"
 	"fmt"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/test-integration/dbserver"
 	"reflect"
 	"sort"
 	"testing"
+
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/config"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/test-integration/dbserver"
 
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
 )
@@ -62,8 +64,8 @@ func writeTransactionWithIntWork(ctx context.Context, t *testing.T, session neo4
 	return result.(int64)
 }
 
-func newSessionAndTx(ctx context.Context, t *testing.T, driver neo4j.DriverWithContext, mode neo4j.AccessMode, configurers ...func(*neo4j.TransactionConfig)) (neo4j.SessionWithContext, neo4j.ExplicitTransaction) {
-	session := driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: mode})
+func newSessionAndTx(ctx context.Context, t *testing.T, driver neo4j.DriverWithContext, mode config.AccessMode, configurers ...func(*neo4j.TransactionConfig)) (neo4j.SessionWithContext, neo4j.ExplicitTransaction) {
+	session := driver.NewSession(ctx, config.SessionConfig{AccessMode: mode})
 
 	tx, err := session.BeginTransaction(ctx, configurers...)
 	assertNil(t, err)

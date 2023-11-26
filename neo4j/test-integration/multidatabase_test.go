@@ -21,7 +21,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/config"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/test-integration/dbserver"
 )
 
@@ -47,7 +47,7 @@ func TestMultidatabase(outer *testing.T) {
 
 	// Ensure that a test database exists using system database
 	func() {
-		sysSess := driver.NewSession(ctx, neo4j.SessionConfig{DatabaseName: "system"})
+		sysSess := driver.NewSession(ctx, config.SessionConfig{DatabaseName: "system"})
 		defer sysSess.Close(ctx)
 		_, err := sysSess.Run(ctx, server.DropDatabaseQuery("testdb"), nil)
 		assertNil(outer, err)
@@ -57,17 +57,17 @@ func TestMultidatabase(outer *testing.T) {
 
 	outer.Run("Node created in test db should not be visible in default db", func(t *testing.T) {
 		// Create node in testdb session
-		testSess := driver.NewSession(ctx, neo4j.SessionConfig{DatabaseName: "testdb"})
+		testSess := driver.NewSession(ctx, config.SessionConfig{DatabaseName: "testdb"})
 		randId := createRandomNode(ctx, t, testSess)
 		testSess.Close(ctx)
 
 		// Look for above node in default database session, it shouldn't exist there
-		defaultSess := driver.NewSession(ctx, neo4j.SessionConfig{})
+		defaultSess := driver.NewSession(ctx, config.SessionConfig{})
 		assertNoRandomNode(ctx, t, defaultSess, randId)
 		defaultSess.Close(ctx)
 
 		// Look again in testdb session, should of course exist here
-		testSess = driver.NewSession(ctx, neo4j.SessionConfig{DatabaseName: "testdb"})
+		testSess = driver.NewSession(ctx, config.SessionConfig{DatabaseName: "testdb"})
 		assertRandomNode(ctx, t, testSess, randId)
 		testSess.Close(ctx)
 	})
