@@ -21,13 +21,15 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	idb "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/errorutil"
 	"io"
 	"reflect"
 	"sync"
 	"testing"
 	"time"
+
+	bm "github.com/neo4j/neo4j-go-driver/v5/neo4j/bookmarks"
+	idb "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/errorutil"
 
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/db"
 	. "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/testutil"
@@ -67,7 +69,7 @@ func TestSession(outer *testing.T) {
 		return &router, &pool, sess
 	}
 
-	createSessionWithBookmarks := func(bookmarks Bookmarks) (*RouterFake, *PoolFake, *sessionWithContext) {
+	createSessionWithBookmarks := func(bookmarks bm.Bookmarks) (*RouterFake, *PoolFake, *sessionWithContext) {
 		sessConfig := SessionConfig{AccessMode: AccessModeRead, Bookmarks: bookmarks, BoltLogger: boltLogger}
 		return createSessionFromConfig(sessConfig)
 	}
@@ -197,13 +199,13 @@ func TestSession(outer *testing.T) {
 
 	outer.Run("Bookmarking", func(inner *testing.T) {
 		inner.Run("Initial bookmarks are returned from LastBookmarks", func(t *testing.T) {
-			_, _, sess := createSessionWithBookmarks(BookmarksFromRawValues("b1", "b2"))
-			AssertDeepEquals(t, sess.LastBookmarks(), BookmarksFromRawValues("b1", "b2"))
+			_, _, sess := createSessionWithBookmarks(bm.BookmarksFromRawValues("b1", "b2"))
+			AssertDeepEquals(t, sess.LastBookmarks(), bm.BookmarksFromRawValues("b1", "b2"))
 		})
 
 		inner.Run("Initial bookmarks are used and cleaned up before usage", func(t *testing.T) {
-			dirtyBookmarks := BookmarksFromRawValues("", "b1", "", "b2", "")
-			cleanBookmarks := BookmarksFromRawValues("b1", "b2")
+			dirtyBookmarks := bm.BookmarksFromRawValues("", "b1", "", "b2", "")
+			cleanBookmarks := bm.BookmarksFromRawValues("b1", "b2")
 			_, pool, sess := createSessionWithBookmarks(dirtyBookmarks)
 			err := errors.New("make all fail")
 			conn := &ConnFake{Alive: true, RunErr: err, TxBeginErr: err}
@@ -254,13 +256,13 @@ func TestSession(outer *testing.T) {
 			// Should call Buffer on connection to ensure that first Run is buffered and
 			// it's bookmark retrieved
 			sess.Run(context.Background(), "cypher", nil)
-			AssertDeepEquals(t, BookmarksToRawValues(sess.LastBookmarks()), []string{"buffer-1"})
+			AssertDeepEquals(t, bm.BookmarksToRawValues(sess.LastBookmarks()), []string{"buffer-1"})
 			result, _ := sess.Run(context.Background(), "cypher", nil)
-			AssertDeepEquals(t, BookmarksToRawValues(sess.LastBookmarks()), []string{"buffer-2"})
+			AssertDeepEquals(t, bm.BookmarksToRawValues(sess.LastBookmarks()), []string{"buffer-2"})
 			// And finally consuming the last result should give a new bookmark
 			AssertIntEqual(t, consumeCalls, 0)
 			result.Consume(context.Background())
-			AssertDeepEquals(t, BookmarksToRawValues(sess.LastBookmarks()), []string{"consume-1"})
+			AssertDeepEquals(t, bm.BookmarksToRawValues(sess.LastBookmarks()), []string{"consume-1"})
 		})
 
 		inner.Run("Pending and invoke tx function", func(t *testing.T) {
@@ -285,7 +287,7 @@ func TestSession(outer *testing.T) {
 			if !reflect.DeepEqual([]string{"1"}, rtx.Bookmarks) {
 				t.Errorf("Using unclean or no bookmarks: %+v", rtx)
 			}
-			AssertDeepEquals(t, BookmarksToRawValues(sess.LastBookmarks()), []string{"1"})
+			AssertDeepEquals(t, bm.BookmarksToRawValues(sess.LastBookmarks()), []string{"1"})
 			AssertIntEqual(t, bufferCalls, 1)
 		})
 
@@ -309,7 +311,7 @@ func TestSession(outer *testing.T) {
 			if !reflect.DeepEqual([]string{"1"}, rtx.Bookmarks) {
 				t.Errorf("Using unclean or no bookmarks: %+v", rtx)
 			}
-			AssertDeepEquals(t, BookmarksToRawValues(sess.LastBookmarks()), []string{"1"})
+			AssertDeepEquals(t, bm.BookmarksToRawValues(sess.LastBookmarks()), []string{"1"})
 			AssertIntEqual(t, bufferCalls, 1)
 		})
 
@@ -471,7 +473,7 @@ func TestSession(outer *testing.T) {
 			// Begin and commit a transaction on the session
 			tx, _ := sess.BeginTransaction(context.Background())
 			tx.Commit(context.Background())
-			AssertDeepEquals(t, BookmarksToRawValues(sess.LastBookmarks()), []string{bookmark})
+			AssertDeepEquals(t, bm.BookmarksToRawValues(sess.LastBookmarks()), []string{bookmark})
 			// The bookmark should be used in next transaction
 			sess.BeginTransaction(context.Background())
 			AssertLen(t, conn.RecordedTxs, 2)

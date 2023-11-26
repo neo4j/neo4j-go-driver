@@ -23,6 +23,7 @@ import (
 	"testing"
 
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
+	bm "github.com/neo4j/neo4j-go-driver/v5/neo4j/bookmarks"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/test-integration/dbserver"
 )
 
@@ -50,7 +51,7 @@ func TestBookmark(outer *testing.T) {
 		})
 		assertNil(outer, err)
 
-		bookmarks := neo4j.BookmarksToRawValues(session.LastBookmarks())
+		bookmarks := bm.BookmarksToRawValues(session.LastBookmarks())
 		assertEquals(outer, len(bookmarks), 1)
 		return bookmarks[0]
 	}
@@ -81,7 +82,7 @@ func TestBookmark(outer *testing.T) {
 			_, err = result.Consume(ctx)
 
 			assertNil(t, err)
-			assertStringsNotEmpty(t, neo4j.BookmarksToRawValues(session.LastBookmarks()))
+			assertStringsNotEmpty(t, bm.BookmarksToRawValues(session.LastBookmarks()))
 		})
 
 		inner.Run("when a node is created in explicit transaction and committed, last bookmark should not be empty", func(t *testing.T) {
@@ -100,7 +101,7 @@ func TestBookmark(outer *testing.T) {
 			err = tx.Commit(ctx)
 			assertNil(t, err)
 
-			assertStringsNotEmpty(t, neo4j.BookmarksToRawValues(session.LastBookmarks()))
+			assertStringsNotEmpty(t, bm.BookmarksToRawValues(session.LastBookmarks()))
 		})
 
 		inner.Run("when a node is created in explicit transaction and rolled back, last bookmark should be empty", func(t *testing.T) {
@@ -119,7 +120,7 @@ func TestBookmark(outer *testing.T) {
 			err = tx.Rollback(ctx)
 			assertNil(t, err)
 
-			assertStringsEmpty(t, neo4j.BookmarksToRawValues(session.LastBookmarks()))
+			assertStringsEmpty(t, bm.BookmarksToRawValues(session.LastBookmarks()))
 		})
 
 		inner.Run("when a node is created in transaction function, last bookmark should not be empty", func(t *testing.T) {
@@ -138,7 +139,7 @@ func TestBookmark(outer *testing.T) {
 
 			assertNil(t, err)
 			assertEquals(t, result, 1)
-			assertStringsNotEmpty(t, neo4j.BookmarksToRawValues(session.LastBookmarks()))
+			assertStringsNotEmpty(t, bm.BookmarksToRawValues(session.LastBookmarks()))
 		})
 
 		inner.Run("when a node is created in transaction function and rolled back, last bookmark should be empty", func(t *testing.T) {
@@ -158,7 +159,7 @@ func TestBookmark(outer *testing.T) {
 
 			assertEquals(t, err, failWith)
 			assertNil(t, result)
-			assertStringsEmpty(t, neo4j.BookmarksToRawValues(session.LastBookmarks()))
+			assertStringsEmpty(t, bm.BookmarksToRawValues(session.LastBookmarks()))
 		})
 
 		inner.Run("when a node is queried in transaction function, last bookmark should not be empty", func(t *testing.T) {
@@ -180,7 +181,7 @@ func TestBookmark(outer *testing.T) {
 
 			assertNil(t, err)
 			assertEquals(t, result, 1)
-			assertStringsNotEmpty(t, neo4j.BookmarksToRawValues(session.LastBookmarks()))
+			assertStringsNotEmpty(t, bm.BookmarksToRawValues(session.LastBookmarks()))
 		})
 
 		inner.Run("when a node is created in transaction function and rolled back, last bookmark should be empty", func(t *testing.T) {
@@ -203,7 +204,7 @@ func TestBookmark(outer *testing.T) {
 
 			assertEquals(t, err, failWith)
 			assertNil(t, result)
-			assertStringsEmpty(t, neo4j.BookmarksToRawValues(session.LastBookmarks()))
+			assertStringsEmpty(t, bm.BookmarksToRawValues(session.LastBookmarks()))
 		})
 	})
 
@@ -213,7 +214,7 @@ func TestBookmark(outer *testing.T) {
 			bookmark := createNodeInTx(driver)
 			session := driver.NewSession(ctx, neo4j.SessionConfig{
 				AccessMode: neo4j.AccessModeWrite,
-				Bookmarks:  neo4j.BookmarksFromRawValues(bookmark),
+				Bookmarks:  bm.BookmarksFromRawValues(bookmark),
 			})
 			return driver, session, bookmark
 		}
@@ -236,7 +237,7 @@ func TestBookmark(outer *testing.T) {
 			assertNil(t, err)
 			defer tx.Close(ctx)
 
-			assertEquals(t, neo4j.BookmarksToRawValues(session.LastBookmarks()), []string{bookmark})
+			assertEquals(t, bm.BookmarksToRawValues(session.LastBookmarks()), []string{bookmark})
 		})
 
 		inner.Run("given bookmarks should be accessible after ROLLBACK", func(t *testing.T) {
@@ -253,7 +254,7 @@ func TestBookmark(outer *testing.T) {
 			err = tx.Rollback(ctx)
 			assertNil(t, err)
 
-			assertEquals(t, neo4j.BookmarksToRawValues(session.LastBookmarks()), []string{bookmark})
+			assertEquals(t, bm.BookmarksToRawValues(session.LastBookmarks()), []string{bookmark})
 		})
 
 		inner.Run("given bookmarks should be accessible when transaction fails", func(t *testing.T) {
@@ -269,7 +270,7 @@ func TestBookmark(outer *testing.T) {
 
 			err = tx.Close(ctx)
 			assertNil(t, err)
-			assertEquals(t, neo4j.BookmarksToRawValues(session.LastBookmarks()), []string{bookmark})
+			assertEquals(t, bm.BookmarksToRawValues(session.LastBookmarks()), []string{bookmark})
 		})
 
 		inner.Run("given bookmarks should be accessible after run", func(t *testing.T) {
@@ -282,7 +283,7 @@ func TestBookmark(outer *testing.T) {
 			_, err = result.Consume(ctx)
 			assertNil(t, err)
 
-			assertEquals(t, neo4j.BookmarksToRawValues(session.LastBookmarks()), []string{bookmark})
+			assertEquals(t, bm.BookmarksToRawValues(session.LastBookmarks()), []string{bookmark})
 		})
 
 		inner.Run("given bookmarks should be accessible after failed run", func(t *testing.T) {
@@ -292,7 +293,7 @@ func TestBookmark(outer *testing.T) {
 			_, err := session.Run(ctx, "RETURN", nil)
 			assertNotNil(t, err)
 
-			assertEquals(t, neo4j.BookmarksToRawValues(session.LastBookmarks()), []string{bookmark})
+			assertEquals(t, bm.BookmarksToRawValues(session.LastBookmarks()), []string{bookmark})
 		})
 
 	})
@@ -313,7 +314,7 @@ func TestBookmark(outer *testing.T) {
 
 		session = driver.NewSession(ctx, neo4j.SessionConfig{
 			AccessMode: neo4j.AccessModeWrite,
-			Bookmarks:  neo4j.BookmarksFromRawValues(bookmark1, bookmark2),
+			Bookmarks:  bm.BookmarksFromRawValues(bookmark1, bookmark2),
 		})
 
 		defer func() {
@@ -331,7 +332,7 @@ func TestBookmark(outer *testing.T) {
 			assertNil(t, err)
 			defer tx.Close(ctx)
 
-			assertEquals(t, neo4j.BookmarksToRawValues(session.LastBookmarks()), []string{bookmark1, bookmark2})
+			assertEquals(t, bm.BookmarksToRawValues(session.LastBookmarks()), []string{bookmark1, bookmark2})
 		})
 
 		inner.Run("new bookmark should be reported back by the server after committing", func(t *testing.T) {
@@ -349,9 +350,9 @@ func TestBookmark(outer *testing.T) {
 			err = tx.Commit(ctx)
 			assertNil(t, err)
 
-			assertNotNil(t, neo4j.BookmarksToRawValues(session.LastBookmarks()))
-			assertNotEquals(t, neo4j.BookmarksToRawValues(session.LastBookmarks()), []string{bookmark1})
-			assertNotEquals(t, neo4j.BookmarksToRawValues(session.LastBookmarks()), []string{bookmark2})
+			assertNotNil(t, bm.BookmarksToRawValues(session.LastBookmarks()))
+			assertNotEquals(t, bm.BookmarksToRawValues(session.LastBookmarks()), []string{bookmark1})
+			assertNotEquals(t, bm.BookmarksToRawValues(session.LastBookmarks()), []string{bookmark2})
 		})
 
 	})
@@ -365,7 +366,7 @@ func TestBookmark(outer *testing.T) {
 
 			session := driver.NewSession(ctx, neo4j.SessionConfig{
 				AccessMode: neo4j.AccessModeWrite,
-				Bookmarks:  neo4j.BookmarksFromRawValues(bookmark + "0"),
+				Bookmarks:  bm.BookmarksFromRawValues(bookmark + "0"),
 			})
 			return driver, session, bookmark
 		}

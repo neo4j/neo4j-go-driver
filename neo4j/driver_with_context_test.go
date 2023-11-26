@@ -21,14 +21,16 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/racing"
-	. "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/testutil"
 	"net/url"
 	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
 	"unsafe"
+
+	bm "github.com/neo4j/neo4j-go-driver/v5/neo4j/bookmarks"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/racing"
+	. "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/testutil"
 )
 
 func TestDriverExecuteQuery(outer *testing.T) {
@@ -448,7 +450,7 @@ func TestDriverExecuteQuery(outer *testing.T) {
 				callExecuteQueryOrBookmarkManagerGetter(driver, i)
 				storeBookmarkManagerAddress(
 					&bookmarkManagerAddresses,
-					driver.delegate.executeQueryBookmarkManager.(*bookmarkManager))
+					driver.delegate.executeQueryBookmarkManager.(*bm.DefaultBookmarkManager))
 				wait.Done()
 			}(i)
 		}
@@ -462,7 +464,7 @@ func TestDriverExecuteQuery(outer *testing.T) {
 		if len(addressCounts) != 1 {
 			t.Errorf("expected exactly 1 bookmark manager pointer to have been created, got %v", addressCounts)
 		}
-		address := uintptr(unsafe.Pointer(driver.delegate.executeQueryBookmarkManager.(*bookmarkManager)))
+		address := uintptr(unsafe.Pointer(driver.delegate.executeQueryBookmarkManager.(*bm.DefaultBookmarkManager)))
 		if count, found := addressCounts[address]; !found || count != int32(goroutineCount) {
 			t.Errorf("expected pointer address %v to be seen %d time(s), got these instead %v", address, count, addressCounts)
 		}
@@ -479,7 +481,7 @@ func callExecuteQueryOrBookmarkManagerGetter(driver DriverWithContext, i int) {
 	}
 }
 
-func storeBookmarkManagerAddress(bookmarkManagerAddresses *sync.Map, bookmarkMgr *bookmarkManager) {
+func storeBookmarkManagerAddress(bookmarkManagerAddresses *sync.Map, bookmarkMgr *bm.DefaultBookmarkManager) {
 	address := uintptr(unsafe.Pointer(bookmarkMgr))
 	defaultCount := int32(1)
 	if count, loaded := bookmarkManagerAddresses.LoadOrStore(address, &defaultCount); loaded {
@@ -517,7 +519,7 @@ type driverDelegate struct {
 	newSession func(context.Context, SessionConfig) SessionWithContext
 }
 
-func (d *driverDelegate) ExecuteQueryBookmarkManager() BookmarkManager {
+func (d *driverDelegate) ExecuteQueryBookmarkManager() bm.BookmarkManager {
 	return d.delegate.ExecuteQueryBookmarkManager()
 }
 
@@ -560,7 +562,7 @@ type fakeSession struct {
 	closeErr                       error
 }
 
-func (s *fakeSession) LastBookmarks() Bookmarks {
+func (s *fakeSession) LastBookmarks() bm.Bookmarks {
 	panic("implement me")
 }
 

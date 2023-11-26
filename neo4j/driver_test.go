@@ -21,6 +21,7 @@ import (
 	"reflect"
 	"testing"
 
+	bm "github.com/neo4j/neo4j-go-driver/v5/neo4j/bookmarks"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/router"
 	. "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/testutil"
 )
@@ -214,7 +215,7 @@ func TestDriverSessionCreation(t *testing.T) {
 		name      string
 		testing   string
 		mode      AccessMode
-		bookmarks Bookmarks
+		bookmarks bm.Bookmarks
 	}{
 		{"Write", "bolt://localhost:7687", AccessModeWrite, []string(nil)},
 		{"Read", "bolt://localhost:7687", AccessModeRead, []string(nil)},

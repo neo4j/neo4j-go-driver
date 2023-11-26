@@ -21,6 +21,8 @@ import (
 	"context"
 	"reflect"
 	"testing"
+
+	bm "github.com/neo4j/neo4j-go-driver/v5/neo4j/bookmarks"
 )
 
 func TestSessionBookmarks(outer *testing.T) {
@@ -130,7 +132,7 @@ type fakeBookmarkManager struct {
 	recordedCalls []invocation
 }
 
-func (f *fakeBookmarkManager) UpdateBookmarks(ctx context.Context, previousBookmarks, newBookmarks Bookmarks) error {
+func (f *fakeBookmarkManager) UpdateBookmarks(ctx context.Context, previousBookmarks, newBookmarks bm.Bookmarks) error {
 	f.recordedCalls = append(f.recordedCalls, invocation{
 		function:  "UpdateBookmarks",
 		arguments: []any{ctx, previousBookmarks, newBookmarks},
@@ -138,7 +140,7 @@ func (f *fakeBookmarkManager) UpdateBookmarks(ctx context.Context, previousBookm
 	return nil
 }
 
-func (f *fakeBookmarkManager) GetBookmarks(ctx context.Context) (Bookmarks, error) {
+func (f *fakeBookmarkManager) GetBookmarks(ctx context.Context) (bm.Bookmarks, error) {
 	f.recordedCalls = append(f.recordedCalls, invocation{
 		function:  "GetBookmarks",
 		arguments: []any{ctx},
@@ -146,7 +148,7 @@ func (f *fakeBookmarkManager) GetBookmarks(ctx context.Context) (Bookmarks, erro
 	return nil, nil
 }
 
-func (f *fakeBookmarkManager) GetAllBookmarks(ctx context.Context) (Bookmarks, error) {
+func (f *fakeBookmarkManager) GetAllBookmarks(ctx context.Context) (bm.Bookmarks, error) {
 	f.recordedCalls = append(f.recordedCalls, invocation{
 		function:  "GetAllBookmarks",
 		arguments: []any{ctx},

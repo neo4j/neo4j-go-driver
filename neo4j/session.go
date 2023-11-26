@@ -19,6 +19,8 @@ package neo4j
 
 import (
 	"context"
+
+	bm "github.com/neo4j/neo4j-go-driver/v5/neo4j/bookmarks"
 )
 
 // Session represents a logical connection (which is not tied to a physical connection)
@@ -32,7 +34,7 @@ type Session interface {
 	// LastBookmarks returns the bookmark received following the last successfully completed transaction.
 	// If no bookmark was received or if this transaction was rolled back, the initial set of bookmarks will be
 	// returned.
-	LastBookmarks() Bookmarks
+	LastBookmarks() bm.Bookmarks
 	// LastBookmark returns the bookmark received following the last successfully completed transaction.
 	// If no bookmark was received or if this transaction was rolled back, the bookmark value will not be changed.
 	// Warning: this method can lead to unexpected behaviour if the session has not yet successfully completed a
@@ -58,7 +60,7 @@ type session struct {
 	delegate *sessionWithContext
 }
 
-func (s *session) LastBookmarks() Bookmarks {
+func (s *session) LastBookmarks() bm.Bookmarks {
 	return s.delegate.LastBookmarks()
 }
 
@@ -122,7 +124,7 @@ func (s *erroredSession) LastBookmark() string {
 	return ""
 }
 
-func (s *erroredSession) LastBookmarks() Bookmarks {
+func (s *erroredSession) LastBookmarks() bm.Bookmarks {
 	return []string{}
 }
 

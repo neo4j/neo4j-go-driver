@@ -21,15 +21,17 @@ package neo4j
 import (
 	"context"
 	"fmt"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/auth"
-	idb "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/errorutil"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/racing"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/log"
 	"net/url"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/auth"
+	bm "github.com/neo4j/neo4j-go-driver/v5/neo4j/bookmarks"
+	idb "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/errorutil"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/racing"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/log"
 
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/connector"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/pool"
@@ -61,7 +63,7 @@ type DriverWithContext interface {
 	// 	// maintain consistency with sessions as well
 	//	session := driver.NewSession(ctx, neo4j.SessionConfig {BookmarkManager: bookmarkManager})
 	//	// [...] run something within the session
-	ExecuteQueryBookmarkManager() BookmarkManager
+	ExecuteQueryBookmarkManager() bm.BookmarkManager
 	// Target returns the url this driver is bootstrapped
 	Target() url.URL
 	// NewSession creates a new session based on the specified session configuration.
@@ -322,7 +324,7 @@ type driverWithContext struct {
 	executeQueryBookmarkManagerInitializer sync.Once
 	// instance of the bookmark manager only used by default by managed sessions of ExecuteQuery
 	// this is *not* used by default by user-created session (see NewSession)
-	executeQueryBookmarkManager BookmarkManager
+	executeQueryBookmarkManager bm.BookmarkManager
 	auth                        auth.TokenManager
 	now                         func() time.Time
 }
@@ -542,10 +544,10 @@ func ExecuteQuery[T any](
 	return result.(T), err
 }
 
-func (d *driverWithContext) ExecuteQueryBookmarkManager() BookmarkManager {
+func (d *driverWithContext) ExecuteQueryBookmarkManager() bm.BookmarkManager {
 	d.executeQueryBookmarkManagerInitializer.Do(func() {
 		if d.executeQueryBookmarkManager == nil { // this allows tests to init the field themselves
-			d.executeQueryBookmarkManager = NewBookmarkManager(BookmarkManagerConfig{})
+			d.executeQueryBookmarkManager = bm.NewBookmarkManager(bm.BookmarkManagerConfig{})
 		}
 	})
 	return d.executeQueryBookmarkManager
@@ -640,7 +642,7 @@ func ExecuteQueryWithDatabase(db string) ExecuteQueryConfigurationOption {
 }
 
 // ExecuteQueryWithBookmarkManager configures DriverWithContext.ExecuteQuery to rely on the specified BookmarkManager
-func ExecuteQueryWithBookmarkManager(bookmarkManager BookmarkManager) ExecuteQueryConfigurationOption {
+func ExecuteQueryWithBookmarkManager(bookmarkManager bm.BookmarkManager) ExecuteQueryConfigurationOption {
 	return func(configuration *ExecuteQueryConfiguration) {
 		configuration.BookmarkManager = bookmarkManager
 	}
@@ -665,7 +667,7 @@ type ExecuteQueryConfiguration struct {
 	Routing          RoutingControl
 	ImpersonatedUser string
 	Database         string
-	BookmarkManager  BookmarkManager
+	BookmarkManager  bm.BookmarkManager
 	BoltLogger       log.BoltLogger
 }
 
