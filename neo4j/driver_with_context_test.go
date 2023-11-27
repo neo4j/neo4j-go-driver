@@ -571,18 +571,18 @@ func (s *fakeSession) lastBookmark() string {
 	panic("implement me")
 }
 
-func (s *fakeSession) BeginTransaction(context.Context, ...func(*TransactionConfig)) (ExplicitTransaction, error) {
+func (s *fakeSession) BeginTransaction(context.Context, ...func(*config.TransactionConfig)) (ExplicitTransaction, error) {
 	panic("implement me")
 }
 
-func (s *fakeSession) ExecuteRead(_ context.Context, callback ManagedTransactionWork, _ ...func(*TransactionConfig)) (any, error) {
+func (s *fakeSession) ExecuteRead(_ context.Context, callback ManagedTransactionWork, _ ...func(*config.TransactionConfig)) (any, error) {
 	return callback(&fakeManagedTransaction{
 		result: s.executeReadTransactionResult,
 		err:    s.executeReadErr,
 	})
 }
 
-func (s *fakeSession) ExecuteWrite(_ context.Context, callback ManagedTransactionWork, _ ...func(*TransactionConfig)) (any, error) {
+func (s *fakeSession) ExecuteWrite(_ context.Context, callback ManagedTransactionWork, _ ...func(*config.TransactionConfig)) (any, error) {
 	result := s.executeWriteTransactionResult
 	err := s.executeWriteErr
 	if s.executeWriteErrs != nil {
@@ -592,14 +592,14 @@ func (s *fakeSession) ExecuteWrite(_ context.Context, callback ManagedTransactio
 	}
 	return callback(&fakeManagedTransaction{result: result, err: err})
 }
-func (s *fakeSession) executeQueryRead(_ context.Context, callback ManagedTransactionWork, _ ...func(*TransactionConfig)) (any, error) {
+func (s *fakeSession) executeQueryRead(_ context.Context, callback ManagedTransactionWork, _ ...func(*config.TransactionConfig)) (any, error) {
 	return callback(&fakeManagedTransaction{
 		result: s.executeReadTransactionResult,
 		err:    s.executeReadErr,
 	})
 }
 
-func (s *fakeSession) executeQueryWrite(_ context.Context, callback ManagedTransactionWork, _ ...func(*TransactionConfig)) (any, error) {
+func (s *fakeSession) executeQueryWrite(_ context.Context, callback ManagedTransactionWork, _ ...func(*config.TransactionConfig)) (any, error) {
 	result := s.executeWriteTransactionResult
 	err := s.executeWriteErr
 	if s.executeWriteErrs != nil {
@@ -609,7 +609,7 @@ func (s *fakeSession) executeQueryWrite(_ context.Context, callback ManagedTrans
 	}
 	return callback(&fakeManagedTransaction{result: result, err: err})
 }
-func (s *fakeSession) Run(context.Context, string, map[string]any, ...func(*TransactionConfig)) (ResultWithContext, error) {
+func (s *fakeSession) Run(context.Context, string, map[string]any, ...func(*config.TransactionConfig)) (ResultWithContext, error) {
 	panic("implement me")
 }
 

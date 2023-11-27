@@ -475,7 +475,7 @@ func TestSession(outer *testing.T) {
 				t.Skip("Can not list transactions on non-enterprise version")
 			}
 
-			matched, err := session.ExecuteRead(ctx, listTransactionsAndMatchMetadataWork(ctx, server.Version, metadata), neo4j.WithTxMetadata(metadata))
+			matched, err := session.ExecuteRead(ctx, listTransactionsAndMatchMetadataWork(ctx, server.Version, metadata), config.WithTxMetadata(metadata))
 
 			assertNil(t, err)
 			assertTrue(t, matched.(bool))
@@ -492,7 +492,7 @@ func TestSession(outer *testing.T) {
 				t.Skip("Can not list transactions on non-enterprise version")
 			}
 
-			matched, err := session.ExecuteRead(ctx, listTransactionsAndMatchMetadataWork(ctx, server.Version, metadata), neo4j.WithTxMetadata(metadata))
+			matched, err := session.ExecuteRead(ctx, listTransactionsAndMatchMetadataWork(ctx, server.Version, metadata), config.WithTxMetadata(metadata))
 			assertNil(t, err)
 			assertTrue(t, matched.(bool))
 		})
@@ -508,7 +508,7 @@ func TestSession(outer *testing.T) {
 				t.Skip("Can not list transactions on non-enterprise version")
 			}
 
-			matched, err := session.ExecuteWrite(ctx, listTransactionsAndMatchMetadataWork(ctx, server.Version, metadata), neo4j.WithTxMetadata(metadata))
+			matched, err := session.ExecuteWrite(ctx, listTransactionsAndMatchMetadataWork(ctx, server.Version, metadata), config.WithTxMetadata(metadata))
 			assertNil(t, err)
 			assertTrue(t, matched.(bool))
 		})
@@ -523,7 +523,7 @@ func TestSession(outer *testing.T) {
 
 			session3 := driver.NewSession(ctx, config.SessionConfig{AccessMode: config.AccessModeWrite})
 
-			result3, err := session3.Run(ctx, "MATCH (n:RunTxTimeOut) SET n.id = 2", nil, neo4j.WithTxTimeout(1*time.Second))
+			result3, err := session3.Run(ctx, "MATCH (n:RunTxTimeOut) SET n.id = 2", nil, config.WithTxTimeout(1*time.Second))
 			// Up to db to determine when error occurs
 			if err != nil {
 				dbErr := err.(*db.Neo4jError)
@@ -550,7 +550,7 @@ func TestSession(outer *testing.T) {
 
 			session3 := driver.NewSession(ctx, config.SessionConfig{AccessMode: config.AccessModeWrite})
 
-			_, err := session3.ExecuteWrite(ctx, updateNodeWork(ctx, t, "WriteTransactionTxTimeOut", map[string]any{"id": 2}), neo4j.WithTxTimeout(1*time.Second))
+			_, err := session3.ExecuteWrite(ctx, updateNodeWork(ctx, t, "WriteTransactionTxTimeOut", map[string]any{"id": 2}), config.WithTxTimeout(1*time.Second))
 			assertNotNil(t, err)
 			dbErr := err.(*db.Neo4jError)
 			assertStringContains(t, dbErr.Msg, "terminated")

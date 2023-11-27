@@ -19,6 +19,8 @@ package neo4j
 
 import (
 	"context"
+
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/config"
 )
 
 type ManagedTransactionWorkT[T any] func(tx ManagedTransaction) (T, error)
@@ -31,7 +33,7 @@ type ManagedTransactionWorkT[T any] func(tx ManagedTransaction) (T, error)
 // If an error occurs, the zero value of T is returned.
 func ExecuteRead[T any](ctx context.Context, session SessionWithContext,
 	work ManagedTransactionWorkT[T],
-	configurers ...func(config *TransactionConfig)) (T, error) {
+	configurers ...func(config *config.TransactionConfig)) (T, error) {
 
 	return castGeneric[T](session.ExecuteRead(ctx, transactionWorkAdapter(work), configurers...))
 }
@@ -44,7 +46,7 @@ func ExecuteRead[T any](ctx context.Context, session SessionWithContext,
 // If an error occurs, the zero value of T is returned.
 func ExecuteWrite[T any](ctx context.Context, session SessionWithContext,
 	work ManagedTransactionWorkT[T],
-	configurers ...func(config *TransactionConfig)) (T, error) {
+	configurers ...func(config *config.TransactionConfig)) (T, error) {
 
 	return castGeneric[T](session.ExecuteWrite(ctx, transactionWorkAdapter(work), configurers...))
 }

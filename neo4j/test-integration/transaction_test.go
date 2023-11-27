@@ -240,7 +240,7 @@ func TestTransaction(outer *testing.T) {
 				"m4": neo4j.LocalDateTimeOf(time.Now()),
 			}
 
-			tx, err = session.BeginTransaction(ctx, neo4j.WithTxMetadata(metadata))
+			tx, err = session.BeginTransaction(ctx, config.WithTxMetadata(metadata))
 			assertNil(t, err)
 			defer tx.Close(ctx)
 
@@ -267,7 +267,7 @@ func TestTransaction(outer *testing.T) {
 
 			updateNodeInTx(ctx, t, tx2, "TxTimeOut", map[string]any{"id": 1})
 
-			session3, tx3 := newSessionAndTx(ctx, t, driver, config.AccessModeWrite, neo4j.WithTxTimeout(1*time.Second))
+			session3, tx3 := newSessionAndTx(ctx, t, driver, config.AccessModeWrite, config.WithTxTimeout(1*time.Second))
 			defer session3.Close(ctx)
 			defer tx3.Close(ctx)
 
@@ -283,12 +283,12 @@ func TestTransaction(outer *testing.T) {
 		}
 
 		t.Run("should fail when transaction timeout is set for Session.BeginTransaction", func(t *testing.T) {
-			_, err := session.BeginTransaction(ctx, neo4j.WithTxTimeout(1*time.Second))
+			_, err := session.BeginTransaction(ctx, config.WithTxTimeout(1*time.Second))
 			assertNotNil(t, err)
 		})
 
 		t.Run("should fail when transaction metadata is set for Session.BeginTransaction", func(t *testing.T) {
-			_, err := session.BeginTransaction(ctx, neo4j.WithTxMetadata(map[string]any{"x": 1}))
+			_, err := session.BeginTransaction(ctx, config.WithTxMetadata(map[string]any{"x": 1}))
 			assertNotNil(t, err)
 		})
 	})

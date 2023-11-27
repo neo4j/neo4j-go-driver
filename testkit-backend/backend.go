@@ -296,8 +296,8 @@ func (b *backend) toRequest(s string) map[string]any {
 	return req
 }
 
-func (b *backend) toTransactionConfigApply(data map[string]any) func(*neo4j.TransactionConfig) {
-	txConfig := neo4j.TransactionConfig{Timeout: math.MinInt}
+func (b *backend) toTransactionConfigApply(data map[string]any) func(*config.TransactionConfig) {
+	txConfig := config.TransactionConfig{Timeout: math.MinInt}
 	// Optional transaction meta data
 	if data["txMeta"] != nil {
 		txMetadata, err := b.toParams(data["txMeta"].(map[string]any))
@@ -310,7 +310,7 @@ func (b *backend) toTransactionConfigApply(data map[string]any) func(*neo4j.Tran
 	if data["timeout"] != nil {
 		txConfig.Timeout = time.Millisecond * time.Duration(asInt64(data["timeout"].(json.Number)))
 	}
-	return func(conf *neo4j.TransactionConfig) {
+	return func(conf *config.TransactionConfig) {
 		if txConfig.Metadata != nil {
 			conf.Metadata = txConfig.Metadata
 		}

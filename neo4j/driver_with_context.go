@@ -683,7 +683,7 @@ func (c *ExecuteQueryConfiguration) toSessionConfig() config.SessionConfig {
 	}
 }
 
-type transactionFunction func(context.Context, ManagedTransactionWork, ...func(*TransactionConfig)) (any, error)
+type transactionFunction func(context.Context, ManagedTransactionWork, ...func(*config.TransactionConfig)) (any, error)
 
 func (c *ExecuteQueryConfiguration) selectTxFunctionApi(session SessionWithContext) (transactionFunction, error) {
 	switch c.Routing {

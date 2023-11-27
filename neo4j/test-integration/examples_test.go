@@ -628,7 +628,7 @@ func configTxTimeout(ctx context.Context, driver neo4j.DriverWithContext, name s
 		}
 
 		return result.Consume(ctx)
-	}, neo4j.WithTxTimeout(5*time.Second))
+	}, config.WithTxTimeout(5*time.Second))
 
 	return err
 }
@@ -647,7 +647,7 @@ func configTxMetadata(ctx context.Context, driver neo4j.DriverWithContext, name 
 		}
 
 		return result.Consume(ctx)
-	}, neo4j.WithTxMetadata(map[string]any{"applicationId": 123}))
+	}, config.WithTxMetadata(map[string]any{"applicationId": 123}))
 
 	return err
 }

@@ -50,21 +50,21 @@ func transactionWithIntWork(t *testing.T, tx neo4j.ExplicitTransaction, work neo
 	return result.(int64)
 }
 
-func readTransactionWithIntWork(ctx context.Context, t *testing.T, session neo4j.SessionWithContext, work neo4j.ManagedTransactionWork, configurers ...func(*neo4j.TransactionConfig)) int64 {
+func readTransactionWithIntWork(ctx context.Context, t *testing.T, session neo4j.SessionWithContext, work neo4j.ManagedTransactionWork, configurers ...func(*config.TransactionConfig)) int64 {
 	result, err := session.ExecuteRead(ctx, work, configurers...)
 	assertNil(t, err)
 
 	return result.(int64)
 }
 
-func writeTransactionWithIntWork(ctx context.Context, t *testing.T, session neo4j.SessionWithContext, work neo4j.ManagedTransactionWork, configurers ...func(*neo4j.TransactionConfig)) int64 {
+func writeTransactionWithIntWork(ctx context.Context, t *testing.T, session neo4j.SessionWithContext, work neo4j.ManagedTransactionWork, configurers ...func(*config.TransactionConfig)) int64 {
 	result, err := session.ExecuteWrite(ctx, work, configurers...)
 	assertNil(t, err)
 
 	return result.(int64)
 }
 
-func newSessionAndTx(ctx context.Context, t *testing.T, driver neo4j.DriverWithContext, mode config.AccessMode, configurers ...func(*neo4j.TransactionConfig)) (neo4j.SessionWithContext, neo4j.ExplicitTransaction) {
+func newSessionAndTx(ctx context.Context, t *testing.T, driver neo4j.DriverWithContext, mode config.AccessMode, configurers ...func(*config.TransactionConfig)) (neo4j.SessionWithContext, neo4j.ExplicitTransaction) {
 	session := driver.NewSession(ctx, config.SessionConfig{AccessMode: mode})
 
 	tx, err := session.BeginTransaction(ctx, configurers...)

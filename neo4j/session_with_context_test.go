@@ -37,7 +37,7 @@ import (
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/log"
 )
 
-type transactionFunc func(context.Context, ManagedTransactionWork, ...func(*TransactionConfig)) (any, error)
+type transactionFunc func(context.Context, ManagedTransactionWork, ...func(*config.TransactionConfig)) (any, error)
 type transactionFuncApi func(session SessionWithContext) transactionFunc
 
 func TestSession(outer *testing.T) {
