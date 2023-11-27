@@ -233,7 +233,7 @@ func TestDriverSessionCreation(t *testing.T) {
 			sess := sessi.(*session)
 
 			if config.AccessMode(sess.delegate.defaultMode) != tt.mode {
-				t.Errorf("the defaultMode was not correctly set %v", AccessMode(sess.delegate.defaultMode))
+				t.Errorf("the defaultMode was not correctly set %v", config.AccessMode(sess.delegate.defaultMode))
 			}
 
 			if len(sess.delegate.bookmarks.currentBookmarks()) != len(tt.bookmarks) {

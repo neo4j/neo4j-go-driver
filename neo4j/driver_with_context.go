@@ -41,14 +41,6 @@ import (
 
 // AccessMode defines modes that routing driver decides to which cluster member
 // a connection should be opened.
-type AccessMode int
-
-const (
-	// AccessModeWrite tells the driver to use a connection to 'Leader'
-	AccessModeWrite AccessMode = 0
-	// AccessModeRead tells the driver to use a connection to one of the 'Follower' or 'Read Replica'.
-	AccessModeRead AccessMode = 1
-)
 
 // DriverWithContext represents a pool of connections to a neo4j server or cluster. It's
 // safe for concurrent use.
