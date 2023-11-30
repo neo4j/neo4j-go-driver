@@ -40,41 +40,43 @@ type databaseRouter struct {
 
 // Router is thread safe
 type Router struct {
-	routerContext map[string]string
-	pool          Pool
-	dbRouters     map[string]*databaseRouter
-	updating      map[string][]chan struct{}
-	dbRoutersMut  sync.Mutex
-	now           *func() time.Time
-	sleep         func(time.Duration)
-	rootRouter    string
-	getRouters    func() []string
-	log           log.Logger
-	logId         string
+	routerContext   map[string]string
+	pool            Pool
+	idlenessTimeout time.Duration
+	dbRouters       map[string]*databaseRouter
+	updating        map[string][]chan struct{}
+	dbRoutersMut    sync.Mutex
+	now             *func() time.Time
+	sleep           func(time.Duration)
+	rootRouter      string
+	getRouters      func() []string
+	log             log.Logger
+	logId           string
 }
 
 type Pool interface {
 	// Borrow acquires a connection from the provided list of servers
 	// If all connections are busy and the pool is full, calls to Borrow may wait for a connection to become idle
-	// If a connection has been idle for longer than idlenessThreshold, it will be reset
+	// If a connection has been idle for longer than idlenessTimeout, it will be reset
 	// to check if it's still alive.
-	Borrow(ctx context.Context, getServers func() []string, wait bool, boltLogger log.BoltLogger, idlenessThreshold time.Duration, auth *idb.ReAuthToken) (idb.Connection, error)
+	Borrow(ctx context.Context, getServers func() []string, wait bool, boltLogger log.BoltLogger, idlenessTimeout time.Duration, auth *idb.ReAuthToken) (idb.Connection, error)
 	Return(ctx context.Context, c idb.Connection)
 }
 
-func New(rootRouter string, getRouters func() []string, routerContext map[string]string, pool Pool, logger log.Logger, logId string, timer *func() time.Time) *Router {
+func New(rootRouter string, getRouters func() []string, routerContext map[string]string, pool Pool, idlenessTimeout time.Duration, logger log.Logger, logId string, timer *func() time.Time) *Router {
 	r := &Router{
-		rootRouter:    rootRouter,
-		getRouters:    getRouters,
-		routerContext: routerContext,
-		pool:          pool,
-		dbRouters:     make(map[string]*databaseRouter),
-		updating:      make(map[string][]chan struct{}),
-		dbRoutersMut:  sync.Mutex{},
-		now:           timer,
-		sleep:         time.Sleep,
-		log:           logger,
-		logId:         logId,
+		rootRouter:      rootRouter,
+		getRouters:      getRouters,
+		routerContext:   routerContext,
+		pool:            pool,
+		idlenessTimeout: idlenessTimeout,
+		dbRouters:       make(map[string]*databaseRouter),
+		updating:        make(map[string][]chan struct{}),
+		dbRoutersMut:    sync.Mutex{},
+		now:             timer,
+		sleep:           time.Sleep,
+		log:             logger,
+		logId:           logId,
 	}
 	r.log.Infof(log.Router, r.logId, "Created {context: %v}", routerContext)
 	return r
@@ -98,7 +100,7 @@ func (r *Router) readTable(
 	if dbRouter != nil && len(dbRouter.table.Routers) > 0 {
 		routers := dbRouter.table.Routers
 		r.log.Infof(log.Router, r.logId, "Reading routing table for '%s' from previously known routers: %v", database, routers)
-		table, err = readTable(ctx, r.pool, routers, r.routerContext, bookmarks, database, impersonatedUser, auth, boltLogger)
+		table, err = readTable(ctx, r.pool, routers, r.routerContext, r.idlenessTimeout, bookmarks, database, impersonatedUser, auth, boltLogger)
 	}
 	if errorutil.IsFatalDuringDiscovery(err) {
 		r.log.Error(log.Router, r.logId, err)
@@ -108,7 +110,7 @@ func (r *Router) readTable(
 	// Try initial router if no routers or failed
 	if table == nil {
 		r.log.Infof(log.Router, r.logId, "Reading routing table from initial router: %s", r.rootRouter)
-		table, err = readTable(ctx, r.pool, []string{r.rootRouter}, r.routerContext, bookmarks, database, impersonatedUser, auth, boltLogger)
+		table, err = readTable(ctx, r.pool, []string{r.rootRouter}, r.routerContext, r.idlenessTimeout, bookmarks, database, impersonatedUser, auth, boltLogger)
 	}
 	if errorutil.IsFatalDuringDiscovery(err) {
 		r.log.Error(log.Router, r.logId, err)
@@ -119,7 +121,7 @@ func (r *Router) readTable(
 	if table == nil && r.getRouters != nil {
 		routers := r.getRouters()
 		r.log.Infof(log.Router, r.logId, "Reading routing table for '%s' from custom routers: %v", routers)
-		table, err = readTable(ctx, r.pool, routers, r.routerContext, bookmarks, database, impersonatedUser, auth, boltLogger)
+		table, err = readTable(ctx, r.pool, routers, r.routerContext, r.idlenessTimeout, bookmarks, database, impersonatedUser, auth, boltLogger)
 	}
 	if errorutil.IsFatalDuringDiscovery(err) {
 		r.log.Error(log.Router, r.logId, err)

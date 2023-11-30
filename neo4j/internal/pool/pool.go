@@ -36,9 +36,9 @@ import (
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/log"
 )
 
-// DefaultLivenessCheckThreshold disables the liveness check of connections
-// Liveness checks are performed before a connection is deemed idle enough to be reset
-const DefaultLivenessCheckThreshold = math.MaxInt64
+// DefaultConnectionLivenessCheckTimeout disables the liveness check of connections.
+// Liveness checks are performed before a connection is deemed idle enough to be reset.
+const DefaultConnectionLivenessCheckTimeout = math.MaxInt64
 
 type Connect func(context.Context, string, *idb.ReAuthToken, bolt.ConnectionErrorListener, log.BoltLogger) (idb.Connection, error)
 
@@ -171,7 +171,7 @@ func (p *Pool) getPenaltiesForServers(ctx context.Context, serverNames []string)
 	return penalties
 }
 
-func (p *Pool) tryAnyIdle(ctx context.Context, serverNames []string, idlenessThreshold time.Duration, auth *idb.ReAuthToken, logger log.BoltLogger) (idb.Connection, error) {
+func (p *Pool) tryAnyIdle(ctx context.Context, serverNames []string, idlenessTimeout time.Duration, auth *idb.ReAuthToken, logger log.BoltLogger) (idb.Connection, error) {
 	p.serversMut.Lock()
 	var unlock = new(sync.Once)
 	defer unlock.Do(p.serversMut.Unlock)
@@ -185,7 +185,7 @@ serverLoop:
 					continue serverLoop
 				}
 				unlock.Do(p.serversMut.Unlock)
-				healthy, err := srv.healthCheck(ctx, conn, idlenessThreshold, auth, logger)
+				healthy, err := srv.healthCheck(ctx, conn, idlenessTimeout, auth, logger)
 				if healthy {
 					return conn, nil
 				}
@@ -202,7 +202,7 @@ serverLoop:
 	return nil, nil
 }
 
-func (p *Pool) Borrow(ctx context.Context, getServerNames func() []string, wait bool, boltLogger log.BoltLogger, idlenessThreshold time.Duration, auth *idb.ReAuthToken) (idb.Connection, error) {
+func (p *Pool) Borrow(ctx context.Context, getServerNames func() []string, wait bool, boltLogger log.BoltLogger, idlenessTimeout time.Duration, auth *idb.ReAuthToken) (idb.Connection, error) {
 	for {
 		if p.closed {
 			return nil, &errorutil.PoolClosed{}
@@ -223,7 +223,7 @@ func (p *Pool) Borrow(ctx context.Context, getServerNames func() []string, wait 
 
 		var conn idb.Connection
 		for _, s := range penalties {
-			conn, err = p.tryBorrow(ctx, s.name, boltLogger, idlenessThreshold, auth)
+			conn, err = p.tryBorrow(ctx, s.name, boltLogger, idlenessTimeout, auth)
 			if conn != nil {
 				return conn, nil
 			}
@@ -252,7 +252,7 @@ func (p *Pool) Borrow(ctx context.Context, getServerNames func() []string, wait 
 		// Ok, now that we own the queue we can add the item there but between getting the lock
 		// and above check for an existing connection another thread might have returned a connection
 		// so check again to avoid potentially starving this thread.
-		conn, err = p.tryAnyIdle(ctx, serverNames, idlenessThreshold, auth, boltLogger)
+		conn, err = p.tryAnyIdle(ctx, serverNames, idlenessTimeout, auth, boltLogger)
 		if err != nil {
 			p.queueMut.Unlock()
 			return nil, err
@@ -284,7 +284,7 @@ func (p *Pool) Borrow(ctx context.Context, getServerNames func() []string, wait 
 	}
 }
 
-func (p *Pool) tryBorrow(ctx context.Context, serverName string, boltLogger log.BoltLogger, idlenessThreshold time.Duration, auth *idb.ReAuthToken) (idb.Connection, error) {
+func (p *Pool) tryBorrow(ctx context.Context, serverName string, boltLogger log.BoltLogger, idlenessTimeout time.Duration, auth *idb.ReAuthToken) (idb.Connection, error) {
 	// For now, lock complete servers map to avoid over connecting but with the downside
 	// that long connect times will block connects to other servers as well. To fix this
 	// we would need to add a pending connect to the server and lock per server.
@@ -304,7 +304,7 @@ func (p *Pool) tryBorrow(ctx context.Context, serverName string, boltLogger log.
 				break
 			}
 			unlock.Do(p.serversMut.Unlock)
-			healthy, err := srv.healthCheck(ctx, connection, idlenessThreshold, auth, boltLogger)
+			healthy, err := srv.healthCheck(ctx, connection, idlenessTimeout, auth, boltLogger)
 			if healthy {
 				return connection, nil
 			}

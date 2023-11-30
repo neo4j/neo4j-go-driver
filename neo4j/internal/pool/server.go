@@ -66,12 +66,12 @@ func (s *server) getIdle() db.Connection {
 func (s *server) healthCheck(
 	ctx context.Context,
 	connection db.Connection,
-	idlenessThreshold time.Duration,
+	idlenessTimeout time.Duration,
 	auth *db.ReAuthToken,
 	boltLogger log.BoltLogger) (healthy bool, _ error) {
 
 	connection.SetBoltLogger(boltLogger)
-	if time.Since(connection.IdleDate()) > idlenessThreshold {
+	if time.Since(connection.IdleDate()) > idlenessTimeout {
 		connection.ForceReset(ctx)
 		if !connection.IsAlive() {
 			return false, nil

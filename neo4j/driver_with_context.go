@@ -241,7 +241,16 @@ func NewDriverWithContext(target string, auth auth.TokenManager, configurers ...
 			}
 		}
 		// Let the router use the same log ID as the driver to simplify log reading.
-		d.router = router.New(address, routersResolver, routingContext, d.pool, d.log, d.logId, &d.now)
+		d.router = router.New(
+			address,
+			routersResolver,
+			routingContext,
+			d.pool,
+			d.config.ConnectionLivenessCheckTimeout,
+			d.log,
+			d.logId,
+			&d.now,
+		)
 	}
 
 	d.pool.SetRouter(d.router)

@@ -488,6 +488,9 @@ func (b *backend) handleRequest(req map[string]any) {
 			if data["connectionAcquisitionTimeoutMs"] != nil {
 				c.ConnectionAcquisitionTimeout = time.Millisecond * time.Duration(asInt64(data["connectionAcquisitionTimeoutMs"].(json.Number)))
 			}
+			if data["livenessCheckTimeoutMs"] != nil {
+				c.ConnectionLivenessCheckTimeout = time.Millisecond * time.Duration(asInt64(data["livenessCheckTimeoutMs"].(json.Number)))
+			}
 			if data["maxConnectionPoolSize"] != nil {
 				c.MaxConnectionPoolSize = asInt(data["maxConnectionPoolSize"].(json.Number))
 			}
@@ -1141,8 +1144,7 @@ func (b *backend) handleRequest(req map[string]any) {
 				"Feature:API:Driver.VerifyAuthentication",
 				"Feature:API:Driver.VerifyConnectivity",
 				//"Feature:API:Driver.SupportsSessionAuth",
-				// Go driver does not support LivenessCheckTimeout yet
-				//"Feature:API:Liveness.Check",
+				"Feature:API:Liveness.Check",
 				"Feature:API:Result.List",
 				"Feature:API:Result.Peek",
 				//"Feature:API:Result.Single",

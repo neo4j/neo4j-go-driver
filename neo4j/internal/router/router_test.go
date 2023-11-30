@@ -22,6 +22,7 @@ import (
 	"context"
 	"errors"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
+	"math"
 	"reflect"
 	"sync"
 	"testing"
@@ -56,7 +57,7 @@ func TestMultithreading(t *testing.T) {
 		n = n.Add(time.Duration(table.TimeToLive) * time.Second * 2)
 		return n
 	}
-	router := New("router", func() []string { return []string{} }, nil, pool, logger, "routerid", &timer)
+	router := New("router", func() []string { return []string{} }, nil, pool, math.MaxInt64, logger, "routerid", &timer)
 
 	dbName := "dbname"
 	wg := sync.WaitGroup{}
@@ -108,7 +109,7 @@ func TestRespectsTimeToLiveAndInvalidate(t *testing.T) {
 	timer := func() time.Time {
 		return n
 	}
-	router := New("router", func() []string { return []string{} }, nil, pool, logger, "routerid", &timer)
+	router := New("router", func() []string { return []string{} }, nil, pool, math.MaxInt64, logger, "routerid", &timer)
 	dbName := "dbname"
 
 	// First access should trigger initial table read
@@ -165,7 +166,7 @@ func TestUsesRootRouterWhenPreviousRoutersFails(t *testing.T) {
 	timer := func() time.Time {
 		return n
 	}
-	router := New("rootRouter", func() []string { return []string{} }, nil, pool, logger, "routerid", &timer)
+	router := New("rootRouter", func() []string { return []string{} }, nil, pool, math.MaxInt64, logger, "routerid", &timer)
 	dbName := "dbname"
 
 	// First access should trigger initial table read from root router
@@ -229,7 +230,7 @@ func TestUseGetRoutersHookWhenInitialRouterFails(t *testing.T) {
 	rootRouter := "rootRouter"
 	backupRouters := []string{"bup1", "bup2"}
 	timer := time.Now
-	router := New(rootRouter, func() []string { return backupRouters }, nil, pool, logger, "routerid", &timer)
+	router := New(rootRouter, func() []string { return backupRouters }, nil, pool, math.MaxInt64, logger, "routerid", &timer)
 	dbName := "dbname"
 
 	// Trigger read of routing table
@@ -256,7 +257,7 @@ func TestWritersFailAfterNRetries(t *testing.T) {
 	}
 	numsleep := 0
 	timer := time.Now
-	router := New("router", func() []string { return []string{} }, nil, pool, logger, "routerid", &timer)
+	router := New("router", func() []string { return []string{} }, nil, pool, math.MaxInt64, logger, "routerid", &timer)
 	router.sleep = func(time.Duration) {
 		numsleep++
 	}
@@ -294,7 +295,7 @@ func TestWritersRetriesWhenNoWriters(t *testing.T) {
 	}
 	numsleep := 0
 	timer := time.Now
-	router := New("router", func() []string { return []string{} }, nil, pool, logger, "routerid", &timer)
+	router := New("router", func() []string { return []string{} }, nil, pool, math.MaxInt64, logger, "routerid", &timer)
 	router.sleep = func(time.Duration) {
 		numsleep++
 	}
@@ -333,7 +334,7 @@ func TestReadersRetriesWhenNoReaders(t *testing.T) {
 	}
 	numsleep := 0
 	timer := time.Now
-	router := New("router", func() []string { return []string{} }, nil, pool, logger, "routerid", &timer)
+	router := New("router", func() []string { return []string{} }, nil, pool, math.MaxInt64, logger, "routerid", &timer)
 	router.sleep = func(time.Duration) {
 		numsleep++
 	}
@@ -367,7 +368,7 @@ func TestCleanUp(t *testing.T) {
 	}
 	now := time.Now()
 	timer := func() time.Time { return now }
-	router := New("router", func() []string { return []string{} }, nil, pool, logger, "routerid", &timer)
+	router := New("router", func() []string { return []string{} }, nil, pool, math.MaxInt64, logger, "routerid", &timer)
 
 	ctx := context.Background()
 	if _, err := router.GetOrUpdateReaders(ctx, nilBookmarks, "db1", nil, nil); err != nil {
