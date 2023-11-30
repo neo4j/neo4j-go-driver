@@ -20,9 +20,12 @@ package neo4j_test
 import (
 	"context"
 	"fmt"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
-	. "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/testutil"
 	"testing"
+
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
+	bm "github.com/neo4j/neo4j-go-driver/v5/neo4j/bookmarks"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/config"
+	. "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/testutil"
 )
 
 func TestExecuteRead(outer *testing.T) {
@@ -79,7 +82,7 @@ type fakeSession struct {
 	neo4j.SessionWithContext
 }
 
-func (f *fakeSession) LastBookmarks() neo4j.Bookmarks {
+func (f *fakeSession) LastBookmarks() bm.Bookmarks {
 	panic("implement me")
 }
 
@@ -88,19 +91,19 @@ func (f *fakeSession) lastBookmark() string {
 	panic("implement me")
 }
 
-func (f *fakeSession) BeginTransaction(ctx context.Context, configurers ...func(*neo4j.TransactionConfig)) (neo4j.ExplicitTransaction, error) {
+func (f *fakeSession) BeginTransaction(ctx context.Context, configurers ...func(*config.TransactionConfig)) (neo4j.ExplicitTransaction, error) {
 	panic("implement me")
 }
 
-func (f *fakeSession) ExecuteRead(_ context.Context, work neo4j.ManagedTransactionWork, _ ...func(*neo4j.TransactionConfig)) (any, error) {
+func (f *fakeSession) ExecuteRead(_ context.Context, work neo4j.ManagedTransactionWork, _ ...func(*config.TransactionConfig)) (any, error) {
 	return work(&FakeTransaction{})
 }
 
-func (f *fakeSession) ExecuteWrite(_ context.Context, work neo4j.ManagedTransactionWork, _ ...func(*neo4j.TransactionConfig)) (any, error) {
+func (f *fakeSession) ExecuteWrite(_ context.Context, work neo4j.ManagedTransactionWork, _ ...func(*config.TransactionConfig)) (any, error) {
 	return work(&FakeTransaction{})
 }
 
-func (f *fakeSession) Run(context.Context, string, map[string]any, ...func(*neo4j.TransactionConfig)) (neo4j.ResultWithContext, error) {
+func (f *fakeSession) Run(context.Context, string, map[string]any, ...func(*config.TransactionConfig)) (neo4j.ResultWithContext, error) {
 	panic("implement me")
 }
 

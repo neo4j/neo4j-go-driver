@@ -21,6 +21,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/config"
 )
 
 var myDriver DriverWithContext
@@ -82,7 +84,7 @@ func ExampleExecuteQuery_defaultBookmarkManagerExplicitReuse() {
 	// retrieve the default bookmark manager used by the previous call (since there was no bookmark manager explicitly
 	// configured)
 	bookmarkManager := myDriver.ExecuteQueryBookmarkManager()
-	session := myDriver.NewSession(ctx, SessionConfig{BookmarkManager: bookmarkManager})
+	session := myDriver.NewSession(ctx, config.SessionConfig{BookmarkManager: bookmarkManager})
 
 	// the following transaction function is guaranteed to see the result of the previous query
 	// since the session uses the same bookmark manager as the previous ExecuteQuery call and targets the same

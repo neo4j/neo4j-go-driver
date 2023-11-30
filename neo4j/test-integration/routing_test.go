@@ -22,6 +22,7 @@ import (
 	"testing"
 
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/config"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/test-integration/dbserver"
 )
 
@@ -55,7 +56,7 @@ func TestRouting(outer *testing.T) {
 		assertNil(t, err)
 		defer driver.Close(ctx)
 
-		session = driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead})
+		session = driver.NewSession(ctx, config.SessionConfig{AccessMode: config.AccessModeRead})
 		defer session.Close(ctx)
 
 		result, err = session.Run(ctx, "RETURN 1", nil)
@@ -75,7 +76,7 @@ func TestRouting(outer *testing.T) {
 		driver := getDriver(server.URI())
 		assertNil(t, err)
 
-		session = driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
+		session = driver.NewSession(ctx, config.SessionConfig{AccessMode: config.AccessModeWrite})
 
 		writeCount, err = session.ExecuteWrite(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
 			writeResult, err := tx.Run(ctx, "MERGE (n:Person {name: 'John'}) RETURN 1", nil)

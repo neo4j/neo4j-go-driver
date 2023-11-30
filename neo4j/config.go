@@ -18,15 +18,29 @@
 package neo4j
 
 import (
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/config"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/notifications"
 	"math"
 	"net/url"
 	"time"
+
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/bookmarks"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/config"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/notifications"
 )
 
 // Deprecated: please use config.Config directly. This alias will be removed in 6.0.
 type Config = config.Config
+
+// Deprecated: please use config.SessionConfig directly. This alias will be removed in 6.0.
+type SessionConfig = config.SessionConfig
+
+// Deprecated: please use config.AccessMode directly. This alias will be removed in 6.0.
+type AccessMode = config.AccessMode
+
+// Deprecated: please use config.TransactionConfig directly. This alias will be removed in 6.0.
+type TransactionConfig = config.TransactionConfig
+
+// Deprecated: please use bookmarks.Bookmarks directly. This alias will be removed in 6.0.
+type Bookmarks = bookmarks.Bookmarks
 
 // Deprecated: please use config.ServerAddressResolver directly. This alias will be removed in 6.0.
 type ServerAddressResolver = config.ServerAddressResolver

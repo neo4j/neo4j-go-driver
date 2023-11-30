@@ -337,12 +337,12 @@ boltLogger := neo4j.ConsoleBoltLogger()
 result, err := neo4j.ExecuteQuery(ctx, driver, query, params, transformer, neo4j.ExecuteQueryWithBoltLogger(boltLogger))
 
 # for the regular session APIs (session.Run, session.BeginTransaction, session.ExecuteRead, session.ExecuteWrite)
-session := driver.NewSession(neo4j.SessionConfig{BoltLogger: boltLogger})
+session := driver.NewSession(config.SessionConfig{BoltLogger: boltLogger})
 ```
 
 ### Custom Bolt Logger
 
-The `BoltLogger` field of the `neo4j.SessionConfig` struct is defined to be of interface `neo4j/log.BoltLogger` which has the following definition:
+The `BoltLogger` field of the `config.SessionConfig` struct is defined to be of interface `neo4j/log.BoltLogger` which has the following definition:
 
 ```go
 type BoltLogger interface {

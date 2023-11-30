@@ -20,14 +20,16 @@ package neo4j
 import (
 	"context"
 	"fmt"
+	"math"
+	"time"
+
+	bm "github.com/neo4j/neo4j-go-driver/v5/neo4j/bookmarks"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/config"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/collections"
 	idb "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/errorutil"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/pool"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/telemetry"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/notifications"
-	"math"
-	"time"
 
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/retry"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/log"
@@ -51,131 +53,30 @@ type SessionWithContext interface {
 	// LastBookmarks returns the bookmark received following the last successfully completed transaction.
 	// If no bookmark was received or if this transaction was rolled back, the initial set of bookmarks will be
 	// returned.
-	LastBookmarks() Bookmarks
+	LastBookmarks() bm.Bookmarks
 	lastBookmark() string
 	// BeginTransaction starts a new explicit transaction on this session
 	// Contexts terminating too early negatively affect connection pooling and degrade the driver performance.
-	BeginTransaction(ctx context.Context, configurers ...func(*TransactionConfig)) (ExplicitTransaction, error)
+	BeginTransaction(ctx context.Context, configurers ...func(*config.TransactionConfig)) (ExplicitTransaction, error)
 	// ExecuteRead executes the given unit of work in a AccessModeRead transaction with
 	// retry logic in place
 	// Contexts terminating too early negatively affect connection pooling and degrade the driver performance.
-	ExecuteRead(ctx context.Context, work ManagedTransactionWork, configurers ...func(*TransactionConfig)) (any, error)
+	ExecuteRead(ctx context.Context, work ManagedTransactionWork, configurers ...func(*config.TransactionConfig)) (any, error)
 	// ExecuteWrite executes the given unit of work in a AccessModeWrite transaction with
 	// retry logic in place
 	// Contexts terminating too early negatively affect connection pooling and degrade the driver performance.
-	ExecuteWrite(ctx context.Context, work ManagedTransactionWork, configurers ...func(*TransactionConfig)) (any, error)
+	ExecuteWrite(ctx context.Context, work ManagedTransactionWork, configurers ...func(*config.TransactionConfig)) (any, error)
 	// Run executes an auto-commit statement and returns a result
 	// Contexts terminating too early negatively affect connection pooling and degrade the driver performance.
-	Run(ctx context.Context, cypher string, params map[string]any, configurers ...func(*TransactionConfig)) (ResultWithContext, error)
+	Run(ctx context.Context, cypher string, params map[string]any, configurers ...func(*config.TransactionConfig)) (ResultWithContext, error)
 	// Close closes any open resources and marks this session as unusable
 	// Contexts terminating too early negatively affect connection pooling and degrade the driver performance.
 	Close(ctx context.Context) error
-	executeQueryRead(ctx context.Context, work ManagedTransactionWork, configurers ...func(*TransactionConfig)) (any, error)
-	executeQueryWrite(ctx context.Context, work ManagedTransactionWork, configurers ...func(*TransactionConfig)) (any, error)
+	executeQueryRead(ctx context.Context, work ManagedTransactionWork, configurers ...func(*config.TransactionConfig)) (any, error)
+	executeQueryWrite(ctx context.Context, work ManagedTransactionWork, configurers ...func(*config.TransactionConfig)) (any, error)
 	legacy() Session
 	getServerInfo(ctx context.Context) (ServerInfo, error)
 	verifyAuthentication(ctx context.Context) error
-}
-
-// SessionConfig is used to configure a new session, its zero value uses safe defaults.
-type SessionConfig struct {
-	// AccessMode used when using Session.Run and explicit transactions. Used to route query
-	// to read or write servers when running in a cluster. Session.ReadTransaction and Session.WriteTransaction
-	// does not rely on this mode.
-	AccessMode AccessMode
-	// Bookmarks are the initial bookmarks used to ensure that the executing server is at least up
-	// to date to the point represented by the latest of the provided bookmarks. After running commands
-	// on the session the bookmark can be retrieved with Session.LastBookmark. All commands executing
-	// within the same session will automatically use the bookmark from the previous command in the
-	// session.
-	Bookmarks Bookmarks
-	// DatabaseName sets the target database name for the queries executed within the session created with this
-	// configuration.
-	// Usage of Cypher clauses like USE is not a replacement for this option.
-	// Drive​r sends Cypher to the server for processing.
-	// This option has no explicit value by default, but it is recommended to set one if the target database is known
-	// in advance. This has the benefit of ensuring a consistent target database name throughout the session in a
-	// straightforward way and potentially simplifies driver logic as well as reduces network communication resulting
-	// in better performance.
-	// When no explicit name is set, the driver behavior depends on the connection URI scheme supplied to the driver on
-	// instantiation and Bolt protocol version.
-	//
-	// Specifically, the following applies:
-	//
-	// - for bolt schemes
-	//		queries are dispatched to the server for execution without explicit database name supplied,
-	// 		meaning that the target database name for query execution is determined by the server.
-	//		It is important to note that the target database may change (even within the same session), for instance if the
-	//		user's home database is changed on the server.
-	//
-	// - for neo4j schemes
-	//		providing that Bolt protocol version 4.4, which was introduced with Neo4j server 4.4, or above
-	//		is available, the driver fetches the user's home database name from the server on first query execution
-	//		within the session and uses the fetched database name explicitly for all queries executed within the session.
-	//		This ensures that the database name remains consistent within the given session. For instance, if the user's
-	//		home database name is 'movies' and the server supplies it to the driver upon database name fetching for the
-	//		session, all queries within that session are executed with the explicit database name 'movies' supplied.
-	//		Any change to the user’s home database is reflected only in sessions created after such change takes effect.
-	//		This behavior requires additional network communication.
-	//		In clustered environments, it is strongly recommended to avoid a single point of failure.
-	//		For instance, by ensuring that the connection URI resolves to multiple endpoints.
-	//		For older Bolt protocol versions, the behavior is the same as described for the bolt schemes above.
-	DatabaseName string
-	// FetchSize defines how many records to pull from server in each batch.
-	// From Bolt protocol v4 (Neo4j 4+) records can be fetched in batches as compared to fetching
-	// all in previous versions.
-	//
-	// If FetchSize is set to FetchDefault, the driver decides the appropriate size. If set to a positive value
-	// that size is used if the underlying protocol supports it otherwise it is ignored.
-	//
-	// To turn off fetching in batches and always fetch everything, set FetchSize to FetchAll.
-	// If a single large result is to be retrieved this is the most performant setting.
-	FetchSize int
-	// Logging target the session will send its Bolt message traces
-	//
-	// Possible to use custom logger (implement log.BoltLogger interface) or
-	// use neo4j.ConsoleBoltLogger.
-	BoltLogger log.BoltLogger
-	// ImpersonatedUser sets the Neo4j user that the session will be acting as.
-	// If not set, the user configured for the driver will be used.
-	//
-	// If user impersonation is used, the default database for that impersonated
-	// user will be used unless DatabaseName is set.
-	//
-	// In the former case, when routing is enabled, using impersonation
-	// without DatabaseName will cause the driver to query the
-	// cluster for the name of the default database of the impersonated user.
-	// This is done at the beginning of the session so that queries are routed
-	// to the correct cluster member (different databases may have different
-	// leaders).
-	ImpersonatedUser string
-	// BookmarkManager defines a central point to externally supply bookmarks
-	// and be notified of bookmark updates per database
-	// Since 5.0
-	// default: nil (no-op)
-	BookmarkManager BookmarkManager
-	// NotificationsMinSeverity defines the minimum severity level of notifications the server should send.
-	// By default, the driver's settings are used.
-	// Else, this option overrides the driver's settings.
-	// Disabling severities allows the server to skip analysis for those, which can speed up query execution.
-	NotificationsMinSeverity notifications.NotificationMinimumSeverityLevel
-	// NotificationsDisabledCategories defines the categories of notifications the server should not send.
-	// By default, the driver's settings are used.
-	// Else, this option overrides the driver's settings.
-	// Disabling categories allows the server to skip analysis for those, which can speed up query execution.
-	NotificationsDisabledCategories notifications.NotificationDisabledCategories
-	// Auth is used to overwrite the authentication information for the session.
-	// This requires the server to support re-authentication on the protocol level.
-	// `nil` will make the driver use the authentication information from the driver configuration.
-	// The `neo4j` package provides factory functions for common authentication schemes:
-	//   - `neo4j.NoAuth`
-	//   - `neo4j.BasicAuth`
-	//   - `neo4j.KerberosAuth`
-	//   - `neo4j.BearerAuth`
-	//   - `neo4j.CustomAuth`
-	Auth *AuthToken
-
-	forceReAuth bool
 }
 
 // FetchAll turns off fetching records in batches.
@@ -207,13 +108,13 @@ type sessionWithContext struct {
 	log           log.Logger
 	throttleTime  time.Duration
 	fetchSize     int
-	config        SessionConfig
+	config        config.SessionConfig
 	auth          *idb.ReAuthToken
 }
 
 func newSessionWithContext(
 	config *Config,
-	sessConfig SessionConfig,
+	sessConfig config.SessionConfig,
 	router sessionRouter,
 	pool sessionPool,
 	logger log.Logger,
@@ -263,7 +164,7 @@ func (s *sessionWithContext) lastBookmark() string {
 	return s.bookmarks.lastBookmark()
 }
 
-func (s *sessionWithContext) LastBookmarks() Bookmarks {
+func (s *sessionWithContext) LastBookmarks() bm.Bookmarks {
 	// Pick up bookmark from pending auto-commit if there is a bookmark on it
 	// Note: the bookmark manager should not be notified here because:
 	//  - the results of the autocommit transaction may have not been consumed
@@ -280,7 +181,7 @@ func (s *sessionWithContext) LastBookmarks() Bookmarks {
 	return s.bookmarks.currentBookmarks()
 }
 
-func (s *sessionWithContext) BeginTransaction(ctx context.Context, configurers ...func(*TransactionConfig)) (ExplicitTransaction, error) {
+func (s *sessionWithContext) BeginTransaction(ctx context.Context, configurers ...func(*config.TransactionConfig)) (ExplicitTransaction, error) {
 	// Guard for more than one transaction per session
 	if s.explicitTx != nil {
 		err := &UsageError{Message: "Session already has a pending transaction"}
@@ -362,25 +263,25 @@ func (s *sessionWithContext) BeginTransaction(ctx context.Context, configurers .
 }
 
 func (s *sessionWithContext) ExecuteRead(ctx context.Context,
-	work ManagedTransactionWork, configurers ...func(*TransactionConfig)) (any, error) {
+	work ManagedTransactionWork, configurers ...func(*config.TransactionConfig)) (any, error) {
 
 	return s.runRetriable(ctx, idb.ReadMode, work, true, telemetry.ManagedTransaction, configurers...)
 }
 
 func (s *sessionWithContext) ExecuteWrite(ctx context.Context,
-	work ManagedTransactionWork, configurers ...func(*TransactionConfig)) (any, error) {
+	work ManagedTransactionWork, configurers ...func(*config.TransactionConfig)) (any, error) {
 
 	return s.runRetriable(ctx, idb.WriteMode, work, true, telemetry.ManagedTransaction, configurers...)
 }
 
 func (s *sessionWithContext) executeQueryRead(ctx context.Context,
-	work ManagedTransactionWork, configurers ...func(*TransactionConfig)) (any, error) {
+	work ManagedTransactionWork, configurers ...func(*config.TransactionConfig)) (any, error) {
 
 	return s.runRetriable(ctx, idb.ReadMode, work, false, telemetry.ExecuteQuery, configurers...)
 }
 
 func (s *sessionWithContext) executeQueryWrite(ctx context.Context,
-	work ManagedTransactionWork, configurers ...func(*TransactionConfig)) (any, error) {
+	work ManagedTransactionWork, configurers ...func(*config.TransactionConfig)) (any, error) {
 
 	return s.runRetriable(ctx, idb.WriteMode, work, false, telemetry.ExecuteQuery, configurers...)
 }
@@ -391,7 +292,7 @@ func (s *sessionWithContext) runRetriable(
 	work ManagedTransactionWork,
 	blockingTxBegin bool,
 	api telemetry.API,
-	configurers ...func(*TransactionConfig)) (any, error) {
+	configurers ...func(*config.TransactionConfig)) (any, error) {
 
 	// Guard for more than one transaction per session
 	if s.explicitTx != nil {
@@ -436,7 +337,7 @@ func (s *sessionWithContext) runRetriable(
 func (s *sessionWithContext) executeTransactionFunction(
 	ctx context.Context,
 	mode idb.AccessMode,
-	config TransactionConfig,
+	config config.TransactionConfig,
 	state *retry.State,
 	work ManagedTransactionWork,
 	blockingTxBegin bool,
@@ -571,7 +472,7 @@ func (s *sessionWithContext) getConnection(ctx context.Context, mode idb.AccessM
 	return conn, nil
 }
 
-func (s *sessionWithContext) retrieveBookmarks(ctx context.Context, conn idb.Connection, sentBookmarks Bookmarks) error {
+func (s *sessionWithContext) retrieveBookmarks(ctx context.Context, conn idb.Connection, sentBookmarks bm.Bookmarks) error {
 	if conn == nil {
 		return nil
 	}
@@ -586,7 +487,7 @@ func (s *sessionWithContext) retrieveSessionBookmarks(conn idb.Connection) {
 }
 
 func (s *sessionWithContext) Run(ctx context.Context,
-	cypher string, params map[string]any, configurers ...func(*TransactionConfig)) (ResultWithContext, error) {
+	cypher string, params map[string]any, configurers ...func(*config.TransactionConfig)) (ResultWithContext, error) {
 
 	if s.explicitTx != nil {
 		err := &UsageError{Message: "Trying to run auto-commit transaction while in explicit transaction"}
@@ -760,7 +661,7 @@ func (s *sessionWithContext) resolveHomeDatabase(ctx context.Context) error {
 	return nil
 }
 
-func (s *sessionWithContext) getBookmarks(ctx context.Context) (Bookmarks, error) {
+func (s *sessionWithContext) getBookmarks(ctx context.Context) (bm.Bookmarks, error) {
 	bookmarks, err := s.bookmarks.getBookmarks(ctx)
 	if err != nil {
 		return nil, err
@@ -774,29 +675,29 @@ type erroredSessionWithContext struct {
 	err error
 }
 
-func (s *erroredSessionWithContext) LastBookmarks() Bookmarks {
+func (s *erroredSessionWithContext) LastBookmarks() bm.Bookmarks {
 	return nil
 }
 
 func (s *erroredSessionWithContext) lastBookmark() string {
 	return ""
 }
-func (s *erroredSessionWithContext) BeginTransaction(context.Context, ...func(*TransactionConfig)) (ExplicitTransaction, error) {
+func (s *erroredSessionWithContext) BeginTransaction(context.Context, ...func(*config.TransactionConfig)) (ExplicitTransaction, error) {
 	return nil, s.err
 }
-func (s *erroredSessionWithContext) ExecuteRead(context.Context, ManagedTransactionWork, ...func(*TransactionConfig)) (any, error) {
+func (s *erroredSessionWithContext) ExecuteRead(context.Context, ManagedTransactionWork, ...func(*config.TransactionConfig)) (any, error) {
 	return nil, s.err
 }
-func (s *erroredSessionWithContext) ExecuteWrite(context.Context, ManagedTransactionWork, ...func(*TransactionConfig)) (any, error) {
+func (s *erroredSessionWithContext) ExecuteWrite(context.Context, ManagedTransactionWork, ...func(*config.TransactionConfig)) (any, error) {
 	return nil, s.err
 }
-func (s *erroredSessionWithContext) executeQueryRead(context.Context, ManagedTransactionWork, ...func(*TransactionConfig)) (any, error) {
+func (s *erroredSessionWithContext) executeQueryRead(context.Context, ManagedTransactionWork, ...func(*config.TransactionConfig)) (any, error) {
 	return nil, s.err
 }
-func (s *erroredSessionWithContext) executeQueryWrite(context.Context, ManagedTransactionWork, ...func(*TransactionConfig)) (any, error) {
+func (s *erroredSessionWithContext) executeQueryWrite(context.Context, ManagedTransactionWork, ...func(*config.TransactionConfig)) (any, error) {
 	return nil, s.err
 }
-func (s *erroredSessionWithContext) Run(context.Context, string, map[string]any, ...func(*TransactionConfig)) (ResultWithContext, error) {
+func (s *erroredSessionWithContext) Run(context.Context, string, map[string]any, ...func(*config.TransactionConfig)) (ResultWithContext, error) {
 	return nil, s.err
 }
 func (s *erroredSessionWithContext) Close(context.Context) error {
@@ -813,11 +714,11 @@ func (s *erroredSessionWithContext) verifyAuthentication(context.Context) error 
 	return s.err
 }
 
-func defaultTransactionConfig() TransactionConfig {
-	return TransactionConfig{Timeout: math.MinInt, Metadata: nil}
+func defaultTransactionConfig() config.TransactionConfig {
+	return config.TransactionConfig{Timeout: math.MinInt, Metadata: nil}
 }
 
-func validateTransactionConfig(config TransactionConfig) error {
+func validateTransactionConfig(config config.TransactionConfig) error {
 	if config.Timeout != math.MinInt && config.Timeout < 0 {
 		err := fmt.Sprintf("Negative transaction timeouts are not allowed. Given: %d", config.Timeout)
 		return &UsageError{Message: err}

@@ -44,7 +44,7 @@ func DisableCategories(value ...NotificationCategory) NotificationDisabledCatego
 }
 
 // DisableNoCategories creates a NotificationDisabledCategories that enables all categories.
-// Can be used for NotificationsDisabledCategories of neo4j.Config and neo4j.SessionConfig.
+// Can be used for NotificationsDisabledCategories of neo4j.Config and config.SessionConfig.
 func DisableNoCategories() NotificationDisabledCategories {
 	return NotificationDisabledCategories{nil, true}
 }

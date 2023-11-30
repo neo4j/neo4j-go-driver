@@ -23,6 +23,7 @@ import (
 	"sync/atomic"
 
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
+	bm "github.com/neo4j/neo4j-go-driver/v5/neo4j/bookmarks"
 )
 
 // TestContext provides state data shared across tests
@@ -48,7 +49,7 @@ func NewTestContext(driver neo4j.DriverWithContext) *TestContext {
 		createdNodeCount:       0,
 	}
 
-	result.bookmarks.Store(neo4j.Bookmarks{})
+	result.bookmarks.Store(bm.Bookmarks{})
 
 	return result
 }
@@ -71,11 +72,11 @@ func (ctx *TestContext) addRead() {
 	atomic.AddInt32(&ctx.readNodeCount, 1)
 }
 
-func (ctx *TestContext) getBookmarks() neo4j.Bookmarks {
-	return ctx.bookmarks.Load().(neo4j.Bookmarks)
+func (ctx *TestContext) getBookmarks() bm.Bookmarks {
+	return ctx.bookmarks.Load().(bm.Bookmarks)
 }
 
-func (ctx *TestContext) setBookmarks(bookmarks neo4j.Bookmarks) {
+func (ctx *TestContext) setBookmarks(bookmarks bm.Bookmarks) {
 	ctx.bookmarks.Store(bookmarks)
 }
 

@@ -19,9 +19,11 @@ package test_integration
 
 import (
 	"context"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/test-integration/dbserver"
 	"testing"
+
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/config"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/test-integration/dbserver"
 )
 
 func TestContext(outer *testing.T) {
@@ -35,7 +37,7 @@ func TestContext(outer *testing.T) {
 	outer.Run("server does not hold on transaction when driver cancels context", func(t *testing.T) {
 		driver := server.Driver()
 		defer driver.Close(ctx)
-		session := driver.NewSession(ctx, neo4j.SessionConfig{FetchSize: 1})
+		session := driver.NewSession(ctx, config.SessionConfig{FetchSize: 1})
 		defer session.Close(ctx)
 		tx, err := session.BeginTransaction(ctx)
 		assertNil(t, err)
@@ -55,7 +57,7 @@ func TestContext(outer *testing.T) {
 }
 
 func listTransactionWorkloads(ctx context.Context, driver neo4j.DriverWithContext, server dbserver.DbServer) []string {
-	session := driver.NewSession(ctx, neo4j.SessionConfig{})
+	session := driver.NewSession(ctx, config.SessionConfig{})
 	defer session.Close(ctx)
 	transactionQuery := server.GetTransactionWorkloadsQuery()
 	results, err := session.Run(ctx, transactionQuery, nil)

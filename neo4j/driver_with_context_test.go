@@ -21,14 +21,17 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/racing"
-	. "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/testutil"
 	"net/url"
 	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
 	"unsafe"
+
+	bm "github.com/neo4j/neo4j-go-driver/v5/neo4j/bookmarks"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/config"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/racing"
+	. "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/testutil"
 )
 
 func TestDriverExecuteQuery(outer *testing.T) {
@@ -42,7 +45,7 @@ func TestDriverExecuteQuery(outer *testing.T) {
 	summary := &fakeSummary{resultAvailableAfter: 42 * time.Millisecond}
 	defaultBookmarkManager := &fakeBookmarkManager{}
 	customBookmarkManager := &fakeBookmarkManager{}
-	defaultSessionConfig := SessionConfig{BookmarkManager: defaultBookmarkManager}
+	defaultSessionConfig := config.SessionConfig{BookmarkManager: defaultBookmarkManager}
 
 	outer.Run("nil driver is not allowed", func(t *testing.T) {
 		_, err := ExecuteQuery(ctx, nil, "RETURN 42", nil, EagerResultTransformer)
@@ -55,7 +58,7 @@ func TestDriverExecuteQuery(outer *testing.T) {
 		resultTransformer     func() ResultTransformer[T]
 		configurers           []ExecuteQueryConfigurationOption
 		createSession         *fakeSession
-		expectedSessionConfig SessionConfig
+		expectedSessionConfig config.SessionConfig
 		expectedResult        T
 		expectedErr           error
 	}
@@ -88,7 +91,7 @@ func TestDriverExecuteQuery(outer *testing.T) {
 					nextRecords: records,
 					summary:     summary,
 				}},
-			expectedSessionConfig: SessionConfig{ImpersonatedUser: "jane", BookmarkManager: defaultBookmarkManager},
+			expectedSessionConfig: config.SessionConfig{ImpersonatedUser: "jane", BookmarkManager: defaultBookmarkManager},
 			expectedResult: &EagerResult{
 				Keys:    keys,
 				Records: records,
@@ -106,7 +109,7 @@ func TestDriverExecuteQuery(outer *testing.T) {
 					nextRecords: records,
 					summary:     summary,
 				}},
-			expectedSessionConfig: SessionConfig{DatabaseName: "imdb", BookmarkManager: defaultBookmarkManager},
+			expectedSessionConfig: config.SessionConfig{DatabaseName: "imdb", BookmarkManager: defaultBookmarkManager},
 			expectedResult: &EagerResult{
 				Keys:    keys,
 				Records: records,
@@ -124,7 +127,7 @@ func TestDriverExecuteQuery(outer *testing.T) {
 					nextRecords: records,
 					summary:     summary,
 				}},
-			expectedSessionConfig: SessionConfig{BookmarkManager: customBookmarkManager},
+			expectedSessionConfig: config.SessionConfig{BookmarkManager: customBookmarkManager},
 			expectedResult: &EagerResult{
 				Keys:    keys,
 				Records: records,
@@ -142,7 +145,7 @@ func TestDriverExecuteQuery(outer *testing.T) {
 					nextRecords: records,
 					summary:     summary,
 				}},
-			expectedSessionConfig: SessionConfig{BookmarkManager: nil},
+			expectedSessionConfig: config.SessionConfig{BookmarkManager: nil},
 			expectedResult: &EagerResult{
 				Keys:    keys,
 				Records: records,
@@ -409,7 +412,7 @@ func TestDriverExecuteQuery(outer *testing.T) {
 	for _, testCase := range testCases {
 		outer.Run(testCase.description, func(t *testing.T) {
 			driver := &driverDelegate{
-				newSession: func(_ context.Context, config SessionConfig) SessionWithContext {
+				newSession: func(_ context.Context, config config.SessionConfig) SessionWithContext {
 					AssertDeepEquals(t, testCase.expectedSessionConfig, config)
 					return testCase.createSession
 				},
@@ -429,7 +432,7 @@ func TestDriverExecuteQuery(outer *testing.T) {
 
 	outer.Run("default bookmark manager is thread-safe", func(t *testing.T) {
 		driver := &driverDelegate{
-			newSession: func(_ context.Context, config SessionConfig) SessionWithContext {
+			newSession: func(_ context.Context, config config.SessionConfig) SessionWithContext {
 				return &fakeSession{
 					executeWriteErr: fmt.Errorf("oopsie, write failed"),
 				}
@@ -448,7 +451,7 @@ func TestDriverExecuteQuery(outer *testing.T) {
 				callExecuteQueryOrBookmarkManagerGetter(driver, i)
 				storeBookmarkManagerAddress(
 					&bookmarkManagerAddresses,
-					driver.delegate.executeQueryBookmarkManager.(*bookmarkManager))
+					driver.delegate.executeQueryBookmarkManager.(*bm.DefaultBookmarkManager))
 				wait.Done()
 			}(i)
 		}
@@ -462,7 +465,7 @@ func TestDriverExecuteQuery(outer *testing.T) {
 		if len(addressCounts) != 1 {
 			t.Errorf("expected exactly 1 bookmark manager pointer to have been created, got %v", addressCounts)
 		}
-		address := uintptr(unsafe.Pointer(driver.delegate.executeQueryBookmarkManager.(*bookmarkManager)))
+		address := uintptr(unsafe.Pointer(driver.delegate.executeQueryBookmarkManager.(*bm.DefaultBookmarkManager)))
 		if count, found := addressCounts[address]; !found || count != int32(goroutineCount) {
 			t.Errorf("expected pointer address %v to be seen %d time(s), got these instead %v", address, count, addressCounts)
 		}
@@ -479,7 +482,7 @@ func callExecuteQueryOrBookmarkManagerGetter(driver DriverWithContext, i int) {
 	}
 }
 
-func storeBookmarkManagerAddress(bookmarkManagerAddresses *sync.Map, bookmarkMgr *bookmarkManager) {
+func storeBookmarkManagerAddress(bookmarkManagerAddresses *sync.Map, bookmarkMgr *bm.DefaultBookmarkManager) {
 	address := uintptr(unsafe.Pointer(bookmarkMgr))
 	defaultCount := int32(1)
 	if count, loaded := bookmarkManagerAddresses.LoadOrStore(address, &defaultCount); loaded {
@@ -514,10 +517,10 @@ func (f *failingResultTransformer) Complete([]string, ResultSummary) (*EagerResu
 
 type driverDelegate struct {
 	delegate   *driverWithContext
-	newSession func(context.Context, SessionConfig) SessionWithContext
+	newSession func(context.Context, config.SessionConfig) SessionWithContext
 }
 
-func (d *driverDelegate) ExecuteQueryBookmarkManager() BookmarkManager {
+func (d *driverDelegate) ExecuteQueryBookmarkManager() bm.BookmarkManager {
 	return d.delegate.ExecuteQueryBookmarkManager()
 }
 
@@ -525,7 +528,7 @@ func (d *driverDelegate) Target() url.URL {
 	return d.delegate.Target()
 }
 
-func (d *driverDelegate) NewSession(ctx context.Context, config SessionConfig) SessionWithContext {
+func (d *driverDelegate) NewSession(ctx context.Context, config config.SessionConfig) SessionWithContext {
 	return d.newSession(ctx, config)
 }
 
@@ -560,7 +563,7 @@ type fakeSession struct {
 	closeErr                       error
 }
 
-func (s *fakeSession) LastBookmarks() Bookmarks {
+func (s *fakeSession) LastBookmarks() bm.Bookmarks {
 	panic("implement me")
 }
 
@@ -568,18 +571,18 @@ func (s *fakeSession) lastBookmark() string {
 	panic("implement me")
 }
 
-func (s *fakeSession) BeginTransaction(context.Context, ...func(*TransactionConfig)) (ExplicitTransaction, error) {
+func (s *fakeSession) BeginTransaction(context.Context, ...func(*config.TransactionConfig)) (ExplicitTransaction, error) {
 	panic("implement me")
 }
 
-func (s *fakeSession) ExecuteRead(_ context.Context, callback ManagedTransactionWork, _ ...func(*TransactionConfig)) (any, error) {
+func (s *fakeSession) ExecuteRead(_ context.Context, callback ManagedTransactionWork, _ ...func(*config.TransactionConfig)) (any, error) {
 	return callback(&fakeManagedTransaction{
 		result: s.executeReadTransactionResult,
 		err:    s.executeReadErr,
 	})
 }
 
-func (s *fakeSession) ExecuteWrite(_ context.Context, callback ManagedTransactionWork, _ ...func(*TransactionConfig)) (any, error) {
+func (s *fakeSession) ExecuteWrite(_ context.Context, callback ManagedTransactionWork, _ ...func(*config.TransactionConfig)) (any, error) {
 	result := s.executeWriteTransactionResult
 	err := s.executeWriteErr
 	if s.executeWriteErrs != nil {
@@ -589,14 +592,14 @@ func (s *fakeSession) ExecuteWrite(_ context.Context, callback ManagedTransactio
 	}
 	return callback(&fakeManagedTransaction{result: result, err: err})
 }
-func (s *fakeSession) executeQueryRead(_ context.Context, callback ManagedTransactionWork, _ ...func(*TransactionConfig)) (any, error) {
+func (s *fakeSession) executeQueryRead(_ context.Context, callback ManagedTransactionWork, _ ...func(*config.TransactionConfig)) (any, error) {
 	return callback(&fakeManagedTransaction{
 		result: s.executeReadTransactionResult,
 		err:    s.executeReadErr,
 	})
 }
 
-func (s *fakeSession) executeQueryWrite(_ context.Context, callback ManagedTransactionWork, _ ...func(*TransactionConfig)) (any, error) {
+func (s *fakeSession) executeQueryWrite(_ context.Context, callback ManagedTransactionWork, _ ...func(*config.TransactionConfig)) (any, error) {
 	result := s.executeWriteTransactionResult
 	err := s.executeWriteErr
 	if s.executeWriteErrs != nil {
@@ -606,7 +609,7 @@ func (s *fakeSession) executeQueryWrite(_ context.Context, callback ManagedTrans
 	}
 	return callback(&fakeManagedTransaction{result: result, err: err})
 }
-func (s *fakeSession) Run(context.Context, string, map[string]any, ...func(*TransactionConfig)) (ResultWithContext, error) {
+func (s *fakeSession) Run(context.Context, string, map[string]any, ...func(*config.TransactionConfig)) (ResultWithContext, error) {
 	panic("implement me")
 }
 

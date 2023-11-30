@@ -24,6 +24,7 @@ import (
 	"time"
 
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/config"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/test-integration/dbserver"
 )
 
@@ -41,7 +42,7 @@ func TestTransaction(outer *testing.T) {
 	var result neo4j.ResultWithContext
 
 	driver = server.Driver()
-	session = driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
+	session = driver.NewSession(ctx, config.SessionConfig{AccessMode: config.AccessModeWrite})
 
 	defer func() {
 		if session != nil {
@@ -239,7 +240,7 @@ func TestTransaction(outer *testing.T) {
 				"m4": neo4j.LocalDateTimeOf(time.Now()),
 			}
 
-			tx, err = session.BeginTransaction(ctx, neo4j.WithTxMetadata(metadata))
+			tx, err = session.BeginTransaction(ctx, config.WithTxMetadata(metadata))
 			assertNil(t, err)
 			defer tx.Close(ctx)
 
@@ -250,7 +251,7 @@ func TestTransaction(outer *testing.T) {
 				t.Skip("Can not list transactions on non-enterprise version")
 			}
 
-			session2 := driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead})
+			session2 := driver.NewSession(ctx, config.SessionConfig{AccessMode: config.AccessModeRead})
 			defer session2.Close(ctx)
 			matched, err := session2.ExecuteRead(ctx, listTransactionsAndMatchMetadataWork(ctx, server.Version, metadata))
 			assertNil(t, err)
@@ -260,13 +261,13 @@ func TestTransaction(outer *testing.T) {
 		inner.Run("should set transaction timeout", func(t *testing.T) {
 			createNode(ctx, t, session, "TxTimeOut", nil)
 
-			session2, tx2 := newSessionAndTx(ctx, t, driver, neo4j.AccessModeWrite)
+			session2, tx2 := newSessionAndTx(ctx, t, driver, config.AccessModeWrite)
 			defer session2.Close(ctx)
 			defer tx2.Close(ctx)
 
 			updateNodeInTx(ctx, t, tx2, "TxTimeOut", map[string]any{"id": 1})
 
-			session3, tx3 := newSessionAndTx(ctx, t, driver, neo4j.AccessModeWrite, neo4j.WithTxTimeout(1*time.Second))
+			session3, tx3 := newSessionAndTx(ctx, t, driver, config.AccessModeWrite, config.WithTxTimeout(1*time.Second))
 			defer session3.Close(ctx)
 			defer tx3.Close(ctx)
 
@@ -282,12 +283,12 @@ func TestTransaction(outer *testing.T) {
 		}
 
 		t.Run("should fail when transaction timeout is set for Session.BeginTransaction", func(t *testing.T) {
-			_, err := session.BeginTransaction(ctx, neo4j.WithTxTimeout(1*time.Second))
+			_, err := session.BeginTransaction(ctx, config.WithTxTimeout(1*time.Second))
 			assertNotNil(t, err)
 		})
 
 		t.Run("should fail when transaction metadata is set for Session.BeginTransaction", func(t *testing.T) {
-			_, err := session.BeginTransaction(ctx, neo4j.WithTxMetadata(map[string]any{"x": 1}))
+			_, err := session.BeginTransaction(ctx, config.WithTxMetadata(map[string]any{"x": 1}))
 			assertNotNil(t, err)
 		})
 	})

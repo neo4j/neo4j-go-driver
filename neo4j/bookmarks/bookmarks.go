@@ -15,12 +15,13 @@
  * limitations under the License.
  */
 
-package neo4j
+package bookmarks
 
 import (
 	"context"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/collections"
 	"sync"
+
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/collections"
 )
 
 // Bookmarks is a holder for server-side bookmarks which are used for causally-chained sessions.
@@ -54,14 +55,14 @@ type BookmarkManagerConfig struct {
 	BookmarkConsumer func(ctx context.Context, bookmarks Bookmarks) error
 }
 
-type bookmarkManager struct {
+type DefaultBookmarkManager struct {
 	bookmarks        collections.Set[string]
 	supplyBookmarks  func(context.Context) (Bookmarks, error)
 	consumeBookmarks func(context.Context, Bookmarks) error
 	mutex            sync.RWMutex
 }
 
-func (b *bookmarkManager) UpdateBookmarks(ctx context.Context, previousBookmarks, newBookmarks Bookmarks) error {
+func (b *DefaultBookmarkManager) UpdateBookmarks(ctx context.Context, previousBookmarks, newBookmarks Bookmarks) error {
 	if len(newBookmarks) == 0 {
 		return nil
 	}
@@ -77,7 +78,7 @@ func (b *bookmarkManager) UpdateBookmarks(ctx context.Context, previousBookmarks
 	return nil
 }
 
-func (b *bookmarkManager) GetBookmarks(ctx context.Context) (Bookmarks, error) {
+func (b *DefaultBookmarkManager) GetBookmarks(ctx context.Context) (Bookmarks, error) {
 	var extraBookmarks Bookmarks
 	if b.supplyBookmarks != nil {
 		bookmarks, err := b.supplyBookmarks(ctx)
@@ -100,7 +101,7 @@ func (b *bookmarkManager) GetBookmarks(ctx context.Context) (Bookmarks, error) {
 }
 
 func NewBookmarkManager(config BookmarkManagerConfig) BookmarkManager {
-	return &bookmarkManager{
+	return &DefaultBookmarkManager{
 		bookmarks:        collections.NewSet(config.InitialBookmarks),
 		supplyBookmarks:  config.BookmarkSupplier,
 		consumeBookmarks: config.BookmarkConsumer,
@@ -111,7 +112,7 @@ func NewBookmarkManager(config BookmarkManagerConfig) BookmarkManager {
 // Let s1, s2, s3 be Session interfaces. You can easily causally chain the sessions like so:
 // ```go
 //
-//	s4 := driver.NewSession(neo4j.SessionConfig{
+//	s4 := driver.NewSession(config.SessionConfig{
 //		Bookmarks: neo4j.CombineBookmarks(s1.LastBookmarks(), s2.LastBookmarks(), s3.LastBookmarks()),
 //	})
 //

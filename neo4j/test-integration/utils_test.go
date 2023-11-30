@@ -20,10 +20,12 @@ package test_integration
 import (
 	"context"
 	"fmt"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/test-integration/dbserver"
 	"reflect"
 	"sort"
 	"testing"
+
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/config"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/test-integration/dbserver"
 
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
 )
@@ -48,22 +50,22 @@ func transactionWithIntWork(t *testing.T, tx neo4j.ExplicitTransaction, work neo
 	return result.(int64)
 }
 
-func readTransactionWithIntWork(ctx context.Context, t *testing.T, session neo4j.SessionWithContext, work neo4j.ManagedTransactionWork, configurers ...func(*neo4j.TransactionConfig)) int64 {
+func readTransactionWithIntWork(ctx context.Context, t *testing.T, session neo4j.SessionWithContext, work neo4j.ManagedTransactionWork, configurers ...func(*config.TransactionConfig)) int64 {
 	result, err := session.ExecuteRead(ctx, work, configurers...)
 	assertNil(t, err)
 
 	return result.(int64)
 }
 
-func writeTransactionWithIntWork(ctx context.Context, t *testing.T, session neo4j.SessionWithContext, work neo4j.ManagedTransactionWork, configurers ...func(*neo4j.TransactionConfig)) int64 {
+func writeTransactionWithIntWork(ctx context.Context, t *testing.T, session neo4j.SessionWithContext, work neo4j.ManagedTransactionWork, configurers ...func(*config.TransactionConfig)) int64 {
 	result, err := session.ExecuteWrite(ctx, work, configurers...)
 	assertNil(t, err)
 
 	return result.(int64)
 }
 
-func newSessionAndTx(ctx context.Context, t *testing.T, driver neo4j.DriverWithContext, mode neo4j.AccessMode, configurers ...func(*neo4j.TransactionConfig)) (neo4j.SessionWithContext, neo4j.ExplicitTransaction) {
-	session := driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: mode})
+func newSessionAndTx(ctx context.Context, t *testing.T, driver neo4j.DriverWithContext, mode config.AccessMode, configurers ...func(*config.TransactionConfig)) (neo4j.SessionWithContext, neo4j.ExplicitTransaction) {
+	session := driver.NewSession(ctx, config.SessionConfig{AccessMode: mode})
 
 	tx, err := session.BeginTransaction(ctx, configurers...)
 	assertNil(t, err)
