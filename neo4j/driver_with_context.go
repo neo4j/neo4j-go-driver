@@ -24,7 +24,6 @@ import (
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/auth"
 	idb "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/errorutil"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/racing"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/log"
 	"net/url"
 	"strings"
@@ -145,7 +144,7 @@ func NewDriverWithContext(target string, auth auth.TokenManager, configurers ...
 		return nil, err
 	}
 
-	d := driverWithContext{target: parsed, mut: racing.NewMutex(), now: time.Now, auth: auth}
+	d := driverWithContext{target: parsed, mut: sync.Mutex{}, now: time.Now, auth: auth}
 
 	routing := true
 	d.connector.Network = "tcp"
@@ -313,7 +312,7 @@ type driverWithContext struct {
 	target    *url.URL
 	config    *Config
 	pool      *pool.Pool
-	mut       racing.Mutex
+	mut       sync.Mutex
 	connector connector.Connector
 	router    sessionRouter
 	logId     string
@@ -331,7 +330,9 @@ func (d *driverWithContext) Target() url.URL {
 	return *d.target
 }
 
-func (d *driverWithContext) NewSession(ctx context.Context, config SessionConfig) SessionWithContext {
+// TODO 6.0: remove unused Context parameter
+
+func (d *driverWithContext) NewSession(_ context.Context, config SessionConfig) SessionWithContext {
 	if config.DatabaseName == "" {
 		config.DatabaseName = idb.DefaultDatabase
 	}
@@ -351,10 +352,7 @@ func (d *driverWithContext) NewSession(ctx context.Context, config SessionConfig
 		}
 	}
 
-	if !d.mut.TryLock(ctx) {
-		return &erroredSessionWithContext{
-			err: racing.LockTimeoutError("could not acquire lock in time when creating session")}
-	}
+	d.mut.Lock()
 	defer d.mut.Unlock()
 	if d.pool == nil {
 		return &erroredSessionWithContext{
@@ -381,16 +379,18 @@ func (d *driverWithContext) GetServerInfo(ctx context.Context) (_ ServerInfo, er
 }
 
 func (d *driverWithContext) Close(ctx context.Context) error {
-	if !d.mut.TryLock(ctx) {
-		return racing.LockTimeoutError("could not acquire lock in time when closing driver")
+	d.mut.Lock()
+	if d.pool == nil {
+		// Safeguard against closing more than once
+		return nil
 	}
-	defer d.mut.Unlock()
-	// Safeguard against closing more than once
-	if d.pool != nil {
-		d.pool.Close(ctx)
-		d.pool = nil
-		d.log.Infof(log.Driver, d.logId, "Closed")
-	}
+	pool := d.pool
+	d.pool = nil
+	d.mut.Unlock()
+
+	pool.Close(ctx)
+	pool = nil
+	d.log.Infof(log.Driver, d.logId, "Closed")
 	return nil
 }
 
