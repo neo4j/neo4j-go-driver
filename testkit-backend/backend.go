@@ -297,17 +297,9 @@ func (b *backend) toRequest(s string) map[string]any {
 func (b *backend) toTransactionConfigApply(data map[string]any) func(*neo4j.TransactionConfig) {
 	txConfig := neo4j.TransactionConfig{Timeout: math.MinInt}
 	// Optional transaction meta data
-	if data["txMeta"] != nil {
-		txMetadata, err := b.toParams(data["txMeta"].(map[string]any))
-		if err != nil {
-			panic(err)
-		}
-		txConfig.Metadata = txMetadata
-	}
+	txConfig.Metadata = b.toTxMetadata(data)
 	// Optional timeout in milliseconds
-	if data["timeout"] != nil {
-		txConfig.Timeout = time.Millisecond * time.Duration(asInt64(data["timeout"].(json.Number)))
-	}
+	txConfig.Timeout = b.toTimeout(data)
 	return func(conf *neo4j.TransactionConfig) {
 		if txConfig.Metadata != nil {
 			conf.Metadata = txConfig.Metadata
@@ -316,6 +308,24 @@ func (b *backend) toTransactionConfigApply(data map[string]any) func(*neo4j.Tran
 			conf.Timeout = txConfig.Timeout
 		}
 	}
+}
+
+func (b *backend) toTxMetadata(data map[string]any) map[string]any {
+	if data["txMeta"] != nil {
+		txMetadata, err := b.toParams(data["txMeta"].(map[string]any))
+		if err != nil {
+			panic(err)
+		}
+		return txMetadata
+	}
+	return nil
+}
+
+func (b *backend) toTimeout(data map[string]any) time.Duration {
+	if data["timeout"] != nil {
+		return time.Millisecond * time.Duration(asInt64(data["timeout"].(json.Number)))
+	}
+	return math.MinInt
 }
 
 func (b *backend) toCypherAndParams(data map[string]any) (string, map[string]any, error) {
@@ -595,6 +605,13 @@ func (b *backend) handleRequest(req map[string]any) {
 					} else {
 						config.BookmarkManager = b.bookmarkManagers[bookmarkManagerId.(string)]
 					}
+				}
+				// Append configurers to config if they exist.
+				if executeQueryConfig["timeout"] != nil {
+					config.TransactionConfigurers = append(config.TransactionConfigurers, neo4j.WithTxTimeout(b.toTimeout(executeQueryConfig)))
+				}
+				if executeQueryConfig["txMeta"] != nil {
+					config.TransactionConfigurers = append(config.TransactionConfigurers, neo4j.WithTxMetadata(b.toTxMetadata(executeQueryConfig)))
 				}
 			})
 		}
