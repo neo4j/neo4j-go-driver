@@ -544,7 +544,7 @@ func ExecuteQuery[T any](
 	if err != nil {
 		return *new(T), err
 	}
-	result, err := txFunction(ctx, executeQueryCallback(ctx, query, parameters, newResultTransformer))
+	result, err := txFunction(ctx, executeQueryCallback(ctx, query, parameters, newResultTransformer), configuration.TransactionConfigurers...)
 	if err != nil {
 		return *new(T), err
 	}
@@ -669,13 +669,21 @@ func ExecuteQueryWithBoltLogger(boltLogger log.BoltLogger) ExecuteQueryConfigura
 	}
 }
 
+// ExecuteQueryWithTransactionConfig configures DriverWithContext.ExecuteQuery with additional transaction configuration.
+func ExecuteQueryWithTransactionConfig(configurers ...func(*TransactionConfig)) ExecuteQueryConfigurationOption {
+	return func(configuration *ExecuteQueryConfiguration) {
+		configuration.TransactionConfigurers = configurers
+	}
+}
+
 // ExecuteQueryConfiguration holds all the possible configuration settings for DriverWithContext.ExecuteQuery
 type ExecuteQueryConfiguration struct {
-	Routing          RoutingControl
-	ImpersonatedUser string
-	Database         string
-	BookmarkManager  BookmarkManager
-	BoltLogger       log.BoltLogger
+	Routing                RoutingControl
+	ImpersonatedUser       string
+	Database               string
+	BookmarkManager        BookmarkManager
+	BoltLogger             log.BoltLogger
+	TransactionConfigurers []func(*TransactionConfig)
 }
 
 // RoutingControl specifies how the query executed by DriverWithContext.ExecuteQuery is to be routed
