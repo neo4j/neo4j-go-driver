@@ -530,9 +530,7 @@ func (s *sessionWithContext) getConnection(ctx context.Context, mode idb.AccessM
 	if timeout > 0 {
 		var cancel context.CancelFunc
 		ctx, cancel = context.WithTimeout(ctx, timeout)
-		if cancel != nil {
-			defer cancel()
-		}
+		defer cancel()
 		deadline, _ := ctx.Deadline()
 		s.log.Debugf(log.Session, s.logId, "connection acquisition timeout is %s, resolved deadline is: %s", timeout, deadline)
 	} else if deadline, ok := ctx.Deadline(); ok {
