@@ -608,10 +608,10 @@ func (b *backend) handleRequest(req map[string]any) {
 				}
 				// Append configurers to config if they exist.
 				if executeQueryConfig["timeout"] != nil {
-					config.Configurers = append(config.Configurers, neo4j.WithTxTimeout(b.toTimeout(executeQueryConfig)))
+					config.TransactionConfigurers = append(config.TransactionConfigurers, neo4j.WithTxTimeout(b.toTimeout(executeQueryConfig)))
 				}
 				if executeQueryConfig["txMeta"] != nil {
-					config.Configurers = append(config.Configurers, neo4j.WithTxMetadata(b.toTxMetadata(executeQueryConfig)))
+					config.TransactionConfigurers = append(config.TransactionConfigurers, neo4j.WithTxMetadata(b.toTxMetadata(executeQueryConfig)))
 				}
 			})
 		}
