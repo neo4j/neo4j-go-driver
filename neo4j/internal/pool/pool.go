@@ -23,16 +23,17 @@ package pool
 import (
 	"container/list"
 	"context"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/config"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/db"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/bolt"
-	idb "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/errorutil"
 	"math"
 	"sort"
 	"sync"
 	"time"
 
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/config"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/db"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/bolt"
+	idb "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/errorutil"
+	itime "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/time"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/log"
 )
 
@@ -60,7 +61,6 @@ type Pool struct {
 	serversMut sync.Mutex
 	queueMut   sync.Mutex
 	queue      list.List
-	now        *func() time.Time
 	closed     bool
 	log        log.Logger
 	logId      string
@@ -71,7 +71,7 @@ type serverPenalty struct {
 	penalty uint32
 }
 
-func New(config *config.Config, connect Connect, logger log.Logger, logId string, now *func() time.Time) *Pool {
+func New(config *config.Config, connect Connect, logger log.Logger, logId string) *Pool {
 	// Means infinite life, simplifies checking later on
 
 	p := &Pool{
@@ -81,7 +81,6 @@ func New(config *config.Config, connect Connect, logger log.Logger, logId string
 		servers:    make(map[string]*server),
 		serversMut: sync.Mutex{},
 		queueMut:   sync.Mutex{},
-		now:        now,
 		logId:      logId,
 		log:        logger,
 	}
@@ -137,7 +136,7 @@ func (p *Pool) getServers() map[string]*server {
 func (p *Pool) CleanUp(ctx context.Context) {
 	p.serversMut.Lock()
 	defer p.serversMut.Unlock()
-	now := (*p.now)()
+	now := itime.Now()
 	for n, s := range p.servers {
 		s.removeIdleOlderThan(ctx, now, p.config.MaxConnectionLifetime)
 		if s.size() == 0 && !s.hasFailedConnect(now) {
@@ -146,17 +145,13 @@ func (p *Pool) CleanUp(ctx context.Context) {
 	}
 }
 
-func (p *Pool) Now() time.Time {
-	return (*p.now)()
-}
-
 func (p *Pool) getPenaltiesForServers(ctx context.Context, serverNames []string) []serverPenalty {
 	p.serversMut.Lock()
 	defer p.serversMut.Unlock()
 
 	// Retrieve penalty for each server
 	penalties := make([]serverPenalty, len(serverNames))
-	now := (*p.now)()
+	now := itime.Now()
 	for i, n := range serverNames {
 		s := p.servers[n]
 		penalties[i].name = n
@@ -189,7 +184,7 @@ serverLoop:
 				if healthy {
 					return conn, nil
 				}
-				p.unreg(ctx, serverName, conn, p.Now())
+				p.unreg(ctx, serverName, conn, itime.Now())
 				if err != nil {
 					p.log.Debugf(log.Pool, p.logId, "Health check failed for %s: %s", serverName, err)
 					return nil, err
@@ -308,7 +303,7 @@ func (p *Pool) tryBorrow(ctx context.Context, serverName string, boltLogger log.
 			if healthy {
 				return connection, nil
 			}
-			p.unreg(ctx, serverName, connection, p.Now())
+			p.unreg(ctx, serverName, connection, itime.Now())
 			if err != nil {
 				p.log.Debugf(log.Pool, p.logId, "Health check failed for %s: %s", serverName, err)
 				return nil, err
@@ -337,7 +332,7 @@ func (p *Pool) tryBorrow(ctx context.Context, serverName string, boltLogger log.
 		p.log.Warnf(log.Pool, p.logId, "Failed to connect to %s: %s", serverName, err)
 		// FeatureNotSupportedError is not the server fault, don't penalize it
 		if _, ok := err.(*db.FeatureNotSupportedError); !ok {
-			srv.notifyFailedConnect((*p.now)())
+			srv.notifyFailedConnect(itime.Now())
 		}
 		return nil, err
 	}
@@ -397,7 +392,7 @@ func (p *Pool) Return(ctx context.Context, c idb.Connection) {
 	// If the connection is dead, remove all other idle connections on the same server that older
 	// or of the same age as the dead connection, otherwise perform normal cleanup of old connections
 	maxAge := p.config.MaxConnectionLifetime
-	now := (*p.now)()
+	now := itime.Now()
 	age := now.Sub(c.Birthdate())
 	if !isAlive {
 		// Since this connection has died all other connections that connected before this one

@@ -19,15 +19,16 @@ package connector_test
 
 import (
 	"context"
+	"io"
+	"net"
+	"testing"
+	"time"
+
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/config"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/db"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/connector"
 	idb "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
 	. "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/testutil"
-	"io"
-	"net"
-	"testing"
-	"time"
 )
 
 type noopErrorListener struct{}
@@ -51,12 +52,10 @@ func TestConnect(outer *testing.T) {
 			server.acceptVersion(1, 0)
 		}()
 		connectionDelegate := &ConnDelegate{Delegate: clientConnection}
-		timer := time.Now
 		connector := &connector.Connector{
 			SupplyConnection: supplyThis(connectionDelegate),
 			SkipEncryption:   true,
 			Config:           &config.Config{},
-			Now:              &timer,
 		}
 
 		connection, err := connector.Connect(ctx, "irrelevant", nil, noopErrorListener{}, nil)
@@ -72,12 +71,10 @@ func TestConnect(outer *testing.T) {
 			server.failAcceptingVersion()
 		}()
 		connectionDelegate := &ConnDelegate{Delegate: clientConnection}
-		timer := time.Now
 		connector := &connector.Connector{
 			SupplyConnection: supplyThis(connectionDelegate),
 			SkipEncryption:   true,
 			Config:           &config.Config{},
-			Now:              &timer,
 		}
 
 		connection, err := connector.Connect(ctx, "irrelevant", nil, noopErrorListener{}, nil)

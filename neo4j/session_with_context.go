@@ -20,16 +20,16 @@ package neo4j
 import (
 	"context"
 	"fmt"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/collections"
-	idb "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/errorutil"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/telemetry"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/notifications"
 	"math"
 	"time"
 
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/collections"
+	idb "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/errorutil"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/retry"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/telemetry"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/log"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/notifications"
 )
 
 // TransactionWork represents a unit of work that will be executed against the provided
@@ -188,7 +188,6 @@ type sessionPool interface {
 	Borrow(ctx context.Context, getServerNames func() []string, wait bool, boltLogger log.BoltLogger, livenessCheckTimeout time.Duration, auth *idb.ReAuthToken) (idb.Connection, error)
 	Return(ctx context.Context, c idb.Connection)
 	CleanUp(ctx context.Context)
-	Now() time.Time
 }
 
 type sessionWithContext struct {
@@ -201,7 +200,6 @@ type sessionWithContext struct {
 	explicitTx    *explicitTransaction
 	autocommitTx  *autocommitTransaction
 	sleep         func(d time.Duration)
-	now           *func() time.Time
 	logId         string
 	log           log.Logger
 	throttleTime  time.Duration
@@ -217,7 +215,6 @@ func newSessionWithContext(
 	pool sessionPool,
 	logger log.Logger,
 	token *idb.ReAuthToken,
-	now *func() time.Time,
 ) *sessionWithContext {
 	logId := log.NewId()
 	logger.Debugf(log.Session, logId, "Created")
@@ -236,7 +233,6 @@ func newSessionWithContext(
 		config:        sessConfig,
 		resolveHomeDb: sessConfig.DatabaseName == "",
 		sleep:         time.Sleep,
-		now:           now,
 		log:           logger,
 		logId:         logId,
 		throttleTime:  time.Second * 1,
@@ -415,7 +411,6 @@ func (s *sessionWithContext) runRetriable(
 		Log:                     s.log,
 		LogName:                 log.Session,
 		LogId:                   s.logId,
-		Now:                     s.now,
 		Sleep:                   s.sleep,
 		Throttle:                retry.Throttler(s.throttleTime),
 		MaxDeadConnections:      s.driverConfig.MaxConnectionPoolSize,

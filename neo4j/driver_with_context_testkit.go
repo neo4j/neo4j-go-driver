@@ -1,4 +1,4 @@
-//go:build internal_testkit
+//go:build internal_testkit && internal_time_mock
 
 /*
  * Copyright (c) "Neo4j"
@@ -25,21 +25,11 @@ import (
 	idb "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/errorutil"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/router"
+	itime "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/time"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/log"
-	"time"
 )
 
 type RoutingTable = idb.RoutingTable
-
-func SetTimer(d DriverWithContext, timer func() time.Time) {
-	driver := d.(*driverWithContext)
-	driver.now = timer
-}
-
-func ResetTime(d DriverWithContext) {
-	driver := d.(*driverWithContext)
-	driver.now = time.Now
-}
 
 func ForceRoutingTableUpdate(d DriverWithContext, database string, bookmarks []string, logger log.BoltLogger) error {
 	driver := d.(*driverWithContext)
@@ -70,3 +60,8 @@ func GetRoutingTable(d DriverWithContext, database string) (*RoutingTable, error
 	table := router.GetTable(database)
 	return table, nil
 }
+
+var Now = itime.Now
+var FreezeTime = itime.FreezeTime
+var TickTime = itime.TickTime
+var UnfreezeTime = itime.UnfreezeTime

@@ -27,6 +27,7 @@ import (
 	"sync"
 	"time"
 
+	itime "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/time"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/log"
 )
 
@@ -46,7 +47,6 @@ type Router struct {
 	dbRouters       map[string]*databaseRouter
 	updating        map[string][]chan struct{}
 	dbRoutersMut    sync.Mutex
-	now             *func() time.Time
 	sleep           func(time.Duration)
 	rootRouter      string
 	getRouters      func() []string
@@ -63,7 +63,7 @@ type Pool interface {
 	Return(ctx context.Context, c idb.Connection)
 }
 
-func New(rootRouter string, getRouters func() []string, routerContext map[string]string, pool Pool, idlenessTimeout time.Duration, logger log.Logger, logId string, timer *func() time.Time) *Router {
+func New(rootRouter string, getRouters func() []string, routerContext map[string]string, pool Pool, idlenessTimeout time.Duration, logger log.Logger, logId string) *Router {
 	r := &Router{
 		rootRouter:      rootRouter,
 		getRouters:      getRouters,
@@ -73,7 +73,6 @@ func New(rootRouter string, getRouters func() []string, routerContext map[string
 		dbRouters:       make(map[string]*databaseRouter),
 		updating:        make(map[string][]chan struct{}),
 		dbRoutersMut:    sync.Mutex{},
-		now:             timer,
 		sleep:           time.Sleep,
 		log:             logger,
 		logId:           logId,
@@ -191,7 +190,7 @@ func (r *Router) getOrUpdateTable(ctx context.Context, bookmarksFn func(context.
 }
 
 func (r *Router) getTableLocked(dbRouter *databaseRouter) *idb.RoutingTable {
-	now := (*r.now)()
+	now := itime.Now()
 	if dbRouter != nil && now.Unix() < dbRouter.dueUnix {
 		return dbRouter.table
 	}
@@ -208,7 +207,7 @@ func (r *Router) updateTable(ctx context.Context, bookmarksFn func(context.Conte
 		return nil, err
 	}
 
-	err = r.storeRoutingTable(ctx, database, table, (*r.now)())
+	err = r.storeRoutingTable(ctx, database, table, itime.Now())
 	if err != nil {
 		return nil, err
 	}
@@ -295,7 +294,7 @@ func (r *Router) GetNameOfDefaultDatabase(ctx context.Context, bookmarks []strin
 		return "", err
 	}
 	// Store the fresh routing table as well to avoid another roundtrip to receive servers from session.
-	now := (*r.now)()
+	now := itime.Now()
 	err = r.storeRoutingTable(ctx, table.DatabaseName, table, now)
 	if err != nil {
 		return "", err
@@ -362,7 +361,7 @@ func removeServerFromList(list []string, server string) []string {
 
 func (r *Router) CleanUp() {
 	r.log.Debugf(log.Router, r.logId, "Cleaning up")
-	now := (*r.now)().Unix()
+	now := itime.Now().Unix()
 	r.dbRoutersMut.Lock()
 	defer r.dbRoutersMut.Unlock()
 

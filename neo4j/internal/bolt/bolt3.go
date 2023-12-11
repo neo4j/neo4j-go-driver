@@ -26,6 +26,7 @@ import (
 	idb "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/errorutil"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/telemetry"
+	itime "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/time"
 	"net"
 	"reflect"
 	"time"
@@ -95,18 +96,16 @@ type bolt3 struct {
 	authManager   auth.TokenManager
 	resetAuth     bool
 	errorListener ConnectionErrorListener
-	now           *func() time.Time
 }
 
 func NewBolt3(
 	serverName string,
 	conn net.Conn,
 	errorListener ConnectionErrorListener,
-	timer *func() time.Time,
 	logger log.Logger,
 	boltLog log.BoltLogger,
 ) *bolt3 {
-	now := (*timer)()
+	now := itime.Now()
 	b := &bolt3{
 		state:      bolt3_unauthorized,
 		conn:       conn,
@@ -123,7 +122,6 @@ func NewBolt3(
 		idleDate:      now,
 		log:           logger,
 		errorListener: errorListener,
-		now:           timer,
 	}
 	b.out = &outgoing{
 		chunker: newChunker(),
@@ -166,7 +164,7 @@ func (b *bolt3) receiveMsg(ctx context.Context) any {
 		b.state = bolt3_dead
 		return nil
 	}
-	b.idleDate = (*b.now)()
+	b.idleDate = itime.Now()
 	return msg
 }
 
