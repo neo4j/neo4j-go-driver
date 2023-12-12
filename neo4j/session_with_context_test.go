@@ -47,13 +47,12 @@ func TestSession(outer *testing.T) {
 		}
 	}
 
-	now := time.Now
 	createSession := func() (*RouterFake, *PoolFake, *sessionWithContext) {
 		conf := Config{MaxTransactionRetryTime: 3 * time.Millisecond, MaxConnectionPoolSize: 100}
 		router := RouterFake{}
 		pool := PoolFake{}
 		sessConfig := SessionConfig{AccessMode: AccessModeRead, BoltLogger: boltLogger}
-		sess := newSessionWithContext(&conf, sessConfig, &router, &pool, logger, nil, &now)
+		sess := newSessionWithContext(&conf, sessConfig, &router, &pool, logger, nil)
 		sess.throttleTime = time.Millisecond * 1
 		return &router, &pool, sess
 	}
@@ -62,7 +61,7 @@ func TestSession(outer *testing.T) {
 		conf := Config{MaxTransactionRetryTime: 3 * time.Millisecond}
 		router := RouterFake{}
 		pool := PoolFake{}
-		sess := newSessionWithContext(&conf, sessConfig, &router, &pool, logger, nil, &now)
+		sess := newSessionWithContext(&conf, sessConfig, &router, &pool, logger, nil)
 		sess.throttleTime = time.Millisecond * 1
 		return &router, &pool, sess
 	}

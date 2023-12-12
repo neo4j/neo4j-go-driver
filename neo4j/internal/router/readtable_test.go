@@ -23,6 +23,7 @@ import (
 	iauth "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/auth"
 	idb "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/errorutil"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/pool"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/log"
 	"testing"
 
@@ -180,6 +181,7 @@ func TestReadTableTable(ot *testing.T) {
 				c.pool,
 				c.routers,
 				nil,
+				pool.DefaultConnectionLivenessCheckTimeout,
 				nil,
 				"dbname",
 				"",

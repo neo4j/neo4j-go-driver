@@ -104,7 +104,6 @@ func TestBolt3(outer *testing.T) {
 		tcpConn, srv, cleanup := setupBolt3Pipe(t)
 		go serverJob(srv)
 
-		timer := time.Now
 		c, err := Connect(
 			context.Background(),
 			"serverName",
@@ -116,7 +115,6 @@ func TestBolt3(outer *testing.T) {
 			logger,
 			nil,
 			idb.NotificationConfig{},
-			&timer,
 		)
 		if err != nil {
 			t.Fatal(err)
@@ -158,7 +156,6 @@ func TestBolt3(outer *testing.T) {
 			srv.waitForHello()
 			srv.rejectHelloUnauthorized()
 		}()
-		timer := time.Now
 		bolt, err := Connect(
 			context.Background(),
 			"serverName",
@@ -170,7 +167,6 @@ func TestBolt3(outer *testing.T) {
 			logger,
 			nil,
 			idb.NotificationConfig{},
-			&timer,
 		)
 		AssertNil(t, bolt)
 		AssertError(t, err)

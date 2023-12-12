@@ -19,6 +19,7 @@ package neo4j
 
 import (
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/config"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/pool"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/notifications"
 	"math"
 	"net/url"
@@ -41,6 +42,7 @@ func defaultConfig() *Config {
 		MaxConnectionPoolSize:           100,
 		MaxConnectionLifetime:           1 * time.Hour,
 		ConnectionAcquisitionTimeout:    1 * time.Minute,
+		ConnectionLivenessCheckTimeout:  pool.DefaultConnectionLivenessCheckTimeout,
 		SocketConnectTimeout:            5 * time.Second,
 		SocketKeepalive:                 true,
 		RootCAs:                         nil,
@@ -75,6 +77,11 @@ func validateAndNormaliseConfig(config *Config) error {
 	// Connection Acquisition Timeout
 	if config.ConnectionAcquisitionTimeout < 0 {
 		config.ConnectionAcquisitionTimeout = -1
+	}
+
+	// Connection Liveness Check Timeout
+	if config.ConnectionLivenessCheckTimeout < 0 {
+		return &UsageError{Message: "Connection liveness check timeout cannot be smaller than 0"}
 	}
 
 	// Socket Connect Timeout

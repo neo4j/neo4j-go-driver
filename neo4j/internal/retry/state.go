@@ -22,11 +22,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	idb "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/errorutil"
 	"time"
 
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/db"
+	idb "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/errorutil"
+	itime "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/time"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/log"
 )
 
@@ -36,7 +37,6 @@ type State struct {
 	Log                     log.Logger
 	LogName                 string
 	LogId                   string
-	Now                     *func() time.Time
 	Sleep                   func(time.Duration)
 	Throttle                Throttler
 	MaxDeadConnections      int
@@ -68,7 +68,7 @@ func (s *State) OnFailure(_ context.Context, err error, conn idb.Connection, isC
 
 func (s *State) Continue() bool {
 	if s.start.IsZero() {
-		s.start = (*s.Now)()
+		s.start = itime.Now()
 	}
 
 	if len(s.Errs) == 0 {
@@ -80,7 +80,7 @@ func (s *State) Continue() bool {
 		return false
 	}
 
-	if (*s.Now)().Sub(s.start) > s.MaxTransactionRetryTime {
+	if itime.Since(s.start) > s.MaxTransactionRetryTime {
 		s.Errs = []error{&errorutil.TransactionExecutionLimit{
 			Cause:  fmt.Sprintf("timeout (exceeded max retry time: %s)", s.MaxTransactionRetryTime.String()),
 			Errors: s.Errs,
