@@ -21,12 +21,11 @@ package bolt
 import (
 	"context"
 	"fmt"
+	"net"
+
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/errorutil"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/racing"
-	"net"
-	"time"
-
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/log"
 )
 
@@ -56,7 +55,7 @@ func Connect(ctx context.Context,
 	logger log.Logger,
 	boltLogger log.BoltLogger,
 	notificationConfig db.NotificationConfig,
-	timer *func() time.Time) (db.Connection, error) {
+) (db.Connection, error) {
 	// Perform Bolt handshake to negotiate version
 	// Send handshake to server
 	handshake := []byte{
@@ -93,11 +92,11 @@ func Connect(ctx context.Context,
 	var boltConn db.Connection
 	switch major {
 	case 3:
-		boltConn = NewBolt3(serverName, conn, errorListener, timer, logger, boltLogger)
+		boltConn = NewBolt3(serverName, conn, errorListener, logger, boltLogger)
 	case 4:
-		boltConn = NewBolt4(serverName, conn, errorListener, timer, logger, boltLogger)
+		boltConn = NewBolt4(serverName, conn, errorListener, logger, boltLogger)
 	case 5:
-		boltConn = NewBolt5(serverName, conn, errorListener, timer, logger, boltLogger)
+		boltConn = NewBolt5(serverName, conn, errorListener, logger, boltLogger)
 	case 0:
 		return nil, fmt.Errorf("server did not accept any of the requested Bolt versions (%#v)", versions)
 	default:

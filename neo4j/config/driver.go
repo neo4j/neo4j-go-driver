@@ -103,6 +103,21 @@ type Config struct {
 	//
 	// default: 1 * time.Minute
 	ConnectionAcquisitionTimeout time.Duration
+	// ConnectionLivenessCheckTimeout sets the timeout duration for idle connections in the pool.
+	// Connections idle longer than this timeout will be tested for liveliness before reuse. A low timeout value
+	// can increase network requests when acquiring a connection, impacting performance. Conversely, a high
+	// timeout may result in using connections that are no longer active, causing exceptions in your application.
+	// These exceptions typically resolve with a retry or using a driver API with automatic
+	// retries, assuming the database is operational.
+	//
+	// The parameter balances the likelihood of encountering connection issues against performance.
+	// Typically, adjustment of this parameter is not necessary.
+	//
+	// By default, no liveliness check is performed. A value of 0 ensures connections are always tested for
+	// validity, and negative values are not permitted.
+	//
+	// default: pool.DefaultConnectionLivenessCheckTimeout
+	ConnectionLivenessCheckTimeout time.Duration
 	// Connect timeout that will be set on underlying sockets. Values less than
 	// or equal to 0 results in no timeout being applied.
 	//
