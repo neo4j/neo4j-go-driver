@@ -21,18 +21,17 @@ package neo4j
 import (
 	"context"
 	"fmt"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/auth"
-	idb "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/errorutil"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/log"
 	"net/url"
 	"strings"
 	"sync"
-	"time"
 
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/auth"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/connector"
+	idb "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/errorutil"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/pool"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/router"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/log"
 )
 
 // AccessMode defines modes that routing driver decides to which cluster member
@@ -144,7 +143,7 @@ func NewDriverWithContext(target string, auth auth.TokenManager, configurers ...
 		return nil, err
 	}
 
-	d := driverWithContext{target: parsed, mut: sync.Mutex{}, now: time.Now, auth: auth}
+	d := driverWithContext{target: parsed, mut: sync.Mutex{}, auth: auth}
 
 	routing := true
 	d.connector.Network = "tcp"
@@ -219,10 +218,9 @@ func NewDriverWithContext(target string, auth auth.TokenManager, configurers ...
 	d.connector.Log = d.log
 	d.connector.RoutingContext = routingContext
 	d.connector.Config = d.config
-	d.connector.Now = &d.now
 
 	// Let the pool use the same log ID as the driver to simplify log reading.
-	d.pool = pool.New(d.config, d.connector.Connect, d.log, d.logId, &d.now)
+	d.pool = pool.New(d.config, d.connector.Connect, d.log, d.logId)
 
 	if !routing {
 		d.router = &directRouter{address: address}
@@ -240,7 +238,15 @@ func NewDriverWithContext(target string, auth auth.TokenManager, configurers ...
 			}
 		}
 		// Let the router use the same log ID as the driver to simplify log reading.
-		d.router = router.New(address, routersResolver, routingContext, d.pool, d.log, d.logId, &d.now)
+		d.router = router.New(
+			address,
+			routersResolver,
+			routingContext,
+			d.pool,
+			d.config.ConnectionLivenessCheckTimeout,
+			d.log,
+			d.logId,
+		)
 	}
 
 	d.pool.SetRouter(d.router)
@@ -323,7 +329,6 @@ type driverWithContext struct {
 	// this is *not* used by default by user-created session (see NewSession)
 	executeQueryBookmarkManager BookmarkManager
 	auth                        auth.TokenManager
-	now                         func() time.Time
 }
 
 func (d *driverWithContext) Target() url.URL {
@@ -358,7 +363,7 @@ func (d *driverWithContext) NewSession(_ context.Context, config SessionConfig) 
 		return &erroredSessionWithContext{
 			err: &UsageError{Message: "Trying to create session on closed driver"}}
 	}
-	return newSessionWithContext(d.config, config, d.router, d.pool, d.log, reAuthToken, &d.now)
+	return newSessionWithContext(d.config, config, d.router, d.pool, d.log, reAuthToken)
 }
 
 func (d *driverWithContext) VerifyConnectivity(ctx context.Context) error {
@@ -535,7 +540,7 @@ func ExecuteQuery[T any](
 	if err != nil {
 		return *new(T), err
 	}
-	result, err := txFunction(ctx, executeQueryCallback(ctx, query, parameters, newResultTransformer))
+	result, err := txFunction(ctx, executeQueryCallback(ctx, query, parameters, newResultTransformer), configuration.TransactionConfigurers...)
 	if err != nil {
 		return *new(T), err
 	}
@@ -660,13 +665,21 @@ func ExecuteQueryWithBoltLogger(boltLogger log.BoltLogger) ExecuteQueryConfigura
 	}
 }
 
+// ExecuteQueryWithTransactionConfig configures DriverWithContext.ExecuteQuery with additional transaction configuration.
+func ExecuteQueryWithTransactionConfig(configurers ...func(*TransactionConfig)) ExecuteQueryConfigurationOption {
+	return func(configuration *ExecuteQueryConfiguration) {
+		configuration.TransactionConfigurers = configurers
+	}
+}
+
 // ExecuteQueryConfiguration holds all the possible configuration settings for DriverWithContext.ExecuteQuery
 type ExecuteQueryConfiguration struct {
-	Routing          RoutingControl
-	ImpersonatedUser string
-	Database         string
-	BookmarkManager  BookmarkManager
-	BoltLogger       log.BoltLogger
+	Routing                RoutingControl
+	ImpersonatedUser       string
+	Database               string
+	BookmarkManager        BookmarkManager
+	BoltLogger             log.BoltLogger
+	TransactionConfigurers []func(*TransactionConfig)
 }
 
 // RoutingControl specifies how the query executed by DriverWithContext.ExecuteQuery is to be routed

@@ -13,11 +13,11 @@ fi
 echo "# pre-commit hook"
 printf '%-15s' "## staticcheck "
 cd "$(mktemp -d)" && go install honnef.co/go/tools/cmd/staticcheck@"${staticcheck_version}" && cd - > /dev/null
-"${GOBIN:-$(go env GOPATH)/bin}"/staticcheck -tags internal_testkit ./...
+"${GOBIN:-$(go env GOPATH)/bin}"/staticcheck -tags internal_testkit,internal_time_mock ./...
 echo "✅"
 
 printf '%-15s' "## go vet "
-go vet -tags internal_testkit ./...
+go vet -tags internal_testkit,internal_time_mock ./...
 echo "✅"
 
 printf '%-15s' "## go test "

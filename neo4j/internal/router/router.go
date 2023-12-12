@@ -27,6 +27,7 @@ import (
 	"sync"
 	"time"
 
+	itime "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/time"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/log"
 )
 
@@ -40,41 +41,41 @@ type databaseRouter struct {
 
 // Router is thread safe
 type Router struct {
-	routerContext map[string]string
-	pool          Pool
-	dbRouters     map[string]*databaseRouter
-	updating      map[string][]chan struct{}
-	dbRoutersMut  sync.Mutex
-	now           *func() time.Time
-	sleep         func(time.Duration)
-	rootRouter    string
-	getRouters    func() []string
-	log           log.Logger
-	logId         string
+	routerContext   map[string]string
+	pool            Pool
+	idlenessTimeout time.Duration
+	dbRouters       map[string]*databaseRouter
+	updating        map[string][]chan struct{}
+	dbRoutersMut    sync.Mutex
+	sleep           func(time.Duration)
+	rootRouter      string
+	getRouters      func() []string
+	log             log.Logger
+	logId           string
 }
 
 type Pool interface {
 	// Borrow acquires a connection from the provided list of servers
 	// If all connections are busy and the pool is full, calls to Borrow may wait for a connection to become idle
-	// If a connection has been idle for longer than idlenessThreshold, it will be reset
+	// If a connection has been idle for longer than idlenessTimeout, it will be reset
 	// to check if it's still alive.
-	Borrow(ctx context.Context, getServers func() []string, wait bool, boltLogger log.BoltLogger, idlenessThreshold time.Duration, auth *idb.ReAuthToken) (idb.Connection, error)
+	Borrow(ctx context.Context, getServers func() []string, wait bool, boltLogger log.BoltLogger, idlenessTimeout time.Duration, auth *idb.ReAuthToken) (idb.Connection, error)
 	Return(ctx context.Context, c idb.Connection)
 }
 
-func New(rootRouter string, getRouters func() []string, routerContext map[string]string, pool Pool, logger log.Logger, logId string, timer *func() time.Time) *Router {
+func New(rootRouter string, getRouters func() []string, routerContext map[string]string, pool Pool, idlenessTimeout time.Duration, logger log.Logger, logId string) *Router {
 	r := &Router{
-		rootRouter:    rootRouter,
-		getRouters:    getRouters,
-		routerContext: routerContext,
-		pool:          pool,
-		dbRouters:     make(map[string]*databaseRouter),
-		updating:      make(map[string][]chan struct{}),
-		dbRoutersMut:  sync.Mutex{},
-		now:           timer,
-		sleep:         time.Sleep,
-		log:           logger,
-		logId:         logId,
+		rootRouter:      rootRouter,
+		getRouters:      getRouters,
+		routerContext:   routerContext,
+		pool:            pool,
+		idlenessTimeout: idlenessTimeout,
+		dbRouters:       make(map[string]*databaseRouter),
+		updating:        make(map[string][]chan struct{}),
+		dbRoutersMut:    sync.Mutex{},
+		sleep:           time.Sleep,
+		log:             logger,
+		logId:           logId,
 	}
 	r.log.Infof(log.Router, r.logId, "Created {context: %v}", routerContext)
 	return r
@@ -98,7 +99,7 @@ func (r *Router) readTable(
 	if dbRouter != nil && len(dbRouter.table.Routers) > 0 {
 		routers := dbRouter.table.Routers
 		r.log.Infof(log.Router, r.logId, "Reading routing table for '%s' from previously known routers: %v", database, routers)
-		table, err = readTable(ctx, r.pool, routers, r.routerContext, bookmarks, database, impersonatedUser, auth, boltLogger)
+		table, err = readTable(ctx, r.pool, routers, r.routerContext, r.idlenessTimeout, bookmarks, database, impersonatedUser, auth, boltLogger)
 	}
 	if errorutil.IsFatalDuringDiscovery(err) {
 		r.log.Error(log.Router, r.logId, err)
@@ -108,7 +109,7 @@ func (r *Router) readTable(
 	// Try initial router if no routers or failed
 	if table == nil {
 		r.log.Infof(log.Router, r.logId, "Reading routing table from initial router: %s", r.rootRouter)
-		table, err = readTable(ctx, r.pool, []string{r.rootRouter}, r.routerContext, bookmarks, database, impersonatedUser, auth, boltLogger)
+		table, err = readTable(ctx, r.pool, []string{r.rootRouter}, r.routerContext, r.idlenessTimeout, bookmarks, database, impersonatedUser, auth, boltLogger)
 	}
 	if errorutil.IsFatalDuringDiscovery(err) {
 		r.log.Error(log.Router, r.logId, err)
@@ -119,7 +120,7 @@ func (r *Router) readTable(
 	if table == nil && r.getRouters != nil {
 		routers := r.getRouters()
 		r.log.Infof(log.Router, r.logId, "Reading routing table for '%s' from custom routers: %v", routers)
-		table, err = readTable(ctx, r.pool, routers, r.routerContext, bookmarks, database, impersonatedUser, auth, boltLogger)
+		table, err = readTable(ctx, r.pool, routers, r.routerContext, r.idlenessTimeout, bookmarks, database, impersonatedUser, auth, boltLogger)
 	}
 	if errorutil.IsFatalDuringDiscovery(err) {
 		r.log.Error(log.Router, r.logId, err)
@@ -189,7 +190,7 @@ func (r *Router) getOrUpdateTable(ctx context.Context, bookmarksFn func(context.
 }
 
 func (r *Router) getTableLocked(dbRouter *databaseRouter) *idb.RoutingTable {
-	now := (*r.now)()
+	now := itime.Now()
 	if dbRouter != nil && now.Unix() < dbRouter.dueUnix {
 		return dbRouter.table
 	}
@@ -206,7 +207,7 @@ func (r *Router) updateTable(ctx context.Context, bookmarksFn func(context.Conte
 		return nil, err
 	}
 
-	err = r.storeRoutingTable(ctx, database, table, (*r.now)())
+	err = r.storeRoutingTable(ctx, database, table, itime.Now())
 	if err != nil {
 		return nil, err
 	}
@@ -293,7 +294,7 @@ func (r *Router) GetNameOfDefaultDatabase(ctx context.Context, bookmarks []strin
 		return "", err
 	}
 	// Store the fresh routing table as well to avoid another roundtrip to receive servers from session.
-	now := (*r.now)()
+	now := itime.Now()
 	err = r.storeRoutingTable(ctx, table.DatabaseName, table, now)
 	if err != nil {
 		return "", err
@@ -360,7 +361,7 @@ func removeServerFromList(list []string, server string) []string {
 
 func (r *Router) CleanUp() {
 	r.log.Debugf(log.Router, r.logId, "Cleaning up")
-	now := (*r.now)().Unix()
+	now := itime.Now().Unix()
 	r.dbRoutersMut.Lock()
 	defer r.dbRoutersMut.Unlock()
 

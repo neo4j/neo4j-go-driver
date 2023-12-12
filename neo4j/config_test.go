@@ -99,6 +99,16 @@ func TestValidateAndNormaliseConfig(rt *testing.T) {
 		}
 	})
 
+	rt.Run("ConnectionLivenessCheckTimeout less than zero", func(t *testing.T) {
+		config := defaultConfig()
+
+		config.ConnectionLivenessCheckTimeout = -1 * time.Second
+		err := validateAndNormaliseConfig(config)
+		if err == nil {
+			t.Errorf("ConnectionLivenessCheckTimeout is less than 0 but never returned an error")
+		}
+	})
+
 	rt.Run("SocketConnectTimeout less than zero", func(t *testing.T) {
 		config := defaultConfig()
 

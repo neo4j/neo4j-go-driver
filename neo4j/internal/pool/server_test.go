@@ -158,7 +158,7 @@ func TestServerPenalty(t *testing.T) {
 	// Get the connection from srv1 and return it, now srv1 should have higher penalty.
 	ctx := context.Background()
 	idle := srv1.getIdle()
-	_, _ = srv1.healthCheck(ctx, idle, DefaultLivenessCheckThreshold, nil, nil)
+	_, _ = srv1.healthCheck(ctx, idle, DefaultConnectionLivenessCheckTimeout, nil, nil)
 	testutil.AssertDeepEquals(t, idle, c11)
 	srv1.returnBusy(context.Background(), c11)
 	assertPenaltiesGreaterThan(srv1, srv2, now)
@@ -173,18 +173,18 @@ func TestServerPenalty(t *testing.T) {
 	assertPenaltiesGreaterThan(srv2, srv1, now)
 	// Get both idle connections from srv1
 	idle = srv1.getIdle()
-	_, _ = srv1.healthCheck(ctx, idle, DefaultLivenessCheckThreshold, nil, nil)
+	_, _ = srv1.healthCheck(ctx, idle, DefaultConnectionLivenessCheckTimeout, nil, nil)
 	idle = srv1.getIdle()
-	_, _ = srv1.healthCheck(ctx, idle, DefaultLivenessCheckThreshold, nil, nil)
+	_, _ = srv1.healthCheck(ctx, idle, DefaultConnectionLivenessCheckTimeout, nil, nil)
 	// Get one idle connection from srv2
 	idle = srv2.getIdle()
-	_, _ = srv2.healthCheck(ctx, idle, DefaultLivenessCheckThreshold, nil, nil)
+	_, _ = srv2.healthCheck(ctx, idle, DefaultConnectionLivenessCheckTimeout, nil, nil)
 	// Since more connections are in use on srv1, it should have higher penalty even though
 	// srv2 was last used
 	assertPenaltiesGreaterThan(srv1, srv2, now)
 	// Return the connections
 	idle = srv2.getIdle()
-	_, _ = srv2.healthCheck(ctx, idle, DefaultLivenessCheckThreshold, nil, nil)
+	_, _ = srv2.healthCheck(ctx, idle, DefaultConnectionLivenessCheckTimeout, nil, nil)
 	srv2.returnBusy(context.Background(), c21)
 	srv2.returnBusy(context.Background(), c22)
 	srv1.returnBusy(context.Background(), c11)
@@ -200,9 +200,9 @@ func TestServerPenalty(t *testing.T) {
 	testutil.AssertFalse(t, srv2.hasFailedConnect(now))
 	// Use srv2 to the max
 	idle = srv2.getIdle()
-	_, _ = srv2.healthCheck(ctx, idle, DefaultLivenessCheckThreshold, nil, nil)
+	_, _ = srv2.healthCheck(ctx, idle, DefaultConnectionLivenessCheckTimeout, nil, nil)
 	idle = srv2.getIdle()
-	_, _ = srv2.healthCheck(ctx, idle, DefaultLivenessCheckThreshold, nil, nil)
+	_, _ = srv2.healthCheck(ctx, idle, DefaultConnectionLivenessCheckTimeout, nil, nil)
 	// Even at this point we should prefer srv2
 	assertPenaltiesGreaterThan(srv1, srv2, now)
 

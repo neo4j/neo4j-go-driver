@@ -368,7 +368,7 @@ modules](https://go.dev/ref/mod) for dependency resolution.
 You can run unit tests as follows:
 
 ```shell
-go test -tags=internal_testkit -short ./...
+go test -tags internal_testkit,internal_time_mock -short ./...
 ```
 
 ### Integration and Benchmark Testing
