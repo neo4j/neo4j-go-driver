@@ -60,19 +60,6 @@ type backend struct {
 	suppliedBookmarks               map[string]neo4j.Bookmarks
 	consumedBookmarks               map[string]struct{}
 	bookmarkManagers                map[string]neo4j.BookmarkManager
-	timer                           *Timer
-}
-
-type Timer struct {
-	now time.Time
-}
-
-func (t *Timer) Now() time.Time {
-	return t.now
-}
-
-func (t *Timer) Tick(duration time.Duration) {
-	t.now = t.now.Add(duration)
 }
 
 // To implement transactional functions a bit of extra state is needed on the
@@ -498,6 +485,9 @@ func (b *backend) handleRequest(req map[string]any) {
 			if data["connectionAcquisitionTimeoutMs"] != nil {
 				c.ConnectionAcquisitionTimeout = time.Millisecond * time.Duration(asInt64(data["connectionAcquisitionTimeoutMs"].(json.Number)))
 			}
+			if data["livenessCheckTimeoutMs"] != nil {
+				c.ConnectionLivenessCheckTimeout = time.Millisecond * time.Duration(asInt64(data["livenessCheckTimeoutMs"].(json.Number)))
+			}
 			if data["maxConnectionPoolSize"] != nil {
 				c.MaxConnectionPoolSize = asInt(data["maxConnectionPoolSize"].(json.Number))
 			}
@@ -534,9 +524,6 @@ func (b *backend) handleRequest(req map[string]any) {
 		if err != nil {
 			b.writeError(err)
 			return
-		}
-		if b.timer != nil {
-			neo4j.SetTimer(driver, b.timer.Now)
 		}
 		idKey := b.nextId()
 		b.drivers[idKey] = driver
@@ -964,30 +951,25 @@ func (b *backend) handleRequest(req map[string]any) {
 		b.writeResponse("Driver", map[string]any{"id": driverId})
 
 	case "FakeTimeInstall":
-		b.timer = &Timer{
-			now: time.Unix(0, 0),
-		}
-		for _, driver := range b.drivers {
-			neo4j.SetTimer(driver, b.timer.Now)
-		}
-		for _, manager := range b.authTokenManagers {
-			auth.SetTimer(manager, b.timer.Now)
+		if err := neo4j.FreezeTime(); err != nil {
+			b.writeError(err)
+			return
 		}
 		b.writeResponse("FakeTimeAck", nil)
 
 	case "FakeTimeUninstall":
-		b.timer = nil
-		for _, driver := range b.drivers {
-			neo4j.ResetTime(driver)
-		}
-		for _, manager := range b.authTokenManagers {
-			auth.ResetTime(manager)
+		if err := neo4j.UnfreezeTime(); err != nil {
+			b.writeError(err)
+			return
 		}
 		b.writeResponse("FakeTimeAck", nil)
 
 	case "FakeTimeTick":
 		milliseconds := asInt64(data["incrementMs"].(json.Number))
-		b.timer.Tick(time.Duration(milliseconds) * time.Millisecond)
+		if err := neo4j.TickTime(time.Duration(milliseconds) * time.Millisecond); err != nil {
+			b.writeError(err)
+			return
+		}
 		b.writeResponse("FakeTimeAck", nil)
 
 	case "VerifyAuthentication":
@@ -1084,9 +1066,6 @@ func (b *backend) handleRequest(req map[string]any) {
 					}
 				}
 			})
-		if b.timer != nil {
-			auth.SetTimer(manager, b.timer.Now)
-		}
 		b.authTokenManagers[managerId] = manager
 		b.writeResponse("BasicAuthTokenManager", map[string]any{"id": managerId})
 	case "BasicAuthTokenProviderCompleted":
@@ -1113,9 +1092,6 @@ func (b *backend) handleRequest(req map[string]any) {
 					}
 				}
 			})
-		if b.timer != nil {
-			auth.SetTimer(manager, b.timer.Now)
-		}
 		b.authTokenManagers[managerId] = manager
 		b.writeResponse("BearerAuthTokenManager", map[string]any{"id": managerId})
 	case "BearerAuthTokenProviderCompleted":
@@ -1127,16 +1103,10 @@ func (b *backend) handleRequest(req map[string]any) {
 			return
 		}
 		var expiration *time.Time
-		var now func() time.Time
-		if b.timer != nil {
-			now = b.timer.Now
-		} else {
-			now = time.Now
-		}
 		expiresInRaw := bearerToken["expiresInMs"]
 		if expiresInRaw != nil {
 			expiresIn := time.Millisecond * time.Duration(asInt64(bearerToken["expiresInMs"].(json.Number)))
-			expirationTime := now().Add(expiresIn)
+			expirationTime := neo4j.Now().Add(expiresIn)
 			expiration = &expirationTime
 		}
 		b.resolvedBearerTokens[id] = AuthTokenAndExpiration{token, expiration}
@@ -1158,8 +1128,7 @@ func (b *backend) handleRequest(req map[string]any) {
 				"Feature:API:Driver.VerifyAuthentication",
 				"Feature:API:Driver.VerifyConnectivity",
 				//"Feature:API:Driver.SupportsSessionAuth",
-				// Go driver does not support LivenessCheckTimeout yet
-				//"Feature:API:Liveness.Check",
+				"Feature:API:Liveness.Check",
 				"Feature:API:Result.List",
 				"Feature:API:Result.Peek",
 				//"Feature:API:Result.Single",
@@ -1549,6 +1518,7 @@ func testSkips() map[string]string {
 		"stub.routing.test_routing_v*.RoutingV*.test_should_accept_routing_table_without_writers_and_then_rediscover":        "Driver retries to fetch a routing table up to 100 times if it's empty",
 		"stub.routing.test_routing_v*.RoutingV*.test_should_fail_on_routing_table_with_no_reader":                            "Driver retries to fetch a routing table up to 100 times if it's empty",
 		"stub.routing.test_routing_v*.RoutingV*.test_should_fail_discovery_when_router_fails_with_unknown_code":              "Unify: other drivers have a list of fast failing errors during discover: on anything else, the driver will try the next router",
+		"stub.routing.test_routing_v*.RoutingV*.test_should_drop_connections_failing_liveness_check":                         "Liveness check error handling is not (yet) unified: https://github.com/neo-technology/drivers-adr/pull/83",
 		"stub.*.test_0_timeout":                                  "Fixme: driver omits 0 as tx timeout value",
 		"stub.summary.test_summary.TestSummary.test_server_info": "pending unification: should the server address be pre or post DNS resolution?",
 	}

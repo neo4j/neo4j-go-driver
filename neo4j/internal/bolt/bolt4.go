@@ -21,18 +21,19 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/auth"
-	iauth "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/auth"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/collections"
-	idb "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/errorutil"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/telemetry"
 	"net"
 	"reflect"
 	"time"
 
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/auth"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/db"
+	iauth "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/auth"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/collections"
+	idb "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/errorutil"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/packstream"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/telemetry"
+	itime "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/time"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/log"
 )
 
@@ -111,18 +112,16 @@ type bolt4 struct {
 	authManager   auth.TokenManager
 	resetAuth     bool
 	errorListener ConnectionErrorListener
-	now           *func() time.Time
 }
 
 func NewBolt4(
 	serverName string,
 	conn net.Conn,
 	errorListener ConnectionErrorListener,
-	timer *func() time.Time,
 	logger log.Logger,
 	boltLog log.BoltLogger,
 ) *bolt4 {
-	now := (*timer)()
+	now := itime.Now()
 	b := &bolt4{
 		state:         bolt4_unauthorized,
 		conn:          conn,
@@ -133,7 +132,6 @@ func NewBolt4(
 		streams:       openstreams{},
 		lastQid:       -1,
 		errorListener: errorListener,
-		now:           timer,
 	}
 	b.queue = newMessageQueue(
 		conn,
@@ -1135,7 +1133,7 @@ func (b *bolt4) expectedSuccessHandler(onSuccess func(*success)) responseHandler
 }
 
 func (b *bolt4) onNextMessage() {
-	b.idleDate = (*b.now)()
+	b.idleDate = itime.Now()
 }
 
 func (b *bolt4) onFailure(ctx context.Context, failure *db.Neo4jError) {
