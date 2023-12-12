@@ -202,12 +202,15 @@ serverLoop:
 	return nil, nil
 }
 
-func (p *Pool) Borrow(ctx context.Context, getServerNames func() []string, wait bool, boltLogger log.BoltLogger, idlenessThreshold time.Duration, auth *idb.ReAuthToken) (idb.Connection, error) {
+func (p *Pool) Borrow(ctx context.Context, getServerNames func(context.Context) ([]string, error), wait bool, boltLogger log.BoltLogger, idlenessThreshold time.Duration, auth *idb.ReAuthToken) (idb.Connection, error) {
 	for {
 		if p.closed {
 			return nil, &errorutil.PoolClosed{}
 		}
-		serverNames := getServerNames()
+		serverNames, err := getServerNames(ctx)
+		if err != nil {
+			return nil, err
+		}
 		if len(serverNames) == 0 {
 			return nil, &errorutil.PoolOutOfServers{}
 		}
@@ -218,8 +221,6 @@ func (p *Pool) Borrow(ctx context.Context, getServerNames func() []string, wait 
 		sort.Slice(penalties, func(i, j int) bool {
 			return penalties[i].penalty < penalties[j].penalty
 		})
-
-		var err error
 
 		var conn idb.Connection
 		for _, s := range penalties {

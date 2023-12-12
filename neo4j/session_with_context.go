@@ -186,7 +186,7 @@ const FetchDefault = 0
 
 // Connection pool as seen by the session.
 type sessionPool interface {
-	Borrow(ctx context.Context, getServerNames func() []string, wait bool, boltLogger log.BoltLogger, livenessCheckThreshold time.Duration, auth *idb.ReAuthToken) (idb.Connection, error)
+	Borrow(ctx context.Context, getServerNames func(context.Context) ([]string, error), wait bool, boltLogger log.BoltLogger, livenessCheckThreshold time.Duration, auth *idb.ReAuthToken) (idb.Connection, error)
 	Return(ctx context.Context, c idb.Connection)
 	CleanUp(ctx context.Context)
 	Now() time.Time
@@ -507,20 +507,21 @@ func (s *sessionWithContext) executeTransactionFunction(
 	return true, x
 }
 
-func (s *sessionWithContext) getOrUpdateServers(ctx context.Context, mode idb.AccessMode) ([]string, error) {
-	if mode == idb.ReadMode {
-		return s.router.GetOrUpdateReaders(ctx, s.getBookmarks, s.config.DatabaseName, s.auth, s.config.BoltLogger)
-	} else {
-		return s.router.GetOrUpdateWriters(ctx, s.getBookmarks, s.config.DatabaseName, s.auth, s.config.BoltLogger)
-	}
-}
-
-func (s *sessionWithContext) getServers(mode idb.AccessMode) func() []string {
-	return func() []string {
+func (s *sessionWithContext) getServers(mode idb.AccessMode) func(ctx context.Context) ([]string, error) {
+	update := true
+	return func(ctx context.Context) ([]string, error) {
+		if update {
+			update = false
+			if mode == idb.ReadMode {
+				return s.router.GetOrUpdateReaders(ctx, s.getBookmarks, s.config.DatabaseName, s.auth, s.config.BoltLogger)
+			} else {
+				return s.router.GetOrUpdateWriters(ctx, s.getBookmarks, s.config.DatabaseName, s.auth, s.config.BoltLogger)
+			}
+		}
 		if mode == idb.ReadMode {
-			return s.router.Readers(s.config.DatabaseName)
+			return s.router.Readers(s.config.DatabaseName), nil
 		} else {
-			return s.router.Writers(s.config.DatabaseName)
+			return s.router.Writers(s.config.DatabaseName), nil
 		}
 	}
 }
@@ -540,10 +541,6 @@ func (s *sessionWithContext) getConnection(ctx context.Context, mode idb.AccessM
 	}
 
 	if err := s.resolveHomeDatabase(ctx); err != nil {
-		return nil, errorutil.WrapError(err)
-	}
-	_, err := s.getOrUpdateServers(ctx, mode)
-	if err != nil {
 		return nil, errorutil.WrapError(err)
 	}
 
@@ -695,10 +692,6 @@ func (s *sessionWithContext) getServerInfo(ctx context.Context) (ServerInfo, err
 	if err := s.resolveHomeDatabase(ctx); err != nil {
 		return nil, errorutil.WrapError(err)
 	}
-	_, err := s.getOrUpdateServers(ctx, idb.ReadMode)
-	if err != nil {
-		return nil, errorutil.WrapError(err)
-	}
 	conn, err := s.pool.Borrow(
 		ctx,
 		s.getServers(idb.ReadMode),
@@ -718,10 +711,6 @@ func (s *sessionWithContext) getServerInfo(ctx context.Context) (ServerInfo, err
 }
 
 func (s *sessionWithContext) verifyAuthentication(ctx context.Context) error {
-	_, err := s.getOrUpdateServers(ctx, idb.ReadMode)
-	if err != nil {
-		return errorutil.WrapError(err)
-	}
 	conn, err := s.pool.Borrow(
 		ctx,
 		s.getServers(idb.ReadMode),

@@ -6,13 +6,13 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      https://www.apache.org/licenses/LICENSE-2.0
+ *     https://www.apache.org/licenses/LICENSE-2.0
  *
- *  Unless required by applicable law or agreed to in writing, software
- *  distributed under the License is distributed on an "AS IS" BASIS,
- *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *  See the License for the specific language governing permissions and
- *  limitations under the License.
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 
 package bolt
@@ -20,6 +20,7 @@ package bolt
 import (
 	"context"
 	"encoding/binary"
+	"errors"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/errorutil"
 	rio "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/racing"
 	"io"
@@ -116,7 +117,7 @@ func processWriteError(err error, ctx context.Context) error {
 			Err:         err,
 		}
 	}
-	if err == context.Canceled {
+	if errors.Is(err, context.Canceled) {
 		return &errorutil.ConnectionWriteCanceled{
 			Err: err,
 		}

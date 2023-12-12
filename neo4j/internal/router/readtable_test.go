@@ -6,13 +6,13 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      https://www.apache.org/licenses/LICENSE-2.0
+ *     https://www.apache.org/licenses/LICENSE-2.0
  *
- *  Unless required by applicable law or agreed to in writing, software
- *  distributed under the License is distributed on an "AS IS" BASIS,
- *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *  See the License for the specific language governing permissions and
- *  limitations under the License.
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 
 package router
@@ -25,6 +25,7 @@ import (
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/errorutil"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/log"
 	"testing"
+	"time"
 
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/db"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/testutil"
@@ -69,6 +70,18 @@ func TestReadTableTable(ot *testing.T) {
 		}
 	}
 
+	assertCancelledError := func(t *testing.T, err error) {
+		if !errors.Is(err, context.Canceled) {
+			t.Errorf("Error should be %T but was %T", context.Canceled, err)
+		}
+	}
+
+	assertDeadlineExceededError := func(t *testing.T, err error) {
+		if !errors.Is(err, context.DeadlineExceeded) {
+			t.Errorf("Error should be %T but was %T", context.DeadlineExceeded, err)
+		}
+	}
+
 	cases := []struct {
 		name       string
 		routers    []string
@@ -91,8 +104,9 @@ func TestReadTableTable(ot *testing.T) {
 			assert:    assertNoTable,
 			assertErr: assertRoutingTableError,
 			pool: &poolFake{
-				borrow: func(names []string, cancel context.CancelFunc,
-					_ log.BoltLogger) (idb.Connection, error) {
+				borrow: func(
+					ctx context.Context, names []string, cancel context.CancelFunc, _ log.BoltLogger,
+				) (idb.Connection, error) {
 					return nil, errors.New("borrow fail")
 				},
 			},
@@ -104,8 +118,9 @@ func TestReadTableTable(ot *testing.T) {
 			assert:    assertNoTable,
 			assertErr: assertNeo4jError,
 			pool: &poolFake{
-				borrow: func(names []string, cancel context.CancelFunc,
-					_ log.BoltLogger) (idb.Connection, error) {
+				borrow: func(
+					ctx context.Context, names []string, cancel context.CancelFunc, _ log.BoltLogger,
+				) (idb.Connection, error) {
 					return nil, &db.Neo4jError{Code: "Neo.ClientError.Security.Unauthorized"}
 				},
 			},
@@ -116,8 +131,9 @@ func TestReadTableTable(ot *testing.T) {
 			routers: standardRouters,
 			assert:  assertTable,
 			pool: &poolFake{
-				borrow: func(names []string, cancel context.CancelFunc,
-					_ log.BoltLogger) (idb.Connection, error) {
+				borrow: func(
+					ctx context.Context, names []string, cancel context.CancelFunc, _ log.BoltLogger,
+				) (idb.Connection, error) {
 					return &testutil.ConnFake{Table: &idb.RoutingTable{}}, nil
 				},
 			},
@@ -128,8 +144,9 @@ func TestReadTableTable(ot *testing.T) {
 			routers: standardRouters,
 			assert:  assertTable,
 			pool: &poolFake{
-				borrow: func(names []string, cancel context.CancelFunc,
-					_ log.BoltLogger) (idb.Connection, error) {
+				borrow: func(
+					ctx context.Context, names []string, cancel context.CancelFunc, _ log.BoltLogger,
+				) (idb.Connection, error) {
 					if names[0] == "router2" {
 						return &testutil.ConnFake{Table: &idb.
 							RoutingTable{}}, nil
@@ -145,8 +162,9 @@ func TestReadTableTable(ot *testing.T) {
 			assert:    assertNoTable,
 			assertErr: assertRoutingTableError,
 			pool: &poolFake{
-				borrow: func(names []string, cancel context.CancelFunc,
-					_ log.BoltLogger) (idb.Connection, error) {
+				borrow: func(
+					ctx context.Context, names []string, cancel context.CancelFunc, _ log.BoltLogger,
+				) (idb.Connection, error) {
 					return &testutil.ConnFake{Err: errors.New("GetRoutingTable fail")}, nil
 				},
 			},
@@ -156,17 +174,38 @@ func TestReadTableTable(ot *testing.T) {
 			name:    "Cancel context",
 			routers: standardRouters,
 			pool: &poolFake{
-				borrow: func(names []string, cancel context.CancelFunc,
-					_ log.BoltLogger) (idb.Connection, error) {
+				borrow: func(
+					ctx context.Context, names []string, cancel context.CancelFunc, _ log.BoltLogger,
+				) (idb.Connection, error) {
 					if names[0] == "router2" {
 						panic("Should not be called")
 					}
 					cancel()
-					return nil, errors.New("cancelled")
+					return nil, ctx.Err()
 				},
 			},
 			assert:     assertNoTable,
-			assertErr:  assertRoutingTableError,
+			assertErr:  assertCancelledError,
+			numReturns: 0,
+		},
+		{
+			name:    "Deadline exceeded context",
+			routers: standardRouters,
+			pool: &poolFake{
+				borrow: func(
+					ctx context.Context, names []string, _ context.CancelFunc, _ log.BoltLogger,
+				) (idb.Connection, error) {
+					if names[0] == "router2" {
+						panic("Should not be called")
+					}
+					ctx, cancel := context.WithDeadline(ctx, time.Now().Add(-1*time.Second))
+					err := ctx.Err()
+					cancel()
+					return nil, err
+				},
+			},
+			assert:     assertNoTable,
+			assertErr:  assertDeadlineExceededError,
 			numReturns: 0,
 		},
 	}
