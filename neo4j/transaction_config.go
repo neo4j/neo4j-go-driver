@@ -56,6 +56,12 @@ type TransactionConfig struct {
 // To apply a transaction timeout to a write transaction function:
 //
 //	session.ExecuteWrite(DoWork, WithTxTimeout(5*time.Second))
+//
+// To apply a transaction timeout with the ExecuteQuery function, use ExecuteQueryWithTransactionConfig:
+//
+//	ExecuteQuery(ctx, driver, query, parameters, transformer,
+//		ExecuteQueryWithTransactionConfig(WithTxTimeout(*time.Second))
+//	)
 func WithTxTimeout(timeout time.Duration) func(*TransactionConfig) {
 	return func(config *TransactionConfig) {
 		config.Timeout = timeout
@@ -64,21 +70,27 @@ func WithTxTimeout(timeout time.Duration) func(*TransactionConfig) {
 
 // WithTxMetadata returns a transaction configuration function that attaches metadata to a transaction.
 //
-// To attach a metadata to an explicit transaction:
+// To attach metadata to an explicit transaction:
 //
-//	session.BeginTransaction(WithTxMetadata(map[string)any{"work-id": 1}))
+//	session.BeginTransaction(WithTxMetadata(map[string]any{"work-id": 1}))
 //
-// To attach a metadata to an auto-commit transaction:
+// To attach metadata to an auto-commit transaction:
 //
-//	session.Run("RETURN 1", nil, WithTxMetadata(map[string)any{"work-id": 1}))
+//	session.Run("RETURN 1", nil, WithTxMetadata(map[string]any{"work-id": 1}))
 //
-// To attach a metadata to a read transaction function:
+// To attach metadata to a read transaction function:
 //
-//	session.ExecuteRead(DoWork, WithTxMetadata(map[string)any{"work-id": 1}))
+//	session.ExecuteRead(DoWork, WithTxMetadata(map[string]any{"work-id": 1}))
 //
-// To attach a metadata to a write transaction function:
+// To attach metadata to a write transaction function:
 //
-//	session.ExecuteWrite(DoWork, WithTxMetadata(map[string)any{"work-id": 1}))
+//	session.ExecuteWrite(DoWork, WithTxMetadata(map[string]any{"work-id": 1}))
+//
+// To attach metadata with the ExecuteQuery function, use ExecuteQueryWithTransactionConfig:
+//
+//	ExecuteQuery(ctx, driver, query, parameters, transformer,
+//		ExecuteQueryWithTransactionConfig(WithTxMetadata(map[string]any{"work-id": 1}))
+//	)
 func WithTxMetadata(metadata map[string]any) func(*TransactionConfig) {
 	return func(config *TransactionConfig) {
 		config.Metadata = metadata

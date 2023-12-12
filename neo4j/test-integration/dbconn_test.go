@@ -78,7 +78,6 @@ func makeRawConnection(ctx context.Context, logger log.Logger, boltLogger log.Bo
 		},
 	}
 
-	timer := time.Now
 	boltConn, err := bolt.Connect(
 		context.Background(),
 		parsedUri.Host,
@@ -90,7 +89,6 @@ func makeRawConnection(ctx context.Context, logger log.Logger, boltLogger log.Bo
 		logger,
 		boltLogger,
 		idb.NotificationConfig{},
-		&timer,
 	)
 	if err != nil {
 		panic(err)

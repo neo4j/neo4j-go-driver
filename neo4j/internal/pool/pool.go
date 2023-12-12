@@ -23,22 +23,23 @@ package pool
 import (
 	"container/list"
 	"context"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/config"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/db"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/bolt"
-	idb "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/errorutil"
 	"math"
 	"sort"
 	"sync"
 	"time"
 
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/config"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/db"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/bolt"
+	idb "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/errorutil"
+	itime "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/time"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/log"
 )
 
-// DefaultLivenessCheckThreshold disables the liveness check of connections
-// Liveness checks are performed before a connection is deemed idle enough to be reset
-const DefaultLivenessCheckThreshold = math.MaxInt64
+// DefaultConnectionLivenessCheckTimeout disables the liveness check of connections.
+// Liveness checks are performed before a connection is deemed idle enough to be reset.
+const DefaultConnectionLivenessCheckTimeout = math.MaxInt64
 
 type Connect func(context.Context, string, *idb.ReAuthToken, bolt.ConnectionErrorListener, log.BoltLogger) (idb.Connection, error)
 
@@ -60,7 +61,6 @@ type Pool struct {
 	serversMut sync.Mutex
 	queueMut   sync.Mutex
 	queue      list.List
-	now        *func() time.Time
 	closed     bool
 	log        log.Logger
 	logId      string
@@ -71,7 +71,7 @@ type serverPenalty struct {
 	penalty uint32
 }
 
-func New(config *config.Config, connect Connect, logger log.Logger, logId string, now *func() time.Time) *Pool {
+func New(config *config.Config, connect Connect, logger log.Logger, logId string) *Pool {
 	// Means infinite life, simplifies checking later on
 
 	p := &Pool{
@@ -81,7 +81,6 @@ func New(config *config.Config, connect Connect, logger log.Logger, logId string
 		servers:    make(map[string]*server),
 		serversMut: sync.Mutex{},
 		queueMut:   sync.Mutex{},
-		now:        now,
 		logId:      logId,
 		log:        logger,
 	}
@@ -137,7 +136,7 @@ func (p *Pool) getServers() map[string]*server {
 func (p *Pool) CleanUp(ctx context.Context) {
 	p.serversMut.Lock()
 	defer p.serversMut.Unlock()
-	now := (*p.now)()
+	now := itime.Now()
 	for n, s := range p.servers {
 		s.removeIdleOlderThan(ctx, now, p.config.MaxConnectionLifetime)
 		if s.size() == 0 && !s.hasFailedConnect(now) {
@@ -146,17 +145,13 @@ func (p *Pool) CleanUp(ctx context.Context) {
 	}
 }
 
-func (p *Pool) Now() time.Time {
-	return (*p.now)()
-}
-
 func (p *Pool) getPenaltiesForServers(ctx context.Context, serverNames []string) []serverPenalty {
 	p.serversMut.Lock()
 	defer p.serversMut.Unlock()
 
 	// Retrieve penalty for each server
 	penalties := make([]serverPenalty, len(serverNames))
-	now := (*p.now)()
+	now := itime.Now()
 	for i, n := range serverNames {
 		s := p.servers[n]
 		penalties[i].name = n
@@ -185,7 +180,7 @@ func (p *Pool) anyHasCapacity(serverNames []string) bool {
 	return false
 }
 
-func (p *Pool) Borrow(ctx context.Context, getServerNames func() []string, wait bool, boltLogger log.BoltLogger, idlenessThreshold time.Duration, auth *idb.ReAuthToken) (idb.Connection, error) {
+func (p *Pool) Borrow(ctx context.Context, getServerNames func() []string, wait bool, boltLogger log.BoltLogger, idlenessTimeout time.Duration, auth *idb.ReAuthToken) (idb.Connection, error) {
 	for {
 		if p.closed {
 			return nil, &errorutil.PoolClosed{}
@@ -206,7 +201,7 @@ func (p *Pool) Borrow(ctx context.Context, getServerNames func() []string, wait 
 
 		var conn idb.Connection
 		for _, s := range penalties {
-			conn, err = p.tryBorrow(ctx, s.name, boltLogger, idlenessThreshold, auth)
+			conn, err = p.tryBorrow(ctx, s.name, boltLogger, idlenessTimeout, auth)
 			if conn != nil {
 				return conn, nil
 			}
@@ -263,7 +258,7 @@ func (p *Pool) Borrow(ctx context.Context, getServerNames func() []string, wait 
 	}
 }
 
-func (p *Pool) tryBorrow(ctx context.Context, serverName string, boltLogger log.BoltLogger, idlenessThreshold time.Duration, auth *idb.ReAuthToken) (idb.Connection, error) {
+func (p *Pool) tryBorrow(ctx context.Context, serverName string, boltLogger log.BoltLogger, idlenessTimeout time.Duration, auth *idb.ReAuthToken) (idb.Connection, error) {
 	// For now, lock complete servers map to avoid over connecting but with the downside
 	// that long connect times will block connects to other servers as well. To fix this
 	// we would need to add a pending connect to the server and lock per server.
@@ -283,11 +278,11 @@ func (p *Pool) tryBorrow(ctx context.Context, serverName string, boltLogger log.
 				break
 			}
 			unlock.Do(p.serversMut.Unlock)
-			healthy, err := srv.healthCheck(ctx, connection, idlenessThreshold, auth, boltLogger)
+			healthy, err := srv.healthCheck(ctx, connection, idlenessTimeout, auth, boltLogger)
 			if healthy {
 				return connection, nil
 			}
-			p.unreg(ctx, serverName, connection, p.Now())
+			p.unreg(ctx, serverName, connection, itime.Now())
 			if err != nil {
 				p.log.Debugf(log.Pool, p.logId, "Health check failed for %s: %s", serverName, err)
 				return nil, err
@@ -316,7 +311,7 @@ func (p *Pool) tryBorrow(ctx context.Context, serverName string, boltLogger log.
 		p.log.Warnf(log.Pool, p.logId, "Failed to connect to %s: %s", serverName, err)
 		// FeatureNotSupportedError is not the server fault, don't penalize it
 		if _, ok := err.(*db.FeatureNotSupportedError); !ok {
-			srv.notifyFailedConnect((*p.now)())
+			srv.notifyFailedConnect(itime.Now())
 		}
 		return nil, err
 	}
@@ -376,7 +371,7 @@ func (p *Pool) Return(ctx context.Context, c idb.Connection) {
 	// If the connection is dead, remove all other idle connections on the same server that older
 	// or of the same age as the dead connection, otherwise perform normal cleanup of old connections
 	maxAge := p.config.MaxConnectionLifetime
-	now := (*p.now)()
+	now := itime.Now()
 	age := now.Sub(c.Birthdate())
 	if !isAlive {
 		// Since this connection has died all other connections that connected before this one

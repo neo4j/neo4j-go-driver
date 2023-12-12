@@ -108,7 +108,6 @@ func TestBolt5(outer *testing.T) {
 		tcpConn, srv, cleanup := setupBolt5Pipe(t)
 		go serverJob(srv)
 
-		timer := time.Now
 		c, err := Connect(
 			context.Background(),
 			"serverName",
@@ -120,7 +119,6 @@ func TestBolt5(outer *testing.T) {
 			logger,
 			nil,
 			idb.NotificationConfig{},
-			&timer,
 		)
 		if err != nil {
 			t.Fatal(err)
@@ -278,7 +276,6 @@ func TestBolt5(outer *testing.T) {
 			}
 			srv.acceptHello()
 		}()
-		timer := time.Now
 		bolt, err := Connect(
 			context.Background(),
 			"serverName",
@@ -290,7 +287,6 @@ func TestBolt5(outer *testing.T) {
 			logger,
 			nil,
 			idb.NotificationConfig{},
-			&timer,
 		)
 		AssertNoError(t, err)
 		bolt.Close(context.Background())
@@ -312,7 +308,6 @@ func TestBolt5(outer *testing.T) {
 			srv.waitForLogon()
 			srv.acceptLogon()
 		}()
-		timer := time.Now
 		bolt, err := Connect(
 			context.Background(),
 			"serverName",
@@ -324,7 +319,6 @@ func TestBolt5(outer *testing.T) {
 			logger,
 			nil,
 			idb.NotificationConfig{},
-			&timer,
 		)
 		AssertNoError(t, err)
 		bolt.Close(context.Background())
@@ -343,7 +337,6 @@ func TestBolt5(outer *testing.T) {
 			}
 			srv.acceptHello()
 		}()
-		timer := time.Now
 		bolt, err := Connect(
 			context.Background(),
 			"serverName",
@@ -355,7 +348,6 @@ func TestBolt5(outer *testing.T) {
 			logger,
 			nil,
 			idb.NotificationConfig{},
-			&timer,
 		)
 		AssertNoError(t, err)
 		bolt.Close(context.Background())
@@ -376,7 +368,6 @@ func TestBolt5(outer *testing.T) {
 			srv.waitForLogon()
 			srv.acceptLogon()
 		}()
-		timer := time.Now
 		bolt, err := Connect(
 			context.Background(),
 			"serverName",
@@ -388,7 +379,6 @@ func TestBolt5(outer *testing.T) {
 			logger,
 			nil,
 			idb.NotificationConfig{},
-			&timer,
 		)
 		AssertNoError(t, err)
 		bolt.Close(context.Background())
@@ -404,7 +394,6 @@ func TestBolt5(outer *testing.T) {
 			srv.waitForHello()
 			srv.rejectHelloUnauthorized()
 		}()
-		timer := time.Now
 		bolt, err := Connect(
 			context.Background(),
 			"serverName",
@@ -416,7 +405,6 @@ func TestBolt5(outer *testing.T) {
 			logger,
 			nil,
 			idb.NotificationConfig{},
-			&timer,
 		)
 		AssertNil(t, bolt)
 		AssertError(t, err)
@@ -441,7 +429,6 @@ func TestBolt5(outer *testing.T) {
 			srv.waitForLogon()
 			srv.rejectLogonWithoutAuthToken()
 		}()
-		timer := time.Now
 		bolt, err := Connect(
 			context.Background(),
 			"serverName",
@@ -453,7 +440,6 @@ func TestBolt5(outer *testing.T) {
 			logger,
 			nil,
 			idb.NotificationConfig{},
-			&timer,
 		)
 		AssertNil(t, bolt)
 		AssertError(t, err)

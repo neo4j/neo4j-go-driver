@@ -1,3 +1,5 @@
+//go:build internal_time_mock
+
 /*
  * Copyright (c) "Neo4j"
  * Neo4j Sweden AB [https://neo4j.com]
@@ -20,15 +22,16 @@ package retry
 import (
 	"context"
 	"errors"
-	idb "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/errorutil"
 	"io"
 	"reflect"
 	"testing"
 	"time"
 
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/db"
+	idb "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/errorutil"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/testutil"
+	itime "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/time"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/log"
 )
 
@@ -36,7 +39,8 @@ type TStateInvocation struct {
 	conn                      idb.Connection
 	err                       error
 	isCommitting              bool
-	now                       time.Time
+	freezeTime                bool
+	tick                      time.Duration
 	expectContinued           bool
 	expectLastErrWasRetryable bool
 	expectLastErrType         error
@@ -44,10 +48,8 @@ type TStateInvocation struct {
 
 func TestState(outer *testing.T) {
 	var (
-		baseTime     = time.Now()
 		maxRetryTime = time.Second * 10
-		overTime     = baseTime.Add(maxRetryTime).Add(1 * time.Second)
-		halfTime     = baseTime.Add(maxRetryTime / 2)
+		halfTime     = maxRetryTime / 2
 		maxDead      = 2
 		dbName       = "thedb"
 		// a single server can be reused here since the router is a fake impl
@@ -63,11 +65,11 @@ func TestState(outer *testing.T) {
 				expectLastErrWasRetryable: true, expectLastErrType: &errorutil.PoolTimeout{}},
 		},
 		"Retry connect timeout": {
-			{conn: nil, err: dbTransientErr, expectContinued: true, now: baseTime,
+			{conn: nil, err: dbTransientErr, expectContinued: true, freezeTime: true,
 				expectLastErrWasRetryable: true},
-			{conn: nil, err: dbTransientErr, expectContinued: true, now: halfTime,
+			{conn: nil, err: dbTransientErr, expectContinued: true, tick: halfTime,
 				expectLastErrWasRetryable: true},
-			{conn: nil, err: dbTransientErr, expectContinued: false, now: overTime,
+			{conn: nil, err: dbTransientErr, expectContinued: false, tick: halfTime + 1*time.Second,
 				expectLastErrWasRetryable: true},
 		},
 		"Retry dead connection": {
@@ -80,9 +82,9 @@ func TestState(outer *testing.T) {
 		},
 		"Retry dead connection timeout": {
 			{conn: &testutil.ConnFake{Name: serverName, Alive: false}, err: dbTransientErr,
-				expectContinued: true, now: baseTime, expectLastErrWasRetryable: true},
+				expectContinued: true, freezeTime: true, expectLastErrWasRetryable: true},
 			{conn: &testutil.ConnFake{Name: serverName, Alive: false}, err: errors.New("some error 2"),
-				expectContinued: false, now: overTime,
+				expectContinued: false, tick: 2*halfTime + 1*time.Second,
 				expectLastErrWasRetryable: false},
 		},
 		"Retry dead connection max": {
@@ -103,8 +105,8 @@ func TestState(outer *testing.T) {
 		},
 		"Database transient error timeout": {
 			{conn: &testutil.ConnFake{Alive: true}, err: dbTransientErr, expectContinued: true,
-				expectLastErrWasRetryable: true},
-			{conn: &testutil.ConnFake{Alive: true}, err: dbTransientErr, expectContinued: false, now: overTime,
+				expectLastErrWasRetryable: true, freezeTime: true},
+			{conn: &testutil.ConnFake{Alive: true}, err: dbTransientErr, expectContinued: false, tick: 2*halfTime + 1*time.Second,
 				expectLastErrWasRetryable: true},
 		},
 		"User defined error": {
@@ -141,10 +143,7 @@ func TestState(outer *testing.T) {
 	ctx := context.Background()
 	for i, testCase := range testCases {
 		outer.Run(i, func(t *testing.T) {
-			now := baseTime
-			timer := func() time.Time { return now }
 			state := State{
-				Now:                     &timer,
 				Log:                     &log.Void{},
 				LogName:                 "TEST",
 				LogId:                   "State",
@@ -154,9 +153,12 @@ func TestState(outer *testing.T) {
 				DatabaseName:            dbName,
 			}
 			for _, invocation := range testCase {
-				// Update now if a value has been provided
-				if !invocation.now.IsZero() {
-					now = invocation.now
+				if invocation.freezeTime {
+					itime.ForceFreezeTime()
+					defer itime.ForceUnfreezeTime()
+				}
+				if invocation.tick > 0 {
+					itime.ForceTickTime(invocation.tick)
 				}
 
 				state.OnFailure(ctx, invocation.err, invocation.conn, invocation.isCommitting)

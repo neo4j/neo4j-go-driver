@@ -19,12 +19,14 @@ package auth
 
 import (
 	"context"
+	"reflect"
+	"time"
+
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/db"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/auth"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/collections"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/racing"
-	"reflect"
-	"time"
+	itime "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/time"
 )
 
 // TokenManager is an interface for components that can provide auth tokens.
@@ -63,7 +65,6 @@ type neo4jAuthTokenManager struct {
 	token                *auth.Token
 	expiration           *time.Time
 	mutex                racing.Mutex
-	now                  *func() time.Time
 	handledSecurityCodes collections.Set[string]
 }
 
@@ -73,7 +74,7 @@ func (m *neo4jAuthTokenManager) GetAuthToken(ctx context.Context) (auth.Token, e
 			"could not acquire lock in time when getting token in neo4jAuthTokenManager")
 	}
 	defer m.mutex.Unlock()
-	if m.token == nil || m.expiration != nil && (*m.now)().After(*m.expiration) {
+	if m.token == nil || m.expiration != nil && itime.Now().After(*m.expiration) {
 		token, expiration, err := m.provider(ctx)
 		if err != nil {
 			return auth.Token{}, err
@@ -111,11 +112,9 @@ func (m *neo4jAuthTokenManager) HandleSecurityException(ctx context.Context, tok
 // The provider function must only ever return auth information belonging to the same identity.
 // Switching identities is undefined behavior.
 func BasicTokenManager(provider authTokenProvider) TokenManager {
-	now := time.Now
 	return &neo4jAuthTokenManager{
 		provider: wrapWithNilExpiration(provider),
 		mutex:    racing.NewMutex(),
-		now:      &now,
 		handledSecurityCodes: collections.NewSet([]string{
 			"Neo.ClientError.Security.Unauthorized",
 		}),
@@ -135,11 +134,9 @@ func BasicTokenManager(provider authTokenProvider) TokenManager {
 // The provider function must only ever return auth information belonging to the same identity.
 // Switching identities is undefined behavior.
 func BearerTokenManager(provider authTokenWithExpirationProvider) TokenManager {
-	now := time.Now
 	return &neo4jAuthTokenManager{
 		provider: provider,
 		mutex:    racing.NewMutex(),
-		now:      &now,
 		handledSecurityCodes: collections.NewSet([]string{
 			"Neo.ClientError.Security.TokenExpired",
 			"Neo.ClientError.Security.Unauthorized",
