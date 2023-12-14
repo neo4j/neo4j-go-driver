@@ -76,14 +76,14 @@ func (s *server) healthCheck(
 	if itime.Since(connection.IdleDate()) > idlenessTimeout {
 		connection.ForceReset(ctx)
 		if !connection.IsAlive() {
-			return false, nil
+			return false, ctx.Err()
 		}
 	}
 	if err := connection.ReAuth(ctx, auth); err != nil {
 		return false, err
 	}
 	if !connection.IsAlive() {
-		return false, nil
+		return false, ctx.Err()
 	}
 	// Update round-robin counter every time we give away a connection and keep track
 	// of our own round-robin index
