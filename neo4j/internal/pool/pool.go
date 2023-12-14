@@ -258,6 +258,17 @@ func (p *Pool) Borrow(
 		case <-ctx.Done():
 			p.queueMut.Lock()
 			p.queue.Remove(e)
+			if len(q.wakeup) == 1 {
+				// We got notified, but are no longer interested.
+				// Ask the next waiter.
+				if e := p.queue.Front(); e != nil {
+					queuedRequest := e.Value.(*qitem)
+					p.queue.Remove(e)
+					queuedRequest.wakeup <- true
+				}
+				p.queueMut.Unlock()
+				continue
+			}
 			p.queueMut.Unlock()
 			p.log.Warnf(log.Pool, p.logId, "Borrow time-out")
 			return nil, &errorutil.PoolTimeout{Err: ctx.Err(), Servers: serverNames}
@@ -425,7 +436,8 @@ func (p *Pool) Return(ctx context.Context, c idb.Connection) {
 
 	// Check if there is anyone in the queue waiting for a connection to this server.
 	p.queueMut.Lock()
-	for e := p.queue.Front(); e != nil; e = e.Next() {
+
+	if e := p.queue.Front(); e != nil {
 		queuedRequest := e.Value.(*qitem)
 		p.queue.Remove(e)
 		queuedRequest.wakeup <- true
