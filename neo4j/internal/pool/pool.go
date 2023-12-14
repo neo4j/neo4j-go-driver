@@ -180,7 +180,14 @@ func (p *Pool) anyHasCapacity(serverNames []string) bool {
 	return false
 }
 
-func (p *Pool) Borrow(ctx context.Context, getServerNames func() []string, wait bool, boltLogger log.BoltLogger, idlenessTimeout time.Duration, auth *idb.ReAuthToken) (idb.Connection, error) {
+func (p *Pool) Borrow(
+	ctx context.Context,
+	getServerNames func() []string,
+	wait bool,
+	boltLogger log.BoltLogger,
+	idlenessTimeout time.Duration,
+	auth *idb.ReAuthToken,
+) (idb.Connection, error) {
 	for {
 		if p.closed {
 			return nil, &errorutil.PoolClosed{}
@@ -258,10 +265,13 @@ func (p *Pool) Borrow(ctx context.Context, getServerNames func() []string, wait 
 	}
 }
 
-func (p *Pool) tryBorrow(ctx context.Context, serverName string, boltLogger log.BoltLogger, idlenessTimeout time.Duration, auth *idb.ReAuthToken) (idb.Connection, error) {
-	// For now, lock complete servers map to avoid over connecting but with the downside
-	// that long connect times will block connects to other servers as well. To fix this
-	// we would need to add a pending connect to the server and lock per server.
+func (p *Pool) tryBorrow(
+	ctx context.Context,
+	serverName string,
+	boltLogger log.BoltLogger,
+	idlenessTimeout time.Duration,
+	auth *idb.ReAuthToken,
+) (idb.Connection, error) {
 	p.serversMut.Lock()
 	var unlock = new(sync.Once)
 	defer unlock.Do(p.serversMut.Unlock)
@@ -325,10 +335,10 @@ func (p *Pool) tryBorrow(ctx context.Context, serverName string, boltLogger log.
 func (p *Pool) unreg(ctx context.Context, serverName string, c idb.Connection, now time.Time) {
 	p.serversMut.Lock()
 	defer p.serversMut.Unlock()
-	p.unregUnlocked(ctx, serverName, c, now)
+	p.unregLocked(ctx, serverName, c, now)
 }
 
-func (p *Pool) unregUnlocked(ctx context.Context, serverName string, c idb.Connection, now time.Time) {
+func (p *Pool) unregLocked(ctx context.Context, serverName string, c idb.Connection, now time.Time) {
 	defer func() {
 		// Close connection in another thread to avoid potential long blocking operation during close.
 		go c.Close(ctx)
