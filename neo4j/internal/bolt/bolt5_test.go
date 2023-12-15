@@ -25,6 +25,7 @@ import (
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/notifications"
 	"io"
 	"reflect"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -32,6 +33,22 @@ import (
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/db"
 	. "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/testutil"
 )
+
+type recordingBoltLogger struct {
+	clientMessages []string
+	serverMessages []string
+}
+
+func (r *recordingBoltLogger) LogClientMessage(context string, msg string, args ...any) {
+	fmtString := fmt.Sprintf("[%s]", context) + msg
+	r.clientMessages = append(r.clientMessages, fmt.Sprintf(fmtString, args...))
+
+}
+
+func (r *recordingBoltLogger) LogServerMessage(context string, msg string, args ...any) {
+	fmtString := fmt.Sprintf("[%s]", context) + msg
+	r.serverMessages = append(r.serverMessages, fmt.Sprintf(fmtString, args...))
+}
 
 // bolt5.Connect is tested through Connect, no need to test it here
 func TestBolt5(outer *testing.T) {
@@ -1704,6 +1721,155 @@ func TestBolt5(outer *testing.T) {
 
 		AssertIntEqual(t, int(summary1.TFirst), 10)
 		AssertIntEqual(t, int(summary2.TFirst), 20)
+	})
+
+	outer.Run("redacts credentials 5.0", func(t *testing.T) {
+		runs := 100
+		ctx := context.Background()
+		authToken := auth.Manager.(iauth.Token)
+		expectedPrincipal := authToken.Tokens["principal"].(string)
+		expectedCredentials := authToken.Tokens["credentials"].(string)
+
+		var wg sync.WaitGroup
+		wg.Add(runs)
+		for i := 0; i < runs; i++ {
+			go func() {
+				tcpConn, srv, cleanup := setupBolt5Pipe(t)
+				defer cleanup()
+				go func() {
+					srv.waitForHandshake()
+					srv.acceptVersion(5, 0)
+					hello := srv.waitForHello()
+					principal, exists := hello["principal"]
+					if !exists {
+						t.Error("Missing principal in hello")
+					}
+					if principal != expectedPrincipal {
+						t.Errorf("Expected principal %s but got %s", expectedPrincipal, principal)
+					}
+					credentials, exists := hello["credentials"]
+					if !exists {
+						t.Error("Missing credentials in hello")
+					}
+					if credentials != expectedCredentials {
+						t.Errorf("Expected credentials %s but got %s", expectedCredentials, credentials)
+					}
+
+					srv.acceptHello()
+				}()
+
+				boltLogger := recordingBoltLogger{}
+
+				c, err := Connect(
+					context.Background(),
+					"serverName",
+					tcpConn,
+					auth,
+					"007",
+					nil,
+					noopErrorListener{},
+					logger,
+					&boltLogger,
+					idb.NotificationConfig{},
+				)
+				if err != nil {
+					t.Error(err)
+				}
+				defer c.Close(ctx)
+
+				bolt := c.(*bolt5)
+				assertBoltState(t, bolt5Ready, bolt)
+
+				AssertAny(t, boltLogger.clientMessages, func(logMsg string) bool {
+					if strings.Contains(logMsg, "HELLO") {
+						AssertStringContain(t, logMsg, "credentials")
+						AssertStringNotContain(t, logMsg, expectedCredentials)
+						return true
+					}
+					return false
+				})
+
+				wg.Done()
+			}()
+		}
+
+		wg.Wait()
+	})
+
+	outer.Run("redacts credentials 5.1", func(t *testing.T) {
+		runs := 100
+		ctx := context.Background()
+		authToken := auth.Manager.(iauth.Token)
+		expectedPrincipal := authToken.Tokens["principal"].(string)
+		expectedCredentials := authToken.Tokens["credentials"].(string)
+
+		var wg sync.WaitGroup
+		wg.Add(runs)
+		for i := 0; i < runs; i++ {
+			go func() {
+				tcpConn, srv, cleanup := setupBolt5Pipe(t)
+				defer cleanup()
+				go func() {
+					srv.waitForHandshake()
+					srv.acceptVersion(5, 1)
+					srv.waitForHelloWithoutAuthToken()
+					srv.acceptHello()
+					logon := srv.waitForLogon()
+					srv.acceptLogon()
+					principal, exists := logon["principal"]
+					if !exists {
+						t.Error("Missing principal in logon")
+					}
+					if principal != expectedPrincipal {
+						t.Errorf("Expected principal %s but got %s", expectedPrincipal, principal)
+					}
+					credentials, exists := logon["credentials"]
+					if !exists {
+						t.Error("Missing credentials in logon")
+					}
+					if credentials != expectedCredentials {
+						t.Errorf("Expected credentials %s but got %s", expectedCredentials, credentials)
+					}
+
+					srv.acceptLogon()
+				}()
+
+				boltLogger := recordingBoltLogger{}
+
+				c, err := Connect(
+					context.Background(),
+					"serverName",
+					tcpConn,
+					auth,
+					"007",
+					nil,
+					noopErrorListener{},
+					logger,
+					&boltLogger,
+					idb.NotificationConfig{},
+				)
+				if err != nil {
+					t.Error(err)
+				}
+				defer c.Close(ctx)
+
+				bolt := c.(*bolt5)
+				assertBoltState(t, bolt5Ready, bolt)
+
+				AssertAny(t, boltLogger.clientMessages, func(logMsg string) bool {
+					if strings.Contains(logMsg, "LOGON") {
+						AssertStringContain(t, logMsg, "credentials")
+						AssertStringNotContain(t, logMsg, expectedCredentials)
+						return true
+					}
+					return false
+				})
+
+				wg.Done()
+			}()
+		}
+
+		wg.Wait()
 	})
 
 	type txTimeoutTestCase struct {
