@@ -177,6 +177,32 @@ func AssertStringContain(t *testing.T, s, sub string) {
 	}
 }
 
+func AssertStringNotContain(t *testing.T, s, sub string) {
+	t.Helper()
+	if strings.Contains(s, sub) {
+		t.Errorf("Expected %s to not contain %s", s, sub)
+	}
+}
+
+func AssertAny[T any](t *testing.T, slice []T, predicate func(T) bool) {
+	t.Helper()
+	for _, e := range slice {
+		if predicate(e) {
+			return
+		}
+	}
+	t.Errorf("Expected slice to contain element matching predicate")
+}
+
+func AssertAll[T any](t *testing.T, slice []T, predicate func(T) bool) {
+	t.Helper()
+	for _, e := range slice {
+		if !predicate(e) {
+			t.Errorf("Expected slice to contain only elements matching predicate")
+		}
+	}
+}
+
 func AssertMapHasKey[K comparable](t *testing.T, m map[K]any, key K) {
 	t.Helper()
 	if _, ok := m[key]; !ok {
