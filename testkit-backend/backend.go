@@ -532,7 +532,7 @@ func (b *backend) handleRequest(req map[string]any) {
 	case "DriverClose":
 		driverId := data["driverId"].(string)
 		driver := b.drivers[driverId]
-		driver.Close(ctx)
+		err := driver.Close(ctx)
 		if err != nil {
 			b.writeError(err)
 			return
@@ -711,7 +711,7 @@ func (b *backend) handleRequest(req map[string]any) {
 	case "SessionClose":
 		sessionId := data["sessionId"].(string)
 		sessionState := b.sessionStates[sessionId]
-		sessionState.session.Close(ctx)
+		err := sessionState.session.Close(ctx)
 		if err != nil {
 			b.writeError(err)
 			return
@@ -809,7 +809,7 @@ func (b *backend) handleRequest(req map[string]any) {
 	case "TransactionClose":
 		txId := data["txId"].(string)
 		tx := b.explicitTransactions[txId]
-		tx.Close(ctx)
+		err := tx.Close(ctx)
 		if err != nil {
 			b.writeError(err)
 			return
@@ -914,7 +914,7 @@ func (b *backend) handleRequest(req map[string]any) {
 		})
 		result, err := session.Run(ctx, "RETURN 42", nil)
 		defer func() {
-			session.Close(ctx)
+			err = session.Close(ctx)
 			if err != nil {
 				b.writeError(fmt.Errorf("could not check multi DB support: %w", err))
 			}
