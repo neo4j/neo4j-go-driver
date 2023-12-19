@@ -207,7 +207,7 @@ func NewDriverWithContext(target string, auth auth.TokenManager, configurers ...
 	d.log = d.config.Log
 	if d.log == nil {
 		// Default to void logger
-		d.log = &log.Void{}
+		d.log = log.ToVoid()
 	}
 	d.logId = log.NewId()
 

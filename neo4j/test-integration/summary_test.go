@@ -21,6 +21,7 @@ import (
 	"context"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/config"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/log"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/test-integration/dbserver"
 	"testing"
 )
@@ -40,7 +41,7 @@ func TestResultSummary(outer *testing.T) {
 
 	server = dbserver.GetDbServer(ctx)
 	driver = server.Driver(func(config *config.Config) {
-		config.Log = neo4j.ConsoleLogger(neo4j.DEBUG)
+		config.Log = log.ToConsole(log.DEBUG)
 	})
 	assertNotNil(outer, driver)
 
@@ -70,7 +71,7 @@ func TestResultSummary(outer *testing.T) {
 			inner.Skip("Multi-tenancy is a Neo4j 4+ feature")
 		}
 
-		session := driver.NewSession(ctx, neo4j.SessionConfig{DatabaseName: "system", BoltLogger: neo4j.ConsoleBoltLogger()})
+		session := driver.NewSession(ctx, neo4j.SessionConfig{DatabaseName: "system", BoltLogger: log.BoltToConsole()})
 		defer assertCloses(ctx, inner, session)
 		res, err := session.Run(ctx, server.CreateDatabaseQuery(extraDatabase), map[string]any{})
 		assertNil(inner, err)
