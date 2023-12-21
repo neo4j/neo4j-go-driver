@@ -17,323 +17,164 @@
 
 package dbtype
 
-/*
 import (
+	"fmt"
+	"testing"
 	"time"
-
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/ginkgo/extensions/table"
-	. "github.com/onsi/gomega"
 )
 
-var _ = Describe("Temporal Types", func() {
-	Context("LocalDate", func() {
-		When("initialized from a Time value", func() {
-			source := time.Date(2006, time.December, 16, 13, 59, 59, 999999999, time.Local)
-			value := DateOf(source)
-
-			It("should report year as 2006", func() {
-				Expect(value.Year()).To(Equal(2006))
-			})
-
-			It("should report month as December", func() {
-				Expect(value.Month()).To(Equal(time.December))
-			})
-
-			It("should report day as 16", func() {
-				Expect(value.Day()).To(Equal(16))
-			})
-
-			It("should return an equivalent Time value when converted", func() {
-				year, month, day := value.Time().Date()
-
-				Expect(year).To(Equal(source.Year()))
-				Expect(month).To(Equal(source.Month()))
-				Expect(day).To(Equal(source.Day()))
-			})
-
-			It("should generate correct string", func() {
-				Expect(value.String()).To(Equal("2006-12-16"))
-			})
-		})
-	})
-
-	Context("LocalTime", func() {
-		When("initialized from a Time value", func() {
-			source := time.Date(0, 0, 0, 13, 59, 59, 999999999, time.Local)
-			value := LocalTimeOf(source)
-
-			It("should report hour as 13", func() {
-				Expect(value.Hour()).To(Equal(13))
-			})
-
-			It("should report minute as 59", func() {
-				Expect(value.Minute()).To(Equal(59))
-			})
-
-			It("should report second as 59", func() {
-				Expect(value.Second()).To(Equal(59))
-			})
-
-			It("should report nanosecond as 999999999", func() {
-				Expect(value.Nanosecond()).To(Equal(999999999))
-			})
-
-			It("should return an equivalent Time value when converted", func() {
-				converted := value.Time()
-
-				Expect(converted.Hour()).To(Equal(source.Hour()))
-				Expect(converted.Minute()).To(Equal(source.Minute()))
-				Expect(converted.Second()).To(Equal(source.Second()))
-				Expect(converted.Nanosecond()).To(Equal(source.Nanosecond()))
-			})
-
-			It("should generate correct string", func() {
-				Expect(value.String()).To(Equal("13:59:59.999999999"))
-			})
-		})
-	})
-
-	Context("OffsetTime", func() {
-		When("initialized from a Time value", func() {
-			year, month, day := time.Now().Date()
-			location, _ := time.LoadLocation("Europe/Istanbul")
-			source := time.Date(year, month, day, 13, 59, 59, 999999999, location)
-			value := OffsetTimeOf(source)
-
-			It("should report hour as 13", func() {
-				Expect(value.Hour()).To(Equal(13))
-			})
-
-			It("should report minute as 59", func() {
-				Expect(value.Minute()).To(Equal(59))
-			})
-
-			It("should report second as 59", func() {
-				Expect(value.Second()).To(Equal(59))
-			})
-
-			It("should report nanosecond as 999999999", func() {
-				Expect(value.Nanosecond()).To(Equal(999999999))
-			})
-
-			It("should report offset as 3*60*60 (3 hours)", func() {
-				Expect(value.Offset()).To(Equal(10800))
-			})
-
-			It("should return an equivalent Time value when converted", func() {
-				converted := value.Time()
-
-				Expect(converted.Hour()).To(Equal(source.Hour()))
-				Expect(converted.Minute()).To(Equal(source.Minute()))
-				Expect(converted.Second()).To(Equal(source.Second()))
-				Expect(converted.Nanosecond()).To(Equal(source.Nanosecond()))
-
-				_, convertedOffset := converted.Zone()
-				_, offset := source.Zone()
-				Expect(convertedOffset).To(Equal(offset))
-			})
-
-			It("should generate correct string", func() {
-				Expect(value.String()).To(Equal("13:59:59.999999999+03:00"))
-			})
-		})
-	})
-
-	Context("LocalDateTime", func() {
-		When("initialized from a Time value with local time zone", func() {
-			source := time.Date(1947, 12, 17, 23, 49, 54, 999999999, time.Local)
-			value := LocalDateTimeOf(source)
-
-			It("should report year as 2006", func() {
-				Expect(value.Year()).To(Equal(1947))
-			})
-
-			It("should report month as December", func() {
-				Expect(value.Month()).To(Equal(time.December))
-			})
-
-			It("should report day as 17", func() {
-				Expect(value.Day()).To(Equal(17))
-			})
-
-			It("should report hour as 23", func() {
-				Expect(value.Hour()).To(Equal(23))
-			})
-
-			It("should report minute as 49", func() {
-				Expect(value.Minute()).To(Equal(49))
-			})
-
-			It("should report second as 54", func() {
-				Expect(value.Second()).To(Equal(54))
-			})
-
-			It("should report nanosecond as 999999999", func() {
-				Expect(value.Nanosecond()).To(Equal(999999999))
-			})
-
-			It("should return an equivalent Time value when converted", func() {
-				converted := value.Time()
-
-				Expect(converted.Year()).To(Equal(source.Year()))
-				Expect(converted.Month()).To(Equal(source.Month()))
-				Expect(converted.Day()).To(Equal(source.Day()))
-				Expect(converted.Hour()).To(Equal(source.Hour()))
-				Expect(converted.Minute()).To(Equal(source.Minute()))
-				Expect(converted.Second()).To(Equal(source.Second()))
-				Expect(converted.Nanosecond()).To(Equal(source.Nanosecond()))
-			})
-
-			It("should generate correct string", func() {
-				Expect(value.String()).To(Equal("1947-12-17T23:49:54.999999999"))
-			})
-		})
-
-		When("initialized from a Time value with UTC time zone", func() {
-			source := time.Date(1947, 12, 17, 23, 49, 54, 999999999, time.UTC)
-			value := LocalDateTimeOf(source)
-
-			It("should report year as 2006", func() {
-				Expect(value.Year()).To(Equal(1947))
-			})
-
-			It("should report month as December", func() {
-				Expect(value.Month()).To(Equal(time.December))
-			})
-
-			It("should report day as 17", func() {
-				Expect(value.Day()).To(Equal(17))
-			})
-
-			It("should report hour as 23", func() {
-				Expect(value.Hour()).To(Equal(23))
-			})
-
-			It("should report minute as 49", func() {
-				Expect(value.Minute()).To(Equal(49))
-			})
-
-			It("should report second as 54", func() {
-				Expect(value.Second()).To(Equal(54))
-			})
-
-			It("should report nanosecond as 999999999", func() {
-				Expect(value.Nanosecond()).To(Equal(999999999))
-			})
-
-			It("should return an equivalent Time value when converted", func() {
-				converted := value.Time()
-
-				Expect(converted.Year()).To(Equal(source.Year()))
-				Expect(converted.Month()).To(Equal(source.Month()))
-				Expect(converted.Day()).To(Equal(source.Day()))
-				Expect(converted.Hour()).To(Equal(source.Hour()))
-				Expect(converted.Minute()).To(Equal(source.Minute()))
-				Expect(converted.Second()).To(Equal(source.Second()))
-				Expect(converted.Nanosecond()).To(Equal(source.Nanosecond()))
-			})
-
-			It("should generate correct string", func() {
-				Expect(value.String()).To(Equal("1947-12-17T23:49:54.999999999"))
-			})
-		})
-
-		When("initialized from a Time value with a custom time zone", func() {
-			location, _ := time.LoadLocation("Europe/Istanbul")
-			source := time.Date(1947, 12, 17, 23, 49, 54, 999999999, location)
-			value := LocalDateTimeOf(source)
-
-			It("should report year as 2006", func() {
-				Expect(value.Year()).To(Equal(1947))
-			})
-
-			It("should report month as December", func() {
-				Expect(value.Month()).To(Equal(time.December))
-			})
-
-			It("should report day as 17", func() {
-				Expect(value.Day()).To(Equal(17))
-			})
-
-			It("should report hour as 23", func() {
-				Expect(value.Hour()).To(Equal(23))
-			})
-
-			It("should report minute as 49", func() {
-				Expect(value.Minute()).To(Equal(49))
-			})
-
-			It("should report second as 54", func() {
-				Expect(value.Second()).To(Equal(54))
-			})
-
-			It("should report nanosecond as 999999999", func() {
-				Expect(value.Nanosecond()).To(Equal(999999999))
-			})
-
-			It("should return an equivalent Time value when converted", func() {
-				converted := value.Time()
-
-				Expect(converted.Year()).To(Equal(source.Year()))
-				Expect(converted.Month()).To(Equal(source.Month()))
-				Expect(converted.Day()).To(Equal(source.Day()))
-				Expect(converted.Hour()).To(Equal(source.Hour()))
-				Expect(converted.Minute()).To(Equal(source.Minute()))
-				Expect(converted.Second()).To(Equal(source.Second()))
-				Expect(converted.Nanosecond()).To(Equal(source.Nanosecond()))
-			})
-
-			It("should generate correct string", func() {
-				Expect(value.String()).To(Equal("1947-12-17T23:49:54.999999999"))
-			})
-		})
-	})
-
-	Context("Duration", func() {
-		When("constructed", func() {
-			value := DurationOf(15, 32, 785, 789215800)
-
-			It("should report months as 15", func() {
-				Expect(value.Months()).To(BeNumerically("==", 15))
-			})
-
-			It("should report days as 32", func() {
-				Expect(value.Days()).To(BeNumerically("==", 32))
-			})
-
-			It("should report second as 785", func() {
-				Expect(value.Seconds()).To(BeNumerically("==", 785))
-			})
-
-			It("should report nanosecond as 789215800", func() {
-				Expect(value.Nanos()).To(BeNumerically("==", 789215800))
-			})
-
-			It("should generate correct string", func() {
-				Expect(value.String()).To(Equal("P15M32DT785.789215800S"))
-			})
-		})
-
-		DescribeTable("should generate correct string", func(months, days, seconds, nanoseconds int, expected string) {
-			duration := DurationOf(int64(months), int64(days), int64(seconds), nanoseconds)
-
-			Expect(duration.String()).To(Equal(expected))
+type stringTestCase[T interface{ String() string }] struct {
+	input  T
+	output string
+}
+
+func (c stringTestCase[T]) test(t *testing.T) {
+	if c.input.String() != c.output {
+		t.Errorf("Expected %s but was %s", c.output, c.input.String())
+	}
+	if fmt.Sprint(c.input) != c.output {
+		t.Errorf("Expected %s but was %s", c.output, fmt.Sprintln(c.input))
+	}
+}
+
+func TestTimeString(outer *testing.T) {
+	outer.Parallel()
+	testCases := []stringTestCase[Time]{
+		{
+			input:  Time(time.Date(0, 1, 1, 0, 0, 0, 0, time.UTC)),
+			output: "00:00:00Z",
 		},
-			Entry("P15M32DT785.789215800S", 15, 32, 785, 789215800, "P15M32DT785.789215800S"),
-			Entry("P0M32DT785.789215800S", 0, 32, 785, 789215800, "P0M32DT785.789215800S"),
-			Entry("P0M0DT785.789215800S", 0, 0, 785, 789215800, "P0M0DT785.789215800S"),
-			Entry("P0M0DT0.789215800S", 0, 0, 0, 789215800, "P0M0DT0.789215800S"),
-			Entry("P0M0DT-1S", 0, 0, -1, 0, "P0M0DT-1S"),
-			Entry("P0M0DT0.999999999S", 0, 0, 0, 999999999, "P0M0DT0.999999999S"),
-			Entry("P0M0DT-0.999999995S", 0, 0, -1, 5, "P0M0DT-0.999999995S"),
-			Entry("P0M0DT-0.000000001S", 0, 0, -1, 999999999, "P0M0DT-0.000000001S"),
-			Entry("P500M0DT0S", 500, 0, 0, 0, "P500M0DT0S"),
-			Entry("P0M0DT0.000000005S", 0, 0, 0, 5, "P0M0DT0.000000005S"),
-			Entry("P0M0DT-499.999999999S", 0, 0, -500, 1, "P0M0DT-499.999999999S"),
-			Entry("P0M0DT-500S", 0, 0, -500, 0, "P0M0DT-500S"),
-			Entry("P-10M5DT-1.999999500S", -10, 5, -2, 500, "P-10M5DT-1.999999500S"),
-			Entry("P-10M-5DT-1.999999500S", -10, -5, -2, 500, "P-10M-5DT-1.999999500S"))
-	})
-})
-*/
+		{
+			input:  Time(time.Date(0, 1, 1, 1, 2, 3, 4, time.UTC)),
+			output: "01:02:03.000000004Z",
+		},
+		{
+			input:  Time(time.Date(0, 1, 1, 15, 56, 34, 2_000_000, time.UTC)),
+			output: "15:56:34.002Z",
+		},
+		{
+			input:  Time(time.Date(0, 1, 1, 0, 0, 0, 2_000_000, time.FixedZone("Foo", 0))),
+			output: "00:00:00.002Z",
+		},
+		{
+			input:  Time(time.Date(0, 1, 1, 0, 0, 0, 2_000_000, time.FixedZone("Foo", -3600))),
+			output: "00:00:00.002-01:00",
+		},
+		{
+			input:  Time(time.Date(0, 1, 1, 0, 0, 0, 2_000_000, time.FixedZone("Foo", 3600))),
+			output: "00:00:00.002+01:00",
+		},
+	}
+	for _, testCase := range testCases {
+		testCase := testCase
+		outer.Run(testCase.output, func(inner *testing.T) {
+			inner.Parallel()
+			testCase.test(inner)
+		})
+	}
+}
+
+func TestDateString(outer *testing.T) {
+	outer.Parallel()
+	testCases := []stringTestCase[Date]{
+		{input: Date(time.Date(-1, time.January, 1, 0, 0, 0, 0, time.UTC)), output: "-0001-01-01"},
+		{input: Date(time.Date(0, time.January, 1, 0, 0, 0, 0, time.UTC)), output: "0000-01-01"},
+		{input: Date(time.Date(1, time.January, 1, 0, 0, 0, 0, time.UTC)), output: "0001-01-01"},
+		{input: Date(time.Date(1991, time.August, 24, 0, 0, 0, 0, time.UTC)), output: "1991-08-24"},
+		{input: Date(time.Date(-753, time.April, 21, 0, 0, 0, 0, time.UTC)), output: "-0753-04-21"},
+		{input: Date(time.Date(10000, time.January, 1, 0, 0, 0, 0, time.UTC)), output: "10000-01-01"},
+		{input: Date(time.Date(-10000, time.January, 1, 0, 0, 0, 0, time.UTC)), output: "-10000-01-01"},
+	}
+	for _, testCase := range testCases {
+		testCase := testCase
+		outer.Run(testCase.output, func(inner *testing.T) {
+			inner.Parallel()
+			testCase.test(inner)
+		})
+	}
+}
+
+func TestLocalTimeString(outer *testing.T) {
+	outer.Parallel()
+	testCases := []stringTestCase[LocalTime]{
+		{input: LocalTime(time.Date(0, 0, 0, 1, 2, 3, 4, time.Local)), output: "01:02:03.000000004"},
+		{input: LocalTime(time.Date(0, 0, 0, 1, 2, 3, 4_000_000, time.Local)), output: "01:02:03.004"},
+		{input: LocalTime(time.Date(0, 0, 0, 17, 56, 34, 0, time.Local)), output: "17:56:34"},
+	}
+	for _, testCase := range testCases {
+		testCase := testCase
+		outer.Run(testCase.output, func(inner *testing.T) {
+			inner.Parallel()
+			testCase.test(inner)
+		})
+	}
+}
+
+func TestLocalDateTimeString(outer *testing.T) {
+	outer.Parallel()
+	testCases := []stringTestCase[LocalDateTime]{
+		{
+			input:  LocalDateTime(time.Date(-1, time.January, 1, 2, 3, 4, 5_000_000, time.Local)),
+			output: "-0001-01-01T02:03:04.005",
+		},
+		{
+			input:  LocalDateTime(time.Date(0, time.January, 1, 15, 16, 17, 18, time.Local)),
+			output: "0000-01-01T15:16:17.000000018",
+		},
+		{
+			input:  LocalDateTime(time.Date(1, time.January, 1, 0, 0, 0, 0, time.Local)),
+			output: "0001-01-01T00:00:00",
+		},
+		{
+			input:  LocalDateTime(time.Date(1991, time.August, 24, 0, 0, 0, 0, time.Local)),
+			output: "1991-08-24T00:00:00",
+		},
+		{
+			input:  LocalDateTime(time.Date(-753, time.April, 21, 0, 0, 0, 0, time.Local)),
+			output: "-0753-04-21T00:00:00",
+		},
+		{
+			input:  LocalDateTime(time.Date(10000, time.January, 1, 20, 0, 18, 1, time.Local)),
+			output: "10000-01-01T20:00:18.000000001",
+		},
+		{
+			input:  LocalDateTime(time.Date(-10000, time.January, 1, 0, 0, 0, 0, time.Local)),
+			output: "-10000-01-01T00:00:00",
+		},
+	}
+	for _, testCase := range testCases {
+		testCase := testCase
+		outer.Run(testCase.output, func(inner *testing.T) {
+			inner.Parallel()
+			testCase.test(inner)
+		})
+	}
+}
+
+func TestDurationSting(outer *testing.T) {
+	outer.Parallel()
+	testCases := []stringTestCase[Duration]{
+		{input: Duration{Months: 15, Days: 32, Seconds: 785, Nanos: 789215800}, output: "P15M32DT785.789215800S"},
+		{input: Duration{Months: 0, Days: 32, Seconds: 785, Nanos: 789215800}, output: "P0M32DT785.789215800S"},
+		{input: Duration{Months: 0, Days: 0, Seconds: 785, Nanos: 789215800}, output: "P0M0DT785.789215800S"},
+		{input: Duration{Months: 0, Days: 0, Seconds: 0, Nanos: 789215800}, output: "P0M0DT0.789215800S"},
+		{input: Duration{Months: 0, Days: 0, Seconds: -1, Nanos: 0}, output: "P0M0DT-1S"},
+		{input: Duration{Months: 0, Days: 0, Seconds: 0, Nanos: 999999999}, output: "P0M0DT0.999999999S"},
+		{input: Duration{Months: 0, Days: 0, Seconds: -1, Nanos: 5}, output: "P0M0DT-0.999999995S"},
+		{input: Duration{Months: 0, Days: 0, Seconds: -1, Nanos: 999999999}, output: "P0M0DT-0.000000001S"},
+		{input: Duration{Months: 500, Days: 0, Seconds: 0, Nanos: 0}, output: "P500M0DT0S"},
+		{input: Duration{Months: 0, Days: 0, Seconds: 0, Nanos: 5}, output: "P0M0DT0.000000005S"},
+		{input: Duration{Months: 0, Days: 0, Seconds: -500, Nanos: 1}, output: "P0M0DT-499.999999999S"},
+		{input: Duration{Months: 0, Days: 0, Seconds: -500, Nanos: 0}, output: "P0M0DT-500S"},
+		{input: Duration{Months: -10, Days: 5, Seconds: -2, Nanos: 500}, output: "P-10M5DT-1.999999500S"},
+		{input: Duration{Months: -10, Days: -5, Seconds: -2, Nanos: 500}, output: "P-10M-5DT-1.999999500S"},
+	}
+
+	for _, testCase := range testCases {
+		testCase := testCase
+		outer.Run(testCase.output, func(inner *testing.T) {
+			inner.Parallel()
+			testCase.test(inner)
+		})
+	}
+}

@@ -32,13 +32,31 @@ type (
 )
 
 // Time casts LocalDateTime to time.Time
+//
+// Note that the resulting time.Time will have its location set to time.Local.
+// From the DBMS's perspective, however, a LocalDateTime is considered to not have any timezone information.
 func (t LocalDateTime) Time() time.Time {
 	return time.Time(t)
 }
 
+// String returns the string representation of this LocalDateTime in ISO-8601 compliant form:
+// `YYYY-MM-DDThh:mm:ss.nnnnnnnnn`.
+func (t LocalDateTime) String() string {
+	return t.Time().Format("2006-01-02T15:04:05.999999999")
+}
+
 // Time casts LocalTime to time.Time
+//
+// Note that the resulting time.Time will have its location set to time.Local.
+// From the DBMS's perspective, however, a LocalTime is considered to not have any timezone information.
 func (t LocalTime) Time() time.Time {
 	return time.Time(t)
+}
+
+// String returns the string representation of this LocalTime in ISO-8601 compliant form:
+// `hh:mm:ss.nnnnnnnnn`.
+func (t LocalTime) String() string {
+	return t.Time().Format("15:04:05.999999999")
 }
 
 // Time casts Date to time.Time
@@ -46,9 +64,21 @@ func (t Date) Time() time.Time {
 	return time.Time(t)
 }
 
+// String returns the string representation of this Date in ISO-8601 compliant form:
+// `YYYY-MM-DD`.
+func (t Date) String() string {
+	return t.Time().Format("2006-01-02")
+}
+
 // Time casts Time to time.Time
 func (t Time) Time() time.Time {
 	return time.Time(t)
+}
+
+// String returns the string representation of this Time in ISO-8601 compliant form:
+// `hh:mm:ss.nnnnnnnnn±Z/hh:mm`.
+func (t Time) String() string {
+	return t.Time().Format("15:04:05.999999999Z07:00")
 }
 
 // Duration represents temporal amount containing months, days, seconds and nanoseconds.
