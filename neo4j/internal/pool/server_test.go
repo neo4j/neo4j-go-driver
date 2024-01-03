@@ -86,13 +86,8 @@ func TestServer(ot *testing.T) {
 	ot.Run("removeIdleOlderThan", func(t *testing.T) {
 		s := NewServer()
 		// Register and return three connections
-		conns := make([]*testutil.ConnFake, 3)
 		now := time.Now()
-		for i := range conns {
-			c := &testutil.ConnFake{Birth: now, Alive: true}
-			conns[i] = c
-			registerIdle(s, c)
-		}
+		conns, _ := populateServer(s, now, 3, 0)
 
 		// Let the connection in the middle be too old
 		conns[1].Birth = now.Add(-20 * time.Second)
@@ -118,6 +113,32 @@ func TestServer(ot *testing.T) {
 		b1 = s.getIdle()
 		assertNilConnection(t, b1)
 		assertSize(t, s, 0)
+	})
+
+	ot.Run("startClosing clears idle connections", func(t *testing.T) {
+		s := NewServer()
+		// Register and return three connections
+		_, _ = populateServer(s, time.Now(), 3, 3)
+		s.startClosing(context.Background())
+		if s.idle.Len() != 0 {
+			t.Errorf("Expected 0 idle connections, found %d", s.idle.Len())
+		}
+		if s.busy.Len() != 3 {
+			t.Errorf("Expected 3 busy connections, found %d", s.busy.Len())
+		}
+	})
+
+	ot.Run("closeAll clears all connections", func(t *testing.T) {
+		s := NewServer()
+		// Register and return three connections
+		_, _ = populateServer(s, time.Now(), 3, 3)
+		s.closeAll(context.Background())
+		if s.idle.Len() != 0 {
+			t.Errorf("Expected 0 idle connections, found %d", s.idle.Len())
+		}
+		if s.busy.Len() != 0 {
+			t.Errorf("Expected 0 busy connections, found %d", s.busy.Len())
+		}
 	})
 }
 
@@ -284,6 +305,22 @@ func TestIdlenessThreshold(outer *testing.T) {
 		testutil.AssertIntEqual(t, srv.numIdle(), 0)
 		testutil.AssertIntEqual(t, srv.numBusy(), 1)
 	})
+}
+
+func populateServer(s *server, birth time.Time, idle, busy int) ([]*testutil.ConnFake, []*testutil.ConnFake) {
+	idleConns := make([]*testutil.ConnFake, idle)
+	for i := range idleConns {
+		c := &testutil.ConnFake{Birth: birth, Alive: true}
+		idleConns[i] = c
+		registerIdle(s, c)
+	}
+	busyConns := make([]*testutil.ConnFake, busy)
+	for i := range busyConns {
+		c := &testutil.ConnFake{Birth: birth, Alive: true}
+		busyConns[i] = c
+		s.registerBusy(c)
+	}
+	return idleConns, busyConns
 }
 
 func registerIdle(srv *server, connection db.Connection) {
