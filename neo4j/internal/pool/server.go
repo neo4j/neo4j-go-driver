@@ -157,7 +157,7 @@ func (s *server) numBusy() int {
 	return s.busy.Len()
 }
 
-// Adds a db to busy list
+// Adds a connection to the busy list
 func (s *server) registerBusy(c db.Connection) {
 	// Update round-robin to indicate when this server was last used.
 	atomic.StoreUint32(&s.roundRobin, atomic.AddUint32(&sharedRoundRobin, 1))
@@ -197,9 +197,9 @@ func (s *server) removeIdleOlderThan(ctx context.Context, now time.Time, maxAge 
 }
 
 func (s *server) closeAll(ctx context.Context) {
-	closeAndEmptyConnections(ctx, s.idle)
+	closeAndEmptyConnections(ctx, &s.idle)
 	// Closing the busy connections could mean here that we do close from another thread.
-	closeAndEmptyConnections(ctx, s.busy)
+	closeAndEmptyConnections(ctx, &s.busy)
 }
 
 func (s *server) executeForAllConnections(callback func(c db.Connection)) {
@@ -213,10 +213,10 @@ func (s *server) executeForAllConnections(callback func(c db.Connection)) {
 
 func (s *server) startClosing(ctx context.Context) {
 	s.closing = true
-	closeAndEmptyConnections(ctx, s.idle)
+	closeAndEmptyConnections(ctx, &s.idle)
 }
 
-func closeAndEmptyConnections(ctx context.Context, l list.List) {
+func closeAndEmptyConnections(ctx context.Context, l *list.List) {
 	for e := l.Front(); e != nil; e = e.Next() {
 		c := e.Value.(db.Connection)
 		go c.Close(ctx)
