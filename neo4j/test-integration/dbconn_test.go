@@ -98,7 +98,7 @@ func makeRawConnection(ctx context.Context, logger log.Logger, boltLogger log.Bo
 
 func BenchmarkQuery(b *testing.B) {
 	ctx := context.Background()
-	_, conn := makeRawConnection(ctx, &log.Console{Debugs: true, Errors: true, Infos: true, Warns: true}, nil)
+	_, conn := makeRawConnection(ctx, log.ToConsole(log.DEBUG), nil)
 	defer conn.Close(context.Background())
 	params := map[string]any{
 		"one": 1,
@@ -124,7 +124,7 @@ func TestConnectionConformance(outer *testing.T) {
 		outer.Skip()
 	}
 	ctx := context.Background()
-	server, boltConn := makeRawConnection(ctx, &log.Console{Errors: true, Infos: true, Warns: true, Debugs: true}, nil)
+	server, boltConn := makeRawConnection(ctx, log.ToConsole(log.DEBUG), nil)
 	defer boltConn.Close(context.Background())
 
 	randInt := func() int64 {

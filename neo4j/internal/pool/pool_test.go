@@ -38,7 +38,7 @@ import (
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/log"
 )
 
-var logger = &log.Void{}
+var logger = log.ToVoid()
 var ctx = context.Background()
 var reAuthToken = &idb.ReAuthToken{FromSession: false, Manager: iauth.Token{Tokens: map[string]any{"scheme": "none"}}}
 

@@ -35,7 +35,7 @@ import (
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/log"
 )
 
-var logger = &log.Void{}
+var logger = log.ToVoid()
 
 // Verifies that concurrent access works as expected relying on the race detector to
 // report suspicious behavior.

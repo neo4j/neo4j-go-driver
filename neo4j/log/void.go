@@ -18,16 +18,26 @@
 package log
 
 // Logger implementation that throws away all log events.
-type Void struct{}
+type void struct{}
 
-func (l Void) Error(name, id string, err error) {
+func (l void) Error(name, id string, err error) {
 }
 
-func (l Void) Infof(name, id string, msg string, args ...any) {
+func (l void) Infof(name, id, msg string, args ...any) {
 }
 
-func (l Void) Warnf(name, id string, msg string, args ...any) {
+func (l void) Warnf(name, id, msg string, args ...any) {
 }
 
-func (l Void) Debugf(name, id string, msg string, args ...any) {
+func (l void) Debugf(name, id, msg string, args ...any) {
+}
+
+// Void is a Logger implementation that throws away all log events.
+//
+// Deprecated: use log.ToVoid() instead.
+type Void = void
+
+// ToVoid returns a Logger implementation that throws away all log events.
+func ToVoid() Logger {
+	return void{}
 }

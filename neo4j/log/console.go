@@ -23,9 +23,7 @@ import (
 	"time"
 )
 
-// Console is a simple logger that logs to stdout/console.
-// Turn the different log levels on/off as wished, all are off by default.
-type Console struct {
+type console struct {
 	Errors bool
 	Infos  bool
 	Warns  bool
@@ -34,7 +32,7 @@ type Console struct {
 
 const timeFormat = "2006-01-02 15:04:05.000"
 
-func (l *Console) Error(name, id string, err error) {
+func (l *console) Error(name, id string, err error) {
 	if !l.Errors {
 		return
 	}
@@ -42,7 +40,7 @@ func (l *Console) Error(name, id string, err error) {
 	fmt.Fprintf(os.Stderr, "%s  ERROR  [%s %s] %s\n", now.Format(timeFormat), name, id, err.Error())
 }
 
-func (l *Console) Infof(name, id string, msg string, args ...any) {
+func (l *console) Infof(name, id string, msg string, args ...any) {
 	if !l.Infos {
 		return
 	}
@@ -50,7 +48,7 @@ func (l *Console) Infof(name, id string, msg string, args ...any) {
 	fmt.Fprintf(os.Stdout, "%s   INFO  [%s %s] %s\n", now.Format(timeFormat), name, id, fmt.Sprintf(msg, args...))
 }
 
-func (l *Console) Warnf(name, id string, msg string, args ...any) {
+func (l *console) Warnf(name, id string, msg string, args ...any) {
 	if !l.Warns {
 		return
 	}
@@ -58,10 +56,28 @@ func (l *Console) Warnf(name, id string, msg string, args ...any) {
 	fmt.Fprintf(os.Stdout, "%s   WARN  [%s %s] %s\n", now.Format(timeFormat), name, id, fmt.Sprintf(msg, args...))
 }
 
-func (l *Console) Debugf(name, id string, msg string, args ...any) {
+func (l *console) Debugf(name, id string, msg string, args ...any) {
 	if !l.Debugs {
 		return
 	}
 	now := time.Now()
 	fmt.Fprintf(os.Stdout, "%s  DEBUG  [%s %s] %s\n", now.Format(timeFormat), name, id, fmt.Sprintf(msg, args...))
+}
+
+// Console is a simple logger that logs to stdout/console.
+// Turn the different log levels on/off as wished, all are off by default.
+//
+// Deprecated: use log.ToConsole() instead.
+type Console = console
+
+// ToConsole returns a simple logger that logs to stdout/console.
+//
+// level is the minimum log level that will be logged.
+func ToConsole(level Level) Logger {
+	return &console{
+		Errors: level >= ERROR,
+		Warns:  level >= WARNING,
+		Infos:  level >= INFO,
+		Debugs: level >= DEBUG,
+	}
 }
