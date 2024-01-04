@@ -38,7 +38,7 @@ type transactionFunc func(context.Context, ManagedTransactionWork, ...func(*Tran
 type transactionFuncApi func(session SessionWithContext) transactionFunc
 
 func TestSession(outer *testing.T) {
-	var logger log.Logger = &log.Void{}
+	var logger = log.ToVoid()
 	var boltLogger log.BoltLogger = nil
 
 	assertCleanSessionState := func(t *testing.T, sess *sessionWithContext) {

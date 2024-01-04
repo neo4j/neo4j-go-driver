@@ -24,6 +24,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/config"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/log"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/notifications"
 	"io"
 	"math"
@@ -910,7 +911,7 @@ func (b *backend) handleRequest(req map[string]any) {
 	case "CheckMultiDBSupport":
 		driver := b.drivers[data["driverId"].(string)]
 		session := driver.NewSession(ctx, neo4j.SessionConfig{
-			BoltLogger: neo4j.ConsoleBoltLogger(),
+			BoltLogger: log.BoltToConsole(),
 		})
 		result, err := session.Run(ctx, "RETURN 42", nil)
 		defer func() {
