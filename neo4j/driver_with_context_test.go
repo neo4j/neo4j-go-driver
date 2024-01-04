@@ -21,7 +21,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/racing"
 	. "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/testutil"
 	"net/url"
 	"sync"
@@ -415,7 +414,7 @@ func TestDriverExecuteQuery(outer *testing.T) {
 				},
 				delegate: &driverWithContext{
 					executeQueryBookmarkManager: defaultBookmarkManager,
-					mut:                         racing.NewMutex(),
+					mut:                         sync.Mutex{},
 				},
 			}
 
@@ -435,7 +434,7 @@ func TestDriverExecuteQuery(outer *testing.T) {
 				}
 			},
 			delegate: &driverWithContext{
-				mut: racing.NewMutex(),
+				mut: sync.Mutex{},
 			},
 		}
 
