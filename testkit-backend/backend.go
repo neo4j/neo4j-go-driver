@@ -600,6 +600,12 @@ func (b *backend) handleRequest(req map[string]any) {
 				if executeQueryConfig["txMeta"] != nil {
 					config.TransactionConfigurers = append(config.TransactionConfigurers, neo4j.WithTxMetadata(b.toTxMetadata(executeQueryConfig)))
 				}
+				// Append Auth configuration if it exists
+				if executeQueryConfig["auth"] != nil {
+					auth := executeQueryConfig["auth"].(map[string]any)
+					token := neo4j.BasicAuth(auth["principal"].(string), auth["credentials"].(string), "")
+					config.Auth = &token
+				}
 			})
 		}
 

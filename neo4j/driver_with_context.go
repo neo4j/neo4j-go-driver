@@ -672,6 +672,13 @@ func ExecuteQueryWithTransactionConfig(configurers ...func(*TransactionConfig)) 
 	}
 }
 
+// ExecuteQueryWithAuthToken configures DriverWithContext.ExecuteQuery to overwrite the AuthToken for the session.
+func ExecuteQueryWithAuthToken(auth AuthToken) ExecuteQueryConfigurationOption {
+	return func(configuration *ExecuteQueryConfiguration) {
+		configuration.Auth = &auth
+	}
+}
+
 // ExecuteQueryConfiguration holds all the possible configuration settings for DriverWithContext.ExecuteQuery
 type ExecuteQueryConfiguration struct {
 	Routing                RoutingControl
@@ -680,6 +687,7 @@ type ExecuteQueryConfiguration struct {
 	BookmarkManager        BookmarkManager
 	BoltLogger             log.BoltLogger
 	TransactionConfigurers []func(*TransactionConfig)
+	Auth                   *AuthToken
 }
 
 // RoutingControl specifies how the query executed by DriverWithContext.ExecuteQuery is to be routed
@@ -698,6 +706,7 @@ func (c *ExecuteQueryConfiguration) toSessionConfig() SessionConfig {
 		DatabaseName:     c.Database,
 		BookmarkManager:  c.BookmarkManager,
 		BoltLogger:       c.BoltLogger,
+		Auth:             c.Auth,
 	}
 }
 
