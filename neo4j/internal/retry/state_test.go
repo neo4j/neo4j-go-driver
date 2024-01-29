@@ -144,7 +144,7 @@ func TestState(outer *testing.T) {
 	for i, testCase := range testCases {
 		outer.Run(i, func(t *testing.T) {
 			state := State{
-				Log:                     &log.Void{},
+				Log:                     log.ToVoid(),
 				LogName:                 "TEST",
 				LogId:                   "State",
 				Sleep:                   func(time.Duration) {},

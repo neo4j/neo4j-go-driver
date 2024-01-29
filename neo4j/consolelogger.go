@@ -23,28 +23,40 @@ import (
 
 // LogLevel is the type that default logging implementations use for available
 // log levels
-type LogLevel int
+//
+// Deprecated: use log.Level instead.
+type LogLevel = log.Level
 
 const (
 	// ERROR is the level that error messages are written
-	ERROR LogLevel = 1
+	//
+	// Deprecated: use log.ERROR instead.
+	ERROR = log.ERROR
 	// WARNING is the level that warning messages are written
-	WARNING = 2
+	//
+	// Deprecated: use log.WARNING instead.
+	WARNING = log.WARNING
 	// INFO is the level that info messages are written
-	INFO = 3
+	//
+	// Deprecated: use log.INFO instead.
+	INFO = log.INFO
 	// DEBUG is the level that debug messages are written
-	DEBUG = 4
+	//
+	// Deprecated: use log.DEBUG instead.
+	DEBUG = log.DEBUG
 )
 
-func ConsoleLogger(level LogLevel) *log.Console {
+// Deprecated: use log.ToConsole() instead.
+func ConsoleLogger(level log.Level) *log.Console {
 	return &log.Console{
-		Errors: level >= ERROR,
-		Warns:  level >= WARNING,
-		Infos:  level >= INFO,
-		Debugs: level >= DEBUG,
+		Errors: level >= log.ERROR,
+		Warns:  level >= log.WARNING,
+		Infos:  level >= log.INFO,
+		Debugs: level >= log.DEBUG,
 	}
 }
 
+// Deprecated: use log.BoltToConsole() instead.
 func ConsoleBoltLogger() *log.ConsoleBoltLogger {
 	return &log.ConsoleBoltLogger{}
 }
