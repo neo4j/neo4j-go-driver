@@ -603,8 +603,11 @@ func (b *backend) handleRequest(req map[string]any) {
 				}
 				// Append Auth configuration if it exists
 				if executeQueryConfig["auth"] != nil {
-					auth := executeQueryConfig["auth"].(map[string]any)
-					token := neo4j.BasicAuth(auth["principal"].(string), auth["credentials"].(string), "")
+					token, err := getAuth(executeQueryConfig["auth"].(map[string]any)["data"].(map[string]any))
+					if err != nil {
+						b.writeError(err)
+						return
+					}
 					config.Auth = &token
 				}
 			})
