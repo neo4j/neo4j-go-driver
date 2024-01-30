@@ -15,6 +15,19 @@
  * limitations under the License.
  */
 
-package metadata
+package log
 
-const DriverVersion = "5.17.0"
+// Level is the type that default logging implementations use for available
+// log levels
+type Level int
+
+const (
+	// ERROR is the level that error messages are written
+	ERROR Level = 1
+	// WARNING is the level that warning messages are written
+	WARNING = 2
+	// INFO is the level that info messages are written
+	INFO = 3
+	// DEBUG is the level that debug messages are written
+	DEBUG = 4
+)
