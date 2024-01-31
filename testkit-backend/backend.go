@@ -561,7 +561,6 @@ func (b *backend) handleRequest(req map[string]any) {
 		if rawConfig := data["config"]; rawConfig != nil {
 			executeQueryConfig := rawConfig.(map[string]any)
 			configurers = append(configurers, func(config *neo4j.ExecuteQueryConfiguration) {
-
 				config.BoltLogger = &streamLog{writeLine: b.writeLineLocked}
 
 				routing := executeQueryConfig["routing"]
