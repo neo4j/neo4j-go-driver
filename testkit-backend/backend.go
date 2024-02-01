@@ -604,8 +604,8 @@ func (b *backend) handleRequest(req map[string]any) {
 					config.TransactionConfigurers = append(config.TransactionConfigurers, neo4j.WithTxMetadata(b.toTxMetadata(executeQueryConfig)))
 				}
 				// Append Auth configuration if it exists
-				if executeQueryConfig["auth"] != nil {
-					token, err := getAuth(executeQueryConfig["auth"].(map[string]any)["data"].(map[string]any))
+				if executeQueryConfig["authorizationToken"] != nil {
+					token, err := getAuth(executeQueryConfig["authorizationToken"].(map[string]any)["data"].(map[string]any))
 					if err != nil {
 						b.writeError(err)
 						return
