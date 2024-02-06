@@ -561,6 +561,8 @@ func (b *backend) handleRequest(req map[string]any) {
 		if rawConfig := data["config"]; rawConfig != nil {
 			executeQueryConfig := rawConfig.(map[string]any)
 			configurers = append(configurers, func(config *neo4j.ExecuteQueryConfiguration) {
+				config.BoltLogger = &streamLog{writeLine: b.writeLineLocked}
+
 				routing := executeQueryConfig["routing"]
 				if routing != nil {
 					switch routing {
@@ -600,6 +602,15 @@ func (b *backend) handleRequest(req map[string]any) {
 				}
 				if executeQueryConfig["txMeta"] != nil {
 					config.TransactionConfigurers = append(config.TransactionConfigurers, neo4j.WithTxMetadata(b.toTxMetadata(executeQueryConfig)))
+				}
+				// Append Auth configuration if it exists
+				if executeQueryConfig["authorizationToken"] != nil {
+					token, err := getAuth(executeQueryConfig["authorizationToken"].(map[string]any)["data"].(map[string]any))
+					if err != nil {
+						b.writeError(err)
+						return
+					}
+					config.Auth = &token
 				}
 			})
 		}
@@ -1123,6 +1134,7 @@ func (b *backend) handleRequest(req map[string]any) {
 				"Feature:API:BookmarkManager",
 				"Feature:API:ConnectionAcquisitionTimeout",
 				"Feature:API:Driver.ExecuteQuery",
+				"Feature:API:Driver.ExecuteQuery:WithAuth",
 				"Feature:API:Driver:GetServerInfo",
 				"Feature:API:Driver.IsEncrypted",
 				"Feature:API:Driver:NotificationsConfig",
