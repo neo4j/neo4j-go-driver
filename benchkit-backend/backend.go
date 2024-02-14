@@ -22,6 +22,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/log"
 	"net/http"
 	"strings"
 )
@@ -187,7 +188,7 @@ func (b *backend) createDriver() error {
 		uri := fmt.Sprintf("%s://%s:%d", b.config.neo4jScheme, b.config.neo4jHost, b.config.neo4jPort)
 		driver, err := neo4j.NewDriverWithContext(uri, neo4j.BasicAuth(b.config.neo4jUser, b.config.neo4jPass, ""), func(config *neo4j.Config) {
 			if b.config.driverDebug {
-				config.Log = neo4j.ConsoleLogger(neo4j.DEBUG)
+				config.Log = log.ToConsole(log.DEBUG)
 			}
 		})
 		if err != nil {

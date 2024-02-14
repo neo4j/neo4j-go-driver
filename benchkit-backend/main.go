@@ -33,7 +33,7 @@ func main() {
 	http.HandleFunc("/workload/", backend.workloadWithIdHandler)
 
 	// Start server
-	log.Println(fmt.Sprintf("Starting server on port %d", backend.config.backendPort))
+	log.Printf("Starting server on port %d", backend.config.backendPort)
 	if err := http.ListenAndServe(fmt.Sprintf(":%d", backend.config.backendPort), nil); err != nil {
 		log.Fatalf("Failed to start server: %v", err)
 	}
