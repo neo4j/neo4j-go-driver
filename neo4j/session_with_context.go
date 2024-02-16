@@ -676,6 +676,8 @@ func (s *sessionWithContext) Close(ctx context.Context) error {
 	}()
 	<-poolCleanUpChan
 	<-routerCleanUpChan
+	s.pool = nil
+	s.router = nil
 	return txErr
 }
 
