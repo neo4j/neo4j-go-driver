@@ -206,6 +206,7 @@ type sessionWithContext struct {
 	fetchSize     int
 	config        SessionConfig
 	auth          *idb.ReAuthToken
+	closed        bool
 }
 
 func newSessionWithContext(
@@ -276,6 +277,13 @@ func (s *sessionWithContext) LastBookmarks() Bookmarks {
 }
 
 func (s *sessionWithContext) BeginTransaction(ctx context.Context, configurers ...func(*TransactionConfig)) (ExplicitTransaction, error) {
+
+	if s.closed {
+		err := &UsageError{Message: "Operation attempted on a closed session"}
+		s.log.Error(log.Session, s.logId, err)
+		return nil, err
+	}
+
 	// Guard for more than one transaction per session
 	if s.explicitTx != nil {
 		err := &UsageError{Message: "Session already has a pending transaction"}
@@ -387,6 +395,12 @@ func (s *sessionWithContext) runRetriable(
 	blockingTxBegin bool,
 	api telemetry.API,
 	configurers ...func(*TransactionConfig)) (any, error) {
+
+	if s.closed {
+		err := &UsageError{Message: "Operation attempted on a closed session"}
+		s.log.Error(log.Session, s.logId, err)
+		return nil, err
+	}
 
 	// Guard for more than one transaction per session
 	if s.explicitTx != nil {
@@ -580,6 +594,12 @@ func (s *sessionWithContext) retrieveSessionBookmarks(conn idb.Connection) {
 func (s *sessionWithContext) Run(ctx context.Context,
 	cypher string, params map[string]any, configurers ...func(*TransactionConfig)) (ResultWithContext, error) {
 
+	if s.closed {
+		err := &UsageError{Message: "Operation attempted on a closed session"}
+		s.log.Error(log.Session, s.logId, err)
+		return nil, err
+	}
+
 	if s.explicitTx != nil {
 		err := &UsageError{Message: "Trying to run auto-commit transaction while in explicit transaction"}
 		s.log.Error(log.Session, s.logId, err)
@@ -676,6 +696,7 @@ func (s *sessionWithContext) Close(ctx context.Context) error {
 	}()
 	<-poolCleanUpChan
 	<-routerCleanUpChan
+	s.closed = true
 	return txErr
 }
 
