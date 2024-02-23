@@ -736,6 +736,46 @@ func TestSession(outer *testing.T) {
 			AssertErrorMessageContains(t, err, "cannot use this transaction")
 			AssertIntEqual(t, poolReturnsCalls, 1) // pool.Return must not be called again
 		})
+
+		ct.Run("Run returns error if session is closed", func(t *testing.T) {
+			_, _, sess := createSession()
+			sess.Close(context.Background())
+			_, err := sess.Run(context.Background(), "cypher", nil)
+			AssertErrorMessageContains(t, err, "Operation attempted on a closed session")
+		})
+
+		ct.Run("BeginTransaction returns error if session is closed", func(t *testing.T) {
+			_, _, sess := createSession()
+			sess.Close(context.Background())
+			_, err := sess.BeginTransaction(context.Background())
+			AssertErrorMessageContains(t, err, "Operation attempted on a closed session")
+		})
+
+		ct.Run("ExecuteRead returns error if session is closed", func(t *testing.T) {
+			_, _, sess := createSession()
+			sess.Close(context.Background())
+			_, err := sess.ExecuteRead(context.Background(), func(tx ManagedTransaction) (any, error) {
+				return nil, nil
+			})
+			AssertErrorMessageContains(t, err, "Operation attempted on a closed session")
+		})
+
+		ct.Run("ExecuteWrite returns error if session is closed", func(t *testing.T) {
+			_, _, sess := createSession()
+			sess.Close(context.Background())
+			_, err := sess.ExecuteWrite(context.Background(), func(tx ManagedTransaction) (any, error) {
+				return nil, nil
+			})
+			AssertErrorMessageContains(t, err, "Operation attempted on a closed session")
+		})
+
+		ct.Run("Session returns nil if closed multiple times", func(t *testing.T) {
+			_, _, sess := createSession()
+			err := sess.Close(context.Background())
+			AssertNoError(t, err)
+			err = sess.Close(context.Background())
+			AssertNoError(t, err)
+		})
 	})
 
 }
