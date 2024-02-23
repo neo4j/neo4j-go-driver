@@ -674,6 +674,11 @@ func (s *sessionWithContext) Run(ctx context.Context,
 }
 
 func (s *sessionWithContext) Close(ctx context.Context) error {
+	if s.closed {
+		// Safeguard against closing more than once
+		return nil
+	}
+
 	var txErr error
 	if s.explicitTx != nil {
 		txErr = s.explicitTx.Close(ctx)

@@ -768,6 +768,14 @@ func TestSession(outer *testing.T) {
 			})
 			AssertErrorMessageContains(t, err, "Operation attempted on a closed session")
 		})
+
+		ct.Run("Session returns nil if closed multiple times", func(t *testing.T) {
+			_, _, sess := createSession()
+			err := sess.Close(context.Background())
+			AssertNoError(t, err)
+			err = sess.Close(context.Background())
+			AssertNoError(t, err)
+		})
 	})
 
 }
