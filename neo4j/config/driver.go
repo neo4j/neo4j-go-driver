@@ -20,6 +20,7 @@ package config
 import (
 	"crypto/tls"
 	"crypto/x509"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/auth"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/log"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/notifications"
 	"time"
@@ -175,6 +176,8 @@ type Config struct {
 	//
 	// default: true
 	TelemetryDisabled bool
+	// TODO: better docs, ClientCertificate used for mutual TLS.
+	ClientCertificate auth.ClientCertificateProvider
 }
 
 // ServerAddressResolver is a function type that defines the resolver function used by the routing driver to

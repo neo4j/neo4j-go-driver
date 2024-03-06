@@ -99,7 +99,12 @@ func (c Connector) Connect(
 		errorListener.OnDialError(ctx, address, err)
 		return nil, err
 	}
-	tlsConn := tls.Client(conn, c.tlsConfig(serverName))
+	tlsConfig, err := c.tlsConfig(serverName)
+	if err != nil {
+		// TODO: give a better error message here.
+		return nil, err
+	}
+	tlsConn := tls.Client(conn, tlsConfig)
 	err = tlsConn.HandshakeContext(ctx)
 	if err != nil {
 		if err == io.EOF {
@@ -110,7 +115,8 @@ func (c Connector) Connect(
 		errorListener.OnDialError(ctx, address, err)
 		return nil, err
 	}
-	connection, err = bolt.Connect(ctx,
+	connection, err = bolt.Connect(
+		ctx,
 		address,
 		tlsConn,
 		auth,
@@ -136,18 +142,39 @@ func (c Connector) createConnection(ctx context.Context, address string) (net.Co
 	return dialer.DialContext(ctx, c.Network, address)
 }
 
-func (c Connector) tlsConfig(serverName string) *tls.Config {
-	var config *tls.Config
-	if c.Config.TlsConfig == nil {
-		//lint:ignore SA1019 RootCAs is supported until 6.0
-		config = &tls.Config{RootCAs: c.Config.RootCAs}
-	} else {
-		config = c.Config.TlsConfig
+func (c Connector) tlsConfig(serverName string) (*tls.Config, error) {
+	// Start with the provided TlsConfig or initialize a new one if not provided.
+	config := c.Config.TlsConfig
+	if config == nil {
+		config = &tls.Config{
+			// Use RootCAs from the connector's config.
+			RootCAs: c.Config.RootCAs,
+			// It's safe to set MinVersion and other settings here since we're initializing a new config.
+			MinVersion: tls.VersionTLS12,
+		}
 	}
-	if config.MinVersion == 0 {
+
+	// Ensure MinVersion is set to at least TLS 1.2.
+	if config.MinVersion < tls.VersionTLS12 {
 		config.MinVersion = tls.VersionTLS12
 	}
-	config.InsecureSkipVerify = c.SkipVerify
+
+	// Update the config with the client certificate, if provided.
+	if c.Config.ClientCertificate != nil {
+		cert, err := c.Config.ClientCertificate.GetCertificate()
+		if err != nil {
+			return nil, err
+		}
+		// Append the obtained certificate to the Certificates slice.
+		config.Certificates = append(config.Certificates, cert)
+		// If a ClientCertificate is supplied, this implies the need for mTLS.
+		config.ClientAuth = tls.RequireAndVerifyClientCert
+
+	}
+
+	// Configure server name and whether to skip certificate verification.
 	config.ServerName = serverName
-	return config
+	config.InsecureSkipVerify = c.SkipVerify
+
+	return config, nil
 }
