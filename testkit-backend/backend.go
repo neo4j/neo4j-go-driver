@@ -526,6 +526,7 @@ func (b *backend) handleRequest(req map[string]any) {
 				provider, err := auth.NewStaticClientCertificateProvider(auth.ClientCertificate{
 					CertFile: clientCertificate["certfile"].(string),
 					KeyFile:  clientCertificate["keyfile"].(string),
+					Password: toStringPointer(clientCertificate["password"]),
 				})
 				if err != nil {
 					b.writeError(err)
@@ -1672,4 +1673,15 @@ func mapNotificationMinSeverityLevel(rawMinSeverityLevel string) (notifications.
 		return notifications.InformationLevel, nil
 	}
 	return "", fmt.Errorf("unknown min severity level %s", rawMinSeverityLevel)
+}
+
+func toStringPointer(v interface{}) *string {
+	if v == nil {
+		return nil
+	}
+	strVal, ok := v.(string)
+	if !ok {
+		return nil
+	}
+	return &strVal
 }

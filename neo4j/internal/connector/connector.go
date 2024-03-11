@@ -161,8 +161,6 @@ func (c Connector) tlsConfig(serverName string) *tls.Config {
 		if cert != nil {
 			// Append the obtained certificate to the Certificates slice.
 			config.Certificates = append(config.Certificates, *cert)
-			// If a ClientCertificate is supplied, this implies the need for mTLS.
-			config.ClientAuth = tls.RequireAndVerifyClientCert
 		}
 	}
 
