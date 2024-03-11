@@ -53,16 +53,6 @@ type StaticClientCertificateProvider struct {
 // NewStaticClientCertificateProvider creates a new StaticClientCertificateProvider given a ClientCertificate.
 // This function loads the certificate-key pair specified in the ClientCertificate and returns
 // a provider that will always return this loaded certificate.
-//
-// Example:
-//
-//	certProvider, err := auth.NewStaticClientCertificateProvider(auth.ClientCertificate{
-//		CertFile: "path/to/cert.pem",
-//		KeyFile: "path/to/key.pem"
-//	})
-//	if err != nil {
-//	    log.Fatalf("Failed to load certificate: %v", err)
-//	}
 func NewStaticClientCertificateProvider(cert ClientCertificate) (*StaticClientCertificateProvider, error) {
 	tlsCert, err := loadCertificate(cert.CertFile, cert.KeyFile, cert.Password)
 	if err != nil {
@@ -86,16 +76,6 @@ type RotatingClientCertificateProvider struct {
 // NewRotatingClientCertificateProvider creates a new RotatingClientCertificateProvider given a ClientCertificate.
 // This function loads the certificate-key pair specified in the ClientCertificate and returns
 // a provider that allows updating the certificate dynamically through UpdateCertificate method.
-//
-// Example:
-//
-//	certProvider, err := auth.NewRotatingClientCertificateProvider(auth.ClientCertificate{
-//		CertFile: "path/to/cert.pem",
-//		KeyFile: "path/to/key.pem"
-//	})
-//	if err != nil {
-//	    log.Fatalf("Failed to load certificate: %v", err)
-//	}
 func NewRotatingClientCertificateProvider(cert ClientCertificate) (*RotatingClientCertificateProvider, error) {
 	tlsCert, err := loadCertificate(cert.CertFile, cert.KeyFile, cert.Password)
 	if err != nil {
