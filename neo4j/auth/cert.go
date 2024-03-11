@@ -19,14 +19,19 @@ package auth
 
 import (
 	"crypto/tls"
+	"crypto/x509"
+	"encoding/pem"
+	"errors"
+	"os"
 	"sync"
 )
 
 // ClientCertificate holds paths to a TLS certificate file and its corresponding private key file.
 // This struct is used to load certificate-key pairs for use in TLS connections.
 type ClientCertificate struct {
-	CertFile string // Path to the TLS certificate file.
-	KeyFile  string // Path to the TLS private key file.
+	CertFile string  // Path to the TLS certificate file.
+	KeyFile  string  // Path to the TLS private key file.
+	Password *string // Optional password for decrypting the private key file. Nil indicates no password is set.
 }
 
 // ClientCertificateProvider defines an interface for retrieving a tls.Certificate.
@@ -59,7 +64,7 @@ type StaticClientCertificateProvider struct {
 //	    log.Fatalf("Failed to load certificate: %v", err)
 //	}
 func NewStaticClientCertificateProvider(cert ClientCertificate) (*StaticClientCertificateProvider, error) {
-	tlsCert, err := tls.LoadX509KeyPair(cert.CertFile, cert.KeyFile)
+	tlsCert, err := loadCertificate(cert.CertFile, cert.KeyFile, cert.Password)
 	if err != nil {
 		return nil, err
 	}
@@ -92,7 +97,7 @@ type RotatingClientCertificateProvider struct {
 //	    log.Fatalf("Failed to load certificate: %v", err)
 //	}
 func NewRotatingClientCertificateProvider(cert ClientCertificate) (*RotatingClientCertificateProvider, error) {
-	tlsCert, err := tls.LoadX509KeyPair(cert.CertFile, cert.KeyFile)
+	tlsCert, err := loadCertificate(cert.CertFile, cert.KeyFile, cert.Password)
 	if err != nil {
 		return nil, err
 	}
@@ -119,7 +124,7 @@ func (p *RotatingClientCertificateProvider) GetCertificate() *tls.Certificate {
 //	    log.Fatalf("Failed to update certificate: %v", err)
 //	}
 func (p *RotatingClientCertificateProvider) UpdateCertificate(cert ClientCertificate) error {
-	tlsCert, err := tls.LoadX509KeyPair(cert.CertFile, cert.KeyFile)
+	tlsCert, err := loadCertificate(cert.CertFile, cert.KeyFile, cert.Password)
 	if err != nil {
 		return err
 	}
@@ -128,4 +133,36 @@ func (p *RotatingClientCertificateProvider) UpdateCertificate(cert ClientCertifi
 	defer p.mu.Unlock()
 	p.certificate = &tlsCert
 	return nil
+}
+
+// loadCertificate attempts to load a certificate and its corresponding private key
+// from the given paths. If a password is provided, it will attempt to decrypt
+// the private key assuming it is encrypted.
+func loadCertificate(certFile string, keyFile string, password *string) (tls.Certificate, error) {
+	// Load certificate PEM block
+	certPEMBlock, err := os.ReadFile(certFile)
+	if err != nil {
+		return tls.Certificate{}, err
+	}
+	// Load private key PEM block
+	keyPEMBlock, err := os.ReadFile(keyFile)
+	if err != nil {
+		return tls.Certificate{}, err
+	}
+	// Decrypt the private key if a password is provided
+	if password != nil {
+		decodedKeyPEMBlock, _ := pem.Decode(keyPEMBlock)
+		if decodedKeyPEMBlock == nil {
+			return tls.Certificate{}, errors.New("failed to parse PEM block containing the key")
+		}
+
+		decryptedDERBlock, decryptErr := x509.DecryptPEMBlock(decodedKeyPEMBlock, []byte(*password))
+		if decryptErr != nil {
+			return tls.Certificate{}, decryptErr
+		}
+		// Re-encode the decrypted block to PEM
+		keyPEMBlock = pem.EncodeToMemory(&pem.Block{Type: decodedKeyPEMBlock.Type, Bytes: decryptedDERBlock})
+	}
+	// Create the tls.Certificate
+	return tls.X509KeyPair(certPEMBlock, keyPEMBlock)
 }
