@@ -155,7 +155,7 @@ func loadCertificate(certFile string, keyFile string, password *string) (tls.Cer
 		if decodedKeyPEMBlock == nil {
 			return tls.Certificate{}, errors.New("failed to parse PEM block containing the key")
 		}
-
+		//lint:ignore SA1019 Using due to lack of stdlib alternatives; aware of RFC 1423's insecurity.
 		decryptedDERBlock, decryptErr := x509.DecryptPEMBlock(decodedKeyPEMBlock, []byte(*password))
 		if decryptErr != nil {
 			return tls.Certificate{}, decryptErr
