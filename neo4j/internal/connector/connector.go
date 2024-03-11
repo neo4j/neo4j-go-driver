@@ -99,11 +99,7 @@ func (c Connector) Connect(
 		errorListener.OnDialError(ctx, address, err)
 		return nil, err
 	}
-	tlsConfig, err := c.tlsConfig(serverName)
-	if err != nil {
-		// TODO: give a better error message here.
-		return nil, err
-	}
+	tlsConfig := c.tlsConfig(serverName)
 	tlsConn := tls.Client(conn, tlsConfig)
 	err = tlsConn.HandshakeContext(ctx)
 	if err != nil {
@@ -142,7 +138,7 @@ func (c Connector) createConnection(ctx context.Context, address string) (net.Co
 	return dialer.DialContext(ctx, c.Network, address)
 }
 
-func (c Connector) tlsConfig(serverName string) (*tls.Config, error) {
+func (c Connector) tlsConfig(serverName string) *tls.Config {
 	// Start with the provided TlsConfig or initialize a new one if not provided.
 	config := c.Config.TlsConfig
 	if config == nil {
@@ -160,21 +156,19 @@ func (c Connector) tlsConfig(serverName string) (*tls.Config, error) {
 	}
 
 	// Update the config with the client certificate, if provided.
-	if c.Config.ClientCertificate != nil {
-		cert, err := c.Config.ClientCertificate.GetCertificate()
-		if err != nil {
-			return nil, err
+	if c.Config.ClientCertificate != nil && !c.SkipEncryption {
+		cert := c.Config.ClientCertificate.GetCertificate()
+		if cert != nil {
+			// Append the obtained certificate to the Certificates slice.
+			config.Certificates = append(config.Certificates, *cert)
+			// If a ClientCertificate is supplied, this implies the need for mTLS.
+			config.ClientAuth = tls.RequireAndVerifyClientCert
 		}
-		// Append the obtained certificate to the Certificates slice.
-		config.Certificates = append(config.Certificates, cert)
-		// If a ClientCertificate is supplied, this implies the need for mTLS.
-		config.ClientAuth = tls.RequireAndVerifyClientCert
-
 	}
 
 	// Configure server name and whether to skip certificate verification.
 	config.ServerName = serverName
 	config.InsecureSkipVerify = c.SkipVerify
 
-	return config, nil
+	return config
 }

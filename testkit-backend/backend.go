@@ -521,6 +521,18 @@ func (b *backend) handleRequest(req map[string]any) {
 			if data["telemetryDisabled"] != nil {
 				c.TelemetryDisabled = data["telemetryDisabled"].(bool)
 			}
+			if data["clientCertificate"] != nil {
+				clientCertificate := data["clientCertificate"].(map[string]any)["data"].(map[string]any)
+				provider, err := auth.NewStaticClientCertificateProvider(auth.ClientCertificate{
+					CertFile: clientCertificate["certfile"].(string),
+					KeyFile:  clientCertificate["keyfile"].(string),
+				})
+				if err != nil {
+					b.writeError(err)
+					return
+				}
+				c.ClientCertificate = provider
+			}
 		})
 		if err != nil {
 			b.writeError(err)
@@ -1149,6 +1161,7 @@ func (b *backend) handleRequest(req map[string]any) {
 				"Feature:API:RetryableExceptions",
 				"Feature:API:Session:AuthConfig",
 				//"Feature:API:Session:NotificationsConfig",
+				"Feature:API:SSLClientCertificate",
 				//"Feature:API:SSLConfig",
 				//"Feature:API:SSLSchemes",
 				"Feature:API:Type.Spatial",
