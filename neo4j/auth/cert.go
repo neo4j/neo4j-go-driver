@@ -28,6 +28,9 @@ import (
 
 // ClientCertificate holds paths to a TLS certificate file and its corresponding private key file.
 // This struct is used to load certificate-key pairs for use in TLS connections.
+//
+// ClientCertificate is part of the mTLS preview feature
+// (see README on what it means in terms of support and compatibility guarantees)
 type ClientCertificate struct {
 	CertFile string  // Path to the TLS certificate file.
 	KeyFile  string  // Path to the TLS private key file.
@@ -36,16 +39,25 @@ type ClientCertificate struct {
 
 // ClientCertificateProvider defines an interface for retrieving a tls.Certificate.
 // Implementations of this interface can provide static or dynamically updatable certificates.
+//
+// ClientCertificateProvider is part of the mTLS preview feature
+// (see README on what it means in terms of support and compatibility guarantees)
 type ClientCertificateProvider interface {
 	// GetCertificate returns a tls.Certificate for use in TLS connections.
 	// Implementations should ensure thread-safety and handle any necessary logic
 	// to provide the most up-to-date certificate.
+	//
+	// GetCertificate is part of the mTLS preview feature
+	// (see README on what it means in terms of support and compatibility guarantees)
 	GetCertificate() *tls.Certificate
 }
 
 // StaticClientCertificateProvider is an implementation of ClientCertificateProvider
 // that provides a static, unchangeable tls.Certificate. It is intended for use cases
 // where the certificate does not need to be updated over the lifetime of the application.
+//
+// StaticClientCertificateProvider is part of the mTLS preview feature
+// (see README on what it means in terms of support and compatibility guarantees)
 type StaticClientCertificateProvider struct {
 	certificate *tls.Certificate
 }
@@ -53,6 +65,9 @@ type StaticClientCertificateProvider struct {
 // NewStaticClientCertificateProvider creates a new StaticClientCertificateProvider given a ClientCertificate.
 // This function loads the certificate-key pair specified in the ClientCertificate and returns
 // a provider that will always return this loaded certificate.
+//
+// NewStaticClientCertificateProvider is part of the mTLS preview feature
+// (see README on what it means in terms of support and compatibility guarantees)
 func NewStaticClientCertificateProvider(cert ClientCertificate) (*StaticClientCertificateProvider, error) {
 	tlsCert, err := loadCertificate(cert.CertFile, cert.KeyFile, cert.Password)
 	if err != nil {
@@ -68,6 +83,9 @@ func (p *StaticClientCertificateProvider) GetCertificate() *tls.Certificate {
 // RotatingClientCertificateProvider is an implementation of ClientCertificateProvider
 // that supports dynamic updates to the tls.Certificate it provides. It is useful for scenarios
 // where certificates need to be rotated or updated without restarting the application.
+//
+// RotatingClientCertificateProvider is part of the mTLS preview feature
+// (see README on what it means in terms of support and compatibility guarantees)
 type RotatingClientCertificateProvider struct {
 	mu          sync.RWMutex
 	certificate *tls.Certificate
@@ -76,6 +94,9 @@ type RotatingClientCertificateProvider struct {
 // NewRotatingClientCertificateProvider creates a new RotatingClientCertificateProvider given a ClientCertificate.
 // This function loads the certificate-key pair specified in the ClientCertificate and returns
 // a provider that allows updating the certificate dynamically through UpdateCertificate method.
+//
+// NewRotatingClientCertificateProvider is part of the mTLS preview feature
+// (see README on what it means in terms of support and compatibility guarantees)
 func NewRotatingClientCertificateProvider(cert ClientCertificate) (*RotatingClientCertificateProvider, error) {
 	tlsCert, err := loadCertificate(cert.CertFile, cert.KeyFile, cert.Password)
 	if err != nil {
@@ -93,6 +114,9 @@ func (p *RotatingClientCertificateProvider) GetCertificate() *tls.Certificate {
 // UpdateCertificate updates the certificate stored in the provider with a new certificate specified
 // by the ClientCertificate. This method allows dynamic updates to the certificate used in TLS connections,
 // facilitating use cases such as certificate rotation.
+//
+// UpdateCertificate is part of the mTLS preview feature
+// (see README on what it means in terms of support and compatibility guarantees)
 func (p *RotatingClientCertificateProvider) UpdateCertificate(cert ClientCertificate) error {
 	tlsCert, err := loadCertificate(cert.CertFile, cert.KeyFile, cert.Password)
 	if err != nil {
