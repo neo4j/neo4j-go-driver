@@ -51,30 +51,30 @@ type Config struct {
 	// This is considered an advanced setting, use it at your own risk.
 	// Introduced in 5.0.
 	TlsConfig *tls.Config
-	// ClientCertificate specifies a provider for the client TLS certificate for mutual TLS authentication.
+	// ClientCertificateProvider specifies a provider for the client TLS certificate for mutual TLS authentication.
 	// Use auth.NewStaticClientCertificateProvider for static certificates, or auth.NewRotatingClientCertificateProvider
 	// for certificates that require runtime updates without application restart.
 	//
 	// Static certificate example:
-	//   config.ClientCertificate = auth.NewStaticClientCertificateProvider(auth.ClientCertificate{
+	//   config.ClientCertificateProvider = auth.NewStaticClientCertificateProvider(auth.ClientCertificateProvider{
 	//       CertFile: "path/to/client.crt",
 	//       KeyFile:  "path/to/client.key",
 	//   })
 	//
 	// Rotatable certificate example:
-	//   provider, _ := auth.NewRotatingClientCertificateProvider(auth.ClientCertificate{
+	//   provider, _ := auth.NewRotatingClientCertificateProvider(auth.ClientCertificateProvider{
 	//       CertFile: "path/to/initial_client.crt",
 	//       KeyFile:  "path/to/initial_client.key",
 	//   })
-	//   config.ClientCertificate = provider
+	//   config.ClientCertificateProvider = provider
 	//   // Dynamically update the certificate later without restarting the application.
-	//   provider.UpdateCertificate(auth.ClientCertificate{
+	//   provider.UpdateCertificate(auth.ClientCertificateProvider{
 	//       CertFile: "path/to/new_client.crt",
 	//       KeyFile:  "path/to/new_client.key",
 	//   })
 	//
 	// Note: This option is not applicable for 'bolt://', 'neo4j://', or 'bolt+unix://' schemes where encryption isn't used.
-	ClientCertificate auth.ClientCertificateProvider
+	ClientCertificateProvider auth.ClientCertificateProvider
 	// Logging target the driver will send its log outputs
 	//
 	// Possible to use custom logger (implement log.Logger interface) or

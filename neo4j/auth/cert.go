@@ -93,16 +93,6 @@ func (p *RotatingClientCertificateProvider) GetCertificate() *tls.Certificate {
 // UpdateCertificate updates the certificate stored in the provider with a new certificate specified
 // by the ClientCertificate. This method allows dynamic updates to the certificate used in TLS connections,
 // facilitating use cases such as certificate rotation.
-//
-// Example usage:
-//
-//	err := certProvider.UpdateCertificate(auth.ClientCertificate{
-//		CertFile: "path/to/new_cert.pem",
-//		KeyFile: "path/to/new_key.pem"
-//	})
-//	if err != nil {
-//	    log.Fatalf("Failed to update certificate: %v", err)
-//	}
 func (p *RotatingClientCertificateProvider) UpdateCertificate(cert ClientCertificate) error {
 	tlsCert, err := loadCertificate(cert.CertFile, cert.KeyFile, cert.Password)
 	if err != nil {

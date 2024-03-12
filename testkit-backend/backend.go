@@ -532,7 +532,7 @@ func (b *backend) handleRequest(req map[string]any) {
 					b.writeError(err)
 					return
 				}
-				c.ClientCertificate = provider
+				c.ClientCertificateProvider = provider
 			}
 		})
 		if err != nil {

@@ -18,7 +18,7 @@ func ExampleNewStaticClientCertificateProvider() {
 		log.Fatalf("Failed to load certificate: %v", err)
 	}
 	_, _ = neo4j.NewDriverWithContext("bolt://localhost:7687", neo4j.BasicAuth("neo4j", "password", ""), func(config *config.Config) {
-		config.ClientCertificate = provider
+		config.ClientCertificateProvider = provider
 	})
 }
 
@@ -33,7 +33,7 @@ func ExampleNewRotatingClientCertificateProvider() {
 		log.Fatalf("Failed to load certificate: %v", err)
 	}
 	_, _ = neo4j.NewDriverWithContext("bolt://localhost:7687", neo4j.BasicAuth("neo4j", "password", ""), func(config *config.Config) {
-		config.ClientCertificate = provider
+		config.ClientCertificateProvider = provider
 	})
 	// Some time later we update the certificate
 	provider.UpdateCertificate(auth.ClientCertificate{

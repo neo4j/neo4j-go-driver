@@ -157,8 +157,8 @@ func (c Connector) tlsConfig(serverName string) *tls.Config {
 	}
 
 	// Update the config with the client certificate, if provided.
-	if c.Config.ClientCertificate != nil && !c.SkipEncryption {
-		cert := c.Config.ClientCertificate.GetCertificate()
+	if c.Config.ClientCertificateProvider != nil && !c.SkipEncryption {
+		cert := c.Config.ClientCertificateProvider.GetCertificate()
 		if cert != nil {
 			// Append the obtained certificate to the Certificates slice.
 			config.Certificates = append(config.Certificates, *cert)
