@@ -27,7 +27,7 @@ import (
 )
 
 // ClientCertificate holds paths to a TLS certificate file and its corresponding private key file.
-// This struct is used to load certificate-key pairs for use in TLS connections.
+// This struct is used to load client certificate-key pairs for use in mutual TLS.
 //
 // ClientCertificate is part of the mTLS preview feature
 // (see README on what it means in terms of support and compatibility guarantees)
