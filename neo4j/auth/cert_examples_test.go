@@ -53,9 +53,13 @@ func ExampleNewRotatingClientCertificateProvider() {
 		config.ClientCertificateProvider = provider
 	})
 	// Some time later we update the certificate
-	provider.UpdateCertificate(auth.ClientCertificate{
+	err = provider.UpdateCertificate(auth.ClientCertificate{
 		CertFile: "path/to/new_cert.pem",
 		KeyFile:  "path/to/new_key.pem",
 		Password: &password,
 	})
+	if err != nil {
+		// Handle the error
+		log.Fatalf("Failed to update certificate: %v", err)
+	}
 }
