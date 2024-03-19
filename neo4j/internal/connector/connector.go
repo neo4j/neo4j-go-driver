@@ -151,8 +151,8 @@ func (c Connector) tlsConfig(serverName string) *tls.Config {
 		}
 	}
 
-	// Ensure MinVersion is set to at least TLS 1.2.
-	if config.MinVersion < tls.VersionTLS12 {
+	// Ensure MinVersion is set to at least TLS 1.2 if no version is specified.
+	if config.MinVersion == 0 {
 		config.MinVersion = tls.VersionTLS12
 	}
 
