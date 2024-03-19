@@ -68,7 +68,7 @@ type Config struct {
 	//   })
 	//   config.ClientCertificateProvider = provider
 	//   // Dynamically update the certificate later without restarting the application.
-	//   provider.UpdateCertificate(auth.ClientCertificateProvider{
+	//   _ = provider.UpdateCertificate(auth.ClientCertificateProvider{
 	//       CertFile: "path/to/new_client.crt",
 	//       KeyFile:  "path/to/new_client.key",
 	//   })
