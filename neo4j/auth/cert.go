@@ -47,6 +47,8 @@ type ClientCertificateProvider interface {
 	// Implementations should ensure thread-safety and handle any necessary logic
 	// to provide the most up-to-date certificate.
 	//
+	// If a nil value is returned, it indicates that no client certificate is available for use in the TLS connection.
+	// This might be the case if the certificate is not yet available, or if no certificate is configured for use.
 	// GetCertificate is part of the mTLS preview feature
 	// (see README on what it means in terms of support and compatibility guarantees)
 	GetCertificate() *tls.Certificate
