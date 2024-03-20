@@ -95,7 +95,7 @@ type RotatingClientCertificateProvider struct {
 
 // NewRotatingClientCertificateProvider creates a new RotatingClientCertificateProvider given a ClientCertificate.
 // This function loads the certificate-key pair specified in the ClientCertificate and returns
-// a provider that allows updating the certificate dynamically through UpdateCertificate method.
+// a provider that allows updating the certificate dynamically through its UpdateCertificate method.
 //
 // NewRotatingClientCertificateProvider is part of the mTLS preview feature
 // (see README on what it means in terms of support and compatibility guarantees)
