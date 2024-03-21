@@ -139,9 +139,11 @@ func (c Connector) createConnection(ctx context.Context, address string) (net.Co
 }
 
 func (c Connector) tlsConfig(serverName string) *tls.Config {
-	// Start with the provided TlsConfig or initialize a new one if not provided.
-	config := c.Config.TlsConfig
-	if config == nil {
+	var config *tls.Config
+	if c.Config.TlsConfig != nil {
+		// Use Clone to safely copy the config without copying the mutex.
+		config = c.Config.TlsConfig.Clone()
+	} else {
 		config = &tls.Config{
 			// Use RootCAs from the connector's config.
 			//lint:ignore SA1019 RootCAs is supported until 6.0
