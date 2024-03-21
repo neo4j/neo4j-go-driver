@@ -15,7 +15,8 @@
  * limitations under the License.
  */
 
-// Package connector is responsible for connecting to a database server.
+// File to export internals for testing only
+
 package connector
 
 import "crypto/tls"
