@@ -19,6 +19,7 @@ package connector_test
 
 import (
 	"context"
+	"crypto/tls"
 	"io"
 	"net"
 	"testing"
@@ -83,6 +84,34 @@ func TestConnect(outer *testing.T) {
 		AssertError(t, err)
 		AssertTrue(t, connectionDelegate.Closed)
 	})
+}
+
+type Provider struct {
+	cert *tls.Certificate
+}
+
+func (p *Provider) GetCertificate() *tls.Certificate {
+	return p.cert
+}
+
+func TestTlsConfig(t *testing.T) {
+	cert := &tls.Certificate{}
+
+	provider := Provider{cert: cert}
+
+	connector := &connector.Connector{
+		SkipVerify: true,
+		Config: &config.Config{
+			TlsConfig:                 &tls.Config{},
+			ClientCertificateProvider: &provider,
+		},
+	}
+
+	for i := 0; i < 10; i++ {
+		tlsConfig := connector.TlsConfig("foo")
+		AssertNotNil(t, tlsConfig)
+		AssertTrue(t, len(tlsConfig.Certificates) == 1)
+	}
 }
 
 func setUp(t *testing.T) (net.Conn, *boltHandshakeServer) {
