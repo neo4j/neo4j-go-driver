@@ -99,7 +99,8 @@ func (c Connector) Connect(
 		errorListener.OnDialError(ctx, address, err)
 		return nil, err
 	}
-	tlsConn := tls.Client(conn, c.tlsConfig(serverName))
+	tlsConfig := c.tlsConfig(serverName)
+	tlsConn := tls.Client(conn, tlsConfig)
 	err = tlsConn.HandshakeContext(ctx)
 	if err != nil {
 		if err == io.EOF {
@@ -110,7 +111,8 @@ func (c Connector) Connect(
 		errorListener.OnDialError(ctx, address, err)
 		return nil, err
 	}
-	connection, err = bolt.Connect(ctx,
+	connection, err = bolt.Connect(
+		ctx,
 		address,
 		tlsConn,
 		auth,
@@ -138,16 +140,36 @@ func (c Connector) createConnection(ctx context.Context, address string) (net.Co
 
 func (c Connector) tlsConfig(serverName string) *tls.Config {
 	var config *tls.Config
-	if c.Config.TlsConfig == nil {
-		//lint:ignore SA1019 RootCAs is supported until 6.0
-		config = &tls.Config{RootCAs: c.Config.RootCAs}
+	if c.Config.TlsConfig != nil {
+		// Use Clone to safely copy the config without copying the mutex.
+		config = c.Config.TlsConfig.Clone()
 	} else {
-		config = c.Config.TlsConfig
+		config = &tls.Config{
+			// Use RootCAs from the connector's config.
+			//lint:ignore SA1019 RootCAs is supported until 6.0
+			RootCAs: c.Config.RootCAs,
+			// It's safe to set MinVersion and other settings here since we're initializing a new config.
+			MinVersion: tls.VersionTLS12,
+		}
 	}
+
+	// Ensure MinVersion is set to at least TLS 1.2 if no version is specified.
 	if config.MinVersion == 0 {
 		config.MinVersion = tls.VersionTLS12
 	}
-	config.InsecureSkipVerify = c.SkipVerify
+
+	// Update the config with the client certificate, if provided.
+	if c.Config.ClientCertificateProvider != nil && !c.SkipEncryption {
+		cert := c.Config.ClientCertificateProvider.GetCertificate()
+		if cert != nil {
+			// Append the obtained certificate to the Certificates slice.
+			config.Certificates = append(config.Certificates, *cert)
+		}
+	}
+
+	// Configure server name and whether to skip certificate verification.
 	config.ServerName = serverName
+	config.InsecureSkipVerify = c.SkipVerify
+
 	return config
 }

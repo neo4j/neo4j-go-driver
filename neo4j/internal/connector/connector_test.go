@@ -19,6 +19,8 @@ package connector_test
 
 import (
 	"context"
+	"crypto/tls"
+	"fmt"
 	"io"
 	"net"
 	"testing"
@@ -83,6 +85,48 @@ func TestConnect(outer *testing.T) {
 		AssertError(t, err)
 		AssertTrue(t, connectionDelegate.Closed)
 	})
+}
+
+type Provider struct {
+	cert *tls.Certificate
+}
+
+func (p *Provider) GetCertificate() *tls.Certificate {
+	return p.cert
+}
+
+func TestTlsConfig(t *testing.T) {
+	cert1 := &tls.Certificate{
+		Certificate: [][]byte{{1}},
+	}
+	cert2 := &tls.Certificate{
+		Certificate: [][]byte{{2}},
+	}
+
+	provider := Provider{cert: cert2}
+
+	connector := &connector.Connector{
+		SkipVerify: true,
+		Config: &config.Config{
+			TlsConfig: &tls.Config{
+				Certificates: []tls.Certificate{*cert1},
+			},
+			ClientCertificateProvider: &provider,
+		},
+	}
+
+	configs := make([]*tls.Config, 10)
+	for i := 0; i < len(configs); i++ {
+		tlsConfig := connector.TlsConfig(fmt.Sprintf("foo%d", i))
+		configs[i] = tlsConfig
+	}
+	for i, tlsConfig := range configs {
+		AssertNotNil(t, tlsConfig)
+		AssertTrue(t, tlsConfig.ServerName == fmt.Sprintf("foo%d", i))
+		AssertTrue(t, len(tlsConfig.Certificates) == 2)
+		AssertDeepEquals(t, tlsConfig.Certificates[0], *cert1)
+		AssertDeepEquals(t, tlsConfig.Certificates[1], *cert2)
+	}
 }
 
 func setUp(t *testing.T) (net.Conn, *boltHandshakeServer) {
