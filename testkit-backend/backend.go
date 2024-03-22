@@ -102,11 +102,11 @@ type TestKitClientCertificateProvider struct {
 	backend *backend
 }
 
-func NewTestKitClientCertificateProvider(id string, backend *backend) (*TestKitClientCertificateProvider, error) {
+func NewTestKitClientCertificateProvider(id string, backend *backend) *TestKitClientCertificateProvider {
 	return &TestKitClientCertificateProvider{
 		id:      id,
 		backend: backend,
-	}, nil
+	}
 }
 
 func (p TestKitClientCertificateProvider) GetCertificate() *tls.Certificate {
@@ -604,7 +604,7 @@ func (b *backend) handleRequest(req map[string]any) {
 		b.writeResponse("Driver", map[string]any{"id": idKey})
 
 	case "NewClientCertificateProvider":
-		provider, _ := NewTestKitClientCertificateProvider(b.nextId(), b)
+		provider := NewTestKitClientCertificateProvider(b.nextId(), b)
 		b.clientCertificateProviders[provider.id] = TestKitClientCertificateProvider{id: provider.id, backend: b}
 		b.writeResponse("ClientCertificateProvider", map[string]any{"id": provider.id})
 
