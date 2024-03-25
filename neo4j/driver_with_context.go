@@ -53,7 +53,7 @@ type DriverWithContext interface {
 	// This is useful when ExecuteQuery is called without custom bookmark managers and the lower-level
 	// neo4j.SessionWithContext APIs are called as well.
 	// In that case, the recommended approach is as follows:
-	// 	results, err := driver.ExecuteQuery(ctx, query, params)
+	// 	results, err := neo4j.ExecuteQuery(ctx, driver, query, params, transformerFunc)
 	// 	// [...] do something with results and error
 	//	bookmarkManager := driver.ExecuteQueryBookmarkManager()
 	// 	// maintain consistency with sessions as well
