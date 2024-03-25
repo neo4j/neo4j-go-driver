@@ -167,7 +167,7 @@ type Config struct {
 	// Each time one of the specified APIs is utilized to execute a query for the first time, the driver
 	// informs the server of this action without providing additional details such as arguments or client identifiers:
 	//
-	//   DriverWithContext.ExecuteQuery
+	//   neo4j.ExecuteQuery
 	//   SessionWithContext.Run
 	//   SessionWithContext.BeginTransaction
 	//   SessionWithContext.ExecuteRead
