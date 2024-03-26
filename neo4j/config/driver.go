@@ -20,6 +20,7 @@ package config
 import (
 	"crypto/tls"
 	"crypto/x509"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/auth"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/log"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/notifications"
 	"time"
@@ -50,7 +51,33 @@ type Config struct {
 	// This is considered an advanced setting, use it at your own risk.
 	// Introduced in 5.0.
 	TlsConfig *tls.Config
-
+	// ClientCertificateProvider specifies a provider for the client TLS certificate for mutual TLS authentication.
+	// Use auth.NewStaticClientCertificateProvider for static certificates, or auth.NewRotatingClientCertificateProvider
+	// for certificates that require runtime updates without application restart.
+	//
+	// Static certificate example:
+	//   config.ClientCertificateProvider = auth.NewStaticClientCertificateProvider(auth.ClientCertificateProvider{
+	//       CertFile: "path/to/client.crt",
+	//       KeyFile:  "path/to/client.key",
+	//   })
+	//
+	// Rotatable certificate example:
+	//   provider, _ := auth.NewRotatingClientCertificateProvider(auth.ClientCertificateProvider{
+	//       CertFile: "path/to/initial_client.crt",
+	//       KeyFile:  "path/to/initial_client.key",
+	//   })
+	//   config.ClientCertificateProvider = provider
+	//   // Dynamically update the certificate later without restarting the application.
+	//   _ = provider.UpdateCertificate(auth.ClientCertificateProvider{
+	//       CertFile: "path/to/new_client.crt",
+	//       KeyFile:  "path/to/new_client.key",
+	//   })
+	//
+	// Note: This option is not applicable for 'bolt://' or 'neo4j://' schemes where encryption isn't used.
+	//
+	// ClientCertificateProvider is part of the mTLS preview feature
+	// (see README on what it means in terms of support and compatibility guarantees)
+	ClientCertificateProvider auth.ClientCertificateProvider
 	// Logging target the driver will send its log outputs
 	//
 	// Possible to use custom logger (implement log.Logger interface) or

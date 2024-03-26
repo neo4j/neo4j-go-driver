@@ -672,7 +672,15 @@ func ExecuteQueryWithTransactionConfig(configurers ...func(*TransactionConfig)) 
 	}
 }
 
-// ExecuteQueryConfiguration holds all the possible configuration settings for neo4j.ExecuteQuery
+
+// ExecuteQueryWithAuthToken configures neo4j.ExecuteQuery to overwrite the AuthToken for the session.
+func ExecuteQueryWithAuthToken(auth AuthToken) ExecuteQueryConfigurationOption {
+	return func(configuration *ExecuteQueryConfiguration) {
+		configuration.Auth = &auth
+	}
+}
+
+// ExecuteQueryConfiguration holds all the possible configuration settings for neo4j.ExecuteQuer
 type ExecuteQueryConfiguration struct {
 	Routing                RoutingControl
 	ImpersonatedUser       string
@@ -680,6 +688,7 @@ type ExecuteQueryConfiguration struct {
 	BookmarkManager        BookmarkManager
 	BoltLogger             log.BoltLogger
 	TransactionConfigurers []func(*TransactionConfig)
+	Auth                   *AuthToken
 }
 
 // RoutingControl specifies how the query executed by neo4j.ExecuteQuery is to be routed
@@ -698,6 +707,7 @@ func (c *ExecuteQueryConfiguration) toSessionConfig() SessionConfig {
 		DatabaseName:     c.Database,
 		BookmarkManager:  c.BookmarkManager,
 		BoltLogger:       c.BoltLogger,
+		Auth:             c.Auth,
 	}
 }
 

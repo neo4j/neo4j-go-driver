@@ -15,6 +15,12 @@
  * limitations under the License.
  */
 
-package metadata
+// File to export internals for testing only
 
-const DriverVersion = "5.18.0"
+package connector
+
+import "crypto/tls"
+
+func (c Connector) TlsConfig(serverName string) *tls.Config {
+	return c.tlsConfig(serverName)
+}

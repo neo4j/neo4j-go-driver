@@ -15,6 +15,26 @@
  * limitations under the License.
  */
 
-package metadata
+package main
 
-const DriverVersion = "5.18.0"
+import (
+	"fmt"
+	"log"
+	"net/http"
+)
+
+func main() {
+	// Create backend and initialize configuration
+	backend := &backend{config: makeConfig()}
+
+	// Define endpoints
+	http.HandleFunc("/ready", backend.readyHandler)
+	http.HandleFunc("/workload", backend.workloadHandler)
+	http.HandleFunc("/workload/", backend.workloadWithIdHandler)
+
+	// Start server
+	log.Printf("Starting server on port %d", backend.config.backendPort)
+	if err := http.ListenAndServe(fmt.Sprintf(":%d", backend.config.backendPort), nil); err != nil {
+		log.Fatalf("Failed to start server: %v", err)
+	}
+}
