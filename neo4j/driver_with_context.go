@@ -53,7 +53,7 @@ type DriverWithContext interface {
 	// This is useful when ExecuteQuery is called without custom bookmark managers and the lower-level
 	// neo4j.SessionWithContext APIs are called as well.
 	// In that case, the recommended approach is as follows:
-	// 	results, err := driver.ExecuteQuery(ctx, query, params)
+	// 	results, err := neo4j.ExecuteQuery(ctx, driver, query, params, transformerFunc)
 	// 	// [...] do something with results and error
 	//	bookmarkManager := driver.ExecuteQueryBookmarkManager()
 	// 	// maintain consistency with sessions as well
@@ -613,73 +613,74 @@ func (e *eagerResultTransformer) Complete(keys []string, summary ResultSummary) 
 	}, nil
 }
 
-// ExecuteQueryConfigurationOption is a callback that configures the execution of DriverWithContext.ExecuteQuery
+// ExecuteQueryConfigurationOption is a callback that configures the execution of neo4j.ExecuteQuery
 type ExecuteQueryConfigurationOption func(*ExecuteQueryConfiguration)
 
-// ExecuteQueryWithReadersRouting configures DriverWithContext.ExecuteQuery to route to reader members of the cluster
+// ExecuteQueryWithReadersRouting configures neo4j.ExecuteQuery to route to reader members of the cluster
 func ExecuteQueryWithReadersRouting() ExecuteQueryConfigurationOption {
 	return func(configuration *ExecuteQueryConfiguration) {
 		configuration.Routing = Read
 	}
 }
 
-// ExecuteQueryWithWritersRouting configures DriverWithContext.ExecuteQuery to route to writer members of the cluster
+// ExecuteQueryWithWritersRouting configures neo4j.ExecuteQuery to route to writer members of the cluster
 func ExecuteQueryWithWritersRouting() ExecuteQueryConfigurationOption {
 	return func(configuration *ExecuteQueryConfiguration) {
 		configuration.Routing = Write
 	}
 }
 
-// ExecuteQueryWithImpersonatedUser configures DriverWithContext.ExecuteQuery to impersonate the specified user
+// ExecuteQueryWithImpersonatedUser configures neo4j.ExecuteQuery to impersonate the specified user
 func ExecuteQueryWithImpersonatedUser(user string) ExecuteQueryConfigurationOption {
 	return func(configuration *ExecuteQueryConfiguration) {
 		configuration.ImpersonatedUser = user
 	}
 }
 
-// ExecuteQueryWithDatabase configures DriverWithContext.ExecuteQuery to target the specified database
+// ExecuteQueryWithDatabase configures neo4j.ExecuteQuery to target the specified database
 func ExecuteQueryWithDatabase(db string) ExecuteQueryConfigurationOption {
 	return func(configuration *ExecuteQueryConfiguration) {
 		configuration.Database = db
 	}
 }
 
-// ExecuteQueryWithBookmarkManager configures DriverWithContext.ExecuteQuery to rely on the specified BookmarkManager
+// ExecuteQueryWithBookmarkManager configures neo4j.ExecuteQuery to rely on the specified BookmarkManager
 func ExecuteQueryWithBookmarkManager(bookmarkManager BookmarkManager) ExecuteQueryConfigurationOption {
 	return func(configuration *ExecuteQueryConfiguration) {
 		configuration.BookmarkManager = bookmarkManager
 	}
 }
 
-// ExecuteQueryWithoutBookmarkManager configures DriverWithContext.ExecuteQuery to not rely on any BookmarkManager
+// ExecuteQueryWithoutBookmarkManager configures neo4j.ExecuteQuery to not rely on any BookmarkManager
 func ExecuteQueryWithoutBookmarkManager() ExecuteQueryConfigurationOption {
 	return func(configuration *ExecuteQueryConfiguration) {
 		configuration.BookmarkManager = nil
 	}
 }
 
-// ExecuteQueryWithBoltLogger configures DriverWithContext.ExecuteQuery to log Bolt messages with the provided BoltLogger
+// ExecuteQueryWithBoltLogger configures neo4j.ExecuteQuery to log Bolt messages with the provided BoltLogger
 func ExecuteQueryWithBoltLogger(boltLogger log.BoltLogger) ExecuteQueryConfigurationOption {
 	return func(configuration *ExecuteQueryConfiguration) {
 		configuration.BoltLogger = boltLogger
 	}
 }
 
-// ExecuteQueryWithTransactionConfig configures DriverWithContext.ExecuteQuery with additional transaction configuration.
+// ExecuteQueryWithTransactionConfig configures neo4j.ExecuteQuery with additional transaction configuration.
 func ExecuteQueryWithTransactionConfig(configurers ...func(*TransactionConfig)) ExecuteQueryConfigurationOption {
 	return func(configuration *ExecuteQueryConfiguration) {
 		configuration.TransactionConfigurers = configurers
 	}
 }
 
-// ExecuteQueryWithAuthToken configures DriverWithContext.ExecuteQuery to overwrite the AuthToken for the session.
+
+// ExecuteQueryWithAuthToken configures neo4j.ExecuteQuery to overwrite the AuthToken for the session.
 func ExecuteQueryWithAuthToken(auth AuthToken) ExecuteQueryConfigurationOption {
 	return func(configuration *ExecuteQueryConfiguration) {
 		configuration.Auth = &auth
 	}
 }
 
-// ExecuteQueryConfiguration holds all the possible configuration settings for DriverWithContext.ExecuteQuery
+// ExecuteQueryConfiguration holds all the possible configuration settings for neo4j.ExecuteQuer
 type ExecuteQueryConfiguration struct {
 	Routing                RoutingControl
 	ImpersonatedUser       string
@@ -690,7 +691,7 @@ type ExecuteQueryConfiguration struct {
 	Auth                   *AuthToken
 }
 
-// RoutingControl specifies how the query executed by DriverWithContext.ExecuteQuery is to be routed
+// RoutingControl specifies how the query executed by neo4j.ExecuteQuery is to be routed
 type RoutingControl int
 
 const (
@@ -723,7 +724,7 @@ func (c *ExecuteQueryConfiguration) selectTxFunctionApi(session SessionWithConte
 		"but got: %d", Write, Read, c.Routing)
 }
 
-// EagerResult holds the result and result metadata of the query executed via DriverWithContext.ExecuteQuery
+// EagerResult holds the result and result metadata of the query executed via neo4j.ExecuteQuery
 type EagerResult struct {
 	Keys    []string
 	Records []*Record
