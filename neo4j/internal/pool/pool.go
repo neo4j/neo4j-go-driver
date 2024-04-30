@@ -47,6 +47,7 @@ type poolRouter interface {
 	InvalidateWriter(db string, server string)
 	InvalidateReader(db string, server string)
 	InvalidateServer(server string)
+	Address() string
 }
 
 type qitem struct {
@@ -178,6 +179,10 @@ func (p *Pool) anyHasCapacity(serverNames []string) bool {
 		}
 	}
 	return false
+}
+
+func (p *Pool) BorrowOptimistically(ctx context.Context, logger log.BoltLogger, auth *idb.ReAuthToken) (idb.Connection, error) {
+	return p.tryBorrow(ctx, p.router.Address(), logger, time.Hour, auth)
 }
 
 func (p *Pool) Borrow(

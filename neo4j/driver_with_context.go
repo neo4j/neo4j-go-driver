@@ -312,6 +312,7 @@ type sessionRouter interface {
 	InvalidateWriter(db string, server string)
 	InvalidateReader(db string, server string)
 	InvalidateServer(server string)
+	Address() string
 }
 
 type driverWithContext struct {
@@ -671,7 +672,6 @@ func ExecuteQueryWithTransactionConfig(configurers ...func(*TransactionConfig)) 
 		configuration.TransactionConfigurers = configurers
 	}
 }
-
 
 // ExecuteQueryWithAuthToken configures neo4j.ExecuteQuery to overwrite the AuthToken for the session.
 func ExecuteQueryWithAuthToken(auth AuthToken) ExecuteQueryConfigurationOption {

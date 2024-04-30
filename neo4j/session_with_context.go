@@ -186,6 +186,7 @@ const FetchDefault = 0
 // Connection pool as seen by the session.
 type sessionPool interface {
 	Borrow(ctx context.Context, getServerNames func() []string, wait bool, boltLogger log.BoltLogger, livenessCheckTimeout time.Duration, auth *idb.ReAuthToken) (idb.Connection, error)
+	BorrowOptimistically(ctx context.Context, boltLogger log.BoltLogger, auth *idb.ReAuthToken) (idb.Connection, error)
 	Return(ctx context.Context, c idb.Connection)
 	CleanUp(ctx context.Context)
 }
@@ -544,22 +545,8 @@ func (s *sessionWithContext) getConnection(ctx context.Context, mode idb.AccessM
 	} else if deadline, ok := ctx.Deadline(); ok {
 		s.log.Debugf(log.Session, s.logId, "connection acquisition user-provided deadline is: %s", deadline)
 	}
-
-	if err := s.resolveHomeDatabase(ctx); err != nil {
-		return nil, errorutil.WrapError(err)
-	}
-	_, err := s.getOrUpdateServers(ctx, mode)
-	if err != nil {
-		return nil, errorutil.WrapError(err)
-	}
-
-	conn, err := s.pool.Borrow(
-		ctx,
-		s.getServers(mode),
-		timeout != 0,
-		s.config.BoltLogger,
-		livenessCheckTimeout,
-		s.auth)
+	// Optimistically borrow a connection
+	conn, err := s.pool.BorrowOptimistically(ctx, s.config.BoltLogger, s.auth)
 	if err != nil {
 		return nil, errorutil.WrapError(err)
 	}

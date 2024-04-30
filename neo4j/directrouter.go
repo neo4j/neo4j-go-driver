@@ -28,6 +28,10 @@ type directRouter struct {
 	address string
 }
 
+func (r *directRouter) Address() string {
+	return r.address
+}
+
 func (r *directRouter) InvalidateWriter(string, string) {}
 
 func (r *directRouter) InvalidateReader(string, string) {}
