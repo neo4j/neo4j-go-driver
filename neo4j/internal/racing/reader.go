@@ -38,30 +38,30 @@ type racingReader struct {
 	in     chan *ioResult
 }
 
-func (selfPtr *racingReader) Close() {
-	close(selfPtr.in)
+func (rr *racingReader) Close() {
+	close(rr.in)
 }
 
-func (selfPtr *racingReader) Read(ctx context.Context, bytes []byte) (int, error) {
-	return selfPtr.race(ctx, bytes, read)
+func (rr *racingReader) Read(ctx context.Context, bytes []byte) (int, error) {
+	return rr.race(ctx, bytes, read)
 }
 
-func (selfPtr *racingReader) ReadFull(ctx context.Context, bytes []byte) (int, error) {
-	return selfPtr.race(ctx, bytes, readFull)
+func (rr *racingReader) ReadFull(ctx context.Context, bytes []byte) (int, error) {
+	return rr.race(ctx, bytes, readFull)
 }
 
-func (selfPtr *racingReader) race(ctx context.Context, bytes []byte, readFn func(io.Reader, []byte) (int, error)) (int, error) {
+func (rr *racingReader) race(ctx context.Context, bytes []byte, readFn func(io.Reader, []byte) (int, error)) (int, error) {
 	deadline, hasDeadline := ctx.Deadline()
 	err := ctx.Err()
 	switch {
 	case !hasDeadline && err == nil:
-		return readFn(selfPtr.reader, bytes)
+		return readFn(rr.reader, bytes)
 	case deadline.Before(time.Now()) || err != nil:
 		return 0, err
 	}
 	go func() {
-		n, err := readFn(selfPtr.reader, bytes)
-		selfPtr.in <- &ioResult{
+		n, err := readFn(rr.reader, bytes)
+		rr.in <- &ioResult{
 			n:   n,
 			err: err,
 		}
@@ -69,7 +69,7 @@ func (selfPtr *racingReader) race(ctx context.Context, bytes []byte, readFn func
 	select {
 	case <-ctx.Done():
 		return 0, ctx.Err()
-	case result := <-selfPtr.in:
+	case result := <-rr.in:
 		return result.n, result.err
 	}
 }
