@@ -19,7 +19,7 @@ package bolt
 
 import (
 	"context"
-	"net"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/racing"
 	"time"
 )
 
@@ -29,11 +29,11 @@ type incoming struct {
 	connReadTimeout time.Duration
 }
 
-func (i *incoming) next(ctx context.Context, rd net.Conn) (any, error) {
+func (i *incoming) next(ctx context.Context, reader *racing.RacingReader) (any, error) {
 	// Get next message from transport layer
 	var err error
 	var msg []byte
-	i.buf, msg, err = dechunkMessage(ctx, rd, i.buf, i.connReadTimeout)
+	i.buf, msg, err = dechunkMessage(ctx, reader, i.buf, i.connReadTimeout)
 	if err != nil {
 		return nil, err
 	}

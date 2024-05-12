@@ -23,6 +23,7 @@ import (
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/auth"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/db"
 	iauth "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/auth"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/racing"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/telemetry"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/log"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/notifications"
@@ -166,6 +167,8 @@ type Connection interface {
 	GetCurrentAuth() (auth.TokenManager, iauth.Token)
 	// Telemetry sends telemetry information about the API usage to the server.
 	Telemetry(api telemetry.API, onSuccess func())
+
+	Reader() *racing.RacingReader
 }
 
 type RoutingTable struct {

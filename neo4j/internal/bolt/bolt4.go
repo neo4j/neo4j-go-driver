@@ -21,6 +21,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/racing"
 	"net"
 	"reflect"
 	"time"
@@ -112,6 +113,11 @@ type bolt4 struct {
 	authManager   auth.TokenManager
 	resetAuth     bool
 	errorListener ConnectionErrorListener
+	reader        racing.RacingReader
+}
+
+func (b *bolt4) Reader() *racing.RacingReader {
+	return &b.reader
 }
 
 func NewBolt4(
@@ -132,6 +138,7 @@ func NewBolt4(
 		streams:       openstreams{},
 		lastQid:       -1,
 		errorListener: errorListener,
+		reader:        racing.NewRacingReader(conn),
 	}
 	b.queue = newMessageQueue(
 		conn,
@@ -152,6 +159,7 @@ func NewBolt4(
 		},
 		b.onNextMessage,
 		b.onIoError,
+		b.Reader(),
 	)
 
 	return b

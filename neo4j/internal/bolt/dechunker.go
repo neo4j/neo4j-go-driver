@@ -21,8 +21,7 @@ import (
 	"context"
 	"encoding/binary"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/errorutil"
-	rio "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/racing"
-	"net"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/racing"
 	"time"
 )
 
@@ -32,16 +31,16 @@ import (
 // Reads will race against the provided context ctx
 // If the server provides the connection read timeout hint readTimeout, a new context will be created from that timeout
 // and the user-provided context ctx before every read
-func dechunkMessage(ctx context.Context, conn net.Conn, msgBuf []byte, readTimeout time.Duration) ([]byte, []byte, error) {
+func dechunkMessage(ctx context.Context, reader *racing.RacingReader, msgBuf []byte, readTimeout time.Duration) ([]byte, []byte, error) {
 
 	sizeBuf := []byte{0x00, 0x00}
 	off := 0
 
-	reader := rio.NewRacingReader(conn)
+	r := *reader
 
 	for {
 		updatedCtx, cancelFunc := newContext(ctx, readTimeout)
-		_, err := reader.ReadFull(updatedCtx, sizeBuf)
+		_, err := r.ReadFull(updatedCtx, sizeBuf)
 		if err != nil {
 			return msgBuf, nil, processReadError(err, ctx, readTimeout)
 		}
@@ -65,7 +64,7 @@ func dechunkMessage(ctx context.Context, conn net.Conn, msgBuf []byte, readTimeo
 		}
 		// Read the chunk into buffer
 		updatedCtx, cancelFunc = newContext(ctx, readTimeout)
-		_, err = reader.ReadFull(updatedCtx, msgBuf[off:(off+chunkSize)])
+		_, err = r.ReadFull(updatedCtx, msgBuf[off:(off+chunkSize)])
 		if err != nil {
 			return msgBuf, nil, processReadError(err, ctx, readTimeout)
 		}

@@ -18,6 +18,7 @@
 package bolt
 
 import (
+	"bufio"
 	"context"
 	"errors"
 	"fmt"
@@ -25,6 +26,7 @@ import (
 	iauth "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/auth"
 	idb "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/errorutil"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/racing"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/telemetry"
 	itime "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/time"
 	"net"
@@ -96,6 +98,7 @@ type bolt3 struct {
 	authManager   auth.TokenManager
 	resetAuth     bool
 	errorListener ConnectionErrorListener
+	reader        racing.RacingReader
 }
 
 func NewBolt3(
@@ -122,6 +125,7 @@ func NewBolt3(
 		idleDate:      now,
 		log:           logger,
 		errorListener: errorListener,
+		reader:        racing.NewRacingReader(bufio.NewReaderSize(conn, 65536)),
 	}
 	b.out = &outgoing{
 		chunker: newChunker(),
@@ -157,7 +161,7 @@ func (b *bolt3) ServerVersion() string {
 
 // Sets b.err and b.state on failure
 func (b *bolt3) receiveMsg(ctx context.Context) any {
-	msg, err := b.in.next(ctx, b.conn)
+	msg, err := b.in.next(ctx, b.Reader())
 	if err != nil {
 		b.err = err
 		b.log.Error(log.Bolt3, b.logId, b.err)
@@ -199,6 +203,10 @@ func (b *bolt3) receiveSuccess(ctx context.Context) *success {
 		b.log.Error(log.Bolt3, b.logId, b.err)
 		return nil
 	}
+}
+
+func (b *bolt3) Reader() *racing.RacingReader {
+	return &b.reader
 }
 
 func (b *bolt3) Connect(
@@ -816,6 +824,7 @@ func (b *bolt3) GetRoutingTable(ctx context.Context,
 // Beware: could be called on another thread when driver is closed.
 func (b *bolt3) Close(ctx context.Context) {
 	b.log.Infof(log.Bolt3, b.logId, "Close")
+	b.reader.Close()
 	if b.state != bolt3_dead {
 		b.out.appendGoodbye()
 		b.out.send(ctx, b.conn)
