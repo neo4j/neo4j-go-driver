@@ -202,6 +202,10 @@ type Config struct {
 	//
 	// default: true
 	TelemetryDisabled bool
+	// ReadBufferSize defines the size of the buffer used for reading data from the network connection.
+	// A larger buffer size can improve performance by reducing the number of read operations required
+	// for large data transfers. The default value is racing.DefaultReadBufferSize bytes.
+	ReadBufferSize int
 }
 
 // ServerAddressResolver is a function type that defines the resolver function used by the routing driver to

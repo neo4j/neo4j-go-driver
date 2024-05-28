@@ -107,6 +107,7 @@ func NewBolt3(
 	errorListener ConnectionErrorListener,
 	logger log.Logger,
 	boltLog log.BoltLogger,
+	readBufferSize int,
 ) *bolt3 {
 	now := itime.Now()
 	b := &bolt3{
@@ -125,7 +126,7 @@ func NewBolt3(
 		idleDate:      now,
 		log:           logger,
 		errorListener: errorListener,
-		reader:        racing.NewRacingReader(bufio.NewReaderSize(conn, 65536)),
+		reader:        racing.NewRacingReader(bufio.NewReaderSize(conn, readBufferSize)),
 	}
 	b.out = &outgoing{
 		chunker: newChunker(),

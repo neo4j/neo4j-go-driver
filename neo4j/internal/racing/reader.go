@@ -23,6 +23,9 @@ import (
 	"time"
 )
 
+// DefaultReadBufferSize specifies the default size (in bytes) of the buffer used for reading data from the network connection.
+const DefaultReadBufferSize = 65536
+
 type RacingReader interface {
 	Read(ctx context.Context, bytes []byte) (int, error)
 	ReadFull(ctx context.Context, bytes []byte) (int, error)

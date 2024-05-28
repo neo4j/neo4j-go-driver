@@ -22,6 +22,7 @@ import (
 	"fmt"
 	iauth "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/auth"
 	idb "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/racing"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/notifications"
 	"io"
 	"sync"
@@ -115,6 +116,7 @@ func TestBolt3(outer *testing.T) {
 			logger,
 			nil,
 			idb.NotificationConfig{},
+			racing.DefaultReadBufferSize,
 		)
 		if err != nil {
 			t.Fatal(err)
@@ -167,6 +169,7 @@ func TestBolt3(outer *testing.T) {
 			logger,
 			nil,
 			idb.NotificationConfig{},
+			racing.DefaultReadBufferSize,
 		)
 		AssertNil(t, bolt)
 		AssertError(t, err)

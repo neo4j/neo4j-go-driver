@@ -48,7 +48,7 @@ func newBolt3Server(conn net.Conn) *bolt3server {
 			chunker: newChunker(),
 			packer:  packstream.Packer{},
 		},
-		reader: racing.NewRacingReader(bufio.NewReaderSize(conn, 65536)),
+		reader: racing.NewRacingReader(bufio.NewReaderSize(conn, racing.DefaultReadBufferSize)),
 	}
 }
 

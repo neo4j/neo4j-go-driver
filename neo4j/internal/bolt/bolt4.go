@@ -18,6 +18,7 @@
 package bolt
 
 import (
+	"bufio"
 	"context"
 	"errors"
 	"fmt"
@@ -126,6 +127,7 @@ func NewBolt4(
 	errorListener ConnectionErrorListener,
 	logger log.Logger,
 	boltLog log.BoltLogger,
+	readBufferSize int,
 ) *bolt4 {
 	now := itime.Now()
 	b := &bolt4{
@@ -138,7 +140,7 @@ func NewBolt4(
 		streams:       openstreams{},
 		lastQid:       -1,
 		errorListener: errorListener,
-		reader:        racing.NewRacingReader(conn),
+		reader:        racing.NewRacingReader(bufio.NewReaderSize(conn, readBufferSize)),
 	}
 	b.queue = newMessageQueue(
 		conn,

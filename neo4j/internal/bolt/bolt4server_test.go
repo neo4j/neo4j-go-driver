@@ -49,7 +49,7 @@ func newBolt4Server(conn net.Conn) *bolt4server {
 			chunker: newChunker(),
 			packer:  packstream.Packer{},
 		},
-		reader: racing.NewRacingReader(bufio.NewReaderSize(conn, 65536)),
+		reader: racing.NewRacingReader(bufio.NewReaderSize(conn, racing.DefaultReadBufferSize)),
 	}
 }
 

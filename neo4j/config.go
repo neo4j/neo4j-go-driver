@@ -20,6 +20,7 @@ package neo4j
 import (
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/config"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/pool"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/racing"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/notifications"
 	"math"
 	"net/url"
@@ -51,6 +52,7 @@ func defaultConfig() *Config {
 		NotificationsMinSeverity:        notifications.DefaultLevel,
 		NotificationsDisabledCategories: notifications.NotificationDisabledCategories{},
 		TelemetryDisabled:               false,
+		ReadBufferSize:                  racing.DefaultReadBufferSize,
 	}
 }
 

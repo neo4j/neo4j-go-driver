@@ -19,6 +19,7 @@ package bolt
 
 import (
 	"context"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/racing"
 	"testing"
 
 	iauth "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/auth"
@@ -64,6 +65,7 @@ func TestConnect(ot *testing.T) {
 			logger,
 			nil,
 			idb.NotificationConfig{},
+			racing.DefaultReadBufferSize,
 		)
 		AssertError(t, err)
 	})
@@ -90,6 +92,7 @@ func TestConnect(ot *testing.T) {
 			logger,
 			nil,
 			idb.NotificationConfig{},
+			racing.DefaultReadBufferSize,
 		)
 		AssertError(t, err)
 		if boltconn != nil {

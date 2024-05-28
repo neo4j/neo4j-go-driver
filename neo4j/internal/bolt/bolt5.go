@@ -130,6 +130,7 @@ func NewBolt5(
 	errorListener ConnectionErrorListener,
 	logger log.Logger,
 	boltLog log.BoltLogger,
+	readBufferSize int,
 ) *bolt5 {
 	now := itime.Now()
 	b := &bolt5{
@@ -142,7 +143,7 @@ func NewBolt5(
 		streams:       openstreams{},
 		lastQid:       -1,
 		errorListener: errorListener,
-		reader:        racing.NewRacingReader(bufio.NewReaderSize(conn, 65536)),
+		reader:        racing.NewRacingReader(bufio.NewReaderSize(conn, readBufferSize)),
 	}
 	b.queue = newMessageQueue(
 		conn,

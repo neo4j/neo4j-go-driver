@@ -55,6 +55,7 @@ func Connect(ctx context.Context,
 	logger log.Logger,
 	boltLogger log.BoltLogger,
 	notificationConfig db.NotificationConfig,
+	readBufferSize int,
 ) (db.Connection, error) {
 	// Perform Bolt handshake to negotiate version
 	// Send handshake to server
@@ -92,11 +93,11 @@ func Connect(ctx context.Context,
 	var boltConn db.Connection
 	switch major {
 	case 3:
-		boltConn = NewBolt3(serverName, conn, errorListener, logger, boltLogger)
+		boltConn = NewBolt3(serverName, conn, errorListener, logger, boltLogger, readBufferSize)
 	case 4:
-		boltConn = NewBolt4(serverName, conn, errorListener, logger, boltLogger)
+		boltConn = NewBolt4(serverName, conn, errorListener, logger, boltLogger, readBufferSize)
 	case 5:
-		boltConn = NewBolt5(serverName, conn, errorListener, logger, boltLogger)
+		boltConn = NewBolt5(serverName, conn, errorListener, logger, boltLogger, readBufferSize)
 	case 0:
 		return nil, fmt.Errorf("server did not accept any of the requested Bolt versions (%#v)", versions)
 	default:
