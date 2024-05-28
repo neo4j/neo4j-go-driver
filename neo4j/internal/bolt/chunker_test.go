@@ -20,6 +20,7 @@ package bolt
 import (
 	"bytes"
 	"context"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/racing"
 	"net"
 	"testing"
 
@@ -80,7 +81,8 @@ func TestChunker(ot *testing.T) {
 
 	receiveAndAssertMessage := func(t *testing.T, conn net.Conn, expected []byte) {
 		t.Helper()
-		_, msg, err := dechunkMessage(context.Background(), conn, []byte{}, -1)
+		reader := racing.NewRacingReader(conn)
+		_, msg, err := dechunkMessage(context.Background(), &reader, []byte{}, -1)
 		AssertNoError(t, err)
 		assertSlices(t, msg, expected)
 	}

@@ -18,8 +18,10 @@
 package bolt
 
 import (
+	"bufio"
 	"context"
 	"fmt"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/racing"
 	"io"
 	"net"
 	"testing"
@@ -35,6 +37,7 @@ type bolt3server struct {
 	conn     net.Conn
 	unpacker *packstream.Unpacker
 	out      *outgoing
+	reader   racing.RacingReader
 }
 
 func newBolt3Server(conn net.Conn) *bolt3server {
@@ -45,6 +48,7 @@ func newBolt3Server(conn net.Conn) *bolt3server {
 			chunker: newChunker(),
 			packer:  packstream.Packer{},
 		},
+		reader: racing.NewRacingReader(bufio.NewReaderSize(conn, 65536)),
 	}
 }
 
@@ -90,7 +94,7 @@ func (s *bolt3server) waitForHello() {
 }
 
 func (s *bolt3server) receiveMsg() *testStruct {
-	_, buf, err := dechunkMessage(context.Background(), s.conn, []byte{}, -1)
+	_, buf, err := dechunkMessage(context.Background(), &s.reader, []byte{}, -1)
 	if err != nil {
 		panic(err)
 	}

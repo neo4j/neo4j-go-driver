@@ -21,6 +21,7 @@ import (
 	"context"
 	"fmt"
 	idb "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/racing"
 	. "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/testutil"
 	"net"
 	"reflect"
@@ -115,7 +116,8 @@ func TestOutgoing(ot *testing.T) {
 		}()
 
 		// Dechunk it
-		_, byts, err := dechunkMessage(context.Background(), serv, []byte{}, -1)
+		reader := racing.NewRacingReader(serv)
+		_, byts, err := dechunkMessage(context.Background(), &reader, []byte{}, -1)
 		if err != nil {
 			t.Fatal(err)
 		}
