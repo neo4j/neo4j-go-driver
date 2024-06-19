@@ -360,7 +360,7 @@ driver.
 
 ### Prerequisites
 
-The Go driver on this branch requires at least Go 1.18 and relies on [Go
+The Go driver on this branch requires at least Go 1.19 and relies on [Go
 modules](https://go.dev/ref/mod) for dependency resolution.
 
 ### Unit Testing
