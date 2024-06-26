@@ -1921,7 +1921,8 @@ func TestBolt5(outer *testing.T) {
 		outer.Run(test.description, func(t *testing.T) {
 			tx := internalTx5{timeout: test.input}
 
-			actual, ok := tx.toMeta(logger, "")["tx_timeout"]
+			minor := 0
+			actual, ok := tx.toMeta(logger, "", minor)["tx_timeout"]
 			if test.omitted {
 				if ok {
 					t.Errorf("tx_timeout was present but should be omitted")

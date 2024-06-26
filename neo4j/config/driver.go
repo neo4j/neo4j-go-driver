@@ -182,10 +182,18 @@ type Config struct {
 	// By default, the server's settings are used.
 	// Disabling severities allows the server to skip analysis for those, which can speed up query execution.
 	NotificationsMinSeverity notifications.NotificationMinimumSeverityLevel
+	// Deprecated: please use NotificationsDisabledClassifications. This will be removed in 6.0.
+	//
 	// NotificationsDisabledCategories defines the categories of notifications the server should not send.
 	// By default, the server's settings are used.
 	// Disabling categories allows the server to skip analysis for those, which can speed up query execution.
 	NotificationsDisabledCategories notifications.NotificationDisabledCategories
+	// NotificationsDisabledClassifications is identical to NotificationsDisabledCategories.
+	// This alternative is provided for a consistent naming with neo4j.GqlStatusObject Classification.
+	//
+	// NotificationsDisabledClassifications is part of the GQL compliant notifications preview feature
+	// (see README on what it means in terms of support and compatibility guarantees)
+	NotificationsDisabledClassifications notifications.NotificationDisabledClassifications
 	// By default, if the server requests it, the driver will automatically transmit anonymous usage
 	// statistics to the server it is connected to.
 	//

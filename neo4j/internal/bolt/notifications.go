@@ -28,7 +28,8 @@ func checkNotificationFiltering(
 	bolt idb.Connection,
 ) error {
 	if notificationConfig.MinSev == notifications.DefaultLevel &&
-		!notificationConfig.DisCats.DisablesNone() && len(notificationConfig.DisCats.DisabledCategories()) == 0 {
+		!notificationConfig.DisCats.DisablesNone() && len(notificationConfig.DisCats.DisabledCategories()) == 0 &&
+		!notificationConfig.DisClas.DisablesNone() && len(notificationConfig.DisClas.DisabledClassifications()) == 0 {
 		return nil
 	}
 	version := bolt.Version()

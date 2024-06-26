@@ -384,7 +384,7 @@ func (b *backend) toClientCertificate(data map[string]any) auth.ClientCertificat
 	}
 }
 
-func (b *backend) toStringPointer(v interface{}) *string {
+func (b *backend) toStringPointer(v any) *string {
 	if v == nil {
 		return nil
 	}
@@ -1244,6 +1244,7 @@ func (b *backend) handleRequest(req map[string]any) {
 				"Feature:API:SSLClientCertificate",
 				//"Feature:API:SSLConfig",
 				//"Feature:API:SSLSchemes",
+				"Feature:API:Summary:GqlStatusObjects",
 				"Feature:API:Type.Spatial",
 				"Feature:API:Type.Temporal",
 				"Feature:Auth:Bearer",
@@ -1260,6 +1261,7 @@ func (b *backend) handleRequest(req map[string]any) {
 				"Feature:Bolt:5.2",
 				"Feature:Bolt:5.3",
 				"Feature:Bolt:5.4",
+				"Feature:Bolt:5.5",
 				"Feature:Bolt:Patch:UTC",
 				"Feature:Impersonation",
 				//"Feature:TLS:1.1",
@@ -1471,6 +1473,45 @@ func serializeNotifications(slice []neo4j.Notification) []map[string]any {
 	return res
 }
 
+func serializeGqlStatusObjects(slice []neo4j.GqlStatusObject) []map[string]any {
+	if slice == nil {
+		return []map[string]any{}
+	}
+	if len(slice) == 0 {
+		return []map[string]any{}
+	}
+	var res []map[string]any
+	for i, status := range slice {
+		res = append(res, map[string]any{
+			"isNotification":    status.IsNotification(),
+			"gqlStatus":         status.GqlStatus(),
+			"statusDescription": status.StatusDescription(),
+			"rawClassification": emptyStringToNil(status.RawClassification()),
+			"classification":    string(status.Classification()),
+			"rawSeverity":       emptyStringToNil(status.RawSeverity()),
+			"severity":          string(status.Severity()),
+			"diagnosticRecord":  serializeParameters(status.DiagnosticRecord()),
+		})
+		if status.Position() != nil {
+			res[i]["position"] = map[string]any{
+				"offset": status.Position().Offset(),
+				"line":   status.Position().Line(),
+				"column": status.Position().Column(),
+			}
+		} else {
+			res[i]["position"] = nil
+		}
+	}
+	return res
+}
+
+func emptyStringToNil(s string) any {
+	if s == "" {
+		return nil
+	}
+	return s
+}
+
 func serializeSummary(summary neo4j.ResultSummary) map[string]any {
 	serverInfo := summary.Server()
 	counters := summary.Counters()
@@ -1501,9 +1542,10 @@ func serializeSummary(summary neo4j.ResultSummary) map[string]any {
 			"text":       summary.Query().Text(),
 			"parameters": serializeParameters(summary.Query().Parameters()),
 		},
-		"notifications": serializeNotifications(summary.Notifications()),
-		"plan":          serializePlan(summary.Plan()),
-		"profile":       serializeProfile(summary.Profile()),
+		"notifications":    serializeNotifications(summary.Notifications()),
+		"gqlStatusObjects": serializeGqlStatusObjects(summary.GqlStatusObjects()),
+		"plan":             serializePlan(summary.Plan()),
+		"profile":          serializeProfile(summary.Profile()),
 	}
 	if summary.ResultAvailableAfter() >= 0 {
 		response["resultAvailableAfter"] = summary.ResultAvailableAfter().Milliseconds()

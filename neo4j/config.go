@@ -37,20 +37,21 @@ type ServerAddress = config.ServerAddress
 
 func defaultConfig() *Config {
 	return &Config{
-		AddressResolver:                 nil,
-		MaxTransactionRetryTime:         30 * time.Second,
-		MaxConnectionPoolSize:           100,
-		MaxConnectionLifetime:           1 * time.Hour,
-		ConnectionAcquisitionTimeout:    1 * time.Minute,
-		ConnectionLivenessCheckTimeout:  pool.DefaultConnectionLivenessCheckTimeout,
-		SocketConnectTimeout:            5 * time.Second,
-		SocketKeepalive:                 true,
-		RootCAs:                         nil,
-		UserAgent:                       UserAgent,
-		FetchSize:                       FetchDefault,
-		NotificationsMinSeverity:        notifications.DefaultLevel,
-		NotificationsDisabledCategories: notifications.NotificationDisabledCategories{},
-		TelemetryDisabled:               false,
+		AddressResolver:                      nil,
+		MaxTransactionRetryTime:              30 * time.Second,
+		MaxConnectionPoolSize:                100,
+		MaxConnectionLifetime:                1 * time.Hour,
+		ConnectionAcquisitionTimeout:         1 * time.Minute,
+		ConnectionLivenessCheckTimeout:       pool.DefaultConnectionLivenessCheckTimeout,
+		SocketConnectTimeout:                 5 * time.Second,
+		SocketKeepalive:                      true,
+		RootCAs:                              nil,
+		UserAgent:                            UserAgent,
+		FetchSize:                            FetchDefault,
+		NotificationsMinSeverity:             notifications.DefaultLevel,
+		NotificationsDisabledCategories:      notifications.NotificationDisabledCategories{},
+		NotificationsDisabledClassifications: notifications.NotificationDisabledClassifications{},
+		TelemetryDisabled:                    false,
 	}
 }
 
@@ -87,6 +88,12 @@ func validateAndNormaliseConfig(config *Config) error {
 	// Socket Connect Timeout
 	if config.SocketConnectTimeout < 0 {
 		config.SocketConnectTimeout = 0
+	}
+
+	// Check notifications have not been configured with both categories and classifications.
+	if len(config.NotificationsDisabledCategories.DisabledCategories()) > 0 &&
+		len(config.NotificationsDisabledClassifications.DisabledClassifications()) > 0 {
+		return &UsageError{Message: "Notifications cannot be disabled for both categories and classifications at the same time."}
 	}
 
 	return nil

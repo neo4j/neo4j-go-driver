@@ -20,6 +20,9 @@ package neo4j
 import (
 	"fmt"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/db"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/notifications"
+	"math"
+	"sort"
 	"time"
 )
 
@@ -67,9 +70,25 @@ type ResultSummary interface {
 	Plan() Plan
 	// Profile returns profiled statement plan for the executed statement if available, otherwise null.
 	Profile() ProfiledPlan
+	// Deprecated: Notifications will be removed in 6.0.
+	//
 	// Notifications returns a slice of notifications produced while executing the statement.
 	// The list will be empty if no notifications produced while executing the statement.
 	Notifications() []Notification
+	// GqlStatusObjects returns a slice of GqlStatusObjects that arose when executing the query.
+	//
+	// The slice always contains at least 1 status representing the Success, No Data, or Omitted Result.
+	// All other statuses are notifications such as warnings about problematic queries or other valuable
+	// information that can be presented to a client.
+	//
+	// The GqlStatusObjects will be presented in the following order:
+	//   - A "no data" (``02xxx``) has precedence over a warning.
+	//   - A "warning" (``01xxx``) has precedence over a success.
+	//   - A "success" (``00xxx``) has precedence over anything informational (``03xxx``).
+	//
+	// GqlStatusObjects is part of the GQL compliant notifications preview feature
+	// (see README on what it means in terms of support and compatibility guarantees)
+	GqlStatusObjects() []GqlStatusObject
 	// ResultAvailableAfter returns the time it took for the server to make the result available for consumption.
 	// Since 5.0, this returns a negative duration if the server has not sent the corresponding statistic.
 	ResultAvailableAfter() time.Duration
@@ -237,6 +256,65 @@ type Notification interface {
 	Category() NotificationCategory
 }
 
+// GqlStatusObject represents a GqlStatusObject generated when executing a statement.
+// A GqlStatusObject can be visualized in a client pinpointing problems or other information about the statement.
+// Contrary to failures or errors, GqlStatusObjects do not affect the execution of the statement.
+//
+// GqlStatusObject is part of the GQL compliant notifications preview feature
+// (see README on what it means in terms of support and compatibility guarantees)
+type GqlStatusObject interface {
+	// GqlStatus returns the GQLSTATUS.
+	// The following GQLSTATUS codes denote codes that the driver will use for
+	// polyfilling (when connected to an old, non-GQL-aware server). Further, they may be used by servers
+	// during the transition-phase to GQLSTATUS-awareness.
+	//   - "01N42" (warning - unknown warning)
+	//   - "02N42" (no data - unknown subcondition)
+	//   - "03N42" (informational - unknown notification)
+	//   - "05N42" (general processing exception - unknown error)
+	//
+	// This means these codes are not guaranteed to be stable and may change in future versions.
+	GqlStatus() string
+	// StatusDescription returns a description of the status.
+	StatusDescription() string
+	// Position returns the position in the statement where this status points to.
+	// Not all statuses have a unique position to point to and in that case the position would be set to nil.
+	//
+	// Only Notifications (see IsNotification) have a meaningful position.
+	Position() InputPosition
+	// Classification returns the mapped Classification of this status.
+	// If the Classification is not a known value, Classification returns notifications.UnknownClassification.
+	// Call RawClassification to get access to the raw string value
+	//
+	// Only Notifications (see IsNotification) have a meaningful classification.
+	Classification() notifications.NotificationClassification
+	// RawClassification returns the unmapped Classification of this status.
+	// This is useful when the driver cannot interpret the Classification returned by the server.
+	//
+	// Only Notifications (see IsNotification) have a meaningful classification.
+	RawClassification() string
+	// Severity returns the mapped Severity of this status.
+	// If the Severity is not a known value, Severity returns UnknownSeverity. // TODO should this be notifications.UnknownSeverity?
+	// Call RawSeverity to get access to the raw string value
+	//
+	// Only Notifications (see IsNotification) have a meaningful severity.
+	Severity() NotificationSeverity // TODO should this be or notifications.NotificationSeverity in the notification package?
+	// RawSeverity returns the unmapped Severity level of this status.
+	// This is useful when the driver cannot interpret the Severity returned by the server
+	//
+	// Only Notifications (see IsNotification) have a meaningful severity.
+	RawSeverity() string
+	// DiagnosticRecord returns further information about the status for diagnostic purposes.
+	// Call RawDiagnosticRecord to get access to the raw string value.
+	DiagnosticRecord() map[string]any
+	// RawDiagnosticRecord returns a string version of DiagnosticRecord.
+	// The purpose of this function is to provide a serialized object for human inspection.
+	RawDiagnosticRecord() string
+	// IsNotification returns true if this status is a Notification.
+	//
+	// Only some statuses are Notifications.
+	IsNotification() bool
+}
+
 // InputPosition contains information about a specific position in a statement
 type InputPosition interface {
 	// Offset returns the character offset referred to by this position; offset numbers start at 0.
@@ -255,8 +333,10 @@ const (
 	UnknownSeverity NotificationSeverity = "UNKNOWN"
 )
 
-type NotificationCategory string
+// Deprecated: please use notifications.NotificationCategory directly. This will be removed in 6.0.
+type NotificationCategory notifications.NotificationCategory // TODO is this ok to do from string?
 
+// TODO do these need deprecated individually to their notification.x equivalent?
 const (
 	Hint            NotificationCategory = "HINT"
 	Unrecognized    NotificationCategory = "UNRECOGNIZED"
@@ -504,14 +584,68 @@ func (p *profile) Time() int64 {
 }
 
 func (s *resultSummary) Notifications() []Notification {
-	if s.sum.Notifications == nil {
-		return nil
+	if s.sum.Notifications != nil {
+		n := make([]Notification, len(s.sum.Notifications))
+		for i := range s.sum.Notifications {
+			n[i] = &notification{notification: &s.sum.Notifications[i]}
+		}
+		return n
 	}
-	notifications := make([]Notification, len(s.sum.Notifications))
-	for i := range s.sum.Notifications {
-		notifications[i] = &notification{notification: &s.sum.Notifications[i]}
+
+	if s.sum.GqlStatusObjects != nil {
+		// Polyfill Notifications from GqlStatusObjects
+		n := make([]Notification, len(s.sum.GqlStatusObjects))
+		for i := range s.sum.GqlStatusObjects {
+			gqlStatusObject := s.sum.GqlStatusObjects[i]
+			if gqlStatusObject.IsNotification {
+				n[i] = &notification{notification: notifications.ToNotification(gqlStatusObject)}
+			}
+		}
+		return n
 	}
-	return notifications
+	return nil
+}
+
+func (s *resultSummary) GqlStatusObjects() []GqlStatusObject {
+	if s.sum.GqlStatusObjects != nil {
+		g := make([]GqlStatusObject, len(s.sum.GqlStatusObjects))
+		for i := range s.sum.GqlStatusObjects {
+			g[i] = &gqlStatusObject{gqlStatusObject: &s.sum.GqlStatusObjects[i]}
+		}
+		return g
+	}
+	if s.sum.Notifications != nil {
+		// Polyfill GqlStatusObjects from Notifications
+		g := make([]GqlStatusObject, len(s.sum.Notifications))
+		for i := range s.sum.Notifications {
+			notification := s.sum.Notifications[i]
+			g[i] = &gqlStatusObject{gqlStatusObject: notifications.ToGqlStatusObject(notification)}
+		}
+		// Client generated polyfill status representing SUCCESS, NO DATA or OMITTED RESULT
+		g = append(g, &gqlStatusObject{gqlStatusObject: notifications.ToGqlStatusObjectFromSummary(s.sum)})
+		// Sort by GqlStatus weight
+		sort.Slice(g, func(i, j int) bool {
+			return calculateGqlStatusWeight(g[i]) < calculateGqlStatusWeight(g[j])
+		})
+		return g
+	}
+	return nil
+}
+
+func calculateGqlStatusWeight(gqlStatusObject GqlStatusObject) int {
+	status := gqlStatusObject.GqlStatus()[:2]
+	switch status {
+	case "02":
+		return 0 // no data
+	case "01":
+		return 1 // warning
+	case "00":
+		return 2 // success
+	case "03":
+		return 3 // informational
+	default:
+		return math.MaxInt // unknown or error statuses
+	}
 }
 
 type notification struct {
@@ -586,9 +720,96 @@ func (n *notification) Position() InputPosition {
 func (n *notification) Offset() int {
 	return n.notification.Position.Offset
 }
+
 func (n *notification) Column() int {
 	return n.notification.Position.Column
 }
+
 func (n *notification) Line() int {
 	return n.notification.Position.Line
+}
+
+type gqlStatusObject struct {
+	gqlStatusObject *db.GqlStatusObject
+}
+
+func (g *gqlStatusObject) GqlStatus() string {
+	return g.gqlStatusObject.GqlStatus
+}
+
+func (g *gqlStatusObject) StatusDescription() string {
+	return g.gqlStatusObject.StatusDescription
+}
+
+func (g *gqlStatusObject) Position() InputPosition {
+	if g.gqlStatusObject.Position == nil {
+		return nil
+	}
+	return g
+}
+
+func (g *gqlStatusObject) Offset() int {
+	return g.gqlStatusObject.Position.Offset
+}
+
+func (g *gqlStatusObject) Column() int {
+	return g.gqlStatusObject.Position.Column
+}
+
+func (g *gqlStatusObject) Line() int {
+	return g.gqlStatusObject.Position.Line
+}
+
+func (g *gqlStatusObject) Classification() notifications.NotificationClassification {
+	switch g.gqlStatusObject.Classification {
+	case "HINT":
+		return notifications.HintClassification
+	case "UNRECOGNIZED":
+		return notifications.UnrecognizedClassification
+	case "UNSUPPORTED":
+		return notifications.UnsupportedClassification
+	case "PERFORMANCE":
+		return notifications.PerformanceClassification
+	case "DEPRECATION":
+		return notifications.DeprecationClassification
+	case "SECURITY":
+		return notifications.SecurityClassification
+	case "TOPOLOGY":
+		return notifications.TopologyClassification
+	case "GENERIC":
+		return notifications.GenericClassification
+	default:
+		return notifications.UnknownClassification
+	}
+}
+
+func (g *gqlStatusObject) RawClassification() string {
+	return g.gqlStatusObject.Classification
+}
+
+func (g *gqlStatusObject) Severity() NotificationSeverity {
+	switch g.gqlStatusObject.Severity {
+	case "WARNING":
+		return Warning
+	case "INFORMATION":
+		return Information
+	default:
+		return UnknownSeverity
+	}
+}
+
+func (g *gqlStatusObject) RawSeverity() string {
+	return g.gqlStatusObject.Severity
+}
+
+func (g *gqlStatusObject) DiagnosticRecord() map[string]any {
+	return g.gqlStatusObject.DiagnosticRecord
+}
+
+func (g *gqlStatusObject) RawDiagnosticRecord() string {
+	return fmt.Sprintf("%v", g.gqlStatusObject.DiagnosticRecord)
+}
+
+func (g *gqlStatusObject) IsNotification() bool {
+	return g.gqlStatusObject.IsNotification
 }

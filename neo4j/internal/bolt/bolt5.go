@@ -60,7 +60,7 @@ type internalTx5 struct {
 	notificationConfig idb.NotificationConfig
 }
 
-func (i *internalTx5) toMeta(logger log.Logger, logId string) map[string]any {
+func (i *internalTx5) toMeta(logger log.Logger, logId string, minor int) map[string]any {
 	if i == nil {
 		return nil
 	}
@@ -88,7 +88,7 @@ func (i *internalTx5) toMeta(logger log.Logger, logId string) map[string]any {
 	if i.impersonatedUser != "" {
 		meta["imp_user"] = i.impersonatedUser
 	}
-	i.notificationConfig.ToMeta(meta)
+	i.notificationConfig.ToMeta(meta, minor)
 	return meta
 }
 
@@ -270,7 +270,7 @@ func (b *bolt5) Connect(
 	if err := checkNotificationFiltering(notificationConfig, b); err != nil {
 		return err
 	}
-	notificationConfig.ToMeta(hello)
+	notificationConfig.ToMeta(hello, b.minor)
 	b.queue.appendHello(hello, b.helloResponseHandler())
 	if b.minor > 0 {
 		b.queue.appendLogon(token.Tokens, b.logonResponseHandler())
@@ -322,7 +322,7 @@ func (b *bolt5) TxBegin(
 		notificationConfig: txConfig.NotificationConfig,
 	}
 
-	b.queue.appendBegin(tx.toMeta(b.log, b.logId), b.beginResponseHandler())
+	b.queue.appendBegin(tx.toMeta(b.log, b.logId, b.minor), b.beginResponseHandler())
 	if syncMessages {
 		if b.queue.send(ctx); b.err != nil {
 			return 0, b.err
@@ -561,7 +561,7 @@ func (b *bolt5) run(ctx context.Context, cypher string, params map[string]any, r
 
 	fetchSize := b.normalizeFetchSize(rawFetchSize)
 	stream := &stream{fetchSize: fetchSize}
-	b.queue.appendRun(cypher, params, tx.toMeta(b.log, b.logId), b.runResponseHandler(stream))
+	b.queue.appendRun(cypher, params, tx.toMeta(b.log, b.logId, b.minor), b.runResponseHandler(stream))
 	b.queue.appendPullN(fetchSize, b.pullResponseHandler(stream))
 	if b.queue.send(ctx); b.err != nil {
 		return nil, b.err

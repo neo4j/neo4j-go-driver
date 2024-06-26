@@ -49,6 +49,7 @@ type success struct {
 	plan               *db.Plan
 	profile            *db.ProfiledPlan
 	notifications      []db.Notification
+	statuses           []db.GqlStatusObject
 	routingTable       *idb.RoutingTable
 	num                uint32
 	configurationHints map[string]any
@@ -272,6 +273,9 @@ func (h *hydrator) success(n uint32) *success {
 		case "notifications":
 			l := h.array()
 			succ.notifications = parseNotifications(l)
+		case "statuses":
+			l := h.array()
+			succ.statuses = parseGqlStatusObjects(l)
 		case "rt":
 			succ.routingTable = h.routingTable()
 		case "hints":
@@ -878,6 +882,20 @@ func parseNotifications(notificationsx []any) []db.Notification {
 	return notifications
 }
 
+func parseGqlStatusObjects(statuses []any) []db.GqlStatusObject {
+	var gqlStatusObjects []db.GqlStatusObject
+	if statuses != nil {
+		gqlStatusObjects = make([]db.GqlStatusObject, 0, len(statuses))
+		for _, x := range statuses {
+			status, ok := x.(map[string]any)
+			if ok {
+				gqlStatusObjects = append(gqlStatusObjects, parseGqlStatusObject(status))
+			}
+		}
+	}
+	return gqlStatusObjects
+}
+
 func parsePlanOpIdArgsChildren(planx map[string]any) (string, []string, map[string]any, []any) {
 	operator, _ := planx["operatorType"].(string)
 	identifiersx, _ := planx["identifiers"].([]any)
@@ -952,26 +970,79 @@ func parseProfile(profilex map[string]any) *db.ProfiledPlan {
 	return plan
 }
 
+func parseInputPosition(m map[string]any) *db.InputPosition {
+	if m == nil {
+		return nil
+	}
+	pos := &db.InputPosition{}
+	if i, ok := m["column"].(int64); ok {
+		pos.Column = int(i)
+	}
+	if i, ok := m["line"].(int64); ok {
+		pos.Line = int(i)
+	}
+	if i, ok := m["offset"].(int64); ok {
+		pos.Offset = int(i)
+	}
+	return pos
+}
+
 func parseNotification(m map[string]any) db.Notification {
 	n := db.Notification{}
 	n.Code, _ = m["code"].(string)
-	n.Description = m["description"].(string)
+	if description, found := m["description"].(string); found {
+		n.Description = description
+	}
 	n.Severity, _ = m["severity"].(string)
 	n.Category, _ = m["category"].(string)
 	n.Title, _ = m["title"].(string)
-	posx, exists := m["position"].(map[string]any)
-	if exists {
-		pos := &db.InputPosition{}
-		i, _ := posx["column"].(int64)
-		pos.Column = int(i)
-		i, _ = posx["line"].(int64)
-		pos.Line = int(i)
-		i, _ = posx["offset"].(int64)
-		pos.Offset = int(i)
-		n.Position = pos
+	if pos, exists := m["position"].(map[string]any); exists {
+		n.Position = parseInputPosition(pos)
+	}
+	return n
+}
+
+func parseGqlStatusObject(m map[string]any) db.GqlStatusObject {
+	g := db.GqlStatusObject{}
+	g.GqlStatus = m["gql_status"].(string)
+	g.StatusDescription = m["status_description"].(string)
+
+	// Backward compatibility support for deprecated Notification API.
+	if code, found := m["neo4j_code"].(string); found {
+		g.Code = code
+		g.IsNotification = true
 	}
 
-	return n
+	// Backward compatibility support for deprecated Notification API.
+	if title, found := m["title"].(string); found {
+		g.Title = title
+	}
+
+	// Initialize the default diagnostic record
+	diagnosticRecord := map[string]any{
+		"OPERATION":      "",
+		"OPERATION_CODE": "0",
+		"CURRENT_SCHEMA": "/",
+	}
+
+	// Merge the diagnostic record from the map m
+	if dr, ok := m["diagnostic_record"].(map[string]any); ok {
+		for key, value := range dr {
+			diagnosticRecord[key] = value
+		}
+		if pos, found := dr["_position"].(map[string]any); found {
+			g.Position = parseInputPosition(pos)
+		}
+		if classification, found := dr["_classification"].(string); found {
+			g.Classification = classification
+		}
+		if severity, found := dr["_severity"].(string); found {
+			g.Severity = severity
+		}
+	}
+
+	g.DiagnosticRecord = diagnosticRecord
+	return g
 }
 
 func (h *hydrator) unknownStructError(t byte) any {

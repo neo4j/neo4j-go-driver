@@ -71,6 +71,7 @@ func (c Connector) Connect(
 	notificationConfig := db.NotificationConfig{
 		MinSev:  c.Config.NotificationsMinSeverity,
 		DisCats: c.Config.NotificationsDisabledCategories,
+		DisClas: c.Config.NotificationsDisabledClassifications,
 	}
 
 	// TLS not requested

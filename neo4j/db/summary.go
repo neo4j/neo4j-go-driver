@@ -99,6 +99,20 @@ type Notification struct {
 	Category    string
 }
 
+type GqlStatusObject struct {
+	// Deprecated: for backward compatibility with Notification.Code only.
+	Code string
+	// Deprecated: for backward compatibility with Notification.Title only.
+	Title             string
+	GqlStatus         string
+	StatusDescription string
+	Position          *InputPosition
+	Classification    string
+	Severity          string
+	DiagnosticRecord  map[string]any
+	IsNotification    bool
+}
+
 // InputPosition contains information about a specific position in a statement
 type InputPosition struct {
 	// Offset contains the character offset referred to by this position; offset numbers start at 0.
@@ -127,6 +141,7 @@ type Summary struct {
 	Plan                  *Plan
 	ProfiledPlan          *ProfiledPlan
 	Notifications         []Notification
+	GqlStatusObjects      []GqlStatusObject
 	Database              string
 	ContainsSystemUpdates *bool
 	ContainsUpdates       *bool
