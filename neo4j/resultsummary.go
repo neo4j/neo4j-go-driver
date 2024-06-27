@@ -247,13 +247,13 @@ type Notification interface {
 	// In that case, Category returns UnknownCategory while RawCategory returns the raw string
 	RawCategory() string
 	// SeverityLevel returns the mapped security level of this notification.
-	// If the severity level is not a known value, SeverityLevel returns UnknownSeverity
+	// If the severity level is not a known value, SeverityLevel returns notifications.UnknownSeverity
 	// Call RawSeverityLevel to get access to the raw string value
-	SeverityLevel() NotificationSeverity
+	SeverityLevel() notifications.NotificationSeverity
 	// Category returns the mapped category of this notification.
 	// If the category is not a known value, Category returns UnknownCategory
 	// Call RawCategory to get access to the raw string value
-	Category() NotificationCategory
+	Category() notifications.NotificationCategory
 }
 
 // GqlStatusObject represents a GqlStatusObject generated when executing a statement.
@@ -293,11 +293,11 @@ type GqlStatusObject interface {
 	// Only Notifications (see IsNotification) have a meaningful classification.
 	RawClassification() string
 	// Severity returns the mapped Severity of this status.
-	// If the Severity is not a known value, Severity returns UnknownSeverity. // TODO should this be notifications.UnknownSeverity?
+	// If the Severity is not a known value, Severity returns notifications.UnknownSeverity.
 	// Call RawSeverity to get access to the raw string value
 	//
 	// Only Notifications (see IsNotification) have a meaningful severity.
-	Severity() NotificationSeverity // TODO should this be or notifications.NotificationSeverity in the notification package?
+	Severity() notifications.NotificationSeverity
 	// RawSeverity returns the unmapped Severity level of this status.
 	// This is useful when the driver cannot interpret the Severity returned by the server
 	//
@@ -325,28 +325,40 @@ type InputPosition interface {
 	Column() int
 }
 
-type NotificationSeverity string
+// Deprecated: please use notifications.NotificationSeverity directly. This will be removed in 6.0.
+type NotificationSeverity = notifications.NotificationSeverity
 
 const (
-	Warning         NotificationSeverity = "WARNING"
-	Information     NotificationSeverity = "INFORMATION"
-	UnknownSeverity NotificationSeverity = "UNKNOWN"
+	// Deprecated: please use notifications.Warning directly. This will be removed in 6.0.
+	Warning NotificationSeverity = notifications.Warning
+	// Deprecated: please use notifications.Information directly. This will be removed in 6.0.
+	Information NotificationSeverity = notifications.Information
+	// Deprecated: please use notifications.UnknownSeverity directly. This will be removed in 6.0.
+	UnknownSeverity NotificationSeverity = notifications.UnknownSeverity
 )
 
 // Deprecated: please use notifications.NotificationCategory directly. This will be removed in 6.0.
-type NotificationCategory notifications.NotificationCategory // TODO is this ok to do from string?
+type NotificationCategory = notifications.NotificationCategory
 
-// TODO do these need deprecated individually to their notification.x equivalent?
 const (
-	Hint            NotificationCategory = "HINT"
-	Unrecognized    NotificationCategory = "UNRECOGNIZED"
-	Unsupported     NotificationCategory = "UNSUPPORTED"
-	Performance     NotificationCategory = "PERFORMANCE"
-	Deprecation     NotificationCategory = "DEPRECATION"
-	Generic         NotificationCategory = "GENERIC"
-	Security        NotificationCategory = "SECURITY"
-	Topology        NotificationCategory = "TOPOLOGY"
-	UnknownCategory NotificationCategory = "UNKNOWN"
+	// Deprecated: please use notifications.Hint directly. This will be removed in 6.0.
+	Hint NotificationCategory = notifications.Hint
+	// Deprecated: please use notifications.Unrecognized directly. This will be removed in 6.0.
+	Unrecognized NotificationCategory = notifications.Unrecognized
+	// Deprecated: please use notifications.Unsupported directly. This will be removed in 6.0.
+	Unsupported NotificationCategory = notifications.Unsupported
+	// Deprecated: please use notifications.Performance directly. This will be removed in 6.0.
+	Performance NotificationCategory = notifications.Performance
+	// Deprecated: please use notifications.Deprecation directly. This will be removed in 6.0.
+	Deprecation NotificationCategory = notifications.Deprecation
+	// Deprecated: please use notifications.Generic directly. This will be removed in 6.0.
+	Generic NotificationCategory = notifications.Generic
+	// Deprecated: please use notifications.Security directly. This will be removed in 6.0.
+	Security NotificationCategory = notifications.Security
+	// Deprecated: please use notifications.Topology directly. This will be removed in 6.0.
+	Topology NotificationCategory = notifications.Topology
+	// Deprecated: please use notifications.Unknown directly. This will be removed in 6.0.
+	UnknownCategory NotificationCategory = notifications.Unknown
 )
 
 type resultSummary struct {
@@ -672,7 +684,7 @@ func (n *notification) RawSeverityLevel() string {
 	return n.notification.Severity
 }
 
-func (n *notification) SeverityLevel() NotificationSeverity {
+func (n *notification) SeverityLevel() notifications.NotificationSeverity {
 	switch n.notification.Severity {
 	case "WARNING":
 		return Warning
@@ -687,7 +699,7 @@ func (n *notification) RawCategory() string {
 	return n.notification.Category
 }
 
-func (n *notification) Category() NotificationCategory {
+func (n *notification) Category() notifications.NotificationCategory {
 	switch n.notification.Category {
 	case "HINT":
 		return Hint
@@ -763,23 +775,23 @@ func (g *gqlStatusObject) Line() int {
 func (g *gqlStatusObject) Classification() notifications.NotificationClassification {
 	switch g.gqlStatusObject.Classification {
 	case "HINT":
-		return notifications.HintClassification
+		return notifications.Hint
 	case "UNRECOGNIZED":
-		return notifications.UnrecognizedClassification
+		return notifications.Unrecognized
 	case "UNSUPPORTED":
-		return notifications.UnsupportedClassification
+		return notifications.Unsupported
 	case "PERFORMANCE":
-		return notifications.PerformanceClassification
+		return notifications.Performance
 	case "DEPRECATION":
-		return notifications.DeprecationClassification
+		return notifications.Deprecation
 	case "SECURITY":
-		return notifications.SecurityClassification
+		return notifications.Security
 	case "TOPOLOGY":
-		return notifications.TopologyClassification
+		return notifications.Topology
 	case "GENERIC":
-		return notifications.GenericClassification
+		return notifications.Generic
 	default:
-		return notifications.UnknownClassification
+		return notifications.Unknown
 	}
 }
 
@@ -787,7 +799,7 @@ func (g *gqlStatusObject) RawClassification() string {
 	return g.gqlStatusObject.Classification
 }
 
-func (g *gqlStatusObject) Severity() NotificationSeverity {
+func (g *gqlStatusObject) Severity() notifications.NotificationSeverity {
 	switch g.gqlStatusObject.Severity {
 	case "WARNING":
 		return Warning

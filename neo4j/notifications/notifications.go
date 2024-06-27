@@ -26,9 +26,8 @@ type NotificationCategory string
 
 // NotificationClassification is part of the GQL compliant notifications preview feature
 // (see README on what it means in terms of support and compatibility guarantees)
-type NotificationClassification string
+type NotificationClassification = NotificationCategory
 
-// TODO do these need deprecated individually?
 const (
 	Hint         NotificationCategory = "HINT"
 	Unrecognized NotificationCategory = "UNRECOGNIZED"
@@ -40,20 +39,26 @@ const (
 	Security NotificationCategory = "SECURITY"
 	// Topology requires server version 5.14 or newer.
 	Topology NotificationCategory = "TOPOLOGY"
+	Unknown  NotificationCategory = "UNKNOWN"
 )
 
+type NotificationSeverity string
+
 const (
-	HintClassification         NotificationClassification = "HINT"
-	UnrecognizedClassification NotificationClassification = "UNRECOGNIZED"
-	UnsupportedClassification  NotificationClassification = "UNSUPPORTED"
-	PerformanceClassification  NotificationClassification = "PERFORMANCE"
-	DeprecationClassification  NotificationClassification = "DEPRECATION"
-	GenericClassification      NotificationClassification = "GENERIC"
-	// SecurityClassification requires server version 5.14 or newer.
-	SecurityClassification NotificationClassification = "SECURITY"
-	// TopologyClassification requires server version 5.14 or newer.
-	TopologyClassification NotificationClassification = "TOPOLOGY"
-	UnknownClassification  NotificationClassification = "UNKNOWN"
+	Warning         NotificationSeverity = "WARNING"
+	Information     NotificationSeverity = "INFORMATION"
+	UnknownSeverity NotificationSeverity = "UNKNOWN"
+)
+
+// NotificationMinimumSeverityLevel defines the minimum severity level of notifications the server should send.
+// Can be used for NotificationsMinSeverity of config.Config and config.SessionConfig.
+type NotificationMinimumSeverityLevel string
+
+const (
+	DefaultLevel     NotificationMinimumSeverityLevel = ""
+	DisabledLevel    NotificationMinimumSeverityLevel = "OFF"
+	WarningLevel     NotificationMinimumSeverityLevel = "WARNING"
+	InformationLevel NotificationMinimumSeverityLevel = "INFORMATION"
 )
 
 // Deprecated: please use notifications.NotificationDisabledClassifications. This will be removed in 6.0.
@@ -118,17 +123,6 @@ func (n *NotificationDisabledCategories) DisabledCategories() []NotificationCate
 func (n *NotificationDisabledClassifications) DisabledClassifications() []NotificationClassification {
 	return n.classifications
 }
-
-// NotificationMinimumSeverityLevel defines the minimum severity level of notifications the server should send.
-// Can be used for NotificationsMinSeverity of config.Config and config.SessionConfig.
-type NotificationMinimumSeverityLevel string
-
-const (
-	DefaultLevel     NotificationMinimumSeverityLevel = ""
-	DisabledLevel    NotificationMinimumSeverityLevel = "OFF"
-	WarningLevel     NotificationMinimumSeverityLevel = "WARNING"
-	InformationLevel NotificationMinimumSeverityLevel = "INFORMATION"
-)
 
 // ToNotification returns a db.Notification that corresponds to the given db.GqlStatusObject.
 // It maps fields from the status to their respective notification fields.
