@@ -202,8 +202,12 @@ func ToGqlStatusObject(notification db.Notification) *db.GqlStatusObject {
 	if notification.Position != nil {
 		diagnosticRecord["_position"] = notification.Position
 	}
-	diagnosticRecord["_classification"] = notification.Category
-	diagnosticRecord["_severity"] = notification.Severity
+	if notification.Severity != "" {
+		diagnosticRecord["_severity"] = notification.Severity
+	}
+	if notification.Category != "" {
+		diagnosticRecord["_classification"] = notification.Category
+	}
 
 	return &db.GqlStatusObject{
 		Code:              notification.Code,

@@ -79,6 +79,7 @@ func (s *success) summary() *db.Summary {
 		Plan:                  s.plan,
 		ProfiledPlan:          s.profile,
 		Notifications:         s.notifications,
+		GqlStatusObjects:      s.statuses,
 		Database:              s.db,
 		ContainsSystemUpdates: extractBoolPointer(s.counters, containsSystemUpdatesKey),
 		ContainsUpdates:       extractBoolPointer(s.counters, containsUpdatesKey),

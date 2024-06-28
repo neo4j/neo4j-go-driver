@@ -1442,8 +1442,11 @@ func serializeRecord(record *neo4j.Record) map[string]any {
 	return data
 }
 
-func serializeNotifications(slice []neo4j.Notification) []map[string]any {
+func serializeNotifications(slice []neo4j.Notification, version db.ProtocolVersion) []map[string]any {
 	if slice == nil {
+		if version.Minor >= 5 {
+			return []map[string]any{}
+		}
 		return nil
 	}
 	if len(slice) == 0 {
@@ -1542,7 +1545,7 @@ func serializeSummary(summary neo4j.ResultSummary) map[string]any {
 			"text":       summary.Query().Text(),
 			"parameters": serializeParameters(summary.Query().Parameters()),
 		},
-		"notifications":    serializeNotifications(summary.Notifications()),
+		"notifications":    serializeNotifications(summary.Notifications(), protocolVersion),
 		"gqlStatusObjects": serializeGqlStatusObjects(summary.GqlStatusObjects()),
 		"plan":             serializePlan(summary.Plan()),
 		"profile":          serializeProfile(summary.Profile()),

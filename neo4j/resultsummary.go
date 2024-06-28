@@ -597,20 +597,21 @@ func (p *profile) Time() int64 {
 
 func (s *resultSummary) Notifications() []Notification {
 	if s.sum.Notifications != nil {
-		n := make([]Notification, len(s.sum.Notifications))
+		n := make([]Notification, 0, len(s.sum.Notifications))
 		for i := range s.sum.Notifications {
-			n[i] = &notification{notification: &s.sum.Notifications[i]}
+			n = append(n, &notification{notification: &s.sum.Notifications[i]})
 		}
 		return n
 	}
 
 	if s.sum.GqlStatusObjects != nil {
 		// Polyfill Notifications from GqlStatusObjects
-		n := make([]Notification, len(s.sum.GqlStatusObjects))
+		n := make([]Notification, 0, len(s.sum.GqlStatusObjects))
 		for i := range s.sum.GqlStatusObjects {
-			gqlStatusObject := s.sum.GqlStatusObjects[i]
-			if gqlStatusObject.IsNotification {
-				n[i] = &notification{notification: notifications.ToNotification(gqlStatusObject)}
+			status := s.sum.GqlStatusObjects[i]
+			if status.IsNotification {
+				n = append(n, &notification{notification: notifications.ToNotification(status)})
+
 			}
 		}
 		return n
@@ -620,20 +621,19 @@ func (s *resultSummary) Notifications() []Notification {
 
 func (s *resultSummary) GqlStatusObjects() []GqlStatusObject {
 	if s.sum.GqlStatusObjects != nil {
-		g := make([]GqlStatusObject, len(s.sum.GqlStatusObjects))
+		g := make([]GqlStatusObject, 0, len(s.sum.GqlStatusObjects))
 		for i := range s.sum.GqlStatusObjects {
-			g[i] = &gqlStatusObject{gqlStatusObject: &s.sum.GqlStatusObjects[i]}
+			g = append(g, &gqlStatusObject{gqlStatusObject: &s.sum.GqlStatusObjects[i]})
 		}
 		return g
 	}
 	if s.sum.Notifications != nil {
 		// Polyfill GqlStatusObjects from Notifications
-		g := make([]GqlStatusObject, len(s.sum.Notifications))
+		g := make([]GqlStatusObject, 0, len(s.sum.Notifications))
 		for i := range s.sum.Notifications {
-			notification := s.sum.Notifications[i]
-			g[i] = &gqlStatusObject{gqlStatusObject: notifications.ToGqlStatusObject(notification)}
+			g = append(g, &gqlStatusObject{gqlStatusObject: notifications.ToGqlStatusObject(s.sum.Notifications[i])})
 		}
-		// Client generated polyfill status representing SUCCESS, NO DATA or OMITTED RESULT
+		// Append client generated polyfill status
 		g = append(g, &gqlStatusObject{gqlStatusObject: notifications.ToGqlStatusObjectFromSummary(s.sum)})
 		// Sort by GqlStatus weight
 		sort.Slice(g, func(i, j int) bool {
@@ -641,7 +641,8 @@ func (s *resultSummary) GqlStatusObjects() []GqlStatusObject {
 		})
 		return g
 	}
-	return nil
+	// If both s.sum.GqlStatusObjects and s.sum.Notifications are nil
+	return []GqlStatusObject{&gqlStatusObject{gqlStatusObject: notifications.ToGqlStatusObjectFromSummary(s.sum)}}
 }
 
 func calculateGqlStatusWeight(gqlStatusObject GqlStatusObject) int {
