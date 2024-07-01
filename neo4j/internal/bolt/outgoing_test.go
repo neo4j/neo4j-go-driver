@@ -20,9 +20,6 @@ package bolt
 import (
 	"context"
 	"fmt"
-	idb "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/racing"
-	. "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/testutil"
 	"net"
 	"reflect"
 	"strings"
@@ -31,7 +28,9 @@ import (
 
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/db"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/dbtype"
+	idb "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/packstream"
+	. "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/testutil"
 )
 
 // Utility to dehydrate/unpack
@@ -116,8 +115,7 @@ func TestOutgoing(ot *testing.T) {
 		}()
 
 		// Dechunk it
-		reader := racing.NewRacingReader(serv)
-		_, byts, err := dechunkMessage(context.Background(), &reader, []byte{}, -1)
+		_, byts, err := dechunkMessage(context.Background(), serv, []byte{}, -1)
 		if err != nil {
 			t.Fatal(err)
 		}

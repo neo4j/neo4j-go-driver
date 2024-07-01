@@ -22,7 +22,6 @@ import (
 	"context"
 	"fmt"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/db"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/racing"
 	. "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/testutil"
 	"net"
 	"reflect"
@@ -141,7 +140,7 @@ func TestMessageQueue(outer *testing.T) {
 			},
 		}
 
-		queue := newMessageQueue(nil, nil, &writer, nil, nil, nil)
+		queue := newMessageQueue(nil, nil, &writer, nil, nil)
 
 		for _, test := range tests {
 			inner.Run(test.description, func(t *testing.T) {
@@ -178,8 +177,7 @@ func TestMessageQueue(outer *testing.T) {
 		}
 		writer := &outgoing{}
 
-		r := racing.NewRacingReader(client)
-		queue := newMessageQueue(client, &reader, nil, func() {}, nil, &r)
+		queue := newMessageQueue(client, &reader, nil, func() {}, nil)
 
 		inner.Run("receives single message, executes the first handler", func(t *testing.T) {
 			defer func() {

@@ -26,20 +26,14 @@ import (
 type RacingReader interface {
 	Read(ctx context.Context, bytes []byte) (int, error)
 	ReadFull(ctx context.Context, bytes []byte) (int, error)
-	Close()
 }
 
 func NewRacingReader(reader io.Reader) RacingReader {
-	return &racingReader{reader: reader, in: make(chan *ioResult, 1)}
+	return &racingReader{reader: reader}
 }
 
 type racingReader struct {
 	reader io.Reader
-	in     chan *ioResult
-}
-
-func (rr *racingReader) Close() {
-	close(rr.in)
 }
 
 func (rr *racingReader) Read(ctx context.Context, bytes []byte) (int, error) {
@@ -59,9 +53,11 @@ func (rr *racingReader) race(ctx context.Context, bytes []byte, readFn func(io.R
 	case deadline.Before(time.Now()) || err != nil:
 		return 0, err
 	}
+	resultChan := make(chan *ioResult, 1)
 	go func() {
+		defer close(resultChan)
 		n, err := readFn(rr.reader, bytes)
-		rr.in <- &ioResult{
+		resultChan <- &ioResult{
 			n:   n,
 			err: err,
 		}
@@ -69,7 +65,7 @@ func (rr *racingReader) race(ctx context.Context, bytes []byte, readFn func(io.R
 	select {
 	case <-ctx.Done():
 		return 0, ctx.Err()
-	case result := <-rr.in:
+	case result := <-resultChan:
 		return result.n, result.err
 	}
 }

@@ -21,7 +21,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/binary"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/racing"
 	"net"
 	"reflect"
 	"testing"
@@ -81,8 +80,7 @@ func TestDechunker(t *testing.T) {
 		go func() {
 			AssertWriteSucceeds(t, cli, str.Bytes())
 		}()
-		reader := racing.NewRacingReader(serv)
-		buf, msgBuf, err = dechunkMessage(context.Background(), &reader, buf, -1)
+		buf, msgBuf, err = dechunkMessage(context.Background(), serv, buf, -1)
 		AssertNoError(t, err)
 		AssertLen(t, msgBuf, int(msg.size))
 		// Check content of buffer
@@ -122,9 +120,7 @@ func TestDechunkerWithTimeout(ot *testing.T) {
 			AssertWriteSucceeds(t, cli, []byte{0x00, 0x00})
 		}()
 		buffer := make([]byte, 2)
-
-		reader := racing.NewRacingReader(serv)
-		_, _, err := dechunkMessage(context.Background(), &reader, buffer, timeout)
+		_, _, err := dechunkMessage(context.Background(), serv, buffer, timeout)
 		AssertNoError(t, err)
 		AssertTrue(t, reflect.DeepEqual(buffer, []byte{0xCA, 0xFE}))
 	})
@@ -133,8 +129,7 @@ func TestDechunkerWithTimeout(ot *testing.T) {
 		serv, cli := net.Pipe()
 		defer closePipe(ot, serv, cli)
 
-		reader := racing.NewRacingReader(serv)
-		_, _, err := dechunkMessage(context.Background(), &reader, nil, timeout)
+		_, _, err := dechunkMessage(context.Background(), serv, nil, timeout)
 
 		AssertError(t, err)
 		AssertStringContain(t, err.Error(), "context deadline exceeded")
@@ -146,8 +141,7 @@ func TestDechunkerWithTimeout(ot *testing.T) {
 		ctx, cancelFunc := context.WithTimeout(context.Background(), timeout)
 		defer cancelFunc()
 
-		reader := racing.NewRacingReader(serv)
-		_, _, err := dechunkMessage(ctx, &reader, nil, -1)
+		_, _, err := dechunkMessage(ctx, serv, nil, -1)
 
 		AssertError(t, err)
 		AssertStringContain(t, err.Error(), "context deadline exceeded")

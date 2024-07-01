@@ -19,7 +19,6 @@ package bolt
 
 import (
 	"context"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/racing"
 	"net"
 	"testing"
 	"time"
@@ -59,9 +58,7 @@ func TestDehydrateHydrate(ot *testing.T) {
 		go func() {
 			out.send(context.Background(), cli)
 		}()
-
-		reader := racing.NewRacingReader(serv)
-		_, byts, err := dechunkMessage(context.Background(), &reader, []byte{}, -1)
+		_, byts, err := dechunkMessage(context.Background(), serv, []byte{}, -1)
 		if err != nil {
 			t.Fatal(err)
 		}

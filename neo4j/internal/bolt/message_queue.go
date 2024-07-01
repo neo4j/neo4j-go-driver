@@ -22,10 +22,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/db"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/racing"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/log"
 	"io"
+
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/db"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/log"
 )
 
 type messageQueue struct {
@@ -37,7 +37,6 @@ type messageQueue struct {
 
 	onNextMessage func()
 	onIoErr       func(context.Context, error)
-	reader        *racing.RacingReader
 }
 
 func newMessageQueue(
@@ -45,7 +44,6 @@ func newMessageQueue(
 	in *incoming, out *outgoing,
 	onNext func(),
 	onIoErr func(context.Context, error),
-	reader *racing.RacingReader,
 ) messageQueue {
 	return messageQueue{
 		in:               in,
@@ -54,7 +52,6 @@ func newMessageQueue(
 		targetConnection: target,
 		onNextMessage:    onNext,
 		onIoErr:          onIoErr,
-		reader:           reader,
 	}
 }
 
@@ -209,7 +206,7 @@ func (q *messageQueue) receiveMsg(ctx context.Context) any {
 		return nil
 	}
 
-	msg, err := q.in.next(ctx, q.reader)
+	msg, err := q.in.next(ctx, q.targetConnection)
 	q.err = err
 	if err != nil {
 		q.onIoErr(ctx, err)

@@ -19,15 +19,14 @@ package testutil
 
 import (
 	"context"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/auth"
-	iauth "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/auth"
-	idb "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/racing"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/telemetry"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/log"
 	"time"
 
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/auth"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/db"
+	iauth "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/auth"
+	idb "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/telemetry"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/log"
 )
 
 type Next struct {
@@ -219,7 +218,3 @@ func (c *ConnFake) GetCurrentAuth() (auth.TokenManager, iauth.Token) {
 }
 
 func (c *ConnFake) Telemetry(telemetry.API, func()) {}
-
-func (c *ConnFake) Reader() *racing.RacingReader {
-	return nil
-}
