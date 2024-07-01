@@ -178,7 +178,7 @@ func TestMessageQueue(outer *testing.T) {
 		}
 		writer := &outgoing{}
 
-		r := racing.NewRacingReader(server)
+		r := racing.NewRacingReader(client)
 		queue := newMessageQueue(client, &reader, nil, func() {}, nil, &r)
 
 		inner.Run("receives single message, executes the first handler", func(t *testing.T) {
