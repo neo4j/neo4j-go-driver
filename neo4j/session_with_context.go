@@ -164,6 +164,8 @@ type SessionConfig struct {
 	// By default, the driver's settings are used.
 	// Else, this option overrides the driver's settings.
 	// Disabling categories allows the server to skip analysis for those, which can speed up query execution.
+	//
+	//lint:ignore SA1019 NotificationDisabledCategories is supported at least until 6.0
 	NotificationsDisabledCategories notifications.NotificationDisabledCategories
 	// NotificationsDisabledClassifications is identical to NotificationsDisabledCategories.
 	// This alternative is provided for a consistent naming with neo4j.GqlStatusObject Classification.

@@ -253,6 +253,7 @@ type Notification interface {
 	// Category returns the mapped category of this notification.
 	// If the category is not a known value, Category returns UnknownCategory
 	// Call RawCategory to get access to the raw string value
+	//lint:ignore SA1019 NotificationCategory is supported at least until 6.0
 	Category() notifications.NotificationCategory
 }
 
@@ -338,6 +339,8 @@ const (
 )
 
 // Deprecated: please use notifications.NotificationCategory directly. This will be removed in 6.0.
+//
+//lint:ignore SA1019 NotificationCategory is supported at least until 6.0
 type NotificationCategory = notifications.NotificationCategory
 
 const (
@@ -700,6 +703,7 @@ func (n *notification) RawCategory() string {
 	return n.notification.Category
 }
 
+//lint:ignore SA1019 NotificationCategory is supported at least until 6.0
 func (n *notification) Category() notifications.NotificationCategory {
 	switch n.notification.Category {
 	case "HINT":

@@ -28,6 +28,7 @@ func checkNotificationFiltering(
 	bolt idb.Connection,
 ) error {
 	if notificationConfig.MinSev == notifications.DefaultLevel &&
+		//lint:ignore SA1019 DisablesNone and DisabledCategories are supported at least until 6.0
 		!notificationConfig.DisCats.DisablesNone() && len(notificationConfig.DisCats.DisabledCategories()) == 0 &&
 		!notificationConfig.DisClas.DisablesNone() && len(notificationConfig.DisClas.DisabledClassifications()) == 0 {
 		return nil

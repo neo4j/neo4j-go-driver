@@ -128,7 +128,9 @@ func (n *NotificationDisabledClassifications) DisabledClassifications() []Notifi
 // It maps fields from the status to their respective notification fields.
 func ToNotification(gqlStatusObject db.GqlStatusObject) *db.Notification {
 	return &db.Notification{
-		Code:        gqlStatusObject.Code,
+		//lint:ignore SA1019 Code is supported at least until 6.0
+		Code: gqlStatusObject.Code,
+		//lint:ignore SA1019 Title is supported at least until 6.0
 		Title:       gqlStatusObject.Title,
 		Description: gqlStatusObject.StatusDescription,
 		Position:    gqlStatusObject.Position,

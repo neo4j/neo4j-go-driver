@@ -59,7 +59,8 @@ type TxConfig struct {
 }
 
 type NotificationConfig struct {
-	MinSev  notifications.NotificationMinimumSeverityLevel
+	MinSev notifications.NotificationMinimumSeverityLevel
+	//lint:ignore SA1019 NotificationDisabledCategories is supported at least until 6.0
 	DisCats notifications.NotificationDisabledCategories
 	DisClas notifications.NotificationDisabledClassifications
 }
@@ -73,11 +74,13 @@ func (n *NotificationConfig) ToMeta(meta map[string]any, minor int) {
 	if minor >= 5 {
 		disabledKey = "notifications_disabled_classifications"
 	}
-
+	//lint:ignore SA1019 DisablesNone is supported at least until 6.0
 	if n.DisCats.DisablesNone() || n.DisClas.DisablesNone() {
 		meta[disabledKey] = make([]string, 0)
 	} else {
+		//lint:ignore SA1019 DisabledCategories is supported at least until 6.0
 		if len(n.DisCats.DisabledCategories()) > 0 {
+			//lint:ignore SA1019 DisabledCategories is supported at least until 6.0
 			meta[disabledKey] = n.DisCats.DisabledCategories()
 		}
 		if len(n.DisClas.DisabledClassifications()) > 0 {

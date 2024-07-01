@@ -1012,12 +1012,14 @@ func parseGqlStatusObject(m map[string]any) db.GqlStatusObject {
 
 	// Backward compatibility support for deprecated Notification API.
 	if code, found := m["neo4j_code"].(string); found {
+		//lint:ignore SA1019 Code is supported at least until 6.0
 		g.Code = code
 		g.IsNotification = true
 	}
 
 	// Backward compatibility support for deprecated Notification API.
 	if title, found := m["title"].(string); found {
+		//lint:ignore SA1019 Title is supported at least until 6.0
 		g.Title = title
 	}
 

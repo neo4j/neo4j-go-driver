@@ -556,8 +556,9 @@ func TestBolt5(outer *testing.T) {
 	outer.Run("with notifications", func(inner *testing.T) {
 		warningSev := "WARNING"
 		type testCase struct {
-			description     string
-			MinSev          notifications.NotificationMinimumSeverityLevel
+			description string
+			MinSev      notifications.NotificationMinimumSeverityLevel
+			//lint:ignore SA1019 NotificationDisabledCategories is supported at least until 6.0
 			DisCats         notifications.NotificationDisabledCategories
 			ExpectedMinSev  *string
 			ExpectDisCats   bool
@@ -578,15 +579,17 @@ func TestBolt5(outer *testing.T) {
 					Method:         s,
 				},
 				testCase{
-					description:     "disabled categories",
+					description: "disabled categories",
+					//lint:ignore SA1019 DisableCategories is supported at least until 6.0
 					DisCats:         notifications.DisableCategories(notifications.Unsupported, notifications.Generic),
 					ExpectDisCats:   true,
 					ExpectedDisCats: []any{"UNSUPPORTED", "GENERIC"},
 					Method:          s,
 				},
 				testCase{
-					description:     "warning minimum severity and disabled categories",
-					MinSev:          notifications.WarningLevel,
+					description: "warning minimum severity and disabled categories",
+					MinSev:      notifications.WarningLevel,
+					//lint:ignore SA1019 DisableCategories is supported at least until 6.0
 					DisCats:         notifications.DisableCategories(notifications.Unsupported, notifications.Generic),
 					ExpectDisCats:   true,
 					ExpectedDisCats: []any{"UNSUPPORTED", "GENERIC"},
@@ -594,7 +597,8 @@ func TestBolt5(outer *testing.T) {
 					Method:          s,
 				},
 				testCase{
-					description:     "disable no categories",
+					description: "disable no categories",
+					//lint:ignore SA1019 DisableNoCategories is supported at least until 6.0
 					DisCats:         notifications.DisableNoCategories(),
 					ExpectDisCats:   true,
 					ExpectedDisCats: []any{},
@@ -661,6 +665,7 @@ func TestBolt5(outer *testing.T) {
 		type testCase struct {
 			description string
 			MinSev      notifications.NotificationMinimumSeverityLevel
+			//lint:ignore SA1019 NotificationDisabledCategories is supported at least until 6.0
 			DisCats     notifications.NotificationDisabledCategories
 			ExpectError bool
 			Method      string
@@ -680,6 +685,7 @@ func TestBolt5(outer *testing.T) {
 				},
 				testCase{
 					description: "disabled categories",
+					//lint:ignore SA1019 DisableCategories is supported at least until 6.0
 					DisCats:     notifications.DisableCategories(notifications.Unsupported, notifications.Generic),
 					ExpectError: true,
 					Method:      s,
@@ -687,12 +693,14 @@ func TestBolt5(outer *testing.T) {
 				testCase{
 					description: "warning minimum severity and disabled categories",
 					MinSev:      notifications.WarningLevel,
+					//lint:ignore SA1019 DisableCategories is supported at least until 6.0
 					DisCats:     notifications.DisableCategories(notifications.Unsupported, notifications.Generic),
 					ExpectError: true,
 					Method:      s,
 				},
 				testCase{
 					description: "disable no categories",
+					//lint:ignore SA1019 DisableNoCategories is supported at least until 6.0
 					DisCats:     notifications.DisableNoCategories(),
 					ExpectError: true,
 					Method:      s,
