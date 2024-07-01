@@ -652,6 +652,7 @@ func (b *bolt3) receiveNext(ctx context.Context) (*db.Record, *db.Summary, error
 		sum.Minor = b.minor
 		sum.ServerName = b.serverName
 		sum.TFirst = b.currStream.tfirst
+		sum.StreamSummary = b.currStream.ToSummary()
 		b.currStream.sum = sum
 		b.currStream = nil
 		return nil, sum, nil

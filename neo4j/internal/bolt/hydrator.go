@@ -54,6 +54,7 @@ type success struct {
 	num                uint32
 	configurationHints map[string]any
 	patches            []string
+	streamSummary      db.StreamSummary
 }
 
 func (s *success) String() string {
@@ -83,6 +84,7 @@ func (s *success) summary() *db.Summary {
 		Database:              s.db,
 		ContainsSystemUpdates: extractBoolPointer(s.counters, containsSystemUpdatesKey),
 		ContainsUpdates:       extractBoolPointer(s.counters, containsUpdatesKey),
+		StreamSummary:         s.streamSummary,
 	}
 }
 

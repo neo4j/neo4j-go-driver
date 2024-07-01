@@ -1052,6 +1052,9 @@ func (b *bolt5) discardResponseHandler(stream *stream) responseHandler {
 func (b *bolt5) pullResponseHandler(stream *stream) responseHandler {
 	return responseHandler{
 		onRecord: func(record *db.Record) {
+			if record != nil {
+				stream.hadRecord = true
+			}
 			if stream.discarding {
 				stream.emptyRecords()
 			} else {
@@ -1190,5 +1193,6 @@ func (b *bolt5) extractSummary(success *success, stream *stream) *db.Summary {
 	summary.Minor = b.minor
 	summary.ServerName = b.serverName
 	summary.TFirst = stream.tfirst
+	summary.StreamSummary = stream.ToSummary()
 	return summary
 }

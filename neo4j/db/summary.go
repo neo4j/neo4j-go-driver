@@ -90,6 +90,11 @@ type ProfiledPlan struct {
 	Time              int64
 }
 
+type StreamSummary struct {
+	HadRecord bool
+	HadKey    bool
+}
+
 type Notification struct {
 	Code        string
 	Title       string
@@ -145,4 +150,5 @@ type Summary struct {
 	Database              string
 	ContainsSystemUpdates *bool
 	ContainsUpdates       *bool
+	StreamSummary         StreamSummary
 }

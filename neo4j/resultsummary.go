@@ -634,7 +634,7 @@ func (s *resultSummary) GqlStatusObjects() []GqlStatusObject {
 			g = append(g, &gqlStatusObject{gqlStatusObject: notifications.ToGqlStatusObject(s.sum.Notifications[i])})
 		}
 		// Append client generated polyfill status
-		g = append(g, &gqlStatusObject{gqlStatusObject: notifications.ToGqlStatusObjectFromSummary(s.sum)})
+		g = append(g, &gqlStatusObject{gqlStatusObject: notifications.ToGqlStatusObjectFromSummary(s.sum.StreamSummary)})
 		// Sort by GqlStatus weight
 		sort.Slice(g, func(i, j int) bool {
 			return calculateGqlStatusWeight(g[i]) < calculateGqlStatusWeight(g[j])
@@ -642,7 +642,7 @@ func (s *resultSummary) GqlStatusObjects() []GqlStatusObject {
 		return g
 	}
 	// If both s.sum.GqlStatusObjects and s.sum.Notifications are nil
-	return []GqlStatusObject{&gqlStatusObject{gqlStatusObject: notifications.ToGqlStatusObjectFromSummary(s.sum)}}
+	return []GqlStatusObject{&gqlStatusObject{gqlStatusObject: notifications.ToGqlStatusObjectFromSummary(s.sum.StreamSummary)}}
 }
 
 func calculateGqlStatusWeight(gqlStatusObject GqlStatusObject) int {

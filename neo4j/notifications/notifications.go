@@ -137,56 +137,60 @@ func ToNotification(gqlStatusObject db.GqlStatusObject) *db.Notification {
 	}
 }
 
-var (
-	defaultDiagnosticRecord = map[string]any{
+func newDefaultDiagnosticRecord() map[string]any {
+	return map[string]any{
 		"OPERATION":      "",
 		"OPERATION_CODE": "0",
 		"CURRENT_SCHEMA": "/",
 	}
+}
 
-	successGqlStatusObject = &db.GqlStatusObject{
+func newSuccessGqlStatusObject() *db.GqlStatusObject {
+	return &db.GqlStatusObject{
 		GqlStatus:         "00000",
 		StatusDescription: "note: successful completion",
-		DiagnosticRecord:  defaultDiagnosticRecord,
+		DiagnosticRecord:  newDefaultDiagnosticRecord(),
 	}
+}
 
-	noDataGqlStatusObject = &db.GqlStatusObject{
+func newNoDataGqlStatusObject() *db.GqlStatusObject {
+	return &db.GqlStatusObject{
 		GqlStatus:         "02000",
 		StatusDescription: "note: no data",
-		DiagnosticRecord:  defaultDiagnosticRecord,
+		DiagnosticRecord:  newDefaultDiagnosticRecord(),
 	}
+}
 
-	noDataUnknownGqlStatusObject = &db.GqlStatusObject{
-		GqlStatus:         "02N42",
-		StatusDescription: "note: no data - unknown subcondition",
-		DiagnosticRecord:  defaultDiagnosticRecord,
-	}
-
-	omittedResultGqlStatusObject = &db.GqlStatusObject{
+func newOmittedResultGqlStatusObject() *db.GqlStatusObject {
+	return &db.GqlStatusObject{
 		GqlStatus:         "00001",
 		StatusDescription: "note: successful completion - omitted result",
-		DiagnosticRecord:  defaultDiagnosticRecord,
+		DiagnosticRecord:  newDefaultDiagnosticRecord(),
 	}
+}
 
-	unknownWarningResultGqlStatusObject = &db.GqlStatusObject{
+func newUnknownWarningResultGqlStatusObject() *db.GqlStatusObject {
+	return &db.GqlStatusObject{
 		GqlStatus:         "01N42",
 		StatusDescription: "warn: unknown warning",
-		DiagnosticRecord:  defaultDiagnosticRecord,
+		DiagnosticRecord:  newDefaultDiagnosticRecord(),
 	}
+}
 
-	unknownInformationResultGqlStatusObject = &db.GqlStatusObject{
+func newUnknownInformationResultGqlStatusObject() *db.GqlStatusObject {
+	return &db.GqlStatusObject{
 		GqlStatus:         "03N42",
 		StatusDescription: "info: unknown notification",
-		DiagnosticRecord:  defaultDiagnosticRecord,
+		DiagnosticRecord:  newDefaultDiagnosticRecord(),
 	}
-)
+}
 
 // ToGqlStatusObject returns a db.GqlStatusObject that corresponds to the given db.Notification.
 // It maps fields from the notification to their respective status fields.
 func ToGqlStatusObject(notification db.Notification) *db.GqlStatusObject {
-	defaultStatus := unknownInformationResultGqlStatusObject
+	defaultStatus := newUnknownInformationResultGqlStatusObject()
 	if notification.Severity == string(WarningLevel) {
-		defaultStatus = unknownWarningResultGqlStatusObject
+		defaultStatus = newUnknownWarningResultGqlStatusObject()
 	}
 
 	statusDescription := notification.Description
@@ -194,10 +198,7 @@ func ToGqlStatusObject(notification db.Notification) *db.GqlStatusObject {
 		statusDescription = defaultStatus.StatusDescription
 	}
 
-	diagnosticRecord := map[string]any{}
-	for k, v := range defaultDiagnosticRecord {
-		diagnosticRecord[k] = v
-	}
+	diagnosticRecord := newDefaultDiagnosticRecord()
 
 	if notification.Position != nil {
 		diagnosticRecord["_position"] = notification.Position
@@ -222,7 +223,13 @@ func ToGqlStatusObject(notification db.Notification) *db.GqlStatusObject {
 	}
 }
 
-func ToGqlStatusObjectFromSummary(summary *db.Summary) *db.GqlStatusObject {
-	// TODO return successGqlStatusObject, noDataGqlStatusObject, noDataUnknownGqlStatusObject or omittedResultGqlStatusObject
-	return successGqlStatusObject
+// ToGqlStatusObjectFromSummary creates a new db.GqlStatusObject based on the context of the db.StreamSummary.
+func ToGqlStatusObjectFromSummary(summary db.StreamSummary) *db.GqlStatusObject {
+	if summary.HadRecord {
+		return newSuccessGqlStatusObject()
+	} else if summary.HadKey {
+		return newNoDataGqlStatusObject()
+	} else {
+		return newOmittedResultGqlStatusObject()
+	}
 }
