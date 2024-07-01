@@ -18,12 +18,11 @@
 package bolt
 
 import (
-	"bufio"
 	"context"
 	"errors"
 	"fmt"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/racing"
-	"net"
+	"io"
 	"reflect"
 	"time"
 
@@ -98,7 +97,7 @@ type bolt5 struct {
 	state            int
 	txId             idb.TxHandle
 	streams          openstreams
-	conn             net.Conn
+	conn             io.ReadWriteCloser
 	serverName       string
 	queue            messageQueue
 	connId           string
@@ -126,11 +125,10 @@ func (b *bolt5) Reader() *racing.RacingReader {
 
 func NewBolt5(
 	serverName string,
-	conn net.Conn,
+	conn io.ReadWriteCloser,
 	errorListener ConnectionErrorListener,
 	logger log.Logger,
 	boltLog log.BoltLogger,
-	readBufferSize int,
 ) *bolt5 {
 	now := itime.Now()
 	b := &bolt5{
@@ -143,7 +141,7 @@ func NewBolt5(
 		streams:       openstreams{},
 		lastQid:       -1,
 		errorListener: errorListener,
-		reader:        racing.NewRacingReader(bufio.NewReaderSize(conn, readBufferSize)),
+		reader:        racing.NewRacingReader(conn),
 	}
 	b.queue = newMessageQueue(
 		conn,

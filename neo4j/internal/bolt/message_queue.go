@@ -25,14 +25,14 @@ import (
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/db"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/racing"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/log"
-	"net"
+	"io"
 )
 
 type messageQueue struct {
 	in               *incoming
 	out              *outgoing
 	handlers         list.List // List[responseHandler]
-	targetConnection net.Conn
+	targetConnection io.ReadWriteCloser
 	err              error
 
 	onNextMessage func()
@@ -41,7 +41,7 @@ type messageQueue struct {
 }
 
 func newMessageQueue(
-	target net.Conn,
+	target io.ReadWriteCloser,
 	in *incoming, out *outgoing,
 	onNext func(),
 	onIoErr func(context.Context, error),

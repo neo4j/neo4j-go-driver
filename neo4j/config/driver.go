@@ -204,7 +204,8 @@ type Config struct {
 	TelemetryDisabled bool
 	// ReadBufferSize defines the size of the buffer used for reading data from the network connection.
 	// A larger buffer size can improve performance by reducing the number of read operations required
-	// for large data transfers. The default value is racing.DefaultReadBufferSize bytes.
+	// for large data transfers. Currently, the default value is 8 KiB, but may change in the future.
+	// Set to 0 or below to disable buffering.
 	ReadBufferSize int
 }
 

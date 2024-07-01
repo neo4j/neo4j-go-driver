@@ -24,7 +24,6 @@ import (
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/db"
 	iauth "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/auth"
 	idb "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/racing"
 	"math"
 	"math/big"
 	"net"
@@ -90,7 +89,7 @@ func makeRawConnection(ctx context.Context, logger log.Logger, boltLogger log.Bo
 		logger,
 		boltLogger,
 		idb.NotificationConfig{},
-		racing.DefaultReadBufferSize,
+		bolt.DefaultReadBufferSize,
 	)
 	if err != nil {
 		panic(err)

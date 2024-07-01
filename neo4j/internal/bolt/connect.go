@@ -90,14 +90,16 @@ func Connect(ctx context.Context,
 
 	major := buf[3]
 	minor := buf[2]
+
+	bufferedConn := bufferedConnection(conn, readBufferSize)
 	var boltConn db.Connection
 	switch major {
 	case 3:
-		boltConn = NewBolt3(serverName, conn, errorListener, logger, boltLogger, readBufferSize)
+		boltConn = NewBolt3(serverName, bufferedConn, errorListener, logger, boltLogger)
 	case 4:
-		boltConn = NewBolt4(serverName, conn, errorListener, logger, boltLogger, readBufferSize)
+		boltConn = NewBolt4(serverName, bufferedConn, errorListener, logger, boltLogger)
 	case 5:
-		boltConn = NewBolt5(serverName, conn, errorListener, logger, boltLogger, readBufferSize)
+		boltConn = NewBolt5(serverName, bufferedConn, errorListener, logger, boltLogger)
 	case 0:
 		return nil, fmt.Errorf("server did not accept any of the requested Bolt versions (%#v)", versions)
 	default:
