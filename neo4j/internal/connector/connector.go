@@ -72,6 +72,7 @@ func (c Connector) Connect(
 		MinSev:  c.Config.NotificationsMinSeverity,
 		DisCats: c.Config.NotificationsDisabledCategories,
 	}
+
 	// TLS not requested
 	if c.SkipEncryption {
 		connection, err := bolt.Connect(
