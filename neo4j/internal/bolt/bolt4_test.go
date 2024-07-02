@@ -118,6 +118,7 @@ func TestBolt4(outer *testing.T) {
 			logger,
 			nil,
 			idb.NotificationConfig{},
+			DefaultReadBufferSize,
 		)
 		if err != nil {
 			t.Fatal(err)
@@ -230,6 +231,7 @@ func TestBolt4(outer *testing.T) {
 			logger,
 			nil,
 			idb.NotificationConfig{},
+			DefaultReadBufferSize,
 		)
 		AssertNoError(t, err)
 		bolt.Close(context.Background())
@@ -259,6 +261,7 @@ func TestBolt4(outer *testing.T) {
 			logger,
 			nil,
 			idb.NotificationConfig{},
+			DefaultReadBufferSize,
 		)
 		AssertNoError(t, err)
 		bolt.Close(context.Background())
@@ -289,6 +292,7 @@ func TestBolt4(outer *testing.T) {
 			logger,
 			nil,
 			idb.NotificationConfig{},
+			DefaultReadBufferSize,
 		)
 		AssertNoError(t, err)
 		bolt.Close(context.Background())
@@ -315,6 +319,7 @@ func TestBolt4(outer *testing.T) {
 			logger,
 			nil,
 			idb.NotificationConfig{},
+			DefaultReadBufferSize,
 		)
 		AssertNil(t, bolt)
 		AssertError(t, err)

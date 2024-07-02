@@ -27,7 +27,7 @@ import (
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/errorutil"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/telemetry"
 	itime "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/time"
-	"net"
+	"io"
 	"reflect"
 	"time"
 
@@ -79,7 +79,7 @@ type bolt3 struct {
 	state         int
 	txId          idb.TxHandle
 	currStream    *stream
-	conn          net.Conn
+	conn          io.ReadWriteCloser
 	serverName    string
 	out           *outgoing
 	in            *incoming
@@ -100,7 +100,7 @@ type bolt3 struct {
 
 func NewBolt3(
 	serverName string,
-	conn net.Conn,
+	conn io.ReadWriteCloser,
 	errorListener ConnectionErrorListener,
 	logger log.Logger,
 	boltLog log.BoltLogger,

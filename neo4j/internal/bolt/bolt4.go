@@ -21,7 +21,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"net"
+	"io"
 	"reflect"
 	"time"
 
@@ -94,7 +94,7 @@ type bolt4 struct {
 	state         int
 	txId          idb.TxHandle
 	streams       openstreams
-	conn          net.Conn
+	conn          io.ReadWriteCloser
 	serverName    string
 	connId        string
 	logId         string
@@ -116,7 +116,7 @@ type bolt4 struct {
 
 func NewBolt4(
 	serverName string,
-	conn net.Conn,
+	conn io.ReadWriteCloser,
 	errorListener ConnectionErrorListener,
 	logger log.Logger,
 	boltLog log.BoltLogger,

@@ -20,10 +20,11 @@ package bolt
 import (
 	"context"
 	"encoding/binary"
+	"io"
+	"time"
+
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/errorutil"
 	rio "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/racing"
-	"net"
-	"time"
 )
 
 // dechunkMessage takes a buffer to be reused and returns the reusable buffer
@@ -32,7 +33,7 @@ import (
 // Reads will race against the provided context ctx
 // If the server provides the connection read timeout hint readTimeout, a new context will be created from that timeout
 // and the user-provided context ctx before every read
-func dechunkMessage(ctx context.Context, conn net.Conn, msgBuf []byte, readTimeout time.Duration) ([]byte, []byte, error) {
+func dechunkMessage(ctx context.Context, conn io.Reader, msgBuf []byte, readTimeout time.Duration) ([]byte, []byte, error) {
 
 	sizeBuf := []byte{0x00, 0x00}
 	off := 0

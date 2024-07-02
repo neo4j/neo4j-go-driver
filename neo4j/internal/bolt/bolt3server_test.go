@@ -18,6 +18,7 @@
 package bolt
 
 import (
+	"bufio"
 	"context"
 	"fmt"
 	"io"
@@ -25,6 +26,7 @@ import (
 	"testing"
 
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/packstream"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/racing"
 )
 
 // Fake of bolt3 server.
@@ -35,6 +37,7 @@ type bolt3server struct {
 	conn     net.Conn
 	unpacker *packstream.Unpacker
 	out      *outgoing
+	reader   racing.RacingReader
 }
 
 func newBolt3Server(conn net.Conn) *bolt3server {
@@ -45,6 +48,7 @@ func newBolt3Server(conn net.Conn) *bolt3server {
 			chunker: newChunker(),
 			packer:  packstream.Packer{},
 		},
+		reader: racing.NewRacingReader(bufio.NewReaderSize(conn, DefaultReadBufferSize)),
 	}
 }
 
