@@ -1005,6 +1005,14 @@ func parseNotification(m map[string]any) db.Notification {
 	return n
 }
 
+func newDefaultDiagnosticRecord() map[string]any {
+	return map[string]any{
+		"OPERATION":      "",
+		"OPERATION_CODE": "0",
+		"CURRENT_SCHEMA": "/",
+	}
+}
+
 func parseGqlStatusObject(m map[string]any) db.GqlStatusObject {
 	g := db.GqlStatusObject{}
 	g.GqlStatus = m["gql_status"].(string)
@@ -1024,11 +1032,7 @@ func parseGqlStatusObject(m map[string]any) db.GqlStatusObject {
 	}
 
 	// Initialize the default diagnostic record
-	diagnosticRecord := map[string]any{
-		"OPERATION":      "",
-		"OPERATION_CODE": "0",
-		"CURRENT_SCHEMA": "/",
-	}
+	diagnosticRecord := newDefaultDiagnosticRecord()
 
 	// Merge the diagnostic record from the map m
 	if dr, ok := m["diagnostic_record"].(map[string]any); ok {

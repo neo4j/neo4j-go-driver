@@ -75,7 +75,7 @@ type NotificationDisabledClassifications struct {
 // Deprecated: please use DisableClassifications. This will be removed in 6.0.
 //
 // DisableCategories creates a NotificationDisabledCategories that disables the given categories.
-// Can be used for NotificationDisabledClassifications of config.Config and config.SessionConfig.
+// Can be used for NotificationsDisabledCategories of config.Config and config.SessionConfig.
 func DisableCategories(value ...NotificationCategory) NotificationDisabledCategories {
 	return NotificationDisabledCategories{value, false}
 }
@@ -107,7 +107,7 @@ func (n *NotificationDisabledCategories) DisablesNone() bool {
 	return n.none
 }
 
-// DisablesNone returns true if all categories are enabled.
+// DisablesNone returns true if all classifications are enabled.
 func (n *NotificationDisabledClassifications) DisablesNone() bool {
 	return n.none
 }

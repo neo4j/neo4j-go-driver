@@ -45,6 +45,15 @@ func TestHydrator(outer *testing.T) {
 		panic(err)
 	}
 
+	fullDiagnosticRecord := newDefaultDiagnosticRecord()
+	fullDiagnosticRecord["_severity"] = "s1"
+	fullDiagnosticRecord["_classification"] = "c1"
+	fullDiagnosticRecord["_position"] = map[string]any{
+		"offset": int64(1),
+		"line":   int64(2),
+		"column": int64(3),
+	}
+
 	packer := packstream.Packer{}
 	cases := []hydratorTestCase{
 		{
@@ -305,6 +314,69 @@ func TestHydrator(outer *testing.T) {
 				notifications: []db.Notification{
 					{Code: "c1", Title: "t1", Description: "d1", Severity: "s1", Position: &db.InputPosition{Offset: 1, Line: 2, Column: 3}},
 					{Code: "c2", Title: "t2", Description: "d2", Severity: "s2"},
+				}},
+		},
+		{
+			name: "Success summary with statuses",
+			build: func() {
+				packer.StructHeader(byte(msgSuccess), 1)
+				packer.MapHeader(4)
+				packer.String("has_more")
+				packer.Bool(false)
+				packer.String("bookmark")
+				packer.String("bm")
+				packer.String("db")
+				packer.String("sys")
+				packer.String("statuses") // Array
+				packer.ArrayHeader(2)
+				packer.MapHeader(5) // GqlStatusObject map
+				packer.String("gql_status")
+				packer.String("g1")
+				packer.String("status_description")
+				packer.String("d1")
+				packer.String("neo4j_code")
+				packer.String("n1")
+				packer.String("title")
+				packer.String("t1")
+				packer.String("diagnostic_record") // Array
+				packer.MapHeader(3)                // Diagnostic Record map
+				packer.String("_severity")
+				packer.String("s1")
+				packer.String("_classification")
+				packer.String("c1")
+				packer.String("_position")
+				packer.MapHeader(3)
+				packer.String("offset")
+				packer.Int(1)
+				packer.String("line")
+				packer.Int(2)
+				packer.String("column")
+				packer.Int(3)
+				packer.MapHeader(2) // GqlStatusObject map
+				packer.String("gql_status")
+				packer.String("g2")
+				packer.String("status_description")
+				packer.String("d2")
+			},
+			x: &success{tlast: -1, tfirst: -1, bookmark: "bm", db: "sys", qid: -1, num: 4,
+				statuses: []db.GqlStatusObject{
+					{
+						Code:              "n1",
+						Title:             "t1",
+						GqlStatus:         "g1",
+						StatusDescription: "d1",
+						Position:          &db.InputPosition{Offset: 1, Line: 2, Column: 3},
+						Classification:    "c1",
+						Severity:          "s1",
+						DiagnosticRecord:  fullDiagnosticRecord,
+						IsNotification:    true,
+					},
+					{
+						GqlStatus:         "g2",
+						StatusDescription: "d2",
+						DiagnosticRecord:  newDefaultDiagnosticRecord(),
+						IsNotification:    false,
+					},
 				}},
 		},
 		{

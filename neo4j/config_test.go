@@ -18,6 +18,7 @@
 package neo4j
 
 import (
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/notifications"
 	"math"
 	"testing"
 	"time"
@@ -119,6 +120,18 @@ func TestValidateAndNormaliseConfig(rt *testing.T) {
 		}
 		if config.SocketConnectTimeout != 0*time.Nanosecond {
 			t.Errorf("SocketConnectTimeout should be set to (0 * time.Nanosecond) when negative")
+		}
+	})
+
+	rt.Run("Configure both NotificationsDisabledCategories and NotificationsDisabledCategories", func(t *testing.T) {
+		config := defaultConfig()
+
+		config.NotificationsDisabledCategories = notifications.DisableCategories(notifications.Deprecation)
+		config.NotificationsDisabledClassifications = notifications.DisableClassifications(notifications.Deprecation)
+
+		err := validateAndNormaliseConfig(config)
+		if err == nil {
+			t.Errorf("NotificationsDisabledCategories and NotificationsDisabledCategories are configured but no error returned")
 		}
 	})
 }
