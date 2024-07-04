@@ -18,12 +18,37 @@
 package bolt
 
 import (
+	"bufio"
 	"context"
+	"io"
+	"net"
+
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/db"
 	idb "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/errorutil"
-	"net"
 )
+
+// DefaultReadBufferSize specifies the default size (in bytes) of the buffer used for reading data from the network connection.
+const DefaultReadBufferSize = 8192
+
+func bufferedConnection(conn net.Conn, readBufferSize int) io.ReadWriteCloser {
+	var reader io.Reader
+	if readBufferSize > 0 {
+		reader = bufio.NewReaderSize(conn, readBufferSize)
+	} else {
+		reader = conn
+	}
+
+	return struct {
+		io.Reader
+		io.Writer
+		io.Closer
+	}{
+		Reader: reader,
+		Writer: conn,
+		Closer: conn,
+	}
+}
 
 type ConnectionErrorListener interface {
 	OnNeo4jError(context.Context, idb.Connection, *db.Neo4jError) error
@@ -31,7 +56,7 @@ type ConnectionErrorListener interface {
 	OnDialError(context.Context, string, error)
 }
 
-func handleTerminatedContextError(err error, connection net.Conn) error {
+func handleTerminatedContextError(err error, connection io.Closer) error {
 	if !contextTerminatedErr(err) {
 		return nil
 	}

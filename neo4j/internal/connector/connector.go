@@ -88,6 +88,7 @@ func (c Connector) Connect(
 			c.Log,
 			boltLogger,
 			notificationConfig,
+			c.Config.ReadBufferSize,
 		)
 		if err != nil {
 			return nil, err
@@ -124,6 +125,7 @@ func (c Connector) Connect(
 		c.Log,
 		boltLogger,
 		notificationConfig,
+		c.Config.ReadBufferSize,
 	)
 	if err != nil {
 		return nil, err

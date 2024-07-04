@@ -115,6 +115,7 @@ func TestBolt3(outer *testing.T) {
 			logger,
 			nil,
 			idb.NotificationConfig{},
+			DefaultReadBufferSize,
 		)
 		if err != nil {
 			t.Fatal(err)
@@ -167,6 +168,7 @@ func TestBolt3(outer *testing.T) {
 			logger,
 			nil,
 			idb.NotificationConfig{},
+			DefaultReadBufferSize,
 		)
 		AssertNil(t, bolt)
 		AssertError(t, err)
