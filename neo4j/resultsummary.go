@@ -614,7 +614,6 @@ func (s *resultSummary) Notifications() []Notification {
 			status := s.sum.GqlStatusObjects[i]
 			if status.IsNotification {
 				n = append(n, &notification{notification: notifications.ToNotification(status)})
-
 			}
 		}
 		return n
