@@ -191,7 +191,7 @@ func newUnknownInformationResultGqlStatusObject() *db.GqlStatusObject {
 // It maps fields from the notification to their respective status fields.
 func ToGqlStatusObject(notification db.Notification) *db.GqlStatusObject {
 	var defaultStatus *db.GqlStatusObject
-	if notification.Severity == string(WarningLevel) {
+	if notification.Severity == string(Warning) {
 		defaultStatus = newUnknownWarningResultGqlStatusObject()
 	} else {
 		defaultStatus = newUnknownInformationResultGqlStatusObject()
