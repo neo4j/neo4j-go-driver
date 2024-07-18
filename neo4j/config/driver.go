@@ -169,13 +169,13 @@ type Config struct {
 	// From Bolt protocol v4 (Neo4j 4+) records can be fetched in batches as
 	// compared to fetching all in previous versions.
 	//
-	// If FetchSize is set to `FetchDefault`, the driver decides the appropriate
-	// size. If set to a positive value that size is used if the underlying
-	// protocol supports it otherwise it is ignored.
+	// If FetchSize is set to `FetchDefault`, the driver decides the appropriate size.
+	// If set to a positive value that size is used (if the underlying protocol supports it);
+	// otherwise it is ignored.
 	//
-	// To turn off fetching in batches and always fetch everything, set
-	// FetchSize to `FetchAll`.
-	// `FetchAll` is the most performant setting for results consisting of a single large record.
+	// To turn off fetching in batches and always fetch everything, set FetchSize to `FetchAll`.
+	// A limited FetchSize ensures the client is not overflown with records,
+	// and allows to bound memory usage.
 	FetchSize int
 	// NotificationsMinSeverity defines the minimum severity level of notifications the server should send.
 	// By default, the server's settings are used.
