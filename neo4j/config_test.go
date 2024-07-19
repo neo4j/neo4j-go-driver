@@ -126,7 +126,6 @@ func TestValidateAndNormaliseConfig(rt *testing.T) {
 	rt.Run("Configure both NotificationsDisabledCategories and NotificationsDisabledCategories", func(t *testing.T) {
 		config := defaultConfig()
 
-		//lint:ignore SA1019 NotificationsDisabledCategories and DisableCategories are supported at least until 6.0
 		config.NotificationsDisabledCategories = notifications.DisableCategories(notifications.Deprecation)
 		config.NotificationsDisabledClassifications = notifications.DisableClassifications(notifications.Deprecation)
 

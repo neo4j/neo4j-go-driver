@@ -19,7 +19,6 @@ package main
 
 import (
 	"fmt"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/db"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/dbtype"
 	"time"
 
@@ -32,6 +31,8 @@ func nativeToCypher(v any) map[string]any {
 		return map[string]any{"name": "CypherNull", "data": nil}
 	}
 	switch x := v.(type) {
+	case int:
+		return valueResponse("CypherInt", x)
 	case int64:
 		return valueResponse("CypherInt", x)
 	case string:
@@ -202,15 +203,6 @@ func nativeToCypher(v any) map[string]any {
 				"z":      x.Z,
 			},
 		}
-	case *db.InputPosition:
-		if x != nil {
-			return valueResponse("CypherMap", map[string]any{
-				"column": nativeToCypher(int64(x.Column)),
-				"line":   nativeToCypher(int64(x.Line)),
-				"offset": nativeToCypher(int64(x.Offset)),
-			})
-		}
-		return nil
 	}
 
 	panic(fmt.Sprintf("Don't know how to patch %T", v))

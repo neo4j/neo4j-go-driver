@@ -625,6 +625,7 @@ func (b *bolt3) receiveNext(ctx context.Context) (*db.Record, *db.Summary, error
 	switch message := res.(type) {
 	case *db.Record:
 		message.Keys = b.currStream.keys
+		b.currStream.hadRecord = true
 		return message, nil, nil
 	case *success:
 		// End of stream, parse summary

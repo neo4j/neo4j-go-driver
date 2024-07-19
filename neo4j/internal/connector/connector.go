@@ -69,8 +69,7 @@ func (c Connector) Connect(
 	}()
 
 	notificationConfig := db.NotificationConfig{
-		MinSev: c.Config.NotificationsMinSeverity,
-		//lint:ignore SA1019 NotificationsDisabledCategories is supported at least until 6.0
+		MinSev:  c.Config.NotificationsMinSeverity,
 		DisCats: c.Config.NotificationsDisabledCategories,
 		DisClas: c.Config.NotificationsDisabledClassifications,
 	}

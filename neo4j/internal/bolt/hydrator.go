@@ -54,7 +54,6 @@ type success struct {
 	num                uint32
 	configurationHints map[string]any
 	patches            []string
-	streamSummary      db.StreamSummary
 }
 
 func (s *success) String() string {
@@ -84,7 +83,6 @@ func (s *success) summary() *db.Summary {
 		Database:              s.db,
 		ContainsSystemUpdates: extractBoolPointer(s.counters, containsSystemUpdatesKey),
 		ContainsUpdates:       extractBoolPointer(s.counters, containsUpdatesKey),
-		StreamSummary:         s.streamSummary,
 	}
 }
 
@@ -993,13 +991,13 @@ func parseInputPosition(m map[string]any) *db.InputPosition {
 func parseNotification(m map[string]any) db.Notification {
 	n := db.Notification{}
 	n.Code, _ = m["code"].(string)
-	if description, found := m["description"].(string); found {
+	if description, ok := m["description"].(string); ok {
 		n.Description = description
 	}
 	n.Severity, _ = m["severity"].(string)
 	n.Category, _ = m["category"].(string)
 	n.Title, _ = m["title"].(string)
-	if pos, exists := m["position"].(map[string]any); exists {
+	if pos, ok := m["position"].(map[string]any); ok {
 		n.Position = parseInputPosition(pos)
 	}
 	return n
@@ -1015,18 +1013,24 @@ func newDefaultDiagnosticRecord() map[string]any {
 
 func parseGqlStatusObject(m map[string]any) db.GqlStatusObject {
 	g := db.GqlStatusObject{}
-	g.GqlStatus = m["gql_status"].(string)
-	g.StatusDescription = m["status_description"].(string)
 
-	// Backward compatibility support for deprecated Notification API.
-	if code, found := m["neo4j_code"].(string); found {
+	if status, ok := m["gql_status"].(string); ok {
+		g.GqlStatus = status
+	}
+
+	if statusDescription, ok := m["status_description"].(string); ok {
+		g.StatusDescription = statusDescription
+	}
+
+	// Backward compatibility support for older Notification API.
+	if code, ok := m["neo4j_code"].(string); ok {
 		//lint:ignore SA1019 Code is supported at least until 6.0
 		g.Code = code
 		g.IsNotification = true
 	}
 
-	// Backward compatibility support for deprecated Notification API.
-	if title, found := m["title"].(string); found {
+	// Backward compatibility support for older Notification API.
+	if title, ok := m["title"].(string); ok {
 		//lint:ignore SA1019 Title is supported at least until 6.0
 		g.Title = title
 	}
@@ -1039,13 +1043,13 @@ func parseGqlStatusObject(m map[string]any) db.GqlStatusObject {
 		for key, value := range dr {
 			diagnosticRecord[key] = value
 		}
-		if pos, found := dr["_position"].(map[string]any); found {
+		if pos, ok := dr["_position"].(map[string]any); ok {
 			g.Position = parseInputPosition(pos)
 		}
-		if classification, found := dr["_classification"].(string); found {
+		if classification, ok := dr["_classification"].(string); ok {
 			g.Classification = classification
 		}
-		if severity, found := dr["_severity"].(string); found {
+		if severity, ok := dr["_severity"].(string); ok {
 			g.Severity = severity
 		}
 	}

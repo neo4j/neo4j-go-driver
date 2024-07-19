@@ -569,11 +569,9 @@ func (b *backend) handleRequest(req map[string]any) {
 			if data["notificationsDisabledCategories"] != nil {
 				notiDisCats := data["notificationsDisabledCategories"].([]any)
 				if len(notiDisCats) == 0 {
-					//lint:ignore SA1019 NotificationsDisabledCategories and DisableNoCategories are supported at least until 6.0
 					c.NotificationsDisabledCategories = notifications.DisableNoCategories()
 				} else {
 					cats := convertSlice(notiDisCats, anyToNotificationCategory)
-					//lint:ignore SA1019 NotificationsDisabledCategories and DisableNoCategories are supported at least until 6.0
 					c.NotificationsDisabledCategories = notifications.DisableCategories(cats...)
 				}
 			}
@@ -780,11 +778,9 @@ func (b *backend) handleRequest(req map[string]any) {
 		if data["notificationsDisabledCategories"] != nil {
 			notiDisCats := data["notificationsDisabledCategories"].([]any)
 			if len(notiDisCats) == 0 {
-				//lint:ignore SA1019 NotificationsDisabledCategories and DisableNoCategories are supported at least until 6.0
 				sessionConfig.NotificationsDisabledCategories = notifications.DisableNoCategories()
 			} else {
 				cats := convertSlice(notiDisCats, anyToNotificationCategory)
-				//lint:ignore SA1019 NotificationsDisabledCategories and DisableNoCategories are supported at least until 6.0
 				sessionConfig.NotificationsDisabledCategories = notifications.DisableCategories(cats...)
 			}
 		}
@@ -1448,7 +1444,7 @@ func serializeRecord(record *neo4j.Record) map[string]any {
 
 func serializeNotifications(slice []neo4j.Notification, version db.ProtocolVersion) []map[string]any {
 	if slice == nil {
-		if version.Minor >= 5 {
+		if version.Major == 4 && version.Minor >= 5 {
 			return []map[string]any{}
 		}
 		return nil
@@ -1481,12 +1477,6 @@ func serializeNotifications(slice []neo4j.Notification, version db.ProtocolVersi
 }
 
 func serializeGqlStatusObjects(slice []neo4j.GqlStatusObject) []map[string]any {
-	if slice == nil {
-		return []map[string]any{}
-	}
-	if len(slice) == 0 {
-		return []map[string]any{}
-	}
 	var res []map[string]any
 	for i, status := range slice {
 		res = append(res, map[string]any{
@@ -1549,7 +1539,6 @@ func serializeSummary(summary neo4j.ResultSummary) map[string]any {
 			"text":       summary.Query().Text(),
 			"parameters": serializeParameters(summary.Query().Parameters()),
 		},
-		//lint:ignore SA1019 Notifications is supported at least until 6.0
 		"notifications":    serializeNotifications(summary.Notifications(), protocolVersion),
 		"gqlStatusObjects": serializeGqlStatusObjects(summary.GqlStatusObjects()),
 		"plan":             serializePlan(summary.Plan()),
@@ -1780,9 +1769,7 @@ func convertInitialBookmarks(bookmarks []any) neo4j.Bookmarks {
 	return result
 }
 
-//lint:ignore SA1019 NotificationCategory is supported at least until 6.0
 func anyToNotificationCategory(v any) notifications.NotificationCategory {
-	//lint:ignore SA1019 NotificationCategory is supported at least until 6.0
 	return notifications.NotificationCategory(v.(string))
 }
 

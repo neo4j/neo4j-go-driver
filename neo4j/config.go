@@ -38,23 +38,22 @@ type ServerAddress = config.ServerAddress
 
 func defaultConfig() *Config {
 	return &Config{
-		AddressResolver:                nil,
-		MaxTransactionRetryTime:        30 * time.Second,
-		MaxConnectionPoolSize:          100,
-		MaxConnectionLifetime:          1 * time.Hour,
-		ConnectionAcquisitionTimeout:   1 * time.Minute,
-		ConnectionLivenessCheckTimeout: pool.DefaultConnectionLivenessCheckTimeout,
-		SocketConnectTimeout:           5 * time.Second,
-		SocketKeepalive:                true,
-		RootCAs:                        nil,
-		UserAgent:                      UserAgent,
-		FetchSize:                      FetchDefault,
-		NotificationsMinSeverity:       notifications.DefaultLevel,
-		//lint:ignore SA1019 NotificationsDisabledCategories is supported at least until 6.0
+		AddressResolver:                      nil,
+		MaxTransactionRetryTime:              30 * time.Second,
+		MaxConnectionPoolSize:                100,
+		MaxConnectionLifetime:                1 * time.Hour,
+		ConnectionAcquisitionTimeout:         1 * time.Minute,
+		ConnectionLivenessCheckTimeout:       pool.DefaultConnectionLivenessCheckTimeout,
+		SocketConnectTimeout:                 5 * time.Second,
+		SocketKeepalive:                      true,
+		RootCAs:                              nil,
+		UserAgent:                            UserAgent,
+		FetchSize:                            FetchDefault,
+		NotificationsMinSeverity:             notifications.DefaultLevel,
 		NotificationsDisabledCategories:      notifications.NotificationDisabledCategories{},
 		NotificationsDisabledClassifications: notifications.NotificationDisabledClassifications{},
 		TelemetryDisabled:                    false,
-		ReadBufferSize:                  bolt.DefaultReadBufferSize,
+		ReadBufferSize:                       bolt.DefaultReadBufferSize,
 	}
 }
 
@@ -94,7 +93,6 @@ func validateAndNormaliseConfig(config *Config) error {
 	}
 
 	// Check notifications have not been configured with both categories and classifications.
-	//lint:ignore SA1019 NotificationsDisabledCategories and DisabledCategories are supported at least until 6.0
 	if len(config.NotificationsDisabledCategories.DisabledCategories()) > 0 &&
 		len(config.NotificationsDisabledClassifications.DisabledClassifications()) > 0 {
 		return &UsageError{Message: "Notifications cannot be disabled for both categories and classifications at the same time."}

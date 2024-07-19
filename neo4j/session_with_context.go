@@ -158,14 +158,10 @@ type SessionConfig struct {
 	// Else, this option overrides the driver's settings.
 	// Disabling severities allows the server to skip analysis for those, which can speed up query execution.
 	NotificationsMinSeverity notifications.NotificationMinimumSeverityLevel
-	// Deprecated: please use NotificationsDisabledClassifications. This will be removed in 6.0.
-	//
 	// NotificationsDisabledCategories defines the categories of notifications the server should not send.
 	// By default, the driver's settings are used.
 	// Else, this option overrides the driver's settings.
 	// Disabling categories allows the server to skip analysis for those, which can speed up query execution.
-	//
-	//lint:ignore SA1019 NotificationDisabledCategories is supported at least until 6.0
 	NotificationsDisabledCategories notifications.NotificationDisabledCategories
 	// NotificationsDisabledClassifications is identical to NotificationsDisabledCategories.
 	// This alternative is provided for a consistent naming with neo4j.GqlStatusObject Classification.

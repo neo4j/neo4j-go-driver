@@ -20,6 +20,7 @@ package neo4j
 import (
 	"fmt"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/db"
+	inotifications "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/notifications"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/notifications"
 	"math"
 	"sort"
@@ -70,8 +71,6 @@ type ResultSummary interface {
 	Plan() Plan
 	// Profile returns profiled statement plan for the executed statement if available, otherwise null.
 	Profile() ProfiledPlan
-	// Deprecated: Notifications will be removed in 6.0.
-	//
 	// Notifications returns a slice of notifications produced while executing the statement.
 	// The list will be empty if no notifications produced while executing the statement.
 	Notifications() []Notification
@@ -253,7 +252,6 @@ type Notification interface {
 	// Category returns the mapped category of this notification.
 	// If the category is not a known value, Category returns UnknownCategory
 	// Call RawCategory to get access to the raw string value
-	//lint:ignore SA1019 NotificationCategory is supported at least until 6.0
 	Category() notifications.NotificationCategory
 }
 
@@ -339,8 +337,6 @@ const (
 )
 
 // Deprecated: please use notifications.NotificationCategory directly. This will be removed in 6.0.
-//
-//lint:ignore SA1019 NotificationCategory is supported at least until 6.0
 type NotificationCategory = notifications.NotificationCategory
 
 const (
@@ -613,7 +609,7 @@ func (s *resultSummary) Notifications() []Notification {
 		for i := range s.sum.GqlStatusObjects {
 			status := s.sum.GqlStatusObjects[i]
 			if status.IsNotification {
-				n = append(n, &notification{notification: notifications.ToNotification(status)})
+				n = append(n, &notification{notification: inotifications.ToNotification(status)})
 			}
 		}
 		return n
@@ -633,10 +629,10 @@ func (s *resultSummary) GqlStatusObjects() []GqlStatusObject {
 		// Polyfill GqlStatusObjects from Notifications
 		g := make([]GqlStatusObject, 0, len(s.sum.Notifications))
 		for i := range s.sum.Notifications {
-			g = append(g, &gqlStatusObject{gqlStatusObject: notifications.ToGqlStatusObject(s.sum.Notifications[i])})
+			g = append(g, &gqlStatusObject{gqlStatusObject: inotifications.ToGqlStatusObject(s.sum.Notifications[i])})
 		}
 		// Append client generated polyfill status
-		g = append(g, &gqlStatusObject{gqlStatusObject: notifications.ToGqlStatusObjectFromSummary(s.sum.StreamSummary)})
+		g = append(g, &gqlStatusObject{gqlStatusObject: inotifications.ToGqlStatusObjectFromSummary(s.sum.StreamSummary)})
 		// Sort by GqlStatus weight
 		sort.Slice(g, func(i, j int) bool {
 			return calculateGqlStatusWeight(g[i]) < calculateGqlStatusWeight(g[j])
@@ -644,7 +640,7 @@ func (s *resultSummary) GqlStatusObjects() []GqlStatusObject {
 		return g
 	}
 	// If both s.sum.GqlStatusObjects and s.sum.Notifications are nil
-	return []GqlStatusObject{&gqlStatusObject{gqlStatusObject: notifications.ToGqlStatusObjectFromSummary(s.sum.StreamSummary)}}
+	return []GqlStatusObject{&gqlStatusObject{gqlStatusObject: inotifications.ToGqlStatusObjectFromSummary(s.sum.StreamSummary)}}
 }
 
 func calculateGqlStatusWeight(gqlStatusObject GqlStatusObject) int {
@@ -702,7 +698,6 @@ func (n *notification) RawCategory() string {
 	return n.notification.Category
 }
 
-//lint:ignore SA1019 NotificationCategory is supported at least until 6.0
 func (n *notification) Category() notifications.NotificationCategory {
 	switch n.notification.Category {
 	case "HINT":

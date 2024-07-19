@@ -182,13 +182,9 @@ type Config struct {
 	// By default, the server's settings are used.
 	// Disabling severities allows the server to skip analysis for those, which can speed up query execution.
 	NotificationsMinSeverity notifications.NotificationMinimumSeverityLevel
-	// Deprecated: please use NotificationsDisabledClassifications. This will be removed in 6.0.
-	//
 	// NotificationsDisabledCategories defines the categories of notifications the server should not send.
 	// By default, the server's settings are used.
 	// Disabling categories allows the server to skip analysis for those, which can speed up query execution.
-	//
-	//lint:ignore SA1019 NotificationsDisabledCategories is supported at least until 6.0
 	NotificationsDisabledCategories notifications.NotificationDisabledCategories
 	// NotificationsDisabledClassifications is identical to NotificationsDisabledCategories.
 	// This alternative is provided for a consistent naming with neo4j.GqlStatusObject Classification.
