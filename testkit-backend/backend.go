@@ -1444,7 +1444,7 @@ func serializeRecord(record *neo4j.Record) map[string]any {
 
 func serializeNotifications(slice []neo4j.Notification, version db.ProtocolVersion) []map[string]any {
 	if slice == nil {
-		if version.Major == 4 && version.Minor >= 5 {
+		if version.Major == 5 && version.Minor >= 5 {
 			return []map[string]any{}
 		}
 		return nil
