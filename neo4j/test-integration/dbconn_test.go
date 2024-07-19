@@ -89,6 +89,7 @@ func makeRawConnection(ctx context.Context, logger log.Logger, boltLogger log.Bo
 		logger,
 		boltLogger,
 		idb.NotificationConfig{},
+		bolt.DefaultReadBufferSize,
 	)
 	if err != nil {
 		panic(err)

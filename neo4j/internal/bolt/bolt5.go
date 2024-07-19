@@ -21,7 +21,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"net"
+	"io"
 	"reflect"
 	"time"
 
@@ -96,7 +96,7 @@ type bolt5 struct {
 	state            int
 	txId             idb.TxHandle
 	streams          openstreams
-	conn             net.Conn
+	conn             io.ReadWriteCloser
 	serverName       string
 	queue            messageQueue
 	connId           string
@@ -119,7 +119,7 @@ type bolt5 struct {
 
 func NewBolt5(
 	serverName string,
-	conn net.Conn,
+	conn io.ReadWriteCloser,
 	errorListener ConnectionErrorListener,
 	logger log.Logger,
 	boltLog log.BoltLogger,
