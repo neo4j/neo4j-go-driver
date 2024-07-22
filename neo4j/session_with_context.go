@@ -121,14 +121,16 @@ type SessionConfig struct {
 	//		For older Bolt protocol versions, the behavior is the same as described for the bolt schemes above.
 	DatabaseName string
 	// FetchSize defines how many records to pull from server in each batch.
-	// From Bolt protocol v4 (Neo4j 4+) records can be fetched in batches as compared to fetching
-	// all in previous versions.
+	// From Bolt protocol v4 (Neo4j 4+) records can be fetched in batches as
+	// compared to fetching all in previous versions.
+	// If the underlying protocol does not support FetchSize, it is ignored.
 	//
-	// If FetchSize is set to FetchDefault, the driver decides the appropriate size. If set to a positive value
-	// that size is used if the underlying protocol supports it otherwise it is ignored.
+	// If FetchSize is set to `FetchDefault`, the driver decides the appropriate size.
+	// If set to a positive value that size is used; negative values behaves as `FetchAll` (see below).
 	//
-	// To turn off fetching in batches and always fetch everything, set FetchSize to FetchAll.
-	// If a single large result is to be retrieved this is the most performant setting.
+	// To turn off fetching in batches and always fetch everything, set FetchSize to `FetchAll`.
+	// A limited FetchSize ensures the client is not overflown with records,
+	// and allows to bound memory usage.
 	FetchSize int
 	// Logging target the session will send its Bolt message traces
 	//
