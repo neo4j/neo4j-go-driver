@@ -117,6 +117,8 @@ type GqlStatusObject struct {
 	Code string
 	// Deprecated: for backward compatibility with Notification.Title only.
 	Title string
+	// Deprecated: for backward compatibility with Notification.Description only.
+	Description string
 	// GqlStatus returns the GQLSTATUS.
 	// The following GQLSTATUS codes denote codes that the driver will use for
 	// polyfilling (when connected to an old, non-GQL-aware server). Further, they may be used by servers

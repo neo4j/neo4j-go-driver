@@ -1035,6 +1035,12 @@ func parseGqlStatusObject(m map[string]any) db.GqlStatusObject {
 		g.Title = title
 	}
 
+	// Backward compatibility support for older Notification API.
+	if description, ok := m["description"].(string); ok {
+		//lint:ignore SA1019 Description is supported at least until 6.0
+		g.Description = description
+	}
+
 	// Initialize the default diagnostic record
 	diagnosticRecord := newDefaultDiagnosticRecord()
 

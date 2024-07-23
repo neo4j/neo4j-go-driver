@@ -60,8 +60,9 @@ func ToNotification(gqlStatusObject db.GqlStatusObject) *db.Notification {
 		//lint:ignore SA1019 Code is supported at least until 6.0
 		Code: gqlStatusObject.Code,
 		//lint:ignore SA1019 Title is supported at least until 6.0
-		Title:       gqlStatusObject.Title,
-		Description: gqlStatusObject.StatusDescription,
+		Title: gqlStatusObject.Title,
+		//lint:ignore SA1019 Description is supported at least until 6.0
+		Description: gqlStatusObject.Description,
 		Position:    gqlStatusObject.Position,
 		Severity:    gqlStatusObject.Severity,
 		Category:    gqlStatusObject.Classification,
@@ -102,6 +103,7 @@ func ToGqlStatusObject(notification db.Notification) *db.GqlStatusObject {
 	return &db.GqlStatusObject{
 		Code:              notification.Code,
 		Title:             notification.Title,
+		Description:       notification.Description,
 		GqlStatus:         defaultStatus.GqlStatus,
 		StatusDescription: statusDescription,
 		Position:          notification.Position,
