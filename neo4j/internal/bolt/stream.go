@@ -38,6 +38,7 @@ type stream struct {
 	endOfBatch bool
 	discarding bool
 	tfirst     int64 // Time that server started streaming
+	hadRecord  bool
 }
 
 // Acts on buffered data, first return value indicates if buffering
@@ -75,6 +76,13 @@ func (s *stream) Err() error {
 
 func (s *stream) push(rec *db.Record) {
 	s.fifo.PushBack(rec)
+}
+
+func (s *stream) ToSummary() db.StreamSummary {
+	return db.StreamSummary{
+		HadRecord: s.hadRecord,
+		HadKey:    len(s.keys) > 0,
+	}
 }
 
 // Only need to keep track of current stream. Client keeps track of other

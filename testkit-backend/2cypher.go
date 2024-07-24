@@ -31,6 +31,8 @@ func nativeToCypher(v any) map[string]any {
 		return map[string]any{"name": "CypherNull", "data": nil}
 	}
 	switch x := v.(type) {
+	case int:
+		return valueResponse("CypherInt", x)
 	case int64:
 		return valueResponse("CypherInt", x)
 	case string:
@@ -202,6 +204,7 @@ func nativeToCypher(v any) map[string]any {
 			},
 		}
 	}
+
 	panic(fmt.Sprintf("Don't know how to patch %T", v))
 }
 

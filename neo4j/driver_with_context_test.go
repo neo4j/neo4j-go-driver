@@ -743,6 +743,10 @@ func (sum *fakeSummary) Notifications() []Notification {
 	panic("implement me")
 }
 
+func (sum *fakeSummary) GqlStatusObjects() []GqlStatusObject {
+	panic("implement me")
+}
+
 func (sum *fakeSummary) ResultAvailableAfter() time.Duration {
 	return sum.resultAvailableAfter
 }

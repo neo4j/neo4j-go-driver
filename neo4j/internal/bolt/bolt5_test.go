@@ -1929,8 +1929,8 @@ func TestBolt5(outer *testing.T) {
 	for _, test := range txTimeoutTestCases {
 		outer.Run(test.description, func(t *testing.T) {
 			tx := internalTx5{timeout: test.input}
-
-			actual, ok := tx.toMeta(logger, "")["tx_timeout"]
+			version := db.ProtocolVersion{Major: 5, Minor: 0}
+			actual, ok := tx.toMeta(logger, "", version)["tx_timeout"]
 			if test.omitted {
 				if ok {
 					t.Errorf("tx_timeout was present but should be omitted")
@@ -1945,4 +1945,70 @@ func TestBolt5(outer *testing.T) {
 			}
 		})
 	}
+
+	outer.Run("StreamSummary tests", func(t *testing.T) {
+		// Test where both HadRecord and HadKey are false - omitted result
+		t.Run("StreamSummary omitted result", func(t *testing.T) {
+			bolt, cleanup := connectToServer(t, func(srv *bolt5server) {
+				srv.accept(5)
+				// Simulate a run that returns no keys and no records
+				srv.waitForRun(nil)
+				srv.send(msgSuccess, map[string]any{"fields": []any{}})
+				srv.send(msgSuccess, map[string]any{})
+			})
+			defer cleanup()
+			defer bolt.Close(context.Background())
+
+			stream, _ := bolt.Run(context.Background(), idb.Command{Cypher: "MATCH (n) RETURN n"}, idb.TxConfig{Mode: idb.ReadMode})
+			summary, err := bolt.Consume(context.Background(), stream)
+			AssertNoError(t, err)
+
+			// Validate StreamSummary fields
+			AssertFalse(t, summary.StreamSummary.HadRecord)
+			AssertFalse(t, summary.StreamSummary.HadKey)
+		})
+
+		// Test where both HadRecord and HadKey are true - success result
+		t.Run("StreamSummary success result", func(t *testing.T) {
+			bolt, cleanup := connectToServer(t, func(srv *bolt5server) {
+				srv.accept(5)
+				// Simulate a run that returns keys and records
+				srv.waitForRun(nil)
+				srv.send(msgSuccess, map[string]any{"fields": []any{"name"}})
+				srv.send(msgRecord, []any{"John Doe"})
+				srv.send(msgSuccess, map[string]any{})
+			})
+			defer cleanup()
+			defer bolt.Close(context.Background())
+
+			stream, _ := bolt.Run(context.Background(), idb.Command{Cypher: "MATCH (n) RETURN n"}, idb.TxConfig{Mode: idb.ReadMode})
+			summary, err := bolt.Consume(context.Background(), stream)
+			AssertNoError(t, err)
+
+			// Validate StreamSummary fields
+			AssertTrue(t, summary.StreamSummary.HadRecord)
+			AssertTrue(t, summary.StreamSummary.HadKey)
+		})
+
+		// Test where HadRecord is false but HadKey is true - no data result
+		t.Run("StreamSummary no data result", func(t *testing.T) {
+			bolt, cleanup := connectToServer(t, func(srv *bolt5server) {
+				srv.accept(5)
+				// Simulate a run that returns keys but no records
+				srv.waitForRun(nil)
+				srv.send(msgSuccess, map[string]any{"fields": []any{"name"}})
+				srv.send(msgSuccess, map[string]any{})
+			})
+			defer cleanup()
+			defer bolt.Close(context.Background())
+
+			stream, _ := bolt.Run(context.Background(), idb.Command{Cypher: "MATCH (n) RETURN n"}, idb.TxConfig{Mode: idb.ReadMode})
+			summary, err := bolt.Consume(context.Background(), stream)
+			AssertNoError(t, err)
+
+			// Validate StreamSummary fields
+			AssertFalse(t, summary.StreamSummary.HadRecord)
+			AssertTrue(t, summary.StreamSummary.HadKey)
+		})
+	})
 }

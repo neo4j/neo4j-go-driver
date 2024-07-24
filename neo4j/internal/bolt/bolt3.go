@@ -625,6 +625,7 @@ func (b *bolt3) receiveNext(ctx context.Context) (*db.Record, *db.Summary, error
 	switch message := res.(type) {
 	case *db.Record:
 		message.Keys = b.currStream.keys
+		b.currStream.hadRecord = true
 		return message, nil, nil
 	case *success:
 		// End of stream, parse summary
@@ -652,6 +653,7 @@ func (b *bolt3) receiveNext(ctx context.Context) (*db.Record, *db.Summary, error
 		sum.Minor = b.minor
 		sum.ServerName = b.serverName
 		sum.TFirst = b.currStream.tfirst
+		sum.StreamSummary = b.currStream.ToSummary()
 		b.currStream.sum = sum
 		b.currStream = nil
 		return nil, sum, nil
