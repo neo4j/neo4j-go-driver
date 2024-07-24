@@ -329,15 +329,17 @@ func TestHydrator(outer *testing.T) {
 				packer.String("sys")
 				packer.String("statuses") // Array
 				packer.ArrayHeader(2)
-				packer.MapHeader(5) // GqlStatusObject map
+				packer.MapHeader(6) // GqlStatusObject map
 				packer.String("gql_status")
 				packer.String("g1")
 				packer.String("status_description")
-				packer.String("d1")
+				packer.String("sd1")
 				packer.String("neo4j_code")
 				packer.String("n1")
 				packer.String("title")
 				packer.String("t1")
+				packer.String("description")
+				packer.String("d1")
 				packer.String("diagnostic_record") // Array
 				packer.MapHeader(3)                // Diagnostic Record map
 				packer.String("_severity")
@@ -356,15 +358,16 @@ func TestHydrator(outer *testing.T) {
 				packer.String("gql_status")
 				packer.String("g2")
 				packer.String("status_description")
-				packer.String("d2")
+				packer.String("sd2")
 			},
 			x: &success{tlast: -1, tfirst: -1, bookmark: "bm", db: "sys", qid: -1, num: 4,
 				statuses: []db.GqlStatusObject{
 					{
 						Code:              "n1",
 						Title:             "t1",
+						Description:       "d1",
 						GqlStatus:         "g1",
-						StatusDescription: "d1",
+						StatusDescription: "sd1",
 						Position:          &db.InputPosition{Offset: 1, Line: 2, Column: 3},
 						Classification:    "c1",
 						Severity:          "s1",
@@ -373,7 +376,7 @@ func TestHydrator(outer *testing.T) {
 					},
 					{
 						GqlStatus:         "g2",
-						StatusDescription: "d2",
+						StatusDescription: "sd2",
 						DiagnosticRecord:  newDefaultDiagnosticRecord(),
 						IsNotification:    false,
 					},
