@@ -19,7 +19,9 @@ package bolt
 
 import (
 	"fmt"
+	"math"
 	"reflect"
+	"runtime/debug"
 	"testing"
 	"time"
 
@@ -1062,6 +1064,72 @@ func TestHydratorBolt5(outer *testing.T) {
 			if !reflect.DeepEqual(x, c.x) {
 				fmt.Printf("%+v", hydrator.cachedSuccess.plan)
 				t.Fatalf("Expected:\n%+v\n != Actual: \n%+v\n", c.x, x)
+			}
+		})
+	}
+}
+
+// TestHydratorPathWithEdgeCaseSizes ensures that the hydrator does not panic due to integer overflow
+// when handling the size of nodes, unbound relationships, and indices that are between the upper bounds of
+// signed and unsigned integers. This test case was created due to a bug identified in
+// GitHub issue #590 (https://github.com/neo4j/neo4j-go-driver/issues/590).
+func TestHydratorPathIntegerOverflowScenarios(outer *testing.T) {
+	type hydratorPathTestCase struct {
+		name string
+		size int
+	}
+
+	cases := []hydratorPathTestCase{
+		{name: "int8-overflow", size: math.MaxInt8 + 1},
+		{name: "int16-overflow", size: math.MaxInt16 + 1},
+		{name: "uint8-boundary", size: math.MaxUint8 - 1},   // Indices requires even size
+		{name: "uint16-boundary", size: math.MaxUint16 - 1}, // Indices requires even size
+	}
+
+	for _, c := range cases {
+		outer.Run(c.name, func(t *testing.T) {
+			defer func() {
+				if r := recover(); r != nil {
+					t.Fatalf("Error hydrating path: %s : %s", r, string(debug.Stack()))
+				}
+			}()
+
+			packer := packstream.Packer{}
+			hydrator := hydrator{}
+
+			packer.Begin([]byte{})
+			packer.StructHeader(byte(msgRecord), 1)
+			packer.ArrayHeader(1)
+			packer.StructHeader('P', 3)
+			// Nodes
+			packer.ArrayHeader(c.size)
+			for i := 1; i <= c.size; i++ {
+				packer.StructHeader('N', 3)
+				packer.Int64(int64(i))
+				packer.ArrayHeader(0)
+				packer.MapHeader(0)
+			}
+			// Unbound Relationships
+			packer.ArrayHeader(c.size)
+			for i := 1; i <= c.size; i++ {
+				packer.StructHeader('r', 3)
+				packer.Int(i)
+				packer.String("type")
+				packer.MapHeader(0)
+			}
+			// Indices
+			packer.ArrayHeader(c.size)
+			for i := 1; i <= c.size; i++ {
+				packer.Int(1)
+			}
+			// Test we can hydrate without a panic from int overflows.
+			buf, err := packer.End()
+			if err != nil {
+				t.Fatal("Build error")
+			}
+			_, err = hydrator.hydrate(buf)
+			if err != nil {
+				t.Fatal("Hydrate error")
 			}
 		})
 	}
