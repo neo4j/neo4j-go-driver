@@ -19,6 +19,7 @@ package bolt
 
 import (
 	"fmt"
+	"math"
 	"reflect"
 	"runtime/debug"
 	"testing"
@@ -1079,10 +1080,10 @@ func TestHydratorPathIntegerOverflowScenarios(outer *testing.T) {
 	}
 
 	cases := []hydratorPathTestCase{
-		{name: "int8-overflow", size: 128},
-		{name: "int16-overflow", size: 32768},
-		{name: "uint8-boundary", size: 254},    // Indices requires even number
-		{name: "uint16-boundary", size: 65534}, // Indices requires even number
+		{name: "int8-overflow", size: math.MaxInt8 + 1},
+		{name: "int16-overflow", size: math.MaxInt16 + 1},
+		{name: "uint8-boundary", size: math.MaxUint8 - 1},   // Indices requires even size
+		{name: "uint16-boundary", size: math.MaxUint16 - 1}, // Indices requires even size
 	}
 
 	for _, c := range cases {
