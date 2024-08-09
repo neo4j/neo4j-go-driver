@@ -658,7 +658,7 @@ func (h *hydrator) path(n uint32) any {
 	}
 	// Array of nodes
 	h.unp.Next()
-	num := h.unp.Int()
+	num := h.unp.Len()
 	nodes := make([]dbtype.Node, num)
 	for i := range nodes {
 		h.unp.Next()
@@ -675,7 +675,7 @@ func (h *hydrator) path(n uint32) any {
 	}
 	// Array of relnodes
 	h.unp.Next()
-	num = h.unp.Int()
+	num = h.unp.Len()
 	rnodes := make([]*relNode, num)
 	for i := range rnodes {
 		h.unp.Next()
@@ -692,7 +692,7 @@ func (h *hydrator) path(n uint32) any {
 	}
 	// Array of indexes
 	h.unp.Next()
-	num = h.unp.Int()
+	num = h.unp.Len()
 	indexes := make([]int, num)
 	for i := range indexes {
 		h.unp.Next()
