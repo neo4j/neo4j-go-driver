@@ -1125,11 +1125,11 @@ func TestHydratorPathIntegerOverflowScenarios(outer *testing.T) {
 			// Test we can hydrate without a panic from int overflows.
 			buf, err := packer.End()
 			if err != nil {
-				panic("Build error")
+				t.Fatal("Build error")
 			}
 			_, err = hydrator.hydrate(buf)
 			if err != nil {
-				panic(err)
+				t.Fatal("Hydrate error")
 			}
 		})
 	}
