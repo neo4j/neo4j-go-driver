@@ -1240,7 +1240,7 @@ func (b *backend) handleRequest(req map[string]any) {
 				//"Feature:API:Result.SingleOptional",
 				"Feature:API:RetryableExceptions",
 				"Feature:API:Session:AuthConfig",
-				//"Feature:API:Session:NotificationsConfig",
+				"Feature:API:Session:NotificationsConfig",
 				"Feature:API:SSLClientCertificate",
 				//"Feature:API:SSLConfig",
 				//"Feature:API:SSLSchemes",
