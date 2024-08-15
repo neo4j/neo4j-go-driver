@@ -34,7 +34,9 @@ const (
 	Security NotificationCategory = "SECURITY"
 	// Topology requires server version 5.14 or newer.
 	Topology NotificationCategory = "TOPOLOGY"
-	Unknown  NotificationCategory = "UNKNOWN"
+	// Schema requires server version 5.17 or newer.
+	Schema  NotificationCategory = "SCHEMA"
+	Unknown NotificationCategory = "UNKNOWN"
 )
 
 type NotificationSeverity string
