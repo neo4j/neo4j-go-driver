@@ -4,10 +4,22 @@ set -Eeuo pipefail
 
 grep_not(){ ! grep "${@}"; return $?;}
 
-go_version=$(go version)
+verlte() {
+    [ "$1" = "$(echo -e "$1\n$2" | sort -V | head -n1)" ]
+}
+
+verlt() {
+    [ "$1" = "$2" ] && return 1 || verlte $1 $2
+}
+
+go_version=$(go version | grep -o "go\([0-9.]\)\+" | grep -o "\([0-9.]\)\+")
 staticcheck_version="latest"
-if [[ "${go_version}" == *"go1.18"* ]]; then
+if verlt $go_version "1.19"; then  # go 1.18 and below
 	staticcheck_version="v0.3.3"
+elif verlt $go_version "1.20"; then  # go 1.19 and below
+	staticcheck_version="v0.4.7"
+elif verlt $go_version "1.22.1"; then
+	staticcheck_version="v0.4.7"
 fi
 
 echo "# pre-commit hook"
