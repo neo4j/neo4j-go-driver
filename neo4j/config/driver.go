@@ -45,12 +45,20 @@ type Config struct {
 	// 'neo4j+s' and 'neo4j+ssc'.
 	//
 	// The default MinVersion attribute is tls.VersionTLS12. This is overridable.
-	// The InsecureSkipVerify attribute of TlsConfig is always derived from the initial URI scheme.
+	// The InsecureSkipVerify attribute of TlsConfig is always derived from the initial URI scheme unless OverrideInsecureSkipVerify is set.
 	// The ServerName attribute of TlsConfig is always derived from the initial URI host.
 	//
 	// This is considered an advanced setting, use it at your own risk.
 	// Introduced in 5.0.
 	TlsConfig *tls.Config
+	// OverrideInsecureSkipVerify specifies whether to override the value inferred for TlsConfig.InsecureSkipVerify from
+	// the URI scheme. 
+	//
+	// If OverrideInsecureSkipVerify is true then TlsConfig.InsecureSkipVerify will be true, regardless
+	// of the URI.
+	//
+	// default: false
+	OverrideInsecureSkipVerify bool
 	// ClientCertificateProvider specifies a provider for the client TLS certificate for mutual TLS authentication.
 	// Use auth.NewStaticClientCertificateProvider for static certificates, or auth.NewRotatingClientCertificateProvider
 	// for certificates that require runtime updates without application restart.

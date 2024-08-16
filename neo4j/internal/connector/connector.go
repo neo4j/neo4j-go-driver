@@ -172,7 +172,7 @@ func (c Connector) tlsConfig(serverName string) *tls.Config {
 
 	// Configure server name and whether to skip certificate verification.
 	config.ServerName = serverName
-	config.InsecureSkipVerify = c.SkipVerify
+	config.InsecureSkipVerify = c.SkipVerify || c.Config.OverrideInsecureSkipVerify
 
 	return config
 }
