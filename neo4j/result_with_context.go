@@ -19,6 +19,8 @@ package neo4j
 
 import (
 	"context"
+	"iter"
+
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/db"
 	idb "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/errorutil"
@@ -44,6 +46,8 @@ type ResultWithContext interface {
 	Record() *Record
 	// Collect fetches all remaining records and returns them.
 	Collect(ctx context.Context) ([]*Record, error)
+	// Collect fetches all remaining records and returns them.
+	Records(ctx context.Context) (iter.Seq2[*Record, error])
 	// Single returns the only remaining record from the stream.
 	// If none or more than one record is left, an error is returned.
 	// The result is fully consumed after this call and its summary is immediately available when calling Consume.
@@ -147,18 +151,29 @@ func (r *resultWithContext) Record() *Record {
 	return r.record
 }
 
-func (r *resultWithContext) Collect(ctx context.Context) ([]*Record, error) {
-	recs := make([]*Record, 0, 1024)
-	for r.summary == nil && r.err == nil {
-		r.advance(ctx)
-		if r.record != nil {
-			recs = append(recs, r.record)
+func (r *resultWithContext) Records(ctx context.Context) iter.Seq2[*Record, error] {
+	return func(yield func(*db.Record, error) bool) {
+		defer r.callAfterConsumptionHook()
+		for r.summary == nil && r.err == nil {
+			r.advance(ctx)
+			if r.record != nil && !yield(r.record, nil) {
+				return
+			}
+		}
+		if r.err != nil {
+			yield(nil, errorutil.WrapError(r.err))
 		}
 	}
-	if r.err != nil {
-		return nil, errorutil.WrapError(r.err)
+}
+
+func (r *resultWithContext) Collect(ctx context.Context) ([]*Record, error) {
+	recs := make([]*Record, 0, 1024)
+	for r, err := range r.Records(ctx) {
+		if err != nil {
+			return nil, err
+		}
+		recs = append(recs, r)
 	}
-	r.callAfterConsumptionHook()
 	return recs, nil
 }
 

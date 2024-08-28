@@ -22,6 +22,7 @@ import (
 	"errors"
 	"fmt"
 	. "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/testutil"
+	"iter"
 	"net/url"
 	"sync"
 	"sync/atomic"
@@ -681,6 +682,10 @@ func (f *fakeResult) Err() error {
 
 func (f *fakeResult) Record() *Record {
 	return f.nextRecords[f.nextIndex]
+}
+
+func (f *fakeResult) Records(context.Context) (iter.Seq2[*Record, error]) {
+	panic("implement me")
 }
 
 func (f *fakeResult) Collect(context.Context) ([]*Record, error) {

@@ -28,7 +28,7 @@ import (
 	. "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/testutil"
 )
 
-type iter struct {
+type s_iter struct {
 	expectNext bool
 	expectRec  *db.Record
 	expectSum  *db.Summary
@@ -74,7 +74,7 @@ func TestResult(outer *testing.T) {
 	iterCases := []struct {
 		name   string
 		stream []Next
-		rounds []iter
+		rounds []s_iter
 		sum    db.Summary
 	}{
 		{
@@ -84,7 +84,7 @@ func TestResult(outer *testing.T) {
 				{Record: recs[1]},
 				{Summary: sums[0]},
 			},
-			rounds: []iter{
+			rounds: []s_iter{
 				{expectNext: true, expectRec: recs[0]},
 				{expectNext: true, expectRec: recs[1]},
 				{expectNext: false, expectSum: sums[0]},
@@ -96,7 +96,7 @@ func TestResult(outer *testing.T) {
 				{Record: recs[0]},
 				{Err: errs[0]},
 			},
-			rounds: []iter{
+			rounds: []s_iter{
 				{expectNext: true, expectRec: recs[0]},
 				{expectNext: false, expectErr: errs[0]},
 			},
@@ -107,7 +107,7 @@ func TestResult(outer *testing.T) {
 				{Record: recs[0]},
 				{Err: errs[0]},
 			},
-			rounds: []iter{
+			rounds: []s_iter{
 				{expectNext: true, expectRec: recs[0]},
 				{expectNext: false, expectErr: errs[0]},
 				{expectNext: false, expectErr: errs[0]},
