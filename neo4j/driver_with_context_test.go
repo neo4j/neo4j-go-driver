@@ -683,6 +683,10 @@ func (f *fakeResult) Record() *Record {
 	return f.nextRecords[f.nextIndex]
 }
 
+func (f *fakeResult) Records(context.Context) (func(yield func(*Record, error) bool)) {
+	panic("implement me")
+}
+
 func (f *fakeResult) Collect(context.Context) ([]*Record, error) {
 	panic("implement me")
 }
