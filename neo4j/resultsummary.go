@@ -356,6 +356,8 @@ const (
 	Security NotificationCategory = notifications.Security
 	// Deprecated: please use notifications.Topology directly. This will be removed in 6.0.
 	Topology NotificationCategory = notifications.Topology
+	// Deprecated: please use notifications.Schema directly. This will be removed in 6.0.
+	Schema NotificationCategory = notifications.Schema
 	// Deprecated: please use notifications.Unknown directly. This will be removed in 6.0.
 	UnknownCategory NotificationCategory = notifications.Unknown
 )
@@ -714,6 +716,8 @@ func (n *notification) Category() notifications.NotificationCategory {
 		return Security
 	case "TOPOLOGY":
 		return Topology
+	case "SCHEMA":
+		return Schema
 	case "GENERIC":
 		return Generic
 	default:
@@ -787,6 +791,8 @@ func (g *gqlStatusObject) Classification() notifications.NotificationClassificat
 		return notifications.Security
 	case "TOPOLOGY":
 		return notifications.Topology
+	case "SCHEMA":
+		return notifications.Schema
 	case "GENERIC":
 		return notifications.Generic
 	default:
