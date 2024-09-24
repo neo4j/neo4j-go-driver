@@ -102,6 +102,7 @@ func (s *State) Continue(ctx context.Context) bool {
 		sleepTime := s.Throttle.delay()
 		s.Log.Debugf(s.LogName, s.LogId,
 			"Retrying transaction (%s): %s [after %s]", s.cause, lastErr, sleepTime)
+
 		select {
 		case <-ctx.Done():
 			s.Errs = []error{context.Canceled}

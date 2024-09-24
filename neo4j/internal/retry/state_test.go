@@ -187,3 +187,34 @@ func TestState(outer *testing.T) {
 		})
 	}
 }
+
+func TestContextCancel(t *testing.T) {
+	state := State{
+		Log:                     log.ToVoid(),
+		LogName:                 "TEST",
+		LogId:                   "State",
+		MaxTransactionRetryTime: time.Second * 10,
+		Throttle:                Throttler(time.Second * 10),
+		Errs: []error{&errorutil.PoolTimeout{
+			Err:     errors.New("dummy error"),
+			Servers: nil,
+		}},
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+
+	waitCh := make(chan struct{})
+	go func() {
+		state.Continue(ctx)
+		close(waitCh)
+	}()
+
+	<-time.After(time.Second * 1)
+	cancel()
+
+	select {
+	case <-time.After(time.Second * 1):
+		t.Fatal("continue did not exit after context was canceled")
+	case <-waitCh:
+	}
+}
