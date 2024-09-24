@@ -161,7 +161,7 @@ func TestState(outer *testing.T) {
 				}
 
 				state.OnFailure(ctx, invocation.err, invocation.conn, invocation.isCommitting)
-				continued := state.Continue()
+				continued := state.Continue(ctx)
 				if continued != invocation.expectContinued {
 					t.Errorf("Expected continue to return %v but returned %v", invocation.expectContinued, continued)
 				}
