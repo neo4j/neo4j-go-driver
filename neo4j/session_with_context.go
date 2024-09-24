@@ -207,7 +207,6 @@ type sessionWithContext struct {
 	router        sessionRouter
 	explicitTx    *explicitTransaction
 	autocommitTx  *autocommitTransaction
-	sleep         func(d time.Duration)
 	logId         string
 	log           log.Logger
 	throttleTime  time.Duration
@@ -241,7 +240,6 @@ func newSessionWithContext(
 		bookmarks:     newSessionBookmarks(sessConfig.BookmarkManager, sessConfig.Bookmarks),
 		config:        sessConfig,
 		resolveHomeDb: sessConfig.DatabaseName == "",
-		sleep:         time.Sleep,
 		log:           logger,
 		logId:         logId,
 		throttleTime:  time.Second * 1,
@@ -434,12 +432,11 @@ func (s *sessionWithContext) runRetriable(
 		Log:                     s.log,
 		LogName:                 log.Session,
 		LogId:                   s.logId,
-		Sleep:                   s.sleep,
 		Throttle:                retry.Throttler(s.throttleTime),
 		MaxDeadConnections:      s.driverConfig.MaxConnectionPoolSize,
 		DatabaseName:            s.config.DatabaseName,
 	}
-	for state.Continue() {
+	for state.Continue(ctx) {
 		if hasCompleted, result := s.executeTransactionFunction(ctx, mode, config, &state, work, blockingTxBegin, api); hasCompleted {
 			return result, nil
 		}

@@ -147,7 +147,6 @@ func TestState(outer *testing.T) {
 				Log:                     log.ToVoid(),
 				LogName:                 "TEST",
 				LogId:                   "State",
-				Sleep:                   func(time.Duration) {},
 				MaxTransactionRetryTime: maxRetryTime,
 				MaxDeadConnections:      maxDead,
 				DatabaseName:            dbName,
