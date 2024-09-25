@@ -214,7 +214,7 @@ func TestContextCancel(t *testing.T) {
 
 	select {
 	case <-time.After(time.Second * 1):
-		t.Fatal("continue did not exit after context was canceled")
+		t.Error("continue did not exit after context was canceled")
 	case <-waitCh:
 	}
 }
