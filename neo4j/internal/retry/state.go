@@ -105,7 +105,10 @@ func (s *State) Continue(ctx context.Context) bool {
 
 		select {
 		case <-ctx.Done():
-			s.Errs = []error{context.Canceled}
+			s.Errs = []error{&errorutil.TransactionExecutionLimit{
+				Cause:  context.Canceled.Error(),
+				Errors: s.Errs,
+			}}
 			return false
 		case <-time.After(sleepTime):
 		}
