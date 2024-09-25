@@ -23,7 +23,7 @@ To help us understand your issue, please specify important details, primarily:
 
 Additionally, include (as appropriate) log-files, stacktraces, and other debug output.
 Always check the server logs to see if there is any stacktrace related to the driver error too.
-Also add any solutions you've tried to solve the problem yourself.
+Also, add any solutions you've tried to solve the problem yourself.
 
 ## Example bug report
 
