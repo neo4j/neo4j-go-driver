@@ -435,7 +435,7 @@ func (s *sessionWithContext) runRetriable(
 		Log:                     s.log,
 		LogName:                 log.Session,
 		LogId:                   s.logId,
-		Sleep:                   racing.Sleep,
+		Sleep:                   s.sleep,
 		Throttle:                retry.Throttler(s.throttleTime),
 		MaxDeadConnections:      s.driverConfig.MaxConnectionPoolSize,
 		DatabaseName:            s.config.DatabaseName,
