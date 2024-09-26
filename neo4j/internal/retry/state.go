@@ -37,6 +37,7 @@ type State struct {
 	Log                     log.Logger
 	LogName                 string
 	LogId                   string
+	Sleep                   func(context.Context, time.Duration) error
 	Throttle                Throttler
 	MaxDeadConnections      int
 	DatabaseName            string
@@ -103,14 +104,12 @@ func (s *State) Continue(ctx context.Context) bool {
 		s.Log.Debugf(s.LogName, s.LogId,
 			"Retrying transaction (%s): %s [after %s]", s.cause, lastErr, sleepTime)
 
-		select {
-		case <-ctx.Done():
+		err := s.Sleep(ctx, sleepTime)
+		if err != nil {
 			s.Errs = []error{&errorutil.TransactionExecutionLimit{
-				Cause:  context.Canceled.Error(),
+				Cause:  err.Error(),
 				Errors: s.Errs,
 			}}
-			return false
-		case <-time.After(sleepTime):
 		}
 	}
 	return true

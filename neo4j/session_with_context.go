@@ -20,6 +20,7 @@ package neo4j
 import (
 	"context"
 	"fmt"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/racing"
 	"math"
 	"time"
 
@@ -207,6 +208,7 @@ type sessionWithContext struct {
 	router        sessionRouter
 	explicitTx    *explicitTransaction
 	autocommitTx  *autocommitTransaction
+	sleep         func(context.Context, time.Duration) error
 	logId         string
 	log           log.Logger
 	throttleTime  time.Duration
@@ -240,6 +242,7 @@ func newSessionWithContext(
 		bookmarks:     newSessionBookmarks(sessConfig.BookmarkManager, sessConfig.Bookmarks),
 		config:        sessConfig,
 		resolveHomeDb: sessConfig.DatabaseName == "",
+		sleep:         racing.Sleep,
 		log:           logger,
 		logId:         logId,
 		throttleTime:  time.Second * 1,
@@ -432,6 +435,7 @@ func (s *sessionWithContext) runRetriable(
 		Log:                     s.log,
 		LogName:                 log.Session,
 		LogId:                   s.logId,
+		Sleep:                   racing.Sleep,
 		Throttle:                retry.Throttler(s.throttleTime),
 		MaxDeadConnections:      s.driverConfig.MaxConnectionPoolSize,
 		DatabaseName:            s.config.DatabaseName,
