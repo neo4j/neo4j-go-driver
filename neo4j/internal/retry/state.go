@@ -37,7 +37,7 @@ type State struct {
 	Log                     log.Logger
 	LogName                 string
 	LogId                   string
-	Sleep                   func(time.Duration)
+	Sleep                   func(context.Context, time.Duration) error
 	Throttle                Throttler
 	MaxDeadConnections      int
 	DatabaseName            string
@@ -66,7 +66,7 @@ func (s *State) OnFailure(_ context.Context, err error, conn idb.Connection, isC
 	s.skipSleep = false
 }
 
-func (s *State) Continue() bool {
+func (s *State) Continue(ctx context.Context) bool {
 	if s.start.IsZero() {
 		s.start = itime.Now()
 	}
@@ -103,7 +103,14 @@ func (s *State) Continue() bool {
 		sleepTime := s.Throttle.delay()
 		s.Log.Debugf(s.LogName, s.LogId,
 			"Retrying transaction (%s): %s [after %s]", s.cause, lastErr, sleepTime)
-		s.Sleep(sleepTime)
+
+		err := s.Sleep(ctx, sleepTime)
+		if err != nil {
+			s.Errs = []error{&errorutil.TransactionExecutionLimit{
+				Cause:  err.Error(),
+				Errors: s.Errs,
+			}}
+		}
 	}
 	return true
 }
