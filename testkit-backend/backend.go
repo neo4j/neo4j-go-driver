@@ -218,11 +218,20 @@ func (b *backend) writeError(err error) {
 		neo4j.IsTransactionExecutionLimit(err)
 
 	if isDriverError {
+		var msg, errorType string
+		if neo4jError, ok := err.(*neo4j.Neo4jError); ok {
+			msg = neo4jError.Msg
+			errorType = "Neo4jError"
+		} else {
+			msg = err.Error()
+			errorType = strings.Split(err.Error(), ":")[0]
+		}
+
 		id := b.setError(err)
 		b.writeResponse("DriverError", map[string]any{
 			"id":        id,
-			"errorType": strings.Split(err.Error(), ":")[0],
-			"msg":       err.Error(),
+			"errorType": errorType,
+			"msg":       msg,
 			"code":      code,
 			"retryable": retriable,
 		})
