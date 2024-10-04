@@ -45,6 +45,12 @@ func newBolt4Server(conn net.Conn) *bolt4server {
 		out: &outgoing{
 			chunker: newChunker(),
 			packer:  packstream.Packer{},
+			onPackErr: func(err error) {
+				panic(err)
+			},
+			onIoErr: func(_ context.Context, err error) {
+				panic(err)
+			},
 		},
 	}
 }
@@ -292,6 +298,7 @@ func setupBolt4Pipe(t *testing.T) (net.Conn, *bolt4server, func()) {
 	}
 
 	addr := l.Addr()
+	fmt.Println("Test server listening on", addr.String())
 	clientConn, _ := net.Dial(addr.Network(), addr.String())
 
 	srvConn, err := l.Accept()

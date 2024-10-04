@@ -44,6 +44,12 @@ func newBolt5Server(conn net.Conn) *bolt5server {
 		out: &outgoing{
 			chunker: newChunker(),
 			packer:  packstream.Packer{},
+			onPackErr: func(err error) {
+				panic(err)
+			},
+			onIoErr: func(_ context.Context, err error) {
+				panic(err)
+			},
 		},
 	}
 }
@@ -313,6 +319,7 @@ func setupBolt5Pipe(t *testing.T) (net.Conn, *bolt5server, func()) {
 	}
 
 	addr := l.Addr()
+	fmt.Println("Test server listening on", addr.String())
 	clientConn, _ := net.Dial(addr.Network(), addr.String())
 
 	srvConn, err := l.Accept()
