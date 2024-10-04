@@ -47,6 +47,12 @@ func newBolt3Server(conn net.Conn) *bolt3server {
 		out: &outgoing{
 			chunker: newChunker(),
 			packer:  packstream.Packer{},
+			onPackErr: func(err error) {
+				panic(err)
+			},
+			onIoErr: func(_ context.Context, err error) {
+				panic(err)
+			},
 		},
 		reader: racing.NewRacingReader(bufio.NewReaderSize(conn, DefaultReadBufferSize)),
 	}
@@ -221,6 +227,7 @@ func setupBolt3Pipe(t *testing.T) (net.Conn, *bolt3server, func()) {
 	}
 
 	addr := l.Addr()
+	fmt.Println("Test server listening on", addr.String())
 	clientConn, _ := net.Dial(addr.Network(), addr.String())
 
 	srvConn, err := l.Accept()
