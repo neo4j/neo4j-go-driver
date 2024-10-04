@@ -459,11 +459,12 @@ func TestBolt4(outer *testing.T) {
 		}
 		inner.Parallel()
 		for _, test := range testCases {
+			testCopy := test
 			inner.Run(fmt.Sprintf("%s for %s", test.description, test.Method), func(t *testing.T) {
 				bolt, cleanup := connectToServer(t, func(srv *bolt4server) {
 					srv.acceptWithMinor(4, 4)
-					if !test.ExpectError {
-						if test.Method == "run" {
+					if !testCopy.ExpectError {
+						if testCopy.Method == "run" {
 							srv.waitForRun(nil)
 						} else {
 							srv.waitForTxBegin()
@@ -1418,10 +1419,11 @@ func TestBolt4(outer *testing.T) {
 		}
 
 		for _, callback := range callbacks {
+			callbackCopy := callback
 			inner.Run(callback.scenario, func(t *testing.T) {
 				bolt, cleanup := connectToServer(inner, func(srv *bolt4server) {
 					srv.accept(4)
-					callback.server(t, srv)
+					callbackCopy.server(t, srv)
 				})
 				defer cleanup()
 				defer bolt.Close(ctx)
