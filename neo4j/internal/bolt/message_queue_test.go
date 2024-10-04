@@ -25,6 +25,7 @@ import (
 	. "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/testutil"
 	"net"
 	"reflect"
+	"sync"
 	"testing"
 )
 
@@ -202,19 +203,22 @@ func TestMessageQueue(outer *testing.T) {
 		})
 
 		inner.Run("receives all messages, executes all handlers", func(t *testing.T) {
-			done := make(chan any)
+			waitGroup := sync.WaitGroup{}
 			called := make(chan bool)
 			queue.enqueueCallback(responseHandler{onSuccess: func(s *success) { called <- true }})
 			queue.enqueueCallback(responseHandler{onIgnored: func(*ignored) { called <- true }})
 			queue.enqueueCallback(responseHandler{onRecord: func(*db.Record) { called <- true }})
 
+			waitGroup.Add(1)
 			go func() {
+				defer waitGroup.Done()
 				AssertTrue(t, <-called)
 				AssertTrue(t, <-called)
 				AssertTrue(t, <-called)
-				done <- struct{}{}
 			}()
+			waitGroup.Add(1)
 			go func() {
+				defer waitGroup.Done()
 				AssertNoError(t, queue.receiveAll(ctx))
 			}()
 
@@ -224,7 +228,7 @@ func TestMessageQueue(outer *testing.T) {
 			writer.send(ctx, server)
 			writer.appendX(msgRecord, []any{})
 			writer.send(ctx, server)
-			<-done
+			waitGroup.Wait()
 		})
 
 		inner.Run("returns error when nil callback called for", func(inner *testing.T) {
