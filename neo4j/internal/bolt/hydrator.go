@@ -208,7 +208,7 @@ func (h *hydrator) failure(n uint32, isNestedError bool) *db.Neo4jError {
 			dberr.Msg = h.unp.String()
 		case "diagnostic_record":
 			dberr.GqlDiagnosticRecord = h.amap()
-		case "isNestedError":
+		case "cause":
 			dberr.GqlCause = h.failure(1, true)
 		default:
 			// Do not fail on unknown value in map
