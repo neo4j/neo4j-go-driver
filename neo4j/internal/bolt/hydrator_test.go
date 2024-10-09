@@ -1034,6 +1034,56 @@ func TestHydratorBolt5(outer *testing.T) {
 					}},
 			}},
 		},
+		{
+			name: "Failure with GQL Error",
+			build: func() {
+				packer.StructHeader(byte(msgFailure), 1)
+				packer.MapHeader(6)
+				packer.String("gql_status")
+				packer.String("g1")
+				packer.String("description")
+				packer.String("d1")
+				packer.String("message")
+				packer.String("m1")
+				packer.String("neo4j_code")
+				packer.String("c1")
+				packer.String("diagnostic_record")
+				packer.MapHeader(1) // diagnostic record map
+				packer.String("_classification")
+				packer.String("CLIENT_ERROR")
+				packer.String("cause")
+				packer.MapHeader(3) // nested cause error map
+				packer.String("gql_status")
+				packer.String("g2")
+				packer.String("description")
+				packer.String("d2")
+				packer.String("message")
+				packer.String("m2")
+			},
+			x: &db.Neo4jError{
+				Code:                 "c1",
+				Msg:                  "m1",
+				GqlStatus:            "g1",
+				GqlStatusDescription: "d1",
+				GqlClassification:    db.ClientError,
+				GqlRawClassification: "CLIENT_ERROR",
+				GqlDiagnosticRecord: map[string]any{
+					"OPERATION":       "",
+					"OPERATION_CODE":  "0",
+					"CURRENT_SCHEMA":  "/",
+					"_classification": "CLIENT_ERROR",
+				},
+				GqlCause: &db.Neo4jError{
+					Code:                 "Neo.DatabaseError.General.UnknownError",
+					Msg:                  "m2",
+					GqlStatus:            "g2",
+					GqlStatusDescription: "d2",
+					GqlClassification:    db.UnknownError,
+					GqlRawClassification: "",
+					GqlDiagnosticRecord:  gql.NewDefaultDiagnosticRecord(),
+				},
+			},
+		},
 	}
 
 	hydrator := hydrator{boltMajor: 5, useUtc: true}
