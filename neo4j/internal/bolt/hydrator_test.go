@@ -19,6 +19,7 @@ package bolt
 
 import (
 	"fmt"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/gql"
 	"math"
 	"reflect"
 	"runtime/debug"
@@ -47,7 +48,7 @@ func TestHydrator(outer *testing.T) {
 		panic(err)
 	}
 
-	fullDiagnosticRecord := newDefaultDiagnosticRecord()
+	fullDiagnosticRecord := gql.NewDefaultDiagnosticRecord()
 	fullDiagnosticRecord["_severity"] = "s1"
 	fullDiagnosticRecord["_classification"] = "c1"
 	fullDiagnosticRecord["_position"] = map[string]any{
@@ -379,7 +380,7 @@ func TestHydrator(outer *testing.T) {
 					{
 						GqlStatus:         "g2",
 						StatusDescription: "sd2",
-						DiagnosticRecord:  newDefaultDiagnosticRecord(),
+						DiagnosticRecord:  gql.NewDefaultDiagnosticRecord(),
 						IsNotification:    false,
 					},
 				}},

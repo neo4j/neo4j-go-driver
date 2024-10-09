@@ -23,12 +23,34 @@ import (
 	"strings"
 )
 
+type ErrorClassification string
+
+const (
+	ClientError    ErrorClassification = "CLIENT_ERROR"
+	DatabaseError  ErrorClassification = "DATABASE_ERROR"
+	TransientError ErrorClassification = "TRANSIENT_ERROR"
+	UnknownError   ErrorClassification = "UNKNOWN"
+)
+
 // Neo4jError is created when the database server failed to fulfill request.
+// TODO 6.0: rename to GqlError
 type Neo4jError struct {
-	Code           string
-	Msg            string
+	// TODO 6.0: to be deprecated.
+	Code      string
+	Msg       string
+	GqlStatus string
+	// TODO 6.0: rename to StatusDescription
+	GqlStatusDescription string
+	// TODO 6.0: rename to Classification
+	GqlClassification ErrorClassification
+	// TODO 6.0: rename to RawClassification
+	GqlRawClassification string
+	// TODO 6.0: rename to DiagnosticRecord
+	GqlDiagnosticRecord map[string]any
+	// TODO 6.0: rename to Cause
+	GqlCause       *Neo4jError
 	parsed         bool
-	classification string
+	classification string // Legacy non-GQL classification
 	category       string
 	title          string
 	retriable      bool
@@ -38,6 +60,7 @@ func (e *Neo4jError) Error() string {
 	return fmt.Sprintf("Neo4jError: %s (%s)", e.Code, e.Msg)
 }
 
+// TODO 6.0: remove in favour of GqlClassification
 func (e *Neo4jError) Classification() string {
 	e.parse()
 	return e.classification

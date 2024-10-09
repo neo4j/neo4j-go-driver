@@ -218,10 +218,18 @@ func (b *backend) writeError(err error) {
 		neo4j.IsTransactionExecutionLimit(err)
 
 	if isDriverError {
-		var msg, errorType string
+		var msg, errorType, gqlStatus, gqlStatusDescription, gqlClassification, gqlRawClassification string
+		var gqlDiagnosticRecord map[string]any
+		var cause *db.Neo4jError
 		if neo4jError, ok := err.(*neo4j.Neo4jError); ok {
 			msg = neo4jError.Msg
+			gqlStatus = neo4jError.GqlStatus
+			gqlStatusDescription = neo4jError.GqlStatusDescription
+			gqlClassification = string(neo4jError.GqlClassification)
+			gqlRawClassification = neo4jError.GqlRawClassification
+			gqlDiagnosticRecord = serializeParameters(neo4jError.GqlDiagnosticRecord)
 			errorType = "Neo4jError"
+			cause = neo4jError.GqlCause
 		} else {
 			msg = err.Error()
 			errorType = strings.Split(err.Error(), ":")[0]
@@ -229,11 +237,17 @@ func (b *backend) writeError(err error) {
 
 		id := b.setError(err)
 		b.writeResponse("DriverError", map[string]any{
-			"id":        id,
-			"errorType": errorType,
-			"msg":       msg,
-			"code":      code,
-			"retryable": retriable,
+			"id":                id,
+			"errorType":         errorType,
+			"msg":               msg,
+			"code":              code,
+			"gqlStatus":         gqlStatus,
+			"statusDescription": gqlStatusDescription,
+			"classification":    gqlClassification,
+			"rawClassification": emptyStringToNil(gqlRawClassification),
+			"diagnosticRecord":  gqlDiagnosticRecord,
+			"cause":             b.serializeGqlErrorCause(cause),
+			"retryable":         retriable,
 		})
 		return
 	}
@@ -252,6 +266,21 @@ func (b *backend) writeError(err error) {
 	// This simplifies debugging errors from the frontend perspective, it will also make sure
 	// that the frontend doesn't hang when backend suddenly disappears.
 	b.writeResponse("BackendError", map[string]any{"msg": err.Error()})
+}
+
+func (b *backend) serializeGqlErrorCause(cause *db.Neo4jError) map[string]any {
+	if cause == nil {
+		return nil
+	}
+	return map[string]any{"name": "GqlError", "data": map[string]any{
+		"msg":               cause.Msg,
+		"gqlStatus":         cause.GqlStatus,
+		"statusDescription": cause.GqlStatusDescription,
+		"classification":    string(cause.GqlClassification),
+		"rawClassification": emptyStringToNil(cause.GqlRawClassification),
+		"diagnosticRecord":  serializeParameters(cause.GqlDiagnosticRecord),
+		"cause":             b.serializeGqlErrorCause(cause.GqlCause),
+	}}
 }
 
 func (b *backend) nextId() string {
@@ -1272,6 +1301,7 @@ func (b *backend) handleRequest(req map[string]any) {
 				"Feature:Bolt:5.4",
 				"Feature:Bolt:5.5",
 				"Feature:Bolt:5.6",
+				"Feature:Bolt:5.7",
 				"Feature:Bolt:Patch:UTC",
 				"Feature:Impersonation",
 				//"Feature:TLS:1.1",
