@@ -19,7 +19,9 @@ package errorutil_test
 
 import (
 	"fmt"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/db"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/errorutil"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/gql"
 	"reflect"
 	"testing"
 )
@@ -126,6 +128,73 @@ func TestCombineAllErrors(outer *testing.T) {
 
 			if !reflect.DeepEqual(testCase.output, output) {
 				t.Errorf("expected %v, got %v", testCase.output, output)
+			}
+		})
+	}
+}
+
+func TestPolyfillGqlError(outer *testing.T) {
+
+	type testCase struct {
+		description string
+		input       *db.Neo4jError
+		output      *db.Neo4jError
+	}
+
+	testCases := []testCase{
+		{
+			description: "fills missing fields",
+			input:       &db.Neo4jError{},
+			output: &db.Neo4jError{
+				Code:                 "Neo.DatabaseError.General.UnknownError",
+				Msg:                  "An unknown error occurred",
+				GqlStatus:            "50N42",
+				GqlStatusDescription: "error: general processing exception - unexpected error. An unknown error occurred",
+				GqlClassification:    "UNKNOWN",
+				GqlRawClassification: "",
+				GqlDiagnosticRecord:  gql.NewDefaultDiagnosticRecord(),
+				GqlCause:             nil,
+			},
+		},
+		{
+			description: "respects existing fields and diagnostic record classification",
+			input: &db.Neo4jError{
+				Code:                 "Neo.ClientError.Transaction.LockClientStopped",
+				Msg:                  "Transaction lock client stopped",
+				GqlStatus:            "01N00",
+				GqlStatusDescription: "custom status description",
+				GqlDiagnosticRecord: map[string]any{
+					"_classification": "CLIENT_ERROR",
+					"_custom_key":     "hello",
+				},
+				GqlCause: &db.Neo4jError{},
+			},
+			output: &db.Neo4jError{
+				Code:                 "Neo.ClientError.Transaction.LockClientStopped",
+				Msg:                  "Transaction lock client stopped",
+				GqlStatus:            "01N00",
+				GqlStatusDescription: "custom status description",
+				GqlClassification:    db.ClientError,
+				GqlRawClassification: "CLIENT_ERROR",
+				GqlDiagnosticRecord: map[string]any{
+					"OPERATION":       "",
+					"OPERATION_CODE":  "0",
+					"CURRENT_SCHEMA":  "/",
+					"_classification": "CLIENT_ERROR",
+					"_custom_key":     "hello",
+				},
+				GqlCause: &db.Neo4jError{},
+			},
+		},
+	}
+
+	outer.Parallel()
+	for _, testCase := range testCases {
+		outer.Run(testCase.description, func(t *testing.T) {
+			errorutil.PolyfillGqlError(testCase.input)
+
+			if !reflect.DeepEqual(testCase.input, testCase.output) {
+				t.Errorf("expected %v, got %v", testCase.input, testCase.output)
 			}
 		})
 	}
