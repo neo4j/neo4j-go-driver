@@ -24,7 +24,7 @@ if __name__ == "__main__":
     for extra_args in (
         (), ("-tags", "internal_time_mock")
     ):
-        cmd = ["go", "test", *extra_args]
+        cmd = ["go", "test", "-race", *extra_args]
         if os.environ.get("TEST_IN_TEAMCITY", False):
             cmd = cmd + ["-v", "-json"]
 

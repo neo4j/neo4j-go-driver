@@ -30,6 +30,7 @@ import (
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/db"
 	idb "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/errorutil"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/racing"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/testutil"
 	itime "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/time"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/log"
@@ -44,6 +45,11 @@ type TStateInvocation struct {
 	expectContinued           bool
 	expectLastErrWasRetryable bool
 	expectLastErrType         error
+}
+
+type TrackableBackgroundContext struct {
+	context.Context
+	id int
 }
 
 func TestState(outer *testing.T) {
@@ -140,14 +146,23 @@ func TestState(outer *testing.T) {
 		},
 	}
 
-	ctx := context.Background()
-	for i, testCase := range testCases {
-		outer.Run(i, func(t *testing.T) {
+	i := 0
+	for name, testCase := range testCases {
+		i++
+		ctx := TrackableBackgroundContext{Context: context.Background(), id: i}
+		outer.Run(name, func(t *testing.T) {
+			sleep := func(sleepCtx context.Context, _ time.Duration) error {
+				if !reflect.DeepEqual(sleepCtx, ctx) {
+					t.Fatal("expected context to be passed through")
+				}
+				return nil
+			}
+
 			state := State{
 				Log:                     log.ToVoid(),
 				LogName:                 "TEST",
 				LogId:                   "State",
-				Sleep:                   func(time.Duration) {},
+				Sleep:                   sleep,
 				MaxTransactionRetryTime: maxRetryTime,
 				MaxDeadConnections:      maxDead,
 				DatabaseName:            dbName,
@@ -162,7 +177,7 @@ func TestState(outer *testing.T) {
 				}
 
 				state.OnFailure(ctx, invocation.err, invocation.conn, invocation.isCommitting)
-				continued := state.Continue()
+				continued := state.Continue(ctx)
 				if continued != invocation.expectContinued {
 					t.Errorf("Expected continue to return %v but returned %v", invocation.expectContinued, continued)
 				}
@@ -186,5 +201,40 @@ func TestState(outer *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestContextCancel(t *testing.T) {
+	t.Parallel()
+
+	state := State{
+		Log:                     log.ToVoid(),
+		LogName:                 "TEST",
+		LogId:                   "State",
+		Sleep:                   racing.Sleep,
+		MaxTransactionRetryTime: time.Second * 10,
+		Throttle:                Throttler(time.Second * 10),
+		Errs: []error{&errorutil.PoolTimeout{
+			Err:     errors.New("dummy error"),
+			Servers: nil,
+		}},
+	}
+
+	const sleepTime = time.Millisecond * 100
+	ctx, cancel := context.WithCancel(context.Background())
+
+	waitCh := make(chan struct{})
+	go func() {
+		state.Continue(ctx)
+		close(waitCh)
+	}()
+
+	<-time.After(sleepTime)
+	cancel()
+
+	select {
+	case <-time.After(sleepTime):
+		t.Error("continue did not exit after context was canceled")
+	case <-waitCh:
 	}
 }

@@ -15,6 +15,18 @@
  * limitations under the License.
  */
 
-package metadata
+package racing
 
-const DriverVersion = "5.25.0"
+import (
+	"context"
+	"time"
+)
+
+func Sleep(ctx context.Context, d time.Duration) error {
+	select {
+	case <-time.After(d):
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
+	}
+}
