@@ -32,22 +32,51 @@ const (
 	UnknownError   ErrorClassification = "UNKNOWN"
 )
 
-// Neo4jError is created when the database server failed to fulfill request.
-// TODO 6.0: rename to GqlError
+// TODO: when we no longer need to support the old Neo4jError, rename the following fields:
+// - Neo4jError -> GqlError
+// - GqlStatusDescription -> StatusDescription
+// - GqlClassification -> Classification
+// - GqlRawClassification -> RawClassification
+// - GqlDiagnosticRecord -> DiagnosticRecord
+// - GqlCause -> Cause
+// - GqlStatus to remain as-is to comply with GQLSTATUS.
+
+// Neo4jError is created when the database server fails to fulfill a request.
 type Neo4jError struct {
-	// TODO 6.0: to be deprecated.
-	Code      string
-	Msg       string
+	// Code is the Neo4j-specific error code, to be deprecated in favor of GqlStatus.
+	Code string
+	// Msg is the specific error message describing the failure.
+	Msg string
+	// GqlStatus returns the GQLSTATUS.
+	// GqlStatus is the error code compliant with the GQL specification.
+	//
+	// GqlStatus is part of the GQL compliant errors preview feature
+	// (see README on what it means in terms of support and compatibility guarantees)
 	GqlStatus string
-	// TODO 6.0: rename to StatusDescription
+	// GqlStatusDescription provides a standard description for the associated GQLStatus code.
+	//
+	// GqlStatusDescription is part of the GQL compliant errors preview feature
+	// (see README on what it means in terms of support and compatibility guarantees)
 	GqlStatusDescription string
-	// TODO 6.0: rename to Classification
+	// GqlClassification is a high-level categorization of the error, specific to GQL error handling.
+	//
+	// GqlClassification is part of the GQL compliant errors preview feature
+	// (see README on what it means in terms of support and compatibility guarantees)
 	GqlClassification ErrorClassification
-	// TODO 6.0: rename to RawClassification
+	// GqlRawClassification holds the raw classification as received from the server.
+	//
+	// GqlRawClassification is part of the GQL compliant errors preview feature
+	// (see README on what it means in terms of support and compatibility guarantees)
 	GqlRawClassification string
-	// TODO 6.0: rename to DiagnosticRecord
+	// GqlDiagnosticRecord returns further information about the status for diagnostic purposes.
+	//
+	// GqlDiagnosticRecord is part of the GQL compliant errors preview feature
+	// (see README on what it means in terms of support and compatibility guarantees)
 	GqlDiagnosticRecord map[string]any
-	// TODO 6.0: rename to Cause
+	// GqlCause represents the underlying error, if any, which caused the current error.
+	//
+	// GqlCause is part of the GQL compliant errors preview feature
+	// (see README on what it means in terms of support and compatibility guarantees)
 	GqlCause       *Neo4jError
 	parsed         bool
 	classification string // Legacy non-GQL classification
