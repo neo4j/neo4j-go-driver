@@ -22,7 +22,7 @@ import (
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/db"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/errorutil"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/gql"
-	"reflect"
+	. "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/testutil"
 	"testing"
 )
 
@@ -69,9 +69,7 @@ func TestCombineErrors(outer *testing.T) {
 		outer.Run(testCase.description, func(t *testing.T) {
 			output := errorutil.CombineErrors(testCase.input1, testCase.input2)
 
-			if !reflect.DeepEqual(testCase.output, output) {
-				t.Errorf("expected %v, got %v", testCase.output, output)
-			}
+			AssertDeepEquals(t, testCase.output, output)
 		})
 	}
 }
@@ -126,9 +124,7 @@ func TestCombineAllErrors(outer *testing.T) {
 		outer.Run(testCase.description, func(t *testing.T) {
 			output := errorutil.CombineAllErrors(testCase.input...)
 
-			if !reflect.DeepEqual(testCase.output, output) {
-				t.Errorf("expected %v, got %v", testCase.output, output)
-			}
+			AssertDeepEquals(t, testCase.output, output)
 		})
 	}
 }
@@ -193,9 +189,7 @@ func TestPolyfillGqlError(outer *testing.T) {
 		outer.Run(testCase.description, func(t *testing.T) {
 			errorutil.PolyfillGqlError(testCase.input)
 
-			if !reflect.DeepEqual(testCase.input, testCase.output) {
-				t.Errorf("expected %v, got %v", testCase.input, testCase.output)
-			}
+			AssertDeepEquals(t, testCase.input, testCase.output)
 		})
 	}
 }
