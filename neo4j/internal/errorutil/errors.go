@@ -20,9 +20,15 @@ package errorutil
 import (
 	"fmt"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/db"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/gql"
 	"io"
 	"net"
 )
+
+const unknownNeo4jCode = "Neo.DatabaseError.General.UnknownError"
+const unknownMessage = "An unknown error occurred"
+const unknownGqlStatus = "50N42"
+const unknownGqlStatusDescription = "error: general processing exception - unexpected error."
 
 func CombineAllErrors(errs ...error) error {
 	if len(errs) == 0 {
@@ -118,4 +124,49 @@ func (e *TokenExpiredError) Unwrap() error {
 
 func (e *TokenExpiredError) Error() string {
 	return fmt.Sprintf("TokenExpiredError: %s (%s)", e.Code, e.Message)
+}
+
+func PolyfillGqlError(dberr *db.Neo4jError) {
+	if dberr.Code == "" {
+		dberr.Code = unknownNeo4jCode
+	}
+	if dberr.Msg == "" {
+		dberr.Msg = unknownMessage
+	}
+	if dberr.GqlStatus == "" {
+		dberr.GqlStatus = unknownGqlStatus
+	}
+	if dberr.GqlStatusDescription == "" {
+		dberr.GqlStatusDescription = fmt.Sprintf("%s %s", unknownGqlStatusDescription, dberr.Msg)
+	}
+	// Ensure diagnostic record exists or fill missing keys
+	defaultRecord := gql.NewDefaultDiagnosticRecord()
+	if dberr.GqlDiagnosticRecord == nil {
+		dberr.GqlDiagnosticRecord = defaultRecord
+	} else {
+		// Polyfill any missing keys from default record
+		for key, value := range defaultRecord {
+			if _, exists := dberr.GqlDiagnosticRecord[key]; !exists {
+				dberr.GqlDiagnosticRecord[key] = value
+			}
+		}
+	}
+	// Extract classification from diagnostic record
+	if classification, ok := dberr.GqlDiagnosticRecord["_classification"].(string); ok {
+		// Set the raw classification string
+		dberr.GqlRawClassification = classification
+		switch classification {
+		case string(db.ClientError):
+			dberr.GqlClassification = db.ClientError
+		case string(db.DatabaseError):
+			dberr.GqlClassification = db.DatabaseError
+		case string(db.TransientError):
+			dberr.GqlClassification = db.TransientError
+		default:
+			dberr.GqlClassification = db.UnknownError
+		}
+	} else {
+		dberr.GqlRawClassification = ""
+		dberr.GqlClassification = db.UnknownError
+	}
 }

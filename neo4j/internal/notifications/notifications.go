@@ -1,23 +1,33 @@
+/*
+ * Copyright (c) "Neo4j"
+ * Neo4j Sweden AB [https://neo4j.com]
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package notifications
 
 import (
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/db"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/gql"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/notifications"
 )
-
-func newDefaultDiagnosticRecord() map[string]any {
-	return map[string]any{
-		"OPERATION":      "",
-		"OPERATION_CODE": "0",
-		"CURRENT_SCHEMA": "/",
-	}
-}
 
 func newSuccessGqlStatusObject() *db.GqlStatusObject {
 	return &db.GqlStatusObject{
 		GqlStatus:         "00000",
 		StatusDescription: "note: successful completion",
-		DiagnosticRecord:  newDefaultDiagnosticRecord(),
+		DiagnosticRecord:  gql.NewDefaultDiagnosticRecord(),
 	}
 }
 
@@ -25,7 +35,7 @@ func newNoDataGqlStatusObject() *db.GqlStatusObject {
 	return &db.GqlStatusObject{
 		GqlStatus:         "02000",
 		StatusDescription: "note: no data",
-		DiagnosticRecord:  newDefaultDiagnosticRecord(),
+		DiagnosticRecord:  gql.NewDefaultDiagnosticRecord(),
 	}
 }
 
@@ -33,7 +43,7 @@ func newOmittedResultGqlStatusObject() *db.GqlStatusObject {
 	return &db.GqlStatusObject{
 		GqlStatus:         "00001",
 		StatusDescription: "note: successful completion - omitted result",
-		DiagnosticRecord:  newDefaultDiagnosticRecord(),
+		DiagnosticRecord:  gql.NewDefaultDiagnosticRecord(),
 	}
 }
 
@@ -41,7 +51,7 @@ func newUnknownWarningResultGqlStatusObject() *db.GqlStatusObject {
 	return &db.GqlStatusObject{
 		GqlStatus:         "01N42",
 		StatusDescription: "warn: unknown warning",
-		DiagnosticRecord:  newDefaultDiagnosticRecord(),
+		DiagnosticRecord:  gql.NewDefaultDiagnosticRecord(),
 	}
 }
 
@@ -49,7 +59,7 @@ func newUnknownInformationResultGqlStatusObject() *db.GqlStatusObject {
 	return &db.GqlStatusObject{
 		GqlStatus:         "03N42",
 		StatusDescription: "info: unknown notification",
-		DiagnosticRecord:  newDefaultDiagnosticRecord(),
+		DiagnosticRecord:  gql.NewDefaultDiagnosticRecord(),
 	}
 }
 
@@ -84,7 +94,7 @@ func ToGqlStatusObject(notification db.Notification) *db.GqlStatusObject {
 		statusDescription = defaultStatus.StatusDescription
 	}
 
-	diagnosticRecord := newDefaultDiagnosticRecord()
+	diagnosticRecord := gql.NewDefaultDiagnosticRecord()
 
 	if notification.Position != nil {
 		diagnosticRecord["_position"] = map[string]any{

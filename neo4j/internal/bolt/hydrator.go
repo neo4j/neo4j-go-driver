@@ -20,6 +20,8 @@ package bolt
 import (
 	"errors"
 	"fmt"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/errorutil"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/gql"
 	"time"
 
 	idb "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
@@ -157,7 +159,7 @@ func (h *hydrator) hydrate(buf []byte) (x any, err error) {
 	case msgIgnored:
 		x = h.ignored(n)
 	case msgFailure:
-		x = h.failure(n)
+		x = h.failure(n, false)
 	case msgRecord:
 		x = h.record(n)
 	default:
@@ -178,27 +180,42 @@ func (h *hydrator) ignored(n uint32) *ignored {
 	return &h.cachedIgnored
 }
 
-func (h *hydrator) failure(n uint32) *db.Neo4jError {
+func (h *hydrator) failure(n uint32, isNestedError bool) *db.Neo4jError {
 	h.assertLength("failure", 1, n)
 	if h.getErr() != nil {
 		return nil
 	}
 	dberr := db.Neo4jError{}
-	h.unp.Next() // Detect map
+	// Skip h.unp.Next() for nested errors to avoid reprocessing the unpacker,
+	// as it's already handled by the recursive call.
+	if !isNestedError {
+		h.unp.Next() // Detect map
+	}
 	for maplen := h.unp.Len(); maplen > 0; maplen-- {
 		h.unp.Next()
 		key := h.unp.String()
 		h.unp.Next()
 		switch key {
+		case "gql_status":
+			dberr.GqlStatus = h.unp.String()
+		case "description":
+			dberr.GqlStatusDescription = h.unp.String()
+		case "neo4j_code":
+			fallthrough
 		case "code":
 			dberr.Code = h.unp.String()
 		case "message":
 			dberr.Msg = h.unp.String()
+		case "diagnostic_record":
+			dberr.GqlDiagnosticRecord = h.amap()
+		case "cause":
+			dberr.GqlCause = h.failure(1, true)
 		default:
 			// Do not fail on unknown value in map
 			h.trash()
 		}
 	}
+	errorutil.PolyfillGqlError(&dberr)
 	if h.boltLogger != nil {
 		h.boltLogger.LogServerMessage(h.logId, "FAILURE %s", loggableFailure(dberr))
 	}
@@ -1003,14 +1020,6 @@ func parseNotification(m map[string]any) db.Notification {
 	return n
 }
 
-func newDefaultDiagnosticRecord() map[string]any {
-	return map[string]any{
-		"OPERATION":      "",
-		"OPERATION_CODE": "0",
-		"CURRENT_SCHEMA": "/",
-	}
-}
-
 func parseGqlStatusObject(m map[string]any) db.GqlStatusObject {
 	g := db.GqlStatusObject{}
 
@@ -1042,7 +1051,7 @@ func parseGqlStatusObject(m map[string]any) db.GqlStatusObject {
 	}
 
 	// Initialize the default diagnostic record
-	diagnosticRecord := newDefaultDiagnosticRecord()
+	diagnosticRecord := gql.NewDefaultDiagnosticRecord()
 
 	// Merge the diagnostic record from the map m
 	if dr, ok := m["diagnostic_record"].(map[string]any); ok {

@@ -19,6 +19,7 @@ package bolt
 
 import (
 	"fmt"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/gql"
 	"math"
 	"reflect"
 	"runtime/debug"
@@ -47,7 +48,7 @@ func TestHydrator(outer *testing.T) {
 		panic(err)
 	}
 
-	fullDiagnosticRecord := newDefaultDiagnosticRecord()
+	fullDiagnosticRecord := gql.NewDefaultDiagnosticRecord()
 	fullDiagnosticRecord["_severity"] = "s1"
 	fullDiagnosticRecord["_classification"] = "c1"
 	fullDiagnosticRecord["_position"] = map[string]any{
@@ -379,7 +380,7 @@ func TestHydrator(outer *testing.T) {
 					{
 						GqlStatus:         "g2",
 						StatusDescription: "sd2",
-						DiagnosticRecord:  newDefaultDiagnosticRecord(),
+						DiagnosticRecord:  gql.NewDefaultDiagnosticRecord(),
 						IsNotification:    false,
 					},
 				}},
@@ -1032,6 +1033,56 @@ func TestHydratorBolt5(outer *testing.T) {
 						{Id: 9, ElementId: "99", StartId: 3, StartElementId: "33", EndId: 7, EndElementId: "77", Type: "x", Props: map[string]any{"akey": "aval"}},
 					}},
 			}},
+		},
+		{
+			name: "Failure with GQL Error",
+			build: func() {
+				packer.StructHeader(byte(msgFailure), 1)
+				packer.MapHeader(6)
+				packer.String("gql_status")
+				packer.String("g1")
+				packer.String("description")
+				packer.String("d1")
+				packer.String("message")
+				packer.String("m1")
+				packer.String("neo4j_code")
+				packer.String("c1")
+				packer.String("diagnostic_record")
+				packer.MapHeader(1) // diagnostic record map
+				packer.String("_classification")
+				packer.String("CLIENT_ERROR")
+				packer.String("cause")
+				packer.MapHeader(3) // nested cause error map
+				packer.String("gql_status")
+				packer.String("g2")
+				packer.String("description")
+				packer.String("d2")
+				packer.String("message")
+				packer.String("m2")
+			},
+			x: &db.Neo4jError{
+				Code:                 "c1",
+				Msg:                  "m1",
+				GqlStatus:            "g1",
+				GqlStatusDescription: "d1",
+				GqlClassification:    db.ClientError,
+				GqlRawClassification: "CLIENT_ERROR",
+				GqlDiagnosticRecord: map[string]any{
+					"OPERATION":       "",
+					"OPERATION_CODE":  "0",
+					"CURRENT_SCHEMA":  "/",
+					"_classification": "CLIENT_ERROR",
+				},
+				GqlCause: &db.Neo4jError{
+					Code:                 "Neo.DatabaseError.General.UnknownError",
+					Msg:                  "m2",
+					GqlStatus:            "g2",
+					GqlStatusDescription: "d2",
+					GqlClassification:    db.UnknownError,
+					GqlRawClassification: "",
+					GqlDiagnosticRecord:  gql.NewDefaultDiagnosticRecord(),
+				},
+			},
 		},
 	}
 
