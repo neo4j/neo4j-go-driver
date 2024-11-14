@@ -472,7 +472,7 @@ func (d *driverWithContext) VerifyAuthentication(ctx context.Context, auth *Auth
 // the built-in callback neo4j.ExecuteQueryWithBookmarkManager.
 // You can disable bookmark management by passing the neo4j.ExecuteQueryWithoutBookmarkManager callback to ExecuteQuery.
 //
-// The equivalent functionality of ExecuteQuery can be replicated with pre-existing APIs as follows:
+// The equivalent functionality of ExecuteQuery can be replicated with sessions and transaction functions as follows:
 //
 //	 // all the error handling bits have been omitted for brevity (do not do this in production!)
 //		session := driver.NewSession(ctx, neo4j.SessionConfig{
@@ -671,7 +671,6 @@ func ExecuteQueryWithTransactionConfig(configurers ...func(*TransactionConfig)) 
 		configuration.TransactionConfigurers = configurers
 	}
 }
-
 
 // ExecuteQueryWithAuthToken configures neo4j.ExecuteQuery to overwrite the AuthToken for the session.
 func ExecuteQueryWithAuthToken(auth AuthToken) ExecuteQueryConfigurationOption {
