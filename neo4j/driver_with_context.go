@@ -474,27 +474,27 @@ func (d *driverWithContext) VerifyAuthentication(ctx context.Context, auth *Auth
 //
 // The equivalent functionality of ExecuteQuery can be replicated with sessions and transaction functions as follows:
 //
-//	 // all the error handling bits have been omitted for brevity (do not do this in production!)
-//		session := driver.NewSession(ctx, neo4j.SessionConfig{
-//			DatabaseName:     "<DATABASE>",
-//			ImpersonatedUser: "<USER>",
-//			BookmarkManager:  bookmarkManager,
-//		})
-//		defer handleClose(ctx, session)
-//		// session.ExecuteRead is called if the routing is set to neo4j.Read
-//		result, _ := session.ExecuteWrite(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
-//			result, _ := tx.Run(ctx, "<CYPHER>", parameters)
-//			records, _ := result.Collect(ctx) // real implementation does not use Collect
-//			keys, _ := result.Keys()
-//			summary, _ := result.Consume(ctx)
-//			return &neo4j.EagerResult{
-//				Keys:    keys,
-//				Records: records,
-//				Summary: summary,
-//			}, nil
-//		})
-//		eagerResult := result.(*neo4j.EagerResult)
-//		// do something with eagerResult
+//	// all the error handling bits have been omitted for brevity (do not do this in production!)
+//	session := driver.NewSession(ctx, neo4j.SessionConfig{
+//		DatabaseName:     "<DATABASE>",
+//		ImpersonatedUser: "<USER>",
+//		BookmarkManager:  bookmarkManager,
+//	})
+//	defer handleClose(ctx, session)
+//	// session.ExecuteRead is called if the routing is set to neo4j.Read
+//	result, _ := session.ExecuteWrite(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+//		result, _ := tx.Run(ctx, "<CYPHER>", parameters)
+//		records, _ := result.Collect(ctx) // real implementation does not use Collect
+//		keys, _ := result.Keys()
+//		summary, _ := result.Consume(ctx)
+//		return &neo4j.EagerResult{
+//			Keys:    keys,
+//			Records: records,
+//			Summary: summary,
+//		}, nil
+//	})
+//	eagerResult := result.(*neo4j.EagerResult)
+//	// do something with eagerResult
 //
 // The available ResultTransformer implementation, EagerResultTransformer, computes an *EagerResult.
 // As the latter's name suggests, this is not optimal when the result is made from a large number of records.
