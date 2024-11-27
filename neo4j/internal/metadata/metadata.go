@@ -17,4 +17,4 @@
 
 package metadata
 
-const DriverVersion = "5.26.0"
+const DriverVersion = "5.27.0"
