@@ -415,6 +415,8 @@ func (p *Pool) Return(ctx context.Context, c idb.Connection) {
 
 	// Shouldn't return a too old or dead connection back to the pool
 	if !isAlive || age >= p.config.MaxConnectionLifetime {
+		// Fix for race condition where expired connections could be reused or closed concurrently.
+		// See: https://github.com/neo4j/neo4j-go-driver/issues/574
 		isAlive = false
 		p.unreg(ctx, serverName, c, now)
 		p.log.Infof(log.Pool, p.logId, "Unregistering dead or too old connection to %s", serverName)
