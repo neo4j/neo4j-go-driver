@@ -174,6 +174,15 @@ func (b *bolt4) ServerName() string {
 	return b.serverName
 }
 
+func (b *bolt4) AdvertisedServerName() string {
+	// Advertised address not supported by this protocol version
+	return ""
+}
+
+func (b *bolt4) SetServerName(serverName string) {
+	b.serverName = serverName
+}
+
 func (b *bolt4) ServerVersion() string {
 	return b.serverVersion
 }
@@ -985,7 +994,7 @@ func (b *bolt4) GetCurrentAuth() (auth.TokenManager, iauth.Token) {
 }
 
 func (b *bolt4) Telemetry(telemetry.API, func()) {
-	// TELEMETRY not support by this protocol version, so we ignore it.
+	// TELEMETRY not supported by this protocol version, so we ignore it.
 }
 
 func (b *bolt4) helloResponseHandler(checkUtcPatch bool) responseHandler {

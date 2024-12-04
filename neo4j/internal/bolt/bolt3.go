@@ -151,6 +151,15 @@ func (b *bolt3) ServerName() string {
 	return b.serverName
 }
 
+func (b *bolt3) AdvertisedServerName() string {
+	// Advertised address not supported by this protocol version
+	return ""
+}
+
+func (b *bolt3) SetServerName(serverName string) {
+	b.serverName = serverName
+}
+
 func (b *bolt3) ServerVersion() string {
 	return b.serverVersion
 }

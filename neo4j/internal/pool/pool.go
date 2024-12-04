@@ -303,7 +303,7 @@ func (p *Pool) tryBorrow(
 			if healthy {
 				return connection, nil
 			}
-			p.unreg(ctx, serverName, connection, itime.Now())
+			p.unreg(ctx, serverName, connection, itime.Now(), true)
 			if err != nil {
 				p.log.Debugf(log.Pool, p.logId, "Health check failed for %s: %s", serverName, err)
 				return nil, err
@@ -343,16 +343,18 @@ func (p *Pool) tryBorrow(
 	return c, nil
 }
 
-func (p *Pool) unreg(ctx context.Context, serverName string, c idb.Connection, now time.Time) {
+func (p *Pool) unreg(ctx context.Context, serverName string, c idb.Connection, now time.Time, close bool) {
 	p.serversMut.Lock()
 	defer p.serversMut.Unlock()
-	p.unregLocked(ctx, serverName, c, now)
+	p.unregLocked(ctx, serverName, c, now, close)
 }
 
-func (p *Pool) unregLocked(ctx context.Context, serverName string, c idb.Connection, now time.Time) {
+func (p *Pool) unregLocked(ctx context.Context, serverName string, c idb.Connection, now time.Time, close bool) {
 	defer func() {
 		// Close connection in another thread to avoid potential long blocking operation during close.
-		go c.Close(ctx)
+		if close {
+			go c.Close(ctx)
+		}
 	}()
 
 	server := p.servers[serverName]
@@ -384,16 +386,30 @@ func (p *Pool) Return(ctx context.Context, c idb.Connection) {
 		return
 	}
 
-	// Get the name of the server that the connection belongs to.
-	serverName := c.ServerName()
-	isAlive := c.IsAlive()
-	p.log.Debugf(log.Pool, p.logId, "Returning connection to %s {alive:%t}", serverName, isAlive)
-
 	// If the connection is dead, remove all other idle connections on the same server that older
 	// or of the same age as the dead connection, otherwise perform normal cleanup of old connections
 	maxAge := p.config.MaxConnectionLifetime
 	now := itime.Now()
 	age := now.Sub(c.Birthdate())
+
+	// Check if we have an advertised server name and if so replace connection from initial server.
+	if c.ServerName() != c.AdvertisedServerName() {
+		// Remove connection from busy list of initial server.
+		p.unreg(ctx, c.ServerName(), c, now, false)
+		p.log.Debugf(log.Pool, p.logId, "Transferring connection from %s to advertised server %s", c.ServerName(), c.AdvertisedServerName())
+		// Update connection server name to that of the advertised address.
+		c.SetServerName(c.AdvertisedServerName())
+		// Create a fresh server.
+		if _, ok := p.servers[c.ServerName()]; !ok {
+			p.servers[c.ServerName()] = NewServer()
+		}
+	}
+
+	// Get the name of the server that the connection belongs to
+	serverName := c.ServerName()
+	isAlive := c.IsAlive()
+	p.log.Debugf(log.Pool, p.logId, "Returning connection to %s {alive:%t}", serverName, isAlive)
+
 	if !isAlive {
 		// Since this connection has died all other connections that connected before this one
 		// might also be bad, remove the idle ones.
@@ -418,7 +434,7 @@ func (p *Pool) Return(ctx context.Context, c idb.Connection) {
 		// Fix for race condition where expired connections could be reused or closed concurrently.
 		// See: https://github.com/neo4j/neo4j-go-driver/issues/574
 		isAlive = false
-		p.unreg(ctx, serverName, c, now)
+		p.unreg(ctx, serverName, c, now, true)
 		p.log.Infof(log.Pool, p.logId, "Unregistering dead or too old connection to %s", serverName)
 	}
 

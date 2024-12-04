@@ -93,28 +93,29 @@ func (i *internalTx5) toMeta(logger log.Logger, logId string, version db.Protoco
 }
 
 type bolt5 struct {
-	state            int
-	txId             idb.TxHandle
-	streams          openstreams
-	conn             io.ReadWriteCloser
-	serverName       string
-	queue            messageQueue
-	connId           string
-	logId            string
-	serverVersion    string
-	bookmark         string // Last bookmark
-	birthDate        time.Time
-	log              log.Logger
-	databaseName     string
-	err              error // Last fatal error
-	minor            int
-	lastQid          int64 // Last seen qid
-	idleDate         time.Time
-	auth             map[string]any
-	authManager      auth.TokenManager
-	resetAuth        bool
-	errorListener    ConnectionErrorListener
-	telemetryEnabled bool
+	state                int
+	txId                 idb.TxHandle
+	streams              openstreams
+	conn                 io.ReadWriteCloser
+	serverName           string // Initial server name
+	advertisedServerName string // Preferred server name
+	queue                messageQueue
+	connId               string
+	logId                string
+	serverVersion        string
+	bookmark             string // Last bookmark
+	birthDate            time.Time
+	log                  log.Logger
+	databaseName         string
+	err                  error // Last fatal error
+	minor                int
+	lastQid              int64 // Last seen qid
+	idleDate             time.Time
+	auth                 map[string]any
+	authManager          auth.TokenManager
+	resetAuth            bool
+	errorListener        ConnectionErrorListener
+	telemetryEnabled     bool
 }
 
 func NewBolt5(
@@ -176,6 +177,14 @@ func (b *bolt5) checkStreams() {
 
 func (b *bolt5) ServerName() string {
 	return b.serverName
+}
+
+func (b *bolt5) AdvertisedServerName() string {
+	return b.advertisedServerName
+}
+
+func (b *bolt5) SetServerName(serverName string) {
+	b.serverName = serverName
 }
 
 func (b *bolt5) ServerVersion() string {
@@ -989,6 +998,9 @@ func (b *bolt5) logoffResponseHandler() responseHandler {
 }
 
 func (b *bolt5) logonResponseHandler() responseHandler {
+	if b.Version().Major >= 5 && b.Version().Minor >= 8 {
+		return b.expectedSuccessHandler(b.onLogonSuccess)
+	}
 	return b.expectedSuccessHandler(onSuccessNoOp)
 }
 
@@ -1125,6 +1137,10 @@ func (b *bolt5) onHelloSuccess(helloSuccess *success) {
 	b.queue.setLogId(connectionLogId)
 	b.initializeReadTimeoutHint(helloSuccess.configurationHints)
 	b.initializeTelemetryHint(helloSuccess.configurationHints)
+}
+
+func (b *bolt5) onLogonSuccess(logonSuccess *success) {
+	b.advertisedServerName = logonSuccess.advertisedAddress
 }
 
 func (b *bolt5) onCommitSuccess(commitSuccess *success) {

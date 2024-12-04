@@ -56,6 +56,7 @@ type success struct {
 	num                uint32
 	configurationHints map[string]any
 	patches            []string
+	advertisedAddress  string
 }
 
 func (s *success) String() string {
@@ -302,6 +303,8 @@ func (h *hydrator) success(n uint32) *success {
 		case "patch_bolt":
 			patches := h.strings()
 			succ.patches = patches
+		case "advertised_address":
+			succ.advertisedAddress = h.unp.String()
 		default:
 			// Unknown key, waste it
 			h.trash()
