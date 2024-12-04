@@ -393,7 +393,7 @@ func (p *Pool) Return(ctx context.Context, c idb.Connection) {
 	age := now.Sub(c.Birthdate())
 
 	// Check if we have an advertised server name and if so replace connection from initial server.
-	if c.ServerName() != c.AdvertisedServerName() {
+	if c.AdvertisedServerName() != "" && c.ServerName() != c.AdvertisedServerName() {
 		// Remove connection from busy list of initial server.
 		p.unreg(ctx, c.ServerName(), c, now, false)
 		p.log.Debugf(log.Pool, p.logId, "Transferring connection from %s to advertised server %s", c.ServerName(), c.AdvertisedServerName())
