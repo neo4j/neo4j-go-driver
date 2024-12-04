@@ -90,6 +90,13 @@ func (c *ConnFake) ServerName() string {
 	return c.Name
 }
 
+func (c *ConnFake) AdvertisedServerName() string {
+	return ""
+}
+
+func (c *ConnFake) SetServerName(serverName string) {
+}
+
 func (c *ConnFake) IsAlive() bool {
 	return c.Alive
 }
