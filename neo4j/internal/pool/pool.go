@@ -400,9 +400,11 @@ func (p *Pool) Return(ctx context.Context, c idb.Connection) {
 		// Update connection server name to that of the advertised address.
 		c.SetServerName(c.AdvertisedServerName())
 		// Create a fresh server.
+		p.serversMut.Lock()
 		if _, ok := p.servers[c.ServerName()]; !ok {
 			p.servers[c.ServerName()] = NewServer()
 		}
+		p.serversMut.Unlock()
 	}
 
 	// Get the name of the server that the connection belongs to
