@@ -308,6 +308,32 @@ func TestPoolBorrowReturn(outer *testing.T) {
 		wg.Wait()
 		AssertTrue(t, reAuthCalled)
 	})
+
+	outer.Run("Connection is transferred to advertised server on return", func(t *testing.T) {
+		itime.ForceFreezeTime()
+		defer itime.ForceUnfreezeTime()
+		advertisedServerName := "advertised-server"
+		conf := config.Config{MaxConnectionLifetime: maxAge, MaxConnectionPoolSize: 1}
+		p := New(&conf, succeedingConnect, logger, "pool id")
+		defer func() {
+			p.Close(ctx)
+		}()
+		serverNames := []string{"srvA"}
+		c, _ := p.Borrow(ctx, getServers(serverNames), true, nil, DefaultConnectionLivenessCheckTimeout, reAuthToken)
+		c.(*ConnFake).AdvertisedName = advertisedServerName
+		p.Return(ctx, c)
+		servers := p.getServers()
+
+		if len(servers) != 1 {
+			t.Errorf("Expected only 1 server, but %v were found", len(servers))
+		}
+		if _, exists := servers[advertisedServerName]; !exists {
+			t.Errorf("Expected connection to be transferred to %s, but server was not found", advertisedServerName)
+		}
+		if servers[advertisedServerName].numIdle() != 1 {
+			t.Errorf("Expected 1 idle connection in %s, found %d", advertisedServerName, servers[advertisedServerName].numIdle())
+		}
+	})
 }
 
 // Resource usage scenarios

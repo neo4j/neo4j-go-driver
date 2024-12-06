@@ -45,6 +45,7 @@ type RecordedTx struct {
 
 type ConnFake struct {
 	Name               string
+	AdvertisedName     string
 	ConnectionVersion  db.ProtocolVersion
 	Alive              bool
 	Birth              time.Time
@@ -91,10 +92,11 @@ func (c *ConnFake) ServerName() string {
 }
 
 func (c *ConnFake) AdvertisedServerName() string {
-	return ""
+	return c.AdvertisedName
 }
 
 func (c *ConnFake) SetServerName(serverName string) {
+	c.Name = serverName
 }
 
 func (c *ConnFake) IsAlive() bool {
