@@ -220,7 +220,7 @@ func NewDriverWithContext(target string, auth auth.TokenManager, configurers ...
 	d.connector.Config = d.config
 
 	// Let the pool use the same log ID as the driver to simplify log reading.
-	d.pool = pool.New(d.config, d.connector.Connect, d.log, d.logId)
+	d.pool = pool.New(d.config, d.connector.Connect, d.log, d.logId, routing)
 
 	if !routing {
 		d.router = &directRouter{address: address}

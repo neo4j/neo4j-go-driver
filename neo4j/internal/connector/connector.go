@@ -41,9 +41,10 @@ type Connector struct {
 	Network          string
 	Config           *config.Config
 	SupplyConnection func(context.Context, string) (net.Conn, error)
+	TestKitResolver  func(string) []string
 }
 
-func (c Connector) Connect(
+func (c *Connector) Connect(
 	ctx context.Context,
 	address string,
 	auth *db.ReAuthToken,
@@ -138,7 +139,24 @@ func (c Connector) createConnection(ctx context.Context, address string) (net.Co
 		dialer.KeepAlive = -1 * time.Second // Turns keep-alive off
 	}
 
-	return dialer.DialContext(ctx, c.Network, address)
+	if c.TestKitResolver == nil {
+		return dialer.DialContext(ctx, c.Network, address)
+	}
+
+	addresses := c.TestKitResolver(address)
+
+	if len(addresses) == 0 {
+		return nil, errors.New("TestKit DNS resolver returned no address")
+	}
+
+	var err error = nil
+	for _, address := range addresses {
+		con, err := dialer.DialContext(ctx, c.Network, address)
+		if err == nil {
+			return con, nil
+		}
+	}
+	return nil, err
 }
 
 func (c Connector) tlsConfig(serverName string) *tls.Config {
