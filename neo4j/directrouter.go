@@ -28,6 +28,10 @@ type directRouter struct {
 	address string
 }
 
+func (r *directRouter) IsMultiServer() bool {
+	return false
+}
+
 func (r *directRouter) InvalidateWriter(string, string) {}
 
 func (r *directRouter) InvalidateReader(string, string) {}

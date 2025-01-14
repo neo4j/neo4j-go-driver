@@ -81,6 +81,10 @@ func New(rootRouter string, getRouters func() []string, routerContext map[string
 	return r
 }
 
+func (r *Router) IsMultiServer() bool {
+	return true
+}
+
 func (r *Router) readTable(
 	ctx context.Context,
 	dbRouter *databaseRouter,

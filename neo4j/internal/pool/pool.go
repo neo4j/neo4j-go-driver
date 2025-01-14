@@ -47,6 +47,7 @@ type poolRouter interface {
 	InvalidateWriter(db string, server string)
 	InvalidateReader(db string, server string)
 	InvalidateServer(server string)
+	IsMultiServer() bool
 }
 
 type qitem struct {
@@ -64,7 +65,6 @@ type Pool struct {
 	closed     bool
 	log        log.Logger
 	logId      string
-	routing    bool
 }
 
 type serverPenalty struct {
@@ -72,7 +72,7 @@ type serverPenalty struct {
 	penalty uint32
 }
 
-func New(config *config.Config, connect Connect, logger log.Logger, logId string, routing bool) *Pool {
+func New(config *config.Config, connect Connect, logger log.Logger, logId string) *Pool {
 	// Means infinite life, simplifies checking later on
 
 	p := &Pool{
@@ -84,7 +84,6 @@ func New(config *config.Config, connect Connect, logger log.Logger, logId string
 		queueMut:   sync.Mutex{},
 		logId:      logId,
 		log:        logger,
-		routing:    routing,
 	}
 	p.log.Infof(log.Pool, p.logId, "Created")
 	return p
@@ -396,7 +395,7 @@ func (p *Pool) Return(ctx context.Context, c idb.Connection) {
 
 	// Check if we have an advertised server name and if so replace connection from initial server.
 	// Only do this when routing is enabled.
-	if p.routing && c.AdvertisedServerName() != "" && c.ServerName() != c.AdvertisedServerName() {
+	if p.router.IsMultiServer() && c.AdvertisedServerName() != "" && c.ServerName() != c.AdvertisedServerName() {
 		// Remove connection from busy list of initial server.
 		p.unreg(ctx, c.ServerName(), c, now, false)
 		p.log.Debugf(log.Pool, p.logId, "Transferring connection from %s to advertised server %s", c.ServerName(), c.AdvertisedServerName())

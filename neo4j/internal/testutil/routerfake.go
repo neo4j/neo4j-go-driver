@@ -35,6 +35,11 @@ type RouterFake struct {
 	Err                    error
 	CleanUpHook            func()
 	GetNameOfDefaultDbHook func(user string) (string, error)
+	IsMultiServerReturn    bool
+}
+
+func (r *RouterFake) IsMultiServer() bool {
+	return r.IsMultiServerReturn
 }
 
 func (r *RouterFake) InvalidateReader(database string, server string) {
