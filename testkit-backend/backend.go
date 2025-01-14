@@ -149,6 +149,7 @@ func newBackend(rd *bufio.Reader, wr io.Writer) *backend {
 		explicitTransactions:            make(map[string]neo4j.ExplicitTransaction),
 		recordedErrors:                  make(map[string]error),
 		resolvedAddresses:               make(map[string][]any),
+		dnsResolutions:                  make(map[string][]any),
 		authTokenManagers:               make(map[string]auth.TokenManager),
 		resolvedGetAuthTokens:           make(map[string]neo4j.AuthToken),
 		resolvedHandleSecurityException: make(map[string]bool),
@@ -665,7 +666,7 @@ func (b *backend) handleRequest(req map[string]any) {
 			return
 		}
 
-		if data["domainNameResolverRegistered"] != nil && data["domainNameResolverRegistered"].(bool) == true {
+		if data["domainNameResolverRegistered"] != nil && data["domainNameResolverRegistered"].(bool) {
 			neo4j.RegisterDnsResolver(driver, b.dnsResolverFunction())
 		}
 
