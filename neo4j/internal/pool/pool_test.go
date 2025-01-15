@@ -22,6 +22,7 @@ package pool
 import (
 	"context"
 	"errors"
+	"fmt"
 	"math/rand"
 	"sync"
 	"testing"
@@ -42,6 +43,17 @@ var logger = log.ToVoid()
 var ctx = context.Background()
 var reAuthToken = &idb.ReAuthToken{FromSession: false, Manager: iauth.Token{Tokens: map[string]any{"scheme": "none"}}}
 
+type connectFunc = func(ctx context.Context, name string, _ *idb.ReAuthToken, _ bolt.ConnectionErrorListener, _ log.BoltLogger) (idb.Connection, error)
+
+func newPool(
+	conf *config.Config,
+	connect connectFunc,
+) *Pool {
+	pool := New(conf, connect, logger, "pool id")
+	pool.router = &RouterFake{}
+	return pool
+}
+
 func TestPoolBorrowReturn(outer *testing.T) {
 	maxAge := 1 * time.Second
 	birthdate := time.Now()
@@ -59,7 +71,7 @@ func TestPoolBorrowReturn(outer *testing.T) {
 		itime.ForceFreezeTime()
 		defer itime.ForceUnfreezeTime()
 		conf := config.Config{MaxConnectionLifetime: maxAge, MaxConnectionPoolSize: 1}
-		p := New(&conf, succeedingConnect, logger, "pool id")
+		p := newPool(&conf, succeedingConnect)
 		defer func() {
 			p.Close(ctx)
 		}()
@@ -82,7 +94,7 @@ func TestPoolBorrowReturn(outer *testing.T) {
 		itime.ForceFreezeTime()
 		defer itime.ForceUnfreezeTime()
 		conf := config.Config{MaxConnectionLifetime: maxAge, MaxConnectionPoolSize: 1}
-		p := New(&conf, succeedingConnect, logger, "pool id")
+		p := newPool(&conf, succeedingConnect)
 		defer func() {
 			p.Close(ctx)
 		}()
@@ -114,7 +126,7 @@ func TestPoolBorrowReturn(outer *testing.T) {
 		itime.ForceFreezeTime()
 		defer itime.ForceUnfreezeTime()
 		conf := config.Config{MaxConnectionLifetime: maxAge, MaxConnectionPoolSize: 1}
-		p := New(&conf, succeedingConnect, logger, "pool id")
+		p := newPool(&conf, succeedingConnect)
 		defer func() {
 			p.Close(ctx)
 		}()
@@ -136,7 +148,7 @@ func TestPoolBorrowReturn(outer *testing.T) {
 		itime.ForceFreezeTime()
 		defer itime.ForceUnfreezeTime()
 		conf := config.Config{MaxConnectionLifetime: maxAge, MaxConnectionPoolSize: maxConnections}
-		p := New(&conf, succeedingConnect, logger, "pool id")
+		p := newPool(&conf, succeedingConnect)
 		serverNames := []string{"srv1"}
 		numWorkers := 5
 		wg := sync.WaitGroup{}
@@ -170,7 +182,7 @@ func TestPoolBorrowReturn(outer *testing.T) {
 		itime.ForceFreezeTime()
 		defer itime.ForceUnfreezeTime()
 		conf := config.Config{MaxConnectionLifetime: maxAge, MaxConnectionPoolSize: 2}
-		p := New(&conf, failingConnect, logger, "pool id")
+		p := newPool(&conf, failingConnect)
 		p.SetRouter(&RouterFake{})
 		serverNames := []string{"srv1"}
 		c, err := p.Borrow(ctx, getServers(serverNames), true, nil, DefaultConnectionLivenessCheckTimeout, reAuthToken)
@@ -185,7 +197,7 @@ func TestPoolBorrowReturn(outer *testing.T) {
 		itime.ForceFreezeTime()
 		defer itime.ForceUnfreezeTime()
 		conf := config.Config{MaxConnectionLifetime: maxAge, MaxConnectionPoolSize: 1}
-		p := New(&conf, succeedingConnect, logger, "pool id")
+		p := newPool(&conf, succeedingConnect)
 		c1, _ := p.Borrow(ctx, getServers([]string{"A"}), true, nil, DefaultConnectionLivenessCheckTimeout, reAuthToken)
 		cancelableCtx, cancel := context.WithCancel(ctx)
 		wg := sync.WaitGroup{}
@@ -216,7 +228,7 @@ func TestPoolBorrowReturn(outer *testing.T) {
 			t.Errorf("y u call me?")
 		}}
 		conf := config.Config{MaxConnectionLifetime: maxAge, MaxConnectionPoolSize: 1}
-		pool := New(&conf, nil, logger, "pool id")
+		pool := newPool(&conf, nil)
 		setIdleConnections(pool, map[string][]idb.Connection{"a server": {
 			deadAfterReset,
 			stayingAlive,
@@ -239,7 +251,7 @@ func TestPoolBorrowReturn(outer *testing.T) {
 			t.Errorf("force reset should not be called on new connections")
 		}}
 		conf := config.Config{MaxConnectionLifetime: maxAge, MaxConnectionPoolSize: 1}
-		pool := New(&conf, connectTo(healthyConnection), logger, "pool id")
+		pool := newPool(&conf, connectTo(healthyConnection))
 		setIdleConnections(pool, map[string][]idb.Connection{serverName: {deadAfterReset1, deadAfterReset2}})
 
 		result, err := pool.tryBorrow(ctx, serverName, nil, idlenessThreshold, reAuthToken)
@@ -254,7 +266,7 @@ func TestPoolBorrowReturn(outer *testing.T) {
 		itime.ForceFreezeTime()
 		defer itime.ForceUnfreezeTime()
 		conf := config.Config{MaxConnectionLifetime: maxAge, MaxConnectionPoolSize: 1}
-		p := New(&conf, succeedingConnect, logger, "pool id")
+		p := newPool(&conf, succeedingConnect)
 		c1, err := p.Borrow(ctx, getServers([]string{"A"}), true, nil, DefaultConnectionLivenessCheckTimeout, reAuthToken)
 		assertConnection(t, c1, err)
 		ctx = context.Background()
@@ -283,7 +295,7 @@ func TestPoolBorrowReturn(outer *testing.T) {
 		itime.ForceFreezeTime()
 		defer itime.ForceUnfreezeTime()
 		conf := config.Config{MaxConnectionLifetime: maxAge, MaxConnectionPoolSize: 1}
-		p := New(&conf, succeedingConnect, logger, "pool id")
+		p := newPool(&conf, succeedingConnect)
 		c1, err := p.Borrow(ctx, getServers([]string{"A"}), true, nil, DefaultConnectionLivenessCheckTimeout, reAuthToken)
 		assertConnection(t, c1, err)
 		ctx = context.Background()
@@ -314,7 +326,8 @@ func TestPoolBorrowReturn(outer *testing.T) {
 		defer itime.ForceUnfreezeTime()
 		advertisedServerName := "advertised-server"
 		conf := config.Config{MaxConnectionLifetime: maxAge, MaxConnectionPoolSize: 1}
-		p := New(&conf, succeedingConnect, logger, "pool id")
+		p := newPool(&conf, succeedingConnect)
+		p.router.(*RouterFake).IsMultiServerReturn = true
 		defer func() {
 			p.Close(ctx)
 		}()
@@ -327,11 +340,39 @@ func TestPoolBorrowReturn(outer *testing.T) {
 		if len(servers) != 1 {
 			t.Errorf("Expected only 1 server, but %v were found", len(servers))
 		}
-		if _, exists := servers[advertisedServerName]; !exists {
+		serv, exists := servers[advertisedServerName]
+		if !exists {
 			t.Errorf("Expected connection to be transferred to %s, but server was not found", advertisedServerName)
-		}
-		if servers[advertisedServerName].numIdle() != 1 {
+		} else if serv.numIdle() != 1 {
 			t.Errorf("Expected 1 idle connection in %s, found %d", advertisedServerName, servers[advertisedServerName].numIdle())
+		}
+	})
+
+	outer.Run("Connection is not transferred to advertised server on return for direct pool", func(t *testing.T) {
+		itime.ForceFreezeTime()
+		defer itime.ForceUnfreezeTime()
+		advertisedServerName := "advertised-server"
+		conf := config.Config{MaxConnectionLifetime: maxAge, MaxConnectionPoolSize: 1}
+		p := newPool(&conf, succeedingConnect)
+		p.router.(*RouterFake).IsMultiServerReturn = false
+		defer func() {
+			p.Close(ctx)
+		}()
+		serverName := "srvA"
+		c, _ := p.Borrow(ctx, getServers([]string{serverName}), true, nil, DefaultConnectionLivenessCheckTimeout, reAuthToken)
+		c.(*ConnFake).AdvertisedName = advertisedServerName
+		p.Return(ctx, c)
+		servers := p.getServers()
+
+		fmt.Printf("%v\n", servers["foo"])
+		if len(servers) != 1 {
+			t.Errorf("Expected only 1 server, but %v were found", len(servers))
+		}
+		serv, exists := servers[serverName]
+		if !exists {
+			t.Errorf("Expected connection not to be transferred to %s, but server was not found", serverName)
+		} else if serv.numIdle() != 1 {
+			t.Errorf("Expected 1 idle connection in %s, found %d", serverName, servers[serverName].numIdle())
 		}
 	})
 }
@@ -349,7 +390,7 @@ func TestPoolResourceUsage(ot *testing.T) {
 		itime.ForceFreezeTime()
 		defer itime.ForceUnfreezeTime()
 		conf := config.Config{MaxConnectionLifetime: maxAge, MaxConnectionPoolSize: 1}
-		p := New(&conf, succeedingConnect, logger, "pool id")
+		p := newPool(&conf, succeedingConnect)
 		defer func() {
 			p.Close(ctx)
 		}()
@@ -364,7 +405,7 @@ func TestPoolResourceUsage(ot *testing.T) {
 		itime.ForceFreezeTime()
 		defer itime.ForceUnfreezeTime()
 		conf := config.Config{MaxConnectionLifetime: maxAge, MaxConnectionPoolSize: 2}
-		p := New(&conf, succeedingConnect, logger, "pool id")
+		p := newPool(&conf, succeedingConnect)
 		defer func() {
 			p.Close(ctx)
 		}()
@@ -382,7 +423,7 @@ func TestPoolResourceUsage(ot *testing.T) {
 		itime.ForceFreezeTime()
 		defer itime.ForceUnfreezeTime()
 		conf := config.Config{MaxConnectionLifetime: maxAge, MaxConnectionPoolSize: 2}
-		p := New(&conf, succeedingConnect, logger, "pool id")
+		p := newPool(&conf, succeedingConnect)
 		defer func() {
 			p.Close(ctx)
 		}()
@@ -400,7 +441,7 @@ func TestPoolResourceUsage(ot *testing.T) {
 		itime.ForceFreezeTime()
 		defer itime.ForceUnfreezeTime()
 		conf := config.Config{MaxConnectionLifetime: 1<<63 - 1, MaxConnectionPoolSize: 3}
-		p := New(&conf, succeedingConnect, logger, "pool id")
+		p := newPool(&conf, succeedingConnect)
 		// Trigger creation of three connections on the same server
 		c1, _ := p.Borrow(ctx, getServers([]string{"A"}), true, nil, DefaultConnectionLivenessCheckTimeout, reAuthToken)
 		c2, _ := p.Borrow(ctx, getServers([]string{"A"}), true, nil, DefaultConnectionLivenessCheckTimeout, reAuthToken)
@@ -428,7 +469,7 @@ func TestPoolResourceUsage(ot *testing.T) {
 		itime.ForceFreezeTime()
 		defer itime.ForceUnfreezeTime()
 		conf := config.Config{MaxConnectionLifetime: maxAge, MaxConnectionPoolSize: 1}
-		p := New(&conf, succeedingConnect, logger, "pool id")
+		p := newPool(&conf, succeedingConnect)
 		defer func() {
 			p.Close(ctx)
 		}()
@@ -449,7 +490,7 @@ func TestPoolResourceUsage(ot *testing.T) {
 		itime.ForceFreezeTime()
 		defer itime.ForceUnfreezeTime()
 		conf := config.Config{MaxConnectionLifetime: maxAge, MaxConnectionPoolSize: 1}
-		p := New(&conf, succeedingConnect, logger, "pool id")
+		p := newPool(&conf, succeedingConnect)
 		defer func() {
 			p.Close(ctx)
 		}()
@@ -481,7 +522,7 @@ func TestPoolCleanup(ot *testing.T) {
 		itime.ForceFreezeTime()
 		defer itime.ForceUnfreezeTime()
 		conf := config.Config{MaxConnectionLifetime: maxLife, MaxConnectionPoolSize: 0}
-		p := New(&conf, succeedingConnect, logger, "pool id")
+		p := newPool(&conf, succeedingConnect)
 		defer func() {
 			p.Close(ctx)
 		}()
@@ -502,7 +543,7 @@ func TestPoolCleanup(ot *testing.T) {
 		itime.ForceFreezeTime()
 		defer itime.ForceUnfreezeTime()
 		conf := config.Config{MaxConnectionLifetime: maxLife, MaxConnectionPoolSize: 0}
-		p := New(&conf, succeedingConnect, logger, "pool id")
+		p := newPool(&conf, succeedingConnect)
 		defer func() {
 			p.Close(ctx)
 		}()
@@ -525,7 +566,7 @@ func TestPoolCleanup(ot *testing.T) {
 			return nil, errors.New("an error")
 		}
 		conf := config.Config{MaxConnectionLifetime: maxLife, MaxConnectionPoolSize: 0}
-		p := New(&conf, failingConnect, logger, "pool id")
+		p := newPool(&conf, failingConnect)
 		p.SetRouter(&RouterFake{})
 		defer func() {
 			p.Close(ctx)
@@ -555,7 +596,7 @@ func TestPoolCleanup(ot *testing.T) {
 			MaxConnectionLifetime:        maxLife,
 			MaxConnectionPoolSize:        1,
 		}
-		p := New(&conf, succeedingConnect, logger, "pool id")
+		p := newPool(&conf, succeedingConnect)
 		servers := getServers([]string{"example.com"})
 		conn, err := p.Borrow(ctx, servers, false, nil, DefaultConnectionLivenessCheckTimeout, reAuthToken)
 		assertConnection(t, conn, err)
