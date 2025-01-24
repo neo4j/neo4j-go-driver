@@ -8,12 +8,10 @@ import os
 import subprocess
 import sys
 
-
-def run(args):
-    subprocess.run(
-        args, universal_newlines=True, check=True,
-        stdout=sys.stdout, stderr=sys.stderr,
-    )
+from common import (
+    get_go_min_bin,
+    run,
+)
 
 
 if __name__ == "__main__":
@@ -21,15 +19,18 @@ if __name__ == "__main__":
     # Specify -v -json to make TeamCity pickup the tests
     path = os.path.join(".", "neo4j", "...")
 
-    for extra_args in (
-        (), ("-tags", "internal_time_mock")
-    ):
-        for version in ("go", "go1.18"):
-            cmd = [version, "test", "-race", *extra_args]
+    go_versions = {"go"}
+    go_versions.add(get_go_min_bin())
+
+    for go_bin in go_versions:
+        for extra_args in (
+            (), ("-tags", "internal_time_mock")
+        ):
+            cmd = [go_bin, "test", "-race", *extra_args]
             if os.environ.get("TEST_IN_TEAMCITY", False):
                 cmd = cmd + ["-v", "-json"]
             run(cmd + ["-buildvcs=false", "-short", path])
 
-    # Repeat racing tests
-    run(cmd + ["-buildvcs=false", "-race", "-count", "50",
-               "./neo4j/internal/racing"])
+        # Repeat racing tests
+        run(cmd + ["-buildvcs=false", "-race", "-count", "50",
+                   "./neo4j/internal/racing"])

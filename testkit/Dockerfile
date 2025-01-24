@@ -22,6 +22,7 @@ RUN apt-get update && \
 
 ENV GOROOT=/usr/local/go
 ENV PATH=$GOROOT/bin:/root/go/bin:$PATH
+ENV GOMINBIN=go${go_version_min}
 
 # Install minimum version of Go alongside latest
 RUN go install golang.org/dl/go${go_version_min}@latest && go${go_version_min} download
