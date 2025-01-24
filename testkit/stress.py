@@ -8,13 +8,15 @@ import os
 
 from common import (
     get_go_min_bin,
-    run,
+    run_go,
 )
+
 
 ROOT_PACKAGE = "github.com/neo4j/neo4j-go-driver"
 
 
 if __name__ == "__main__":
+    go_bin = get_go_min_bin()
     uri = "%s://%s:%s" % (
             os.environ["TEST_NEO4J_SCHEME"],
             os.environ["TEST_NEO4J_HOST"],
@@ -25,9 +27,9 @@ if __name__ == "__main__":
 
     # Run the stress tests
     stressPath = os.path.join(".", "test-stress")
-    cmd = [get_go_min_bin(), "run", "-buildvcs=false", "--race", stressPath,
+    cmd = ["run", "-buildvcs=false", "--race", stressPath,
            "--seconds", duration,
            "-uri", uri, "-user", user, "-password", password]
     if os.environ.get("TEST_NEO4J_IS_CLUSTER"):
         cmd.append("-cluster")
-    run(cmd)
+    run_go(cmd, go_bin=go_bin)

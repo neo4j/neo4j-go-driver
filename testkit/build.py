@@ -3,14 +3,12 @@ Executed in Go driver container.
 Responsible for building driver and test backend.
 """
 
-from pathlib import Path
 import os
 
 from common import (
     get_go_min_bin,
     run_go,
     run_go_bin,
-    run_output,
 )
 
 
