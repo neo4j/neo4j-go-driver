@@ -24,11 +24,11 @@ if __name__ == "__main__":
     for extra_args in (
         (), ("-tags", "internal_time_mock")
     ):
-        cmd = ["go", "test", "-race", *extra_args]
-        if os.environ.get("TEST_IN_TEAMCITY", False):
-            cmd = cmd + ["-v", "-json"]
-
-        run(cmd + ["-buildvcs=false", "-short", path])
+        for version in ("go", "go1.18"):
+            cmd = [version, "test", "-race", *extra_args]
+            if os.environ.get("TEST_IN_TEAMCITY", False):
+                cmd = cmd + ["-v", "-json"]
+            run(cmd + ["-buildvcs=false", "-short", path])
 
     # Repeat racing tests
     run(cmd + ["-buildvcs=false", "-race", "-count", "50",
