@@ -45,7 +45,8 @@ type ResultWithContext interface {
 	Record() *Record
 	// Collect fetches all remaining records and returns them.
 	Collect(ctx context.Context) ([]*Record, error)
-	// Collect fetches all remaining records and returns them.
+	// Records returns a single-use iterator over the records in this result.
+	// This method's signature is in the style of and compatible with iter.Seq2 (go 1.23.0 and newer).
 	Records(ctx context.Context) func(yield func(*Record, error) bool)
 	// Single returns the only remaining record from the stream.
 	// If none or more than one record is left, an error is returned.
@@ -152,20 +153,35 @@ func (r *resultWithContext) Record() *Record {
 
 func (r *resultWithContext) Records(ctx context.Context) func(yield func(*Record, error) bool) {
 	return func(yield func(*db.Record, error) bool) {
-		defer r.callAfterConsumptionHook()
-		for r.summary == nil && r.err == nil {
+		for {
+			r.checkOpen()
+			if r.err != nil {
+				break
+			}
 			r.advance(ctx)
-			if r.record != nil && !yield(r.record, nil) {
+			if r.record == nil || r.err != nil || r.summary != nil {
+				break
+			}
+			if !yield(r.record, nil) {
 				return
 			}
 		}
 		if r.err != nil {
 			yield(nil, errorutil.WrapError(r.err))
 		}
+		if r.summary != nil {
+			r.callAfterConsumptionHook()
+		}
 	}
 }
 
 func (r *resultWithContext) Collect(ctx context.Context) ([]*Record, error) {
+	if r.err != nil {
+		return nil, errorutil.WrapError(r.err)
+	}
+	if r.summary != nil {
+		return []*Record{}, nil
+	}
 	recs := make([]*Record, 0, 1024)
 	var err error
 	r.Records(ctx)(func(r *Record, innerErr error) bool {
