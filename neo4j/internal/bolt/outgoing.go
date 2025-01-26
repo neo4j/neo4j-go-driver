@@ -408,6 +408,11 @@ func (o *outgoing) packX(x any) {
 			o.packer.Strings(s)
 		case []float64:
 			o.packer.Float64s(s)
+		case []any:
+			o.packer.ArrayHeader(len(s))
+			for _, e := range s {
+				o.packX(e)
+			}
 		default:
 			num := v.Len()
 			o.packer.ArrayHeader(num)
@@ -422,17 +427,27 @@ func (o *outgoing) packX(x any) {
 			o.packer.IntMap(m)
 		case map[string]string:
 			o.packer.StringMap(m)
+		case map[string]any:
+			o.packMap(m)
 		default:
 			t := reflect.TypeOf(x)
 			if t.Key().Kind() != reflect.String {
 				o.onPackErr(&db.UnsupportedTypeError{Type: reflect.TypeOf(x)})
 				return
 			}
-			o.packer.MapHeader(v.Len())
-			// TODO Use MapRange when min Go version is >= 1.12
-			for _, ki := range v.MapKeys() {
-				o.packer.String(ki.String())
-				o.packX(v.MapIndex(ki).Interface())
+			l := v.Len()
+			o.packer.MapHeader(l)
+			if l == 0 {
+				return
+			}
+			key := reflect.New(t.Key()).Elem()
+			value := reflect.New(t.Elem()).Elem()
+			r := v.MapRange()
+			for r.Next() {
+				key.SetIterKey(r)
+				value.SetIterValue(r)
+				o.packer.String(key.String())
+				o.packX(value.Interface())
 			}
 		}
 	default:
