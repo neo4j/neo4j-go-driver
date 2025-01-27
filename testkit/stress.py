@@ -5,21 +5,18 @@ Assumes driver has been setup by build script prior to this.
 """
 
 import os
-import subprocess
-import sys
+
+from common import (
+    get_go_min_bin,
+    run_go,
+)
 
 
 ROOT_PACKAGE = "github.com/neo4j/neo4j-go-driver"
 
 
-def run(args):
-    subprocess.run(
-        args, universal_newlines=True, check=True,
-        stdout=sys.stdout, stderr=sys.stderr,
-    )
-
-
 if __name__ == "__main__":
+    go_bin = get_go_min_bin()
     uri = "%s://%s:%s" % (
             os.environ["TEST_NEO4J_SCHEME"],
             os.environ["TEST_NEO4J_HOST"],
@@ -30,9 +27,9 @@ if __name__ == "__main__":
 
     # Run the stress tests
     stressPath = os.path.join(".", "test-stress")
-    cmd = ["go", "run", "-buildvcs=false", "--race", stressPath,
+    cmd = ["run", "-buildvcs=false", "--race", stressPath,
            "--seconds", duration,
            "-uri", uri, "-user", user, "-password", password]
     if os.environ.get("TEST_NEO4J_IS_CLUSTER"):
         cmd.append("-cluster")
-    run(cmd)
+    run_go(cmd, go_bin=go_bin)
