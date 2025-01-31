@@ -19,6 +19,7 @@ package neo4j
 
 import (
 	"context"
+
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/db"
 	idb "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/errorutil"
@@ -44,6 +45,9 @@ type ResultWithContext interface {
 	Record() *Record
 	// Collect fetches all remaining records and returns them.
 	Collect(ctx context.Context) ([]*Record, error)
+	// Records returns a single-use iterator over the records in this result.
+	// This method's signature is in the style of and compatible with iter.Seq2 (go 1.23.0 and newer).
+	Records(ctx context.Context) func(yield func(*Record, error) bool)
 	// Single returns the only remaining record from the stream.
 	// If none or more than one record is left, an error is returned.
 	// The result is fully consumed after this call and its summary is immediately available when calling Consume.
@@ -147,18 +151,51 @@ func (r *resultWithContext) Record() *Record {
 	return r.record
 }
 
-func (r *resultWithContext) Collect(ctx context.Context) ([]*Record, error) {
-	recs := make([]*Record, 0, 1024)
-	for r.summary == nil && r.err == nil {
-		r.advance(ctx)
-		if r.record != nil {
-			recs = append(recs, r.record)
+func (r *resultWithContext) Records(ctx context.Context) func(yield func(*Record, error) bool) {
+	return func(yield func(*db.Record, error) bool) {
+		for {
+			r.checkOpen()
+			if r.err != nil {
+				break
+			}
+			r.advance(ctx)
+			if r.record == nil || r.err != nil || r.summary != nil {
+				break
+			}
+			if !yield(r.record, nil) {
+				return
+			}
+		}
+		if r.err != nil {
+			yield(nil, errorutil.WrapError(r.err))
+		}
+		if r.summary != nil {
+			r.callAfterConsumptionHook()
 		}
 	}
+}
+
+func (r *resultWithContext) Collect(ctx context.Context) ([]*Record, error) {
 	if r.err != nil {
 		return nil, errorutil.WrapError(r.err)
 	}
-	r.callAfterConsumptionHook()
+	if r.summary != nil {
+		return []*Record{}, nil
+	}
+	recs := make([]*Record, 0, 1024)
+	var err error
+	r.Records(ctx)(func(r *Record, innerErr error) bool {
+		if innerErr != nil {
+			err = innerErr
+			return false
+		}
+
+		recs = append(recs, r)
+		return true
+	})
+	if err != nil {
+		return nil, err
+	}
 	return recs, nil
 }
 

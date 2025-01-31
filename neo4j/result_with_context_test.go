@@ -21,10 +21,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	idb "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
 	"testing"
 
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/db"
+	idb "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
 	. "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/testutil"
 )
 
@@ -33,6 +33,35 @@ type iter struct {
 	expectRec  *db.Record
 	expectSum  *db.Summary
 	expectErr  error
+}
+
+func doRecordsRangeRet[T any](
+	iter func(yield func(*Record, error) bool),
+	loopBody func(record *Record, err error, break_ func(), return_ func(T)),
+) T {
+	breaking := false
+	break_ := func() {
+		breaking = true
+	}
+
+	var returnValue T
+	return_ := func(value T) {
+		returnValue = value
+		break_()
+	}
+
+	iter(func(record *Record, err error) bool {
+		loopBody(record, err, break_, return_)
+		return !breaking
+	})
+
+	return returnValue
+}
+
+func doRecordsRange(iter func(yield func(*Record, error) bool), loopBody func(record *Record, err error, break_ func())) {
+	doRecordsRangeRet(iter, func(record *Record, err error, break_ func(), return_ func(any)) {
+		loopBody(record, err, break_)
+	})
 }
 
 func TestResult(outer *testing.T) {
@@ -543,5 +572,225 @@ func TestResult(outer *testing.T) {
 				AssertIntEqual(t, count, 1)
 			})
 		}
+	})
+
+	outer.Run("manual iter", func(inner1 *testing.T) {
+		inner1.Run("range iter success", func(t *testing.T) {
+			hookCalled := false
+			afterConsumptionHook := func() {
+				hookCalled = true
+			}
+
+			conn := &ConnFake{
+				Nexts: []Next{{Record: recs[0]}, {Record: recs[1]}, {Record: recs[2]}, {Summary: sums[0]}},
+			}
+			res := newResultWithContext(conn, streamHandle, cypher, params, &transactionState{}, afterConsumptionHook)
+			i := 0
+			doRecordsRange(res.Records(ctx), func(record *Record, err error, break_ func()) {
+				AssertBoolEqual(t, hookCalled, false)
+				AssertNoError(t, err)
+				AssertDeepEquals(t, record, recs[i])
+				i += 1
+			})
+			AssertIntEqual(t, i, 3)
+			AssertNil(t, res.Err())
+			AssertBoolEqual(t, hookCalled, true)
+			summary, err := res.Consume(ctx)
+			AssertNoError(t, err)
+			AssertNotNil(t, summary)
+		})
+
+		inner1.Run("range iter error", func(t *testing.T) {
+			hookCalled := false
+			afterConsumptionHook := func() {
+				hookCalled = true
+			}
+
+			conn := &ConnFake{
+				Nexts: []Next{{Record: recs[0]}, {Record: recs[1]}, {Err: errs[0]}},
+			}
+			res := newResultWithContext(conn, streamHandle, cypher, params, &transactionState{}, afterConsumptionHook)
+			i := 0
+			doRecordsRange(res.Records(ctx), func(record *Record, err error, break_ func()) {
+				if i < 2 {
+					AssertNoError(t, err)
+					AssertDeepEquals(t, record, recs[i])
+				} else {
+					AssertError(t, err)
+					AssertNil(t, record)
+				}
+				i += 1
+			})
+			AssertIntEqual(t, i, 3)
+			AssertError(t, res.Err())
+			summary, err := res.Consume(ctx)
+			AssertError(t, err)
+			AssertNil(t, summary)
+			AssertBoolEqual(t, hookCalled, false)
+		})
+
+		inner1.Run("range iter break", func(inner2 *testing.T) {
+			inner2.Parallel()
+
+			type iterBreakTestCase struct {
+				description string
+				reuseIter   bool
+			}
+
+			iterBreakTestCases := []iterBreakTestCase{
+				{"reusing iter", true},
+				{"new iter", false},
+			}
+
+			for _, testCase := range iterBreakTestCases {
+				inner2.Run(testCase.description, func(t *testing.T) {
+					hookCalled := false
+					afterConsumptionHook := func() {
+						hookCalled = true
+					}
+
+					conn := &ConnFake{
+						Nexts: []Next{{Record: recs[0]}, {Record: recs[1]}, {Record: recs[2]}, {Summary: sums[0]}},
+					}
+					res := newResultWithContext(conn, streamHandle, cypher, params, &transactionState{}, afterConsumptionHook)
+					i := 0
+					recordsIter := res.Records(ctx)
+					doRecordsRange(recordsIter, func(record *Record, err error, break_ func()) {
+						AssertBoolEqual(t, hookCalled, false)
+						AssertNoError(t, err)
+						AssertDeepEquals(t, record, recs[i])
+						i += 1
+						if i == 2 {
+							break_()
+						}
+					})
+					AssertNil(t, res.Err())
+					AssertBoolEqual(t, hookCalled, false)
+
+					if !testCase.reuseIter {
+						recordsIter = res.Records(ctx)
+					}
+					doRecordsRange(recordsIter, func(record *Record, err error, break_ func()) {
+						AssertBoolEqual(t, hookCalled, false)
+						AssertNoError(t, err)
+						AssertDeepEquals(t, record, recs[i])
+						i += 1
+					})
+
+					AssertIntEqual(t, i, 3)
+					AssertNil(t, res.Err())
+					AssertBoolEqual(t, hookCalled, true)
+					summary, err := res.Consume(ctx)
+					AssertNoError(t, err)
+					AssertNotNil(t, summary)
+				})
+			}
+		})
+
+		inner1.Run("range iter on closed", func(inner2 *testing.T) {
+			inner2.Parallel()
+
+			type iterBreakTestCase struct {
+				description      string
+				closer           func(ResultWithContext) error
+				usePreIter       bool
+				pullPreIterFirst bool
+			}
+
+			iterBreakTestCases := []iterBreakTestCase{
+				{
+					description: "by single",
+					closer: func(res ResultWithContext) error {
+						_, err := res.Single(ctx)
+						return err
+					},
+				},
+				{
+					description: "by consume",
+					closer: func(res ResultWithContext) error {
+						_, err := res.Consume(ctx)
+						return err
+					},
+				},
+				{
+					description: "by collect",
+					closer: func(res ResultWithContext) error {
+						_, err := res.Collect(ctx)
+						return err
+					},
+				},
+				{
+					description: "by iter",
+					closer: func(res ResultWithContext) error {
+						return doRecordsRangeRet(res.Records(ctx), func(record *Record, err error, break_ func(), return_ func(error)) {
+							if err != nil {
+								return_(err)
+							}
+						})
+					},
+				},
+			}
+
+			extraBreakTestCases := make([]iterBreakTestCase, 0, len(iterBreakTestCases)*2)
+			for _, testCase := range iterBreakTestCases {
+				extraBreakTestCase := testCase
+				extraBreakTestCase.usePreIter = true
+				extraBreakTestCase.description = fmt.Sprintf("%s with pre iter", testCase.description)
+				extraBreakTestCases = append(extraBreakTestCases, extraBreakTestCase)
+				extraBreakTestCase.pullPreIterFirst = true
+				extraBreakTestCase.description = fmt.Sprintf("%s with pre iter failing first", testCase.description)
+				extraBreakTestCases = append(extraBreakTestCases, extraBreakTestCase)
+			}
+			iterBreakTestCases = append(iterBreakTestCases, extraBreakTestCases...)
+
+			for _, testCase := range iterBreakTestCases {
+				inner2.Run(testCase.description, func(t *testing.T) {
+					nexts := []Next{}
+					if testCase.usePreIter {
+						nexts = append(nexts, Next{Record: recs[0]})
+					}
+					nexts = append(nexts, Next{Record: recs[1]}, Next{Summary: sums[0]})
+					conn := &ConnFake{Nexts: nexts, ConsumeSum: sums[0]}
+					res := newResultWithContext(conn, streamHandle, cypher, params, &transactionState{}, nil)
+
+					iter1 := res.Records(ctx)
+					if testCase.usePreIter {
+						doRecordsRange(iter1, func(record *Record, err error, break_ func()) {
+							AssertNoError(t, err)
+							break_()
+						})
+					}
+
+					AssertNoError(t, testCase.closer(res))
+
+					iter2 := res.Records(ctx)
+
+					if testCase.pullPreIterFirst {
+						i := 0
+						doRecordsRange(iter1, func(record *Record, err error, break_ func()) {
+							AssertError(t, err)
+							i += 1
+						})
+						AssertIntEqual(t, i, 1)
+					}
+
+					i := 0
+					doRecordsRange(iter2, func(record *Record, err error, break_ func()) {
+						AssertError(t, err)
+						i += 1
+					})
+					AssertIntEqual(t, i, 1)
+
+					if !testCase.pullPreIterFirst {
+						i = 0
+						doRecordsRange(iter1, func(record *Record, err error, break_ func()) {
+							AssertError(t, err)
+							i += 1
+						})
+						AssertIntEqual(t, i, 1)
+					}
+				})
+			}
+		})
 	})
 }
