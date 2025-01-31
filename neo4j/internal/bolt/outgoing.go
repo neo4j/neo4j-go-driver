@@ -423,10 +423,16 @@ func (o *outgoing) packX(x any) {
 	case reflect.Map:
 		// Optimizations
 		switch m := x.(type) {
+		case map[string][]byte:
+			o.packer.BytesMap(m)
 		case map[string]int:
 			o.packer.IntMap(m)
+		case map[string]int64:
+			o.packer.Int64Map(m)
 		case map[string]string:
 			o.packer.StringMap(m)
+		case map[string]float64:
+			o.packer.Float64Map(m)
 		case map[string]any:
 			o.packMap(m)
 		default:
