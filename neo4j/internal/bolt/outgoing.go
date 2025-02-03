@@ -391,7 +391,7 @@ func (o *outgoing) packX(x any) {
 		case reflect.Struct:
 			o.packStruct(x)
 		default:
-			o.packX(i.Interface())
+			o.packV(i)
 		}
 	case reflect.Struct:
 		o.packStruct(x)
@@ -417,7 +417,7 @@ func (o *outgoing) packX(x any) {
 			num := v.Len()
 			o.packer.ArrayHeader(num)
 			for i := 0; i < num; i++ {
-				o.packX(v.Index(i).Interface())
+				o.packV(v.Index(i))
 			}
 		}
 	case reflect.Map:
@@ -448,16 +448,50 @@ func (o *outgoing) packX(x any) {
 			}
 			key := reflect.New(t.Key()).Elem()
 			value := reflect.New(t.Elem()).Elem()
-			r := v.MapRange()
-			for r.Next() {
-				key.SetIterKey(r)
-				value.SetIterValue(r)
+			iter := v.MapRange()
+			for iter.Next() {
+				key.SetIterKey(iter)
+				value.SetIterValue(iter)
 				o.packer.String(key.String())
-				o.packX(value.Interface())
+				o.packV(value)
 			}
 		}
 	default:
 		o.onPackErr(&db.UnsupportedTypeError{Type: reflect.TypeOf(x)})
+	}
+}
+
+func (o *outgoing) packV(v reflect.Value) {
+	switch v.Kind() {
+	case reflect.Bool:
+		o.packer.Bool(v.Bool())
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+		o.packer.Int64(v.Int())
+	case reflect.Uint8, reflect.Uint16, reflect.Uint32:
+		o.packer.Uint32(uint32(v.Uint()))
+	case reflect.Uint64, reflect.Uint:
+		o.packer.Uint64(v.Uint())
+	case reflect.Float32, reflect.Float64:
+		o.packer.Float64(v.Float())
+	case reflect.String:
+		o.packer.String(v.String())
+	case reflect.Ptr:
+		if v.IsNil() {
+			o.packer.Nil()
+			return
+		}
+		// Inspect what the pointer points to
+		i := reflect.Indirect(v)
+		switch i.Kind() {
+		case reflect.Struct:
+			o.packStruct(v.Interface())
+		default:
+			o.packV(i)
+		}
+	case reflect.Struct:
+		o.packStruct(v.Interface())
+	default:
+		o.packX(v.Interface())
 	}
 }
 
