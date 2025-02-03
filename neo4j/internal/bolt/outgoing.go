@@ -490,6 +490,27 @@ func (o *outgoing) packV(v reflect.Value) {
 		}
 	case reflect.Struct:
 		o.packStruct(v.Interface())
+	case reflect.Slice:
+		switch v.Type().Elem().Kind() {
+		case reflect.Uint8:
+			o.packer.Bytes(v.Bytes())
+			return
+		case reflect.Int, reflect.Int64, reflect.String, reflect.Float64, reflect.Interface:
+			if v.Len() > 5 {
+				// Accept the cost of an allocation (v.Interface())
+				// because this slice type is optimized in packX.
+				// The exact length from which the optimization amortizes
+				// the allocation cost depends on many factors.
+				// 5 is an arbitrary guess.
+				o.packX(v.Interface())
+				return
+			}
+		}
+		num := v.Len()
+		o.packer.ArrayHeader(num)
+		for i := 0; i < num; i++ {
+			o.packV(v.Index(i))
+		}
 	default:
 		o.packX(v.Interface())
 	}
