@@ -461,6 +461,17 @@ func (o *outgoing) packX(x any) {
 	}
 }
 
+func typeForPrimitive[T any]() reflect.Type {
+	var v T
+	return reflect.TypeOf(v)
+}
+
+var intT = typeForPrimitive[int]()
+var int64T = typeForPrimitive[int64]()
+var stringT = typeForPrimitive[string]()
+var float64T = typeForPrimitive[float64]()
+var anyT = reflect.TypeOf((*any)(nil)).Elem()
+
 func (o *outgoing) packV(v reflect.Value) {
 	switch v.Kind() {
 	case reflect.Bool:
@@ -491,22 +502,26 @@ func (o *outgoing) packV(v reflect.Value) {
 	case reflect.Struct:
 		o.packStruct(v.Interface())
 	case reflect.Slice:
-		switch v.Type().Elem().Kind() {
-		case reflect.Uint8:
+		elemType := v.Type().Elem()
+		if elemType.Kind() == reflect.Uint8 {
 			o.packer.Bytes(v.Bytes())
 			return
-		case reflect.Int, reflect.Int64, reflect.String, reflect.Float64, reflect.Interface:
-			if v.Len() > 5 {
+		}
+		num := v.Len()
+		if num > 5 {
+			switch elemType {
+			case intT, int64T, stringT, float64T, anyT:
 				// Accept the cost of an allocation (v.Interface())
 				// because this slice type is optimized in packX.
 				// The exact length from which the optimization amortizes
 				// the allocation cost depends on many factors.
-				// 5 is an arbitrary guess.
+				// 5 seemed a close to the cross-over point on my system
+				// running Go 1.23.0 linux/amd64.
+				// cf. https://github.com/neo4j/neo4j-go-driver/pull/617
 				o.packX(v.Interface())
 				return
 			}
 		}
-		num := v.Len()
 		o.packer.ArrayHeader(num)
 		for i := 0; i < num; i++ {
 			o.packV(v.Index(i))
