@@ -238,12 +238,15 @@ func logManifestHandshake(boltLogger log.BoltLogger, response []byte, count uint
 }
 
 // selectProtocol iterates over our protocol proposals (skipping the manifest marker)
-// and returns the first candidate that is also offered by the server.
+// and returns the first candidate whose major version matches and whose minor version
+// falls within the range offered by the server.
 func selectProtocol(supported []protocolVersion, errorListener ConnectionErrorListener, serverName string) (protocolVersion, error) {
 	proposals := versions[1:]
 	for _, candidate := range proposals {
 		for _, offer := range supported {
-			if candidate.major == offer.major && candidate.minor == offer.minor {
+			if candidate.major == offer.major &&
+				candidate.minor <= offer.minor &&
+				candidate.minor >= (offer.minor-offer.back) {
 				return candidate, nil
 			}
 		}
