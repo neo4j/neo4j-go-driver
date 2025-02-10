@@ -25,6 +25,7 @@ import (
 	"reflect"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/db"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/dbtype"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/packstream"
@@ -414,6 +415,11 @@ func (o *outgoing) packX(x any) {
 			for i := 0; i < num; i++ {
 				o.packX(v.Index(i).Interface())
 			}
+		}
+	case reflect.Array:
+		switch v := x.(type) {
+		case uuid.UUID:
+			o.packer.String(v.String())
 		}
 	case reflect.Map:
 		// Optimizations
