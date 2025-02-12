@@ -173,7 +173,7 @@ func performManifestNegotiation(
 	}
 
 	// Send the handshake confirmation.
-	if err = sendHandshakeConfirmation(ctx, conn, boltLogger, errorListener, serverName, chosen, capBytes); err != nil {
+	if err = sendHandshakeConfirmation(ctx, conn, boltLogger, errorListener, serverName, chosen, []byte{0x00}); err != nil {
 		return 0, 0, err
 	}
 
