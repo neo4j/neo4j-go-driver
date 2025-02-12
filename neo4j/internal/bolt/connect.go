@@ -188,7 +188,7 @@ func readProtocolOfferings(ctx context.Context, r racing.RacingReader, serverNam
 		errorListener.OnDialError(ctx, serverName, err)
 		return 0, nil, fmt.Errorf("failed to read manifest protocol count: %w", err)
 	}
-	supported := make([]protocolVersion, count)
+	supported := make([]protocolVersion, 0, count)
 	for i := uint64(0); i < count; i++ {
 		var versionBytes [4]byte
 		_, err := r.ReadFull(ctx, versionBytes[:])
