@@ -239,18 +239,20 @@ func logManifestHandshake(boltLogger log.BoltLogger, response []byte, count int,
 // selectProtocol iterates over our protocol proposals (skipping the manifest marker)
 // and returns the first candidate whose major version matches and whose minor version
 // falls within the range offered by the server.
-func selectProtocol(supported []protocolVersion) (protocolVersion, error) {
-	proposals := versions[1:]
-	for _, candidate := range proposals {
-		for _, offer := range supported {
-			if candidate.major == offer.major &&
-				candidate.minor <= offer.minor &&
-				candidate.minor >= (offer.minor-offer.back) {
-				return candidate, nil
+func selectProtocol(offers []protocolVersion) (protocolVersion, error) {
+	for _, candidate := range versions[1:] {
+		for v := candidate.minor; v >= candidate.minor-candidate.back; v-- {
+			for _, offer := range offers {
+				if offer.major != candidate.major {
+					continue
+				}
+				if v <= offer.minor && v >= offer.minor-offer.back {
+					return protocolVersion{major: candidate.major, minor: v}, nil
+				}
 			}
 		}
 	}
-	return protocolVersion{}, fmt.Errorf("none of the server offered Bolt versions are supported (offered: %#v)", supported)
+	return protocolVersion{}, fmt.Errorf("none of the server offered Bolt versions are supported (offered: %#v)", offers)
 }
 
 // sendHandshakeConfirmation sends the chosen protocol version and capability mask back to the server.

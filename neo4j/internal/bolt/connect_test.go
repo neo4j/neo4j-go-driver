@@ -286,3 +286,62 @@ func TestReadVarIntReadError(t *testing.T) {
 		t.Errorf("expected error 'read error', got %v", err)
 	}
 }
+
+func TestSelectProtocol(ot *testing.T) {
+	cases := []struct {
+		name     string
+		offers   []protocolVersion
+		expected protocolVersion
+	}{
+		{
+			name: "ServerEquals",
+			offers: []protocolVersion{
+				{back: 7, minor: 7, major: 5},
+			},
+			expected: protocolVersion{minor: 7, major: 5},
+		},
+		{
+			name: "ServerGreater",
+			offers: []protocolVersion{
+				{back: 7, minor: 8, major: 5},
+			},
+			expected: protocolVersion{minor: 7, major: 5},
+		},
+		{
+			name: "ServerLess",
+			offers: []protocolVersion{
+				{back: 6, minor: 6, major: 5},
+				{back: 4, minor: 4, major: 4},
+			},
+			expected: protocolVersion{minor: 6, major: 5},
+		},
+	}
+
+	for _, c := range cases {
+		ot.Run(c.name, func(t *testing.T) {
+			restore := setTestVersions([4]protocolVersion{
+				{major: 0xFF, minor: 0x01, back: 0x00},
+				{major: 5, minor: 7, back: 7},
+				{major: 4, minor: 4, back: 2},
+				{major: 3, minor: 0, back: 0},
+			})
+			defer restore()
+
+			candidate, err := selectProtocol(c.offers)
+			if err != nil {
+				t.Fatalf("expected no error, got %v", err)
+			}
+			if candidate != c.expected {
+				t.Errorf("expected %v, got %v", c.expected, candidate)
+			}
+		})
+	}
+}
+
+// setTestVersions temporarily overrides the global versions variable and returns a
+// function to restore the original value.
+func setTestVersions(testVers [4]protocolVersion) func() {
+	orig := versions
+	versions = testVers
+	return func() { versions = orig }
+}
