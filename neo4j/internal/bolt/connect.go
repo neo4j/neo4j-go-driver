@@ -38,7 +38,7 @@ type protocolVersion struct {
 }
 
 func (p *protocolVersion) formatProtocol() string {
-	return fmt.Sprintf("0x%04X%02X%02X", p.back, p.minor, p.major)
+	return fmt.Sprintf("%#04X%02X%02X", p.back, p.minor, p.major)
 }
 
 // versions lists the supported protocol versions in priority order.
