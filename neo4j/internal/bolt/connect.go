@@ -96,6 +96,11 @@ func Connect(ctx context.Context,
 	major := buf[3]
 	minor := buf[2]
 
+	if major == 80 && minor == 84 {
+		return nil, &errorutil.UsageError{Message: "server responded HTTP. Make sure you are not trying to connect to the http endpoint " +
+			"(HTTP defaults to port 7474 whereas BOLT defaults to port 7687)"}
+	}
+
 	// Log legacy handshake response.
 	if !(major == 0xFF && minor == 0x01) && boltLogger != nil {
 		boltLogger.LogServerMessage("", "<HANDSHAKE> %#010X", buf)
@@ -122,10 +127,6 @@ func Connect(ctx context.Context,
 	case 0:
 		return nil, fmt.Errorf("server did not accept any of the requested Bolt versions (%#v)", versions)
 	default:
-		if major == 80 && minor == 84 {
-			return nil, &errorutil.UsageError{Message: "server responded HTTP. Make sure you are not trying to connect to the http endpoint " +
-				"(HTTP defaults to port 7474 whereas BOLT defaults to port 7687)"}
-		}
 		return nil, &errorutil.UsageError{Message: fmt.Sprintf("server responded with unsupported version %d.%d", major, minor)}
 	}
 	if err = boltConn.Connect(ctx, int(minor), auth, userAgent, routingContext, notificationConfig); err != nil {
@@ -148,7 +149,7 @@ func performManifestNegotiation(
 	reader := racing.NewRacingReader(conn)
 
 	// Read the protocol offerings.
-	count, supported, err := readProtocolOfferings(ctx, reader, serverName, errorListener)
+	supported, err := readProtocolOfferings(ctx, reader, serverName, errorListener)
 	if err != nil {
 		return 0, 0, err
 	}
@@ -160,13 +161,13 @@ func performManifestNegotiation(
 	}
 
 	// Log the complete server handshake message.
-	logManifestHandshake(boltLogger, response, count, supported, capBytes)
+	logManifestHandshake(boltLogger, response, len(supported), supported, capBytes)
 
 	// Select an acceptable protocol version.
-	chosen, err := selectProtocol(supported, errorListener, serverName)
+	chosen, err := selectProtocol(supported)
 	if err != nil {
 		invalidHandshake := []byte{0x00, 0x00, 0x00, 0x00, 0x00} // 4 bytes for version + 1 byte for capabilities.
-		if _, err := conn.Write(invalidHandshake); err != nil {
+		if _, err := racing.NewRacingWriter(conn).Write(ctx, invalidHandshake); err != nil {
 			errorListener.OnDialError(ctx, serverName, err)
 		}
 		return 0, 0, err
@@ -182,11 +183,11 @@ func performManifestNegotiation(
 
 // readProtocolOfferings reads the number of protocol offerings and returns the count and
 // a slice of supported protocol versions.
-func readProtocolOfferings(ctx context.Context, r racing.RacingReader, serverName string, errorListener ConnectionErrorListener) (uint64, []protocolVersion, error) {
+func readProtocolOfferings(ctx context.Context, r racing.RacingReader, serverName string, errorListener ConnectionErrorListener) ([]protocolVersion, error) {
 	count, err := readVarInt(ctx, r)
 	if err != nil {
 		errorListener.OnDialError(ctx, serverName, err)
-		return 0, nil, fmt.Errorf("failed to read manifest protocol count: %w", err)
+		return nil, fmt.Errorf("failed to read manifest protocol count: %w", err)
 	}
 	supported := make([]protocolVersion, 0, count)
 	for i := uint64(0); i < count; i++ {
@@ -194,15 +195,15 @@ func readProtocolOfferings(ctx context.Context, r racing.RacingReader, serverNam
 		_, err := r.ReadFull(ctx, versionBytes[:])
 		if err != nil {
 			errorListener.OnDialError(ctx, serverName, err)
-			return 0, nil, fmt.Errorf("failed to read manifest protocol version: %w", err)
+			return nil, fmt.Errorf("failed to read manifest protocol version: %w", err)
 		}
-		supported[i] = protocolVersion{
+		supported = append(supported, protocolVersion{
 			back:  versionBytes[1],
 			minor: versionBytes[2],
 			major: versionBytes[3],
-		}
+		})
 	}
-	return count, supported, nil
+	return supported, nil
 }
 
 // readCapabilityMask reads the capability bit mask (a Base128 VarInt) and returns both the
@@ -222,11 +223,11 @@ func readCapabilityMask(ctx context.Context, r racing.RacingReader, serverName s
 
 // logManifestHandshake logs the complete server handshake message for manifest negotiation.
 // It prints the initial response, count of offerings, each supported protocol, and the capability mask.
-func logManifestHandshake(boltLogger log.BoltLogger, response []byte, count uint64, supported []protocolVersion, capBytes []byte) {
+func logManifestHandshake(boltLogger log.BoltLogger, response []byte, count int, supported []protocolVersion, capBytes []byte) {
 	if boltLogger == nil {
 		return
 	}
-	var supportedProtocols []string
+	supportedProtocols := make([]string, 0, len(supported))
 	for _, p := range supported {
 		supportedProtocols = append(supportedProtocols, p.formatProtocol())
 	}
@@ -260,11 +261,12 @@ func sendHandshakeConfirmation(ctx context.Context, conn io.ReadWriteCloser, bol
 	if boltLogger != nil {
 		boltLogger.LogClientMessage("", "<HANDSHAKE> %#X %#X", chosenBytes, capBytes)
 	}
-	if _, err := conn.Write(chosenBytes); err != nil {
+	writer := racing.NewRacingWriter(conn)
+	if _, err := writer.Write(ctx, chosenBytes); err != nil {
 		errorListener.OnDialError(ctx, serverName, err)
 		return err
 	}
-	if _, err := conn.Write(capBytes); err != nil {
+	if _, err := writer.Write(ctx, capBytes); err != nil {
 		errorListener.OnDialError(ctx, serverName, err)
 		return err
 	}
@@ -278,8 +280,7 @@ func readVarInt(ctx context.Context, r racing.RacingReader) (uint64, error) {
 	var shift uint
 	var buf [1]byte
 	for {
-		_, err := r.Read(ctx, buf[:])
-		if err != nil {
+		if _, err := r.Read(ctx, buf[:]); err != nil {
 			return 0, err
 		}
 		b := buf[0]

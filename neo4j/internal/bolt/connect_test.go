@@ -153,7 +153,8 @@ func TestPerformManifestNegotiationSuccess(t *testing.T) {
 		t.Fatalf("Expected negotiated version 5.7, got %d.%d", major, minor)
 	}
 
-	expectedConfirmation := []byte{0x00, 0x00, 0x07, 0x05, 0x8F, 0x01}
+	// Expect 0 capabilities for now as driver has no capabilities.
+	expectedConfirmation := []byte{0x00, 0x00, 0x07, 0x05, 0x00}
 	if !bytes.Equal(fake.w.Bytes(), expectedConfirmation) {
 		t.Errorf("Handshake confirmation mismatch.\nExpected: % X\nGot:      % X", expectedConfirmation, fake.w.Bytes())
 	}
