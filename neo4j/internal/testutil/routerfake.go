@@ -60,7 +60,14 @@ func (r *RouterFake) Invalidate(database string) {
 	r.Invalidated = true
 }
 
-func (r *RouterFake) GetOrUpdateReaders(_ context.Context, bookmarksFn func(context.Context) ([]string, error), dbSelection db.DatabaseSelection, _ *db.ReAuthToken, _ log.BoltLogger) ([]string, error) {
+func (r *RouterFake) GetOrUpdateReaders(
+	_ context.Context,
+	bookmarksFn func(context.Context) ([]string, error),
+	dbSelection db.DatabaseSelection,
+	_ *db.ReAuthToken,
+	_ log.BoltLogger,
+	_ func(string),
+) ([]string, error) {
 	if r.GetOrUpdateReadersHook != nil {
 		return r.GetOrUpdateReadersHook(bookmarksFn, dbSelection.Name)
 	}
@@ -71,7 +78,14 @@ func (r *RouterFake) Readers(string) []string {
 	return nil
 }
 
-func (r *RouterFake) GetOrUpdateWriters(_ context.Context, bookmarksFn func(context.Context) ([]string, error), dbSelection db.DatabaseSelection, _ *db.ReAuthToken, _ log.BoltLogger) ([]string, error) {
+func (r *RouterFake) GetOrUpdateWriters(
+	_ context.Context,
+	bookmarksFn func(context.Context) ([]string, error),
+	dbSelection db.DatabaseSelection,
+	_ *db.ReAuthToken,
+	_ log.BoltLogger,
+	_ func(string),
+) ([]string, error) {
 	if r.GetOrUpdateWritersHook != nil {
 		return r.GetOrUpdateWritersHook(bookmarksFn, dbSelection.Name)
 	}
@@ -93,11 +107,4 @@ func (r *RouterFake) CleanUp() {
 	if r.CleanUpHook != nil {
 		r.CleanUpHook()
 	}
-}
-
-func (r *RouterFake) GetTable(database string) *db.RoutingTable {
-	if r.GetTableHook != nil {
-		return r.GetTableHook(database)
-	}
-	return nil
 }

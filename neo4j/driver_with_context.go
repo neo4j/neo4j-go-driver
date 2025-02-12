@@ -319,7 +319,6 @@ type sessionRouter interface {
 	InvalidateWriter(db string, server string)
 	InvalidateReader(db string, server string)
 	InvalidateServer(server string)
-	GetTable(db string) *idb.RoutingTable
 }
 
 type driverWithContext struct {

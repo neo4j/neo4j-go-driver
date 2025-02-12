@@ -888,19 +888,6 @@ func TestSession(outer *testing.T) {
 			AssertNoError(t, err)
 			AssertFalse(t, usedHomeDbGuess)
 		})
-
-		inner.Run("Returns false when homeDbGuess is set but no routing table exists", func(t *testing.T) {
-			router, _, sess, _, _ := createSessionWithHomeDbGuess(true)
-
-			router.GetTableHook = func(guess string) *idb.RoutingTable {
-				return nil
-			}
-
-			_, usedHomeDbGuess, err := sess.getServerList(context.Background(), idb.ReadMode)
-
-			AssertNoError(t, err)
-			AssertFalse(t, usedHomeDbGuess)
-		})
 	})
 }
 

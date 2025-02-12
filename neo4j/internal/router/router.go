@@ -141,7 +141,7 @@ func (r *Router) readTable(
 	return table, nil
 }
 
-func (r *Router) GetTable(database string) *idb.RoutingTable {
+func (r *Router) getTable(database string) *idb.RoutingTable {
 	r.dbRoutersMut.Lock()
 	defer r.dbRoutersMut.Unlock()
 
@@ -266,7 +266,7 @@ func (r *Router) GetOrUpdateReaders(
 }
 
 func (r *Router) Readers(database string) []string {
-	table := r.GetTable(database)
+	table := r.getTable(database)
 	if table == nil {
 		return nil
 	}
@@ -309,7 +309,7 @@ func (r *Router) GetOrUpdateWriters(
 }
 
 func (r *Router) Writers(database string) []string {
-	table := r.GetTable(database)
+	table := r.getTable(database)
 	if table == nil {
 		return nil
 	}

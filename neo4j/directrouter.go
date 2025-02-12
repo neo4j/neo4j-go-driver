@@ -57,7 +57,3 @@ func (r *directRouter) GetNameOfDefaultDatabase(context.Context, []string, strin
 func (r *directRouter) Invalidate(string) {}
 
 func (r *directRouter) CleanUp() {}
-
-func (r *directRouter) GetTable(string) *db.RoutingTable {
-	return nil
-}
