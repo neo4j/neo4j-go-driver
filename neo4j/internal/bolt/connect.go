@@ -20,6 +20,7 @@ package bolt
 
 import (
 	"context"
+	"encoding/binary"
 	"fmt"
 	"io"
 	"net"
@@ -214,10 +215,7 @@ func readCapabilityMask(ctx context.Context, r racing.RacingReader, serverName s
 		errorListener.OnDialError(ctx, serverName, err)
 		return 0, nil, fmt.Errorf("failed to read capability mask: %w", err)
 	}
-	capBytes, err := encodeVarInt(capMask)
-	if err != nil {
-		return 0, nil, fmt.Errorf("failed to encode capability mask: %w", err)
-	}
+	capBytes := encodeVarInt(capMask)
 	return capMask, capBytes, nil
 }
 
@@ -273,43 +271,29 @@ func sendHandshakeConfirmation(ctx context.Context, conn io.ReadWriteCloser, bol
 	return nil
 }
 
-// readVarInt reads a Base128-encoded variable-length integer and returns the
-// decoded unsigned integer, or an error if the value is too long or the read fails.
+// readVarInt returns a Base128-encoded variable-length integer from the reader.
 func readVarInt(ctx context.Context, r racing.RacingReader) (uint64, error) {
-	var result uint64
-	var shift uint
-	var buf [1]byte
-	for {
-		if _, err := r.Read(ctx, buf[:]); err != nil {
+	var buf [10]byte
+	// Read one byte at a time until a byte with the MSB not set is encountered.
+	for i := 0; i < len(buf); i++ {
+		if _, err := r.Read(ctx, buf[i:i+1]); err != nil {
 			return 0, err
 		}
-		b := buf[0]
-		result |= uint64(b&0x7F) << shift
-		// The most significant bit is the continuation flag.
-		if b&0x80 == 0 {
-			break
-		}
-		shift += 7
-		if shift >= 64 {
-			return 0, fmt.Errorf("varint too long")
+		// If the continuation bit is not set, we've reached the end of the varint.
+		if buf[i]&0x80 == 0 {
+			value, n := binary.Uvarint(buf[:i+1])
+			if n <= 0 {
+				return 0, fmt.Errorf("failed to decode varint")
+			}
+			return value, nil
 		}
 	}
-	return result, nil
+	return 0, fmt.Errorf("varint too long")
 }
 
-// encodeVarInt encodes the given unsigned integer into a Base128 variable-length integer.
-// Returns the encoded bytes or an error if the encoding fails.
-func encodeVarInt(value uint64) ([]byte, error) {
-	var buf []byte
-	for {
-		b := byte(value & 0x7F)
-		value >>= 7
-		if value != 0 {
-			buf = append(buf, b|0x80)
-		} else {
-			buf = append(buf, b)
-			break
-		}
-	}
-	return buf, nil
+// encodeVarInt returns the encoded unsigned integer into a Base128 variable-length integer.
+func encodeVarInt(value uint64) []byte {
+	var buf [10]byte
+	n := binary.PutUvarint(buf[:], value)
+	return buf[:n]
 }

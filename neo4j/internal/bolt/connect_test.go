@@ -20,6 +20,8 @@ package bolt
 import (
 	"bytes"
 	"context"
+	"fmt"
+	"io"
 	"testing"
 
 	iauth "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/auth"
@@ -101,7 +103,7 @@ func TestConnect(ot *testing.T) {
 	})
 }
 
-// fakeConn is a simple in-memory implementation of io.ReadWriteCloser.
+// fakeConn is a simple implementation of io.ReadWriteCloser.
 type fakeConn struct {
 	r *bytes.Buffer // Data to be read (simulated server response)
 	w *bytes.Buffer // Data written by the client
@@ -185,5 +187,102 @@ func TestPerformManifestNegotiationNoSupportedVersion(t *testing.T) {
 	expectedInvalid := []byte{0x00, 0x00, 0x00, 0x00, 0x00}
 	if !bytes.Equal(fake.w.Bytes(), expectedInvalid) {
 		t.Errorf("Expected invalid handshake % X, got % X", expectedInvalid, fake.w.Bytes())
+	}
+}
+
+// fakeRacingReader is a simple implementation of a racing.RacingReader.
+type fakeRacingReader struct {
+	r *bytes.Reader
+}
+
+func newFakeRacingReader(data []byte) *fakeRacingReader {
+	return &fakeRacingReader{r: bytes.NewReader(data)}
+}
+
+func (f *fakeRacingReader) Read(_ context.Context, b []byte) (int, error) {
+	return f.r.Read(b)
+}
+
+func (f *fakeRacingReader) ReadFull(_ context.Context, b []byte) (int, error) {
+	return io.ReadFull(f.r, b)
+}
+
+// errorRacingReader always returns an error when Read is called.
+type errorRacingReader struct{}
+
+func (e *errorRacingReader) Read(_ context.Context, _ []byte) (int, error) {
+	return 0, fmt.Errorf("read error")
+}
+
+func (e *errorRacingReader) ReadFull(_ context.Context, b []byte) (int, error) {
+	return 0, fmt.Errorf("readfull error")
+}
+
+// TestEncodeVarInt tests that encodeVarInt returns the expected byte slices.
+func TestEncodeVarInt(t *testing.T) {
+	tests := []struct {
+		value    uint64
+		expected []byte
+	}{
+		{0, []byte{0x00}},
+		{1, []byte{0x01}},
+		{127, []byte{0x7F}},
+		{128, []byte{0x80, 0x01}},
+		{300, []byte{0xAC, 0x02}},
+		{16384, []byte{0x80, 0x80, 0x01}},
+	}
+
+	for _, tt := range tests {
+		encoded := encodeVarInt(tt.value)
+		if !bytes.Equal(encoded, tt.expected) {
+			t.Errorf("encodeVarInt(%d) = % X, want % X", tt.value, encoded, tt.expected)
+		}
+	}
+}
+
+// TestVarIntRoundTrip verifies that encoding then decoding returns the original value.
+func TestVarIntRoundTrip(t *testing.T) {
+	testValues := []uint64{
+		0, 1, 127, 128, 300, 16383, 16384,
+		1<<32 - 1,  // max 32-bit value
+		1<<63 - 1,  // max signed 64-bit value
+		^uint64(0), // max unsigned 64-bit value
+	}
+
+	for _, v := range testValues {
+		encoded := encodeVarInt(v)
+		reader := newFakeRacingReader(encoded)
+		decoded, err := readVarInt(context.Background(), reader)
+		if err != nil {
+			t.Errorf("readVarInt error for value %d: %v", v, err)
+			continue
+		}
+		if decoded != v {
+			t.Errorf("round trip failed: encoded % X, decoded %d, expected %d", encoded, decoded, v)
+		}
+	}
+}
+
+// TestReadVarIntTooLong simulates a varint encoding that never terminates.
+func TestReadVarIntTooLong(t *testing.T) {
+	// 10 bytes with continuation bit set (0x80)
+	data := []byte{0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80}
+	reader := newFakeRacingReader(data)
+	_, err := readVarInt(context.Background(), reader)
+	if err == nil {
+		t.Error("expected error for varint too long, got nil")
+	} else if err.Error() != "varint too long" {
+		t.Errorf("expected error 'varint too long', got %v", err)
+	}
+}
+
+// TestReadVarIntReadError verifies that a read error from the underlying reader is returned.
+func TestReadVarIntReadError(t *testing.T) {
+	reader := &errorRacingReader{}
+	_, err := readVarInt(context.Background(), reader)
+	if err == nil {
+		t.Error("expected error from underlying reader, got nil")
+	} else if err.Error() != "read error" {
+		t.Errorf("expected error 'read error', got %v", err)
 	}
 }
