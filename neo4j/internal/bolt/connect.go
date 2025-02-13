@@ -294,7 +294,7 @@ func readVarInt(ctx context.Context, r racing.RacingReader) (uint64, []byte, err
 
 // encodeVarInt returns the encoded unsigned integer into a Base128 variable-length integer.
 func encodeVarInt(value uint64) []byte {
-	var buf [10]byte
+	var buf [binary.MaxVarintLen64]byte
 	n := binary.PutUvarint(buf[:], value)
 	return buf[:n]
 }
