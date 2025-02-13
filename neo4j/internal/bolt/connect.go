@@ -241,13 +241,13 @@ func logManifestHandshake(boltLogger log.BoltLogger, response []byte, count int,
 // falls within the range offered by the server.
 func selectProtocol(offers []protocolVersion) (protocolVersion, error) {
 	for _, candidate := range versions[1:] {
-		for v := candidate.minor; v >= candidate.minor-candidate.back; v-- {
+		for v := int(candidate.minor); v >= int(candidate.minor)-int(candidate.back); v-- {
 			for _, offer := range offers {
 				if offer.major != candidate.major {
 					continue
 				}
-				if v <= offer.minor && v >= offer.minor-offer.back {
-					return protocolVersion{major: candidate.major, minor: v}, nil
+				if byte(v) <= offer.minor && byte(v) >= offer.minor-offer.back {
+					return protocolVersion{major: candidate.major, minor: byte(v)}, nil
 				}
 			}
 		}
