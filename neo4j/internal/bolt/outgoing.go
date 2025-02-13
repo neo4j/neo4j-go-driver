@@ -391,7 +391,7 @@ func (o *outgoing) packX(x any) {
 		case reflect.Struct:
 			o.packStruct(x)
 		default:
-			o.packX(i.Interface())
+			o.packV(i)
 		}
 	case reflect.Struct:
 		o.packStruct(x)
@@ -408,35 +408,126 @@ func (o *outgoing) packX(x any) {
 			o.packer.Strings(s)
 		case []float64:
 			o.packer.Float64s(s)
+		case []any:
+			o.packer.ArrayHeader(len(s))
+			for _, e := range s {
+				o.packX(e)
+			}
 		default:
 			num := v.Len()
 			o.packer.ArrayHeader(num)
 			for i := 0; i < num; i++ {
-				o.packX(v.Index(i).Interface())
+				o.packV(v.Index(i))
 			}
 		}
 	case reflect.Map:
 		// Optimizations
 		switch m := x.(type) {
+		case map[string][]byte:
+			o.packer.BytesMap(m)
 		case map[string]int:
 			o.packer.IntMap(m)
+		case map[string]int64:
+			o.packer.Int64Map(m)
 		case map[string]string:
 			o.packer.StringMap(m)
+		case map[string]float64:
+			o.packer.Float64Map(m)
+		case map[string]any:
+			o.packMap(m)
 		default:
 			t := reflect.TypeOf(x)
 			if t.Key().Kind() != reflect.String {
 				o.onPackErr(&db.UnsupportedTypeError{Type: reflect.TypeOf(x)})
 				return
 			}
-			o.packer.MapHeader(v.Len())
-			// TODO Use MapRange when min Go version is >= 1.12
-			for _, ki := range v.MapKeys() {
-				o.packer.String(ki.String())
-				o.packX(v.MapIndex(ki).Interface())
+			l := v.Len()
+			o.packer.MapHeader(l)
+			if l == 0 {
+				return
+			}
+			key := reflect.New(t.Key()).Elem()
+			value := reflect.New(t.Elem()).Elem()
+			iter := v.MapRange()
+			for iter.Next() {
+				key.SetIterKey(iter)
+				value.SetIterValue(iter)
+				o.packer.String(key.String())
+				o.packV(value)
 			}
 		}
 	default:
 		o.onPackErr(&db.UnsupportedTypeError{Type: reflect.TypeOf(x)})
+	}
+}
+
+func typeForPrimitive[T any]() reflect.Type {
+	var v T
+	return reflect.TypeOf(v)
+}
+
+var intT = typeForPrimitive[int]()
+var int64T = typeForPrimitive[int64]()
+var stringT = typeForPrimitive[string]()
+var float64T = typeForPrimitive[float64]()
+var anyT = reflect.TypeOf((*any)(nil)).Elem()
+
+func (o *outgoing) packV(v reflect.Value) {
+	switch v.Kind() {
+	case reflect.Bool:
+		o.packer.Bool(v.Bool())
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+		o.packer.Int64(v.Int())
+	case reflect.Uint8, reflect.Uint16, reflect.Uint32:
+		o.packer.Uint32(uint32(v.Uint()))
+	case reflect.Uint64, reflect.Uint:
+		o.packer.Uint64(v.Uint())
+	case reflect.Float32, reflect.Float64:
+		o.packer.Float64(v.Float())
+	case reflect.String:
+		o.packer.String(v.String())
+	case reflect.Ptr:
+		if v.IsNil() {
+			o.packer.Nil()
+			return
+		}
+		// Inspect what the pointer points to
+		i := reflect.Indirect(v)
+		switch i.Kind() {
+		case reflect.Struct:
+			o.packStruct(v.Interface())
+		default:
+			o.packV(i)
+		}
+	case reflect.Struct:
+		o.packStruct(v.Interface())
+	case reflect.Slice:
+		elemType := v.Type().Elem()
+		if elemType.Kind() == reflect.Uint8 {
+			o.packer.Bytes(v.Bytes())
+			return
+		}
+		num := v.Len()
+		if num > 5 {
+			switch elemType {
+			case intT, int64T, stringT, float64T, anyT:
+				// Accept the cost of an allocation (v.Interface())
+				// because this slice type is optimized in packX.
+				// The exact length from which the optimization amortizes
+				// the allocation cost depends on many factors.
+				// 5 seemed a close to the cross-over point on my system
+				// running Go 1.23.0 linux/amd64.
+				// cf. https://github.com/neo4j/neo4j-go-driver/pull/617
+				o.packX(v.Interface())
+				return
+			}
+		}
+		o.packer.ArrayHeader(num)
+		for i := 0; i < num; i++ {
+			o.packV(v.Index(i))
+		}
+	default:
+		o.packX(v.Interface())
 	}
 }
 
