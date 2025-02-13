@@ -190,7 +190,7 @@ func (r *Router) getOrUpdateTable(
 			targetDatabase = ""
 		}
 		table, err := r.updateTable(ctx, bookmarksFn, targetDatabase, auth, boltLogger, dbRouter)
-		if onRoutingTableUpdated != nil {
+		if err == nil && onRoutingTableUpdated != nil {
 			onRoutingTableUpdated(table.DatabaseName)
 		}
 		r.dbRoutersMut.Lock()
