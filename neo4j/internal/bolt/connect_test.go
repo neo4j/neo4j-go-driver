@@ -248,17 +248,28 @@ func TestVarIntRoundTrip(t *testing.T) {
 		1<<63 - 1,  // max signed 64-bit value
 		^uint64(0), // max unsigned 64-bit value
 	}
+	paddings := [][]byte{
+		nil, {0x00}, {0xFF}, {0x00, 0x00}, {0xFF, 0xFF},
+	}
 
 	for _, v := range testValues {
-		encoded := encodeVarInt(v)
-		reader := newFakeRacingReader(encoded)
-		decoded, err := readVarInt(context.Background(), reader)
-		if err != nil {
-			t.Errorf("readVarInt error for value %d: %v", v, err)
-			continue
-		}
-		if decoded != v {
-			t.Errorf("round trip failed: encoded % X, decoded %d, expected %d", encoded, decoded, v)
+		for _, padding := range paddings {
+			t.Run(fmt.Sprintf("value %d, padding % X", v, padding), func(t *testing.T) {
+				encoded := encodeVarInt(v)
+				paddedEncoded := append(encoded, padding...)
+				reader := newFakeRacingReader(paddedEncoded)
+				decoded, readBytes, err := readVarInt(context.Background(), reader)
+				if err != nil {
+					t.Errorf("readVarInt error for value %d: %v", v, err)
+				}
+				if decoded != v {
+					t.Errorf("round trip failed: encoded % X, decoded %d, expected %d", encoded, decoded, v)
+				}
+				AssertSliceEqual(t, encoded, readBytes)
+				unreadBytes, err := io.ReadAll(reader.r)
+				AssertNoError(t, err)
+				AssertSliceEqual(t, unreadBytes, padding)
+			})
 		}
 	}
 }
@@ -268,23 +279,25 @@ func TestReadVarIntTooLong(t *testing.T) {
 	// 10 bytes with continuation bit set (0x80)
 	data := []byte{0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80}
 	reader := newFakeRacingReader(data)
-	_, err := readVarInt(context.Background(), reader)
+	_, readBytes, err := readVarInt(context.Background(), reader)
 	if err == nil {
 		t.Error("expected error for varint too long, got nil")
 	} else if err.Error() != "varint too long" {
 		t.Errorf("expected error 'varint too long', got %v", err)
 	}
+	AssertDeepEquals(t, readBytes, data)
 }
 
 // TestReadVarIntReadError verifies that a read error from the underlying reader is returned.
 func TestReadVarIntReadError(t *testing.T) {
 	reader := &errorRacingReader{}
-	_, err := readVarInt(context.Background(), reader)
+	_, readBytes, err := readVarInt(context.Background(), reader)
 	if err == nil {
 		t.Error("expected error from underlying reader, got nil")
 	} else if err.Error() != "read error" {
 		t.Errorf("expected error 'read error', got %v", err)
 	}
+	AssertDeepEquals(t, readBytes, []byte{})
 }
 
 func TestSelectProtocol(ot *testing.T) {

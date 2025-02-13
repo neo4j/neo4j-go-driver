@@ -185,7 +185,7 @@ func performManifestNegotiation(
 // readProtocolOfferings reads the number of protocol offerings and returns the count and
 // a slice of supported protocol versions.
 func readProtocolOfferings(ctx context.Context, r racing.RacingReader, serverName string, errorListener ConnectionErrorListener) ([]protocolVersion, error) {
-	count, err := readVarInt(ctx, r)
+	count, _, err := readVarInt(ctx, r)
 	if err != nil {
 		errorListener.OnDialError(ctx, serverName, err)
 		return nil, fmt.Errorf("failed to read manifest protocol count: %w", err)
@@ -210,12 +210,11 @@ func readProtocolOfferings(ctx context.Context, r racing.RacingReader, serverNam
 // readCapabilityMask reads the capability bit mask (a Base128 VarInt) and returns both the
 // raw value and its encoded byte slice.
 func readCapabilityMask(ctx context.Context, r racing.RacingReader, serverName string, errorListener ConnectionErrorListener) (uint64, []byte, error) {
-	capMask, err := readVarInt(ctx, r)
+	capMask, capBytes, err := readVarInt(ctx, r)
 	if err != nil {
 		errorListener.OnDialError(ctx, serverName, err)
-		return 0, nil, fmt.Errorf("failed to read capability mask: %w", err)
+		return 0, capBytes, fmt.Errorf("failed to read capability mask: %w", err)
 	}
-	capBytes := encodeVarInt(capMask)
 	return capMask, capBytes, nil
 }
 
@@ -274,23 +273,23 @@ func sendHandshakeConfirmation(ctx context.Context, conn io.ReadWriteCloser, bol
 }
 
 // readVarInt returns a Base128-encoded variable-length integer from the reader.
-func readVarInt(ctx context.Context, r racing.RacingReader) (uint64, error) {
+func readVarInt(ctx context.Context, r racing.RacingReader) (uint64, []byte, error) {
 	var buf [10]byte
 	// Read one byte at a time until a byte with the MSB not set is encountered.
 	for i := 0; i < len(buf); i++ {
 		if _, err := r.Read(ctx, buf[i:i+1]); err != nil {
-			return 0, err
+			return 0, buf[:i], err
 		}
 		// If the continuation bit is not set, we've reached the end of the varint.
 		if buf[i]&0x80 == 0 {
 			value, n := binary.Uvarint(buf[:i+1])
 			if n <= 0 {
-				return 0, fmt.Errorf("failed to decode varint")
+				return 0, buf[:i+1], fmt.Errorf("failed to decode varint")
 			}
-			return value, nil
+			return value, buf[:i+1], nil
 		}
 	}
-	return 0, fmt.Errorf("varint too long")
+	return 0, buf[:], fmt.Errorf("varint too long")
 }
 
 // encodeVarInt returns the encoded unsigned integer into a Base128 variable-length integer.
