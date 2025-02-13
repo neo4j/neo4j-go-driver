@@ -274,7 +274,7 @@ func sendHandshakeConfirmation(ctx context.Context, conn io.ReadWriteCloser, bol
 
 // readVarInt returns a Base128-encoded variable-length integer from the reader.
 func readVarInt(ctx context.Context, r racing.RacingReader) (uint64, []byte, error) {
-	var buf [10]byte
+	var buf [binary.MaxVarintLen64]byte
 	// Read one byte at a time until a byte with the MSB not set is encountered.
 	for i := 0; i < len(buf); i++ {
 		if _, err := r.Read(ctx, buf[i:i+1]); err != nil {
