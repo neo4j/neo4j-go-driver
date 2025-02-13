@@ -132,6 +132,7 @@ func (f *fakeConn) Close() error {
 // It provides a valid manifest handshake response and verifies that the negotiated
 // protocol version is correct and that the handshake confirmation is written.
 func TestPerformManifestNegotiationSuccess(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	serverName := "testServer"
 	errorListener := &noopErrorListener{}
@@ -166,6 +167,7 @@ func TestPerformManifestNegotiationSuccess(t *testing.T) {
 // none of the server-offered protocol versions is acceptable to the client.
 // It verifies that an error is returned and that the invalid handshake is sent.
 func TestPerformManifestNegotiationNoSupportedVersion(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	serverName := "testServer"
 	errorListener := &noopErrorListener{}
@@ -220,6 +222,7 @@ func (e *errorRacingReader) ReadFull(_ context.Context, b []byte) (int, error) {
 
 // TestEncodeVarInt tests that encodeVarInt returns the expected byte slices.
 func TestEncodeVarInt(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		value    uint64
 		expected []byte
@@ -230,6 +233,7 @@ func TestEncodeVarInt(t *testing.T) {
 		{128, []byte{0x80, 0x01}},
 		{300, []byte{0xAC, 0x02}},
 		{16384, []byte{0x80, 0x80, 0x01}},
+		{^uint64(0), []byte{0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0x01}},
 	}
 
 	for _, tt := range tests {
@@ -242,6 +246,7 @@ func TestEncodeVarInt(t *testing.T) {
 
 // TestVarIntRoundTrip verifies that encoding then decoding returns the original value.
 func TestVarIntRoundTrip(t *testing.T) {
+	t.Parallel()
 	testValues := []uint64{
 		0, 1, 127, 128, 300, 16383, 16384,
 		1<<32 - 1,  // max 32-bit value
@@ -276,6 +281,7 @@ func TestVarIntRoundTrip(t *testing.T) {
 
 // TestReadVarIntTooLong simulates a varint encoding that never terminates.
 func TestReadVarIntTooLong(t *testing.T) {
+	t.Parallel()
 	// 10 bytes with continuation bit set (0x80)
 	data := []byte{0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80}
 	reader := newFakeRacingReader(data)
@@ -290,6 +296,7 @@ func TestReadVarIntTooLong(t *testing.T) {
 
 // TestReadVarIntReadError verifies that a read error from the underlying reader is returned.
 func TestReadVarIntReadError(t *testing.T) {
+	t.Parallel()
 	reader := &errorRacingReader{}
 	_, readBytes, err := readVarInt(context.Background(), reader)
 	if err == nil {
@@ -298,6 +305,23 @@ func TestReadVarIntReadError(t *testing.T) {
 		t.Errorf("expected error 'read error', got %v", err)
 	}
 	AssertDeepEquals(t, readBytes, []byte{})
+}
+
+func TestReadVarIntInvalid(t *testing.T) {
+	t.Parallel()
+	// The first 9 bytes have the continuation bit set (0x80).
+	// The 10th byte triggers an invalid varint error.
+	data := []byte{0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x02}
+	reader := newFakeRacingReader(data)
+	_, readBytes, err := readVarInt(context.Background(), reader)
+	if err == nil {
+		t.Error("Expected error for invalid varint, got nil")
+	} else if err.Error() != "failed to decode varint" {
+		t.Errorf("Expected error 'failed to decode varint', got %v", err)
+	}
+	if !bytes.Equal(readBytes, data) {
+		t.Errorf("Expected read bytes % X, got % X", data, readBytes)
+	}
 }
 
 func TestSelectProtocol(ot *testing.T) {
