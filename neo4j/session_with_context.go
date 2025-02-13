@@ -651,7 +651,7 @@ func (s *sessionWithContext) applyConnectionTimeout(ctx context.Context) (contex
 // getServerList resolves the server list based on the session configuration.
 // It returns a list of servers, a boolean indicating whether the home database guess was used, and an error if resolution fails.
 func (s *sessionWithContext) getServerList(ctx context.Context, mode idb.AccessMode) ([]string, bool, error) {
-	if s.config.DatabaseName != "" {
+	if !s.resolveHomeDb {
 		serverList, err := s.getOrUpdateServers(ctx, mode, false, nil)
 		return serverList, false, err
 	}
