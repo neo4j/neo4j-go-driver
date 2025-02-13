@@ -167,10 +167,10 @@ func performManifestNegotiation(
 	// Select an acceptable protocol version.
 	chosen, err := selectProtocol(supported)
 	if err != nil {
+		errorListener.OnDialError(ctx, serverName, err)
+		// Best-effort attempt to send an invalid handshake (ignore any error).
 		invalidHandshake := []byte{0x00, 0x00, 0x00, 0x00, 0x00} // 4 bytes for version + 1 byte for capabilities.
-		if _, err := racing.NewRacingWriter(conn).Write(ctx, invalidHandshake); err != nil {
-			errorListener.OnDialError(ctx, serverName, err)
-		}
+		_, _ = racing.NewRacingWriter(conn).Write(ctx, invalidHandshake)
 		return 0, 0, err
 	}
 
