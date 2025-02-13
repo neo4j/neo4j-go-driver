@@ -584,6 +584,9 @@ func (b *backend) handleRequest(req map[string]any) {
 			if data["livenessCheckTimeoutMs"] != nil {
 				c.ConnectionLivenessCheckTimeout = time.Millisecond * time.Duration(asInt64(data["livenessCheckTimeoutMs"].(json.Number)))
 			}
+			if data["maxConnectionLifetimeMs"] != nil {
+				c.MaxConnectionLifetime = time.Millisecond * time.Duration(asInt64(data["maxConnectionLifetimeMs"].(json.Number)))
+			}
 			if data["maxConnectionPoolSize"] != nil {
 				c.MaxConnectionPoolSize = asInt(data["maxConnectionPoolSize"].(json.Number))
 			}
@@ -1267,6 +1270,7 @@ func (b *backend) handleRequest(req map[string]any) {
 				"Feature:API:Driver.ExecuteQuery:WithAuth",
 				"Feature:API:Driver:GetServerInfo",
 				"Feature:API:Driver.IsEncrypted",
+				"Feature:API:Driver:MaxConnectionLifetime",
 				"Feature:API:Driver:NotificationsConfig",
 				"Feature:API:Driver.VerifyAuthentication",
 				"Feature:API:Driver.VerifyConnectivity",
@@ -1303,6 +1307,7 @@ func (b *backend) handleRequest(req map[string]any) {
 				"Feature:Bolt:5.6",
 				"Feature:Bolt:5.7",
 				"Feature:Bolt:5.8",
+				//"Feature:Bolt:HandshakeManifestV1",
 				"Feature:Bolt:Patch:UTC",
 				"Feature:Impersonation",
 				//"Feature:TLS:1.1",
@@ -1311,6 +1316,7 @@ func (b *backend) handleRequest(req map[string]any) {
 
 				// === OPTIMIZATIONS ===
 				"AuthorizationExpiredTreatment",
+				"Optimization:AuthPipelining",
 				"Optimization:ConnectionReuse",
 				"Optimization:EagerTransactionBegin",
 				"Optimization:ExecuteQueryPipelining",
@@ -1320,13 +1326,13 @@ func (b *backend) handleRequest(req map[string]any) {
 				"Optimization:MinimalBookmarksSet",
 				"Optimization:MinimalResets",
 				//"Optimization:MinimalVerifyAuthentication",
-				"Optimization:AuthPipelining",
 				"Optimization:PullPipelining",
 				//"Optimization:ResultListFetchAll",
 
 				// === IMPLEMENTATION DETAILS ===
 				"Detail:ClosedDriverIsEncrypted",
 				"Detail:DefaultSecurityConfigValueEquality",
+				//"Detail:NumberIsNumber",
 
 				// === CONFIGURATION HINTS (BOLT 4.3+) ===
 				"ConfHint:connection.recv_timeout_seconds",
