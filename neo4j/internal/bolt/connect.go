@@ -162,7 +162,7 @@ func performManifestNegotiation(
 	}
 
 	// Log the complete server handshake message.
-	logManifestHandshake(boltLogger, response, len(supported), supported, capBytes)
+	logManifestHandshake(boltLogger, response, supported, capBytes)
 
 	// Select an acceptable protocol version.
 	chosen, err := selectProtocol(supported)
@@ -221,7 +221,7 @@ func readCapabilityMask(ctx context.Context, r racing.RacingReader, serverName s
 
 // logManifestHandshake logs the complete server handshake message for manifest negotiation.
 // It prints the initial response, count of offerings, each supported protocol, and the capability mask.
-func logManifestHandshake(boltLogger log.BoltLogger, response []byte, count int, supported []protocolVersion, capBytes []byte) {
+func logManifestHandshake(boltLogger log.BoltLogger, response []byte, supported []protocolVersion, capBytes []byte) {
 	if boltLogger == nil {
 		return
 	}
@@ -231,7 +231,7 @@ func logManifestHandshake(boltLogger log.BoltLogger, response []byte, count int,
 	}
 	boltLogger.LogServerMessage("", "<HANDSHAKE> %s [%d] %s %s",
 		fmt.Sprintf("%#X", response),
-		count,
+		len(supported),
 		strings.Join(supportedProtocols, " "),
 		fmt.Sprintf("%#X", capBytes))
 }
