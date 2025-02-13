@@ -267,37 +267,6 @@ func TestBolt4(outer *testing.T) {
 		bolt.Close(context.Background())
 	})
 
-	outer.Run("No routing in hello on 4.0", func(t *testing.T) {
-		routingContext := map[string]string{"some": "thing"}
-		conn, srv, cleanup := setupBolt4Pipe(t)
-		defer cleanup()
-		go func() {
-			srv.waitForHandshake()
-			srv.acceptVersion(4, 0)
-			hmap := srv.waitForHello()
-			_, exists := hmap["routing"].(map[string]any)
-			if exists {
-				panic("Should be no routing entry")
-			}
-			srv.acceptHello()
-		}()
-		bolt, err := Connect(
-			context.Background(),
-			"serverName",
-			conn,
-			auth,
-			"007",
-			routingContext,
-			nil,
-			logger,
-			nil,
-			idb.NotificationConfig{},
-			DefaultReadBufferSize,
-		)
-		AssertNoError(t, err)
-		bolt.Close(context.Background())
-	})
-
 	outer.Run("Failed authentication", func(t *testing.T) {
 		conn, srv, cleanup := setupBolt4Pipe(t)
 		defer cleanup()

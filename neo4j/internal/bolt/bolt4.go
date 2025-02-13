@@ -236,11 +236,8 @@ func (b *bolt4) Connect(
 	hello := map[string]any{
 		"user_agent": userAgent,
 	}
-	// On bolt >= 4.1 add routing to enable/disable routing
-	if b.minor >= 1 {
-		if routingContext != nil {
-			hello["routing"] = routingContext
-		}
+	if routingContext != nil {
+		hello["routing"] = routingContext
 	}
 	checkUtcPatch := b.minor >= 3
 	if checkUtcPatch {
