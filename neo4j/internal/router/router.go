@@ -317,7 +317,6 @@ func (r *Router) Writers(database string) []string {
 }
 
 func (r *Router) GetNameOfDefaultDatabase(ctx context.Context, bookmarks []string, user string, auth *idb.ReAuthToken, boltLogger log.BoltLogger) (string, error) {
-	// FIXME: this seems to indirectly cache the home db for the routing table's TTL
 	table, err := r.readTable(ctx, nil, bookmarks, idb.DefaultDatabase, user, auth, boltLogger)
 	if err != nil {
 		return "", err

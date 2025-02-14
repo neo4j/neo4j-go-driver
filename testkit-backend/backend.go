@@ -1714,6 +1714,7 @@ func testSkips() map[string]string {
 		"stub.routing.*.*.test_should_request_rt_from_all_initial_routers_until_successful_on_authorization_expired": "Add DNS resolver TestKit message and connection timeout support",
 
 		// To fix/to decide whether to fix
+		"stub.routing.*.*.test_should_successfully_acquire_rt_when_router_ip_changes":                                        "Backend lacks custom DNS resolution and Go driver RT discovery differs.",
 		"stub.routing.test_routing_v*.RoutingV*.test_should_revert_to_initial_router_if_known_router_throws_protocol_errors": "Driver always uses configured URL first and custom resolver only if that fails",
 		"stub.routing.test_routing_v*.RoutingV*.test_should_read_successfully_from_reachable_db_after_trying_unreachable_db": "Driver retries to fetch a routing table up to 100 times if it's empty",
 		"stub.routing.test_routing_v*.RoutingV*.test_should_write_successfully_after_leader_switch_using_tx_run":             "Driver retries to fetch a routing table up to 100 times if it's empty",
