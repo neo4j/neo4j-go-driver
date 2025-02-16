@@ -22,7 +22,6 @@ package pool
 import (
 	"context"
 	"errors"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/homedb"
 	"math/rand"
 	"sync"
 	"testing"
@@ -34,6 +33,7 @@ import (
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/bolt"
 	idb "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/errorutil"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/homedb"
 	. "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/testutil"
 	itime "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/time"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/log"

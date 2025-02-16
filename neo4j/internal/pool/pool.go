@@ -66,6 +66,7 @@ type Pool struct {
 	log        log.Logger
 	logId      string
 	cache      *homedb.Cache
+	ssrTracker ssrTracker
 }
 
 type serverPenalty struct {
@@ -86,6 +87,7 @@ func New(config *config.Config, connect Connect, logger log.Logger, logId string
 		logId:      logId,
 		log:        logger,
 		cache:      cache,
+		ssrTracker: ssrTracker{},
 	}
 	p.log.Infof(log.Pool, p.logId, "Created")
 	return p
@@ -107,7 +109,7 @@ func (p *Pool) Close(ctx context.Context) {
 	// Go through each server and close all connections to it
 	p.serversMut.Lock()
 	for n, s := range p.servers {
-		s.closeAll(ctx)
+		s.closeAll(ctx, p.closeConnection)
 		delete(p.servers, n)
 	}
 	p.serversMut.Unlock()
@@ -141,7 +143,7 @@ func (p *Pool) CleanUp(ctx context.Context) {
 	defer p.serversMut.Unlock()
 	now := itime.Now()
 	for n, s := range p.servers {
-		s.removeIdleOlderThan(ctx, now, p.config.MaxConnectionLifetime)
+		p.removeIdleOlderThanLocked(ctx, s, now, p.config.MaxConnectionLifetime)
 		if s.size() == 0 && !s.hasFailedConnect(now) {
 			delete(p.servers, n)
 		}
@@ -160,7 +162,7 @@ func (p *Pool) getPenaltiesForServers(ctx context.Context, serverNames []string)
 		penalties[i].name = n
 		if s != nil {
 			// Make sure that we don't get a too old connection
-			s.removeIdleOlderThan(ctx, now, p.config.MaxConnectionLifetime)
+			p.removeIdleOlderThanLocked(ctx, s, now, p.config.MaxConnectionLifetime)
 			penalties[i].penalty = s.calculatePenalty(now)
 		} else {
 			penalties[i].penalty = newConnectionPenalty
@@ -343,6 +345,7 @@ func (p *Pool) tryBorrow(
 	}
 
 	// Ok, got a connection, register the connection
+	p.ssrTracker.addConnection(c)
 	srv.registerBusy(c)
 	srv.notifySuccessfulConnect()
 	return c, nil
@@ -355,10 +358,7 @@ func (p *Pool) unreg(ctx context.Context, serverName string, c idb.Connection, n
 }
 
 func (p *Pool) unregLocked(ctx context.Context, serverName string, c idb.Connection, now time.Time) {
-	defer func() {
-		// Close connection in another thread to avoid potential long blocking operation during close.
-		go c.Close(ctx)
-	}()
+	defer p.closeConnection(ctx, c)
 
 	server := p.servers[serverName]
 	// Check for strange condition of not finding the server.
@@ -380,7 +380,17 @@ func (p *Pool) removeIdleOlderThanOnServer(ctx context.Context, serverName strin
 	if server == nil {
 		return
 	}
-	server.removeIdleOlderThan(ctx, now, maxAge)
+	p.removeIdleOlderThanLocked(ctx, server, now, maxAge)
+}
+
+func (p *Pool) removeIdleOlderThanLocked(ctx context.Context, s *server, now time.Time, maxAge time.Duration) {
+	s.removeIdleOlderThan(ctx, now, maxAge, p.closeConnection)
+}
+
+func (p *Pool) closeConnection(ctx context.Context, c idb.Connection) {
+	p.ssrTracker.removeConnection(c)
+	// Close connection in another thread to avoid potential long blocking operation during close.
+	go c.Close(ctx)
 }
 
 func (p *Pool) Return(ctx context.Context, c idb.Connection) {
@@ -432,12 +442,13 @@ func (p *Pool) Return(ctx context.Context, c idb.Connection) {
 		p.serversMut.Lock()
 		server := p.servers[serverName]
 		if server != nil { // Strange when server not found
-			server.returnBusy(ctx, c)
+			server.returnBusy(ctx, c, p.closeConnection)
 			if server.closing && server.size() == 0 {
 				delete(p.servers, serverName)
 			}
 		} else {
 			p.log.Warnf(log.Pool, p.logId, "Server %s not found", serverName)
+			p.closeConnection(ctx, c)
 		}
 		p.serversMut.Unlock()
 	}
@@ -506,7 +517,7 @@ func (p *Pool) deactivate(ctx context.Context, serverName string) {
 	defer p.serversMut.Unlock()
 	server := p.servers[serverName]
 	if server != nil {
-		server.startClosing(ctx)
+		server.startClosing(ctx, p.closeConnection)
 	}
 }
 
@@ -516,19 +527,5 @@ func (p *Pool) deactivateWriter(serverName string, db string) {
 }
 
 func (p *Pool) updateCacheState() {
-	p.serversMut.Lock()
-	defer p.serversMut.Unlock()
-
-	allSupportSSR := true
-	for _, server := range p.servers {
-		server.executeForAllConnections(func(conn idb.Connection) {
-			if !conn.IsSsrEnabled() {
-				allSupportSSR = false
-			}
-		})
-		if !allSupportSSR {
-			break
-		}
-	}
-	p.cache.SetEnabled(allSupportSSR)
+	p.cache.SetEnabled(p.ssrTracker.ssrEnabled())
 }

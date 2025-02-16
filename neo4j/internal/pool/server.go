@@ -47,6 +47,8 @@ func NewServer() *server {
 	}
 }
 
+type closeFunc = func(context.Context, db.Connection)
+
 var sharedRoundRobin uint32
 
 const rememberFailedConnectDuration = 3 * time.Minute
@@ -138,10 +140,10 @@ func (s *server) calculatePenalty(now time.Time) uint32 {
 }
 
 // Returns a busy connection, makes it idle
-func (s *server) returnBusy(ctx context.Context, c db.Connection) {
+func (s *server) returnBusy(ctx context.Context, c db.Connection, close closeFunc) {
 	s.unregisterBusy(c)
 	if s.closing {
-		c.Close(ctx)
+		close(ctx, c)
 	} else {
 		s.idle.PushFront(c)
 	}
@@ -165,11 +167,9 @@ func (s *server) registerBusy(c db.Connection) {
 }
 
 func (s *server) unregisterBusy(c db.Connection) {
-	found := false
-	for e := s.busy.Front(); e != nil && !found; e = e.Next() {
+	for e := s.busy.Front(); e != nil; e = e.Next() {
 		x := e.Value.(db.Connection)
-		found = x == c
-		if found {
+		if x == c {
 			s.busy.Remove(e)
 			return
 		}
@@ -180,7 +180,7 @@ func (s *server) size() int {
 	return s.busy.Len() + s.idle.Len() + s.reservations
 }
 
-func (s *server) removeIdleOlderThan(ctx context.Context, now time.Time, maxAge time.Duration) {
+func (s *server) removeIdleOlderThan(ctx context.Context, now time.Time, maxAge time.Duration, close closeFunc) {
 	e := s.idle.Front()
 	for e != nil {
 		n := e.Next()
@@ -189,17 +189,17 @@ func (s *server) removeIdleOlderThan(ctx context.Context, now time.Time, maxAge 
 		age := now.Sub(c.Birthdate())
 		if age >= maxAge {
 			s.idle.Remove(e)
-			go c.Close(ctx)
+			close(ctx, c)
 		}
 
 		e = n
 	}
 }
 
-func (s *server) closeAll(ctx context.Context) {
-	closeAndEmptyConnections(ctx, &s.idle)
+func (s *server) closeAll(ctx context.Context, close closeFunc) {
+	s.closeAndEmptyConnections(ctx, &s.idle, close)
 	// Closing the busy connections could mean here that we do close from another thread.
-	closeAndEmptyConnections(ctx, &s.busy)
+	s.closeAndEmptyConnections(ctx, &s.busy, close)
 }
 
 func (s *server) executeForAllConnections(callback func(c db.Connection)) {
@@ -211,15 +211,15 @@ func (s *server) executeForAllConnections(callback func(c db.Connection)) {
 	}
 }
 
-func (s *server) startClosing(ctx context.Context) {
+func (s *server) startClosing(ctx context.Context, close closeFunc) {
 	s.closing = true
-	closeAndEmptyConnections(ctx, &s.idle)
+	s.closeAndEmptyConnections(ctx, &s.idle, close)
 }
 
-func closeAndEmptyConnections(ctx context.Context, l *list.List) {
+func (s *server) closeAndEmptyConnections(ctx context.Context, l *list.List, close closeFunc) {
 	for e := l.Front(); e != nil; e = e.Next() {
 		c := e.Value.(db.Connection)
-		go c.Close(ctx)
+		close(ctx, c)
 	}
 	l.Init()
 }
