@@ -34,16 +34,18 @@ import (
 )
 
 type Connector struct {
-	SkipEncryption   bool
-	SkipVerify       bool
-	Log              log.Logger
-	RoutingContext   map[string]string
-	Network          string
-	Config           *config.Config
-	SupplyConnection func(context.Context, string) (net.Conn, error)
+	SkipEncryption     bool
+	SkipVerify         bool
+	Log                log.Logger
+	LogId              string
+	RoutingContext     map[string]string
+	Network            string
+	Config             *config.Config
+	SupplyConnection   func(context.Context, string) (net.Conn, error)
+	TestKitDnsResolver func(string) []string
 }
 
-func (c Connector) Connect(
+func (c *Connector) Connect(
 	ctx context.Context,
 	address string,
 	auth *db.ReAuthToken,
@@ -138,7 +140,29 @@ func (c Connector) createConnection(ctx context.Context, address string) (net.Co
 		dialer.KeepAlive = -1 * time.Second // Turns keep-alive off
 	}
 
-	return dialer.DialContext(ctx, c.Network, address)
+	if c.TestKitDnsResolver == nil {
+		c.Log.Debugf(log.Driver, c.LogId, "dialing %s", address)
+		return dialer.DialContext(ctx, c.Network, address)
+	}
+
+	addresses := c.TestKitDnsResolver(address)
+
+	if len(addresses) == 0 {
+		return nil, errors.New("TestKit DNS resolver returned no address")
+	}
+
+	var (
+		err error
+		con net.Conn
+	)
+	for _, address := range addresses {
+		con, err = dialer.DialContext(ctx, c.Network, address)
+		if err == nil {
+			c.Log.Debugf(log.Driver, c.LogId, "dialing %s", address)
+			return con, nil
+		}
+	}
+	return nil, err
 }
 
 func (c Connector) tlsConfig(serverName string) *tls.Config {

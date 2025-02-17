@@ -217,6 +217,7 @@ func NewDriverWithContext(target string, auth auth.TokenManager, configurers ...
 	}
 
 	d.connector.Log = d.log
+	d.connector.LogId = d.logId
 	d.connector.RoutingContext = routingContext
 	d.connector.Config = d.config
 
