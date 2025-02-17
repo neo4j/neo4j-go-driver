@@ -19,14 +19,19 @@ package pool
 
 import (
 	"context"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
 	"testing"
 	"time"
 
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/testutil"
 )
 
+func closeConnection(ctx context.Context, conn db.Connection) {
+	conn.Close(ctx)
+}
+
 func TestServer(ot *testing.T) {
+
 	assertSize := func(t *testing.T, s *server, expected int) {
 		t.Helper()
 		actual := s.size()
@@ -78,7 +83,7 @@ func TestServer(ot *testing.T) {
 		c3 := s.getIdle()
 		assertNilConnection(t, c3)
 
-		s.returnBusy(context.Background(), c2)
+		s.returnBusy(context.Background(), c2, closeConnection)
 		c3 = s.getIdle()
 		assertConnection(t, c3)
 	})
@@ -91,7 +96,7 @@ func TestServer(ot *testing.T) {
 
 		// Let the connection in the middle be too old
 		conns[1].Birth = now.Add(-20 * time.Second)
-		s.removeIdleOlderThan(context.Background(), now, 10*time.Second)
+		s.removeIdleOlderThan(context.Background(), now, 10*time.Second, closeConnection)
 		assertSize(t, s, 2)
 
 		// Should be able to borrow twice
@@ -103,11 +108,11 @@ func TestServer(ot *testing.T) {
 		assertNilConnection(t, b3)
 
 		// Return the connections and let all of them be too old
-		s.returnBusy(context.Background(), b1)
-		s.returnBusy(context.Background(), b2)
+		s.returnBusy(context.Background(), b1, closeConnection)
+		s.returnBusy(context.Background(), b2, closeConnection)
 		conns[0].Birth = now.Add(-20 * time.Second)
 		conns[2].Birth = now.Add(-20 * time.Second)
-		s.removeIdleOlderThan(context.Background(), now, 10*time.Second)
+		s.removeIdleOlderThan(context.Background(), now, 10*time.Second, closeConnection)
 
 		// Shouldn't be able to borrow anything and size should be zero
 		b1 = s.getIdle()
@@ -119,7 +124,7 @@ func TestServer(ot *testing.T) {
 		s := NewServer()
 		// Register and return three connections
 		_, _ = populateServer(s, time.Now(), 3, 3)
-		s.startClosing(context.Background())
+		s.startClosing(context.Background(), closeConnection)
 		if s.idle.Len() != 0 {
 			t.Errorf("Expected 0 idle connections, found %d", s.idle.Len())
 		}
@@ -132,7 +137,7 @@ func TestServer(ot *testing.T) {
 		s := NewServer()
 		// Register and return three connections
 		_, _ = populateServer(s, time.Now(), 3, 3)
-		s.closeAll(context.Background())
+		s.closeAll(context.Background(), closeConnection)
 		if s.idle.Len() != 0 {
 			t.Errorf("Expected 0 idle connections, found %d", s.idle.Len())
 		}
@@ -165,7 +170,7 @@ func TestServerPenalty(t *testing.T) {
 	// Return the busy connection to srv1
 	// Now srv2 should have higher penalty than srv1 since using srv2 would require a new
 	// connection.
-	srv1.returnBusy(context.Background(), c11)
+	srv1.returnBusy(context.Background(), c11, closeConnection)
 	assertPenaltiesGreaterThan(srv2, srv1, now)
 
 	// Add an idle connection to srv2 to make both servers have one idle connection each.
@@ -181,7 +186,7 @@ func TestServerPenalty(t *testing.T) {
 	idle := srv1.getIdle()
 	_, _ = srv1.healthCheck(ctx, idle, DefaultConnectionLivenessCheckTimeout, nil, nil)
 	testutil.AssertDeepEquals(t, idle, c11)
-	srv1.returnBusy(context.Background(), c11)
+	srv1.returnBusy(context.Background(), c11, closeConnection)
 	assertPenaltiesGreaterThan(srv1, srv2, now)
 
 	// Add one more connection each to the servers
@@ -206,10 +211,10 @@ func TestServerPenalty(t *testing.T) {
 	// Return the connections
 	idle = srv2.getIdle()
 	_, _ = srv2.healthCheck(ctx, idle, DefaultConnectionLivenessCheckTimeout, nil, nil)
-	srv2.returnBusy(context.Background(), c21)
-	srv2.returnBusy(context.Background(), c22)
-	srv1.returnBusy(context.Background(), c11)
-	srv1.returnBusy(context.Background(), c12)
+	srv2.returnBusy(context.Background(), c21, closeConnection)
+	srv2.returnBusy(context.Background(), c22, closeConnection)
+	srv1.returnBusy(context.Background(), c11, closeConnection)
+	srv1.returnBusy(context.Background(), c12, closeConnection)
 	// Everything returned, srv2 should have higher penalty since it was last used
 	assertPenaltiesGreaterThan(srv2, srv1, now)
 
@@ -325,5 +330,5 @@ func populateServer(s *server, birth time.Time, idle, busy int) ([]*testutil.Con
 
 func registerIdle(srv *server, connection db.Connection) {
 	srv.registerBusy(connection)
-	srv.returnBusy(context.Background(), connection)
+	srv.returnBusy(context.Background(), connection, closeConnection)
 }

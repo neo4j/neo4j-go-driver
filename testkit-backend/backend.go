@@ -1353,7 +1353,7 @@ func (b *backend) handleRequest(req map[string]any) {
 				"Feature:Bolt:5.5",
 				"Feature:Bolt:5.6",
 				"Feature:Bolt:5.7",
-				//"Feature:Bolt:5.8",
+				"Feature:Bolt:5.8",
 				//"Feature:Bolt:HandshakeManifestV1",
 				"Feature:Bolt:Patch:UTC",
 				"Feature:Bolt:HandshakeManifestV1",
@@ -1368,8 +1368,8 @@ func (b *backend) handleRequest(req map[string]any) {
 				"Optimization:ConnectionReuse",
 				"Optimization:EagerTransactionBegin",
 				"Optimization:ExecuteQueryPipelining",
-				//"Optimization:HomeDatabaseCache",
-				//"Optimization:HomeDbCacheBasicPrincipalIsImpersonatedUser",
+				"Optimization:HomeDatabaseCache",
+				"Optimization:HomeDbCacheBasicPrincipalIsImpersonatedUser",
 				"Optimization:ImplicitDefaultArguments",
 				"Optimization:MinimalBookmarksSet",
 				"Optimization:MinimalResets",
@@ -1436,15 +1436,24 @@ func getAuth(authTokenMap map[string]any) (neo4j.AuthToken, error) {
 	case "bearer":
 		authToken = neo4j.BearerAuth(authTokenMap["credentials"].(string))
 	default:
-		parameters := authTokenMap["parameters"].(map[string]any)
-		if err := patchNumbersInMap(parameters); err != nil {
-			return neo4j.AuthToken{}, err
+		var parameters map[string]any
+		if v, ok := authTokenMap["parameters"].(map[string]any); ok {
+			parameters = v
+			if err := patchNumbersInMap(parameters); err != nil {
+				return neo4j.AuthToken{}, err
+			}
 		}
+
+		scheme := mapGetString(authTokenMap, "scheme")
+		principal := mapGetString(authTokenMap, "principal")
+		credentials := mapGetString(authTokenMap, "credentials")
+		realm := mapGetString(authTokenMap, "realm")
+
 		authToken = neo4j.CustomAuth(
-			authTokenMap["scheme"].(string),
-			authTokenMap["principal"].(string),
-			authTokenMap["credentials"].(string),
-			authTokenMap["realm"].(string),
+			scheme,
+			principal,
+			credentials,
+			realm,
 			parameters)
 	}
 	return authToken, nil
@@ -1886,4 +1895,9 @@ func mapNotificationMinSeverityLevel(rawMinSeverityLevel string) (notifications.
 		return notifications.InformationLevel, nil
 	}
 	return "", fmt.Errorf("unknown min severity level %s", rawMinSeverityLevel)
+}
+
+func mapGetString(data map[string]any, key string) string {
+	out, _ := data[key].(string)
+	return out
 }

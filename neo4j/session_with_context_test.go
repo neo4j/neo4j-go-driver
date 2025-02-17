@@ -21,8 +21,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	iauth "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/auth"
 	idb "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/errorutil"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/homedb"
 	"io"
 	"reflect"
 	"sync"
@@ -37,6 +39,8 @@ import (
 type transactionFunc func(context.Context, ManagedTransactionWork, ...func(*TransactionConfig)) (any, error)
 type transactionFuncApi func(session SessionWithContext) transactionFunc
 
+var reAuthToken = &idb.ReAuthToken{FromSession: false, Manager: iauth.Token{Tokens: map[string]any{"scheme": "none"}}}
+
 func TestSession(outer *testing.T) {
 	var logger = log.ToVoid()
 	var boltLogger log.BoltLogger = nil
@@ -48,20 +52,24 @@ func TestSession(outer *testing.T) {
 	}
 
 	createSession := func() (*RouterFake, *PoolFake, *sessionWithContext) {
+		ctx := context.Background()
 		conf := Config{MaxTransactionRetryTime: 3 * time.Millisecond, MaxConnectionPoolSize: 100}
 		router := RouterFake{}
 		pool := PoolFake{}
+		cache, _ := homedb.NewCache(100)
 		sessConfig := SessionConfig{AccessMode: AccessModeRead, BoltLogger: boltLogger}
-		sess := newSessionWithContext(&conf, sessConfig, &router, &pool, logger, nil)
+		sess := newSessionWithContext(ctx, &conf, sessConfig, &router, &pool, cache, logger, reAuthToken)
 		sess.throttleTime = time.Millisecond * 1
 		return &router, &pool, sess
 	}
 
 	createSessionFromConfig := func(sessConfig SessionConfig) (*RouterFake, *PoolFake, *sessionWithContext) {
+		ctx := context.Background()
 		conf := Config{MaxTransactionRetryTime: 3 * time.Millisecond}
 		router := RouterFake{}
 		pool := PoolFake{}
-		sess := newSessionWithContext(&conf, sessConfig, &router, &pool, logger, nil)
+		cache, _ := homedb.NewCache(100)
+		sess := newSessionWithContext(ctx, &conf, sessConfig, &router, &pool, cache, logger, reAuthToken)
 		sess.throttleTime = time.Millisecond * 1
 		return &router, &pool, sess
 	}
@@ -69,6 +77,38 @@ func TestSession(outer *testing.T) {
 	createSessionWithBookmarks := func(bookmarks Bookmarks) (*RouterFake, *PoolFake, *sessionWithContext) {
 		sessConfig := SessionConfig{AccessMode: AccessModeRead, Bookmarks: bookmarks, BoltLogger: boltLogger}
 		return createSessionFromConfig(sessConfig)
+	}
+
+	createSessionWithHomeDbGuess := func(ssrEnabled bool) (*RouterFake, *PoolFake, *sessionWithContext, *int, *int) {
+		router, pool, sess := createSession()
+		cacheKey := "DEFAULT"
+		databaseName := "db1"
+
+		sess.cache.SetEnabled(true)
+		sess.cache.Set(cacheKey, databaseName)
+		sess.homeDbGuess = cacheKey
+
+		// Fake a routing table lookup for the guessed home database
+		router.GetTableHook = func(guess string) *idb.RoutingTable {
+			if guess == cacheKey {
+				return &idb.RoutingTable{}
+			}
+			return nil
+		}
+
+		// Track number of borrow and return calls
+		borrowCount := 0
+		returnCount := 0
+
+		pool.BorrowHook = func() (idb.Connection, error) {
+			borrowCount++
+			return &ConnFake{Alive: true, SsrEnabled: ssrEnabled}, nil
+		}
+
+		pool.ReturnHook = func() {
+			returnCount++
+		}
+		return router, pool, sess, &borrowCount, &returnCount
 	}
 
 	tokenExpiredErr := &db.Neo4jError{Code: "Neo.ClientError.Security.TokenExpired", Msg: "oopsie whoopsie"}
@@ -778,6 +818,77 @@ func TestSession(outer *testing.T) {
 		})
 	})
 
+	outer.Run("TestGetConnection_HomeDatabaseGuess", func(inner *testing.T) {
+
+		inner.Run("Returns error on borrow failure", func(t *testing.T) {
+			_, pool, sess := createSession()
+			pool.BorrowErr = errors.New("connection borrow failure")
+			_, err := sess.getConnection(context.Background(), idb.ReadMode, 1*time.Minute)
+			AssertErrorMessageContains(t, err, "connection borrow failure")
+		})
+
+		inner.Run("Borrows once, does not return connection if SSR enabled & home DB guess used", func(t *testing.T) {
+			_, _, sess, borrowCount, returnCount := createSessionWithHomeDbGuess(true)
+
+			_, err := sess.getConnection(context.Background(), idb.ReadMode, 1*time.Minute)
+
+			AssertNoError(t, err)
+			AssertIntEqual(t, *borrowCount, 1) // Should borrow only once
+			AssertIntEqual(t, *returnCount, 0) // Should not return connection
+		})
+
+		inner.Run("Borrows twice, returns one connection if SSR disabled & home DB guess used", func(t *testing.T) {
+			_, _, sess, borrowCount, returnCount := createSessionWithHomeDbGuess(false)
+
+			_, err := sess.getConnection(context.Background(), idb.ReadMode, 1*time.Minute)
+
+			AssertNoError(t, err)
+			AssertIntEqual(t, *borrowCount, 2) // Should borrow twice due to SSR being disabled on connection
+			AssertIntEqual(t, *returnCount, 1) // Should return the first connection
+		})
+	})
+
+	outer.Run("TestGetServerList_UsedHomeDatabaseGuess", func(inner *testing.T) {
+
+		inner.Run("Returns false when DatabaseName is set", func(t *testing.T) {
+			_, _, sess := createSession()
+			sess.config.DatabaseName = "my_database"
+
+			_, usedHomeDbGuess, err := sess.getServerList(context.Background(), idb.ReadMode)
+
+			AssertNoError(t, err)
+			AssertFalse(t, usedHomeDbGuess)
+		})
+
+		inner.Run("Returns true when homeDbGuess is used", func(t *testing.T) {
+			_, _, sess, _, _ := createSessionWithHomeDbGuess(true)
+
+			_, usedHomeDbGuess, err := sess.getServerList(context.Background(), idb.ReadMode)
+
+			AssertNoError(t, err)
+			AssertTrue(t, usedHomeDbGuess)
+		})
+
+		inner.Run("Returns false when homeDbGuess is not set", func(t *testing.T) {
+			_, _, sess, _, _ := createSessionWithHomeDbGuess(true)
+			sess.homeDbGuess = ""
+
+			_, usedHomeDbGuess, err := sess.getServerList(context.Background(), idb.ReadMode)
+
+			AssertNoError(t, err)
+			AssertFalse(t, usedHomeDbGuess)
+		})
+
+		inner.Run("Returns false when homeDbGuess is set but cache is disabled", func(t *testing.T) {
+			_, _, sess, _, _ := createSessionWithHomeDbGuess(true)
+			sess.cache.SetEnabled(false)
+
+			_, usedHomeDbGuess, err := sess.getServerList(context.Background(), idb.ReadMode)
+
+			AssertNoError(t, err)
+			AssertFalse(t, usedHomeDbGuess)
+		})
+	})
 }
 
 func assertTokenExpiredError(t *testing.T, err error) {

@@ -43,11 +43,16 @@ func ForceRoutingTableUpdate(d DriverWithContext, database string, bookmarks []s
 		FromSession: false,
 		ForceReAuth: false,
 	}
-	_, err := driver.router.GetOrUpdateReaders(ctx, getBookmarks, database, auth, logger)
+	dbSelection := idb.DatabaseSelection{Name: database}
+	_, err := driver.router.GetOrUpdateReaders(ctx, getBookmarks, dbSelection, auth, logger, func(db string) {
+		if dbSelection.Name == "" {
+			dbSelection.Name = db
+		}
+	})
 	if err != nil {
 		return errorutil.WrapError(err)
 	}
-	_, err = driver.router.GetOrUpdateWriters(ctx, getBookmarks, database, auth, logger)
+	_, err = driver.router.GetOrUpdateWriters(ctx, getBookmarks, dbSelection, auth, logger, nil)
 	return errorutil.WrapError(err)
 }
 

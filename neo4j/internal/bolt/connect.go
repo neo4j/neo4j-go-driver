@@ -47,7 +47,7 @@ func (p *protocolVersion) formatProtocol() string {
 // new manifest-style negotiation.
 var versions = [4]protocolVersion{
 	{major: 0xFF, minor: 0x01, back: 0x00}, // Bolt manifest marker
-	{major: 5, minor: 7, back: 7},
+	{major: 5, minor: 8, back: 8},
 	{major: 4, minor: 4, back: 2},
 	{major: 3, minor: 0, back: 0},
 }

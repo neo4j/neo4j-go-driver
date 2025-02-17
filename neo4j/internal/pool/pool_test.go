@@ -33,6 +33,7 @@ import (
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/bolt"
 	idb "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/errorutil"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/homedb"
 	. "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/testutil"
 	itime "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/time"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/log"
@@ -59,7 +60,8 @@ func TestPoolBorrowReturn(outer *testing.T) {
 		itime.ForceFreezeTime()
 		defer itime.ForceUnfreezeTime()
 		conf := config.Config{MaxConnectionLifetime: maxAge, MaxConnectionPoolSize: 1}
-		p := New(&conf, succeedingConnect, logger, "pool id")
+		cache := &homedb.Cache{}
+		p := New(&conf, succeedingConnect, logger, "pool id", cache)
 		defer func() {
 			p.Close(ctx)
 		}()
@@ -82,7 +84,8 @@ func TestPoolBorrowReturn(outer *testing.T) {
 		itime.ForceFreezeTime()
 		defer itime.ForceUnfreezeTime()
 		conf := config.Config{MaxConnectionLifetime: maxAge, MaxConnectionPoolSize: 1}
-		p := New(&conf, succeedingConnect, logger, "pool id")
+		cache := &homedb.Cache{}
+		p := New(&conf, succeedingConnect, logger, "pool id", cache)
 		defer func() {
 			p.Close(ctx)
 		}()
@@ -114,7 +117,8 @@ func TestPoolBorrowReturn(outer *testing.T) {
 		itime.ForceFreezeTime()
 		defer itime.ForceUnfreezeTime()
 		conf := config.Config{MaxConnectionLifetime: maxAge, MaxConnectionPoolSize: 1}
-		p := New(&conf, succeedingConnect, logger, "pool id")
+		cache := &homedb.Cache{}
+		p := New(&conf, succeedingConnect, logger, "pool id", cache)
 		defer func() {
 			p.Close(ctx)
 		}()
@@ -136,7 +140,8 @@ func TestPoolBorrowReturn(outer *testing.T) {
 		itime.ForceFreezeTime()
 		defer itime.ForceUnfreezeTime()
 		conf := config.Config{MaxConnectionLifetime: maxAge, MaxConnectionPoolSize: maxConnections}
-		p := New(&conf, succeedingConnect, logger, "pool id")
+		cache := &homedb.Cache{}
+		p := New(&conf, succeedingConnect, logger, "pool id", cache)
 		serverNames := []string{"srv1"}
 		numWorkers := 5
 		wg := sync.WaitGroup{}
@@ -170,7 +175,8 @@ func TestPoolBorrowReturn(outer *testing.T) {
 		itime.ForceFreezeTime()
 		defer itime.ForceUnfreezeTime()
 		conf := config.Config{MaxConnectionLifetime: maxAge, MaxConnectionPoolSize: 2}
-		p := New(&conf, failingConnect, logger, "pool id")
+		cache := &homedb.Cache{}
+		p := New(&conf, failingConnect, logger, "pool id", cache)
 		p.SetRouter(&RouterFake{})
 		serverNames := []string{"srv1"}
 		c, err := p.Borrow(ctx, getServers(serverNames), true, nil, DefaultConnectionLivenessCheckTimeout, reAuthToken)
@@ -185,7 +191,8 @@ func TestPoolBorrowReturn(outer *testing.T) {
 		itime.ForceFreezeTime()
 		defer itime.ForceUnfreezeTime()
 		conf := config.Config{MaxConnectionLifetime: maxAge, MaxConnectionPoolSize: 1}
-		p := New(&conf, succeedingConnect, logger, "pool id")
+		cache := &homedb.Cache{}
+		p := New(&conf, succeedingConnect, logger, "pool id", cache)
 		c1, _ := p.Borrow(ctx, getServers([]string{"A"}), true, nil, DefaultConnectionLivenessCheckTimeout, reAuthToken)
 		cancelableCtx, cancel := context.WithCancel(ctx)
 		wg := sync.WaitGroup{}
@@ -216,7 +223,8 @@ func TestPoolBorrowReturn(outer *testing.T) {
 			t.Errorf("y u call me?")
 		}}
 		conf := config.Config{MaxConnectionLifetime: maxAge, MaxConnectionPoolSize: 1}
-		pool := New(&conf, nil, logger, "pool id")
+		cache := &homedb.Cache{}
+		pool := New(&conf, nil, logger, "pool id", cache)
 		setIdleConnections(pool, map[string][]idb.Connection{"a server": {
 			deadAfterReset,
 			stayingAlive,
@@ -239,7 +247,8 @@ func TestPoolBorrowReturn(outer *testing.T) {
 			t.Errorf("force reset should not be called on new connections")
 		}}
 		conf := config.Config{MaxConnectionLifetime: maxAge, MaxConnectionPoolSize: 1}
-		pool := New(&conf, connectTo(healthyConnection), logger, "pool id")
+		cache := &homedb.Cache{}
+		pool := New(&conf, connectTo(healthyConnection), logger, "pool id", cache)
 		setIdleConnections(pool, map[string][]idb.Connection{serverName: {deadAfterReset1, deadAfterReset2}})
 
 		result, err := pool.tryBorrow(ctx, serverName, nil, idlenessThreshold, reAuthToken)
@@ -254,7 +263,8 @@ func TestPoolBorrowReturn(outer *testing.T) {
 		itime.ForceFreezeTime()
 		defer itime.ForceUnfreezeTime()
 		conf := config.Config{MaxConnectionLifetime: maxAge, MaxConnectionPoolSize: 1}
-		p := New(&conf, succeedingConnect, logger, "pool id")
+		cache := &homedb.Cache{}
+		p := New(&conf, succeedingConnect, logger, "pool id", cache)
 		c1, err := p.Borrow(ctx, getServers([]string{"A"}), true, nil, DefaultConnectionLivenessCheckTimeout, reAuthToken)
 		assertConnection(t, c1, err)
 		ctx = context.Background()
@@ -283,7 +293,8 @@ func TestPoolBorrowReturn(outer *testing.T) {
 		itime.ForceFreezeTime()
 		defer itime.ForceUnfreezeTime()
 		conf := config.Config{MaxConnectionLifetime: maxAge, MaxConnectionPoolSize: 1}
-		p := New(&conf, succeedingConnect, logger, "pool id")
+		cache := &homedb.Cache{}
+		p := New(&conf, succeedingConnect, logger, "pool id", cache)
 		c1, err := p.Borrow(ctx, getServers([]string{"A"}), true, nil, DefaultConnectionLivenessCheckTimeout, reAuthToken)
 		assertConnection(t, c1, err)
 		ctx = context.Background()
@@ -323,7 +334,8 @@ func TestPoolResourceUsage(ot *testing.T) {
 		itime.ForceFreezeTime()
 		defer itime.ForceUnfreezeTime()
 		conf := config.Config{MaxConnectionLifetime: maxAge, MaxConnectionPoolSize: 1}
-		p := New(&conf, succeedingConnect, logger, "pool id")
+		cache := &homedb.Cache{}
+		p := New(&conf, succeedingConnect, logger, "pool id", cache)
 		defer func() {
 			p.Close(ctx)
 		}()
@@ -338,7 +350,8 @@ func TestPoolResourceUsage(ot *testing.T) {
 		itime.ForceFreezeTime()
 		defer itime.ForceUnfreezeTime()
 		conf := config.Config{MaxConnectionLifetime: maxAge, MaxConnectionPoolSize: 2}
-		p := New(&conf, succeedingConnect, logger, "pool id")
+		cache := &homedb.Cache{}
+		p := New(&conf, succeedingConnect, logger, "pool id", cache)
 		defer func() {
 			p.Close(ctx)
 		}()
@@ -356,7 +369,8 @@ func TestPoolResourceUsage(ot *testing.T) {
 		itime.ForceFreezeTime()
 		defer itime.ForceUnfreezeTime()
 		conf := config.Config{MaxConnectionLifetime: maxAge, MaxConnectionPoolSize: 2}
-		p := New(&conf, succeedingConnect, logger, "pool id")
+		cache := &homedb.Cache{}
+		p := New(&conf, succeedingConnect, logger, "pool id", cache)
 		defer func() {
 			p.Close(ctx)
 		}()
@@ -374,7 +388,8 @@ func TestPoolResourceUsage(ot *testing.T) {
 		itime.ForceFreezeTime()
 		defer itime.ForceUnfreezeTime()
 		conf := config.Config{MaxConnectionLifetime: 1<<63 - 1, MaxConnectionPoolSize: 3}
-		p := New(&conf, succeedingConnect, logger, "pool id")
+		cache := &homedb.Cache{}
+		p := New(&conf, succeedingConnect, logger, "pool id", cache)
 		// Trigger creation of three connections on the same server
 		c1, _ := p.Borrow(ctx, getServers([]string{"A"}), true, nil, DefaultConnectionLivenessCheckTimeout, reAuthToken)
 		c2, _ := p.Borrow(ctx, getServers([]string{"A"}), true, nil, DefaultConnectionLivenessCheckTimeout, reAuthToken)
@@ -402,7 +417,8 @@ func TestPoolResourceUsage(ot *testing.T) {
 		itime.ForceFreezeTime()
 		defer itime.ForceUnfreezeTime()
 		conf := config.Config{MaxConnectionLifetime: maxAge, MaxConnectionPoolSize: 1}
-		p := New(&conf, succeedingConnect, logger, "pool id")
+		cache := &homedb.Cache{}
+		p := New(&conf, succeedingConnect, logger, "pool id", cache)
 		defer func() {
 			p.Close(ctx)
 		}()
@@ -423,7 +439,8 @@ func TestPoolResourceUsage(ot *testing.T) {
 		itime.ForceFreezeTime()
 		defer itime.ForceUnfreezeTime()
 		conf := config.Config{MaxConnectionLifetime: maxAge, MaxConnectionPoolSize: 1}
-		p := New(&conf, succeedingConnect, logger, "pool id")
+		cache := &homedb.Cache{}
+		p := New(&conf, succeedingConnect, logger, "pool id", cache)
 		defer func() {
 			p.Close(ctx)
 		}()
@@ -455,7 +472,8 @@ func TestPoolCleanup(ot *testing.T) {
 		itime.ForceFreezeTime()
 		defer itime.ForceUnfreezeTime()
 		conf := config.Config{MaxConnectionLifetime: maxLife, MaxConnectionPoolSize: 0}
-		p := New(&conf, succeedingConnect, logger, "pool id")
+		cache := &homedb.Cache{}
+		p := New(&conf, succeedingConnect, logger, "pool id", cache)
 		defer func() {
 			p.Close(ctx)
 		}()
@@ -476,7 +494,8 @@ func TestPoolCleanup(ot *testing.T) {
 		itime.ForceFreezeTime()
 		defer itime.ForceUnfreezeTime()
 		conf := config.Config{MaxConnectionLifetime: maxLife, MaxConnectionPoolSize: 0}
-		p := New(&conf, succeedingConnect, logger, "pool id")
+		cache := &homedb.Cache{}
+		p := New(&conf, succeedingConnect, logger, "pool id", cache)
 		defer func() {
 			p.Close(ctx)
 		}()
@@ -499,7 +518,8 @@ func TestPoolCleanup(ot *testing.T) {
 			return nil, errors.New("an error")
 		}
 		conf := config.Config{MaxConnectionLifetime: maxLife, MaxConnectionPoolSize: 0}
-		p := New(&conf, failingConnect, logger, "pool id")
+		cache := &homedb.Cache{}
+		p := New(&conf, failingConnect, logger, "pool id", cache)
 		p.SetRouter(&RouterFake{})
 		defer func() {
 			p.Close(ctx)
@@ -529,7 +549,8 @@ func TestPoolCleanup(ot *testing.T) {
 			MaxConnectionLifetime:        maxLife,
 			MaxConnectionPoolSize:        1,
 		}
-		p := New(&conf, succeedingConnect, logger, "pool id")
+		cache := &homedb.Cache{}
+		p := New(&conf, succeedingConnect, logger, "pool id", cache)
 		servers := getServers([]string{"example.com"})
 		conn, err := p.Borrow(ctx, servers, false, nil, DefaultConnectionLivenessCheckTimeout, reAuthToken)
 		assertConnection(t, conn, err)
@@ -631,7 +652,8 @@ func TestPoolErrorHanding(ot *testing.T) {
 			}
 
 			router := RouterFake{}
-			p := New(&config.Config{}, succeedingConnect, logger, "pool id")
+			cache := &homedb.Cache{}
+			p := New(&config.Config{}, succeedingConnect, logger, "pool id", cache)
 			p.SetRouter(&router)
 			defer p.Close(ctx)
 			conn, err := p.Borrow(ctx, getServers([]string{ServerName}), false, nil, DefaultConnectionLivenessCheckTimeout, reAuthToken)
