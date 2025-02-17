@@ -18,12 +18,11 @@
 package homedb
 
 import (
-	"fmt"
+	"encoding/json"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/auth"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/errorutil"
 	"math"
 	"sort"
-	"strings"
 	"sync"
 	"time"
 )
@@ -133,27 +132,10 @@ func (c *Cache) ComputeKey(impersonatedUser string, sessionAuth *auth.Token) str
 		case schemeNone:
 			return "none"
 		default:
-			// For custom schemes, construct the key
-			var orderedParams string
-			if params, ok := sessionAuth.Tokens[keyParameters].(map[string]any); ok {
-				orderedParams = serializeMap(params)
-			}
-			var credentialString, realmString string
-			if credentials, ok := sessionAuth.Tokens[keyCredentials].(string); ok && credentials != "" {
-				credentialString = "credentials:" + credentials
-			}
-			if realm, ok := sessionAuth.Tokens[keyRealm].(string); ok && realm != "" {
-				realmString = "realm:" + realm
-			}
-			return fmt.Sprintf("%s:%s,%s:%v,%s,%s,%s:%s",
-				keyScheme, scheme,
-				keyPrincipal, sessionAuth.Tokens[keyPrincipal],
-				credentialString, realmString,
-				keyParameters, orderedParams)
+			return marshalCacheKey(scheme, sessionAuth.Tokens)
 		}
 	}
-	// If no scheme could be found, fall back to serializing the token in a stable way.
-	return fmt.Sprintf("unknown:%v", serializeMap(sessionAuth.Tokens))
+	return marshalCacheKey("unknown", sessionAuth.Tokens)
 }
 
 // SetEnabled enables or disables the cache.
@@ -206,20 +188,20 @@ func (c *Cache) prune() {
 	}
 }
 
-// serializeMap creates a deterministic string representation of a map[string]any.
-func serializeMap(m map[string]any) string {
-	// Extract the keys from the map.
-	keys := make([]string, 0, len(m))
-	for k := range m {
-		keys = append(keys, k)
+// marshalCacheKey returns a deterministic JSON string representation of a cache key built from the scheme and tokens.
+func marshalCacheKey(scheme string, tokens map[string]any) string {
+	b, err := json.Marshal(struct {
+		Scheme string         `json:"scheme"`
+		Tokens map[string]any `json:"tokens"`
+	}{
+		Scheme: scheme,
+		Tokens: tokens,
+	})
+	if err != nil {
+		// TODO do we log an error here and return a string like below minus the unordered params?
+		// Do we go back to our mapParameters function we had before for these params?
+		// Do we return the error and handle this somewhere else?
+		return ""
 	}
-	// Sort the keys to ensure a consistent order.
-	sort.Strings(keys)
-
-	// Build the string representation.
-	var builder strings.Builder
-	for _, k := range keys {
-		builder.WriteString(fmt.Sprintf("<%s>:%v;", k, m[k]))
-	}
-	return builder.String()
+	return string(b)
 }

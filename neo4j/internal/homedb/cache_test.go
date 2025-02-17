@@ -196,7 +196,7 @@ func TestCache_ComputeKey(outer *testing.T) {
 			},
 		}
 		key := cache.ComputeKey("", &authToken)
-		expectedKey := "scheme:custom,principal:customPrincipal,credentials:customCred,realm:customRealm,parameters:<key1>:value1;<key2>:value2;"
+		expectedKey := "{\"scheme\":\"custom\",\"tokens\":{\"credentials\":\"customCred\",\"parameters\":{\"key1\":\"value1\",\"key2\":\"value2\"},\"principal\":\"customPrincipal\",\"realm\":\"customRealm\",\"scheme\":\"custom\"}}"
 		testutil.AssertStringEqual(t, key, expectedKey)
 	})
 
@@ -208,7 +208,7 @@ func TestCache_ComputeKey(outer *testing.T) {
 			},
 		}
 		key := cache.ComputeKey("", &authToken)
-		expectedKey := "scheme:custom,principal:<nil>,,,parameters:"
+		expectedKey := "{\"scheme\":\"custom\",\"tokens\":{\"scheme\":\"custom\"}}"
 		testutil.AssertStringEqual(t, key, expectedKey)
 	})
 
@@ -235,6 +235,24 @@ func TestCache_ComputeKey(outer *testing.T) {
 		testutil.AssertNotDeepEquals(t, key1, key2)
 	})
 
+	outer.Run("auth custom scheme collision check 2", func(t *testing.T) {
+		cache := &Cache{}
+		token1 := auth.Token{
+			Tokens: map[string]any{
+				"scheme": "funky,principal:banana",
+			},
+		}
+		token2 := auth.Token{
+			Tokens: map[string]any{
+				"scheme":    "funky",
+				"principal": "banana,principal:<nil>",
+			},
+		}
+		key1 := cache.ComputeKey("", &token1)
+		key2 := cache.ComputeKey("", &token2)
+		testutil.AssertNotDeepEquals(t, key1, key2)
+	})
+
 	outer.Run("no scheme found, token is stringified", func(t *testing.T) {
 		cache := &Cache{}
 		authToken := auth.Token{
@@ -245,6 +263,6 @@ func TestCache_ComputeKey(outer *testing.T) {
 			},
 		}
 		key := cache.ComputeKey("", &authToken)
-		testutil.AssertStringEqual(t, key, "unknown:<a>:apple;<b>:banana;<c>:carrot;")
+		testutil.AssertStringEqual(t, key, "{\"scheme\":\"unknown\",\"tokens\":{\"a\":\"apple\",\"b\":\"banana\",\"c\":\"carrot\"}}")
 	})
 }
