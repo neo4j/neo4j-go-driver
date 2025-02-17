@@ -992,7 +992,7 @@ func computeCacheKey(ctx context.Context, token *idb.ReAuthToken, cache *homedb.
 		if err != nil {
 			return "", err
 		}
-		return cache.ComputeKey(impersonatedUser, &t), nil
+		return cache.ComputeKey(impersonatedUser, &t)
 	}
-	return cache.ComputeKey(impersonatedUser, nil), nil
+	return cache.ComputeKey(impersonatedUser, nil)
 }

@@ -37,8 +37,6 @@ const schemeKerberos = "kerberos"
 const schemeBearer = "bearer"
 const keyPrincipal = "principal"
 const keyCredentials = "credentials"
-const keyRealm = "realm"
-const keyParameters = "parameters"
 
 type cacheEntry struct {
 	database string
@@ -102,15 +100,15 @@ func (c *Cache) Set(user string, database string) {
 }
 
 // ComputeKey generates a cache key based on user impersonation and an optional session auth token.
-func (c *Cache) ComputeKey(impersonatedUser string, sessionAuth *auth.Token) string {
+func (c *Cache) ComputeKey(impersonatedUser string, sessionAuth *auth.Token) (string, error) {
 	// If an impersonated user is provided, use it as the key.
 	if impersonatedUser != "" {
-		return "basic:" + impersonatedUser
+		return "basic:" + impersonatedUser, nil
 	}
 
 	// If no session authentication token is provided, return a default key.
 	if sessionAuth == nil {
-		return "DEFAULT"
+		return "DEFAULT", nil
 	}
 
 	// Process based on auth scheme
@@ -118,19 +116,19 @@ func (c *Cache) ComputeKey(impersonatedUser string, sessionAuth *auth.Token) str
 		switch scheme {
 		case schemeBasic:
 			if principal, ok := sessionAuth.Tokens[keyPrincipal].(string); ok {
-				return "basic:" + principal
+				return "basic:" + principal, nil
 			}
-			return "basic:"
+			return "basic:", nil
 		case schemeKerberos:
 			if credentials, ok := sessionAuth.Tokens[keyCredentials].(string); ok {
-				return "kerberos:" + credentials
+				return "kerberos:" + credentials, nil
 			}
 		case schemeBearer:
 			if credentials, ok := sessionAuth.Tokens[keyCredentials].(string); ok {
-				return "bearer:" + credentials
+				return "bearer:" + credentials, nil
 			}
 		case schemeNone:
-			return "none"
+			return "none", nil
 		default:
 			return marshalCacheKey(scheme, sessionAuth.Tokens)
 		}
@@ -189,7 +187,7 @@ func (c *Cache) prune() {
 }
 
 // marshalCacheKey returns a deterministic JSON string representation of a cache key built from the scheme and tokens.
-func marshalCacheKey(scheme string, tokens map[string]any) string {
+func marshalCacheKey(scheme string, tokens map[string]any) (string, error) {
 	b, err := json.Marshal(struct {
 		Scheme string         `json:"scheme"`
 		Tokens map[string]any `json:"tokens"`
@@ -197,11 +195,5 @@ func marshalCacheKey(scheme string, tokens map[string]any) string {
 		Scheme: scheme,
 		Tokens: tokens,
 	})
-	if err != nil {
-		// TODO do we log an error here and return a string like below minus the unordered params?
-		// Do we go back to our mapParameters function we had before for these params?
-		// Do we return the error and handle this somewhere else?
-		return ""
-	}
-	return string(b)
+	return string(b), err
 }

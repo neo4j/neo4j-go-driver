@@ -113,13 +113,13 @@ func TestCache_ComputeKey(outer *testing.T) {
 
 	outer.Run("impersonatedUser provided", func(t *testing.T) {
 		cache := &Cache{}
-		key := cache.ComputeKey("impersonatedUser", nil)
+		key, _ := cache.ComputeKey("impersonatedUser", nil)
 		testutil.AssertStringEqual(t, key, "basic:impersonatedUser")
 	})
 
 	outer.Run("no auth or impersonatedUser provided", func(t *testing.T) {
 		cache := &Cache{}
-		key := cache.ComputeKey("", nil)
+		key, _ := cache.ComputeKey("", nil)
 		testutil.AssertStringEqual(t, key, "DEFAULT")
 	})
 
@@ -131,7 +131,7 @@ func TestCache_ComputeKey(outer *testing.T) {
 				"principal": "userPrincipal",
 			},
 		}
-		key := cache.ComputeKey("", &authToken)
+		key, _ := cache.ComputeKey("", &authToken)
 		testutil.AssertStringEqual(t, key, "basic:userPrincipal")
 	})
 
@@ -142,7 +142,7 @@ func TestCache_ComputeKey(outer *testing.T) {
 				"scheme": "basic",
 			},
 		}
-		key := cache.ComputeKey("", &authToken)
+		key, _ := cache.ComputeKey("", &authToken)
 		testutil.AssertStringEqual(t, key, "basic:")
 	})
 
@@ -154,7 +154,7 @@ func TestCache_ComputeKey(outer *testing.T) {
 				"credentials": "kerberosToken",
 			},
 		}
-		key := cache.ComputeKey("", &authToken)
+		key, _ := cache.ComputeKey("", &authToken)
 		testutil.AssertStringEqual(t, key, "kerberos:kerberosToken")
 	})
 
@@ -166,7 +166,7 @@ func TestCache_ComputeKey(outer *testing.T) {
 				"credentials": "bearerToken",
 			},
 		}
-		key := cache.ComputeKey("", &authToken)
+		key, _ := cache.ComputeKey("", &authToken)
 		testutil.AssertStringEqual(t, key, "bearer:bearerToken")
 	})
 
@@ -177,7 +177,7 @@ func TestCache_ComputeKey(outer *testing.T) {
 				"scheme": "none",
 			},
 		}
-		key := cache.ComputeKey("", &authToken)
+		key, _ := cache.ComputeKey("", &authToken)
 		testutil.AssertStringEqual(t, key, "none")
 	})
 
@@ -195,7 +195,7 @@ func TestCache_ComputeKey(outer *testing.T) {
 				"principal":   "customPrincipal",
 			},
 		}
-		key := cache.ComputeKey("", &authToken)
+		key, _ := cache.ComputeKey("", &authToken)
 		expectedKey := "{\"scheme\":\"custom\",\"tokens\":{\"credentials\":\"customCred\",\"parameters\":{\"key1\":\"value1\",\"key2\":\"value2\"},\"principal\":\"customPrincipal\",\"realm\":\"customRealm\",\"scheme\":\"custom\"}}"
 		testutil.AssertStringEqual(t, key, expectedKey)
 	})
@@ -207,7 +207,7 @@ func TestCache_ComputeKey(outer *testing.T) {
 				"scheme": "custom",
 			},
 		}
-		key := cache.ComputeKey("", &authToken)
+		key, _ := cache.ComputeKey("", &authToken)
 		expectedKey := "{\"scheme\":\"custom\",\"tokens\":{\"scheme\":\"custom\"}}"
 		testutil.AssertStringEqual(t, key, expectedKey)
 	})
@@ -230,8 +230,8 @@ func TestCache_ComputeKey(outer *testing.T) {
 				},
 			},
 		}
-		key1 := cache.ComputeKey("", &token1)
-		key2 := cache.ComputeKey("", &token2)
+		key1, _ := cache.ComputeKey("", &token1)
+		key2, _ := cache.ComputeKey("", &token2)
 		testutil.AssertNotDeepEquals(t, key1, key2)
 	})
 
@@ -248,8 +248,8 @@ func TestCache_ComputeKey(outer *testing.T) {
 				"principal": "banana,principal:<nil>",
 			},
 		}
-		key1 := cache.ComputeKey("", &token1)
-		key2 := cache.ComputeKey("", &token2)
+		key1, _ := cache.ComputeKey("", &token1)
+		key2, _ := cache.ComputeKey("", &token2)
 		testutil.AssertNotDeepEquals(t, key1, key2)
 	})
 
@@ -262,7 +262,20 @@ func TestCache_ComputeKey(outer *testing.T) {
 				"b": "banana",
 			},
 		}
-		key := cache.ComputeKey("", &authToken)
+		key, _ := cache.ComputeKey("", &authToken)
 		testutil.AssertStringEqual(t, key, "{\"scheme\":\"unknown\",\"tokens\":{\"a\":\"apple\",\"b\":\"banana\",\"c\":\"carrot\"}}")
+	})
+
+	outer.Run("marshal failure", func(t *testing.T) {
+		cache := &Cache{}
+		authToken := auth.Token{
+			Tokens: map[string]any{
+				"scheme": "custom",
+				"bad":    make(chan int), // non-marshallable value
+			},
+		}
+		key, err := cache.ComputeKey("", &authToken)
+		testutil.AssertError(t, err)
+		testutil.AssertEmptyString(t, key)
 	})
 }
