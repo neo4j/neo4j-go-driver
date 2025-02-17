@@ -139,13 +139,16 @@ func AssertLen(t *testing.T, x any, el int) {
 	}
 }
 
-func AssertSliceEqual(t *testing.T, x, y any) {
+func AssertSliceEqual[T comparable](t *testing.T, x, y []T) {
 	t.Helper()
-	lenx := reflect.ValueOf(x).Len()
-	leny := reflect.ValueOf(y).Len()
-	if lenx != leny {
-		t.Errorf("Lengths of slices differ %d vs %d", lenx, leny)
+	if len(x) != len(y) {
+		t.Errorf("Expected slice to be equal but length differs: %v %v", x, y)
 		return
+	}
+	for i := range x {
+		if x[i] != y[i] {
+			t.Errorf("Expected slice to be equal but differs at index %d: %v %v", i, x, y)
+		}
 	}
 }
 

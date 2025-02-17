@@ -170,6 +170,11 @@ type Connection interface {
 	GetCurrentAuth() (auth.TokenManager, iauth.Token)
 	// Telemetry sends telemetry information about the API usage to the server.
 	Telemetry(api telemetry.API, onSuccess func())
+	// SetPinHomeDatabaseCallback registers a callback to update the session's cached home database.
+	// The callback is triggered on successful BEGIN or RUN responses containing a database name.
+	SetPinHomeDatabaseCallback(callback func(ctx context.Context, database string))
+	// IsSsrEnabled returns true if the connection supports Server-Side Routing.
+	IsSsrEnabled() bool
 }
 
 type RoutingTable struct {

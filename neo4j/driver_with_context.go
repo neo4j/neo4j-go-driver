@@ -21,6 +21,7 @@ package neo4j
 import (
 	"context"
 	"fmt"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/homedb"
 	"net/url"
 	"strings"
 	"sync"
@@ -219,8 +220,14 @@ func NewDriverWithContext(target string, auth auth.TokenManager, configurers ...
 	d.connector.RoutingContext = routingContext
 	d.connector.Config = d.config
 
+	// Create cache for home database
+	d.cache, err = homedb.NewCache(homedb.DefaultCacheMaxSize)
+	if err != nil {
+		return nil, err
+	}
+
 	// Let the pool use the same log ID as the driver to simplify log reading.
-	d.pool = pool.New(d.config, d.connector.Connect, d.log, d.logId)
+	d.pool = pool.New(d.config, d.connector.Connect, d.log, d.logId, d.cache)
 
 	if !routing {
 		d.router = &directRouter{address: address}
@@ -295,12 +302,12 @@ type sessionRouter interface {
 	// note: bookmarks are lazily supplied, only when a new routing table needs to be fetched
 	// this is needed because custom bookmark managers may provide bookmarks from external systems
 	// they should not be called when it is not needed (e.g. when a routing table is cached)
-	GetOrUpdateReaders(ctx context.Context, bookmarks func(context.Context) ([]string, error), database string, auth *idb.ReAuthToken, boltLogger log.BoltLogger) ([]string, error)
+	GetOrUpdateReaders(ctx context.Context, bookmarks func(context.Context) ([]string, error), dbSelection idb.DatabaseSelection, auth *idb.ReAuthToken, boltLogger log.BoltLogger, onRoutingTableUpdated func(string)) ([]string, error)
 	// Readers returns the list of servers that can serve reads on the requested database.
 	Readers(database string) []string
 	// GetOrUpdateWriters returns the list of servers that can serve writes on the requested database.
 	// note: bookmarks are lazily supplied, see Readers documentation to learn why
-	GetOrUpdateWriters(ctx context.Context, bookmarks func(context.Context) ([]string, error), database string, auth *idb.ReAuthToken, boltLogger log.BoltLogger) ([]string, error)
+	GetOrUpdateWriters(ctx context.Context, bookmarks func(context.Context) ([]string, error), dbSelection idb.DatabaseSelection, auth *idb.ReAuthToken, boltLogger log.BoltLogger, onRoutingTableUpdated func(string)) ([]string, error)
 	// Writers returns the list of servers that can serve writes on the requested database.
 	Writers(database string) []string
 	// GetNameOfDefaultDatabase returns the name of the default database for the specified user.
@@ -329,15 +336,14 @@ type driverWithContext struct {
 	// this is *not* used by default by user-created session (see NewSession)
 	executeQueryBookmarkManager BookmarkManager
 	auth                        auth.TokenManager
+	cache                       *homedb.Cache
 }
 
 func (d *driverWithContext) Target() url.URL {
 	return *d.target
 }
 
-// TODO 6.0: remove unused Context parameter
-
-func (d *driverWithContext) NewSession(_ context.Context, config SessionConfig) SessionWithContext {
+func (d *driverWithContext) NewSession(ctx context.Context, config SessionConfig) SessionWithContext {
 	if config.DatabaseName == "" {
 		config.DatabaseName = idb.DefaultDatabase
 	}
@@ -363,7 +369,7 @@ func (d *driverWithContext) NewSession(_ context.Context, config SessionConfig) 
 		return &erroredSessionWithContext{
 			err: &UsageError{Message: "Trying to create session on closed driver"}}
 	}
-	return newSessionWithContext(d.config, config, d.router, d.pool, d.log, reAuthToken)
+	return newSessionWithContext(ctx, d.config, config, d.router, d.pool, d.cache, d.log, reAuthToken)
 }
 
 func (d *driverWithContext) VerifyConnectivity(ctx context.Context) error {

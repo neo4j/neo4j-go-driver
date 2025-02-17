@@ -149,20 +149,27 @@ func (r *Router) getTable(database string) *idb.RoutingTable {
 	return r.getTableLocked(dbRouter)
 }
 
-func (r *Router) getOrUpdateTable(ctx context.Context, bookmarksFn func(context.Context) ([]string, error), database string, auth *idb.ReAuthToken, boltLogger log.BoltLogger) (*idb.RoutingTable, error) {
+func (r *Router) getOrUpdateTable(
+	ctx context.Context,
+	bookmarksFn func(context.Context) ([]string, error),
+	dbSelection idb.DatabaseSelection,
+	auth *idb.ReAuthToken,
+	boltLogger log.BoltLogger,
+	onRoutingTableUpdated func(string),
+) (*idb.RoutingTable, error) {
 	r.dbRoutersMut.Lock()
 	var unlock = new(sync.Once)
 	defer unlock.Do(r.dbRoutersMut.Unlock)
 	for {
-		dbRouter := r.dbRouters[database]
+		dbRouter := r.dbRouters[dbSelection.Name]
 		if table := r.getTableLocked(dbRouter); table != nil {
 			return table, nil
 		}
-		waiters, ok := r.updating[database]
+		waiters, ok := r.updating[dbSelection.Name]
 		if ok {
 			// Wait for the table to be updated by other goroutine
 			ch := make(chan struct{})
-			r.updating[database] = append(waiters, ch)
+			r.updating[dbSelection.Name] = append(waiters, ch)
 			unlock.Do(r.dbRoutersMut.Unlock)
 			select {
 			case <-ctx.Done():
@@ -174,17 +181,25 @@ func (r *Router) getOrUpdateTable(ctx context.Context, bookmarksFn func(context.
 			}
 		}
 		// this goroutine will update the table
-		r.updating[database] = make([]chan struct{}, 0)
+		r.updating[dbSelection.Name] = make([]chan struct{}, 0)
 		unlock.Do(r.dbRoutersMut.Unlock)
-
-		table, err := r.updateTable(ctx, bookmarksFn, database, auth, boltLogger, dbRouter)
+		// Use an empty string for updating the routing table if the home database is a guess,
+		// as we cannot guarantee the guess is correct.
+		targetDatabase := dbSelection.Name
+		if dbSelection.IsHomeDbGuess {
+			targetDatabase = ""
+		}
+		table, err := r.updateTable(ctx, bookmarksFn, targetDatabase, auth, boltLogger, dbRouter)
+		if err == nil && onRoutingTableUpdated != nil {
+			onRoutingTableUpdated(table.DatabaseName)
+		}
 		r.dbRoutersMut.Lock()
 		*unlock = sync.Once{}
 		// notify all waiters
-		for _, waiter := range r.updating[database] {
+		for _, waiter := range r.updating[dbSelection.Name] {
 			close(waiter)
 		}
-		delete(r.updating, database)
+		delete(r.updating, dbSelection.Name)
 		return table, err
 	}
 }
@@ -215,8 +230,15 @@ func (r *Router) updateTable(ctx context.Context, bookmarksFn func(context.Conte
 	return table, nil
 }
 
-func (r *Router) GetOrUpdateReaders(ctx context.Context, bookmarks func(context.Context) ([]string, error), database string, auth *idb.ReAuthToken, boltLogger log.BoltLogger) ([]string, error) {
-	table, err := r.getOrUpdateTable(ctx, bookmarks, database, auth, boltLogger)
+func (r *Router) GetOrUpdateReaders(
+	ctx context.Context,
+	bookmarks func(context.Context) ([]string, error),
+	dbSelection idb.DatabaseSelection,
+	auth *idb.ReAuthToken,
+	boltLogger log.BoltLogger,
+	onRoutingTableUpdated func(string),
+) ([]string, error) {
+	table, err := r.getOrUpdateTable(ctx, bookmarks, dbSelection, auth, boltLogger, onRoutingTableUpdated)
 	if err != nil {
 		return nil, err
 	}
@@ -231,7 +253,7 @@ func (r *Router) GetOrUpdateReaders(ctx context.Context, bookmarks func(context.
 		r.log.Infof(log.Router, r.logId, "Invalidating routing table, no readers")
 		r.Invalidate(table.DatabaseName)
 		r.sleep(100 * time.Millisecond)
-		table, err = r.getOrUpdateTable(ctx, bookmarks, database, auth, boltLogger)
+		table, err = r.getOrUpdateTable(ctx, bookmarks, dbSelection, auth, boltLogger, onRoutingTableUpdated)
 		if err != nil {
 			return nil, err
 		}
@@ -251,8 +273,15 @@ func (r *Router) Readers(database string) []string {
 	return table.Readers
 }
 
-func (r *Router) GetOrUpdateWriters(ctx context.Context, bookmarks func(context.Context) ([]string, error), database string, auth *idb.ReAuthToken, boltLogger log.BoltLogger) ([]string, error) {
-	table, err := r.getOrUpdateTable(ctx, bookmarks, database, auth, boltLogger)
+func (r *Router) GetOrUpdateWriters(
+	ctx context.Context,
+	bookmarks func(context.Context) ([]string, error),
+	dbSelection idb.DatabaseSelection,
+	auth *idb.ReAuthToken,
+	boltLogger log.BoltLogger,
+	onRoutingTableUpdated func(string),
+) ([]string, error) {
+	table, err := r.getOrUpdateTable(ctx, bookmarks, dbSelection, auth, boltLogger, onRoutingTableUpdated)
 	if err != nil {
 		return nil, err
 	}
@@ -265,9 +294,9 @@ func (r *Router) GetOrUpdateWriters(ctx context.Context, bookmarks func(context.
 			break
 		}
 		r.log.Infof(log.Router, r.logId, "Invalidating routing table, no writers")
-		r.Invalidate(database)
+		r.Invalidate(dbSelection.Name)
 		r.sleep(100 * time.Millisecond)
-		table, err = r.getOrUpdateTable(ctx, bookmarks, database, auth, boltLogger)
+		table, err = r.getOrUpdateTable(ctx, bookmarks, dbSelection, auth, boltLogger, onRoutingTableUpdated)
 		if err != nil {
 			return nil, err
 		}
@@ -288,7 +317,6 @@ func (r *Router) Writers(database string) []string {
 }
 
 func (r *Router) GetNameOfDefaultDatabase(ctx context.Context, bookmarks []string, user string, auth *idb.ReAuthToken, boltLogger log.BoltLogger) (string, error) {
-	// FIXME: this seems to indirectly cache the home db for the routing table's TTL
 	table, err := r.readTable(ctx, nil, bookmarks, idb.DefaultDatabase, user, auth, boltLogger)
 	if err != nil {
 		return "", err
@@ -372,9 +400,12 @@ func (r *Router) CleanUp() {
 	}
 }
 
-func (r *Router) storeRoutingTable(ctx context.Context, database string, table *idb.RoutingTable, now time.Time) error {
+func (r *Router) storeRoutingTable(_ context.Context, database string, table *idb.RoutingTable, now time.Time) error {
 	r.dbRoutersMut.Lock()
 	defer r.dbRoutersMut.Unlock()
+	if database == "" {
+		database = table.DatabaseName
+	}
 	r.dbRouters[database] = &databaseRouter{
 		table:   table,
 		dueUnix: now.Add(time.Duration(table.TimeToLive) * time.Second).Unix(),

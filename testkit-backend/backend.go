@@ -584,6 +584,9 @@ func (b *backend) handleRequest(req map[string]any) {
 			if data["livenessCheckTimeoutMs"] != nil {
 				c.ConnectionLivenessCheckTimeout = time.Millisecond * time.Duration(asInt64(data["livenessCheckTimeoutMs"].(json.Number)))
 			}
+			if data["maxConnectionLifetimeMs"] != nil {
+				c.MaxConnectionLifetime = time.Millisecond * time.Duration(asInt64(data["maxConnectionLifetimeMs"].(json.Number)))
+			}
 			if data["maxConnectionPoolSize"] != nil {
 				c.MaxConnectionPoolSize = asInt(data["maxConnectionPoolSize"].(json.Number))
 			}
@@ -1267,6 +1270,7 @@ func (b *backend) handleRequest(req map[string]any) {
 				"Feature:API:Driver.ExecuteQuery:WithAuth",
 				"Feature:API:Driver:GetServerInfo",
 				"Feature:API:Driver.IsEncrypted",
+				"Feature:API:Driver:MaxConnectionLifetime",
 				"Feature:API:Driver:NotificationsConfig",
 				"Feature:API:Driver.VerifyAuthentication",
 				"Feature:API:Driver.VerifyConnectivity",
@@ -1290,7 +1294,6 @@ func (b *backend) handleRequest(req map[string]any) {
 				"Feature:Auth:Kerberos",
 				"Feature:Auth:Managed",
 				"Feature:Bolt:3.0",
-				"Feature:Bolt:4.1",
 				"Feature:Bolt:4.2",
 				"Feature:Bolt:4.3",
 				"Feature:Bolt:4.4",
@@ -1302,7 +1305,10 @@ func (b *backend) handleRequest(req map[string]any) {
 				"Feature:Bolt:5.5",
 				"Feature:Bolt:5.6",
 				"Feature:Bolt:5.7",
+				"Feature:Bolt:5.8",
+				//"Feature:Bolt:HandshakeManifestV1",
 				"Feature:Bolt:Patch:UTC",
+				"Feature:Bolt:HandshakeManifestV1",
 				"Feature:Impersonation",
 				//"Feature:TLS:1.1",
 				"Feature:TLS:1.2",
@@ -1310,20 +1316,23 @@ func (b *backend) handleRequest(req map[string]any) {
 
 				// === OPTIMIZATIONS ===
 				"AuthorizationExpiredTreatment",
+				"Optimization:AuthPipelining",
 				"Optimization:ConnectionReuse",
 				"Optimization:EagerTransactionBegin",
 				"Optimization:ExecuteQueryPipelining",
+				"Optimization:HomeDatabaseCache",
+				"Optimization:HomeDbCacheBasicPrincipalIsImpersonatedUser",
 				"Optimization:ImplicitDefaultArguments",
 				"Optimization:MinimalBookmarksSet",
 				"Optimization:MinimalResets",
 				//"Optimization:MinimalVerifyAuthentication",
-				"Optimization:AuthPipelining",
 				"Optimization:PullPipelining",
 				//"Optimization:ResultListFetchAll",
 
 				// === IMPLEMENTATION DETAILS ===
 				"Detail:ClosedDriverIsEncrypted",
 				"Detail:DefaultSecurityConfigValueEquality",
+				//"Detail:NumberIsNumber",
 
 				// === CONFIGURATION HINTS (BOLT 4.3+) ===
 				"ConfHint:connection.recv_timeout_seconds",
@@ -1379,15 +1388,24 @@ func getAuth(authTokenMap map[string]any) (neo4j.AuthToken, error) {
 	case "bearer":
 		authToken = neo4j.BearerAuth(authTokenMap["credentials"].(string))
 	default:
-		parameters := authTokenMap["parameters"].(map[string]any)
-		if err := patchNumbersInMap(parameters); err != nil {
-			return neo4j.AuthToken{}, err
+		var parameters map[string]any
+		if v, ok := authTokenMap["parameters"].(map[string]any); ok {
+			parameters = v
+			if err := patchNumbersInMap(parameters); err != nil {
+				return neo4j.AuthToken{}, err
+			}
 		}
+
+		scheme := mapGetString(authTokenMap, "scheme")
+		principal := mapGetString(authTokenMap, "principal")
+		credentials := mapGetString(authTokenMap, "credentials")
+		realm := mapGetString(authTokenMap, "realm")
+
 		authToken = neo4j.CustomAuth(
-			authTokenMap["scheme"].(string),
-			authTokenMap["principal"].(string),
-			authTokenMap["credentials"].(string),
-			authTokenMap["realm"].(string),
+			scheme,
+			principal,
+			credentials,
+			realm,
 			parameters)
 	}
 	return authToken, nil
@@ -1696,6 +1714,7 @@ func testSkips() map[string]string {
 		"stub.routing.*.*.test_should_request_rt_from_all_initial_routers_until_successful_on_authorization_expired": "Add DNS resolver TestKit message and connection timeout support",
 
 		// To fix/to decide whether to fix
+		"stub.routing.*.*.test_should_successfully_acquire_rt_when_router_ip_changes":                                        "Backend lacks custom DNS resolution and Go driver RT discovery differs.",
 		"stub.routing.test_routing_v*.RoutingV*.test_should_revert_to_initial_router_if_known_router_throws_protocol_errors": "Driver always uses configured URL first and custom resolver only if that fails",
 		"stub.routing.test_routing_v*.RoutingV*.test_should_read_successfully_from_reachable_db_after_trying_unreachable_db": "Driver retries to fetch a routing table up to 100 times if it's empty",
 		"stub.routing.test_routing_v*.RoutingV*.test_should_write_successfully_after_leader_switch_using_tx_run":             "Driver retries to fetch a routing table up to 100 times if it's empty",
@@ -1831,4 +1850,9 @@ func mapNotificationMinSeverityLevel(rawMinSeverityLevel string) (notifications.
 		return notifications.InformationLevel, nil
 	}
 	return "", fmt.Errorf("unknown min severity level %s", rawMinSeverityLevel)
+}
+
+func mapGetString(data map[string]any, key string) string {
+	out, _ := data[key].(string)
+	return out
 }

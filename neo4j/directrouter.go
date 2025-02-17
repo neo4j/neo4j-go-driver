@@ -34,7 +34,7 @@ func (r *directRouter) InvalidateReader(string, string) {}
 
 func (r *directRouter) InvalidateServer(string) {}
 
-func (r *directRouter) GetOrUpdateReaders(context.Context, func(context.Context) ([]string, error), string, *db.ReAuthToken, log.BoltLogger) ([]string, error) {
+func (r *directRouter) GetOrUpdateReaders(context.Context, func(context.Context) ([]string, error), db.DatabaseSelection, *db.ReAuthToken, log.BoltLogger, func(string)) ([]string, error) {
 	return []string{r.address}, nil
 }
 
@@ -42,7 +42,7 @@ func (r *directRouter) Readers(string) []string {
 	return []string{r.address}
 }
 
-func (r *directRouter) GetOrUpdateWriters(context.Context, func(context.Context) ([]string, error), string, *db.ReAuthToken, log.BoltLogger) ([]string, error) {
+func (r *directRouter) GetOrUpdateWriters(context.Context, func(context.Context) ([]string, error), db.DatabaseSelection, *db.ReAuthToken, log.BoltLogger, func(string)) ([]string, error) {
 	return []string{r.address}, nil
 }
 
