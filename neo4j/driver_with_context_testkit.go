@@ -56,6 +56,10 @@ func ForceRoutingTableUpdate(d DriverWithContext, database string, bookmarks []s
 	return errorutil.WrapError(err)
 }
 
+func RegisterDnsResolver(d DriverWithContext, hook func(address string) []string) {
+	d.(*driverWithContext).connector.TestKitDnsResolver = hook
+}
+
 func GetRoutingTable(d DriverWithContext, database string) (*RoutingTable, error) {
 	driver := d.(*driverWithContext)
 	router, ok := driver.router.(*router.Router)
