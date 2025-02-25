@@ -89,9 +89,8 @@ func (p *Pool) Close() {
 	p.queueMut.Unlock()
 	// Go through each server and close all connections to it
 	p.serversMut.Lock()
-	for n, s := range p.servers {
-		s.closeAll()
-		delete(p.servers, n)
+	for _, s := range p.servers {
+		s.startClosing()
 	}
 	p.serversMut.Unlock()
 	p.log.Infof(log.Pool, p.logId, "Closed")
@@ -413,6 +412,9 @@ func (p *Pool) Return(c db.Connection) {
 	server := p.servers[serverName]
 	if server != nil { // Strange when server not found
 		server.returnBusy(c)
+		if server.closing && server.size() == 0 {
+			delete(p.servers, serverName)
+		}
 	} else {
 		p.log.Warnf(log.Pool, p.logId, "Server %s not found", serverName)
 	}

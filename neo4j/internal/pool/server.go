@@ -35,6 +35,7 @@ type server struct {
 	busy            list.List
 	failedConnectAt time.Time
 	roundRobin      uint32
+	closing         bool
 }
 
 var sharedRoundRobin uint32
@@ -104,7 +105,11 @@ func (s *server) calculatePenalty(now time.Time) uint32 {
 // Returns a busy connection, makes it idle
 func (s *server) returnBusy(c db.Connection) {
 	s.unregisterBusy(c)
-	s.idle.PushFront(c)
+	if s.closing {
+		c.Close()
+	} else {
+		s.idle.PushFront(c)
+	}
 }
 
 // Number of idle connections
@@ -151,7 +156,7 @@ func (s *server) removeIdleOlderThan(now time.Time, maxAge time.Duration) {
 	}
 }
 
-func closeAndEmptyConnections(l list.List) {
+func closeAndEmptyConnections(l *list.List) {
 	for e := l.Front(); e != nil; e = e.Next() {
 		c := e.Value.(db.Connection)
 		c.Close()
@@ -159,8 +164,7 @@ func closeAndEmptyConnections(l list.List) {
 	l.Init()
 }
 
-func (s *server) closeAll() {
-	closeAndEmptyConnections(s.idle)
-	// Closing the busy connections could mean here that we do close from another thread.
-	closeAndEmptyConnections(s.busy)
+func (s *server) startClosing() {
+	s.closing = true
+	closeAndEmptyConnections(&s.idle)
 }
