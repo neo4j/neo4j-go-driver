@@ -75,6 +75,7 @@ type ConnFake struct {
 	ReAuthHook              func(context.Context, *idb.ReAuthToken) error
 	SsrEnabled              bool
 	PinHomeDatabaseCallback func(context.Context, string)
+	Closed                  bool
 }
 
 func (c *ConnFake) Connect(
@@ -108,6 +109,7 @@ func (c *ConnFake) ForceReset(context.Context) {
 }
 
 func (c *ConnFake) Close(ctx context.Context) {
+	c.Closed = true
 }
 
 func (c *ConnFake) Birthdate() time.Time {

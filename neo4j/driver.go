@@ -37,6 +37,7 @@ type Driver interface {
 	// or error describing the problem.
 	VerifyConnectivity() error
 	// Close the driver and all underlying connections
+	// This function may not be called while the driver is in use (i.e., concurrently).
 	Close() error
 	// IsEncrypted determines whether the driver communication with the server
 	// is encrypted. This is a static check. The function can also be called on

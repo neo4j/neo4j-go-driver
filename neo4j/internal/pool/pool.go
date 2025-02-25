@@ -108,9 +108,8 @@ func (p *Pool) Close(ctx context.Context) {
 	p.queueMut.Unlock()
 	// Go through each server and close all connections to it
 	p.serversMut.Lock()
-	for n, s := range p.servers {
-		s.closeAll(ctx, p.closeConnection)
-		delete(p.servers, n)
+	for _, s := range p.servers {
+		s.startClosing(ctx, p.closeConnection)
 	}
 	p.serversMut.Unlock()
 	p.log.Infof(log.Pool, p.logId, "Closed")
@@ -194,8 +193,8 @@ func (p *Pool) Borrow(
 	auth *idb.ReAuthToken,
 ) (idb.Connection, error) {
 	for {
-		if p.closed {
-			return nil, &errorutil.PoolClosed{}
+		if err := p.checkClosed(); err != nil {
+			return nil, err
 		}
 		serverNames := getServerNames()
 		if len(serverNames) == 0 {
@@ -294,6 +293,10 @@ func (p *Pool) tryBorrow(
 	var unlock = new(sync.Once)
 	defer unlock.Do(p.serversMut.Unlock)
 
+	if err := p.checkClosed(); err != nil {
+		return nil, err
+	}
+
 	srv := p.servers[serverName]
 	for {
 		if srv != nil {
@@ -349,6 +352,13 @@ func (p *Pool) tryBorrow(
 	srv.registerBusy(c)
 	srv.notifySuccessfulConnect()
 	return c, nil
+}
+
+func (p *Pool) checkClosed() error {
+	if p.closed {
+		return &errorutil.PoolClosed{}
+	}
+	return nil
 }
 
 func (p *Pool) unreg(ctx context.Context, serverName string, c idb.Connection, now time.Time) {

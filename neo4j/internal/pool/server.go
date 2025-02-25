@@ -196,12 +196,6 @@ func (s *server) removeIdleOlderThan(ctx context.Context, now time.Time, maxAge 
 	}
 }
 
-func (s *server) closeAll(ctx context.Context, close closeFunc) {
-	s.closeAndEmptyConnections(ctx, &s.idle, close)
-	// Closing the busy connections could mean here that we do close from another thread.
-	s.closeAndEmptyConnections(ctx, &s.busy, close)
-}
-
 func (s *server) executeForAllConnections(callback func(c db.Connection)) {
 	for item := s.busy.Front(); item != nil; item = item.Next() {
 		callback(item.Value.(db.Connection))
