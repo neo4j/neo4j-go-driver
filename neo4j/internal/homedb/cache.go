@@ -18,11 +18,13 @@
 package homedb
 
 import (
-	"encoding/json"
+	"fmt"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/auth"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/errorutil"
 	"math"
+	"reflect"
 	"sort"
+	"strings"
 	"sync"
 	"time"
 )
@@ -130,10 +132,10 @@ func (c *Cache) ComputeKey(impersonatedUser string, sessionAuth *auth.Token) (st
 		case schemeNone:
 			return "none", nil
 		default:
-			return marshalCacheKey(scheme, sessionAuth.Tokens)
+			return createCacheKey(scheme, sessionAuth.Tokens)
 		}
 	}
-	return marshalCacheKey("unknown", sessionAuth.Tokens)
+	return createCacheKey("unknown", sessionAuth.Tokens)
 }
 
 // SetEnabled enables or disables the cache.
@@ -186,14 +188,97 @@ func (c *Cache) prune() {
 	}
 }
 
-// marshalCacheKey returns a deterministic JSON string representation of a cache key built from the scheme and tokens.
-func marshalCacheKey(scheme string, tokens map[string]any) (string, error) {
-	b, err := json.Marshal(struct {
-		Scheme string         `json:"scheme"`
-		Tokens map[string]any `json:"tokens"`
-	}{
-		Scheme: scheme,
-		Tokens: tokens,
-	})
-	return string(b), err
+// createCacheKey TODO
+func createCacheKey(scheme string, m map[string]any) (string, error) {
+	//return fmt.Sprintf("%v", m), nil
+	// Add scheme to map if missing.
+	if scheme != "" {
+		if _, exists := m["scheme"]; !exists {
+			m["scheme"] = scheme
+		}
+	}
+
+	// Extract keys and sort them.
+	keys := make([]string, 0, len(m))
+	for k := range m {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+
+	var b strings.Builder
+	b.WriteString("{")
+	for i, k := range keys {
+		if i > 0 {
+			b.WriteString(",")
+		}
+		b.WriteString(fmt.Sprintf("%q:%s", k, marshalValue(m[k])))
+	}
+	b.WriteString("}")
+	return b.String(), nil
+}
+
+// marshalValue TODO
+func marshalValue(v any) string {
+	if v == nil {
+		return "nil"
+	}
+	rv := reflect.ValueOf(v)
+	rt := reflect.TypeOf(v)
+	switch rt.Kind() {
+	case reflect.Map:
+		if rt.Key().Kind() == reflect.String {
+			var keys []string
+			for _, key := range rv.MapKeys() {
+				keys = append(keys, key.String())
+			}
+			sort.Strings(keys)
+			var b strings.Builder
+			b.WriteString("{")
+			for i, key := range keys {
+				if i > 0 {
+					b.WriteString(",")
+				}
+				b.WriteString(fmt.Sprintf("%q:%s", key, marshalValue(rv.MapIndex(reflect.ValueOf(key)).Interface())))
+			}
+			b.WriteString("}")
+			return b.String()
+		}
+		// For maps with non-string keys, build a slice of entries using their deterministic representation.
+		type entry struct {
+			keyStr string
+			key    reflect.Value
+			value  reflect.Value
+		}
+		var entries []entry
+		for _, key := range rv.MapKeys() {
+			keyStr := marshalValue(key.Interface())
+			entries = append(entries, entry{
+				keyStr: keyStr,
+				key:    key,
+				value:  rv.MapIndex(key),
+			})
+		}
+		sort.Slice(entries, func(i, j int) bool {
+			return entries[i].keyStr < entries[j].keyStr
+		})
+		var b strings.Builder
+		b.WriteString("{")
+		for i, entry := range entries {
+			if i > 0 {
+				b.WriteString(",")
+			}
+			b.WriteString(fmt.Sprintf("%s:%s", entry.keyStr, marshalValue(entry.value.Interface())))
+		}
+		b.WriteString("}")
+		return b.String()
+	case reflect.Slice, reflect.Array:
+		var elems []string
+		for i := 0; i < rv.Len(); i++ {
+			elems = append(elems, marshalValue(rv.Index(i).Interface()))
+		}
+		sort.Strings(elems)
+		return "[" + strings.Join(elems, ",") + "]"
+	default:
+		return fmt.Sprintf("{type:%T,value:%#v}", v, v)
+	}
 }
