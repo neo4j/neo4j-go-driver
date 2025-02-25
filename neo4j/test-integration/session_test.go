@@ -50,19 +50,11 @@ func TestSession(outer *testing.T) {
 			c.Log = log.ToConsole(log.DEBUG)
 		})
 		assertNotNil(inner, driver)
+		defer func() { _ = driver.Close(ctx) }()
 
 		session = driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead})
 		assertNotNil(inner, session)
-
-		defer func() {
-			if session != nil {
-				session.Close(ctx)
-			}
-
-			if driver != nil {
-				driver.Close(ctx)
-			}
-		}()
+		defer func() { _ = session.Close(ctx) }()
 
 		inner.Run("when a query is executed, it should run and return summary with correct statement", func(t *testing.T) {
 			stmt := "UNWIND [1, 2, 3, 4, 5] AS x RETURN x"

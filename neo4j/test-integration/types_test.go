@@ -41,18 +41,10 @@ func TestTypes(outer *testing.T) {
 	var result neo4j.ResultWithContext
 
 	driver = server.Driver()
+	defer func() { _ = driver.Close(ctx) }()
 	session = driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
 	assertNotNil(outer, session)
-
-	defer func() {
-		if session != nil {
-			session.Close(ctx)
-		}
-
-		if driver != nil {
-			driver.Close(ctx)
-		}
-	}()
+	defer func() { _ = session.Close(ctx) }()
 
 	outer.Run("should be able to send and receive boolean property", func(t *testing.T) {
 		value := true
