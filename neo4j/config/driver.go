@@ -74,9 +74,6 @@ type Config struct {
 	//   })
 	//
 	// Note: This option is not applicable for 'bolt://' or 'neo4j://' schemes where encryption isn't used.
-	//
-	// ClientCertificateProvider is part of the mTLS preview feature
-	// (see README on what it means in terms of support and compatibility guarantees)
 	ClientCertificateProvider auth.ClientCertificateProvider
 	// Logging target the driver will send its log outputs
 	//
