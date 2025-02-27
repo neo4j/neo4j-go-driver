@@ -74,6 +74,7 @@ func TestRouting(outer *testing.T) {
 
 		driver := getDriver(server.URI())
 		assertNil(t, err)
+		defer func() { _ = driver.Close(ctx) }()
 
 		session = driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
 

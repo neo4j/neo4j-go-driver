@@ -44,6 +44,7 @@ func TestResultSummary(outer *testing.T) {
 		config.Log = log.ToConsole(log.DEBUG)
 	})
 	assertNotNil(outer, driver)
+	defer func() { _ = driver.Close(ctx) }()
 
 	outer.Run("from single-tenant Neo4j servers", func(inner *testing.T) {
 		if isMultiTenant(server) {
