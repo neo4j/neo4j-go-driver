@@ -96,6 +96,7 @@ func GetDbServer() DbServer {
 
 func (s DbServer) deleteData() {
 	driver := s.Driver()
+	defer func() { _ = driver.Close() }()
 	session := driver.NewSession(neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
 	defer session.Close()
 
