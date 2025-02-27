@@ -18,12 +18,11 @@
 package homedb
 
 import (
-	"fmt"
+	"encoding/json"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/auth"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/errorutil"
 	"math"
 	"sort"
-	"strings"
 	"sync"
 	"time"
 )
@@ -38,8 +37,6 @@ const schemeKerberos = "kerberos"
 const schemeBearer = "bearer"
 const keyPrincipal = "principal"
 const keyCredentials = "credentials"
-const keyRealm = "realm"
-const keyParameters = "parameters"
 
 type cacheEntry struct {
 	database string
@@ -103,15 +100,15 @@ func (c *Cache) Set(user string, database string) {
 }
 
 // ComputeKey generates a cache key based on user impersonation and an optional session auth token.
-func (c *Cache) ComputeKey(impersonatedUser string, sessionAuth *auth.Token) string {
+func (c *Cache) ComputeKey(impersonatedUser string, sessionAuth *auth.Token) (string, error) {
 	// If an impersonated user is provided, use it as the key.
 	if impersonatedUser != "" {
-		return "basic:" + impersonatedUser
+		return "basic:" + impersonatedUser, nil
 	}
 
 	// If no session authentication token is provided, return a default key.
 	if sessionAuth == nil {
-		return "DEFAULT"
+		return "DEFAULT", nil
 	}
 
 	// Process based on auth scheme
@@ -119,41 +116,24 @@ func (c *Cache) ComputeKey(impersonatedUser string, sessionAuth *auth.Token) str
 		switch scheme {
 		case schemeBasic:
 			if principal, ok := sessionAuth.Tokens[keyPrincipal].(string); ok {
-				return "basic:" + principal
+				return "basic:" + principal, nil
 			}
-			return "basic:"
+			return "basic:", nil
 		case schemeKerberos:
 			if credentials, ok := sessionAuth.Tokens[keyCredentials].(string); ok {
-				return "kerberos:" + credentials
+				return "kerberos:" + credentials, nil
 			}
 		case schemeBearer:
 			if credentials, ok := sessionAuth.Tokens[keyCredentials].(string); ok {
-				return "bearer:" + credentials
+				return "bearer:" + credentials, nil
 			}
 		case schemeNone:
-			return "none"
+			return "none", nil
 		default:
-			// For custom schemes, construct the key
-			var orderedParams string
-			if params, ok := sessionAuth.Tokens[keyParameters].(map[string]any); ok {
-				orderedParams = serializeMap(params)
-			}
-			var credentialString, realmString string
-			if credentials, ok := sessionAuth.Tokens[keyCredentials].(string); ok && credentials != "" {
-				credentialString = "credentials:" + credentials
-			}
-			if realm, ok := sessionAuth.Tokens[keyRealm].(string); ok && realm != "" {
-				realmString = "realm:" + realm
-			}
-			return fmt.Sprintf("%s:%s,%s:%v,%s,%s,%s:%s",
-				keyScheme, scheme,
-				keyPrincipal, sessionAuth.Tokens[keyPrincipal],
-				credentialString, realmString,
-				keyParameters, orderedParams)
+			return marshalCacheKey(scheme, sessionAuth.Tokens)
 		}
 	}
-	// If no scheme could be found, fall back to serializing the token in a stable way.
-	return fmt.Sprintf("unknown:%v", serializeMap(sessionAuth.Tokens))
+	return marshalCacheKey("unknown", sessionAuth.Tokens)
 }
 
 // SetEnabled enables or disables the cache.
@@ -206,20 +186,14 @@ func (c *Cache) prune() {
 	}
 }
 
-// serializeMap creates a deterministic string representation of a map[string]any.
-func serializeMap(m map[string]any) string {
-	// Extract the keys from the map.
-	keys := make([]string, 0, len(m))
-	for k := range m {
-		keys = append(keys, k)
-	}
-	// Sort the keys to ensure a consistent order.
-	sort.Strings(keys)
-
-	// Build the string representation.
-	var builder strings.Builder
-	for _, k := range keys {
-		builder.WriteString(fmt.Sprintf("<%s>:%v;", k, m[k]))
-	}
-	return builder.String()
+// marshalCacheKey returns a deterministic JSON string representation of a cache key built from the scheme and tokens.
+func marshalCacheKey(scheme string, tokens map[string]any) (string, error) {
+	b, err := json.Marshal(struct {
+		Scheme string         `json:"scheme"`
+		Tokens map[string]any `json:"tokens"`
+	}{
+		Scheme: scheme,
+		Tokens: tokens,
+	})
+	return string(b), err
 }
