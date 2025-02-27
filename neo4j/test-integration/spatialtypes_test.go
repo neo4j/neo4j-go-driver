@@ -37,6 +37,7 @@ func TestSpatialTypes(st *testing.T) {
 
 	server := dbserver.GetDbServer()
 	driver := server.Driver()
+	defer func() { _ = driver.Close() }()
 	if server.Version.LessThan(V340) {
 		st.Skip("Spatial types are only available after neo4j 3.4.0 release")
 	}

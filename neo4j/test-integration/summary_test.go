@@ -25,6 +25,12 @@ var _ = Describe("Result Summary", func() {
 		Expect(driver).NotTo(BeNil())
 	})
 
+	AfterEach(func() {
+		if driver != nil {
+			_ = driver.Close()
+		}
+	})
+
 	Context("from single-tenant Neo4j servers", func() {
 		BeforeEach(func() {
 			if isMultiTenant(server) {
@@ -93,7 +99,6 @@ var _ = Describe("Result Summary", func() {
 			Expect(summary.Database().Name()).To(Equal(extraDatabase))
 		})
 	})
-
 
 })
 
