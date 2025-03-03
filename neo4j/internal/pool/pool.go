@@ -108,11 +108,22 @@ func (p *Pool) Close(ctx context.Context) {
 	p.queueMut.Unlock()
 	// Go through each server and close all connections to it
 	p.serversMut.Lock()
+	pendingConnections := 0
 	for _, s := range p.servers {
 		s.startClosing(ctx, p.closeConnection)
+		pendingConnections += s.size()
 	}
 	p.serversMut.Unlock()
-	p.log.Infof(log.Pool, p.logId, "Closed")
+	if pendingConnections == 0 {
+		p.log.Infof(log.Pool, p.logId, "Closed")
+	} else {
+		p.log.Warnf(
+			log.Pool,
+			p.logId,
+			"Called close with %d in-flight connections (will be closed when work is done).",
+			pendingConnections,
+		)
+	}
 }
 
 // For testing
