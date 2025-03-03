@@ -100,7 +100,26 @@ func (b *backend) writeLineLocked(s string) error {
 
 // Reads and writes to the socket until it is closed
 func (b *backend) serve() {
+	defer b.close()
 	for b.process() {
+	}
+}
+
+func (b *backend) close() {
+	b.closed = true
+	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
+	defer cancel()
+	for k, tx := range b.explicitTransactions {
+		_ = tx.Close(ctx)
+		delete(b.explicitTransactions, k)
+	}
+	for k, session := range b.sessionStates {
+		_ = session.session.Close(ctx)
+		delete(b.sessionStates, k)
+	}
+	for k, driver := range b.drivers {
+		_ = driver.Close(ctx)
+		delete(b.drivers, k)
 	}
 }
 

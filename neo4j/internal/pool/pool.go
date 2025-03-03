@@ -89,11 +89,22 @@ func (p *Pool) Close() {
 	p.queueMut.Unlock()
 	// Go through each server and close all connections to it
 	p.serversMut.Lock()
+	pendingConnections := 0
 	for _, s := range p.servers {
 		s.startClosing()
+		pendingConnections += s.size()
 	}
 	p.serversMut.Unlock()
-	p.log.Infof(log.Pool, p.logId, "Closed")
+	if pendingConnections == 0 {
+		p.log.Infof(log.Pool, p.logId, "Closed")
+	} else {
+		p.log.Warnf(
+			log.Pool,
+			p.logId,
+			"Called close with %d in-flight connections (will be closed when work is done).",
+			pendingConnections,
+		)
+	}
 }
 
 func (p *Pool) anyExistingConnectionsOnServers(serverNames []string) bool {
@@ -347,7 +358,6 @@ func (p *Pool) removeIdleOlderThanOnServer(serverName string, now time.Time, max
 func (p *Pool) Return(c db.Connection) {
 	if p.closed {
 		p.log.Warnf(log.Pool, p.logId, "Trying to return connection to closed pool")
-		return
 	}
 
 	c.SetBoltLogger(nil)
@@ -355,7 +365,14 @@ func (p *Pool) Return(c db.Connection) {
 	// Get the name of the server that the connection belongs to.
 	serverName := c.ServerName()
 	isAlive := c.IsAlive()
-	p.log.Debugf(log.Pool, p.logId, "Returning connection to %s {alive:%t}", serverName, isAlive)
+	p.log.Debugf(
+		log.Pool,
+		p.logId,
+		"Returning connection %s to %s {alive:%t}",
+		c.ConnId(),
+		serverName,
+		isAlive,
+	)
 
 	// If the connection is dead, remove all other idle connections on the same server that older
 	// or of the same age as the dead connection, otherwise perform normal cleanup of old connections
