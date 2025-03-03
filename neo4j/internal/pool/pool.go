@@ -417,13 +417,19 @@ func (p *Pool) closeConnection(ctx context.Context, c idb.Connection) {
 func (p *Pool) Return(ctx context.Context, c idb.Connection) {
 	if p.closed {
 		p.log.Warnf(log.Pool, p.logId, "Trying to return connection to closed pool")
-		return
 	}
 
 	// Get the name of the server that the connection belongs to.
 	serverName := c.ServerName()
 	isAlive := c.IsAlive()
-	p.log.Debugf(log.Pool, p.logId, "Returning connection to %s {alive:%t}", serverName, isAlive)
+	p.log.Debugf(
+		log.Pool,
+		p.logId,
+		"Returning connection %s to %s {alive:%t}",
+		c.ConnId(),
+		serverName,
+		isAlive,
+	)
 
 	// If the connection is dead, remove all other idle connections on the same server that older
 	// or of the same age as the dead connection, otherwise perform normal cleanup of old connections

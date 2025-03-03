@@ -174,6 +174,10 @@ func (b *bolt4) ServerName() string {
 	return b.serverName
 }
 
+func (b *bolt4) ConnId() string {
+	return b.connId
+}
+
 func (b *bolt4) ServerVersion() string {
 	return b.serverVersion
 }

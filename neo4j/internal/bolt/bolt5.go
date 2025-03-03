@@ -185,6 +185,10 @@ func (b *bolt5) ServerName() string {
 	return b.serverName
 }
 
+func (b *bolt5) ConnId() string {
+	return b.connId
+}
+
 func (b *bolt5) ServerVersion() string {
 	return b.serverVersion
 }
