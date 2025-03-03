@@ -20,7 +20,9 @@ package main
 
 import (
 	"bufio"
+	"fmt"
 	"net"
+	"os"
 )
 
 func main() {
@@ -37,7 +39,21 @@ func main() {
 			panic(err)
 		}
 		// Hand over connection to backend
-		backend := newBackend(bufio.NewReader(conn), conn)
-		backend.serve()
+		serverWithBackend(conn)
 	}
+}
+
+func serverWithBackend(conn net.Conn) {
+	defer func() {
+		panicErr := recover()
+		if panicErr != nil {
+			if n, err := fmt.Fprintf(os.Stderr, "backend panicked: %v\n", panicErr); err != nil || n == 0 {
+				fmt.Printf("failed to write panic message to stderr (wrote %v bytes): %v\n", n, err)
+				panic(panicErr)
+			}
+		}
+	}()
+
+	backend := newBackend(bufio.NewReader(conn), conn)
+	backend.serve()
 }
