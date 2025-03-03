@@ -18,9 +18,10 @@
 package homedb
 
 import (
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/auth"
+	"math"
 	"testing"
 
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/auth"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/testutil"
 )
 
@@ -109,142 +110,168 @@ func TestCache_Set(outer *testing.T) {
 }
 
 func TestCache_ComputeKey(outer *testing.T) {
-	outer.Parallel()
-
-	outer.Run("impersonatedUser provided", func(t *testing.T) {
-		cache := &Cache{}
-		key := cache.ComputeKey("impersonatedUser", nil)
-		testutil.AssertStringEqual(t, key, "basic:impersonatedUser")
-	})
-
-	outer.Run("no auth or impersonatedUser provided", func(t *testing.T) {
-		cache := &Cache{}
-		key := cache.ComputeKey("", nil)
-		testutil.AssertStringEqual(t, key, "DEFAULT")
-	})
-
-	outer.Run("auth scheme basic with principal", func(t *testing.T) {
-		cache := &Cache{}
-		authToken := auth.Token{
-			Tokens: map[string]any{
-				"scheme":    "basic",
-				"principal": "userPrincipal",
-			},
-		}
-		key := cache.ComputeKey("", &authToken)
-		testutil.AssertStringEqual(t, key, "basic:userPrincipal")
-	})
-
-	outer.Run("auth scheme basic without principal", func(t *testing.T) {
-		cache := &Cache{}
-		authToken := auth.Token{
-			Tokens: map[string]any{
-				"scheme": "basic",
-			},
-		}
-		key := cache.ComputeKey("", &authToken)
-		testutil.AssertStringEqual(t, key, "basic:")
-	})
-
-	outer.Run("auth scheme kerberos", func(t *testing.T) {
-		cache := &Cache{}
-		authToken := auth.Token{
-			Tokens: map[string]any{
-				"scheme":      "kerberos",
-				"credentials": "kerberosToken",
-			},
-		}
-		key := cache.ComputeKey("", &authToken)
-		testutil.AssertStringEqual(t, key, "kerberos:kerberosToken")
-	})
-
-	outer.Run("auth scheme bearer", func(t *testing.T) {
-		cache := &Cache{}
-		authToken := auth.Token{
-			Tokens: map[string]any{
-				"scheme":      "bearer",
-				"credentials": "bearerToken",
-			},
-		}
-		key := cache.ComputeKey("", &authToken)
-		testutil.AssertStringEqual(t, key, "bearer:bearerToken")
-	})
-
-	outer.Run("auth scheme none", func(t *testing.T) {
-		cache := &Cache{}
-		authToken := auth.Token{
-			Tokens: map[string]any{
-				"scheme": "none",
-			},
-		}
-		key := cache.ComputeKey("", &authToken)
-		testutil.AssertStringEqual(t, key, "none")
-	})
-
-	outer.Run("auth custom scheme with parameters", func(t *testing.T) {
-		cache := &Cache{}
-		authToken := auth.Token{
-			Tokens: map[string]any{
-				"scheme": "custom",
-				"parameters": map[string]any{
-					"key1": "value1",
-					"key2": "value2",
-				},
-				"credentials": "customCred",
-				"realm":       "customRealm",
-				"principal":   "customPrincipal",
-			},
-		}
-		key := cache.ComputeKey("", &authToken)
-		expectedKey := "scheme:custom,principal:customPrincipal,credentials:customCred,realm:customRealm,parameters:<key1>:value1;<key2>:value2;"
-		testutil.AssertStringEqual(t, key, expectedKey)
-	})
-
-	outer.Run("auth custom scheme without parameters", func(t *testing.T) {
-		cache := &Cache{}
-		authToken := auth.Token{
-			Tokens: map[string]any{
-				"scheme": "custom",
-			},
-		}
-		key := cache.ComputeKey("", &authToken)
-		expectedKey := "scheme:custom,principal:<nil>,,,parameters:"
-		testutil.AssertStringEqual(t, key, expectedKey)
-	})
-
-	outer.Run("auth custom scheme collision check", func(t *testing.T) {
-		cache := &Cache{}
-		token1 := auth.Token{
-			Tokens: map[string]any{
-				"scheme": "custom",
-				"parameters": map[string]any{
-					"key1:fun": "value1",
+	tests := []struct {
+		name             string
+		impersonatedUser string
+		token            *auth.Token
+		expectedKey      string
+		wantErr          bool
+	}{
+		{
+			name:             "impersonatedUser provided",
+			impersonatedUser: "impersonatedUser",
+			expectedKey:      "basic:impersonatedUser",
+		},
+		{
+			name:        "no auth or impersonatedUser provided",
+			expectedKey: "DEFAULT",
+		},
+		{
+			name: "auth scheme basic with principal",
+			token: &auth.Token{
+				Tokens: map[string]any{
+					"scheme":    "basic",
+					"principal": "userPrincipal",
 				},
 			},
-		}
-		token2 := auth.Token{
-			Tokens: map[string]any{
-				"scheme": "custom",
-				"parameters": map[string]any{
-					"key1": "fun:value1",
+			expectedKey: "basic:userPrincipal",
+		},
+		{
+			name: "auth scheme basic without principal",
+			token: &auth.Token{
+				Tokens: map[string]any{
+					"scheme": "basic",
 				},
 			},
-		}
-		key1 := cache.ComputeKey("", &token1)
-		key2 := cache.ComputeKey("", &token2)
-		testutil.AssertNotDeepEquals(t, key1, key2)
-	})
-
-	outer.Run("no scheme found, token is stringified", func(t *testing.T) {
-		cache := &Cache{}
-		authToken := auth.Token{
-			Tokens: map[string]any{
-				"c": "carrot",
-				"a": "apple",
-				"b": "banana",
+			expectedKey: "basic:",
+		},
+		{
+			name: "auth scheme kerberos",
+			token: &auth.Token{
+				Tokens: map[string]any{
+					"scheme":      "kerberos",
+					"credentials": "kerberosToken",
+				},
 			},
-		}
-		key := cache.ComputeKey("", &authToken)
-		testutil.AssertStringEqual(t, key, "unknown:<a>:apple;<b>:banana;<c>:carrot;")
-	})
+			expectedKey: "kerberos:kerberosToken",
+		},
+		{
+			name: "auth scheme bearer",
+			token: &auth.Token{
+				Tokens: map[string]any{
+					"scheme":      "bearer",
+					"credentials": "bearerToken",
+				},
+			},
+			expectedKey: "bearer:bearerToken",
+		},
+		{
+			name: "auth scheme none",
+			token: &auth.Token{
+				Tokens: map[string]any{
+					"scheme": "none",
+				},
+			},
+			expectedKey: "none",
+		},
+		{
+			name: "auth custom scheme with parameters",
+			token: &auth.Token{
+				Tokens: map[string]any{
+					"scheme": "custom",
+					"parameters": map[string]any{
+						"key1": "value1",
+						"key2": "value2",
+					},
+					"credentials": "customCred",
+					"realm":       "customRealm",
+					"principal":   "customPrincipal",
+				},
+			},
+			expectedKey: "{\"scheme\":\"custom\",\"tokens\":{\"credentials\":\"customCred\",\"parameters\":{\"key1\":\"value1\",\"key2\":\"value2\"},\"principal\":\"customPrincipal\",\"realm\":\"customRealm\",\"scheme\":\"custom\"}}",
+		},
+		{
+			name: "auth custom scheme without parameters",
+			token: &auth.Token{
+				Tokens: map[string]any{
+					"scheme": "custom",
+				},
+			},
+			expectedKey: "{\"scheme\":\"custom\",\"tokens\":{\"scheme\":\"custom\"}}",
+		},
+		{
+			name: "no scheme found, token is stringified",
+			token: &auth.Token{
+				Tokens: map[string]any{
+					"a": "apple",
+					"b": "banana",
+					"c": "carrot",
+				},
+			},
+			expectedKey: "{\"scheme\":\"unknown\",\"tokens\":{\"a\":\"apple\",\"b\":\"banana\",\"c\":\"carrot\"}}",
+		},
+		{
+			name: "marshal failure with non-marshallable channel",
+			token: &auth.Token{
+				Tokens: map[string]any{
+					"scheme": "custom",
+					"bad":    make(chan int),
+				},
+			},
+			wantErr: true,
+		},
+		{
+			name: "marshal failure with NaN",
+			token: &auth.Token{
+				Tokens: map[string]any{
+					"scheme": "custom",
+					"bad":    math.NaN(),
+				},
+			},
+			wantErr: true,
+		},
+		{
+			name: "marshal failure with positive infinity",
+			token: &auth.Token{
+				Tokens: map[string]any{
+					"scheme": "custom",
+					"bad":    math.Inf(1),
+				},
+			},
+			wantErr: true,
+		},
+		{
+			name: "marshal failure with negative infinity",
+			token: &auth.Token{
+				Tokens: map[string]any{
+					"scheme": "custom",
+					"bad":    math.Inf(-1),
+				},
+			},
+			wantErr: true,
+		},
+	}
+
+	for _, tc := range tests {
+		tc := tc
+		outer.Run(tc.name, func(t *testing.T) {
+			cache := &Cache{}
+			key, err := cache.ComputeKey(tc.impersonatedUser, tc.token)
+			if tc.wantErr {
+				if err == nil {
+					t.Errorf("expected error but got nil")
+				}
+				if key != "" {
+					t.Errorf("expected empty key on error but got: %s", key)
+				}
+			} else {
+				if err != nil {
+					t.Errorf("unexpected error: %v", err)
+				}
+				if key != tc.expectedKey {
+					t.Errorf("expected key %q, got %q", tc.expectedKey, key)
+				}
+			}
+		})
+	}
 }

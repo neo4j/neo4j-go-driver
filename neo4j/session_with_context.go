@@ -248,9 +248,9 @@ func newSessionWithContext(
 
 	homeDbGuess, found := cache.Get(key)
 	if found {
-		logger.Debugf(log.Session, logId, "Home database guess retrieved from cache: '%s' for key '%s'", homeDbGuess, key)
+		logger.Debugf(log.Session, logId, "Home database guess retrieved from cache: '%s'", homeDbGuess)
 	} else {
-		logger.Debugf(log.Session, logId, "No home database guess found in cache for key '%s'", key)
+		logger.Debugf(log.Session, logId, "No home database guess found in cache for provided user")
 	}
 
 	session := &sessionWithContext{
@@ -910,7 +910,7 @@ func (s *sessionWithContext) pinHomeDatabase(ctx context.Context, database strin
 
 	if key, err := computeCacheKey(ctx, s.auth, s.cache, s.config.ImpersonatedUser); err == nil {
 		s.cache.Set(key, database)
-		s.log.Debugf(log.Session, s.logId, "Cached home database '%s' for key '%s'", database, key)
+		s.log.Debugf(log.Session, s.logId, "Cached home database '%s'", database)
 	} else {
 		s.log.Warnf(log.Session, s.logId, "Failed to compute cache key: %v", err)
 	}
@@ -992,7 +992,7 @@ func computeCacheKey(ctx context.Context, token *idb.ReAuthToken, cache *homedb.
 		if err != nil {
 			return "", err
 		}
-		return cache.ComputeKey(impersonatedUser, &t), nil
+		return cache.ComputeKey(impersonatedUser, &t)
 	}
-	return cache.ComputeKey(impersonatedUser, nil), nil
+	return cache.ComputeKey(impersonatedUser, nil)
 }
