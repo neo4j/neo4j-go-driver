@@ -106,19 +106,16 @@ func (b *backend) serve() {
 }
 
 func (b *backend) close() {
-	b.closed = true
-	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
-	defer cancel()
-	for k, tx := range b.explicitTransactions {
-		_ = tx.Close(ctx)
-		delete(b.explicitTransactions, k)
+	for k, tx := range b.transactions {
+		_ = tx.Close()
+		delete(b.transactions, k)
 	}
 	for k, session := range b.sessionStates {
-		_ = session.session.Close(ctx)
+		_ = session.session.Close()
 		delete(b.sessionStates, k)
 	}
 	for k, driver := range b.drivers {
-		_ = driver.Close(ctx)
+		_ = driver.Close()
 		delete(b.drivers, k)
 	}
 }
