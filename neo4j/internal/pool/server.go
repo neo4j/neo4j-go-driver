@@ -24,7 +24,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/neo4j/neo4j-go-driver/v4/neo4j/db"
+	idb "github.com/neo4j/neo4j-go-driver/v4/neo4j/internal/db"
 )
 
 // Represents a server with a number of connections that either is in use (borrowed) or
@@ -43,7 +43,7 @@ var sharedRoundRobin uint32
 const rememberFailedConnectDuration = 3 * time.Minute
 
 // Returns a idle connection if any
-func (s *server) getIdle() db.Connection {
+func (s *server) getIdle() idb.Connection {
 	// Remove from idle list and add to busy list
 	e := s.idle.Front()
 	if e != nil {
@@ -52,7 +52,7 @@ func (s *server) getIdle() db.Connection {
 		// Update round-robin counter every time we give away a connection and keep track
 		// of our own round-robin index
 		s.roundRobin = atomic.AddUint32(&sharedRoundRobin, 1)
-		return c.(db.Connection)
+		return c.(idb.Connection)
 	}
 	return nil
 }
@@ -103,7 +103,7 @@ func (s *server) calculatePenalty(now time.Time) uint32 {
 }
 
 // Returns a busy connection, makes it idle
-func (s *server) returnBusy(c db.Connection) {
+func (s *server) returnBusy(c idb.Connection) {
 	s.unregisterBusy(c)
 	if s.closing {
 		c.Close()
@@ -118,16 +118,16 @@ func (s server) numIdle() int {
 }
 
 // Adds a connection to busy list
-func (s *server) registerBusy(c db.Connection) {
+func (s *server) registerBusy(c idb.Connection) {
 	// Update round-robin to indicate when this server was last used.
 	s.roundRobin = atomic.AddUint32(&sharedRoundRobin, 1)
 	s.busy.PushFront(c)
 }
 
-func (s *server) unregisterBusy(c db.Connection) {
+func (s *server) unregisterBusy(c idb.Connection) {
 	found := false
 	for e := s.busy.Front(); e != nil && !found; e = e.Next() {
-		x := e.Value.(db.Connection)
+		x := e.Value.(idb.Connection)
 		found = x == c
 		if found {
 			s.busy.Remove(e)
@@ -144,7 +144,7 @@ func (s *server) removeIdleOlderThan(now time.Time, maxAge time.Duration) {
 	e := s.idle.Front()
 	for e != nil {
 		n := e.Next()
-		c := e.Value.(db.Connection)
+		c := e.Value.(idb.Connection)
 
 		age := now.Sub(c.Birthdate())
 		if age >= maxAge {
@@ -158,7 +158,7 @@ func (s *server) removeIdleOlderThan(now time.Time, maxAge time.Duration) {
 
 func closeAndEmptyConnections(l *list.List) {
 	for e := l.Front(); e != nil; e = e.Next() {
-		c := e.Value.(db.Connection)
+		c := e.Value.(idb.Connection)
 		c.Close()
 	}
 	l.Init()

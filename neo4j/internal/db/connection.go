@@ -17,34 +17,16 @@
  *  limitations under the License.
  */
 
-package testutil
+// Package db defines generic database functionality.
+package db
 
 import (
-	"context"
-	
-	idb "github.com/neo4j/neo4j-go-driver/v4/neo4j/internal/db"
-	"github.com/neo4j/neo4j-go-driver/v4/neo4j/log"
+	"github.com/neo4j/neo4j-go-driver/v4/neo4j/db"
 )
 
-type PoolFake struct {
-	BorrowConn  idb.Connection
-	BorrowErr   error
-	ReturnHook  func()
-	CleanUpHook func()
-}
-
-func (p *PoolFake) Borrow(ctx context.Context, serverNames []string, wait bool, _ log.BoltLogger) (idb.Connection, error) {
-	return p.BorrowConn, p.BorrowErr
-}
-
-func (p *PoolFake) Return(c idb.Connection) {
-	if p.ReturnHook != nil {
-		p.ReturnHook()
-	}
-}
-
-func (p *PoolFake) CleanUp() {
-	if p.CleanUpHook != nil {
-		p.CleanUpHook()
-	}
+// Connection defines an abstract database server connection.
+type Connection interface {
+	db.Connection
+	// ConnId returns the connection id as assigned by the server ("" if not available)
+	ConnId() string
 }

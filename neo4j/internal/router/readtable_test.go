@@ -26,6 +26,7 @@ import (
 	"testing"
 
 	"github.com/neo4j/neo4j-go-driver/v4/neo4j/db"
+	idb "github.com/neo4j/neo4j-go-driver/v4/neo4j/internal/db"
 	"github.com/neo4j/neo4j-go-driver/v4/neo4j/internal/testutil"
 )
 
@@ -90,7 +91,7 @@ func TestReadTableTable(ot *testing.T) {
 			assert:    assertNoTable,
 			assertErr: assertRoutingTableError,
 			pool: &poolFake{
-				borrow: func(names []string, cancel context.CancelFunc, _ log.BoltLogger) (db.Connection, error) {
+				borrow: func(names []string, cancel context.CancelFunc, _ log.BoltLogger) (idb.Connection, error) {
 					return nil, errors.New("borrow fail")
 				},
 			},
@@ -102,7 +103,7 @@ func TestReadTableTable(ot *testing.T) {
 			assert:    assertNoTable,
 			assertErr: assertNeo4jError,
 			pool: &poolFake{
-				borrow: func(names []string, cancel context.CancelFunc, _ log.BoltLogger) (db.Connection, error) {
+				borrow: func(names []string, cancel context.CancelFunc, _ log.BoltLogger) (idb.Connection, error) {
 					return nil, &db.Neo4jError{Code: "Neo.ClientError.Security.Unauthorized"}
 				},
 			},
@@ -113,7 +114,7 @@ func TestReadTableTable(ot *testing.T) {
 			routers: standardRouters,
 			assert:  assertTable,
 			pool: &poolFake{
-				borrow: func(names []string, cancel context.CancelFunc, _ log.BoltLogger) (db.Connection, error) {
+				borrow: func(names []string, cancel context.CancelFunc, _ log.BoltLogger) (idb.Connection, error) {
 					return &testutil.ConnFake{Table: &db.RoutingTable{}}, nil
 				},
 			},
@@ -124,7 +125,7 @@ func TestReadTableTable(ot *testing.T) {
 			routers: standardRouters,
 			assert:  assertTable,
 			pool: &poolFake{
-				borrow: func(names []string, cancel context.CancelFunc, _ log.BoltLogger) (db.Connection, error) {
+				borrow: func(names []string, cancel context.CancelFunc, _ log.BoltLogger) (idb.Connection, error) {
 					if names[0] == "router2" {
 						return &testutil.ConnFake{Table: &db.RoutingTable{}}, nil
 					}
@@ -139,7 +140,7 @@ func TestReadTableTable(ot *testing.T) {
 			assert:    assertNoTable,
 			assertErr: assertRoutingTableError,
 			pool: &poolFake{
-				borrow: func(names []string, cancel context.CancelFunc, _ log.BoltLogger) (db.Connection, error) {
+				borrow: func(names []string, cancel context.CancelFunc, _ log.BoltLogger) (idb.Connection, error) {
 					return &testutil.ConnFake{Err: errors.New("GetRoutingTable fail")}, nil
 				},
 			},
@@ -149,7 +150,7 @@ func TestReadTableTable(ot *testing.T) {
 			name:    "Cancel context",
 			routers: standardRouters,
 			pool: &poolFake{
-				borrow: func(names []string, cancel context.CancelFunc, _ log.BoltLogger) (db.Connection, error) {
+				borrow: func(names []string, cancel context.CancelFunc, _ log.BoltLogger) (idb.Connection, error) {
 					if names[0] == "router2" {
 						panic("Should not be called")
 					}

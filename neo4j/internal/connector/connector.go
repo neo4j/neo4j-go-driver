@@ -28,8 +28,8 @@ import (
 	"net"
 	"time"
 
-	"github.com/neo4j/neo4j-go-driver/v4/neo4j/db"
 	"github.com/neo4j/neo4j-go-driver/v4/neo4j/internal/bolt"
+	idb "github.com/neo4j/neo4j-go-driver/v4/neo4j/internal/db"
 	"github.com/neo4j/neo4j-go-driver/v4/neo4j/log"
 )
 
@@ -63,7 +63,7 @@ func (e *TlsError) Error() string {
 	return e.inner.Error()
 }
 
-func (c Connector) Connect(address string, boltLogger log.BoltLogger) (db.Connection, error) {
+func (c Connector) Connect(address string, boltLogger log.BoltLogger) (idb.Connection, error) {
 	if c.SupplyConnection == nil {
 		c.SupplyConnection = c.createConnection
 	}
