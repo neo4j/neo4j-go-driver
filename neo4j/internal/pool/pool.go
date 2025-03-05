@@ -31,16 +31,16 @@ import (
 	"sync"
 	"time"
 
-	"github.com/neo4j/neo4j-go-driver/v4/neo4j/db"
+	idb "github.com/neo4j/neo4j-go-driver/v4/neo4j/internal/db"
 	"github.com/neo4j/neo4j-go-driver/v4/neo4j/log"
 )
 
-type Connect func(string, log.BoltLogger) (db.Connection, error)
+type Connect func(string, log.BoltLogger) (idb.Connection, error)
 
 type qitem struct {
 	servers []string
 	wakeup  chan bool
-	conn    db.Connection
+	conn    idb.Connection
 }
 
 type Pool struct {
@@ -89,12 +89,22 @@ func (p *Pool) Close() {
 	p.queueMut.Unlock()
 	// Go through each server and close all connections to it
 	p.serversMut.Lock()
-	for n, s := range p.servers {
-		s.closeAll()
-		delete(p.servers, n)
+	pendingConnections := 0
+	for _, s := range p.servers {
+		s.startClosing()
+		pendingConnections += s.size()
 	}
 	p.serversMut.Unlock()
-	p.log.Infof(log.Pool, p.logId, "Closed")
+	if pendingConnections == 0 {
+		p.log.Infof(log.Pool, p.logId, "Closed")
+	} else {
+		p.log.Warnf(
+			log.Pool,
+			p.logId,
+			"Called close with %d in-flight connections (will be closed when work is done).",
+			pendingConnections,
+		)
+	}
 }
 
 func (p *Pool) anyExistingConnectionsOnServers(serverNames []string) bool {
@@ -145,7 +155,7 @@ func (p *Pool) CleanUp() {
 	}
 }
 
-func (p *Pool) tryBorrow(serverName string, boltLogger log.BoltLogger) (db.Connection, error) {
+func (p *Pool) tryBorrow(serverName string, boltLogger log.BoltLogger) (idb.Connection, error) {
 	// For now, lock complete servers map to avoid over connecting but with the downside
 	// that long connect times will block connects to other servers as well. To fix this
 	// we would need to add a pending connect to the server and lock per server.
@@ -205,7 +215,7 @@ func (p *Pool) getPenaltiesForServers(serverNames []string) []serverPenalty {
 	return penalties
 }
 
-func (p *Pool) tryAnyIdle(serverNames []string) db.Connection {
+func (p *Pool) tryAnyIdle(serverNames []string) idb.Connection {
 	p.serversMut.Lock()
 	defer p.serversMut.Unlock()
 	for _, serverName := range serverNames {
@@ -224,7 +234,7 @@ func (p *Pool) tryAnyIdle(serverNames []string) db.Connection {
 // Borrow tries to borrow an existing database connection or tries to create a new one
 // if none exists. The wait flag indicates if the caller wants to wait for a connection
 // to be returned if there aren't any idle connection available.
-func (p *Pool) Borrow(ctx context.Context, serverNames []string, wait bool, boltLogger log.BoltLogger) (db.Connection, error) {
+func (p *Pool) Borrow(ctx context.Context, serverNames []string, wait bool, boltLogger log.BoltLogger) (idb.Connection, error) {
 	timeOut := func() bool {
 		select {
 		case <-ctx.Done():
@@ -248,7 +258,7 @@ func (p *Pool) Borrow(ctx context.Context, serverNames []string, wait bool, bolt
 	})
 
 	var err error
-	var conn db.Connection
+	var conn idb.Connection
 	for _, s := range penalties {
 		conn, err = p.tryBorrow(s.name, boltLogger)
 		if err == nil {
@@ -313,7 +323,7 @@ func (p *Pool) Borrow(ctx context.Context, serverNames []string, wait bool, bolt
 	}
 }
 
-func (p *Pool) unreg(serverName string, c db.Connection, now time.Time) {
+func (p *Pool) unreg(serverName string, c idb.Connection, now time.Time) {
 	p.serversMut.Lock()
 	defer p.serversMut.Unlock()
 
@@ -345,10 +355,9 @@ func (p *Pool) removeIdleOlderThanOnServer(serverName string, now time.Time, max
 	server.removeIdleOlderThan(now, maxAge)
 }
 
-func (p *Pool) Return(c db.Connection) {
+func (p *Pool) Return(c idb.Connection) {
 	if p.closed {
 		p.log.Warnf(log.Pool, p.logId, "Trying to return connection to closed pool")
-		return
 	}
 
 	c.SetBoltLogger(nil)
@@ -356,7 +365,14 @@ func (p *Pool) Return(c db.Connection) {
 	// Get the name of the server that the connection belongs to.
 	serverName := c.ServerName()
 	isAlive := c.IsAlive()
-	p.log.Debugf(log.Pool, p.logId, "Returning connection to %s {alive:%t}", serverName, isAlive)
+	p.log.Debugf(
+		log.Pool,
+		p.logId,
+		"Returning connection %s to %s {alive:%t}",
+		c.ConnId(),
+		serverName,
+		isAlive,
+	)
 
 	// If the connection is dead, remove all other idle connections on the same server that older
 	// or of the same age as the dead connection, otherwise perform normal cleanup of old connections
@@ -413,6 +429,9 @@ func (p *Pool) Return(c db.Connection) {
 	server := p.servers[serverName]
 	if server != nil { // Strange when server not found
 		server.returnBusy(c)
+		if server.closing && server.size() == 0 {
+			delete(p.servers, serverName)
+		}
 	} else {
 		p.log.Warnf(log.Pool, p.logId, "Server %s not found", serverName)
 	}

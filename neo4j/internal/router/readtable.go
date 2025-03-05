@@ -24,6 +24,7 @@ import (
 	"github.com/neo4j/neo4j-go-driver/v4/neo4j/log"
 
 	"github.com/neo4j/neo4j-go-driver/v4/neo4j/db"
+	idb "github.com/neo4j/neo4j-go-driver/v4/neo4j/internal/db"
 )
 
 // Tries to read routing table from any of the specified routers using new or existing connection
@@ -37,7 +38,7 @@ func readTable(ctx context.Context, pool Pool, routers []string, routerContext m
 	// can't force the pool to not re-use these when putting them back in the pool and retrieving
 	// another db.
 	for _, router := range routers {
-		var conn db.Connection
+		var conn idb.Connection
 		if conn, err = pool.Borrow(ctx, []string{router}, true, boltLogger); err != nil {
 			// Check if failed due to context timing out
 			if ctx.Err() != nil {

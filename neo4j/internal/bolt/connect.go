@@ -26,7 +26,7 @@ import (
 	"io"
 	"net"
 
-	"github.com/neo4j/neo4j-go-driver/v4/neo4j/db"
+	idb "github.com/neo4j/neo4j-go-driver/v4/neo4j/internal/db"
 	"github.com/neo4j/neo4j-go-driver/v4/neo4j/log"
 )
 
@@ -46,7 +46,7 @@ var versions = [4]protocolVersion{
 
 // Connect initiates the negotiation of the Bolt protocol version.
 // Returns the instance of bolt protocol implementing the low-level Connection interface.
-func Connect(serverName string, conn net.Conn, auth map[string]interface{}, userAgent string, routingContext map[string]string, logger log.Logger, boltLog log.BoltLogger) (db.Connection, error) {
+func Connect(serverName string, conn net.Conn, auth map[string]interface{}, userAgent string, routingContext map[string]string, logger log.Logger, boltLog log.BoltLogger) (idb.Connection, error) {
 	// Perform Bolt handshake to negotiate version
 	// Send handshake to server
 	handshake := []byte{

@@ -24,6 +24,7 @@ import (
 	"time"
 
 	"github.com/neo4j/neo4j-go-driver/v4/neo4j/db"
+	idb "github.com/neo4j/neo4j-go-driver/v4/neo4j/internal/db"
 	"github.com/neo4j/neo4j-go-driver/v4/neo4j/internal/retry"
 	"github.com/neo4j/neo4j-go-driver/v4/neo4j/log"
 )
@@ -104,8 +105,8 @@ const FetchDefault = 0
 
 // Connection pool as seen by the session.
 type sessionPool interface {
-	Borrow(ctx context.Context, serverNames []string, wait bool, boltLogger log.BoltLogger) (db.Connection, error)
-	Return(c db.Connection)
+	Borrow(ctx context.Context, serverNames []string, wait bool, boltLogger log.BoltLogger) (idb.Connection, error)
+	Return(c idb.Connection)
 	CleanUp()
 }
 
@@ -364,7 +365,7 @@ func (s *session) getServers(ctx context.Context, mode db.AccessMode) ([]string,
 	}
 }
 
-func (s *session) getConnection(mode db.AccessMode) (db.Connection, error) {
+func (s *session) getConnection(mode db.AccessMode) (idb.Connection, error) {
 	var ctx context.Context
 	if s.config.ConnectionAcquisitionTimeout > 0 {
 		var cancel context.CancelFunc
@@ -438,7 +439,7 @@ func (s *session) Run(
 	}
 
 	var (
-		conn db.Connection
+		conn idb.Connection
 		err  error
 	)
 	for {

@@ -26,6 +26,7 @@ import (
 	"time"
 
 	"github.com/neo4j/neo4j-go-driver/v4/neo4j/db"
+	idb "github.com/neo4j/neo4j-go-driver/v4/neo4j/internal/db"
 	"github.com/neo4j/neo4j-go-driver/v4/neo4j/log"
 )
 
@@ -52,8 +53,8 @@ type Router struct {
 }
 
 type Pool interface {
-	Borrow(ctx context.Context, servers []string, wait bool, boltLogger log.BoltLogger) (db.Connection, error)
-	Return(c db.Connection)
+	Borrow(ctx context.Context, servers []string, wait bool, boltLogger log.BoltLogger) (idb.Connection, error)
+	Return(c idb.Connection)
 }
 
 func New(rootRouter string, getRouters func() []string, routerContext map[string]string, pool Pool, logger log.Logger, logId string) *Router {

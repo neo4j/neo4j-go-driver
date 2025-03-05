@@ -74,6 +74,10 @@ func (c *ConnFake) ServerName() string {
 	return c.Name
 }
 
+func (c *ConnFake) ConnId() string {
+	return "bolt-1"
+}
+
 func (c *ConnFake) IsAlive() bool {
 	return c.Alive
 }

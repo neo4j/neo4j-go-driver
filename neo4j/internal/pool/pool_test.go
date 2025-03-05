@@ -27,7 +27,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/neo4j/neo4j-go-driver/v4/neo4j/db"
+	idb "github.com/neo4j/neo4j-go-driver/v4/neo4j/internal/db"
 	"github.com/neo4j/neo4j-go-driver/v4/neo4j/internal/testutil"
 	"github.com/neo4j/neo4j-go-driver/v4/neo4j/log"
 )
@@ -39,12 +39,12 @@ func TestPoolBorrowReturn(ot *testing.T) {
 	maxAge := 1 * time.Second
 	birthdate := time.Now()
 
-	succeedingConnect := func(s string, _ log.BoltLogger) (db.Connection, error) {
+	succeedingConnect := func(s string, _ log.BoltLogger) (idb.Connection, error) {
 		return &testutil.ConnFake{Name: s, Alive: true, Birth: birthdate}, nil
 	}
 
 	failingError := errors.New("whatever")
-	failingConnect := func(s string, _ log.BoltLogger) (db.Connection, error) {
+	failingConnect := func(s string, _ log.BoltLogger) (idb.Connection, error) {
 		return nil, failingError
 	}
 
@@ -198,7 +198,7 @@ func TestPoolResourceUsage(ot *testing.T) {
 	maxAge := 1 * time.Second
 	birthdate := time.Now()
 
-	succeedingConnect := func(s string, _ log.BoltLogger) (db.Connection, error) {
+	succeedingConnect := func(s string, _ log.BoltLogger) (idb.Connection, error) {
 		return &testutil.ConnFake{Name: s, Alive: true, Birth: birthdate}, nil
 	}
 
@@ -305,12 +305,12 @@ func TestPoolResourceUsage(ot *testing.T) {
 func TestPoolCleanup(ot *testing.T) {
 	birthdate := time.Now()
 	maxLife := 1 * time.Second
-	succeedingConnect := func(s string, _ log.BoltLogger) (db.Connection, error) {
+	succeedingConnect := func(s string, _ log.BoltLogger) (idb.Connection, error) {
 		return &testutil.ConnFake{Name: s, Alive: true, Birth: birthdate}, nil
 	}
 
 	// Borrows a connection in server A and another in server B
-	borrowConnections := func(t *testing.T, p *Pool) (db.Connection, db.Connection) {
+	borrowConnections := func(t *testing.T, p *Pool) (idb.Connection, idb.Connection) {
 		c1, err := p.Borrow(context.Background(), []string{"A"}, true, nil)
 		assertConnection(t, c1, err)
 		c2, err := p.Borrow(context.Background(), []string{"B"}, true, nil)
@@ -352,7 +352,7 @@ func TestPoolCleanup(ot *testing.T) {
 	})
 
 	ot.Run("Should not remove servers with only idle connections but with recent connect failures ", func(t *testing.T) {
-		failingConnect := func(s string, _ log.BoltLogger) (db.Connection, error) {
+		failingConnect := func(s string, _ log.BoltLogger) (idb.Connection, error) {
 			return nil, errors.New("an error")
 		}
 		p := New(0, maxLife, failingConnect, logger, "poolid")

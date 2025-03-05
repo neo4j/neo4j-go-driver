@@ -29,6 +29,7 @@ import (
 	"time"
 
 	"github.com/neo4j/neo4j-go-driver/v4/neo4j/db"
+	idb "github.com/neo4j/neo4j-go-driver/v4/neo4j/internal/db"
 	"github.com/neo4j/neo4j-go-driver/v4/neo4j/internal/testutil"
 	"github.com/neo4j/neo4j-go-driver/v4/neo4j/log"
 )
@@ -44,7 +45,7 @@ func TestMultithreading(t *testing.T) {
 	num := 0
 	table := &db.RoutingTable{Readers: []string{"rd1", "rd2"}, Writers: []string{"wr"}, TimeToLive: 1}
 	pool := &poolFake{
-		borrow: func(names []string, cancel context.CancelFunc, _ log.BoltLogger) (db.Connection, error) {
+		borrow: func(names []string, cancel context.CancelFunc, _ log.BoltLogger) (idb.Connection, error) {
 			num++
 			return &testutil.ConnFake{Table: table}, nil
 		},
@@ -100,7 +101,7 @@ func TestRespectsTimeToLiveAndInvalidate(t *testing.T) {
 	numfetch := 0
 	table := &db.RoutingTable{TimeToLive: 1, Readers: []string{"router1"}}
 	pool := &poolFake{
-		borrow: func(names []string, cancel context.CancelFunc, _ log.BoltLogger) (db.Connection, error) {
+		borrow: func(names []string, cancel context.CancelFunc, _ log.BoltLogger) (idb.Connection, error) {
 			numfetch++
 			return &testutil.ConnFake{Table: table}, nil
 		},
@@ -146,7 +147,7 @@ func TestUsesRootRouterWhenPreviousRoutersFails(t *testing.T) {
 	}}
 	var err error
 	pool := &poolFake{
-		borrow: func(names []string, cancel context.CancelFunc, _ log.BoltLogger) (db.Connection, error) {
+		borrow: func(names []string, cancel context.CancelFunc, _ log.BoltLogger) (idb.Connection, error) {
 			borrows = append(borrows, names)
 			return conn, err
 		},
@@ -174,7 +175,7 @@ func TestUsesRootRouterWhenPreviousRoutersFails(t *testing.T) {
 	// rootRouter
 	requestedOther := false
 	requestedRoot := false
-	pool.borrow = func(names []string, cancel context.CancelFunc, _ log.BoltLogger) (db.Connection, error) {
+	pool.borrow = func(names []string, cancel context.CancelFunc, _ log.BoltLogger) (idb.Connection, error) {
 		if !requestedOther {
 			if names[0] != "otherRouter" {
 				t.Errorf("Expected request for otherRouter")
@@ -208,7 +209,7 @@ func TestUsesRootRouterWhenPreviousRoutersFails(t *testing.T) {
 func TestUseGetRoutersHookWhenInitialRouterFails(t *testing.T) {
 	tried := []string{}
 	pool := &poolFake{
-		borrow: func(names []string, cancel context.CancelFunc, _ log.BoltLogger) (db.Connection, error) {
+		borrow: func(names []string, cancel context.CancelFunc, _ log.BoltLogger) (idb.Connection, error) {
 			tried = append(tried, names...)
 			return nil, errors.New("fail")
 		},
@@ -233,7 +234,7 @@ func TestWritersFailAfterNRetries(t *testing.T) {
 	numfetch := 0
 	tableNoWriters := &db.RoutingTable{TimeToLive: 1, Routers: []string{"rt1", "rt2"}, Readers: []string{"rd1"}}
 	pool := &poolFake{
-		borrow: func(names []string, cancel context.CancelFunc, _ log.BoltLogger) (db.Connection, error) {
+		borrow: func(names []string, cancel context.CancelFunc, _ log.BoltLogger) (idb.Connection, error) {
 			// Return no writers first time and writers the second time
 			numfetch++
 			return &testutil.ConnFake{Table: tableNoWriters}, nil
@@ -267,7 +268,7 @@ func TestWritersRetriesWhenNoWriters(t *testing.T) {
 	tableNoWriters := &db.RoutingTable{TimeToLive: 1, Routers: []string{"rt1", "rt2"}, Readers: []string{"rd1"}}
 	tableWriters := &db.RoutingTable{TimeToLive: 1, Routers: []string{"rt1", "rt2"}, Readers: []string{"rd1"}, Writers: []string{"wr1"}}
 	pool := &poolFake{
-		borrow: func(names []string, cancel context.CancelFunc, _ log.BoltLogger) (db.Connection, error) {
+		borrow: func(names []string, cancel context.CancelFunc, _ log.BoltLogger) (idb.Connection, error) {
 			// Return no writers first time and writers the second time
 			numfetch++
 			if numfetch == 1 {
@@ -305,7 +306,7 @@ func TestReadersRetriesWhenNoReaders(t *testing.T) {
 	tableNoReaders := &db.RoutingTable{TimeToLive: 1, Routers: []string{"rt1", "rt2"}, Writers: []string{"wd1"}}
 	tableReaders := &db.RoutingTable{TimeToLive: 1, Routers: []string{"rt1", "rt2"}, Writers: []string{"wd1"}, Readers: []string{"wr1"}}
 	pool := &poolFake{
-		borrow: func(names []string, cancel context.CancelFunc, _ log.BoltLogger) (db.Connection, error) {
+		borrow: func(names []string, cancel context.CancelFunc, _ log.BoltLogger) (idb.Connection, error) {
 			// Return no readers first time and readers the second time
 			numfetch++
 			if numfetch == 1 {
@@ -343,7 +344,7 @@ func TestReadersRetriesWhenNoReaders(t *testing.T) {
 func TestCleanUp(t *testing.T) {
 	table := &db.RoutingTable{TimeToLive: 1, Readers: []string{"router1"}}
 	pool := &poolFake{
-		borrow: func(names []string, cancel context.CancelFunc, _ log.BoltLogger) (db.Connection, error) {
+		borrow: func(names []string, cancel context.CancelFunc, _ log.BoltLogger) (idb.Connection, error) {
 			return &testutil.ConnFake{Table: table}, nil
 		},
 	}
