@@ -1,4 +1,4 @@
-//go:build !internal_neo4j_testkit_gql_error
+//go:build !internal_neo4j_testkit_mtls
 
 /*
  * Copyright (c) "Neo4j"
@@ -19,23 +19,16 @@
 
 package main
 
-import (
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
-)
-
-const extrasNameGqlError = "gqlError"
+const extrasNameMTLS = "mTLS"
 
 func init() {
 	registerExtra(
-		extrasNameGqlError,
+		extrasNameMTLS,
 		ExtraRegisterEntry{
 			extraBlockedTestKitFeatures: []string{
-				"Feature:Bolt:5.7",
+				"Feature:API:SSLClientCertificate",
 			},
 		},
 	)
-}
 
-func extrasGqlErrorFromNeo4jError(neo4jError *neo4j.Neo4jError) extrasGqlErrorInfo {
-	return extrasGqlErrorInfo{}
 }

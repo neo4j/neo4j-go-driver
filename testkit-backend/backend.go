@@ -20,7 +20,6 @@ package main
 import (
 	"bufio"
 	"context"
-	"crypto/tls"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -62,8 +61,6 @@ type backend struct {
 	suppliedBookmarks               map[string]neo4j.Bookmarks
 	consumedBookmarks               map[string]struct{}
 	bookmarkManagers                map[string]neo4j.BookmarkManager
-	clientCertificateProviders      map[string]auth.ClientCertificateProvider
-	resolvedClientCertificates      map[string]auth.ClientCertificate
 	closed                          bool
 	extrasData                      map[string]any
 }
@@ -99,38 +96,6 @@ func (g GenericTokenManager) HandleSecurityException(_ context.Context, token ne
 	return handled, nil
 }
 
-type TestKitClientCertificateProvider struct {
-	id      string
-	backend *backend
-}
-
-func NewTestKitClientCertificateProvider(id string, backend *backend) *TestKitClientCertificateProvider {
-	return &TestKitClientCertificateProvider{
-		id:      id,
-		backend: backend,
-	}
-}
-
-func (p TestKitClientCertificateProvider) GetCertificate() *tls.Certificate {
-	requestId := p.backend.nextId()
-	p.backend.writeResponse("ClientCertificateProviderRequest", map[string]any{
-		"id":                          requestId,
-		"clientCertificateProviderId": p.id,
-	})
-	for {
-		p.backend.process()
-		if clientCertificate, ok := p.backend.resolvedClientCertificates[requestId]; ok {
-			delete(p.backend.resolvedClientCertificates, requestId)
-
-			provider, err := auth.NewStaticClientCertificateProvider(clientCertificate)
-			if err != nil {
-				panic(fmt.Sprintf("Unable to create provider for client certificate: %v : %s", clientCertificate, err))
-			}
-			return provider.GetCertificate()
-		}
-	}
-}
-
 const (
 	retryableNothing  = 0
 	retryablePositive = 1
@@ -159,8 +124,6 @@ func newBackend(rd *bufio.Reader, wr io.Writer) *backend {
 		bookmarkManagers:                make(map[string]neo4j.BookmarkManager),
 		suppliedBookmarks:               make(map[string]neo4j.Bookmarks),
 		consumedBookmarks:               make(map[string]struct{}),
-		clientCertificateProviders:      make(map[string]auth.ClientCertificateProvider),
-		resolvedClientCertificates:      make(map[string]auth.ClientCertificate),
 		closed:                          false,
 		extrasData:                      newBackendExtraData(),
 	}
@@ -223,10 +186,10 @@ func (b *backend) writeError(err error) {
 
 	if isDriverError {
 		var msg, errorType string
-		var gqlErrorInfo extraGqlErrorInfo
+		var gqlErrorInfo extrasGqlErrorInfo
 		if neo4jError, ok := err.(*neo4j.Neo4jError); ok {
 			msg = neo4jError.Msg
-			gqlErrorInfo = extraGqlErrorFromNeo4jError(neo4jError)
+			gqlErrorInfo = extrasGqlErrorFromNeo4jError(neo4jError)
 			errorType = "Neo4jError"
 		} else {
 			msg = err.Error()
@@ -399,15 +362,6 @@ func (b *backend) toParams(parameters map[string]any) (map[string]any, error) {
 		result[name] = param
 	}
 	return result, nil
-}
-
-func (b *backend) toClientCertificate(data map[string]any) auth.ClientCertificate {
-	clientCertificateData := data["clientCertificate"].(map[string]any)["data"].(map[string]any)
-	return auth.ClientCertificate{
-		CertFile: clientCertificateData["certfile"].(string),
-		KeyFile:  clientCertificateData["keyfile"].(string),
-		Password: b.toStringPointer(clientCertificateData["password"]),
-	}
 }
 
 func (b *backend) toStringPointer(v any) *string {
@@ -608,22 +562,6 @@ func (b *backend) handleRequest(req map[string]any) {
 				c.TelemetryDisabled = data["telemetryDisabled"].(bool)
 			}
 
-			clientCertificateProviderId := data["clientCertificateProviderId"]
-			if clientCertificateProviderId != nil {
-				provider := b.clientCertificateProviders[clientCertificateProviderId.(string)]
-				c.ClientCertificateProvider = provider
-			} else {
-				if data["clientCertificate"] != nil {
-					clientCertificate := b.toClientCertificate(data)
-					provider, err := auth.NewStaticClientCertificateProvider(clientCertificate)
-					if err != nil {
-						b.writeError(err)
-						return
-					}
-					c.ClientCertificateProvider = provider
-				}
-			}
-
 			for _, driverConfig := range extraDriverConfigs {
 				err = driverConfig(b, data, c)
 				if err != nil {
@@ -648,25 +586,6 @@ func (b *backend) handleRequest(req map[string]any) {
 		idKey := b.nextId()
 		b.drivers[idKey] = driver
 		b.writeResponse("Driver", map[string]any{"id": idKey})
-
-	case "NewClientCertificateProvider":
-		provider := NewTestKitClientCertificateProvider(b.nextId(), b)
-		b.clientCertificateProviders[provider.id] = TestKitClientCertificateProvider{id: provider.id, backend: b}
-		b.writeResponse("ClientCertificateProvider", map[string]any{"id": provider.id})
-
-	case "ClientCertificateProviderClose":
-		providerId := data["id"].(string)
-		delete(b.clientCertificateProviders, providerId)
-		b.writeResponse("ClientCertificateProvider", map[string]any{"id": providerId})
-
-	case "ClientCertificateProviderCompleted":
-		requestId := data["requestId"].(string)
-		if data["clientCertificate"] != nil {
-			clientCertificate := b.toClientCertificate(data)
-			b.resolvedClientCertificates[requestId] = clientCertificate
-		} else {
-			b.resolvedClientCertificates[requestId] = auth.ClientCertificate{}
-		}
 
 	case "DriverClose":
 		driverId := data["driverId"].(string)

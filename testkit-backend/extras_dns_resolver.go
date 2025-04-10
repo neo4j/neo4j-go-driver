@@ -26,11 +26,11 @@ import (
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
 )
 
-const extraNameDns = "dns"
+const extrasNameDns = "dns"
 
 func init() {
 	registerExtra(
-		extraNameDns,
+		extrasNameDns,
 		ExtraRegisterEntry{
 			newBackendExtraData: func() any {
 				return make(map[string][]any)
@@ -44,7 +44,7 @@ func init() {
 }
 
 func extrasDnsGetBackendExtraData(backend *backend) map[string][]any {
-	return getBackendExtraData(backend, extraNameDns).(map[string][]any)
+	return getBackendExtraData(backend, extrasNameDns).(map[string][]any)
 }
 
 func domainNameResolutionCompletedHandler(backend *backend, data map[string]any) {

@@ -24,18 +24,18 @@ import (
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/db"
 )
 
-func extraGqlErrorFromNeo4jError(neo4jError *neo4j.Neo4jError) extraGqlErrorInfo {
-	return extraGqlErrorInfo{
+func extrasGqlErrorFromNeo4jError(neo4jError *neo4j.Neo4jError) extrasGqlErrorInfo {
+	return extrasGqlErrorInfo{
 		gqlStatus:            neo4jError.GqlStatus,
 		gqlStatusDescription: neo4jError.GqlStatusDescription,
 		gqlClassification:    string(neo4jError.GqlClassification),
 		gqlRawClassification: neo4jError.GqlRawClassification,
 		gqlDiagnosticRecord:  serializeParameters(neo4jError.GqlDiagnosticRecord),
-		cause:                extraGqlErrorSerializeGqlErrorCause(neo4jError.GqlCause),
+		cause:                extrasGqlErrorSerializeGqlErrorCause(neo4jError.GqlCause),
 	}
 }
 
-func extraGqlErrorSerializeGqlErrorCause(cause *db.Neo4jError) map[string]any {
+func extrasGqlErrorSerializeGqlErrorCause(cause *db.Neo4jError) map[string]any {
 	if cause == nil {
 		return nil
 	}
@@ -46,6 +46,6 @@ func extraGqlErrorSerializeGqlErrorCause(cause *db.Neo4jError) map[string]any {
 		"classification":    string(cause.GqlClassification),
 		"rawClassification": emptyStringToNil(cause.GqlRawClassification),
 		"diagnosticRecord":  serializeParameters(cause.GqlDiagnosticRecord),
-		"cause":             extraGqlErrorSerializeGqlErrorCause(cause.GqlCause),
+		"cause":             extrasGqlErrorSerializeGqlErrorCause(cause.GqlCause),
 	}}
 }

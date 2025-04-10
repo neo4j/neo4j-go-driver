@@ -39,4 +39,8 @@ if vergte "$version" "5.23.0"; then
 	tags="$tags,internal_neo4j_testkit_gql_status"
 fi
 
+if vergte "$version" "5.19.0"; then
+	tags="$tags,internal_neo4j_testkit_mtls"
+fi
+
 echo $tags

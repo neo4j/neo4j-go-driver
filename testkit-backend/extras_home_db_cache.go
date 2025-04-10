@@ -19,13 +19,14 @@
 
 package main
 
-const extraNameHomeDbCache = "homeDbCache"
+const extrasNameHomeDbCache = "homeDbCache"
 
 func init() {
 	registerExtra(
-		extraNameHomeDbCache,
+		extrasNameHomeDbCache,
 		ExtraRegisterEntry{
 			extraBlockedTestKitFeatures: []string{
+				"Feature:Bolt:HandshakeManifestV1",
 				"Feature:Bolt:5.8",
 				"Optimization:HomeDatabaseCache",
 				"Optimization:HomeDbCacheBasicPrincipalIsImpersonatedUser",

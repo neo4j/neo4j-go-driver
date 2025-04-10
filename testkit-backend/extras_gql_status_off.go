@@ -21,11 +21,11 @@ package main
 
 import "github.com/neo4j/neo4j-go-driver/v5/neo4j"
 
-const extraNameGqlStatus = "gqlStatus"
+const extrasNameGqlStatus = "gqlStatus"
 
 func init() {
 	registerExtra(
-		extraNameGqlStatus,
+		extrasNameGqlStatus,
 		ExtraRegisterEntry{
 			extraBlockedTestKitFeatures: []string{
 				"Feature:Bolt:5.5",

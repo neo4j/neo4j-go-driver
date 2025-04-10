@@ -17,7 +17,7 @@
 
 package main
 
-type extraGqlErrorInfo struct {
+type extrasGqlErrorInfo struct {
 	gqlStatus            string
 	gqlStatusDescription string
 	gqlClassification    string
