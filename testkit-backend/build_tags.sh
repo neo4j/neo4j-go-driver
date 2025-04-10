@@ -31,4 +31,8 @@ if vergte "$version" "5.28.0"; then
 	tags="$tags,internal_neo4j_testkit_dns_resolver,internal_neo4j_testkit_home_db_cache"
 fi
 
+if vergte "$version" "5.26.0"; then
+	tags="$tags,internal_neo4j_testkit_gql_error"
+fi
+
 echo $tags

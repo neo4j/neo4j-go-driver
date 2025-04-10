@@ -222,18 +222,12 @@ func (b *backend) writeError(err error) {
 		neo4j.IsTransactionExecutionLimit(err)
 
 	if isDriverError {
-		var msg, errorType, gqlStatus, gqlStatusDescription, gqlClassification, gqlRawClassification string
-		var gqlDiagnosticRecord map[string]any
-		var cause *db.Neo4jError
+		var msg, errorType string
+		var gqlErrorInfo extraGqlErrorInfo
 		if neo4jError, ok := err.(*neo4j.Neo4jError); ok {
 			msg = neo4jError.Msg
-			gqlStatus = neo4jError.GqlStatus
-			gqlStatusDescription = neo4jError.GqlStatusDescription
-			gqlClassification = string(neo4jError.GqlClassification)
-			gqlRawClassification = neo4jError.GqlRawClassification
-			gqlDiagnosticRecord = serializeParameters(neo4jError.GqlDiagnosticRecord)
+			gqlErrorInfo = extraGqlErrorFromNeo4jError(neo4jError)
 			errorType = "Neo4jError"
-			cause = neo4jError.GqlCause
 		} else {
 			msg = err.Error()
 			errorType = strings.Split(err.Error(), ":")[0]
@@ -245,12 +239,12 @@ func (b *backend) writeError(err error) {
 			"errorType":         errorType,
 			"msg":               msg,
 			"code":              code,
-			"gqlStatus":         gqlStatus,
-			"statusDescription": gqlStatusDescription,
-			"classification":    gqlClassification,
-			"rawClassification": emptyStringToNil(gqlRawClassification),
-			"diagnosticRecord":  gqlDiagnosticRecord,
-			"cause":             b.serializeGqlErrorCause(cause),
+			"gqlStatus":         gqlErrorInfo.gqlStatus,
+			"statusDescription": gqlErrorInfo.gqlStatusDescription,
+			"classification":    gqlErrorInfo.gqlClassification,
+			"rawClassification": gqlErrorInfo.gqlRawClassification,
+			"diagnosticRecord":  gqlErrorInfo.gqlDiagnosticRecord,
+			"cause":             gqlErrorInfo.cause,
 			"retryable":         retriable,
 		})
 		return
@@ -270,21 +264,6 @@ func (b *backend) writeError(err error) {
 	// This simplifies debugging errors from the frontend perspective, it will also make sure
 	// that the frontend doesn't hang when backend suddenly disappears.
 	b.writeResponse("BackendError", map[string]any{"msg": err.Error()})
-}
-
-func (b *backend) serializeGqlErrorCause(cause *db.Neo4jError) map[string]any {
-	if cause == nil {
-		return nil
-	}
-	return map[string]any{"name": "GqlError", "data": map[string]any{
-		"msg":               cause.Msg,
-		"gqlStatus":         cause.GqlStatus,
-		"statusDescription": cause.GqlStatusDescription,
-		"classification":    string(cause.GqlClassification),
-		"rawClassification": emptyStringToNil(cause.GqlRawClassification),
-		"diagnosticRecord":  serializeParameters(cause.GqlDiagnosticRecord),
-		"cause":             b.serializeGqlErrorCause(cause.GqlCause),
-	}}
 }
 
 func (b *backend) nextId() string {
