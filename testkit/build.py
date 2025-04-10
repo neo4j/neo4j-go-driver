@@ -6,6 +6,7 @@ Responsible for building driver and test backend.
 import os
 
 from common import (
+    ALL_BUILD_TAGS,
     get_go_min_bin,
     run_go,
     run_go_bin,
@@ -20,11 +21,7 @@ if __name__ == "__main__":
 
     print("Building for current target", flush=True)
     run_go(
-        [
-            "build", "-tags",
-            "internal_neo4j_go_driver_testkit,internal_neo4j_go_driver_time_mock",
-            "-v", "./..."
-        ],
+        ["build", "-tags", ALL_BUILD_TAGS, "-v", "./..."],
         go_bin=go_bin,
         env=defaultEnv
     )
@@ -39,11 +36,7 @@ if __name__ == "__main__":
 
     print("Vet sources", flush=True)
     run_go(
-        [
-            "vet", "-tags",
-            "internal_neo4j_go_driver_testkit,internal_neo4j_go_driver_time_mock",
-            "./..."
-        ],
+        ["vet", "-tags", ALL_BUILD_TAGS, "./..."],
         go_bin=go_bin,
         env=defaultEnv
     )
@@ -58,11 +51,7 @@ if __name__ == "__main__":
     print("Run staticcheck", flush=True)
     run_go_bin(
         "staticcheck",
-        [
-            "-tags",
-            "internal_neo4j_go_driver_testkit,internal_neo4j_go_driver_time_mock",
-            "./...",
-        ],
+        ["-tags", ALL_BUILD_TAGS, "./..."],
         go_bin=go_bin,
         env=defaultEnv
     )
