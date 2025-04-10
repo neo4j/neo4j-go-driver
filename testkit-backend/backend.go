@@ -24,12 +24,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/config"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/log"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/notifications"
 	"io"
 	"math"
-	"net"
 	"net/url"
 	"regexp"
 	"strings"
@@ -38,7 +34,10 @@ import (
 
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/auth"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/config"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/db"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/log"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/notifications"
 )
 
 // Handles a testkit backend session.
@@ -53,7 +52,6 @@ type backend struct {
 	explicitTransactions            map[string]neo4j.ExplicitTransaction
 	recordedErrors                  map[string]error
 	resolvedAddresses               map[string][]any
-	dnsResolutions                  map[string][]any
 	authTokenManagers               map[string]auth.TokenManager
 	resolvedGetAuthTokens           map[string]neo4j.AuthToken
 	resolvedHandleSecurityException map[string]bool
@@ -67,6 +65,7 @@ type backend struct {
 	clientCertificateProviders      map[string]auth.ClientCertificateProvider
 	resolvedClientCertificates      map[string]auth.ClientCertificate
 	closed                          bool
+	extrasData                      map[string]any
 }
 
 // To implement transactional functions a bit of extra state is needed on the
@@ -151,7 +150,6 @@ func newBackend(rd *bufio.Reader, wr io.Writer) *backend {
 		explicitTransactions:            make(map[string]neo4j.ExplicitTransaction),
 		recordedErrors:                  make(map[string]error),
 		resolvedAddresses:               make(map[string][]any),
-		dnsResolutions:                  make(map[string][]any),
 		authTokenManagers:               make(map[string]auth.TokenManager),
 		resolvedGetAuthTokens:           make(map[string]neo4j.AuthToken),
 		resolvedHandleSecurityException: make(map[string]bool),
@@ -164,6 +162,7 @@ func newBackend(rd *bufio.Reader, wr io.Writer) *backend {
 		clientCertificateProviders:      make(map[string]auth.ClientCertificateProvider),
 		resolvedClientCertificates:      make(map[string]auth.ClientCertificate),
 		closed:                          false,
+		extrasData:                      newBackendExtraData(),
 	}
 }
 
@@ -506,34 +505,6 @@ func (b *backend) customAddressResolverFunction() config.ServerAddressResolver {
 	}
 }
 
-func (b *backend) dnsResolverFunction() func(address string) []string {
-	return func(address string) []string {
-		id := b.nextId()
-		host, port, err := net.SplitHostPort(address)
-		if err != nil {
-			b.writeError(fmt.Errorf(
-				"couldn't parse address for custom DNS resulution (probably a bug in backend): %w", err,
-			))
-			return nil
-		}
-		b.writeResponse("DomainNameResolutionRequired", map[string]string{
-			"id":   id,
-			"name": host,
-		})
-		for b.process() {
-			if addresses, ok := b.dnsResolutions[id]; ok {
-				delete(b.dnsResolutions, id)
-				result := make([]string, len(addresses))
-				for i, address := range addresses {
-					result[i] = fmt.Sprintf("%s:%s", address, port)
-				}
-				return result
-			}
-		}
-		return nil
-	}
-}
-
 type serverAddress struct {
 	hostname string
 	port     string
@@ -570,11 +541,6 @@ func (b *backend) handleRequest(req map[string]any) {
 
 	fmt.Printf("REQ: %s %s\n", name, dataJson)
 	switch name {
-
-	case "DomainNameResolutionCompleted":
-		requestId := data["requestId"].(string)
-		addresses := data["addresses"].([]any)
-		b.dnsResolutions[requestId] = addresses
 
 	case "ResolverResolutionCompleted":
 		requestId := data["requestId"].(string)
@@ -678,14 +644,26 @@ func (b *backend) handleRequest(req map[string]any) {
 					c.ClientCertificateProvider = provider
 				}
 			}
+
+			for _, driverConfig := range extraDriverConfigs {
+				err = driverConfig(b, data, c)
+				if err != nil {
+					b.writeError(err)
+					return
+				}
+			}
 		})
 		if err != nil {
 			b.writeError(err)
 			return
 		}
 
-		if data["domainNameResolverRegistered"] != nil && data["domainNameResolverRegistered"].(bool) {
-			neo4j.RegisterDnsResolver(driver, b.dnsResolverFunction())
+		for _, handler := range extraNewDriverHandlers {
+			err = handler(b, driver, data)
+			if err != nil {
+				b.writeError(err)
+				return
+			}
 		}
 
 		idKey := b.nextId()
@@ -1309,87 +1287,89 @@ func (b *backend) handleRequest(req map[string]any) {
 		b.writeResponse("AuthTokenManager", map[string]any{"id": id})
 
 	case "GetFeatures":
+		features := []string{
+			// === FUNCTIONAL FEATURES ===
+			"Feature:API:BookmarkManager",
+			"Feature:API:ConnectionAcquisitionTimeout",
+			"Feature:API:Driver.ExecuteQuery",
+			"Feature:API:Driver.ExecuteQuery:WithAuth",
+			"Feature:API:Driver:GetServerInfo",
+			"Feature:API:Driver.IsEncrypted",
+			"Feature:API:Driver:MaxConnectionLifetime",
+			"Feature:API:Driver:NotificationsConfig",
+			"Feature:API:Driver.VerifyAuthentication",
+			"Feature:API:Driver.VerifyConnectivity",
+			//"Feature:API:Driver.SupportsSessionAuth",
+			"Feature:API:Liveness.Check",
+			"Feature:API:Result.List",
+			"Feature:API:Result.Peek",
+			//"Feature:API:Result.Single",
+			//"Feature:API:Result.SingleOptional",
+			"Feature:API:RetryableExceptions",
+			"Feature:API:Session:AuthConfig",
+			"Feature:API:Session:NotificationsConfig",
+			"Feature:API:SSLClientCertificate",
+			//"Feature:API:SSLConfig",
+			//"Feature:API:SSLSchemes",
+			"Feature:API:Summary:GqlStatusObjects",
+			"Feature:API:Type.Spatial",
+			"Feature:API:Type.Temporal",
+			"Feature:Auth:Bearer",
+			"Feature:Auth:Custom",
+			"Feature:Auth:Kerberos",
+			"Feature:Auth:Managed",
+			"Feature:Bolt:3.0",
+			"Feature:Bolt:4.2",
+			"Feature:Bolt:4.3",
+			"Feature:Bolt:4.4",
+			"Feature:Bolt:5.0",
+			"Feature:Bolt:5.1",
+			"Feature:Bolt:5.2",
+			"Feature:Bolt:5.3",
+			"Feature:Bolt:5.4",
+			"Feature:Bolt:5.5",
+			"Feature:Bolt:5.6",
+			"Feature:Bolt:5.7",
+			"Feature:Bolt:5.8",
+			//"Feature:Bolt:HandshakeManifestV1",
+			"Feature:Bolt:Patch:UTC",
+			"Feature:Bolt:HandshakeManifestV1",
+			"Feature:Impersonation",
+			//"Feature:TLS:1.1",
+			"Feature:TLS:1.2",
+			"Feature:TLS:1.3",
+
+			// === OPTIMIZATIONS ===
+			"AuthorizationExpiredTreatment",
+			"Optimization:AuthPipelining",
+			"Optimization:ConnectionReuse",
+			"Optimization:EagerTransactionBegin",
+			"Optimization:ExecuteQueryPipelining",
+			"Optimization:HomeDatabaseCache",
+			"Optimization:HomeDbCacheBasicPrincipalIsImpersonatedUser",
+			"Optimization:ImplicitDefaultArguments",
+			"Optimization:MinimalBookmarksSet",
+			"Optimization:MinimalResets",
+			//"Optimization:MinimalVerifyAuthentication",
+			"Optimization:PullPipelining",
+			//"Optimization:ResultListFetchAll",
+
+			// === IMPLEMENTATION DETAILS ===
+			"Detail:ClosedDriverIsEncrypted",
+			"Detail:DefaultSecurityConfigValueEquality",
+			//"Detail:NumberIsNumber",
+
+			// === CONFIGURATION HINTS (BOLT 4.3+) ===
+			"ConfHint:connection.recv_timeout_seconds",
+
+			// === BACKEND FEATURES FOR TESTING ===
+			"Backend:MockTime",
+			"Backend:RTFetch",
+			"Backend:RTForceUpdate",
+		}
+		features = append(features, extraTestKitFeatures...)
 		b.writeResponse("FeatureList", map[string]any{
-			"features": []string{
-				// === FUNCTIONAL FEATURES ===
-				"Feature:API:BookmarkManager",
-				"Feature:API:ConnectionAcquisitionTimeout",
-				"Feature:API:Driver.ExecuteQuery",
-				"Feature:API:Driver.ExecuteQuery:WithAuth",
-				"Feature:API:Driver:GetServerInfo",
-				"Feature:API:Driver.IsEncrypted",
-				"Feature:API:Driver:MaxConnectionLifetime",
-				"Feature:API:Driver:NotificationsConfig",
-				"Feature:API:Driver.VerifyAuthentication",
-				"Feature:API:Driver.VerifyConnectivity",
-				//"Feature:API:Driver.SupportsSessionAuth",
-				"Feature:API:Liveness.Check",
-				"Feature:API:Result.List",
-				"Feature:API:Result.Peek",
-				//"Feature:API:Result.Single",
-				//"Feature:API:Result.SingleOptional",
-				"Feature:API:RetryableExceptions",
-				"Feature:API:Session:AuthConfig",
-				"Feature:API:Session:NotificationsConfig",
-				"Feature:API:SSLClientCertificate",
-				//"Feature:API:SSLConfig",
-				//"Feature:API:SSLSchemes",
-				"Feature:API:Summary:GqlStatusObjects",
-				"Feature:API:Type.Spatial",
-				"Feature:API:Type.Temporal",
-				"Feature:Auth:Bearer",
-				"Feature:Auth:Custom",
-				"Feature:Auth:Kerberos",
-				"Feature:Auth:Managed",
-				"Feature:Bolt:3.0",
-				"Feature:Bolt:4.2",
-				"Feature:Bolt:4.3",
-				"Feature:Bolt:4.4",
-				"Feature:Bolt:5.0",
-				"Feature:Bolt:5.1",
-				"Feature:Bolt:5.2",
-				"Feature:Bolt:5.3",
-				"Feature:Bolt:5.4",
-				"Feature:Bolt:5.5",
-				"Feature:Bolt:5.6",
-				"Feature:Bolt:5.7",
-				"Feature:Bolt:5.8",
-				//"Feature:Bolt:HandshakeManifestV1",
-				"Feature:Bolt:Patch:UTC",
-				"Feature:Bolt:HandshakeManifestV1",
-				"Feature:Impersonation",
-				//"Feature:TLS:1.1",
-				"Feature:TLS:1.2",
-				"Feature:TLS:1.3",
-
-				// === OPTIMIZATIONS ===
-				"AuthorizationExpiredTreatment",
-				"Optimization:AuthPipelining",
-				"Optimization:ConnectionReuse",
-				"Optimization:EagerTransactionBegin",
-				"Optimization:ExecuteQueryPipelining",
-				"Optimization:HomeDatabaseCache",
-				"Optimization:HomeDbCacheBasicPrincipalIsImpersonatedUser",
-				"Optimization:ImplicitDefaultArguments",
-				"Optimization:MinimalBookmarksSet",
-				"Optimization:MinimalResets",
-				//"Optimization:MinimalVerifyAuthentication",
-				"Optimization:PullPipelining",
-				//"Optimization:ResultListFetchAll",
-
-				// === IMPLEMENTATION DETAILS ===
-				"Detail:ClosedDriverIsEncrypted",
-				"Detail:DefaultSecurityConfigValueEquality",
-				//"Detail:NumberIsNumber",
-
-				// === CONFIGURATION HINTS (BOLT 4.3+) ===
-				"ConfHint:connection.recv_timeout_seconds",
-
-				// === BACKEND FEATURES FOR TESTING ===
-				"Backend:MockTime",
-				"Backend:RTFetch",
-				"Backend:RTForceUpdate",
-			},
+			"features": features,
 		})
 
 	case "StartTest":
@@ -1415,7 +1395,11 @@ func (b *backend) handleRequest(req map[string]any) {
 		b.writeResponse("RunTest", nil)
 
 	default:
-		b.writeError(errors.New("Unknown request: " + name))
+		if extraHandler, ok := extraRequestHandlers[name]; ok {
+			extraHandler(b, data)
+		} else {
+			b.writeError(errors.New("Unknown request: " + name))
+		}
 	}
 }
 
@@ -1743,7 +1727,7 @@ func firstRecordInvalidValue(record *db.Record) *neo4j.InvalidValue {
 
 // you can use '*' as wildcards anywhere in the qualified test name (useful to exclude a whole class e.g.)
 func testSkips() map[string]string {
-	return map[string]string{
+	skips := map[string]string{
 		// Won't fix - accepted/idiomatic behavioral differences
 		"stub.iteration.test_result_scope.TestResultScope.*":                                                                                       "Won't fix - Results are always valid but don't return records when out of scope",
 		"stub.connectivity_check.test_get_server_info.TestGetServerInfo.test_routing_fail_when_no_reader_are_available":                            "Won't fix - Go driver retries routing table when no readers are available",
@@ -1772,6 +1756,13 @@ func testSkips() map[string]string {
 		"stub.*.test_0_timeout": "Fixme: driver omits 0 as tx timeout value",
 		"stub.summary.test_summary.TestSummaryBasicInfo*.test_server_info": "pending unification: should the server address be pre or post DNS resolution?",
 	}
+	for testPattern, reason := range extraTestSkips {
+		if _, ok := extraTestSkips[testPattern]; ok {
+			panic("Fixed test skip colliding with extra skip: '" + testPattern + "'")
+		}
+		skips[testPattern] = reason
+	}
+	return skips
 }
 
 func mustSkipTimeZoneSubTest(arguments map[string]any) (string, bool) {

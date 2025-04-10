@@ -20,6 +20,7 @@ package main
 
 import (
 	"bufio"
+	"fmt"
 	"net"
 )
 
@@ -29,6 +30,7 @@ func main() {
 		panic(err)
 	}
 
+	fmt.Println("Listening on", l.Addr())
 	for {
 		// Wait for a testkit frontend connection, no need to bother handling more than one
 		// frontend connection at the time.

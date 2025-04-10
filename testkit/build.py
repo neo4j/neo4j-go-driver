@@ -21,7 +21,8 @@ if __name__ == "__main__":
     print("Building for current target", flush=True)
     run_go(
         [
-            "build", "-tags", "internal_testkit,internal_time_mock",
+            "build", "-tags",
+            "internal_neo4j_go_driver_testkit,internal_neo4j_go_driver_time_mock",
             "-v", "./..."
         ],
         go_bin=go_bin,
@@ -39,7 +40,8 @@ if __name__ == "__main__":
     print("Vet sources", flush=True)
     run_go(
         [
-            "vet", "-tags", "internal_testkit,internal_time_mock",
+            "vet", "-tags",
+            "internal_neo4j_go_driver_testkit,internal_neo4j_go_driver_time_mock",
             "./..."
         ],
         go_bin=go_bin,
@@ -56,7 +58,11 @@ if __name__ == "__main__":
     print("Run staticcheck", flush=True)
     run_go_bin(
         "staticcheck",
-        ["-tags", "internal_testkit,internal_time_mock", "./..."],
+        [
+            "-tags",
+            "internal_neo4j_go_driver_testkit,internal_neo4j_go_driver_time_mock",
+            "./...",
+        ],
         go_bin=go_bin,
         env=defaultEnv
     )

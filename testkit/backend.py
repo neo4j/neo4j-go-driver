@@ -19,7 +19,8 @@ if __name__ == "__main__":
     run_go(
         [
             "run", "-tags",
-            "internal_testkit,internal_time_mock", "-buildvcs=false",
+            "internal_neo4j_go_driver_testkit,internal_neo4j_go_driver_time_mock",
+            "-buildvcs=false",
             backend_path
         ],
         go_bin=go_bin,
