@@ -25,7 +25,8 @@ fi
 tags="\
 internal_neo4j_go_driver_testkit,\
 internal_neo4j_go_driver_time_mock,\
-internal_neo4j_testkit_dns_resolver\
+internal_neo4j_testkit_dns_resolver,\
+internal_neo4j_testkit_home_db_cache\
 "
 
 echo "# pre-commit hook"

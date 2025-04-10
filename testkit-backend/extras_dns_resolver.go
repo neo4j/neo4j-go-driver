@@ -35,12 +35,12 @@ func init() {
 			newBackendExtraData: func() any {
 				return make(map[string][]any)
 			},
-			extraRequestHandlers: map[string]func(backend *backend, data map[string]any){
+			extraRequestHandlers: map[string]extraRequestHandlerFunc{
 				"DomainNameResolutionCompleted": domainNameResolutionCompletedHandler,
 			},
+			extraNewDriverHandler: extrasDnsNewDriverHandler,
 		},
 	)
-	extraNewDriverHandlers = append(extraNewDriverHandlers, extrasDnsNewDriverHandler)
 }
 
 func extrasDnsGetBackendExtraData(backend *backend) map[string][]any {

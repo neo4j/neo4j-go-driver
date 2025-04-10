@@ -28,7 +28,7 @@ else
 fi
 
 if vergte "$version" "5.28.0"; then
-	tags="$tags,internal_neo4j_testkit_dns_resolver"
+	tags="$tags,internal_neo4j_testkit_dns_resolver,internal_neo4j_testkit_home_db_cache"
 fi
 
 echo $tags

@@ -1287,87 +1287,6 @@ func (b *backend) handleRequest(req map[string]any) {
 		b.writeResponse("AuthTokenManager", map[string]any{"id": id})
 
 	case "GetFeatures":
-		features := []string{
-			// === FUNCTIONAL FEATURES ===
-			"Feature:API:BookmarkManager",
-			"Feature:API:ConnectionAcquisitionTimeout",
-			"Feature:API:Driver.ExecuteQuery",
-			"Feature:API:Driver.ExecuteQuery:WithAuth",
-			"Feature:API:Driver:GetServerInfo",
-			"Feature:API:Driver.IsEncrypted",
-			"Feature:API:Driver:MaxConnectionLifetime",
-			"Feature:API:Driver:NotificationsConfig",
-			"Feature:API:Driver.VerifyAuthentication",
-			"Feature:API:Driver.VerifyConnectivity",
-			//"Feature:API:Driver.SupportsSessionAuth",
-			"Feature:API:Liveness.Check",
-			"Feature:API:Result.List",
-			"Feature:API:Result.Peek",
-			//"Feature:API:Result.Single",
-			//"Feature:API:Result.SingleOptional",
-			"Feature:API:RetryableExceptions",
-			"Feature:API:Session:AuthConfig",
-			"Feature:API:Session:NotificationsConfig",
-			"Feature:API:SSLClientCertificate",
-			//"Feature:API:SSLConfig",
-			//"Feature:API:SSLSchemes",
-			"Feature:API:Summary:GqlStatusObjects",
-			"Feature:API:Type.Spatial",
-			"Feature:API:Type.Temporal",
-			"Feature:Auth:Bearer",
-			"Feature:Auth:Custom",
-			"Feature:Auth:Kerberos",
-			"Feature:Auth:Managed",
-			"Feature:Bolt:3.0",
-			"Feature:Bolt:4.2",
-			"Feature:Bolt:4.3",
-			"Feature:Bolt:4.4",
-			"Feature:Bolt:5.0",
-			"Feature:Bolt:5.1",
-			"Feature:Bolt:5.2",
-			"Feature:Bolt:5.3",
-			"Feature:Bolt:5.4",
-			"Feature:Bolt:5.5",
-			"Feature:Bolt:5.6",
-			"Feature:Bolt:5.7",
-			"Feature:Bolt:5.8",
-			//"Feature:Bolt:HandshakeManifestV1",
-			"Feature:Bolt:Patch:UTC",
-			"Feature:Bolt:HandshakeManifestV1",
-			"Feature:Impersonation",
-			//"Feature:TLS:1.1",
-			"Feature:TLS:1.2",
-			"Feature:TLS:1.3",
-
-			// === OPTIMIZATIONS ===
-			"AuthorizationExpiredTreatment",
-			"Optimization:AuthPipelining",
-			"Optimization:ConnectionReuse",
-			"Optimization:EagerTransactionBegin",
-			"Optimization:ExecuteQueryPipelining",
-			"Optimization:HomeDatabaseCache",
-			"Optimization:HomeDbCacheBasicPrincipalIsImpersonatedUser",
-			"Optimization:ImplicitDefaultArguments",
-			"Optimization:MinimalBookmarksSet",
-			"Optimization:MinimalResets",
-			//"Optimization:MinimalVerifyAuthentication",
-			"Optimization:PullPipelining",
-			//"Optimization:ResultListFetchAll",
-
-			// === IMPLEMENTATION DETAILS ===
-			"Detail:ClosedDriverIsEncrypted",
-			"Detail:DefaultSecurityConfigValueEquality",
-			//"Detail:NumberIsNumber",
-
-			// === CONFIGURATION HINTS (BOLT 4.3+) ===
-			"ConfHint:connection.recv_timeout_seconds",
-
-			// === BACKEND FEATURES FOR TESTING ===
-			"Backend:MockTime",
-			"Backend:RTFetch",
-			"Backend:RTForceUpdate",
-		}
-		features = append(features, extraTestKitFeatures...)
 		b.writeResponse("FeatureList", map[string]any{
 			"features": features,
 		})
@@ -1481,7 +1400,7 @@ func (b *backend) writeRecord(result neo4j.ResultWithContext, record *neo4j.Reco
 }
 
 func mustSkip(testName string) (string, bool) {
-	skippedTests := testSkips()
+	skippedTests := testSkips
 	for testPattern, exclusionReason := range skippedTests {
 		if matches(testPattern, testName) {
 			return exclusionReason, true
@@ -1725,9 +1644,11 @@ func firstRecordInvalidValue(record *db.Record) *neo4j.InvalidValue {
 	return nil
 }
 
-// you can use '*' as wildcards anywhere in the qualified test name (useful to exclude a whole class e.g.)
-func testSkips() map[string]string {
-	skips := map[string]string{
+var testSkips map[string]string
+
+func init() {
+	// you can use '*' as wildcards anywhere in the qualified test name (useful to exclude a whole class e.g.)
+	testSkips = map[string]string{
 		// Won't fix - accepted/idiomatic behavioral differences
 		"stub.iteration.test_result_scope.TestResultScope.*":                                                                                       "Won't fix - Results are always valid but don't return records when out of scope",
 		"stub.connectivity_check.test_get_server_info.TestGetServerInfo.test_routing_fail_when_no_reader_are_available":                            "Won't fix - Go driver retries routing table when no readers are available",
@@ -1760,9 +1681,8 @@ func testSkips() map[string]string {
 		if _, ok := extraTestSkips[testPattern]; ok {
 			panic("Fixed test skip colliding with extra skip: '" + testPattern + "'")
 		}
-		skips[testPattern] = reason
+		testSkips[testPattern] = reason
 	}
-	return skips
 }
 
 func mustSkipTimeZoneSubTest(arguments map[string]any) (string, bool) {
@@ -1892,4 +1812,95 @@ func mapNotificationMinSeverityLevel(rawMinSeverityLevel string) (notifications.
 func mapGetString(data map[string]any, key string) string {
 	out, _ := data[key].(string)
 	return out
+}
+
+var features []string
+
+func init() {
+	allFeatures := []string{
+		// === FUNCTIONAL FEATURES ===
+		"Feature:API:BookmarkManager",
+		"Feature:API:ConnectionAcquisitionTimeout",
+		"Feature:API:Driver.ExecuteQuery",
+		"Feature:API:Driver.ExecuteQuery:WithAuth",
+		"Feature:API:Driver:GetServerInfo",
+		"Feature:API:Driver.IsEncrypted",
+		"Feature:API:Driver:MaxConnectionLifetime",
+		"Feature:API:Driver:NotificationsConfig",
+		"Feature:API:Driver.VerifyAuthentication",
+		"Feature:API:Driver.VerifyConnectivity",
+		//"Feature:API:Driver.SupportsSessionAuth",
+		"Feature:API:Liveness.Check",
+		"Feature:API:Result.List",
+		"Feature:API:Result.Peek",
+		//"Feature:API:Result.Single",
+		//"Feature:API:Result.SingleOptional",
+		"Feature:API:RetryableExceptions",
+		"Feature:API:Session:AuthConfig",
+		"Feature:API:Session:NotificationsConfig",
+		"Feature:API:SSLClientCertificate",
+		//"Feature:API:SSLConfig",
+		//"Feature:API:SSLSchemes",
+		"Feature:API:Summary:GqlStatusObjects",
+		"Feature:API:Type.Spatial",
+		"Feature:API:Type.Temporal",
+		"Feature:Auth:Bearer",
+		"Feature:Auth:Custom",
+		"Feature:Auth:Kerberos",
+		"Feature:Auth:Managed",
+		"Feature:Bolt:3.0",
+		"Feature:Bolt:4.2",
+		"Feature:Bolt:4.3",
+		"Feature:Bolt:4.4",
+		"Feature:Bolt:5.0",
+		"Feature:Bolt:5.1",
+		"Feature:Bolt:5.2",
+		"Feature:Bolt:5.3",
+		"Feature:Bolt:5.4",
+		"Feature:Bolt:5.5",
+		"Feature:Bolt:5.6",
+		"Feature:Bolt:5.7",
+		"Feature:Bolt:5.8",
+		//"Feature:Bolt:HandshakeManifestV1",
+		"Feature:Bolt:Patch:UTC",
+		"Feature:Bolt:HandshakeManifestV1",
+		"Feature:Impersonation",
+		//"Feature:TLS:1.1",
+		"Feature:TLS:1.2",
+		"Feature:TLS:1.3",
+
+		// === OPTIMIZATIONS ===
+		"AuthorizationExpiredTreatment",
+		"Optimization:AuthPipelining",
+		"Optimization:ConnectionReuse",
+		"Optimization:EagerTransactionBegin",
+		"Optimization:ExecuteQueryPipelining",
+		"Optimization:HomeDatabaseCache",
+		"Optimization:HomeDbCacheBasicPrincipalIsImpersonatedUser",
+		"Optimization:ImplicitDefaultArguments",
+		"Optimization:MinimalBookmarksSet",
+		"Optimization:MinimalResets",
+		//"Optimization:MinimalVerifyAuthentication",
+		"Optimization:PullPipelining",
+		//"Optimization:ResultListFetchAll",
+
+		// === IMPLEMENTATION DETAILS ===
+		"Detail:ClosedDriverIsEncrypted",
+		"Detail:DefaultSecurityConfigValueEquality",
+		//"Detail:NumberIsNumber",
+
+		// === CONFIGURATION HINTS (BOLT 4.3+) ===
+		"ConfHint:connection.recv_timeout_seconds",
+
+		// === BACKEND FEATURES FOR TESTING ===
+		"Backend:MockTime",
+		"Backend:RTFetch",
+		"Backend:RTForceUpdate",
+	}
+	features = make([]string, 0, len(allFeatures))
+	for _, feature := range allFeatures {
+		if _, ok := extraBlockedTestKitFeatures[feature]; !ok {
+			features = append(features, feature)
+		}
+	}
 }

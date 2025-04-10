@@ -22,16 +22,23 @@ import (
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/config"
 )
 
-var extraTestKitFeatures = make([]string, 0)
+type extraRequestHandlerFunc = func(backend *backend, data map[string]any)
+type extraDriverConfigFunc = func(backend *backend, data map[string]any, config *config.Config) error
+type extraNewDriverHandlerFunc = func(backend *backend, driver neo4j.DriverWithContext, data map[string]any) error
+
+var extraBlockedTestKitFeatures = make(map[string]any)
 var extraTestSkips = make(map[string]string)
-var extraRequestHandlers = make(map[string]func(backend *backend, data map[string]any))
-var extraDriverConfigs = make([]func(backend *backend, data map[string]any, config *config.Config) error, 0)
-var extraNewDriverHandlers = make([]func(backend *backend, driver neo4j.DriverWithContext, data map[string]any) error, 0)
+var extraRequestHandlers = make(map[string]extraRequestHandlerFunc)
+var extraDriverConfigs = make([]extraDriverConfigFunc, 0)
+var extraNewDriverHandlers = make([]extraNewDriverHandlerFunc, 0)
 
 type ExtraRegisterEntry struct {
-	newBackendExtraData  func() any
-	extraRequestHandlers map[string]func(backend *backend, data map[string]any)
-	extraTestSkips       map[string]string
+	newBackendExtraData         func() any
+	extraBlockedTestKitFeatures []string
+	extraTestSkips              map[string]string
+	extraRequestHandlers        map[string]extraRequestHandlerFunc
+	extraDriverConfig           extraDriverConfigFunc
+	extraNewDriverHandler       extraNewDriverHandlerFunc
 }
 
 var extraRegister = make(map[string]ExtraRegisterEntry)
@@ -42,17 +49,34 @@ func registerExtra(name string, entry ExtraRegisterEntry) {
 		panic("Extra name '" + name + "' already registered")
 	}
 	extraRegister[name] = entry
+
+	for _, feature := range entry.extraBlockedTestKitFeatures {
+		if _, ok := extraBlockedTestKitFeatures[feature]; ok {
+			panic("Extra TestKit feature '" + feature + "' already blocked")
+		}
+		extraBlockedTestKitFeatures[feature] = struct{}{}
+	}
+
+	for testPattern, reason := range entry.extraTestSkips {
+		if _, ok := extraTestSkips[testPattern]; ok {
+			panic("Extra test reason '" + testPattern + "' already registered")
+		}
+		extraTestSkips[testPattern] = reason
+	}
+
 	for msgName, handler := range entry.extraRequestHandlers {
 		if _, ok := extraRequestHandlers[msgName]; ok {
 			panic("Extra request handler '" + msgName + "' already registered")
 		}
 		extraRequestHandlers[msgName] = handler
 	}
-	for testPattern, reason := range entry.extraTestSkips {
-		if _, ok := extraTestSkips[testPattern]; ok {
-			panic("Extra test reason '" + testPattern + "' already registered")
-		}
-		extraTestSkips[testPattern] = reason
+
+	if entry.extraDriverConfig != nil {
+		extraDriverConfigs = append(extraDriverConfigs, entry.extraDriverConfig)
+	}
+
+	if entry.extraNewDriverHandler != nil {
+		extraNewDriverHandlers = append(extraNewDriverHandlers, entry.extraNewDriverHandler)
 	}
 }
 
