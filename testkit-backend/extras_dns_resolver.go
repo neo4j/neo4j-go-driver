@@ -1,4 +1,4 @@
-//go:build internal_neo4j_testkit_dns_resolver
+//go:build !internal_neo4j_testkit_no_dns_resolver
 
 /*
  * Copyright (c) "Neo4j"

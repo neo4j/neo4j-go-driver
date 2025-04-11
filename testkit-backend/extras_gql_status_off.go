@@ -1,4 +1,4 @@
-//go:build !internal_neo4j_testkit_gql_status
+//go:build internal_neo4j_testkit_no_gql_status
 
 /*
  * Copyright (c) "Neo4j"

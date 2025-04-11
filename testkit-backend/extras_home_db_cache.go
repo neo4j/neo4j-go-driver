@@ -1,4 +1,4 @@
-//go:build !internal_neo4j_testkit_home_db_cache
+//go:build internal_neo4j_testkit_no_home_db_cache
 
 /*
  * Copyright (c) "Neo4j"

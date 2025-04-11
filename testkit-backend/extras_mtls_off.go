@@ -1,4 +1,4 @@
-//go:build !internal_neo4j_testkit_mtls
+//go:build internal_neo4j_testkit_no_mtls
 
 /*
  * Copyright (c) "Neo4j"

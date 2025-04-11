@@ -6,12 +6,7 @@ from pathlib import Path
 
 ALL_BUILD_TAGS = (
     "internal_neo4j_go_driver_testkit,"
-    "internal_neo4j_go_driver_time_mock,"
-    "internal_neo4j_testkit_dns_resolver,"
-    "internal_neo4j_testkit_home_db_cache,"
-    "internal_neo4j_testkit_gql_error,"
-    "internal_neo4j_testkit_gql_status,"
-    "internal_neo4j_testkit_mtls"
+    "internal_neo4j_go_driver_time_mock"
 )
 
 def get_go_min_bin():

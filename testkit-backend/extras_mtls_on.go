@@ -1,4 +1,4 @@
-//go:build internal_neo4j_testkit_mtls
+//go:build !internal_neo4j_testkit_no_mtls
 
 /*
  * Copyright (c) "Neo4j"
@@ -23,8 +23,8 @@ import (
 	"crypto/tls"
 	"fmt"
 
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/config"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/auth"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/config"
 )
 
 const extrasNameMTLS = "mTLS"
@@ -55,7 +55,7 @@ type extrasMTLSExtraData struct {
 }
 
 func extrasMTLSGetBackendExtraData(backend *backend) extrasMTLSExtraData {
-	return getBackendExtraData(backend, extrasNameDns).(extrasMTLSExtraData)
+	return getBackendExtraData(backend, extrasNameMTLS).(extrasMTLSExtraData)
 }
 
 func extrasMTLSDriverConfig(backend *backend, data map[string]any, config *config.Config) error {
