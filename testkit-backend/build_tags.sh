@@ -78,4 +78,11 @@ else
 	exit 0
 fi
 
+if verlt "$version" "5.13.0"; then
+	tags="$tags,internal_neo4j_testkit_no_telemetry"
+else
+	echo $tags
+	exit 0
+fi
+
 echo $tags

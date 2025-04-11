@@ -554,9 +554,6 @@ func (b *backend) handleRequest(req map[string]any) {
 					c.NotificationsDisabledCategories = notifications.DisableCategories(cats...)
 				}
 			}
-			if data["telemetryDisabled"] != nil {
-				c.TelemetryDisabled = data["telemetryDisabled"].(bool)
-			}
 
 			for _, driverConfig := range extrasDriverConfigs {
 				err = driverConfig(b, data, c)
