@@ -913,54 +913,6 @@ func (b *backend) handleRequest(req map[string]any) {
 		}
 		b.writeResponse("Summary", serializeSummary(summary))
 
-	case "ForcedRoutingTableUpdate":
-		databaseRaw := data["database"]
-		var database string
-		if databaseRaw != nil {
-			database = databaseRaw.(string)
-		}
-		var bookmarks []string
-		bookmarksRaw := data["bookmarks"]
-		if bookmarksRaw != nil {
-			bookmarksSlice := bookmarksRaw.([]any)
-			bookmarks = make([]string, len(bookmarksSlice))
-			for i, bookmark := range bookmarksSlice {
-				bookmarks[i] = bookmark.(string)
-			}
-		}
-		driverId := data["driverId"].(string)
-		driver := b.drivers[driverId]
-		err := neo4j.ForceRoutingTableUpdate(driver, database, bookmarks, &streamLog{writeLine: b.writeLineLocked})
-		if err != nil {
-			b.writeError(err)
-			return
-		}
-		b.writeResponse("Driver", map[string]any{"id": driverId})
-
-	case "GetRoutingTable":
-		driver := b.drivers[data["driverId"].(string)]
-		databaseRaw := data["database"]
-		var database string
-		if databaseRaw != nil {
-			database = databaseRaw.(string)
-		}
-		table, err := neo4j.GetRoutingTable(driver, database)
-		if err != nil {
-			b.writeError(err)
-			return
-		}
-		var databaseName any = table.DatabaseName
-		if databaseName == "" {
-			databaseName = nil
-		}
-		b.writeResponse("RoutingTable", map[string]any{
-			"database": databaseName,
-			"ttl":      table.TimeToLive,
-			"routers":  table.Routers,
-			"readers":  table.Readers,
-			"writers":  table.Writers,
-		})
-
 	case "CheckMultiDBSupport":
 		driver := b.drivers[data["driverId"].(string)]
 		session := driver.NewSession(ctx, neo4j.SessionConfig{

@@ -87,6 +87,7 @@ fi
 
 if verlt "$version" "5.12.0"; then
 	tags="$tags,internal_neo4j_testkit_no_execute_query_pipelining"
+	tags="$tags,internal_neo4j_testkit_no_rt_helper"
 else
 	echo $tags
 	exit 0
