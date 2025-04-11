@@ -24,7 +24,7 @@ const extrasNameHomeDbCache = "homeDbCache"
 func init() {
 	registerExtra(
 		extrasNameHomeDbCache,
-		ExtraRegisterEntry{
+		ExtrasRegisterEntry{
 			extraBlockedTestKitFeatures: []string{
 				"Feature:Bolt:HandshakeManifestV1",
 				"Feature:Bolt:5.8",

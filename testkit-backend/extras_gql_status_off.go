@@ -26,7 +26,7 @@ const extrasNameGqlStatus = "gqlStatus"
 func init() {
 	registerExtra(
 		extrasNameGqlStatus,
-		ExtraRegisterEntry{
+		ExtrasRegisterEntry{
 			extraBlockedTestKitFeatures: []string{
 				"Feature:Bolt:5.5",
 				"Feature:Bolt:5.6",

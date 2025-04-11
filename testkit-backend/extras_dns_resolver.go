@@ -31,11 +31,11 @@ const extrasNameDns = "dns"
 func init() {
 	registerExtra(
 		extrasNameDns,
-		ExtraRegisterEntry{
+		ExtrasRegisterEntry{
 			newBackendExtraData: func() any {
 				return make(map[string][]any)
 			},
-			extraRequestHandlers: map[string]extraRequestHandlerFunc{
+			extraRequestHandlers: map[string]extrasRequestHandlerFunc{
 				"DomainNameResolutionCompleted": domainNameResolutionCompletedHandler,
 			},
 			extraNewDriverHandler: extrasDnsNewDriverHandler,
@@ -53,7 +53,7 @@ func domainNameResolutionCompletedHandler(backend *backend, data map[string]any)
 	extrasDnsGetBackendExtraData(backend)[requestId] = addresses
 }
 
-func extrasDnsNewDriverHandler(b *backend, driver neo4j.DriverWithContext, data map[string]any) error {
+func extrasDnsNewDriverHandler(b *backend, data map[string]any, driver neo4j.DriverWithContext) error {
 	if data["domainNameResolverRegistered"] != nil && data["domainNameResolverRegistered"].(bool) {
 		neo4j.RegisterDnsResolver(driver, b.extrasDnsResolverFunction())
 	}

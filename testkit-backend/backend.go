@@ -562,7 +562,7 @@ func (b *backend) handleRequest(req map[string]any) {
 				c.TelemetryDisabled = data["telemetryDisabled"].(bool)
 			}
 
-			for _, driverConfig := range extraDriverConfigs {
+			for _, driverConfig := range extrasDriverConfigs {
 				err = driverConfig(b, data, c)
 				if err != nil {
 					b.writeError(err)
@@ -575,8 +575,8 @@ func (b *backend) handleRequest(req map[string]any) {
 			return
 		}
 
-		for _, handler := range extraNewDriverHandlers {
-			err = handler(b, driver, data)
+		for _, handler := range extrasNewDriverHandlers {
+			err = handler(b, data, driver)
 			if err != nil {
 				b.writeError(err)
 				return
@@ -660,14 +660,13 @@ func (b *backend) handleRequest(req map[string]any) {
 				if executeQueryConfig["txMeta"] != nil {
 					config.TransactionConfigurers = append(config.TransactionConfigurers, neo4j.WithTxMetadata(b.toTxMetadata(executeQueryConfig)))
 				}
-				// Append Auth configuration if it exists
-				if executeQueryConfig["authorizationToken"] != nil {
-					token, err := getAuth(executeQueryConfig["authorizationToken"].(map[string]any)["data"].(map[string]any))
+
+				for _, queryConfig := range extrasExecuteQueryConfigs {
+					err = queryConfig(b, data, config)
 					if err != nil {
 						b.writeError(err)
 						return
 					}
-					config.Auth = &token
 				}
 			})
 		}
@@ -1212,7 +1211,7 @@ func (b *backend) handleRequest(req map[string]any) {
 		b.writeResponse("RunTest", nil)
 
 	default:
-		if extraHandler, ok := extraRequestHandlers[name]; ok {
+		if extraHandler, ok := extrasRequestHandlers[name]; ok {
 			extraHandler(b, data)
 		} else {
 			b.writeError(errors.New("Unknown request: " + name))

@@ -28,7 +28,7 @@ const extrasNameGqlError = "gqlError"
 func init() {
 	registerExtra(
 		extrasNameGqlError,
-		ExtraRegisterEntry{
+		ExtrasRegisterEntry{
 			extraBlockedTestKitFeatures: []string{
 				"Feature:Bolt:5.7",
 			},

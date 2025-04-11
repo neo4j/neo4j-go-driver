@@ -22,67 +22,73 @@ import (
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/config"
 )
 
-type extraRequestHandlerFunc = func(backend *backend, data map[string]any)
-type extraDriverConfigFunc = func(backend *backend, data map[string]any, config *config.Config) error
-type extraNewDriverHandlerFunc = func(backend *backend, driver neo4j.DriverWithContext, data map[string]any) error
+type extrasRequestHandlerFunc = func(backend *backend, data map[string]any)
+type extrasDriverConfigFunc = func(backend *backend, data map[string]any, config *config.Config) error
+type extrasNewDriverHandlerFunc = func(backend *backend, data map[string]any, driver neo4j.DriverWithContext) error
+type extrasExecuteQueryConfigFunc = func(backend *backend, data map[string]any, config *neo4j.ExecuteQueryConfiguration) error
 
-var extraBlockedTestKitFeatures = make(map[string]any)
-var extraTestSkips = make(map[string]string)
-var extraRequestHandlers = make(map[string]extraRequestHandlerFunc)
-var extraDriverConfigs = make([]extraDriverConfigFunc, 0)
-var extraNewDriverHandlers = make([]extraNewDriverHandlerFunc, 0)
+var extrasBlockedTestKitFeatures = make(map[string]any)
+var extrasTestSkips = make(map[string]string)
+var extrasRequestHandlers = make(map[string]extrasRequestHandlerFunc)
+var extrasDriverConfigs = make([]extrasDriverConfigFunc, 0)
+var extrasNewDriverHandlers = make([]extrasNewDriverHandlerFunc, 0)
+var extrasExecuteQueryConfigs = make([]extrasExecuteQueryConfigFunc, 0)
 
-type ExtraRegisterEntry struct {
+type ExtrasRegisterEntry struct {
 	newBackendExtraData         func() any
 	extraBlockedTestKitFeatures []string
 	extraTestSkips              map[string]string
-	extraRequestHandlers        map[string]extraRequestHandlerFunc
-	extraDriverConfig           extraDriverConfigFunc
-	extraNewDriverHandler       extraNewDriverHandlerFunc
+	extraRequestHandlers        map[string]extrasRequestHandlerFunc
+	extraDriverConfig           extrasDriverConfigFunc
+	extraNewDriverHandler       extrasNewDriverHandlerFunc
+	extraExecuteQueryConfig     extrasExecuteQueryConfigFunc
 }
 
-var extraRegister = make(map[string]ExtraRegisterEntry)
+var extrasRegister = make(map[string]ExtrasRegisterEntry)
 
-func registerExtra(name string, entry ExtraRegisterEntry) {
-	// if extraRegister contains name
-	if _, ok := extraRegister[name]; ok {
+func registerExtra(name string, entry ExtrasRegisterEntry) {
+	if _, ok := extrasRegister[name]; ok {
 		panic("Extra name '" + name + "' already registered")
 	}
-	extraRegister[name] = entry
+	extrasRegister[name] = entry
 
 	for _, feature := range entry.extraBlockedTestKitFeatures {
-		if _, ok := extraBlockedTestKitFeatures[feature]; ok {
+		if _, ok := extrasBlockedTestKitFeatures[feature]; ok {
 			panic("Extra TestKit feature '" + feature + "' already blocked")
 		}
-		extraBlockedTestKitFeatures[feature] = struct{}{}
+		extrasBlockedTestKitFeatures[feature] = struct{}{}
 	}
 
 	for testPattern, reason := range entry.extraTestSkips {
-		if _, ok := extraTestSkips[testPattern]; ok {
+		if _, ok := extrasTestSkips[testPattern]; ok {
 			panic("Extra test reason '" + testPattern + "' already registered")
 		}
-		extraTestSkips[testPattern] = reason
+		extrasTestSkips[testPattern] = reason
 	}
 
 	for msgName, handler := range entry.extraRequestHandlers {
-		if _, ok := extraRequestHandlers[msgName]; ok {
+		if _, ok := extrasRequestHandlers[msgName]; ok {
 			panic("Extra request handler '" + msgName + "' already registered")
 		}
-		extraRequestHandlers[msgName] = handler
+		extrasRequestHandlers[msgName] = handler
 	}
 
 	if entry.extraDriverConfig != nil {
-		extraDriverConfigs = append(extraDriverConfigs, entry.extraDriverConfig)
+		extrasDriverConfigs = append(extrasDriverConfigs, entry.extraDriverConfig)
 	}
 
 	if entry.extraNewDriverHandler != nil {
-		extraNewDriverHandlers = append(extraNewDriverHandlers, entry.extraNewDriverHandler)
+		extrasNewDriverHandlers = append(extrasNewDriverHandlers, entry.extraNewDriverHandler)
+	}
+
+	if entry.extraExecuteQueryConfig != nil {
+		extrasExecuteQueryConfigs = append(extrasExecuteQueryConfigs, entry.extraExecuteQueryConfig)
 	}
 }
 
 func newBackendExtraData() map[string]any {
 	extraData := make(map[string]any)
-	for key, entry := range extraRegister {
+	for key, entry := range extrasRegister {
 		extraData[key] = entry.newBackendExtraData()
 	}
 	return extraData

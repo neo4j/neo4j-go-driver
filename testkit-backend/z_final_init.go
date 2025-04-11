@@ -50,8 +50,8 @@ func init() {
 		"stub.*.test_0_timeout": "Fixme: driver omits 0 as tx timeout value",
 		"stub.summary.test_summary.TestSummaryBasicInfo*.test_server_info": "pending unification: should the server address be pre or post DNS resolution?",
 	}
-	for testPattern, reason := range extraTestSkips {
-		if _, ok := extraTestSkips[testPattern]; ok {
+	for testPattern, reason := range extrasTestSkips {
+		if _, ok := extrasTestSkips[testPattern]; ok {
 			panic("Fixed test skip colliding with extra skip: '" + testPattern + "'")
 		}
 		testSkips[testPattern] = reason
@@ -142,11 +142,11 @@ func init() {
 	}
 	features = make([]string, 0, len(allFeatures))
 	for _, feature := range allFeatures {
-		if _, ok := extraBlockedTestKitFeatures[feature]; !ok {
+		if _, ok := extrasBlockedTestKitFeatures[feature]; !ok {
 			features = append(features, feature)
 		}
 	}
-	for blockedFeature := range extraBlockedTestKitFeatures {
+	for blockedFeature := range extrasBlockedTestKitFeatures {
 		if !contains(allFeatures, blockedFeature) {
 			panic("Extra is trying to block an unsupported feature: '" + blockedFeature + "'")
 		}

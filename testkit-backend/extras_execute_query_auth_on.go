@@ -1,4 +1,4 @@
-//go:build internal_neo4j_testkit_no_mtls
+//go:build !internal_neo4j_testkit_no_execute_query_auth
 
 /*
  * Copyright (c) "Neo4j"
@@ -19,16 +19,27 @@
 
 package main
 
-const extrasNameMTLS = "mTLS"
+import "github.com/neo4j/neo4j-go-driver/v5/neo4j"
+
+const extrasNameExecuteQueryAuth = "executeQueryAuth"
 
 func init() {
 	registerExtra(
-		extrasNameMTLS,
+		extrasNameExecuteQueryAuth,
 		ExtrasRegisterEntry{
-			extraBlockedTestKitFeatures: []string{
-				"Feature:API:SSLClientCertificate",
-			},
+			extraExecuteQueryConfig: extrasExecuteQueryAuthConfig,
 		},
 	)
+}
 
+func extrasExecuteQueryAuthConfig(backend *backend, data map[string]any, config *neo4j.ExecuteQueryConfiguration) error {
+	// Append Auth configuration if it exists
+	if data["authorizationToken"] != nil {
+		token, err := getAuth(data["authorizationToken"].(map[string]any)["data"].(map[string]any))
+		if err != nil {
+			return err
+		}
+		config.Auth = &token
+	}
+	return nil
 }

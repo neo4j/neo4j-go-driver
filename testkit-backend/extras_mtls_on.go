@@ -32,14 +32,14 @@ const extrasNameMTLS = "mTLS"
 func init() {
 	registerExtra(
 		extrasNameMTLS,
-		ExtraRegisterEntry{
+		ExtrasRegisterEntry{
 			newBackendExtraData: func() any {
 				return extrasMTLSExtraData{
 					clientCertificateProviders: make(map[string]auth.ClientCertificateProvider),
 					resolvedClientCertificates: make(map[string]auth.ClientCertificate),
 				}
 			},
-			extraRequestHandlers: map[string]extraRequestHandlerFunc{
+			extraRequestHandlers: map[string]extrasRequestHandlerFunc{
 				"NewClientCertificateProvider":       newClientCertificateProviderHandler,
 				"ClientCertificateProviderClose":     clientCertificateProviderCloseHandler,
 				"ClientCertificateProviderCompleted": clientCertificateProviderCompletedHandler,

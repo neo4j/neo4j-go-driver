@@ -1,4 +1,4 @@
-//go:build internal_neo4j_testkit_no_mtls
+//go:build internal_neo4j_testkit_no_execute_query_auth
 
 /*
  * Copyright (c) "Neo4j"
@@ -19,16 +19,15 @@
 
 package main
 
-const extrasNameMTLS = "mTLS"
+const extrasNameExecuteQueryAuth = "executeQueryAuth"
 
 func init() {
 	registerExtra(
-		extrasNameMTLS,
+		extrasNameExecuteQueryAuth,
 		ExtrasRegisterEntry{
 			extraBlockedTestKitFeatures: []string{
-				"Feature:API:SSLClientCertificate",
+				"Feature:API:Driver.ExecuteQuery:WithAuth",
 			},
 		},
 	)
-
 }
