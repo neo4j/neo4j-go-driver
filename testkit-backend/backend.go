@@ -35,7 +35,6 @@ import (
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/auth"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/config"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/db"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/log"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/notifications"
 )
 
@@ -523,9 +522,6 @@ func (b *backend) handleRequest(req map[string]any) {
 			if data["connectionAcquisitionTimeoutMs"] != nil {
 				c.ConnectionAcquisitionTimeout = time.Millisecond * time.Duration(asInt64(data["connectionAcquisitionTimeoutMs"].(json.Number)))
 			}
-			if data["livenessCheckTimeoutMs"] != nil {
-				c.ConnectionLivenessCheckTimeout = time.Millisecond * time.Duration(asInt64(data["livenessCheckTimeoutMs"].(json.Number)))
-			}
 			if data["maxConnectionLifetimeMs"] != nil {
 				c.MaxConnectionLifetime = time.Millisecond * time.Duration(asInt64(data["maxConnectionLifetimeMs"].(json.Number)))
 			}
@@ -652,13 +648,6 @@ func (b *backend) handleRequest(req map[string]any) {
 					} else {
 						config.BookmarkManager = b.bookmarkManagers[bookmarkManagerId.(string)]
 					}
-				}
-				// Append configurers to config if they exist.
-				if executeQueryConfig["timeout"] != nil {
-					config.TransactionConfigurers = append(config.TransactionConfigurers, neo4j.WithTxTimeout(b.toTimeout(executeQueryConfig)))
-				}
-				if executeQueryConfig["txMeta"] != nil {
-					config.TransactionConfigurers = append(config.TransactionConfigurers, neo4j.WithTxMetadata(b.toTxMetadata(executeQueryConfig)))
 				}
 
 				for _, queryConfig := range extrasExecuteQueryConfigs {
@@ -978,7 +967,7 @@ func (b *backend) handleRequest(req map[string]any) {
 	case "CheckMultiDBSupport":
 		driver := b.drivers[data["driverId"].(string)]
 		session := driver.NewSession(ctx, neo4j.SessionConfig{
-			BoltLogger: log.BoltToConsole(),
+			BoltLogger: extrasLogBoltToConsole(),
 		})
 		result, err := session.Run(ctx, "RETURN 42", nil)
 		defer func() {
@@ -1017,28 +1006,6 @@ func (b *backend) handleRequest(req map[string]any) {
 			return
 		}
 		b.writeResponse("Driver", map[string]any{"id": driverId})
-
-	case "FakeTimeInstall":
-		if err := neo4j.FreezeTime(); err != nil {
-			b.writeError(err)
-			return
-		}
-		b.writeResponse("FakeTimeAck", nil)
-
-	case "FakeTimeUninstall":
-		if err := neo4j.UnfreezeTime(); err != nil {
-			b.writeError(err)
-			return
-		}
-		b.writeResponse("FakeTimeAck", nil)
-
-	case "FakeTimeTick":
-		milliseconds := asInt64(data["incrementMs"].(json.Number))
-		if err := neo4j.TickTime(time.Duration(milliseconds) * time.Millisecond); err != nil {
-			b.writeError(err)
-			return
-		}
-		b.writeResponse("FakeTimeAck", nil)
 
 	case "VerifyAuthentication":
 		driverId := data["driverId"].(string)
@@ -1174,7 +1141,7 @@ func (b *backend) handleRequest(req map[string]any) {
 		expiresInRaw := bearerToken["expiresInMs"]
 		if expiresInRaw != nil {
 			expiresIn := time.Millisecond * time.Duration(asInt64(bearerToken["expiresInMs"].(json.Number)))
-			expirationTime := neo4j.Now().Add(expiresIn)
+			expirationTime := Now().Add(expiresIn)
 			expiration = &expirationTime
 		}
 		b.resolvedBearerTokens[id] = AuthTokenAndExpiration{token, expiration}

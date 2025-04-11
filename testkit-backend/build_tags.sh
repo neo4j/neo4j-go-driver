@@ -62,4 +62,20 @@ else
 	exit 0
 fi
 
+if verlt "$version" "5.17.0"; then
+	tags="$tags,internal_neo4j_testkit_no_log_module"
+else
+	echo $tags
+	exit 0
+fi
+
+if verlt "$version" "5.16.0"; then
+	tags="$tags,internal_neo4j_testkit_no_execute_query_tx_config"
+	tags="$tags,internal_neo4j_testkit_no_liveness_check"
+	tags="$tags,internal_neo4j_testkit_no_time_mock"
+else
+	echo $tags
+	exit 0
+fi
+
 echo $tags
