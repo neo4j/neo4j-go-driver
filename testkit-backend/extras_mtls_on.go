@@ -44,7 +44,7 @@ func init() {
 				"ClientCertificateProviderClose":     clientCertificateProviderCloseHandler,
 				"ClientCertificateProviderCompleted": clientCertificateProviderCompletedHandler,
 			},
-			extraDriverConfig: extrasMTLSDriverConfig,
+			extraDriverConfigurer: extrasMTLSDriverConfig,
 		},
 	)
 }

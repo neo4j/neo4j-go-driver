@@ -27,7 +27,7 @@ func init() {
 	registerExtra(
 		extrasNameExecuteQueryTxConfig,
 		ExtrasRegisterEntry{
-			extraExecuteQueryConfig: extrasExecuteQueryTxConfig,
+			extraExecuteQueryConfigurer: extrasExecuteQueryTxConfig,
 		},
 	)
 }

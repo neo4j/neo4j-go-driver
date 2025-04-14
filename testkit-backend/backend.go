@@ -513,8 +513,8 @@ func (b *backend) handleRequest(req map[string]any) {
 				}
 			}
 
-			for _, driverConfig := range extrasDriverConfigs {
-				err = driverConfig(b, data, c)
+			for _, configurer := range extrasDriverConfigurers {
+				err = configurer(b, data, c)
 				if err != nil {
 					b.writeError(err)
 					return
@@ -605,8 +605,8 @@ func (b *backend) handleRequest(req map[string]any) {
 					}
 				}
 
-				for _, queryConfig := range extrasExecuteQueryConfigs {
-					err = queryConfig(b, data, config)
+				for _, configurer := range extrasExecuteQueryConfigurers {
+					err = configurer(b, data, config)
 					if err != nil {
 						b.writeError(err)
 						return
@@ -692,13 +692,13 @@ func (b *backend) handleRequest(req map[string]any) {
 				sessionConfig.NotificationsDisabledCategories = notifications.DisableCategories(cats...)
 			}
 		}
-		if data["authorizationToken"] != nil {
-			authToken, err := getAuth(data["authorizationToken"].(map[string]any)["data"].(map[string]any))
+
+		for _, configurer := range extrasSessionConfigurers {
+			err = configurer(b, data, &sessionConfig)
 			if err != nil {
 				b.writeError(err)
 				return
 			}
-			sessionConfig.Auth = &authToken
 		}
 		session := driver.NewSession(ctx, sessionConfig)
 		idKey := b.nextId()
@@ -913,28 +913,6 @@ func (b *backend) handleRequest(req map[string]any) {
 			return
 		}
 		b.writeResponse("Driver", map[string]any{"id": driverId})
-
-	case "VerifyAuthentication":
-		driverId := data["driverId"].(string)
-		var token *neo4j.AuthToken
-		if data["authorizationToken"] != nil {
-			authToken, err := getAuth(data["authorizationToken"].(map[string]any)["data"].(map[string]any))
-			if err != nil {
-				b.writeError(err)
-				return
-			}
-			token = &authToken
-		}
-		if err := b.drivers[driverId].VerifyAuthentication(ctx, token); err != nil {
-			invalidAuthError := &neo4j.InvalidAuthenticationError{}
-			if errors.As(err, &invalidAuthError) {
-				b.writeResponse("DriverIsAuthenticated", map[string]any{"id": driverId, "authenticated": false})
-			} else {
-				b.writeError(err)
-			}
-		} else {
-			b.writeResponse("DriverIsAuthenticated", map[string]any{"id": driverId, "authenticated": true})
-		}
 
 	case "GetFeatures":
 		b.writeResponse("FeatureList", map[string]any{

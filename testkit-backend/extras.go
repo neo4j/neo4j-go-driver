@@ -26,22 +26,25 @@ type extrasRequestHandlerFunc = func(backend *backend, data map[string]any)
 type extrasDriverConfigFunc = func(backend *backend, data map[string]any, config *config.Config) error
 type extrasNewDriverHandlerFunc = func(backend *backend, data map[string]any, driver neo4j.DriverWithContext) error
 type extrasExecuteQueryConfigFunc = func(backend *backend, data map[string]any, config *neo4j.ExecuteQueryConfiguration) error
+type extrasSessionConfigFunc = func(backend *backend, data map[string]any, config *neo4j.SessionConfig) error
 
 var extrasBlockedTestKitFeatures = make(map[string]any)
 var extrasTestSkips = make(map[string]string)
 var extrasRequestHandlers = make(map[string]extrasRequestHandlerFunc)
-var extrasDriverConfigs = make([]extrasDriverConfigFunc, 0)
+var extrasDriverConfigurers = make([]extrasDriverConfigFunc, 0)
 var extrasNewDriverHandlers = make([]extrasNewDriverHandlerFunc, 0)
-var extrasExecuteQueryConfigs = make([]extrasExecuteQueryConfigFunc, 0)
+var extrasExecuteQueryConfigurers = make([]extrasExecuteQueryConfigFunc, 0)
+var extrasSessionConfigurers = make([]extrasSessionConfigFunc, 0)
 
 type ExtrasRegisterEntry struct {
 	newBackendExtraData         func() any
 	extraBlockedTestKitFeatures []string
 	extraTestSkips              map[string]string
 	extraRequestHandlers        map[string]extrasRequestHandlerFunc
-	extraDriverConfig           extrasDriverConfigFunc
+	extraDriverConfigurer       extrasDriverConfigFunc
 	extraNewDriverHandler       extrasNewDriverHandlerFunc
-	extraExecuteQueryConfig     extrasExecuteQueryConfigFunc
+	extraExecuteQueryConfigurer extrasExecuteQueryConfigFunc
+	extraSessionConfigurer      extrasSessionConfigFunc
 }
 
 var extrasRegister = make(map[string]ExtrasRegisterEntry)
@@ -73,16 +76,20 @@ func registerExtra(name string, entry ExtrasRegisterEntry) {
 		extrasRequestHandlers[msgName] = handler
 	}
 
-	if entry.extraDriverConfig != nil {
-		extrasDriverConfigs = append(extrasDriverConfigs, entry.extraDriverConfig)
+	if entry.extraDriverConfigurer != nil {
+		extrasDriverConfigurers = append(extrasDriverConfigurers, entry.extraDriverConfigurer)
 	}
 
 	if entry.extraNewDriverHandler != nil {
 		extrasNewDriverHandlers = append(extrasNewDriverHandlers, entry.extraNewDriverHandler)
 	}
 
-	if entry.extraExecuteQueryConfig != nil {
-		extrasExecuteQueryConfigs = append(extrasExecuteQueryConfigs, entry.extraExecuteQueryConfig)
+	if entry.extraExecuteQueryConfigurer != nil {
+		extrasExecuteQueryConfigurers = append(extrasExecuteQueryConfigurers, entry.extraExecuteQueryConfigurer)
+	}
+
+	if entry.extraSessionConfigurer != nil {
+		extrasSessionConfigurers = append(extrasSessionConfigurers, entry.extraSessionConfigurer)
 	}
 }
 

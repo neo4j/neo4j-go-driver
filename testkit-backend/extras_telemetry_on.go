@@ -29,7 +29,7 @@ func init() {
 	registerExtra(
 		extrasNameTelemetry,
 		ExtrasRegisterEntry{
-			extraDriverConfig: extrasTelemetry,
+			extraDriverConfigurer: extrasTelemetry,
 		},
 	)
 }

@@ -32,7 +32,7 @@ func init() {
 	registerExtra(
 		extrasNameLivenessCheck,
 		ExtrasRegisterEntry{
-			extraDriverConfig: extrasLivenessCheck,
+			extraDriverConfigurer: extrasLivenessCheck,
 		},
 	)
 }
