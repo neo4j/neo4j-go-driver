@@ -103,6 +103,7 @@ fi
 
 if verlt "$version" "5.8.0"; then
 	tags="$tags,internal_neo4j_testkit_no_session_auth"
+	tags="$tags,internal_neo4j_testkit_no_stable_execute_query"
 else
 	echo $tags
 	exit 0

@@ -575,9 +575,9 @@ func (b *backend) handleRequest(req map[string]any) {
 				if routing != nil {
 					switch routing {
 					case "r":
-						config.Routing = neo4j.Read
+						config.Routing = neo4jRead()
 					case "w":
-						config.Routing = neo4j.Write
+						config.Routing = neo4jWrite()
 					default:
 						b.writeError(fmt.Errorf("unexpected executequery routing value: %v", routing))
 						return
