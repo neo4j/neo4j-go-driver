@@ -49,9 +49,6 @@ type backend struct {
 	resolvedAddresses    map[string][]any
 	id                   int // ID to use for next object created by frontend
 	wrLock               sync.Mutex
-	suppliedBookmarks    map[string]neo4j.Bookmarks
-	consumedBookmarks    map[string]struct{}
-	bookmarkManagers     map[string]neo4j.BookmarkManager
 	closed               bool
 	extrasData           map[string]any
 }
@@ -84,9 +81,6 @@ func newBackend(rd *bufio.Reader, wr io.Writer) *backend {
 		recordedErrors:       make(map[string]error),
 		resolvedAddresses:    make(map[string][]any),
 		id:                   0,
-		bookmarkManagers:     make(map[string]neo4j.BookmarkManager),
-		suppliedBookmarks:    make(map[string]neo4j.Bookmarks),
-		consumedBookmarks:    make(map[string]struct{}),
 		closed:               false,
 		extrasData:           newBackendExtraData(),
 	}
@@ -443,19 +437,6 @@ func (b *backend) handleRequest(req map[string]any) {
 		addresses := data["addresses"].([]any)
 		b.resolvedAddresses[requestId] = addresses
 
-	case "BookmarksSupplierCompleted":
-		requestId := data["requestId"].(string)
-		rawBookmarks := data["bookmarks"].([]any)
-		bookmarks := make(neo4j.Bookmarks, len(rawBookmarks))
-		for i, bookmark := range rawBookmarks {
-			bookmarks[i] = bookmark.(string)
-		}
-		b.suppliedBookmarks[requestId] = bookmarks
-
-	case "BookmarksConsumerCompleted":
-		requestId := data["requestId"].(string)
-		b.consumedBookmarks[requestId] = struct{}{}
-
 	case "NewDriver":
 		authToken, err := getDriverAuthToken(b, data)
 		if err != nil {
@@ -577,15 +558,6 @@ func (b *backend) handleRequest(req map[string]any) {
 		if data["impersonatedUser"] != nil {
 			sessionConfig.ImpersonatedUser = data["impersonatedUser"].(string)
 		}
-		if data["bookmarkManagerId"] != nil {
-			bmmId := data["bookmarkManagerId"].(string)
-			bookmarkManager := b.bookmarkManagers[bmmId]
-			if bookmarkManager == nil {
-				b.writeError(fmt.Errorf("could not find bookmark manager with ID %s", bmmId))
-				return
-			}
-			sessionConfig.BookmarkManager = bookmarkManager
-		}
 
 		for _, configurer := range extrasSessionConfigurers {
 			err = configurer(b, data, &sessionConfig)
@@ -598,21 +570,6 @@ func (b *backend) handleRequest(req map[string]any) {
 		idKey := b.nextId()
 		b.sessionStates[idKey] = &sessionState{session: session}
 		b.writeResponse("Session", map[string]any{"id": idKey})
-
-	case "NewBookmarkManager":
-		bookmarkManagerId := b.nextId()
-		b.bookmarkManagers[bookmarkManagerId] = neo4j.NewBookmarkManager(
-			b.bookmarkManagerConfig(bookmarkManagerId, data))
-		b.writeResponse("BookmarkManager", map[string]any{
-			"id": bookmarkManagerId,
-		})
-
-	case "BookmarkManagerClose":
-		bookmarkManagerId := data["id"].(string)
-		delete(b.bookmarkManagers, bookmarkManagerId)
-		b.writeResponse("BookmarkManager", map[string]any{
-			"id": bookmarkManagerId,
-		})
 
 	case "SessionClose":
 		sessionId := data["sessionId"].(string)
@@ -1159,61 +1116,6 @@ func patchNumbersInMap(dictionary map[string]any) error {
 		}
 	}
 	return nil
-}
-
-func (b *backend) bookmarkManagerConfig(bookmarkManagerId string,
-	config map[string]any) neo4j.BookmarkManagerConfig {
-
-	var initialBookmarks neo4j.Bookmarks
-	if config["initialBookmarks"] != nil {
-		initialBookmarks = convertInitialBookmarks(config["initialBookmarks"].([]any))
-	}
-	result := neo4j.BookmarkManagerConfig{InitialBookmarks: initialBookmarks}
-	supplierRegistered := config["bookmarksSupplierRegistered"]
-	if supplierRegistered != nil && supplierRegistered.(bool) {
-		result.BookmarkSupplier = b.supplyBookmarks(bookmarkManagerId)
-	}
-	consumerRegistered := config["bookmarksConsumerRegistered"]
-	if consumerRegistered != nil && consumerRegistered.(bool) {
-		result.BookmarkConsumer = b.consumeBookmarks(bookmarkManagerId)
-	}
-	return result
-}
-
-func (b *backend) supplyBookmarks(bookmarkManagerId string) func(context.Context) (neo4j.Bookmarks, error) {
-	return func(ctx context.Context) (neo4j.Bookmarks, error) {
-		id := b.nextId()
-		msg := map[string]any{"id": id, "bookmarkManagerId": bookmarkManagerId}
-		b.writeResponse("BookmarksSupplierRequest", msg)
-		b.process()
-		return b.suppliedBookmarks[id], nil
-	}
-}
-
-func (b *backend) consumeBookmarks(bookmarkManagerId string) func(context.Context, neo4j.Bookmarks) error {
-	return func(_ context.Context, bookmarks neo4j.Bookmarks) error {
-		id := b.nextId()
-		b.writeResponse("BookmarksConsumerRequest", map[string]any{
-			"id":                id,
-			"bookmarkManagerId": bookmarkManagerId,
-			"bookmarks":         bookmarks,
-		})
-		for b.process() {
-			if _, found := b.consumedBookmarks[id]; found {
-				delete(b.consumedBookmarks, id)
-				break
-			}
-		}
-		return nil
-	}
-}
-
-func convertInitialBookmarks(bookmarks []any) neo4j.Bookmarks {
-	result := make(neo4j.Bookmarks, len(bookmarks))
-	for i, bookmark := range bookmarks {
-		result[i] = bookmark.(string)
-	}
-	return result
 }
 
 func convertSlice[T any](slice []any, transform func(any) T) []T {

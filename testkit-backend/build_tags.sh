@@ -125,4 +125,13 @@ else
 	exit 0
 fi
 
+if verlt "$version" "5.3.0"; then
+	# In fact, the bookmark manager API was introduced in 5.0.0,
+	# but changed to its final form (while in preview) in 5.3.0.
+	tags="$tags,internal_neo4j_testkit_no_bookmark_manager"
+else
+	echo $tags
+	exit 0
+fi
+
 echo $tags
