@@ -118,4 +118,11 @@ else
 	exit 0
 fi
 
+if verlt "$version" "5.5.0"; then
+	tags="$tags,internal_neo4j_testkit_no_execute_query"
+else
+	echo $tags
+	exit 0
+fi
+
 echo $tags

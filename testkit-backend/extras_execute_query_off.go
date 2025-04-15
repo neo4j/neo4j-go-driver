@@ -1,4 +1,4 @@
-//go:build internal_neo4j_testkit_no_stable_execute_query && !internal_neo4j_testkit_no_execute_query
+//go:build internal_neo4j_testkit_no_execute_query
 
 /*
  * Copyright (c) "Neo4j"
@@ -19,12 +19,17 @@
 
 package main
 
-import "github.com/neo4j/neo4j-go-driver/v5/neo4j"
+const extrasExecuteQuery = "executeQuery"
 
-func neo4jRead() neo4j.RoutingControl {
-	return neo4j.Readers
+func init() {
+	registerExtra(
+		extrasExecuteQuery,
+		ExtrasRegisterEntry{
+			extraBlockedTestKitFeatures: []string{
+				"Feature:API:Driver.ExecuteQuery",
+			},
+		},
+	)
 }
 
-func neo4jWrite() neo4j.RoutingControl {
-	return neo4j.Writers
-}
+type ExecuteQueryConfiguration = any

@@ -24,7 +24,7 @@ import (
 type extrasRequestHandlerFunc = func(backend *backend, data map[string]any)
 type extrasDriverConfigFunc = func(backend *backend, data map[string]any, config *Config) error
 type extrasNewDriverHandlerFunc = func(backend *backend, data map[string]any, driver neo4j.DriverWithContext) error
-type extrasExecuteQueryConfigFunc = func(backend *backend, data map[string]any, config *neo4j.ExecuteQueryConfiguration) error
+type extrasExecuteQueryConfigFunc = func(backend *backend, data map[string]any, config *ExecuteQueryConfiguration) error
 type extrasSessionConfigFunc = func(backend *backend, data map[string]any, config *neo4j.SessionConfig) error
 
 var extrasBlockedTestKitFeatures = make(map[string]any)
