@@ -19,11 +19,10 @@ package main
 
 import (
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/config"
 )
 
 type extrasRequestHandlerFunc = func(backend *backend, data map[string]any)
-type extrasDriverConfigFunc = func(backend *backend, data map[string]any, config *config.Config) error
+type extrasDriverConfigFunc = func(backend *backend, data map[string]any, config *Config) error
 type extrasNewDriverHandlerFunc = func(backend *backend, data map[string]any, driver neo4j.DriverWithContext) error
 type extrasExecuteQueryConfigFunc = func(backend *backend, data map[string]any, config *neo4j.ExecuteQueryConfiguration) error
 type extrasSessionConfigFunc = func(backend *backend, data map[string]any, config *neo4j.SessionConfig) error

@@ -1,4 +1,4 @@
-//go:build !internal_neo4j_testkit_no_telemetry
+//go:build internal_neo4j_testkit_no_config_package
 
 /*
  * Copyright (c) "Neo4j"
@@ -20,23 +20,9 @@
 package main
 
 import (
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/config"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
 )
 
-const extrasNameTelemetry = "telemetry"
-
-func init() {
-	registerExtra(
-		extrasNameTelemetry,
-		ExtrasRegisterEntry{
-			extraDriverConfigurer: extrasTelemetry,
-		},
-	)
-}
-
-func extrasTelemetry(backend *backend, data map[string]any, config *Config) error {
-	if data["telemetryDisabled"] != nil {
-		config.TelemetryDisabled = data["telemetryDisabled"].(bool)
-	}
-	return nil
-}
+type ServerAddressResolver = neo4j.ServerAddressResolver
+type ServerAddress = neo4j.ServerAddress
+type Config = neo4j.Config

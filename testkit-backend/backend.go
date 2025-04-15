@@ -32,9 +32,7 @@ import (
 	"time"
 
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/config"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/db"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/notifications"
 )
 
 // Handles a testkit backend session.
@@ -382,8 +380,8 @@ func (b *backend) handleTransactionFunc(isRead bool, data map[string]any) {
 	}
 }
 
-func (b *backend) customAddressResolverFunction() config.ServerAddressResolver {
-	return func(address config.ServerAddress) []config.ServerAddress {
+func (b *backend) customAddressResolverFunction() ServerAddressResolver {
+	return func(address ServerAddress) []ServerAddress {
 		id := b.nextId()
 		b.writeResponse("ResolverResolutionRequired", map[string]string{
 			"id":      id,
@@ -392,7 +390,7 @@ func (b *backend) customAddressResolverFunction() config.ServerAddressResolver {
 		for b.process() {
 			if addresses, ok := b.resolvedAddresses[id]; ok {
 				delete(b.resolvedAddresses, id)
-				result := make([]config.ServerAddress, len(addresses))
+				result := make([]ServerAddress, len(addresses))
 				for i, address := range addresses {
 					result[i] = NewServerAddress(address.(string))
 				}
@@ -408,7 +406,7 @@ type serverAddress struct {
 	port     string
 }
 
-func NewServerAddress(address string) config.ServerAddress {
+func NewServerAddress(address string) ServerAddress {
 	parsedAddress, err := url.Parse("//" + address)
 	if err != nil {
 		panic(err)
@@ -466,7 +464,7 @@ func (b *backend) handleRequest(req map[string]any) {
 		}
 		// Parse URI (or rather type cast)
 		uri := data["uri"].(string)
-		driver, err := neo4j.NewDriverWithContext(uri, authToken, func(c *config.Config) {
+		driver, err := neo4j.NewDriverWithContext(uri, authToken, func(c *Config) {
 			// Setup custom logger that redirects log entries back to frontend
 			c.Log = &streamLog{writeLine: b.writeLineLocked}
 			// Optional custom user agent from frontend
@@ -494,23 +492,6 @@ func (b *backend) handleRequest(req map[string]any) {
 			}
 			if data["connectionTimeoutMs"] != nil {
 				c.SocketConnectTimeout = time.Millisecond * time.Duration(asInt64(data["connectionTimeoutMs"].(json.Number)))
-			}
-			if data["notificationsMinSeverity"] != nil {
-				minSeverity, err := mapNotificationMinSeverityLevel(data["notificationsMinSeverity"].(string))
-				if err != nil {
-					b.writeError(err)
-					return
-				}
-				c.NotificationsMinSeverity = minSeverity
-			}
-			if data["notificationsDisabledCategories"] != nil {
-				notiDisCats := data["notificationsDisabledCategories"].([]any)
-				if len(notiDisCats) == 0 {
-					c.NotificationsDisabledCategories = notifications.DisableNoCategories()
-				} else {
-					cats := convertSlice(notiDisCats, anyToNotificationCategory)
-					c.NotificationsDisabledCategories = notifications.DisableCategories(cats...)
-				}
 			}
 
 			for _, configurer := range extrasDriverConfigurers {
@@ -569,8 +550,6 @@ func (b *backend) handleRequest(req map[string]any) {
 		if rawConfig := data["config"]; rawConfig != nil {
 			executeQueryConfig := rawConfig.(map[string]any)
 			configurers = append(configurers, func(config *neo4j.ExecuteQueryConfiguration) {
-				config.BoltLogger = &streamLog{writeLine: b.writeLineLocked}
-
 				routing := executeQueryConfig["routing"]
 				if routing != nil {
 					switch routing {
@@ -673,24 +652,6 @@ func (b *backend) handleRequest(req map[string]any) {
 				return
 			}
 			sessionConfig.BookmarkManager = bookmarkManager
-		}
-
-		if data["notificationsMinSeverity"] != nil {
-			minSeverity, err := mapNotificationMinSeverityLevel(data["notificationsMinSeverity"].(string))
-			if err != nil {
-				b.writeError(err)
-				return
-			}
-			sessionConfig.NotificationsMinSeverity = minSeverity
-		}
-		if data["notificationsDisabledCategories"] != nil {
-			notiDisCats := data["notificationsDisabledCategories"].([]any)
-			if len(notiDisCats) == 0 {
-				sessionConfig.NotificationsDisabledCategories = notifications.DisableNoCategories()
-			} else {
-				cats := convertSlice(notiDisCats, anyToNotificationCategory)
-				sessionConfig.NotificationsDisabledCategories = notifications.DisableCategories(cats...)
-			}
 		}
 
 		for _, configurer := range extrasSessionConfigurers {
@@ -1083,25 +1044,8 @@ func serializeNotifications(slice []neo4j.Notification, version db.ProtocolVersi
 		return []map[string]any{}
 	}
 	var res []map[string]any
-	for i, notification := range slice {
-		res = append(res, map[string]any{
-			"code":        notification.Code(),
-			"title":       notification.Title(),
-			"description": notification.Description(),
-			//lint:ignore SA1019 Severity is supported at least until 6.0
-			"severity":         notification.Severity(),
-			"severityLevel":    string(notification.SeverityLevel()),
-			"rawSeverityLevel": notification.RawSeverityLevel(),
-			"category":         string(notification.Category()),
-			"rawCategory":      notification.RawCategory(),
-		})
-		if notification.Position() != nil {
-			res[i]["position"] = map[string]any{
-				"offset": notification.Position().Offset(),
-				"line":   notification.Position().Line(),
-				"column": notification.Position().Column(),
-			}
-		}
+	for _, notification := range slice {
+		res = append(res, serializeNotification(notification))
 	}
 	return res
 }
@@ -1339,28 +1283,12 @@ func convertInitialBookmarks(bookmarks []any) neo4j.Bookmarks {
 	return result
 }
 
-func anyToNotificationCategory(v any) notifications.NotificationCategory {
-	return notifications.NotificationCategory(v.(string))
-}
-
 func convertSlice[T any](slice []any, transform func(any) T) []T {
 	res := make([]T, len(slice))
 	for i, cat := range slice {
 		res[i] = transform(cat)
 	}
 	return res
-}
-
-func mapNotificationMinSeverityLevel(rawMinSeverityLevel string) (notifications.NotificationMinimumSeverityLevel, error) {
-	switch rawMinSeverityLevel {
-	case "OFF":
-		return notifications.DisabledLevel, nil
-	case "WARNING":
-		return notifications.WarningLevel, nil
-	case "INFORMATION":
-		return notifications.InformationLevel, nil
-	}
-	return "", fmt.Errorf("unknown min severity level %s", rawMinSeverityLevel)
 }
 
 func mapGetString(data map[string]any, key string) string {

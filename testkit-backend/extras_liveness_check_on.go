@@ -37,7 +37,7 @@ func init() {
 	)
 }
 
-func extrasLivenessCheck(backend *backend, data map[string]any, config *config.Config) error {
+func extrasLivenessCheck(backend *backend, data map[string]any, config *Config) error {
 	// Append configurers to config if they exist.
 	if data["livenessCheckTimeoutMs"] != nil {
 		config.ConnectionLivenessCheckTimeout = time.Millisecond * time.Duration(asInt64(data["livenessCheckTimeoutMs"].(json.Number)))

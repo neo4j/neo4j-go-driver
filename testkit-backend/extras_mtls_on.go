@@ -58,7 +58,7 @@ func extrasMTLSGetBackendExtraData(backend *backend) extrasMTLSExtraData {
 	return getBackendExtraData(backend, extrasNameMTLS).(extrasMTLSExtraData)
 }
 
-func extrasMTLSDriverConfig(backend *backend, data map[string]any, config *config.Config) error {
+func extrasMTLSDriverConfig(backend *backend, data map[string]any, config *Config) error {
 	clientCertificateProviderId := data["clientCertificateProviderId"]
 	extraData := extrasMTLSGetBackendExtraData(backend)
 	if clientCertificateProviderId != nil {

@@ -1,4 +1,4 @@
-//go:build !internal_neo4j_testkit_no_telemetry
+//go:build !internal_neo4j_testkit_no_execute_query_logger
 
 /*
  * Copyright (c) "Neo4j"
@@ -20,23 +20,21 @@
 package main
 
 import (
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/config"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
 )
 
-const extrasNameTelemetry = "telemetry"
+const extrasExecuteQueryLogger = "executeQueryLogger"
 
 func init() {
 	registerExtra(
-		extrasNameTelemetry,
+		extrasExecuteQueryLogger,
 		ExtrasRegisterEntry{
-			extraDriverConfigurer: extrasTelemetry,
+			extraExecuteQueryConfigurer: extrasExecuteQueryLoggerConfig,
 		},
 	)
 }
 
-func extrasTelemetry(backend *backend, data map[string]any, config *Config) error {
-	if data["telemetryDisabled"] != nil {
-		config.TelemetryDisabled = data["telemetryDisabled"].(bool)
-	}
+func extrasExecuteQueryLoggerConfig(backend *backend, data map[string]any, config *neo4j.ExecuteQueryConfiguration) error {
+	config.BoltLogger = &streamLog{writeLine: backend.writeLineLocked}
 	return nil
 }
