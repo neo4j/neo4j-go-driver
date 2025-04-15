@@ -94,7 +94,7 @@ else
 	exit 0
 fi
 
-if verlt "$version" "5.11.0"; then
+if verlt "$version" "5.10.0"; then
 	tags="$tags,internal_neo4j_testkit_no_bolt_agent"
 else
 	echo $tags

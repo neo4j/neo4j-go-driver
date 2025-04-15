@@ -28,6 +28,7 @@ func init() {
 		extrasNameGqlStatus,
 		ExtrasRegisterEntry{
 			extraBlockedTestKitFeatures: []string{
+				"Feature:API:Summary:GqlStatusObjects",
 				"Feature:Bolt:5.5",
 				"Feature:Bolt:5.6",
 			},
@@ -36,5 +37,5 @@ func init() {
 }
 
 func serializeGqlStatusObjects(summary neo4j.ResultSummary) []map[string]any {
-	return nil
+	return make([]map[string]any, 0)
 }

@@ -93,8 +93,11 @@ func registerExtra(name string, entry ExtrasRegisterEntry) {
 }
 
 func newBackendExtraData() map[string]any {
-	extraData := make(map[string]any)
+	extraData := make(map[string]any, len(extrasRegister))
 	for key, entry := range extrasRegister {
+		if entry.newBackendExtraData == nil {
+			continue
+		}
 		extraData[key] = entry.newBackendExtraData()
 	}
 	return extraData

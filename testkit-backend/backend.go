@@ -883,7 +883,10 @@ func mustSkip(testName string) (string, bool) {
 
 func mustSkipSubTest(testName string, arguments map[string]any) (string, bool) {
 	if strings.Contains(testName, "test_should_echo_all_timezone_ids") {
-		return mustSkipTimeZoneSubTest(arguments)
+		return mustSkipTimeZoneEchoSubTest(arguments)
+	}
+	if strings.Contains(testName, "test_date_time_cypher_created_tz_id") {
+		return mustSkipTimeZoneCypherSubTest(arguments)
 	}
 	return "", false
 }
@@ -1073,7 +1076,7 @@ func firstRecordInvalidValue(record *db.Record) *neo4j.InvalidValue {
 	return nil
 }
 
-func mustSkipTimeZoneSubTest(arguments map[string]any) (string, bool) {
+func mustSkipTimeZoneEchoSubTest(arguments map[string]any) (string, bool) {
 	rawDateTime := arguments["dt"].(map[string]any)
 	dateTimeData := rawDateTime["data"].(map[string]any)
 	timeZoneName := dateTimeData["timezone_id"].(string)
@@ -1096,6 +1099,15 @@ func mustSkipTimeZoneSubTest(arguments map[string]any) (string, bool) {
 		return fmt.Sprintf("Expected offset %d for timezone %s and time %s, got offset %d instead",
 				expectedOffset, timeZoneName, dateTime.String(), actualOffset),
 			true
+	}
+	return "", false
+}
+
+func mustSkipTimeZoneCypherSubTest(arguments map[string]any) (string, bool) {
+	timeZoneName := arguments["tz_id"].(string)
+	_, err := time.LoadLocation(timeZoneName)
+	if err != nil {
+		return fmt.Sprintf("time zone not supported: %s", err), true
 	}
 	return "", false
 }

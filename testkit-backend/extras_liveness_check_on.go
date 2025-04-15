@@ -22,8 +22,6 @@ package main
 import (
 	"encoding/json"
 	"time"
-
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/config"
 )
 
 const extrasNameLivenessCheck = "livenessCheck"

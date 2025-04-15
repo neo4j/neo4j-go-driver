@@ -77,7 +77,8 @@ func executeQueryHandler(backend *backend, data map[string]any) {
 					}
 					config.BookmarkManager = nil
 				} else {
-					config.BookmarkManager = backend.bookmarkManagers[bookmarkManagerId.(string)]
+					extraDataBmm := extrasBookmarkManagerGetBackendExtraData(backend)
+					config.BookmarkManager = extraDataBmm.bookmarkManagers[bookmarkManagerId.(string)]
 				}
 			}
 
