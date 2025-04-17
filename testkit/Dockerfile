@@ -39,7 +39,7 @@ RUN go mod init github.com/neo4j/neo4j-go-driver/testkit-backend/v2 \
     && go build -tags "$(./build_tags.sh ${TIME_WARP})" -o backend
 ENTRYPOINT ["./backend"]
 
-FROM base-py-install AS backend
+FROM base AS backend
 # Install python stuff
 ENV PYTHON=python3
 
