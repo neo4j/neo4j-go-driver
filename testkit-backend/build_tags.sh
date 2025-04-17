@@ -7,7 +7,7 @@ verlte() {
 }
 
 verlt() {
-    [ "$1" = "$2" ] && return 1 || verlte $1 $2
+    [ "$1" = "$2" ] && return 1 || verlte "$1" "$2"
 }
 
 version="${1:-''}"
@@ -16,7 +16,7 @@ if [ -z "$version" ]; then
 	# choose a version bigger than any version checked below
 	# => next major version, at which point we can clean-up this script as it only needs to support the current major
 	version="6.0.0"
-elif [ $(echo "$version" | cut -d "." -f 1) != "5" ]; then
+elif [ "$(echo "$version" | cut -d "." -f 1)" != "5" ]; then
 	echo "Script only works for 5.x" >&2
 	exit 1
 fi
