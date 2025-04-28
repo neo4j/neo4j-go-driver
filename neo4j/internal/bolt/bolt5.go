@@ -949,7 +949,7 @@ func (b *bolt5) Close(ctx context.Context) {
 		b.queue.send(ctx)
 	}
 	if err := b.conn.Close(); err != nil {
-		b.log.Warnf(log.Driver, b.serverName, "could not close underlying socket")
+		b.log.Warnf(log.Driver, b.serverName, "Could not close underlying socket: %v", err)
 	}
 }
 
