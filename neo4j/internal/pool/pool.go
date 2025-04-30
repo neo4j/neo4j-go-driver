@@ -411,7 +411,20 @@ func (p *Pool) removeIdleOlderThanLocked(ctx context.Context, s *server, now tim
 func (p *Pool) closeConnection(ctx context.Context, c idb.Connection) {
 	p.ssrTracker.removeConnection(c)
 	// Close connection in another thread to avoid potential long blocking operation during close.
-	go c.Close(ctx)
+	go func() {
+		ctx, cancelFunc := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancelFunc()
+		c.Close(ctx)
+		if ctxErr := ctx.Err(); ctxErr != nil {
+			p.log.Debugf(
+				log.Pool,
+				p.logId,
+				"Connection %s timed out during graceful shutdown: %s",
+				c.ConnId(),
+				ctxErr,
+			)
+		}
+	}()
 }
 
 func (p *Pool) Return(ctx context.Context, c idb.Connection) {
