@@ -200,6 +200,7 @@ func (b *bolt5) setError(err error, fatal bool) {
 		return
 	}
 
+	wasDead := b.state == bolt5Dead
 	// No previous error
 	if b.err == nil {
 		b.err = err
@@ -224,6 +225,8 @@ func (b *bolt5) setError(err error, fatal bool) {
 	neo4jErr, casted := err.(*db.Neo4jError)
 	if casted && neo4jErr.Classification() == "ClientError" {
 		b.log.Debugf(log.Bolt5, b.logId, "%s", err)
+	} else if wasDead {
+		b.log.Debugf(log.Bolt5, b.logId, "Already broken connection: %s", err)
 	} else {
 		b.log.Error(log.Bolt5, b.logId, err)
 	}
