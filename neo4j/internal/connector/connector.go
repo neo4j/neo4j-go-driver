@@ -172,9 +172,6 @@ func (c Connector) tlsConfig(serverName string) *tls.Config {
 		config = c.Config.TlsConfig.Clone()
 	} else {
 		config = &tls.Config{
-			// Use RootCAs from the connector's config.
-			//lint:ignore SA1019 RootCAs is supported until 6.0
-			RootCAs: c.Config.RootCAs,
 			// It's safe to set MinVersion and other settings here since we're initializing a new config.
 			MinVersion: tls.VersionTLS12,
 		}

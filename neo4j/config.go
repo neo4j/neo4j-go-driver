@@ -40,7 +40,6 @@ func defaultConfig() *config.Config {
 		ConnectionLivenessCheckTimeout:       pool.DefaultConnectionLivenessCheckTimeout,
 		SocketConnectTimeout:                 5 * time.Second,
 		SocketKeepalive:                      true,
-		RootCAs:                              nil,
 		UserAgent:                            UserAgent,
 		FetchSize:                            FetchDefault,
 		NotificationsMinSeverity:             notifications.DefaultLevel,

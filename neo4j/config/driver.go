@@ -19,7 +19,6 @@ package config
 
 import (
 	"crypto/tls"
-	"crypto/x509"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/auth"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/log"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/notifications"
@@ -29,16 +28,6 @@ import (
 // A Config contains options that can be used to customize certain
 // aspects of the driver
 type Config struct {
-	// RootCAs defines the set of certificate authorities that the driver trusts. If set
-	// to nil, the driver uses hosts system certificates.
-	//
-	// The trusted certificates are used to validate connections for URI schemes 'bolt+s'
-	// and 'neo4j+s'.
-	//
-	// Deprecated: RootCAs will be removed in 6.0.
-	// Please rely on TlsConfig's RootCAs attribute instead.
-	// RootCAs is ignored if TlsConfig is set.
-	RootCAs *x509.CertPool
 	// TlsConfig defines the TLS configuration of the driver.
 	//
 	// The configuration is only used for URI schemes 'bolt+s', 'bolt+ssc',
