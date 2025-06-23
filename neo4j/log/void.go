@@ -32,11 +32,6 @@ func (l void) Warnf(name, id, msg string, args ...any) {
 func (l void) Debugf(name, id, msg string, args ...any) {
 }
 
-// Void is a Logger implementation that throws away all log events.
-//
-// Deprecated: use log.ToVoid() instead.
-type Void = void
-
 // ToVoid returns a Logger implementation that throws away all log events.
 func ToVoid() Logger {
 	return void{}
