@@ -288,7 +288,7 @@ Logging at the driver level can be configured by setting `Log` field of `config.
 
 ### Console Logger
 
-For simplicity, we provide a predefined console logger which can be constructed by `neo4j.ConsoleLogger` function. To enable console logger, you need to specify which level you need to enable (`neo4j.ERROR`, `neo4j.WARNING`, `neo4j.INFO` and `neo4j.DEBUG` which are ordered by the level of detail).
+For simplicity, we provide a predefined console logger which can be constructed by `neo4j.ConsoleLogger` function. To enable console logger, you need to specify which level you need to enable (`log.ERROR`, `log.WARNING`, `log.INFO` and `log.DEBUG` which are ordered by the level of detail).
 
 A simple code snippet that will enable console logging is as follows;
 
@@ -300,7 +300,7 @@ useConsoleLogger := func(level log.Level) func(config *config.Config) {
 }
 
 // Construct a new driver
-if driver, err = neo4j.NewDriver(uri, neo4j.BasicAuth(username, password, ""), useConsoleLogger(neo4j.ERROR)); err != nil {
+if driver, err = neo4j.NewDriver(uri, neo4j.BasicAuth(username, password, ""), useConsoleLogger(log.ERROR)); err != nil {
 	return err
 }
 defer driver.Close()

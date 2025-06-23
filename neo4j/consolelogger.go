@@ -21,25 +21,6 @@ import (
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/log"
 )
 
-const (
-	// ERROR is the level that error messages are written
-	//
-	// Deprecated: use log.ERROR instead.
-	ERROR = log.ERROR
-	// WARNING is the level that warning messages are written
-	//
-	// Deprecated: use log.WARNING instead.
-	WARNING = log.WARNING
-	// INFO is the level that info messages are written
-	//
-	// Deprecated: use log.INFO instead.
-	INFO = log.INFO
-	// DEBUG is the level that debug messages are written
-	//
-	// Deprecated: use log.DEBUG instead.
-	DEBUG = log.DEBUG
-)
-
 // Deprecated: use log.ToConsole() instead.
 func ConsoleLogger(level log.Level) *log.Console {
 	return &log.Console{
