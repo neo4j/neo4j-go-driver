@@ -243,14 +243,14 @@ type Notification interface {
 	RawSeverityLevel() string
 	// RawCategory returns the unmapped category of this notification.
 	// This is useful when the driver cannot interpret the category returned by the server
-	// In that case, Category returns UnknownCategory while RawCategory returns the raw string
+	// In that case, Category returns notifications.Unknown while RawCategory returns the raw string
 	RawCategory() string
 	// SeverityLevel returns the mapped security level of this notification.
 	// If the severity level is not a known value, SeverityLevel returns notifications.UnknownSeverity
 	// Call RawSeverityLevel to get access to the raw string value
 	SeverityLevel() notifications.NotificationSeverity
 	// Category returns the mapped category of this notification.
-	// If the category is not a known value, Category returns UnknownCategory
+	// If the category is not a known value, Category returns notifications.Unknown
 	// Call RawCategory to get access to the raw string value
 	Category() notifications.NotificationCategory
 }
@@ -323,32 +323,6 @@ type InputPosition interface {
 	// Column returns the column number referred to by this position; column numbers start at 1.
 	Column() int
 }
-
-// Deprecated: please use notifications.NotificationCategory directly. This will be removed in 6.0.
-type NotificationCategory = notifications.NotificationCategory
-
-const (
-	// Deprecated: please use notifications.Hint directly. This will be removed in 6.0.
-	Hint NotificationCategory = notifications.Hint
-	// Deprecated: please use notifications.Unrecognized directly. This will be removed in 6.0.
-	Unrecognized NotificationCategory = notifications.Unrecognized
-	// Deprecated: please use notifications.Unsupported directly. This will be removed in 6.0.
-	Unsupported NotificationCategory = notifications.Unsupported
-	// Deprecated: please use notifications.Performance directly. This will be removed in 6.0.
-	Performance NotificationCategory = notifications.Performance
-	// Deprecated: please use notifications.Deprecation directly. This will be removed in 6.0.
-	Deprecation NotificationCategory = notifications.Deprecation
-	// Deprecated: please use notifications.Generic directly. This will be removed in 6.0.
-	Generic NotificationCategory = notifications.Generic
-	// Deprecated: please use notifications.Security directly. This will be removed in 6.0.
-	Security NotificationCategory = notifications.Security
-	// Deprecated: please use notifications.Topology directly. This will be removed in 6.0.
-	Topology NotificationCategory = notifications.Topology
-	// Deprecated: please use notifications.Schema directly. This will be removed in 6.0.
-	Schema NotificationCategory = notifications.Schema
-	// Deprecated: please use notifications.Unknown directly. This will be removed in 6.0.
-	UnknownCategory NotificationCategory = notifications.Unknown
-)
 
 type resultSummary struct {
 	sum    *db.Summary
@@ -691,25 +665,25 @@ func (n *notification) RawCategory() string {
 func (n *notification) Category() notifications.NotificationCategory {
 	switch n.notification.Category {
 	case "HINT":
-		return Hint
+		return notifications.Hint
 	case "UNRECOGNIZED":
-		return Unrecognized
+		return notifications.Unrecognized
 	case "UNSUPPORTED":
-		return Unsupported
+		return notifications.Unsupported
 	case "PERFORMANCE":
-		return Performance
+		return notifications.Performance
 	case "DEPRECATION":
-		return Deprecation
+		return notifications.Deprecation
 	case "SECURITY":
-		return Security
+		return notifications.Security
 	case "TOPOLOGY":
-		return Topology
+		return notifications.Topology
 	case "SCHEMA":
-		return Schema
+		return notifications.Schema
 	case "GENERIC":
-		return Generic
+		return notifications.Generic
 	default:
-		return UnknownCategory
+		return notifications.Unknown
 	}
 }
 
