@@ -34,38 +34,12 @@ func SingleTWithContext[T any](ctx context.Context, result ResultWithContext, ma
 	return mapper(single)
 }
 
-// SingleT maps the single record left to an instance of T with the provided mapper function.
-// It relies on Result.Single and propagate its error, if any.
-//
-// Deprecated: use SingleTWithContext instead (the entry point of context-aware
-// APIs is NewDriverWithContext)
-func SingleT[T any](result Result, mapper func(*Record) (T, error)) (T, error) {
-	single, err := result.Single()
-	if err != nil {
-		return *new(T), err
-	}
-	return mapper(single)
-}
-
 // CollectTWithContext maps the records to a slice of T with the provided mapper function.
 // It relies on ResultWithContext.Collect and propagate its error, if any.
 // It accepts a context.Context, which may be canceled or carry a deadline, to control the overall record fetching
 // execution time.
 func CollectTWithContext[T any](ctx context.Context, result ResultWithContext, mapper func(*Record) (T, error)) ([]T, error) {
 	records, err := result.Collect(ctx)
-	if err != nil {
-		return nil, err
-	}
-	return mapAll(records, mapper)
-}
-
-// CollectT maps the records to a slice of T with the provided mapper function.
-// It relies on Result.Collect and propagate its error, if any.
-//
-// Deprecated: use CollectTWithContext instead (the entry point of context-aware
-// APIs is NewDriverWithContext)
-func CollectT[T any](result Result, mapper func(*Record) (T, error)) ([]T, error) {
-	records, err := result.Collect()
 	if err != nil {
 		return nil, err
 	}
