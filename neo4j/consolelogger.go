@@ -21,12 +21,6 @@ import (
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/log"
 )
 
-// LogLevel is the type that default logging implementations use for available
-// log levels
-//
-// Deprecated: use log.Level instead.
-type LogLevel = log.Level
-
 const (
 	// ERROR is the level that error messages are written
 	//

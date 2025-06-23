@@ -293,7 +293,7 @@ For simplicity, we provide a predefined console logger which can be constructed 
 A simple code snippet that will enable console logging is as follows;
 
 ```go
-useConsoleLogger := func(level neo4j.LogLevel) func(config *config.Config) {
+useConsoleLogger := func(level log.Level) func(config *config.Config) {
 	return func(config *config.Config) {
 		config.Log = neo4j.ConsoleLogger(level)
 	}
