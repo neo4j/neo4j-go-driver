@@ -16,9 +16,12 @@
  */
 
 // Benchmark tool that uses driver 1.8 as baseline.
+// The tool requires a running Neo4j instance to connect to.
+// Run with: go run main.go bolt://localhost:7687 user pass
 package main
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"runtime"
@@ -29,16 +32,18 @@ import (
 	neo4j "github.com/neo4j/neo4j-go-driver/v5/neo4j"
 )
 
-func getSetup(driver neo4j.Driver) *neo4j.Node {
+func getSetup(driver neo4j.DriverWithContext) *neo4j.Node {
 	// Check if setup already built
-	sess := driver.NewSession(neo4j.SessionConfig{})
-	defer sess.Close()
+	ctx := context.Background()
+	sess := driver.NewSession(ctx, neo4j.SessionConfig{})
+	defer sess.Close(ctx)
 
-	result, err := sess.Run("MATCH (s:Setup) RETURN s", nil)
+	result, err := sess.Run(ctx, "MATCH (s:Setup) RETURN s", nil)
 	if err != nil {
 		panic(err)
 	}
-	records, err := result.Collect()
+
+	records, err := result.Collect(ctx)
 	if err != nil {
 		panic(err)
 	}
@@ -69,10 +74,10 @@ func getBoolProp(node *neo4j.Node, name string, dflt bool) bool {
 	return b
 }
 
-func buildSetup(driver neo4j.Driver, setup *neo4j.Node) {
-
-	sess := driver.NewSession(neo4j.SessionConfig{})
-	defer sess.Close()
+func buildSetup(driver neo4j.DriverWithContext, setup *neo4j.Node) {
+	ctx := context.Background()
+	sess := driver.NewSession(ctx, neo4j.SessionConfig{})
+	defer sess.Close(ctx)
 
 	if !getBoolProp(setup, "iterMxL", false) {
 		fmt.Println("Building iterMxL")
@@ -85,27 +90,28 @@ func buildSetup(driver neo4j.Driver, setup *neo4j.Node) {
 				x = x + i*i
 				nums[strconv.Itoa(i)] = x
 			}
-			_, err := sess.Run("CREATE (n:IterMxL) SET n = $nums RETURN n", map[string]any{"nums": nums})
+			_, err := sess.Run(ctx, "CREATE (n:IterMxL) SET n = $nums RETURN n", map[string]any{"nums": nums})
 			if err != nil {
 				panic(err)
 			}
 		}
-		sess.Run("MERGE (s:Setup) SET s.iterMxL = true", nil)
+		sess.Run(ctx, "MERGE (s:Setup) SET s.iterMxL = true", nil)
 	}
 }
 
-func iterMxL(driver neo4j.Driver) {
-	sess := driver.NewSession(neo4j.SessionConfig{})
-	defer sess.Close()
+func iterMxL(driver neo4j.DriverWithContext) {
+	ctx := context.Background()
+	sess := driver.NewSession(ctx, neo4j.SessionConfig{})
+	defer sess.Close(ctx)
 
-	result, err := sess.Run("MATCH (n:IterMxL) RETURN n", nil)
+	result, err := sess.Run(ctx, "MATCH (n:IterMxL) RETURN n", nil)
 	if err != nil {
 		panic(err)
 	}
 
 	num := 0
 	var record *neo4j.Record
-	for result.NextRecord(&record) {
+	for result.NextRecord(ctx, &record) {
 		num++
 		node := record.Values[0].(neo4j.Node)
 		if len(node.Props) != iterMxLNUMPROPS {
@@ -151,16 +157,17 @@ func buildParamsLMap() map[string]any {
 	return m
 }
 
-func params(driver neo4j.Driver, m map[string]any, n int) {
+func params(driver neo4j.DriverWithContext, m map[string]any, n int) {
+	ctx := context.Background()
 	// Use same session for all of n, not part of measurement
-	session := driver.NewSession(neo4j.SessionConfig{})
+	session := driver.NewSession(ctx, neo4j.SessionConfig{})
 	for i := 0; i < n; i++ {
-		_, err := session.Run("RETURN 0", m)
+		_, err := session.Run(ctx, "RETURN 0", m)
 		if err != nil {
 			panic(err)
 		}
 	}
-	session.Close()
+	session.Close(ctx)
 }
 
 func params18(driver neo4j18.Driver, m map[string]any, n int) {
@@ -177,16 +184,17 @@ func params18(driver neo4j18.Driver, m map[string]any, n int) {
 
 // Measures time to get a single result using tx function
 // Include session creation in measurement
-func getS(driver neo4j.Driver, n int) {
+func getS(driver neo4j.DriverWithContext, n int) {
+	ctx := context.Background()
 	for i := 0; i < n; i++ {
-		session := driver.NewSession(neo4j.SessionConfig{})
-		x, _ := session.ReadTransaction(func(tx neo4j.Transaction) (any, error) {
-			res, err := tx.Run("RETURN $i", map[string]any{"i": i})
+		session := driver.NewSession(ctx, neo4j.SessionConfig{})
+		x, _ := session.ExecuteRead(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+			res, err := tx.Run(ctx, "RETURN $i", map[string]any{"i": i})
 			if err != nil {
 				panic(err)
 			}
 			var rec *neo4j.Record
-			if !res.NextRecord(&rec) {
+			if !res.NextRecord(ctx, &rec) {
 				panic("no record")
 			}
 			return int(rec.Values[0].(int64)), nil
@@ -194,7 +202,7 @@ func getS(driver neo4j.Driver, n int) {
 		if x.(int) != i {
 			panic("!= i")
 		}
-		session.Close()
+		session.Close(ctx)
 	}
 }
 
@@ -255,7 +263,7 @@ func perf(warmup, measure func()) (time.Duration, memDiff) {
 
 // Run with bolt://localhost:7687 user pass
 func main() {
-	driver, err := neo4j.NewDriver(os.Args[1], neo4j.BasicAuth(os.Args[2], os.Args[3], ""))
+	driver, err := neo4j.NewDriverWithContext(os.Args[1], neo4j.BasicAuth(os.Args[2], os.Args[3], ""))
 	if err != nil {
 		panic(err)
 	}

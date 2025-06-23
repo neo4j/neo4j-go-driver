@@ -73,7 +73,7 @@ type Config struct {
 	Log log.Logger
 	// Resolver that would be used to resolve initial router address. This may
 	// be useful if you want to provide more than one URL for initial router.
-	// If not specified, the URL provided to NewDriver or NewDriverWithContext
+	// If not specified, the URL provided to NewDriverWithContext
 	// is used as the initial router.
 	//
 	// default: nil

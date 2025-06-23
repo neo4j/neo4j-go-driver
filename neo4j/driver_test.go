@@ -18,6 +18,7 @@
 package neo4j
 
 import (
+	"context"
 	"reflect"
 	"testing"
 
@@ -25,57 +26,57 @@ import (
 	. "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/testutil"
 )
 
-func assertNoRouter(t *testing.T, d Driver) {
+func assertNoRouter(t *testing.T, d DriverWithContext) {
 	t.Helper()
-	_, isDirectRouter := d.(*driver).delegate.(*driverWithContext).router.(*directRouter)
+	_, isDirectRouter := d.(*driverWithContext).router.(*directRouter)
 	if !isDirectRouter {
 		t.Error("Expected no router")
 	}
 }
-func assertNoRouterAddress(t *testing.T, d Driver, address string) {
+func assertNoRouterAddress(t *testing.T, d DriverWithContext, address string) {
 	t.Helper()
-	direct := d.(*driver).delegate.(*driverWithContext).router.(*directRouter)
+	direct := d.(*driverWithContext).router.(*directRouter)
 	if direct.address != address {
 		t.Errorf("Address mismatch %s vs %s", address, direct.address)
 	}
 }
 
-func assertRouter(t *testing.T, d Driver) {
+func assertRouter(t *testing.T, d DriverWithContext) {
 	t.Helper()
-	_, isRouter := d.(*driver).delegate.(*driverWithContext).router.(*router.Router)
+	_, isRouter := d.(*driverWithContext).router.(*router.Router)
 	if !isRouter {
 		t.Error("Expected router")
 	}
 }
 
-func assertRouterContext(t *testing.T, d Driver, context map[string]string) {
+func assertRouterContext(t *testing.T, d DriverWithContext, context map[string]string) {
 	t.Helper()
-	r := d.(*driver).delegate.(*driverWithContext).router.(*router.Router)
+	r := d.(*driverWithContext).router.(*router.Router)
 	c := r.Context()
 	if !reflect.DeepEqual(c, context) {
 		t.Errorf("Router contexts differ: %#v vs %#v", c, context)
 	}
 }
 
-func assertSkipEncryption(t *testing.T, d Driver, skipEncryption bool) {
+func assertSkipEncryption(t *testing.T, d DriverWithContext, skipEncryption bool) {
 	t.Helper()
-	c := d.(*driver).delegate.(*driverWithContext).connector
+	c := d.(*driverWithContext).connector
 	if c.SkipEncryption != skipEncryption {
 		t.Errorf("SkipEncryption mismatch, %t vs %t", skipEncryption, c.SkipEncryption)
 	}
 }
 
-func assertSkipVerify(t *testing.T, d Driver, skipVerify bool) {
+func assertSkipVerify(t *testing.T, d DriverWithContext, skipVerify bool) {
 	t.Helper()
-	c := d.(*driver).delegate.(*driverWithContext).connector
+	c := d.(*driverWithContext).connector
 	if c.SkipVerify != skipVerify {
 		t.Errorf("SkipVerify mismatch, %t vs %t", skipVerify, c.SkipVerify)
 	}
 }
 
-func assertNetwork(t *testing.T, d Driver, network string) {
+func assertNetwork(t *testing.T, d DriverWithContext, network string) {
 	t.Helper()
-	c := d.(*driver).delegate.(*driverWithContext).connector
+	c := d.(*driverWithContext).connector
 	if c.Network != network {
 		t.Errorf("Network mismatch, %s vs %s", network, c.Network)
 	}
@@ -102,7 +103,7 @@ func TestDriverURISchemes(t *testing.T) {
 
 	for _, tt := range uriSchemeTests {
 		t.Run(tt.scheme, func(t *testing.T) {
-			driver, err := NewDriver(tt.testing, NoAuth())
+			driver, err := NewDriverWithContext(tt.testing, NoAuth())
 
 			AssertNoError(t, err)
 			AssertStringEqual(t, driver.Target().Scheme, tt.scheme)
@@ -133,7 +134,7 @@ func TestDriverInvalidURISchemes(t *testing.T) {
 
 	for _, tt := range invalidURISchemeTests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, err := NewDriver(tt.testing, NoAuth())
+			_, err := NewDriverWithContext(tt.testing, NoAuth())
 
 			AssertError(t, err)
 			assertUsageError(t, err)
@@ -144,21 +145,21 @@ func TestDriverInvalidURISchemes(t *testing.T) {
 
 func TestDriverURIRoutingContext(t *testing.T) {
 	t.Run("Extracts keys", func(t1 *testing.T) {
-		driver, err := NewDriver("neo4j://localhost:7687?x=y&a=b", NoAuth())
+		driver, err := NewDriverWithContext("neo4j://localhost:7687?x=y&a=b", NoAuth())
 
 		AssertNoError(t1, err)
 		assertRouterContext(t1, driver, map[string]string{"x": "y", "a": "b", "address": "localhost:7687"})
 	})
 
 	t.Run("Duplicate keys should error", func(t1 *testing.T) {
-		_, err := NewDriver("neo4j://localhost:7687?x=y&x=b", NoAuth())
+		_, err := NewDriverWithContext("neo4j://localhost:7687?x=y&x=b", NoAuth())
 
 		AssertError(t, err)
 		assertUsageError(t, err)
 	})
 
 	t.Run("Reserved key 'address' should error", func(t *testing.T) {
-		_, err := NewDriver("neo4j://localhost:7687?x=y&address=b", NoAuth())
+		_, err := NewDriverWithContext("neo4j://localhost:7687?x=y&address=b", NoAuth())
 
 		AssertError(t, err)
 		assertUsageError(t, err)
@@ -167,7 +168,7 @@ func TestDriverURIRoutingContext(t *testing.T) {
 
 func TestDriverDefaultPort(t *testing.T) {
 	t.Run("neo4j://localhost should default to port 7687", func(t1 *testing.T) {
-		driver, err := NewDriver("neo4j://localhost", NoAuth())
+		driver, err := NewDriverWithContext("neo4j://localhost", NoAuth())
 		driverTarget := driver.Target()
 
 		AssertNoError(t1, err)
@@ -177,7 +178,8 @@ func TestDriverDefaultPort(t *testing.T) {
 }
 
 func TestNewDriverAndClose(t *testing.T) {
-	driver, err := NewDriver("bolt://localhost:7687", NoAuth())
+	ctx := context.Background()
+	driver, err := NewDriverWithContext("bolt://localhost:7687", NoAuth())
 	AssertNoError(t, err)
 
 	driverTarget := driver.Target()
@@ -194,16 +196,16 @@ func TestNewDriverAndClose(t *testing.T) {
 		t.Errorf("the port is not the expected %v", driverTarget.Port())
 	}
 
-	err = driver.Close()
+	err = driver.Close(ctx)
 	AssertNoError(t, err)
 
-	session := driver.NewSession(SessionConfig{})
-	_, err = session.Run("cypher", nil)
+	session := driver.NewSession(ctx, SessionConfig{})
+	_, err = session.Run(ctx, "cypher", nil)
 	if !IsUsageError(err) {
 		t.Errorf("should not allow new session after driver being closed")
 	}
 
-	err = driver.Close()
+	err = driver.Close(ctx)
 	if err != nil {
 		t.Errorf("should allow the close call on a closed driver")
 	}
@@ -224,18 +226,19 @@ func TestDriverSessionCreation(t *testing.T) {
 
 	for _, tt := range driverSessionCreationTests {
 		t.Run(tt.name, func(t *testing.T) {
-			driver, err := NewDriver(tt.testing, NoAuth())
+			ctx := context.Background()
+			driver, err := NewDriverWithContext(tt.testing, NoAuth())
 			AssertNoError(t, err)
 
-			sessi := driver.NewSession(SessionConfig{AccessMode: tt.mode, Bookmarks: tt.bookmarks})
-			sess := sessi.(*session)
+			sessi := driver.NewSession(ctx, SessionConfig{AccessMode: tt.mode, Bookmarks: tt.bookmarks})
+			sess := sessi.(*sessionWithContext)
 
-			if AccessMode(sess.delegate.defaultMode) != tt.mode {
-				t.Errorf("the defaultMode was not correctly set %v", AccessMode(sess.delegate.defaultMode))
+			if AccessMode(sess.defaultMode) != tt.mode {
+				t.Errorf("the defaultMode was not correctly set %v", AccessMode(sess.defaultMode))
 			}
 
-			if len(sess.delegate.bookmarks.currentBookmarks()) != len(tt.bookmarks) {
-				t.Errorf("the bookmarks was not correctly set %v", sess.delegate.bookmarks)
+			if len(sess.bookmarks.currentBookmarks()) != len(tt.bookmarks) {
+				t.Errorf("the bookmarks was not correctly set %v", sess.bookmarks)
 			}
 		})
 	}
