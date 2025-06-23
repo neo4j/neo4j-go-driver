@@ -324,18 +324,6 @@ type InputPosition interface {
 	Column() int
 }
 
-// Deprecated: please use notifications.NotificationSeverity directly. This will be removed in 6.0.
-type NotificationSeverity = notifications.NotificationSeverity
-
-const (
-	// Deprecated: please use notifications.Warning directly. This will be removed in 6.0.
-	Warning NotificationSeverity = notifications.Warning
-	// Deprecated: please use notifications.Information directly. This will be removed in 6.0.
-	Information NotificationSeverity = notifications.Information
-	// Deprecated: please use notifications.UnknownSeverity directly. This will be removed in 6.0.
-	UnknownSeverity NotificationSeverity = notifications.UnknownSeverity
-)
-
 // Deprecated: please use notifications.NotificationCategory directly. This will be removed in 6.0.
 type NotificationCategory = notifications.NotificationCategory
 
@@ -688,11 +676,11 @@ func (n *notification) RawSeverityLevel() string {
 func (n *notification) SeverityLevel() notifications.NotificationSeverity {
 	switch n.notification.Severity {
 	case "WARNING":
-		return Warning
+		return notifications.Warning
 	case "INFORMATION":
-		return Information
+		return notifications.Information
 	default:
-		return UnknownSeverity
+		return notifications.UnknownSeverity
 	}
 }
 
@@ -807,11 +795,11 @@ func (g *gqlStatusObject) RawClassification() string {
 func (g *gqlStatusObject) Severity() notifications.NotificationSeverity {
 	switch g.gqlStatusObject.Severity {
 	case "WARNING":
-		return Warning
+		return notifications.Warning
 	case "INFORMATION":
-		return Information
+		return notifications.Information
 	default:
-		return UnknownSeverity
+		return notifications.UnknownSeverity
 	}
 }
 
