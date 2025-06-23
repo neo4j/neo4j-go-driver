@@ -27,6 +27,7 @@ import (
 	"sync"
 
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/auth"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/config"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/connector"
 	idb "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/errorutil"
@@ -126,7 +127,7 @@ type ResultTransformer[T any] interface {
 //
 // You can override default configuration options by providing a configuration function(s)
 //
-//	driver, err = NewDriverWithContext(uri, BasicAuth(username, password), function (config *Config) {
+//	driver, err = NewDriverWithContext(uri, BasicAuth(username, password), function (config *config.Config) {
 //		config.MaxConnectionPoolSize = 10
 //	})
 //
@@ -138,7 +139,7 @@ type ResultTransformer[T any] interface {
 //   - `neo4j.KerberosAuth`
 //   - `neo4j.BearerAuth`
 //   - `neo4j.CustomAuth`
-func NewDriverWithContext(target string, auth auth.TokenManager, configurers ...func(*Config)) (DriverWithContext, error) {
+func NewDriverWithContext(target string, auth auth.TokenManager, configurers ...func(*config.Config)) (DriverWithContext, error) {
 	parsed, err := url.Parse(target)
 	if err != nil {
 		return nil, err
@@ -324,7 +325,7 @@ type sessionRouter interface {
 
 type driverWithContext struct {
 	target    *url.URL
-	config    *Config
+	config    *config.Config
 	pool      *pool.Pool
 	mut       sync.Mutex
 	connector connector.Connector

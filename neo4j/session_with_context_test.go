@@ -21,6 +21,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/config"
 	iauth "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/auth"
 	idb "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/errorutil"
@@ -53,7 +54,7 @@ func TestSession(outer *testing.T) {
 
 	createSession := func() (*RouterFake, *PoolFake, *sessionWithContext) {
 		ctx := context.Background()
-		conf := Config{MaxTransactionRetryTime: 3 * time.Millisecond, MaxConnectionPoolSize: 100}
+		conf := config.Config{MaxTransactionRetryTime: 3 * time.Millisecond, MaxConnectionPoolSize: 100}
 		router := RouterFake{}
 		pool := PoolFake{}
 		cache, _ := homedb.NewCache(100)
@@ -65,7 +66,7 @@ func TestSession(outer *testing.T) {
 
 	createSessionFromConfig := func(sessConfig SessionConfig) (*RouterFake, *PoolFake, *sessionWithContext) {
 		ctx := context.Background()
-		conf := Config{MaxTransactionRetryTime: 3 * time.Millisecond}
+		conf := config.Config{MaxTransactionRetryTime: 3 * time.Millisecond}
 		router := RouterFake{}
 		pool := PoolFake{}
 		cache, _ := homedb.NewCache(100)

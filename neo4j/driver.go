@@ -20,6 +20,7 @@ package neo4j
 
 import (
 	"context"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/config"
 	"net/url"
 )
 
@@ -60,12 +61,12 @@ type Driver interface {
 //
 // You can override default configuration options by providing a configuration function(s)
 //
-//	driver, err = NewDriver(uri, BasicAuth(username, password), function (config *Config) {
+//	driver, err = NewDriver(uri, BasicAuth(username, password), function (config *config.Config) {
 //		config.MaxConnectionPoolSize = 10
 //	})
 //
 // Deprecated: please use NewDriverWithContext instead. This function will be removed in 6.0.
-func NewDriver(target string, auth AuthToken, configurers ...func(*Config)) (Driver, error) {
+func NewDriver(target string, auth AuthToken, configurers ...func(config *config.Config)) (Driver, error) {
 	delegate, err := NewDriverWithContext(target, auth, configurers...)
 	if err != nil {
 		return nil, err

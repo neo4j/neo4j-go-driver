@@ -33,6 +33,7 @@ import (
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/telemetry"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/log"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/notifications"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/config"
 )
 
 // TransactionWork represents a unit of work that will be executed against the provided
@@ -117,7 +118,7 @@ type SessionConfig struct {
 	//		This ensures that the database name remains consistent within the given session. For instance, if the user's
 	//		home database name is 'movies' and the server supplies it to the driver upon database name fetching for the
 	//		session, all queries within that session are executed with the explicit database name 'movies' supplied.
-	//		Any change to the user’s home database is reflected only in sessions created after such change takes effect.
+	//		Any change to the user's home database is reflected only in sessions created after such change takes effect.
 	//		This behavior requires additional network communication.
 	//		In clustered environments, it is strongly recommended to avoid a single point of failure.
 	//		For instance, by ensuring that the connection URI resolves to multiple endpoints.
@@ -202,7 +203,7 @@ type sessionPool interface {
 }
 
 type sessionWithContext struct {
-	driverConfig            *Config
+	driverConfig            *config.Config
 	defaultMode             idb.AccessMode
 	bookmarks               *sessionBookmarks
 	resolveHomeDb           bool
@@ -225,7 +226,7 @@ type sessionWithContext struct {
 
 func newSessionWithContext(
 	ctx context.Context,
-	config *Config,
+	config *config.Config,
 	sessConfig SessionConfig,
 	router sessionRouter,
 	pool sessionPool,

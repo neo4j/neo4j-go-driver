@@ -27,17 +27,14 @@ import (
 	"time"
 )
 
-// Deprecated: please use config.Config directly. This alias will be removed in 6.0.
-type Config = config.Config
-
 // Deprecated: please use config.ServerAddressResolver directly. This alias will be removed in 6.0.
 type ServerAddressResolver = config.ServerAddressResolver
 
 // Deprecated: please use config.ServerAddress directly. This alias will be removed in 6.0.
 type ServerAddress = config.ServerAddress
 
-func defaultConfig() *Config {
-	return &Config{
+func defaultConfig() *config.Config {
+	return &config.Config{
 		AddressResolver:                      nil,
 		MaxTransactionRetryTime:              30 * time.Second,
 		MaxConnectionPoolSize:                100,
@@ -57,7 +54,7 @@ func defaultConfig() *Config {
 	}
 }
 
-func validateAndNormaliseConfig(config *Config) error {
+func validateAndNormaliseConfig(config *config.Config) error {
 	// Max Transaction Retry Time
 	if config.MaxTransactionRetryTime < 0 {
 		return &UsageError{Message: "Maximum transaction retry time cannot be smaller than 0"}

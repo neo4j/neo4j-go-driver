@@ -86,13 +86,13 @@ func DisableClassifications(value ...NotificationClassification) NotificationDis
 }
 
 // DisableNoCategories creates a NotificationDisabledCategories that enables all categories.
-// Can be used for NotificationsDisabledCategories of neo4j.Config and neo4j.SessionConfig.
+// Can be used for NotificationsDisabledCategories of config.Config and neo4j.SessionConfig.
 func DisableNoCategories() NotificationDisabledCategories {
 	return NotificationDisabledCategories{nil, true}
 }
 
 // DisableNoClassifications creates a NotificationDisabledClassifications that enables all classifications.
-// Can be used for NotificationsDisabledClassifications of neo4j.Config and neo4j.SessionConfig.
+// Can be used for NotificationsDisabledClassifications of config.Config and neo4j.SessionConfig.
 //
 // DisableNoClassifications is part of the GQL compliant notifications preview feature
 // (see README on what it means in terms of support and compatibility guarantees)

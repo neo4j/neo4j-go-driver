@@ -284,7 +284,7 @@ Note:
 
 ## Logging
 
-Logging at the driver level can be configured by setting `Log` field of `neo4j.Config` through configuration functions that can be passed to `neo4j.NewDriver` function.
+Logging at the driver level can be configured by setting `Log` field of `config.Config` through configuration functions that can be passed to `neo4j.NewDriver` function.
 
 ### Console Logger
 
@@ -293,8 +293,8 @@ For simplicity, we provide a predefined console logger which can be constructed 
 A simple code snippet that will enable console logging is as follows;
 
 ```go
-useConsoleLogger := func(level neo4j.LogLevel) func(config *neo4j.Config) {
-	return func(config *neo4j.Config) {
+useConsoleLogger := func(level neo4j.LogLevel) func(config *config.Config) {
+	return func(config *config.Config) {
 		config.Log = neo4j.ConsoleLogger(level)
 	}
 }
@@ -308,7 +308,7 @@ defer driver.Close()
 
 ### Custom Logger
 
-The `Log` field of the `neo4j.Config` struct is defined to be of interface `neo4j/log.Logger` which has the following definition:
+The `Log` field of the `config.Config` struct is defined to be of interface `neo4j/log.Logger` which has the following definition:
 
 ```go
 type Logger interface {
