@@ -36,14 +36,6 @@ import (
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/notifications"
 )
 
-// TransactionWork represents a unit of work that will be executed against the provided
-// transaction
-// ManagedTransactionWork is created via the context-aware driver returned
-// by NewDriverWithContext.
-//
-// Deprecated: use ManagedTransactionWork instead. TransactionWork will be removed in 6.0.
-type TransactionWork func(tx Transaction) (any, error)
-
 // ManagedTransactionWork represents a unit of work that will be executed against the provided
 // transaction
 type ManagedTransactionWork func(tx ManagedTransaction) (any, error)

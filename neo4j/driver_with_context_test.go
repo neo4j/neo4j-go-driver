@@ -630,10 +630,6 @@ func (tx *fakeManagedTransaction) Run(context.Context, string, map[string]any) (
 	return tx.result, tx.err
 }
 
-func (tx *fakeManagedTransaction) legacy() Transaction {
-	panic("implement me")
-}
-
 type fakeResult struct {
 	keys        []string
 	keysErr     error

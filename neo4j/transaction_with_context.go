@@ -27,8 +27,6 @@ import (
 type ManagedTransaction interface {
 	// Run executes a statement on this transaction and returns a result
 	Run(ctx context.Context, cypher string, params map[string]any) (ResultWithContext, error)
-
-	legacy() Transaction
 }
 
 // ExplicitTransaction represents a transaction in the Neo4j database
@@ -46,10 +44,6 @@ type ExplicitTransaction interface {
 	// and closes all resources associated with this transaction
 	// Contexts terminating too early negatively affect connection pooling and degrade the driver performance.
 	Close(ctx context.Context) error
-
-	// legacy returns the non-cancelling, legacy variant of this ExplicitTransaction type
-	// This is used so that legacy transaction functions can delegate work to their newer, context-aware variants
-	legacy() Transaction
 }
 
 type transactionState struct {
@@ -125,12 +119,6 @@ func (tx *explicitTransaction) Rollback(ctx context.Context) error {
 	return errorutil.WrapError(tx.txState.err)
 }
 
-func (tx *explicitTransaction) legacy() Transaction {
-	return &transaction{
-		delegate: tx,
-	}
-}
-
 // ManagedTransaction implementation used as parameter to transactional functions
 type managedTransaction struct {
 	conn      db.Connection
@@ -161,13 +149,6 @@ func (tx *managedTransaction) Rollback(context.Context) error {
 // legacy interop only - remove in 6.0
 func (tx *managedTransaction) Close(context.Context) error {
 	return &UsageError{Message: "Close not allowed on retryable transaction"}
-}
-
-// legacy interop only - remove in 6.0
-func (tx *managedTransaction) legacy() Transaction {
-	return &transaction{
-		delegate: tx,
-	}
 }
 
 // Represents an auto commit transaction.

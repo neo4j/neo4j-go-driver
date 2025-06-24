@@ -125,8 +125,3 @@ type FakeTransaction struct {
 func (f *FakeTransaction) Run(ctx context.Context, cypher string, params map[string]any) (neo4j.ResultWithContext, error) {
 	panic("implement me")
 }
-
-//lint:ignore U1000 needed for interface adherence
-func (f *FakeTransaction) legacy() neo4j.Transaction {
-	panic("implement me")
-}
