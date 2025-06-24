@@ -109,11 +109,6 @@ func (f *fakeSession) Close(context.Context) error {
 }
 
 //lint:ignore U1000 needed for interface adherence
-func (f *fakeSession) legacy() neo4j.Session {
-	panic("implement me")
-}
-
-//lint:ignore U1000 needed for interface adherence
 func (f *fakeSession) getServerInfo(context.Context) (neo4j.ServerInfo, error) {
 	panic("implement me")
 }

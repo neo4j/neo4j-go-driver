@@ -26,6 +26,7 @@ import (
 	"math"
 	"time"
 
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/config"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/collections"
 	idb "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/errorutil"
@@ -33,7 +34,6 @@ import (
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/telemetry"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/log"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/notifications"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/config"
 )
 
 // TransactionWork represents a unit of work that will be executed against the provided
@@ -75,7 +75,6 @@ type SessionWithContext interface {
 	Close(ctx context.Context) error
 	executeQueryRead(ctx context.Context, work ManagedTransactionWork, configurers ...func(*TransactionConfig)) (any, error)
 	executeQueryWrite(ctx context.Context, work ManagedTransactionWork, configurers ...func(*TransactionConfig)) (any, error)
-	legacy() Session
 	getServerInfo(ctx context.Context) (ServerInfo, error)
 	verifyAuthentication(ctx context.Context) error
 }
@@ -833,10 +832,6 @@ func (s *sessionWithContext) Close(ctx context.Context) error {
 	return txErr
 }
 
-func (s *sessionWithContext) legacy() Session {
-	return &session{delegate: s}
-}
-
 func (s *sessionWithContext) getServerInfo(ctx context.Context) (ServerInfo, error) {
 	if err := s.resolveHomeDatabase(ctx); err != nil {
 		return nil, errorutil.WrapError(err)
@@ -963,9 +958,6 @@ func (s *erroredSessionWithContext) Run(context.Context, string, map[string]any,
 }
 func (s *erroredSessionWithContext) Close(context.Context) error {
 	return s.err
-}
-func (s *erroredSessionWithContext) legacy() Session {
-	return &erroredSession{err: s.err}
 }
 func (s *erroredSessionWithContext) getServerInfo(context.Context) (ServerInfo, error) {
 	return nil, s.err

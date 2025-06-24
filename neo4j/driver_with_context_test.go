@@ -613,10 +613,6 @@ func (s *fakeSession) Close(context.Context) error {
 	return s.closeErr
 }
 
-func (s *fakeSession) legacy() Session {
-	panic("implement me")
-}
-
 func (s *fakeSession) getServerInfo(context.Context) (ServerInfo, error) {
 	panic("implement me")
 }
@@ -683,7 +679,7 @@ func (f *fakeResult) Record() *Record {
 	return f.nextRecords[f.nextIndex]
 }
 
-func (f *fakeResult) Records(context.Context) (func(yield func(*Record, error) bool)) {
+func (f *fakeResult) Records(context.Context) func(yield func(*Record, error) bool) {
 	panic("implement me")
 }
 
