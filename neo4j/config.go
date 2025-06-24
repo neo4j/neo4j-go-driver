@@ -27,9 +27,6 @@ import (
 	"time"
 )
 
-// Deprecated: please use config.ServerAddress directly. This alias will be removed in 6.0.
-type ServerAddress = config.ServerAddress
-
 func defaultConfig() *config.Config {
 	return &config.Config{
 		AddressResolver:                      nil,
@@ -107,7 +104,7 @@ func newServerAddressURL(hostname string, port string) *url.URL {
 	return &url.URL{Host: hostAndPort}
 }
 
-// NewServerAddress generates a ServerAddress with provided hostname and port information.
-func NewServerAddress(hostname string, port string) ServerAddress {
+// NewServerAddress generates a config.ServerAddress with provided hostname and port information.
+func NewServerAddress(hostname string, port string) config.ServerAddress {
 	return newServerAddressURL(hostname, port)
 }
