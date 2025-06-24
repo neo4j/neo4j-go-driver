@@ -699,10 +699,6 @@ func (f *fakeResult) buffer(context.Context) {
 	panic("implement me")
 }
 
-func (f *fakeResult) legacy() Result {
-	panic("implement me")
-}
-
 func (f *fakeResult) errorHandler(error) {
 	panic("implement me")
 }

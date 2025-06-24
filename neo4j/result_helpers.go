@@ -50,12 +50,13 @@ func CollectTWithContext[T any](ctx context.Context, result ResultWithContext, m
 // or reported while navigating the result stream is returned without any conversion.
 // If the result stream contains zero or more than one records error is returned.
 //
-//	record, err := neo4j.Single(session.Run(...))
-func Single(result Result, err error) (*Record, error) {
+//	result, err := session.Run(ctx, "...", nil)
+//	record, err := neo4j.Single(ctx, result, err)
+func Single(ctx context.Context, result ResultWithContext, err error) (*Record, error) {
 	if err != nil {
 		return nil, err
 	}
-	return result.Single()
+	return result.Single(ctx)
 }
 
 // CollectWithContext aggregates the records into a slice.

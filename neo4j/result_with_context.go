@@ -58,7 +58,6 @@ type ResultWithContext interface {
 	// IsOpen determines whether this result cursor is available
 	IsOpen() bool
 	buffer(ctx context.Context)
-	legacy() Result
 	errorHandler(err error)
 }
 
@@ -254,10 +253,6 @@ func (r *resultWithContext) Consume(ctx context.Context) (ResultSummary, error) 
 
 func (r *resultWithContext) IsOpen() bool {
 	return r.isOpen()
-}
-
-func (r *resultWithContext) legacy() Result {
-	return &result{delegate: r}
 }
 
 func (r *resultWithContext) buffer(ctx context.Context) {
