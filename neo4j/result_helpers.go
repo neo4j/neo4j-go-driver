@@ -58,20 +58,6 @@ func Single(result Result, err error) (*Record, error) {
 	return result.Single()
 }
 
-// Collect aggregates the records into a slice.
-// It relies on Result.Collect and propagate its error, if any.
-//
-//	records, err := neo4j.Collect(session.Run(...))
-//
-// Deprecated: use CollectWithContext instead (the entry point of context-aware
-// APIs is NewDriverWithContext)
-func Collect(result Result, err error) ([]*Record, error) {
-	if err != nil {
-		return nil, err
-	}
-	return result.Collect()
-}
-
 // CollectWithContext aggregates the records into a slice.
 // It relies on ResultWithContext.Collect and propagate its error, if any.
 //
@@ -88,11 +74,14 @@ func CollectWithContext(ctx context.Context, result ResultWithContext, err error
 }
 
 // AsRecords passes any existing error or casts from to a slice of records.
-// Use in combination with Collect and transactional functions:
+// Use in combination with CollectWithContext and transactional functions:
 //
-//	records, err := neo4j.AsRecords(session.ExecuteRead(func (tx neo4j.Transaction) {
-//	    return neo4j.Collect(tx.Run(...))
-//	}))
+//	records, err := neo4j.AsRecords(
+//		session.ExecuteRead(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+//			result, err := tx.Run(ctx, "...", nil)
+//			return neo4j.CollectWithContext(ctx, result, err)
+//		}),
+//	)
 func AsRecords(from any, err error) ([]*Record, error) {
 	if err != nil {
 		return nil, err
