@@ -67,7 +67,7 @@ type Config struct {
 	// Logging target the driver will send its log outputs
 	//
 	// Possible to use custom logger (implement log.Logger interface) or
-	// use neo4j.ConsoleLogger.
+	// use log.ToConsole.
 	//
 	// default: No Op Logger (log.ToVoid)
 	Log log.Logger

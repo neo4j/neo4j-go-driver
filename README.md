@@ -288,14 +288,14 @@ Logging at the driver level can be configured by setting `Log` field of `config.
 
 ### Console Logger
 
-For simplicity, we provide a predefined console logger which can be constructed by `neo4j.ConsoleLogger` function. To enable console logger, you need to specify which level you need to enable (`log.ERROR`, `log.WARNING`, `log.INFO` and `log.DEBUG` which are ordered by the level of detail).
+For simplicity, we provide a predefined console logger which can be constructed by `log.ToConsole` function. To enable console logger, you need to specify which level you need to enable (`log.ERROR`, `log.WARNING`, `log.INFO` and `log.DEBUG` which are ordered by the level of detail).
 
 A simple code snippet that will enable console logging is as follows;
 
 ```go
 useConsoleLogger := func(level log.Level) func(config *config.Config) {
 	return func(config *config.Config) {
-		config.Log = neo4j.ConsoleLogger(level)
+		config.Log = log.ToConsole(level)
 	}
 }
 
@@ -328,10 +328,10 @@ This is **disabled** by default.
 
 ### Console Bolt logger
 
-For simplicity, we provide a predefined console logger which can be constructed by `neo4j.ConsoleBoltLogger`.
+For simplicity, we provide a predefined console logger which can be constructed by `log.BoltToConsole`.
 
 ```go
-boltLogger := neo4j.ConsoleBoltLogger()
+boltLogger := log.BoltToConsole()
 
 # for ExecuteQuery
 result, err := neo4j.ExecuteQuery(ctx, driver, query, params, transformer, neo4j.ExecuteQueryWithBoltLogger(boltLogger))

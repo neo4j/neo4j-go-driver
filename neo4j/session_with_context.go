@@ -139,7 +139,7 @@ type SessionConfig struct {
 	// Logging target the session will send its Bolt message traces
 	//
 	// Possible to use custom logger (implement log.BoltLogger interface) or
-	// use neo4j.ConsoleBoltLogger.
+	// use log.BoltToConsole.
 	BoltLogger log.BoltLogger
 	// ImpersonatedUser sets the Neo4j user that the session will be acting as.
 	// If not set, the user configured for the driver will be used.
