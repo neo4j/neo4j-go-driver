@@ -136,21 +136,6 @@ func (tx *managedTransaction) Run(ctx context.Context, cypher string, params map
 	return newResultWithContext(tx.conn, stream, cypher, params, tx.txState, nil), nil
 }
 
-// legacy interop only - remove in 6.0
-func (tx *managedTransaction) Commit(context.Context) error {
-	return &UsageError{Message: "Commit not allowed on retryable transaction"}
-}
-
-// legacy interop only - remove in 6.0
-func (tx *managedTransaction) Rollback(context.Context) error {
-	return &UsageError{Message: "Rollback not allowed on retryable transaction"}
-}
-
-// legacy interop only - remove in 6.0
-func (tx *managedTransaction) Close(context.Context) error {
-	return &UsageError{Message: "Close not allowed on retryable transaction"}
-}
-
 // Represents an auto commit transaction.
 // Does not implement the ExplicitTransaction nor the ManagedTransaction interface.
 type autocommitTransaction struct {
