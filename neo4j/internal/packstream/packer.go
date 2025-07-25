@@ -114,7 +114,10 @@ func (p *Packer) Float64(f float64) {
 }
 
 func (p *Packer) Float32(f float32) {
-	p.Float64(float64(f))
+	// TODO: check if this is correct as I think we only want to pack float32s from vectors, not expose publically.
+	buf := [5]byte{0xc6}
+	binary.BigEndian.PutUint32(buf[1:], math.Float32bits(f))
+	p.buf = append(p.buf, buf[:]...)
 }
 
 func (p *Packer) listHeader(ll int, shortOffset, longOffset byte) {
@@ -261,4 +264,106 @@ func (p *Packer) checkOverflowInt(i uint64) {
 	if i > math.MaxInt64 {
 		p.err = &OverflowError{msg: "Trying to pack uint64 that doesn't fit into int64"}
 	}
+}
+
+func (p *Packer) VectorFloat64(vec []float64) {
+	p.StructHeader('V', 2)
+	p.Bytes([]byte{0xc1}) // FLOAT_64 marker
+
+	if len(vec) == 0 {
+		p.Bytes([]byte{}) // empty values
+		return
+	}
+
+	totalSize := len(vec) * 8
+	values := make([]byte, totalSize)
+	for i, v := range vec {
+		binary.BigEndian.PutUint64(values[i*8:], math.Float64bits(v))
+	}
+	p.Bytes(values)
+}
+
+func (p *Packer) VectorFloat32(vec []float32) {
+	p.StructHeader('V', 2)
+	p.Bytes([]byte{0xc6}) // FLOAT_32 marker
+
+	if len(vec) == 0 {
+		p.Bytes([]byte{}) // empty values
+		return
+	}
+
+	totalSize := len(vec) * 4
+	values := make([]byte, totalSize)
+	for i, v := range vec {
+		binary.BigEndian.PutUint32(values[i*4:], math.Float32bits(v))
+	}
+	p.Bytes(values)
+}
+
+func (p *Packer) VectorInt8(vec []int8) {
+	p.StructHeader('V', 2)
+	p.Bytes([]byte{0xc8}) // INT_8 marker
+
+	if len(vec) == 0 {
+		p.Bytes([]byte{}) // empty values
+		return
+	}
+
+	totalSize := len(vec)
+	values := make([]byte, totalSize)
+	for i, v := range vec {
+		values[i] = byte(v)
+	}
+	p.Bytes(values)
+}
+
+func (p *Packer) VectorInt16(vec []int16) {
+	p.StructHeader('V', 2)
+	p.Bytes([]byte{0xc9}) // INT_16 marker
+
+	if len(vec) == 0 {
+		p.Bytes([]byte{}) // empty values
+		return
+	}
+
+	totalSize := len(vec) * 2
+	values := make([]byte, totalSize)
+	for i, v := range vec {
+		binary.BigEndian.PutUint16(values[i*2:], uint16(v))
+	}
+	p.Bytes(values)
+}
+
+func (p *Packer) VectorInt32(vec []int32) {
+	p.StructHeader('V', 2)
+	p.Bytes([]byte{0xca}) // INT_32 marker
+
+	if len(vec) == 0 {
+		p.Bytes([]byte{}) // empty values
+		return
+	}
+
+	totalSize := len(vec) * 4
+	values := make([]byte, totalSize)
+	for i, v := range vec {
+		binary.BigEndian.PutUint32(values[i*4:], uint32(v))
+	}
+	p.Bytes(values)
+}
+
+func (p *Packer) VectorInt64(vec []int64) {
+	p.StructHeader('V', 2)
+	p.Bytes([]byte{0xcb}) // INT_64 marker
+
+	if len(vec) == 0 {
+		p.Bytes([]byte{}) // empty values
+		return
+	}
+
+	totalSize := len(vec) * 8
+	values := make([]byte, totalSize)
+	for i, v := range vec {
+		binary.BigEndian.PutUint64(values[i*8:], uint64(v))
+	}
+	p.Bytes(values)
 }

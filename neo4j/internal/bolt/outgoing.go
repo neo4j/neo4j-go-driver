@@ -19,11 +19,12 @@ package bolt
 
 import (
 	"context"
-	idb "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/log"
 	"io"
 	"reflect"
 	"time"
+
+	idb "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/log"
 
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/db"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/dbtype"
@@ -409,17 +410,17 @@ func (o *outgoing) packX(x any) {
 		case []float64:
 			o.packer.Float64s(s)
 		case dbtype.Vector[int8]:
-			packVector(o, s)
+			o.packer.VectorInt8(s)
 		case dbtype.Vector[int16]:
-			packVector(o, s)
+			o.packer.VectorInt16(s)
 		case dbtype.Vector[int32]:
-			packVector(o, s)
+			o.packer.VectorInt32(s)
 		case dbtype.Vector[int64]:
-			packVector(o, s)
+			o.packer.VectorInt64(s)
 		case dbtype.Vector[float32]:
-			packVector(o, s)
+			o.packer.VectorFloat32(s)
 		case dbtype.Vector[float64]:
-			o.packer.Float64s(s)
+			o.packer.VectorFloat64(s)
 		case []any:
 			o.packer.ArrayHeader(len(s))
 			for _, e := range s {
@@ -574,21 +575,4 @@ func (o *outgoing) packUtcDateTimeWithTzName(dateTime time.Time) {
 	o.packer.Int64(dateTime.Unix())
 	o.packer.Int(dateTime.Nanosecond())
 	o.packer.String(dateTime.Location().String())
-}
-
-func packVector[T dbtype.Numeric](o *outgoing, s dbtype.Vector[T]) {
-	switch any(s).(type) {
-	case dbtype.Vector[float32], dbtype.Vector[float64]:
-		vec := make([]float64, len(s))
-		for i, v := range s {
-			vec[i] = float64(v)
-		}
-		o.packer.Float64s(vec)
-	case dbtype.Vector[int8], dbtype.Vector[int16], dbtype.Vector[int32], dbtype.Vector[int64]:
-		vec := make([]int64, len(s))
-		for i, v := range s {
-			vec[i] = int64(v)
-		}
-		o.packer.Int64s(vec)
-	}
 }

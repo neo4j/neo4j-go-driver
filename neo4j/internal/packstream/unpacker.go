@@ -104,11 +104,31 @@ func (u *Unpacker) Int() int64 {
 }
 
 func (u *Unpacker) Float() float64 {
-	buf := u.read(8)
-	if u.Err != nil {
-		return math.NaN()
+	// Check if this is a Float32 marker (0xc6) or Float64 marker (0xc1)
+	var buf []byte
+	if u.mrk.numlenbytes == 4 {
+		// Float32 marker (0xc6)
+		buf = u.read(4)
+		if u.Err != nil {
+			return math.NaN()
+		}
+		return float64(math.Float32frombits(binary.BigEndian.Uint32(buf)))
+	} else {
+		// Float64 marker (0xc1)
+		buf = u.read(8)
+		if u.Err != nil {
+			return math.NaN()
+		}
+		return math.Float64frombits(binary.BigEndian.Uint64(buf))
 	}
-	return math.Float64frombits(binary.BigEndian.Uint64(buf))
+}
+
+func (u *Unpacker) Float32() float32 {
+	buf := u.read(4)
+	if u.Err != nil {
+		return float32(math.NaN())
+	}
+	return math.Float32frombits(binary.BigEndian.Uint32(buf))
 }
 
 func (u *Unpacker) StructTag() byte {
@@ -143,6 +163,234 @@ func (u *Unpacker) ByteArray() []byte {
 	out := make([]byte, n)
 	copy(out, buf)
 	return out
+}
+
+func (u *Unpacker) validateVectorStructure() error {
+	if u.Curr != PackedStruct {
+		return &UnpackError{msg: "Expected struct for vector"}
+	}
+
+	tag := u.StructTag()
+	if tag != 'V' {
+		return &UnpackError{msg: "Expected vector struct tag 'V'"}
+	}
+
+	n := u.Len()
+	if n != 2 {
+		return &UnpackError{msg: "Vector struct must have exactly 2 fields"}
+	}
+
+	return nil
+}
+
+func (u *Unpacker) readVectorTypeMarker(expectedMarker byte, expectedTypeName string) error {
+	u.Next()
+	if u.Curr != PackedByteArray {
+		return &UnpackError{msg: "Expected byte array for vector type marker"}
+	}
+
+	typeMarker := u.ByteArray()
+	if len(typeMarker) != 1 {
+		return &UnpackError{msg: "Vector type marker must be exactly 1 byte"}
+	}
+
+	if typeMarker[0] != expectedMarker {
+		return &UnpackError{msg: fmt.Sprintf("Expected %s type marker for vector", expectedTypeName)}
+	}
+
+	return nil
+}
+
+func (u *Unpacker) readVectorValues() ([]byte, error) {
+	u.Next()
+	if u.Curr != PackedByteArray {
+		return nil, &UnpackError{msg: "Expected byte array for vector values"}
+	}
+
+	return u.ByteArray(), nil
+}
+
+func validateVectorByteArrayLength(values []byte, expectedSize int, typeName string) error {
+	if len(values)%expectedSize != 0 {
+		return &UnpackError{msg: fmt.Sprintf("Vector values must be multiple of %d bytes for %s", expectedSize, typeName)}
+	}
+	return nil
+}
+
+func (u *Unpacker) VectorFloat64() []float64 {
+	if err := u.validateVectorStructure(); err != nil {
+		u.setErr(err)
+		return nil
+	}
+
+	if err := u.readVectorTypeMarker(0xc1, "FLOAT_64"); err != nil {
+		u.setErr(err)
+		return nil
+	}
+
+	values, err := u.readVectorValues()
+	if err != nil {
+		u.setErr(err)
+		return nil
+	}
+
+	if err := validateVectorByteArrayLength(values, 8, "float64"); err != nil {
+		u.setErr(err)
+		return nil
+	}
+
+	result := make([]float64, len(values)/8)
+	for i := range result {
+		result[i] = math.Float64frombits(binary.BigEndian.Uint64(values[i*8 : (i+1)*8]))
+	}
+
+	return result
+}
+
+func (u *Unpacker) VectorFloat32() []float32 {
+	if err := u.validateVectorStructure(); err != nil {
+		u.setErr(err)
+		return nil
+	}
+
+	if err := u.readVectorTypeMarker(0xc6, "FLOAT_32"); err != nil {
+		u.setErr(err)
+		return nil
+	}
+
+	values, err := u.readVectorValues()
+	if err != nil {
+		u.setErr(err)
+		return nil
+	}
+
+	if err := validateVectorByteArrayLength(values, 4, "float32"); err != nil {
+		u.setErr(err)
+		return nil
+	}
+
+	result := make([]float32, len(values)/4)
+	for i := range result {
+		result[i] = math.Float32frombits(binary.BigEndian.Uint32(values[i*4 : (i+1)*4]))
+	}
+
+	return result
+}
+
+func (u *Unpacker) VectorInt8() []int8 {
+	if err := u.validateVectorStructure(); err != nil {
+		u.setErr(err)
+		return nil
+	}
+
+	if err := u.readVectorTypeMarker(0xc8, "INT_8"); err != nil {
+		u.setErr(err)
+		return nil
+	}
+
+	values, err := u.readVectorValues()
+	if err != nil {
+		u.setErr(err)
+		return nil
+	}
+
+	// No length validation needed for int8 (1 byte per value)
+	result := make([]int8, len(values))
+	for i := range result {
+		result[i] = int8(values[i])
+	}
+
+	return result
+}
+
+func (u *Unpacker) VectorInt16() []int16 {
+	if err := u.validateVectorStructure(); err != nil {
+		u.setErr(err)
+		return nil
+	}
+
+	if err := u.readVectorTypeMarker(0xc9, "INT_16"); err != nil {
+		u.setErr(err)
+		return nil
+	}
+
+	values, err := u.readVectorValues()
+	if err != nil {
+		u.setErr(err)
+		return nil
+	}
+
+	if err := validateVectorByteArrayLength(values, 2, "int16"); err != nil {
+		u.setErr(err)
+		return nil
+	}
+
+	result := make([]int16, len(values)/2)
+	for i := range result {
+		result[i] = int16(binary.BigEndian.Uint16(values[i*2 : (i+1)*2]))
+	}
+
+	return result
+}
+
+func (u *Unpacker) VectorInt32() []int32 {
+	if err := u.validateVectorStructure(); err != nil {
+		u.setErr(err)
+		return nil
+	}
+
+	if err := u.readVectorTypeMarker(0xca, "INT_32"); err != nil {
+		u.setErr(err)
+		return nil
+	}
+
+	values, err := u.readVectorValues()
+	if err != nil {
+		u.setErr(err)
+		return nil
+	}
+
+	if err := validateVectorByteArrayLength(values, 4, "int32"); err != nil {
+		u.setErr(err)
+		return nil
+	}
+
+	result := make([]int32, len(values)/4)
+	for i := range result {
+		result[i] = int32(binary.BigEndian.Uint32(values[i*4 : (i+1)*4]))
+	}
+
+	return result
+}
+
+func (u *Unpacker) VectorInt64() []int64 {
+	if err := u.validateVectorStructure(); err != nil {
+		u.setErr(err)
+		return nil
+	}
+
+	if err := u.readVectorTypeMarker(0xcb, "INT_64"); err != nil {
+		u.setErr(err)
+		return nil
+	}
+
+	values, err := u.readVectorValues()
+	if err != nil {
+		u.setErr(err)
+		return nil
+	}
+
+	if err := validateVectorByteArrayLength(values, 8, "int64"); err != nil {
+		u.setErr(err)
+		return nil
+	}
+
+	result := make([]int64, len(values)/8)
+	for i := range result {
+		result[i] = int64(binary.BigEndian.Uint64(values[i*8 : (i+1)*8]))
+	}
+
+	return result
 }
 
 func (u *Unpacker) pop() byte {
@@ -222,6 +470,7 @@ func init() {
 	markers[0xc1] = marker{typ: PackedFloat, numlenbytes: 8}
 	markers[0xc2] = marker{typ: PackedFalse}
 	markers[0xc3] = marker{typ: PackedTrue}
+	markers[0xc6] = marker{typ: PackedFloat, numlenbytes: 4} // FLOAT_32
 
 	markers[0xc8] = marker{typ: PackedInt, numlenbytes: 1}
 	markers[0xc9] = marker{typ: PackedInt, numlenbytes: 2}

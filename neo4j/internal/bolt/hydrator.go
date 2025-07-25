@@ -18,11 +18,14 @@
 package bolt
 
 import (
+	"encoding/binary"
 	"errors"
 	"fmt"
+	"math"
+	"time"
+
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/errorutil"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/gql"
-	"time"
 
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/db"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/dbtype"
@@ -483,6 +486,8 @@ func (h *hydrator) value() any {
 			return h.point2d(n)
 		case 'Y':
 			return h.point3d(n)
+		case 'V':
+			return h.vector(n)
 		case 'F':
 			if h.useUtc {
 				return h.unknownStructError(t)
@@ -1070,6 +1075,123 @@ func parseGqlStatusObject(m map[string]any) db.GqlStatusObject {
 
 	g.DiagnosticRecord = diagnosticRecord
 	return g
+}
+
+func (h *hydrator) vector(n uint32) any {
+	h.assertLength("vector", 2, n)
+	if h.getErr() != nil {
+		return nil
+	}
+
+	// Read type marker
+	h.unp.Next()
+	if h.unp.Curr != packstream.PackedByteArray {
+		h.setErr(&db.ProtocolError{
+			MessageType: "vector",
+			Err:         "Expected byte array for vector type marker",
+		})
+		return nil
+	}
+	typeMarker := h.unp.ByteArray()
+	if len(typeMarker) != 1 {
+		h.setErr(&db.ProtocolError{
+			MessageType: "vector",
+			Err:         "Vector type marker must be exactly 1 byte",
+		})
+		return nil
+	}
+
+	// Read values
+	h.unp.Next()
+	if h.unp.Curr != packstream.PackedByteArray {
+		h.setErr(&db.ProtocolError{
+			MessageType: "vector",
+			Err:         "Expected byte array for vector values",
+		})
+		return nil
+	}
+	values := h.unp.ByteArray()
+
+	// Determine vector type and create appropriate vector
+	switch typeMarker[0] {
+	case 0xc1: // FLOAT_64
+		if len(values)%8 != 0 {
+			h.setErr(&db.ProtocolError{
+				MessageType: "vector",
+				Err:         "Vector values must be multiple of 8 bytes for float64",
+			})
+			return nil
+		}
+		result := make(dbtype.Vector[float64], len(values)/8)
+		for i := range result {
+			result[i] = math.Float64frombits(binary.BigEndian.Uint64(values[i*8 : (i+1)*8]))
+		}
+		return result
+	case 0xc6: // FLOAT_32
+		if len(values)%4 != 0 {
+			h.setErr(&db.ProtocolError{
+				MessageType: "vector",
+				Err:         "Vector values must be multiple of 4 bytes for float32",
+			})
+			return nil
+		}
+		result := make(dbtype.Vector[float32], len(values)/4)
+		for i := range result {
+			result[i] = math.Float32frombits(binary.BigEndian.Uint32(values[i*4 : (i+1)*4]))
+		}
+		return result
+	case 0xc8: // INT_8
+		result := make(dbtype.Vector[int8], len(values))
+		for i := range result {
+			result[i] = int8(values[i])
+		}
+		return result
+	case 0xc9: // INT_16
+		if len(values)%2 != 0 {
+			h.setErr(&db.ProtocolError{
+				MessageType: "vector",
+				Err:         "Vector values must be multiple of 2 bytes for int16",
+			})
+			return nil
+		}
+		result := make(dbtype.Vector[int16], len(values)/2)
+		for i := range result {
+			result[i] = int16(binary.BigEndian.Uint16(values[i*2 : (i+1)*2]))
+		}
+		return result
+	case 0xca: // INT_32
+		if len(values)%4 != 0 {
+			h.setErr(&db.ProtocolError{
+				MessageType: "vector",
+				Err:         "Vector values must be multiple of 4 bytes for int32",
+			})
+			return nil
+		}
+		result := make(dbtype.Vector[int32], len(values)/4)
+		for i := range result {
+			result[i] = int32(binary.BigEndian.Uint32(values[i*4 : (i+1)*4]))
+		}
+		return result
+	case 0xcb: // INT_64
+		if len(values)%8 != 0 {
+			h.setErr(&db.ProtocolError{
+				MessageType: "vector",
+				Err:         "Vector values must be multiple of 8 bytes for int64",
+			})
+			return nil
+		}
+		result := make(dbtype.Vector[int64], len(values)/8)
+		for i := range result {
+			result[i] = int64(binary.BigEndian.Uint64(values[i*8 : (i+1)*8]))
+		}
+		return result
+	default:
+		h.setErr(&db.ProtocolError{
+			MessageType: "vector",
+			Err:         fmt.Sprintf("Unknown vector type marker: %d", typeMarker[0]),
+		})
+		return nil
+	}
 }
 
 func (h *hydrator) unknownStructError(t byte) any {

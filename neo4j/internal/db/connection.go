@@ -20,14 +20,15 @@ package db
 
 import (
 	"context"
+	"math"
+	"time"
+
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/auth"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/db"
 	iauth "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/auth"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/telemetry"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/log"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/notifications"
-	"math"
-	"time"
 )
 
 // Definitions of these should correspond to public API
@@ -70,7 +71,7 @@ func (n *NotificationConfig) ToMeta(meta map[string]any, version db.ProtocolVers
 	}
 
 	disabledKey := "notifications_disabled_categories"
-	if version.Minor >= 5 {
+	if version.Major >= 6 || (version.Major == 5 && version.Minor >= 5) {
 		disabledKey = "notifications_disabled_classifications"
 	}
 	if n.DisCats.DisablesNone() || n.DisClas.DisablesNone() {

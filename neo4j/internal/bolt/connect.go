@@ -42,14 +42,28 @@ func (p *protocolVersion) formatProtocol() string {
 	return fmt.Sprintf("%#04X%02X%02X", p.back, p.minor, p.major)
 }
 
-// versions lists the supported protocol versions in priority order.
-// The first proposal is a marker indicating that the client wishes to use the
-// new manifest-style negotiation.
-var versions = [4]protocolVersion{
-	{major: 0xFF, minor: 0x01, back: 0x00}, // Bolt manifest marker
-	{major: 5, minor: 8, back: 8},
-	{major: 4, minor: 4, back: 2},
-	{major: 3, minor: 0, back: 0},
+var (
+	bolt6Ver = protocolVersion{major: 6, minor: 0, back: 0}
+	bolt5Ver = protocolVersion{major: 5, minor: 8, back: 8}
+	bolt4Ver = protocolVersion{major: 4, minor: 4, back: 2}
+	bolt3Ver = protocolVersion{major: 3, minor: 0, back: 0}
+)
+
+// List of all protocol versions supported by this driver, used for manifest negotiation and protocol selection, in priority order.
+var supportedVersions = []protocolVersion{
+	bolt6Ver,
+	bolt5Ver,
+	bolt4Ver,
+	bolt3Ver,
+}
+
+// List of protocol versions to offer in the legacy handshake (must be exactly 4 entries: manifest marker + 3 offers)
+// Update these when dropping/adding legacy support. Do NOT add new major versions here (e.g. 6.0, 7.0, etc).
+var handshakeProposals = [4]protocolVersion{
+	{major: 0xFF, minor: 0x01, back: 0x00}, // Manifest marker (always first)
+	bolt5Ver,
+	bolt4Ver,
+	bolt3Ver,
 }
 
 // Connect initiates the negotiation of the Bolt protocol version.
@@ -70,10 +84,10 @@ func Connect(ctx context.Context,
 	// Send handshake to server
 	handshake := []byte{
 		0x60, 0x60, 0xb0, 0x17, // Magic: GoGoBolt
-		0x00, versions[0].back, versions[0].minor, versions[0].major,
-		0x00, versions[1].back, versions[1].minor, versions[1].major,
-		0x00, versions[2].back, versions[2].minor, versions[2].major,
-		0x00, versions[3].back, versions[3].minor, versions[3].major,
+		0x00, handshakeProposals[0].back, handshakeProposals[0].minor, handshakeProposals[0].major,
+		0x00, handshakeProposals[1].back, handshakeProposals[1].minor, handshakeProposals[1].major,
+		0x00, handshakeProposals[2].back, handshakeProposals[2].minor, handshakeProposals[2].major,
+		0x00, handshakeProposals[3].back, handshakeProposals[3].minor, handshakeProposals[3].major,
 	}
 	if boltLogger != nil {
 		boltLogger.LogClientMessage("", "<MAGIC> %#010X", handshake[0:4])
@@ -125,8 +139,10 @@ func Connect(ctx context.Context,
 		boltConn = NewBolt4(serverName, bufferedConn, errorListener, logger, boltLogger)
 	case 5:
 		boltConn = NewBolt5(serverName, bufferedConn, errorListener, logger, boltLogger)
+	case 6:
+		boltConn = NewBolt6(serverName, bufferedConn, errorListener, logger, boltLogger)
 	case 0:
-		return nil, fmt.Errorf("server did not accept any of the requested Bolt versions (%#v)", versions)
+		return nil, fmt.Errorf("server did not accept any of the requested Bolt versions (%#v)", handshakeProposals)
 	default:
 		return nil, &errorutil.UsageError{Message: fmt.Sprintf("server responded with unsupported version %d.%d", major, minor)}
 	}
@@ -239,7 +255,7 @@ func logManifestHandshake(boltLogger log.BoltLogger, response []byte, supported 
 // and returns the first candidate whose major version matches and whose minor version
 // falls within the range offered by the server.
 func selectProtocol(offers []protocolVersion) (protocolVersion, error) {
-	for _, candidate := range versions[1:] {
+	for _, candidate := range supportedVersions {
 		for v := int(candidate.minor); v >= int(candidate.minor)-int(candidate.back); v-- {
 			for _, offer := range offers {
 				if offer.major != candidate.major {
