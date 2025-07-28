@@ -114,10 +114,7 @@ func (p *Packer) Float64(f float64) {
 }
 
 func (p *Packer) Float32(f float32) {
-	// TODO: check if this is correct as I think we only want to pack float32s from vectors, not expose publically.
-	buf := [5]byte{0xc6}
-	binary.BigEndian.PutUint32(buf[1:], math.Float32bits(f))
-	p.buf = append(p.buf, buf[:]...)
+	p.Float64(float64(f))
 }
 
 func (p *Packer) listHeader(ll int, shortOffset, longOffset byte) {

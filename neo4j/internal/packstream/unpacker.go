@@ -104,31 +104,11 @@ func (u *Unpacker) Int() int64 {
 }
 
 func (u *Unpacker) Float() float64 {
-	// Check if this is a Float32 marker (0xc6) or Float64 marker (0xc1)
-	var buf []byte
-	if u.mrk.numlenbytes == 4 {
-		// Float32 marker (0xc6)
-		buf = u.read(4)
-		if u.Err != nil {
-			return math.NaN()
-		}
-		return float64(math.Float32frombits(binary.BigEndian.Uint32(buf)))
-	} else {
-		// Float64 marker (0xc1)
-		buf = u.read(8)
-		if u.Err != nil {
-			return math.NaN()
-		}
-		return math.Float64frombits(binary.BigEndian.Uint64(buf))
-	}
-}
-
-func (u *Unpacker) Float32() float32 {
-	buf := u.read(4)
+	buf := u.read(8)
 	if u.Err != nil {
-		return float32(math.NaN())
+		return math.NaN()
 	}
-	return math.Float32frombits(binary.BigEndian.Uint32(buf))
+	return math.Float64frombits(binary.BigEndian.Uint64(buf))
 }
 
 func (u *Unpacker) StructTag() byte {
@@ -470,7 +450,6 @@ func init() {
 	markers[0xc1] = marker{typ: PackedFloat, numlenbytes: 8}
 	markers[0xc2] = marker{typ: PackedFalse}
 	markers[0xc3] = marker{typ: PackedTrue}
-	markers[0xc6] = marker{typ: PackedFloat, numlenbytes: 4} // FLOAT_32
 
 	markers[0xc8] = marker{typ: PackedInt, numlenbytes: 1}
 	markers[0xc9] = marker{typ: PackedInt, numlenbytes: 2}

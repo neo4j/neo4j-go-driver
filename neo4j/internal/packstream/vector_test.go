@@ -19,7 +19,6 @@ package packstream
 
 import (
 	"encoding/hex"
-	"math"
 	"reflect"
 	"testing"
 )
@@ -254,101 +253,6 @@ func TestVectorUnpacking(t *testing.T) {
 			}
 
 			if !reflect.DeepEqual(result, tt.expected) {
-				t.Errorf("Unpacked result differs from expected")
-				t.Errorf("Expected: %v", tt.expected)
-				t.Errorf("Got:      %v", result)
-			}
-		})
-	}
-}
-
-func TestFloat32Packing(t *testing.T) {
-	tests := []struct {
-		name     string
-		input    float32
-		expected []byte
-	}{
-		{
-			name:     "Zero",
-			input:    0.0,
-			expected: []byte{0xc6, 0x00, 0x00, 0x00, 0x00},
-		},
-		{
-			name:     "One",
-			input:    1.0,
-			expected: []byte{0xc6, 0x3f, 0x80, 0x00, 0x00},
-		},
-		{
-			name:     "Negative One",
-			input:    -1.0,
-			expected: []byte{0xc6, 0xbf, 0x80, 0x00, 0x00},
-		},
-		{
-			name:     "Small Number",
-			input:    0.1,
-			expected: []byte{0xc6, 0x3d, 0xcc, 0xcc, 0xcd},
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			p := &Packer{}
-			p.Begin([]byte{})
-			p.Float32(tt.input)
-			result, err := p.End()
-			if err != nil {
-				t.Fatalf("Packing failed: %v", err)
-			}
-
-			if !reflect.DeepEqual(result, tt.expected) {
-				t.Errorf("Packed result differs from expected")
-				t.Errorf("Expected: %s", hex.EncodeToString(tt.expected))
-				t.Errorf("Got:      %s", hex.EncodeToString(result))
-			}
-		})
-	}
-}
-
-func TestFloat32Unpacking(t *testing.T) {
-	tests := []struct {
-		name     string
-		data     []byte
-		expected float32
-	}{
-		{
-			name:     "Zero",
-			data:     []byte{0xc6, 0x00, 0x00, 0x00, 0x00},
-			expected: 0.0,
-		},
-		{
-			name:     "One",
-			data:     []byte{0xc6, 0x3f, 0x80, 0x00, 0x00},
-			expected: 1.0,
-		},
-		{
-			name:     "Negative One",
-			data:     []byte{0xc6, 0xbf, 0x80, 0x00, 0x00},
-			expected: -1.0,
-		},
-		{
-			name:     "Small Number",
-			data:     []byte{0xc6, 0x3d, 0xcc, 0xcc, 0xcd},
-			expected: 0.1,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			u := &Unpacker{}
-			u.Reset(tt.data)
-			u.Next() // Move to the float
-
-			result := u.Float32()
-			if u.Err != nil {
-				t.Fatalf("Unpacking failed: %v", u.Err)
-			}
-
-			if math.Abs(float64(result-tt.expected)) > 1e-6 {
 				t.Errorf("Unpacked result differs from expected")
 				t.Errorf("Expected: %v", tt.expected)
 				t.Errorf("Got:      %v", result)
