@@ -32,5 +32,3 @@ type Numeric interface {
 // Vector is part of the Vector preview feature
 // (see README on what it means in terms of support and compatibility guarantees)
 type Vector[T Numeric] []T
-
-// TODO implement various helper functions where required.
