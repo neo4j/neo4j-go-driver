@@ -1,7 +1,7 @@
 FROM ubuntu:20.04
 
-ARG go_version_min=1.18
-ARG go_version_default=1.23.4
+ARG go_version_min=1.23.11
+ARG go_version_default=1.23.5
 
 # Install all needed to build and run tests
 # Install tzdata to make sure Go timezone info works correctly (need noninteractive to avoid

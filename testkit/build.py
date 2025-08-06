@@ -48,7 +48,7 @@ if __name__ == "__main__":
 
     print("Install staticcheck", flush=True)
     run_go(
-        ["install", "honnef.co/go/tools/cmd/staticcheck@v0.3.3"],
+        ["install", "honnef.co/go/tools/cmd/staticcheck@v0.6.0"],
         go_bin=go_bin,
         env=defaultEnv
     )
