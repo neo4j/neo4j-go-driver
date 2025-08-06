@@ -29,6 +29,8 @@ import (
 // it triggered. This API is meant for use in scenarios where users want to
 // implement their own retry mechanism.
 // A similar logic is used by the driver for transaction functions.
+//
+// NOTE: This does not apply when running auto-commit transactions (Session.Run/SessionWithContext.Run)
 func IsRetryable(err error) bool {
 	if err == nil {
 		return false
