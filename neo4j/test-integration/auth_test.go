@@ -33,8 +33,8 @@ func TestAuthentication(outer *testing.T) {
 	ctx := context.Background()
 	server := dbserver.GetDbServer(ctx)
 
-	getDriverAndSession := func(ctx context.Context, token neo4j.AuthToken) (neo4j.DriverWithContext, neo4j.SessionWithContext) {
-		driver, err := neo4j.NewDriverWithContext(server.URI(), token, server.ConfigFunc())
+	getDriverAndSession := func(ctx context.Context, token neo4j.AuthToken) (neo4j.Driver, neo4j.Session) {
+		driver, err := neo4j.NewDriver(server.URI(), token, server.ConfigFunc())
 		if err != nil {
 			panic(err)
 		}

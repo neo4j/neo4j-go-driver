@@ -20,14 +20,15 @@ package neo4j
 import (
 	"context"
 	"fmt"
+	"os"
+
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/config"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/notifications"
-	"os"
 )
 
 func ExampleConfig_disableNoCategories() {
 	ctx := context.Background()
-	driver, err := NewDriverWithContext(getUrl(), getAuth(), func(config *config.Config) {
+	driver, err := NewDriver(getUrl(), getAuth(), func(config *config.Config) {
 		// makes the server return all notification categories
 		config.NotificationsDisabledCategories = notifications.DisableNoCategories()
 	})
@@ -46,7 +47,7 @@ func ExampleConfig_disableNoCategories() {
 
 func ExampleSessionConfig_disableNoCategories() {
 	ctx := context.Background()
-	driver, err := NewDriverWithContext(getUrl(), getAuth())
+	driver, err := NewDriver(getUrl(), getAuth())
 	handleError(err)
 	defer handleClose(ctx, driver)
 
@@ -71,7 +72,7 @@ func ExampleSessionConfig_disableNoCategories() {
 
 func ExampleConfig_disableSomeCategories() {
 	ctx := context.Background()
-	driver, err := NewDriverWithContext(getUrl(), getAuth(), func(config *config.Config) {
+	driver, err := NewDriver(getUrl(), getAuth(), func(config *config.Config) {
 		// makes the server return all notification categories but deprecations
 		config.NotificationsDisabledCategories = notifications.DisableCategories(notifications.Deprecation)
 	})
@@ -91,7 +92,7 @@ func ExampleConfig_disableSomeCategories() {
 
 func ExampleSessionConfig_disableSomeCategories() {
 	ctx := context.Background()
-	driver, err := NewDriverWithContext(getUrl(), getAuth())
+	driver, err := NewDriver(getUrl(), getAuth())
 	handleError(err)
 	defer handleClose(ctx, driver)
 
@@ -117,7 +118,7 @@ func ExampleSessionConfig_disableSomeCategories() {
 
 func ExampleConfig_minimumSeverityLevel() {
 	ctx := context.Background()
-	driver, err := NewDriverWithContext(getUrl(), getAuth(), func(config *config.Config) {
+	driver, err := NewDriver(getUrl(), getAuth(), func(config *config.Config) {
 		// makes the server return only notifications with severity level warning or higher
 		config.NotificationsMinSeverity = notifications.WarningLevel
 	})
@@ -137,7 +138,7 @@ func ExampleConfig_minimumSeverityLevel() {
 
 func ExampleSessionConfig_minimumSeverityLevel() {
 	ctx := context.Background()
-	driver, err := NewDriverWithContext(getUrl(), getAuth())
+	driver, err := NewDriver(getUrl(), getAuth())
 	handleError(err)
 	defer handleClose(ctx, driver)
 

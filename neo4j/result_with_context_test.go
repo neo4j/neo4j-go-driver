@@ -692,7 +692,7 @@ func TestResult(outer *testing.T) {
 
 			type iterBreakTestCase struct {
 				description      string
-				closer           func(ResultWithContext) error
+				closer           func(Result) error
 				usePreIter       bool
 				pullPreIterFirst bool
 			}
@@ -700,28 +700,28 @@ func TestResult(outer *testing.T) {
 			iterBreakTestCases := []iterBreakTestCase{
 				{
 					description: "by single",
-					closer: func(res ResultWithContext) error {
+					closer: func(res Result) error {
 						_, err := res.Single(ctx)
 						return err
 					},
 				},
 				{
 					description: "by consume",
-					closer: func(res ResultWithContext) error {
+					closer: func(res Result) error {
 						_, err := res.Consume(ctx)
 						return err
 					},
 				},
 				{
 					description: "by collect",
-					closer: func(res ResultWithContext) error {
+					closer: func(res Result) error {
 						_, err := res.Collect(ctx)
 						return err
 					},
 				},
 				{
 					description: "by iter",
-					closer: func(res ResultWithContext) error {
+					closer: func(res Result) error {
 						return doRecordsRangeRet(res.Records(ctx), func(record *Record, err error, break_ func(), return_ func(error)) {
 							if err != nil {
 								return_(err)

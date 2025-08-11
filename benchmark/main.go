@@ -32,7 +32,7 @@ import (
 	neo4j "github.com/neo4j/neo4j-go-driver/v5/neo4j"
 )
 
-func getSetup(driver neo4j.DriverWithContext) *neo4j.Node {
+func getSetup(driver neo4j.Driver) *neo4j.Node {
 	// Check if setup already built
 	ctx := context.Background()
 	sess := driver.NewSession(ctx, neo4j.SessionConfig{})
@@ -74,7 +74,7 @@ func getBoolProp(node *neo4j.Node, name string, dflt bool) bool {
 	return b
 }
 
-func buildSetup(driver neo4j.DriverWithContext, setup *neo4j.Node) {
+func buildSetup(driver neo4j.Driver, setup *neo4j.Node) {
 	ctx := context.Background()
 	sess := driver.NewSession(ctx, neo4j.SessionConfig{})
 	defer sess.Close(ctx)
@@ -99,7 +99,7 @@ func buildSetup(driver neo4j.DriverWithContext, setup *neo4j.Node) {
 	}
 }
 
-func iterMxL(driver neo4j.DriverWithContext) {
+func iterMxL(driver neo4j.Driver) {
 	ctx := context.Background()
 	sess := driver.NewSession(ctx, neo4j.SessionConfig{})
 	defer sess.Close(ctx)
@@ -157,7 +157,7 @@ func buildParamsLMap() map[string]any {
 	return m
 }
 
-func params(driver neo4j.DriverWithContext, m map[string]any, n int) {
+func params(driver neo4j.Driver, m map[string]any, n int) {
 	ctx := context.Background()
 	// Use same session for all of n, not part of measurement
 	session := driver.NewSession(ctx, neo4j.SessionConfig{})
@@ -184,7 +184,7 @@ func params18(driver neo4j18.Driver, m map[string]any, n int) {
 
 // Measures time to get a single result using tx function
 // Include session creation in measurement
-func getS(driver neo4j.DriverWithContext, n int) {
+func getS(driver neo4j.Driver, n int) {
 	ctx := context.Background()
 	for i := 0; i < n; i++ {
 		session := driver.NewSession(ctx, neo4j.SessionConfig{})
@@ -263,7 +263,7 @@ func perf(warmup, measure func()) (time.Duration, memDiff) {
 
 // Run with bolt://localhost:7687 user pass
 func main() {
-	driver, err := neo4j.NewDriverWithContext(os.Args[1], neo4j.BasicAuth(os.Args[2], os.Args[3], ""))
+	driver, err := neo4j.NewDriver(os.Args[1], neo4j.BasicAuth(os.Args[2], os.Args[3], ""))
 	if err != nil {
 		panic(err)
 	}

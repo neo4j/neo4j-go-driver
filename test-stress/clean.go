@@ -19,10 +19,11 @@ package main
 
 import (
 	"context"
+
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
 )
 
-func cleanDb(ctx context.Context, driver neo4j.DriverWithContext) {
+func cleanDb(ctx context.Context, driver neo4j.Driver) {
 	session := driver.NewSession(ctx, neo4j.SessionConfig{})
 	batch := 1000
 	for {

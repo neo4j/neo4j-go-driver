@@ -54,7 +54,7 @@ type Driver interface {
 	// ExecuteQueryBookmarkManager returns the bookmark manager instance used by ExecuteQuery by default.
 	//
 	// This is useful when ExecuteQuery is called without custom bookmark managers and the lower-level
-	// neo4j.SessionWithContext APIs are called as well.
+	// neo4j.Session APIs are called as well.
 	// In that case, the recommended approach is as follows:
 	// 	results, err := neo4j.ExecuteQuery(ctx, driver, query, params, transformerFunc)
 	// 	// [...] do something with results and error
@@ -74,7 +74,7 @@ type Driver interface {
 	VerifyConnectivity(ctx context.Context) error
 	// VerifyAuthentication verifies that the authentication information is valid.
 	//
-	// It's much like `DriverWithContext.VerifyConnectivity`, but for checking authentication.
+	// It's much like `Driver.VerifyConnectivity`, but for checking authentication.
 	//
 	// Passing `nil` as `auth` will use the authentication information that was used to create the driver.
 	//
@@ -126,16 +126,16 @@ type ResultTransformer[T any] interface {
 //
 // In order to connect to a single instance database, you need to pass a URI with scheme 'bolt', 'bolt+s' or 'bolt+ssc'.
 //
-//	driver, err = NewDriverWithContext("bolt://db.server:7687", BasicAuth(username, password))
+//	driver, err = NewDriver("bolt://db.server:7687", BasicAuth(username, password))
 //
 // In order to connect to a causal cluster database, you need to pass a URI with scheme 'neo4j', 'neo4j+s' or 'neo4j+ssc'
 // and its host part set to be one of the core cluster members.
 //
-//	driver, err = NewDriverWithContext("neo4j://core.db.server:7687", BasicAuth(username, password))
+//	driver, err = NewDriver("neo4j://core.db.server:7687", BasicAuth(username, password))
 //
 // You can override default configuration options by providing a configuration function(s)
 //
-//	driver, err = NewDriverWithContext(uri, BasicAuth(username, password), function (config *config.Config) {
+//	driver, err = NewDriver(uri, BasicAuth(username, password), function (config *config.Config) {
 //		config.MaxConnectionPoolSize = 10
 //	})
 //
@@ -456,12 +456,12 @@ func (d *driver) VerifyAuthentication(ctx context.Context, auth *AuthToken) (err
 // ExecuteQuery runs the query in a single explicit, retryable transaction within a session entirely managed by
 // the driver.
 //
-// Retries occur in the same conditions as when calling SessionWithContext.ExecuteRead and
-// SessionWithContext.ExecuteWrite.
+// Retries occur in the same conditions as when calling Session.ExecuteRead and
+// Session.ExecuteWrite.
 //
 // Because it is an explicit transaction from the server point of view, Cypher queries using
 // "CALL {} IN TRANSACTIONS" or the older "USING PERIODIC COMMIT" construct will not work (call
-// SessionWithContext.Run for these).
+// Session.Run for these).
 //
 // Specific settings can be configured via configuration callbacks. Built-in callbacks are provided such as:
 //
@@ -490,9 +490,9 @@ func (d *driver) VerifyAuthentication(ctx context.Context, auth *AuthToken) (err
 // In other words, a successful read query run by ExecuteQuery is guaranteed to be able to read results created
 // from a previous successful write query run by ExecuteQuery on the same database.
 // This is achieved through the use of bookmarks, managed by a default neo4j.BookmarkManager instance.
-// This default BookmarkManager instance can be retrieved with DriverWithContext.DefaultExecuteQueryBookmarkManager.
+// This default BookmarkManager instance can be retrieved with Driver.DefaultExecuteQueryBookmarkManager.
 // Such a consistency guarantee is *not* maintained between ExecuteQuery calls and the lower-level
-// neo4j.SessionWithContext API calls, unless sessions are explicitly configured with the same bookmark manager.
+// neo4j.Session API calls, unless sessions are explicitly configured with the same bookmark manager.
 // That guarantee may also break if a custom implementation of neo4j.BookmarkManager is provided via for instance
 // the built-in callback neo4j.ExecuteQueryWithBookmarkManager.
 // You can disable bookmark management by passing the neo4j.ExecuteQueryWithoutBookmarkManager callback to ExecuteQuery.
@@ -737,7 +737,7 @@ func (c *ExecuteQueryConfiguration) toSessionConfig() SessionConfig {
 
 type transactionFunction func(context.Context, ManagedTransactionWork, ...func(*TransactionConfig)) (any, error)
 
-func (c *ExecuteQueryConfiguration) selectTxFunctionApi(session SessionWithContext) (transactionFunction, error) {
+func (c *ExecuteQueryConfiguration) selectTxFunctionApi(session Session) (transactionFunction, error) {
 	switch c.Routing {
 	case Read:
 		return session.executeQueryRead, nil

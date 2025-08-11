@@ -26,10 +26,10 @@ type ManagedTransactionWorkT[T any] func(tx ManagedTransaction) (T, error)
 // ExecuteRead executes the given unit of work in a read transaction with
 // retry logic in place, via the provided session.
 //
-// This is the generic variant of SessionWithContext.ExecuteRead.
+// This is the generic variant of Session.ExecuteRead.
 //
 // If an error occurs, the zero value of T is returned.
-func ExecuteRead[T any](ctx context.Context, session SessionWithContext,
+func ExecuteRead[T any](ctx context.Context, session Session,
 	work ManagedTransactionWorkT[T],
 	configurers ...func(config *TransactionConfig)) (T, error) {
 
@@ -39,10 +39,10 @@ func ExecuteRead[T any](ctx context.Context, session SessionWithContext,
 // ExecuteWrite executes the given unit of work in a write transaction with
 // retry logic in place, via the provided session.
 //
-// This is the generic variant of SessionWithContext.ExecuteWrite.
+// This is the generic variant of Session.ExecuteWrite.
 //
 // If an error occurs, the zero value of T is returned.
-func ExecuteWrite[T any](ctx context.Context, session SessionWithContext,
+func ExecuteWrite[T any](ctx context.Context, session Session,
 	work ManagedTransactionWorkT[T],
 	configurers ...func(config *TransactionConfig)) (T, error) {
 

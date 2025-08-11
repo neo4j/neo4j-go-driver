@@ -32,7 +32,7 @@ import (
 
 type RoutingTable = idb.RoutingTable
 
-func ForceRoutingTableUpdate(d DriverWithContext, database string, bookmarks []string, logger log.BoltLogger) error {
+func ForceRoutingTableUpdate(d Driver, database string, bookmarks []string, logger log.BoltLogger) error {
 	driver := d.(*driver)
 	ctx := context.Background()
 	driver.router.Invalidate(database)
@@ -57,11 +57,11 @@ func ForceRoutingTableUpdate(d DriverWithContext, database string, bookmarks []s
 	return errorutil.WrapError(err)
 }
 
-func RegisterDnsResolver(d DriverWithContext, hook func(address string) []string) {
+func RegisterDnsResolver(d Driver, hook func(address string) []string) {
 	d.(*driver).connector.TestKitDnsResolver = hook
 }
 
-func GetRoutingTable(d DriverWithContext, database string) (*RoutingTable, error) {
+func GetRoutingTable(d Driver, database string) (*RoutingTable, error) {
 	driver := d.(*driver)
 	router, ok := driver.router.(*router.Router)
 	if !ok {

@@ -409,7 +409,7 @@ func TestDriverExecuteQuery(outer *testing.T) {
 	for _, testCase := range testCases {
 		outer.Run(testCase.description, func(t *testing.T) {
 			driver := &driverDelegate{
-				newSession: func(_ context.Context, config SessionConfig) SessionWithContext {
+				newSession: func(_ context.Context, config SessionConfig) Session {
 					AssertDeepEquals(t, testCase.expectedSessionConfig, config)
 					return testCase.createSession
 				},
@@ -429,7 +429,7 @@ func TestDriverExecuteQuery(outer *testing.T) {
 
 	outer.Run("default bookmark manager is thread-safe", func(t *testing.T) {
 		driver := &driverDelegate{
-			newSession: func(_ context.Context, config SessionConfig) SessionWithContext {
+			newSession: func(_ context.Context, config SessionConfig) Session {
 				return &fakeSession{
 					executeWriteErr: fmt.Errorf("oopsie, write failed"),
 				}
@@ -469,7 +469,7 @@ func TestDriverExecuteQuery(outer *testing.T) {
 	})
 }
 
-func callExecuteQueryOrBookmarkManagerGetter(driver DriverWithContext, i int) {
+func callExecuteQueryOrBookmarkManagerGetter(driver Driver, i int) {
 	if i%2 == 0 {
 		// this lazily initializes the default bookmark manager
 		_ = driver.ExecuteQueryBookmarkManager()
@@ -514,7 +514,7 @@ func (f *failingResultTransformer) Complete([]string, ResultSummary) (*EagerResu
 
 type driverDelegate struct {
 	delegate   *driver
-	newSession func(context.Context, SessionConfig) SessionWithContext
+	newSession func(context.Context, SessionConfig) Session
 }
 
 func (d *driverDelegate) ExecuteQueryBookmarkManager() BookmarkManager {
@@ -525,7 +525,7 @@ func (d *driverDelegate) Target() url.URL {
 	return d.delegate.Target()
 }
 
-func (d *driverDelegate) NewSession(ctx context.Context, config SessionConfig) SessionWithContext {
+func (d *driverDelegate) NewSession(ctx context.Context, config SessionConfig) Session {
 	return d.newSession(ctx, config)
 }
 
@@ -606,7 +606,7 @@ func (s *fakeSession) executeQueryWrite(_ context.Context, callback ManagedTrans
 	}
 	return callback(&fakeManagedTransaction{result: result, err: err})
 }
-func (s *fakeSession) Run(context.Context, string, map[string]any, ...func(*TransactionConfig)) (ResultWithContext, error) {
+func (s *fakeSession) Run(context.Context, string, map[string]any, ...func(*TransactionConfig)) (Result, error) {
 	panic("implement me")
 }
 
@@ -627,7 +627,7 @@ type fakeManagedTransaction struct {
 	err    error
 }
 
-func (tx *fakeManagedTransaction) Run(context.Context, string, map[string]any) (ResultWithContext, error) {
+func (tx *fakeManagedTransaction) Run(context.Context, string, map[string]any) (Result, error) {
 	return tx.result, tx.err
 }
 

@@ -20,10 +20,11 @@ package auth_test
 import (
 	"context"
 	"fmt"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/auth"
 	"os"
 	"time"
+
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/auth"
 )
 
 func ExampleBasicTokenManager() {
@@ -37,7 +38,7 @@ func ExampleBasicTokenManager() {
 		return neo4j.BasicAuth(username, password, realm), nil
 	}
 	// create a new driver with a basic token manager which uses provider to handle basic auth password rotation.
-	_, _ = neo4j.NewDriverWithContext(getUrl(), auth.BasicTokenManager(fetchBasicAuthToken))
+	_, _ = neo4j.NewDriver(getUrl(), auth.BasicTokenManager(fetchBasicAuthToken))
 }
 
 func ExampleBearerTokenManager() {
@@ -55,7 +56,7 @@ func ExampleBearerTokenManager() {
 		return token, &expiresIn, nil
 	}
 	// create a new driver with a bearer token manager which uses provider to handle possibly expiring auth tokens.
-	_, _ = neo4j.NewDriverWithContext(getUrl(), auth.BearerTokenManager(fetchAuthTokenFromMyProvider))
+	_, _ = neo4j.NewDriver(getUrl(), auth.BearerTokenManager(fetchAuthTokenFromMyProvider))
 }
 
 func getBasicAuth() (username, password, realm string, error error) {

@@ -72,6 +72,13 @@ type Session interface {
 	verifyAuthentication(ctx context.Context) error
 }
 
+// SessionWithContext is an alias for Session to maintain backward compatibility
+// for users who migrated from v5 to v6 using the WithContext APIs.
+// In v6, Session is the primary interface and is context-aware.
+//
+// Deprecated: please use Session instead. This alias will be removed in 7.0.
+type SessionWithContext = Session
+
 // SessionConfig is used to configure a new session, its zero value uses safe defaults.
 type SessionConfig struct {
 	// AccessMode used when using Session.Run and explicit transactions. Used to route query
@@ -982,10 +989,3 @@ func computeCacheKey(ctx context.Context, token *idb.ReAuthToken, cache *homedb.
 	}
 	return cache.ComputeKey(impersonatedUser, nil)
 }
-
-// SessionWithContext is an alias for Session to maintain backward compatibility
-// for users who migrated from v5 to v6 using the WithContext APIs.
-// In v6, Session is the primary interface and is context-aware.
-//
-// Deprecated: please use Session instead. This alias will be removed in 7.0.
-type SessionWithContext = Session

@@ -19,10 +19,11 @@ package config
 
 import (
 	"crypto/tls"
+	"time"
+
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/auth"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/log"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/notifications"
-	"time"
 )
 
 // A Config contains options that can be used to customize certain
@@ -73,7 +74,7 @@ type Config struct {
 	Log log.Logger
 	// Resolver that would be used to resolve initial router address. This may
 	// be useful if you want to provide more than one URL for initial router.
-	// If not specified, the URL provided to NewDriverWithContext
+	// If not specified, the URL provided to NewDriver
 	// is used as the initial router.
 	//
 	// default: nil
@@ -106,8 +107,8 @@ type Config struct {
 	// The read timeout is automatically applied and may result in connections
 	// being dropped if they are idle beyond the corresponding period.
 	//
-	// Since 5.0, this setting competes with the context-aware APIs. These APIs
-	// are discoverable through NewDriverWithContext.
+	// Since 5.0, this setting competes with the context-aware APIs. In v5, these APIs
+	// were discoverable through NewDriverWithContext; in v6, all APIs are context-aware by default.
 	// When a connection needs to be acquired from the internal driver
 	// connection pool and the user-provided context.Context carries a deadline
 	// (through context.WithTimeout or context.WithDeadline), the earliest
@@ -134,8 +135,8 @@ type Config struct {
 	// Connect timeout that will be set on underlying sockets. Values less than
 	// or equal to 0 results in no timeout being applied.
 	//
-	// Since 5.0, this setting competes with the context-aware APIs. These APIs
-	// are discoverable through NewDriverWithContext.
+	// Since 5.0, this setting competes with the context-aware APIs. In v5, these APIs
+	// were discoverable through NewDriverWithContext; in v6, all APIs are context-aware by default.
 	// If a connection needs to be created when one of these APIs is called
 	// and the user-provided context.Context carries a deadline (through
 	// context.WithTimeout or context.WithDeadline), the TCP dialer will pick
@@ -186,10 +187,10 @@ type Config struct {
 	// informs the server of this action without providing additional details such as arguments or client identifiers:
 	//
 	//   neo4j.ExecuteQuery
-	//   SessionWithContext.Run
-	//   SessionWithContext.BeginTransaction
-	//   SessionWithContext.ExecuteRead
-	//   SessionWithContext.ExecuteWrite
+	//   Session.Run
+	//   Session.BeginTransaction
+	//   Session.ExecuteRead
+	//   Session.ExecuteWrite
 	//
 	// default: true
 	TelemetryDisabled bool

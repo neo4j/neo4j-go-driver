@@ -21,16 +21,17 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/config"
-	iauth "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/auth"
-	idb "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/errorutil"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/homedb"
 	"io"
 	"reflect"
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/config"
+	iauth "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/auth"
+	idb "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/errorutil"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/homedb"
 
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/db"
 	. "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/testutil"
@@ -38,7 +39,7 @@ import (
 )
 
 type transactionFunc func(context.Context, ManagedTransactionWork, ...func(*TransactionConfig)) (any, error)
-type transactionFuncApi func(session SessionWithContext) transactionFunc
+type transactionFuncApi func(session Session) transactionFunc
 
 var reAuthToken = &idb.ReAuthToken{FromSession: false, Manager: iauth.Token{Tokens: map[string]any{"scheme": "none"}}}
 
@@ -208,8 +209,8 @@ func TestSession(outer *testing.T) {
 		})
 
 		transactionFunctions := map[string]transactionFuncApi{
-			"read tx func":  func(s SessionWithContext) transactionFunc { return s.ExecuteRead },
-			"write tx func": func(s SessionWithContext) transactionFunc { return s.ExecuteWrite },
+			"read tx func":  func(s Session) transactionFunc { return s.ExecuteRead },
+			"write tx func": func(s Session) transactionFunc { return s.ExecuteWrite },
 		}
 
 		for name, txFuncApi := range transactionFunctions {
@@ -708,30 +709,30 @@ func TestSession(outer *testing.T) {
 		ct.Run("Does not put back connection twice to the pool", func(inner *testing.T) {
 			type testCase struct {
 				name       string
-				completeTx func(context.Context, SessionWithContext, ExplicitTransaction) error
+				completeTx func(context.Context, Session, ExplicitTransaction) error
 			}
 			cases := []testCase{
 				{
 					name: "session close",
-					completeTx: func(ctx context.Context, session SessionWithContext, _ ExplicitTransaction) error {
+					completeTx: func(ctx context.Context, session Session, _ ExplicitTransaction) error {
 						return session.Close(ctx)
 					},
 				},
 				{
 					name: "tx commit",
-					completeTx: func(ctx context.Context, _ SessionWithContext, transaction ExplicitTransaction) error {
+					completeTx: func(ctx context.Context, _ Session, transaction ExplicitTransaction) error {
 						return transaction.Commit(ctx)
 					},
 				},
 				{
 					name: "tx rollback",
-					completeTx: func(ctx context.Context, _ SessionWithContext, transaction ExplicitTransaction) error {
+					completeTx: func(ctx context.Context, _ Session, transaction ExplicitTransaction) error {
 						return transaction.Rollback(ctx)
 					},
 				},
 				{
 					name: "tx close",
-					completeTx: func(ctx context.Context, _ SessionWithContext, transaction ExplicitTransaction) error {
+					completeTx: func(ctx context.Context, _ Session, transaction ExplicitTransaction) error {
 						return transaction.Close(ctx)
 					},
 				},

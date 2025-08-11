@@ -26,14 +26,14 @@ import (
 	. "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/testutil"
 )
 
-func assertNoRouter(t *testing.T, d DriverWithContext) {
+func assertNoRouter(t *testing.T, d Driver) {
 	t.Helper()
 	_, isDirectRouter := d.(*driver).router.(*directRouter)
 	if !isDirectRouter {
 		t.Error("Expected no router")
 	}
 }
-func assertNoRouterAddress(t *testing.T, d DriverWithContext, address string) {
+func assertNoRouterAddress(t *testing.T, d Driver, address string) {
 	t.Helper()
 	direct := d.(*driver).router.(*directRouter)
 	if direct.address != address {
@@ -41,7 +41,7 @@ func assertNoRouterAddress(t *testing.T, d DriverWithContext, address string) {
 	}
 }
 
-func assertRouter(t *testing.T, d DriverWithContext) {
+func assertRouter(t *testing.T, d Driver) {
 	t.Helper()
 	_, isRouter := d.(*driver).router.(*router.Router)
 	if !isRouter {
@@ -49,7 +49,7 @@ func assertRouter(t *testing.T, d DriverWithContext) {
 	}
 }
 
-func assertRouterContext(t *testing.T, d DriverWithContext, context map[string]string) {
+func assertRouterContext(t *testing.T, d Driver, context map[string]string) {
 	t.Helper()
 	r := d.(*driver).router.(*router.Router)
 	c := r.Context()
@@ -58,7 +58,7 @@ func assertRouterContext(t *testing.T, d DriverWithContext, context map[string]s
 	}
 }
 
-func assertSkipEncryption(t *testing.T, d DriverWithContext, skipEncryption bool) {
+func assertSkipEncryption(t *testing.T, d Driver, skipEncryption bool) {
 	t.Helper()
 	c := d.(*driver).connector
 	if c.SkipEncryption != skipEncryption {
@@ -66,7 +66,7 @@ func assertSkipEncryption(t *testing.T, d DriverWithContext, skipEncryption bool
 	}
 }
 
-func assertSkipVerify(t *testing.T, d DriverWithContext, skipVerify bool) {
+func assertSkipVerify(t *testing.T, d Driver, skipVerify bool) {
 	t.Helper()
 	c := d.(*driver).connector
 	if c.SkipVerify != skipVerify {
@@ -74,7 +74,7 @@ func assertSkipVerify(t *testing.T, d DriverWithContext, skipVerify bool) {
 	}
 }
 
-func assertNetwork(t *testing.T, d DriverWithContext, network string) {
+func assertNetwork(t *testing.T, d Driver, network string) {
 	t.Helper()
 	c := d.(*driver).connector
 	if c.Network != network {
@@ -103,7 +103,7 @@ func TestDriverURISchemes(t *testing.T) {
 
 	for _, tt := range uriSchemeTests {
 		t.Run(tt.scheme, func(t *testing.T) {
-			driver, err := NewDriverWithContext(tt.testing, NoAuth())
+			driver, err := NewDriver(tt.testing, NoAuth())
 
 			AssertNoError(t, err)
 			AssertStringEqual(t, driver.Target().Scheme, tt.scheme)
@@ -134,7 +134,7 @@ func TestDriverInvalidURISchemes(t *testing.T) {
 
 	for _, tt := range invalidURISchemeTests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, err := NewDriverWithContext(tt.testing, NoAuth())
+			_, err := NewDriver(tt.testing, NoAuth())
 
 			AssertError(t, err)
 			assertUsageError(t, err)
@@ -145,21 +145,21 @@ func TestDriverInvalidURISchemes(t *testing.T) {
 
 func TestDriverURIRoutingContext(t *testing.T) {
 	t.Run("Extracts keys", func(t1 *testing.T) {
-		driver, err := NewDriverWithContext("neo4j://localhost:7687?x=y&a=b", NoAuth())
+		driver, err := NewDriver("neo4j://localhost:7687?x=y&a=b", NoAuth())
 
 		AssertNoError(t1, err)
 		assertRouterContext(t1, driver, map[string]string{"x": "y", "a": "b", "address": "localhost:7687"})
 	})
 
 	t.Run("Duplicate keys should error", func(t1 *testing.T) {
-		_, err := NewDriverWithContext("neo4j://localhost:7687?x=y&x=b", NoAuth())
+		_, err := NewDriver("neo4j://localhost:7687?x=y&x=b", NoAuth())
 
 		AssertError(t, err)
 		assertUsageError(t, err)
 	})
 
 	t.Run("Reserved key 'address' should error", func(t *testing.T) {
-		_, err := NewDriverWithContext("neo4j://localhost:7687?x=y&address=b", NoAuth())
+		_, err := NewDriver("neo4j://localhost:7687?x=y&address=b", NoAuth())
 
 		AssertError(t, err)
 		assertUsageError(t, err)
@@ -168,7 +168,7 @@ func TestDriverURIRoutingContext(t *testing.T) {
 
 func TestDriverDefaultPort(t *testing.T) {
 	t.Run("neo4j://localhost should default to port 7687", func(t1 *testing.T) {
-		driver, err := NewDriverWithContext("neo4j://localhost", NoAuth())
+		driver, err := NewDriver("neo4j://localhost", NoAuth())
 		driverTarget := driver.Target()
 
 		AssertNoError(t1, err)
@@ -179,7 +179,7 @@ func TestDriverDefaultPort(t *testing.T) {
 
 func TestNewDriverAndClose(t *testing.T) {
 	ctx := context.Background()
-	driver, err := NewDriverWithContext("bolt://localhost:7687", NoAuth())
+	driver, err := NewDriver("bolt://localhost:7687", NoAuth())
 	AssertNoError(t, err)
 
 	driverTarget := driver.Target()
@@ -227,7 +227,7 @@ func TestDriverSessionCreation(t *testing.T) {
 	for _, tt := range driverSessionCreationTests {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := context.Background()
-			driver, err := NewDriverWithContext(tt.testing, NoAuth())
+			driver, err := NewDriver(tt.testing, NoAuth())
 			AssertNoError(t, err)
 
 			sessi := driver.NewSession(ctx, SessionConfig{AccessMode: tt.mode, Bookmarks: tt.bookmarks})
