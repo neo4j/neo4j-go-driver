@@ -32,9 +32,8 @@ import (
 	neo4j "github.com/neo4j/neo4j-go-driver/v5/neo4j"
 )
 
-func getSetup(driver neo4j.Driver) *neo4j.Node {
+func getSetup(ctx context.Context, driver neo4j.Driver) *neo4j.Node {
 	// Check if setup already built
-	ctx := context.Background()
 	sess := driver.NewSession(ctx, neo4j.SessionConfig{})
 	defer sess.Close(ctx)
 
@@ -74,8 +73,7 @@ func getBoolProp(node *neo4j.Node, name string, dflt bool) bool {
 	return b
 }
 
-func buildSetup(driver neo4j.Driver, setup *neo4j.Node) {
-	ctx := context.Background()
+func buildSetup(ctx context.Context, driver neo4j.Driver, setup *neo4j.Node) {
 	sess := driver.NewSession(ctx, neo4j.SessionConfig{})
 	defer sess.Close(ctx)
 
@@ -99,8 +97,7 @@ func buildSetup(driver neo4j.Driver, setup *neo4j.Node) {
 	}
 }
 
-func iterMxL(driver neo4j.Driver) {
-	ctx := context.Background()
+func iterMxL(ctx context.Context, driver neo4j.Driver) {
 	sess := driver.NewSession(ctx, neo4j.SessionConfig{})
 	defer sess.Close(ctx)
 
@@ -157,8 +154,7 @@ func buildParamsLMap() map[string]any {
 	return m
 }
 
-func params(driver neo4j.Driver, m map[string]any, n int) {
-	ctx := context.Background()
+func params(ctx context.Context, driver neo4j.Driver, m map[string]any, n int) {
 	// Use same session for all of n, not part of measurement
 	session := driver.NewSession(ctx, neo4j.SessionConfig{})
 	for i := 0; i < n; i++ {
@@ -184,8 +180,7 @@ func params18(driver neo4j18.Driver, m map[string]any, n int) {
 
 // Measures time to get a single result using tx function
 // Include session creation in measurement
-func getS(driver neo4j.Driver, n int) {
-	ctx := context.Background()
+func getS(ctx context.Context, driver neo4j.Driver, n int) {
 	for i := 0; i < n; i++ {
 		session := driver.NewSession(ctx, neo4j.SessionConfig{})
 		x, _ := session.ExecuteRead(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
@@ -263,6 +258,8 @@ func perf(warmup, measure func()) (time.Duration, memDiff) {
 
 // Run with bolt://localhost:7687 user pass
 func main() {
+	ctx := context.Background()
+
 	driver, err := neo4j.NewDriver(os.Args[1], neo4j.BasicAuth(os.Args[2], os.Args[3], ""))
 	if err != nil {
 		panic(err)
@@ -275,7 +272,7 @@ func main() {
 	}
 
 	// Build the setup if needed
-	buildSetup(driver, getSetup(driver))
+	buildSetup(ctx, driver, getSetup(ctx, driver))
 
 	fmt.Printf("%-15v %-6v %-5v %-5v\n", "Benchmark", "Dur", "Mal", "Tal")
 	printRes := func(name string, dur, dur18 time.Duration, mem, mem18 memDiff) {
@@ -285,16 +282,16 @@ func main() {
 			float64(mem.TotalAlloc)/float64(mem18.TotalAlloc))
 	}
 
-	dur, mem := perf(func() { iterMxL(driver) }, func() { iterMxL(driver) })
+	dur, mem := perf(func() { iterMxL(ctx, driver) }, func() { iterMxL(ctx, driver) })
 	dur18, mem18 := perf(func() { iterMxL18(driver18) }, func() { iterMxL18(driver18) })
 	printRes("iterMxL", dur, dur18, mem, mem18)
 
-	dur, mem = perf(func() { getS(driver, 10) }, func() { getS(driver, 1000) })
+	dur, mem = perf(func() { getS(ctx, driver, 10) }, func() { getS(ctx, driver, 1000) })
 	dur18, mem18 = perf(func() { getS18(driver18, 10) }, func() { getS18(driver18, 1000) })
 	printRes("getS", dur, dur18, mem, mem18)
 
 	m := buildParamsLMap()
-	dur, mem = perf(func() { params(driver, m, 10) }, func() { params(driver, m, 1000) })
+	dur, mem = perf(func() { params(ctx, driver, m, 10) }, func() { params(ctx, driver, m, 1000) })
 	dur18, mem18 = perf(func() { params18(driver18, m, 10) }, func() { params18(driver18, m, 1000) })
 	printRes("paramsL", dur, dur18, mem, mem18)
 }
