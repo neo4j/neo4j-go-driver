@@ -18,13 +18,13 @@
 package neo4j
 
 import (
+	"math"
+	"time"
+
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/config"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/bolt"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/pool"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/notifications"
-	"math"
-	"net/url"
-	"time"
 )
 
 func defaultConfig() *config.Config {
@@ -91,20 +91,9 @@ func validateAndNormaliseConfig(config *config.Config) error {
 	return nil
 }
 
-func newServerAddressURL(hostname string, port string) *url.URL {
-	if hostname == "" {
-		return nil
-	}
-
-	hostAndPort := hostname
-	if port != "" {
-		hostAndPort = hostAndPort + ":" + port
-	}
-
-	return &url.URL{Host: hostAndPort}
-}
-
 // NewServerAddress generates a config.ServerAddress with provided hostname and port information.
+//
+// Deprecated: Use config.NewServerAddress instead. This function will be removed in v7.
 func NewServerAddress(hostname string, port string) config.ServerAddress {
-	return newServerAddressURL(hostname, port)
+	return config.NewServerAddress(hostname, port)
 }

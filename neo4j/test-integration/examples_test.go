@@ -467,9 +467,9 @@ func addPerson(ctx context.Context, name string) error {
 	)
 
 	driver, err := createDriverWithAddressResolver("neo4j://x.acme.com", username, password,
-		neo4j.NewServerAddress("a.acme.com", "7676"),
-		neo4j.NewServerAddress("b.acme.com", "8787"),
-		neo4j.NewServerAddress("c.acme.com", "9898"))
+		config.NewServerAddress("a.acme.com", "7676"),
+		config.NewServerAddress("b.acme.com", "8787"),
+		config.NewServerAddress("c.acme.com", "9898"))
 	if err != nil {
 		return err
 	}

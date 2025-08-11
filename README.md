@@ -85,7 +85,7 @@ import (
 
 func main() {
     dbUri := "neo4j://localhost" // scheme://host(:port) (default port is 7687)
-    driver, err := neo4j.NewDriverWithContext(dbUri, neo4j.BasicAuth("neo4j", "letmein!", ""))
+    driver, err := neo4j.NewDriver(dbUri, neo4j.BasicAuth("neo4j", "letmein!", ""))
     if err != nil {
         panic(err)
     }
@@ -105,7 +105,7 @@ func main() {
     fmt.Printf("%v\n", item)
 }
 
-func insertItem(ctx context.Context, driver neo4j.DriverWithContext) (*Item, error) {
+func insertItem(ctx context.Context, driver neo4j.Driver) (*Item, error) {
     result, err := neo4j.ExecuteQuery(ctx, driver,
         "CREATE (n:Item { id: $id, name: $name }) RETURN n",
         map[string]any{

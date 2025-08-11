@@ -19,6 +19,7 @@ package config
 
 import (
 	"crypto/tls"
+	"net/url"
 	"time"
 
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/auth"
@@ -212,4 +213,18 @@ type ServerAddress interface {
 	Hostname() string
 	// Port returns the port portion of this ServerAddress.
 	Port() string
+}
+
+// NewServerAddress generates a ServerAddress with provided hostname and port information.
+func NewServerAddress(hostname string, port string) ServerAddress {
+	if hostname == "" {
+		return nil
+	}
+
+	hostAndPort := hostname
+	if port != "" {
+		hostAndPort = hostAndPort + ":" + port
+	}
+
+	return &url.URL{Host: hostAndPort}
 }
