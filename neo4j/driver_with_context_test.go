@@ -564,10 +564,6 @@ func (s *fakeSession) LastBookmarks() Bookmarks {
 	panic("implement me")
 }
 
-func (s *fakeSession) lastBookmark() string {
-	panic("implement me")
-}
-
 func (s *fakeSession) BeginTransaction(context.Context, ...func(*TransactionConfig)) (ExplicitTransaction, error) {
 	panic("implement me")
 }

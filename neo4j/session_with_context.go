@@ -48,7 +48,6 @@ type Session interface {
 	// If no bookmark was received or if this transaction was rolled back, the initial set of bookmarks will be
 	// returned.
 	LastBookmarks() Bookmarks
-	lastBookmark() string
 	// BeginTransaction starts a new explicit transaction on this session
 	// Contexts terminating too early negatively affect connection pooling and degrade the driver performance.
 	BeginTransaction(ctx context.Context, configurers ...func(*TransactionConfig)) (ExplicitTransaction, error)
@@ -274,23 +273,6 @@ func newSession(
 		session.pinHomeDatabase(ctx, database)
 	}
 	return session
-}
-
-func (s *session) lastBookmark() string {
-	// Pick up bookmark from pending auto-commit if there is a bookmark on it
-	// Note: the bookmark manager should not be notified here because:
-	//  - the results of the autocommit transaction may have not been consumed
-	// 	yet, in which case, the underlying connection may have an outdated
-	//	cached bookmark value
-	//  - moreover, the bookmark manager may already hold newer bookmarks
-	// 	because other sessions for the same DB have completed some work in
-	//	parallel
-	if s.autocommitTx != nil {
-		s.retrieveSessionBookmarks(s.autocommitTx.conn)
-	}
-
-	// Report bookmark from previously closed connection or from initial set
-	return s.bookmarks.lastBookmark()
 }
 
 func (s *session) LastBookmarks() Bookmarks {
@@ -935,9 +917,6 @@ func (s *erroredSession) LastBookmarks() Bookmarks {
 	return nil
 }
 
-func (s *erroredSession) lastBookmark() string {
-	return ""
-}
 func (s *erroredSession) BeginTransaction(context.Context, ...func(*TransactionConfig)) (ExplicitTransaction, error) {
 	return nil, s.err
 }

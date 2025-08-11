@@ -84,11 +84,6 @@ func (f *fakeSession) LastBookmarks() neo4j.Bookmarks {
 	panic("implement me")
 }
 
-//lint:ignore U1000 needed for interface adherence
-func (f *fakeSession) lastBookmark() string {
-	panic("implement me")
-}
-
 func (f *fakeSession) BeginTransaction(ctx context.Context, configurers ...func(*neo4j.TransactionConfig)) (neo4j.ExplicitTransaction, error) {
 	panic("implement me")
 }
