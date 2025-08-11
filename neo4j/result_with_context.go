@@ -25,7 +25,7 @@ import (
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/errorutil"
 )
 
-type ResultWithContext interface {
+type Result interface {
 	// Keys returns the keys available on the result set.
 	Keys() ([]string, error)
 	// NextRecord returns true if there is a record to be processed, record parameter is set
@@ -61,11 +61,18 @@ type ResultWithContext interface {
 	errorHandler(err error)
 }
 
+// ResultWithContext is an alias for Result to maintain backward compatibility
+// for users who migrated from v5 to v6 using the WithContext APIs.
+// In v6, Result is the primary interface and is context-aware.
+//
+// Deprecated: please use Result instead. This alias will be removed in 7.0.
+type ResultWithContext = Result
+
 const consumedResultError = "result cursor is not available anymore"
 
 const resultFailedError = "result failed due to invalid transaction"
 
-type resultWithContext struct {
+type result struct {
 	conn                 idb.Connection
 	streamHandle         idb.StreamHandle
 	cypher               string
@@ -80,15 +87,15 @@ type resultWithContext struct {
 	afterConsumptionHook func()
 }
 
-func newResultWithContext(
+func newResult(
 	connection idb.Connection,
 	stream idb.StreamHandle,
 	cypher string,
 	params map[string]any,
 	txState *transactionState,
 	afterConsumptionHook func(),
-) ResultWithContext {
-	return &resultWithContext{
+) Result {
+	return &result{
 		conn:                 connection,
 		streamHandle:         stream,
 		cypher:               cypher,
@@ -98,11 +105,11 @@ func newResultWithContext(
 	}
 }
 
-func (r *resultWithContext) Keys() ([]string, error) {
+func (r *result) Keys() ([]string, error) {
 	return r.conn.Keys(r.streamHandle)
 }
 
-func (r *resultWithContext) NextRecord(ctx context.Context, out **Record) bool {
+func (r *result) NextRecord(ctx context.Context, out **Record) bool {
 	hasNext := r.Next(ctx)
 	if out != nil {
 		*out = r.record
@@ -110,7 +117,7 @@ func (r *resultWithContext) NextRecord(ctx context.Context, out **Record) bool {
 	return hasNext
 }
 
-func (r *resultWithContext) Next(ctx context.Context) bool {
+func (r *result) Next(ctx context.Context) bool {
 	r.checkOpen()
 	if r.err != nil {
 		return false
@@ -122,7 +129,7 @@ func (r *resultWithContext) Next(ctx context.Context) bool {
 	return r.record != nil
 }
 
-func (r *resultWithContext) PeekRecord(ctx context.Context, out **Record) bool {
+func (r *result) PeekRecord(ctx context.Context, out **Record) bool {
 	hasNext := r.Peek(ctx)
 	if out != nil {
 		*out = r.peekedRecord
@@ -130,7 +137,7 @@ func (r *resultWithContext) PeekRecord(ctx context.Context, out **Record) bool {
 	return hasNext
 }
 
-func (r *resultWithContext) Peek(ctx context.Context) bool {
+func (r *result) Peek(ctx context.Context) bool {
 	r.checkOpen()
 	if r.err != nil {
 		return false
@@ -139,18 +146,18 @@ func (r *resultWithContext) Peek(ctx context.Context) bool {
 	return r.peekedRecord != nil
 }
 
-func (r *resultWithContext) Err() error {
+func (r *result) Err() error {
 	return errorutil.WrapError(r.err)
 }
 
-func (r *resultWithContext) Record() *Record {
+func (r *result) Record() *Record {
 	if r.peekedRecord != nil {
 		return r.peekedRecord
 	}
 	return r.record
 }
 
-func (r *resultWithContext) Records(ctx context.Context) func(yield func(*Record, error) bool) {
+func (r *result) Records(ctx context.Context) func(yield func(*Record, error) bool) {
 	return func(yield func(*db.Record, error) bool) {
 		for {
 			r.checkOpen()
@@ -174,7 +181,7 @@ func (r *resultWithContext) Records(ctx context.Context) func(yield func(*Record
 	}
 }
 
-func (r *resultWithContext) Collect(ctx context.Context) ([]*Record, error) {
+func (r *result) Collect(ctx context.Context) ([]*Record, error) {
 	if r.err != nil {
 		return nil, errorutil.WrapError(r.err)
 	}
@@ -198,7 +205,7 @@ func (r *resultWithContext) Collect(ctx context.Context) ([]*Record, error) {
 	return recs, nil
 }
 
-func (r *resultWithContext) Single(ctx context.Context) (*Record, error) {
+func (r *result) Single(ctx context.Context) (*Record, error) {
 	// Try retrieving the single record
 	r.advance(ctx)
 	if r.err != nil {
@@ -234,7 +241,7 @@ func (r *resultWithContext) Single(ctx context.Context) (*Record, error) {
 	return single, nil
 }
 
-func (r *resultWithContext) Consume(ctx context.Context) (ResultSummary, error) {
+func (r *result) Consume(ctx context.Context) (ResultSummary, error) {
 	// Already failed, reuse the internal error, might have been
 	// set by Single to indicate some kind of usage error that "destroyed"
 	// the result.
@@ -251,17 +258,17 @@ func (r *resultWithContext) Consume(ctx context.Context) (ResultSummary, error) 
 	return r.toResultSummary(), nil
 }
 
-func (r *resultWithContext) IsOpen() bool {
+func (r *result) IsOpen() bool {
 	return r.isOpen()
 }
 
-func (r *resultWithContext) buffer(ctx context.Context) {
+func (r *result) buffer(ctx context.Context) {
 	if r.err = r.conn.Buffer(ctx, r.streamHandle); r.err == nil {
 		r.callAfterConsumptionHook()
 	}
 }
 
-func (r *resultWithContext) toResultSummary() ResultSummary {
+func (r *result) toResultSummary() ResultSummary {
 	return &resultSummary{
 		sum:    r.summary,
 		cypher: r.cypher,
@@ -269,7 +276,7 @@ func (r *resultWithContext) toResultSummary() ResultSummary {
 	}
 }
 
-func (r *resultWithContext) advance(ctx context.Context) {
+func (r *result) advance(ctx context.Context) {
 	if r.peeked {
 		r.record, r.peekedRecord = r.peekedRecord, nil
 		r.summary, r.peekedSummary = r.peekedSummary, nil
@@ -282,25 +289,25 @@ func (r *resultWithContext) advance(ctx context.Context) {
 	}
 }
 
-func (r *resultWithContext) peek(ctx context.Context) {
+func (r *result) peek(ctx context.Context) {
 	if !r.peeked {
 		r.peekedRecord, r.peekedSummary, r.err = r.conn.Next(ctx, r.streamHandle)
 		r.peeked = true
 	}
 }
 
-func (r *resultWithContext) checkOpen() {
+func (r *result) checkOpen() {
 	alreadyChecked := r.err != nil && r.err.Error() == consumedResultError
 	if !alreadyChecked && !r.isOpen() {
 		r.err = &UsageError{Message: consumedResultError}
 	}
 }
 
-func (r *resultWithContext) isOpen() bool {
+func (r *result) isOpen() bool {
 	return r.summary == nil
 }
 
-func (r *resultWithContext) callAfterConsumptionHook() {
+func (r *result) callAfterConsumptionHook() {
 	if r.afterConsumptionHook == nil {
 		return
 	}
@@ -308,7 +315,7 @@ func (r *resultWithContext) callAfterConsumptionHook() {
 	r.afterConsumptionHook = nil
 }
 
-func (r *resultWithContext) errorHandler(error) {
+func (r *result) errorHandler(error) {
 	if r.err == nil {
 		r.err = &UsageError{Message: resultFailedError}
 	}

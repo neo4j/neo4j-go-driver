@@ -21,10 +21,11 @@ package neo4j
 import (
 	"context"
 	"fmt"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/homedb"
 	"net/url"
 	"strings"
 	"sync"
+
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/homedb"
 
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/auth"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/config"
@@ -47,9 +48,9 @@ const (
 	AccessModeRead AccessMode = 1
 )
 
-// DriverWithContext represents a pool of connections to a neo4j server or cluster. It's
+// Driver represents a pool of connections to a neo4j server or cluster. It's
 // safe for concurrent use.
-type DriverWithContext interface {
+type Driver interface {
 	// ExecuteQueryBookmarkManager returns the bookmark manager instance used by ExecuteQuery by default.
 	//
 	// This is useful when ExecuteQuery is called without custom bookmark managers and the lower-level
@@ -65,7 +66,7 @@ type DriverWithContext interface {
 	// Target returns the url this driver is bootstrapped
 	Target() url.URL
 	// NewSession creates a new session based on the specified session configuration.
-	NewSession(ctx context.Context, config SessionConfig) SessionWithContext
+	NewSession(ctx context.Context, config SessionConfig) Session
 	// VerifyConnectivity checks that the driver can connect to a remote server or cluster by
 	// establishing a network connection with the remote. Returns nil if successful
 	// or error describing the problem.
@@ -96,6 +97,13 @@ type DriverWithContext interface {
 	GetServerInfo(ctx context.Context) (ServerInfo, error)
 }
 
+// DriverWithContext is an alias for Driver to maintain backward compatibility
+// for users who migrated from v5 to v6 using the WithContext APIs.
+// In v6, Driver is the primary interface and is context-aware.
+//
+// Deprecated: please use Driver instead. This alias will be removed in 7.0.
+type DriverWithContext = Driver
+
 // ResultTransformer is a record accumulator that produces an instance of T when the processing of records is over.
 type ResultTransformer[T any] interface {
 	// Accept is called whenever a new record is fetched from the server
@@ -108,12 +116,12 @@ type ResultTransformer[T any] interface {
 	Complete(keys []string, summary ResultSummary) (T, error)
 }
 
-// NewDriverWithContext is the entry point to the neo4j driver to create an instance of a Driver. It is the first function to
+// NewDriver is the entry point to the neo4j driver to create an instance of a Driver. It is the first function to
 // be called in order to establish a connection to a neo4j database. It requires a Bolt URI and authentication
 // as parameters and can also take optional configuration function(s) as variadic parameters.
 //
-// No connectivity happens when NewDriverWithContext is called.
-// Call DriverWithContext.VerifyConnectivity once the driver is created if you want to eagerly check that the provided
+// No connectivity happens when NewDriver is called.
+// Call Driver.VerifyConnectivity once the driver is created if you want to eagerly check that the provided
 // URI and credentials are correct.
 //
 // In order to connect to a single instance database, you need to pass a URI with scheme 'bolt', 'bolt+s' or 'bolt+ssc'.
@@ -139,13 +147,13 @@ type ResultTransformer[T any] interface {
 //   - `neo4j.KerberosAuth`
 //   - `neo4j.BearerAuth`
 //   - `neo4j.CustomAuth`
-func NewDriverWithContext(target string, auth auth.TokenManager, configurers ...func(*config.Config)) (DriverWithContext, error) {
+func NewDriver(target string, auth auth.TokenManager, configurers ...func(*config.Config)) (Driver, error) {
 	parsed, err := url.Parse(target)
 	if err != nil {
 		return nil, err
 	}
 
-	d := driverWithContext{target: parsed, mut: sync.Mutex{}, auth: auth}
+	d := driver{target: parsed, mut: sync.Mutex{}, auth: auth}
 
 	routing := true
 	d.connector.Network = "tcp"
@@ -264,6 +272,15 @@ func NewDriverWithContext(target string, auth auth.TokenManager, configurers ...
 	return &d, nil
 }
 
+// NewDriverWithContext is an alias for NewDriver to maintain backward compatibility
+// for users who migrated from v5 to v6 using the WithContext APIs.
+// In v6, NewDriver is the primary function and is context-aware.
+//
+// Deprecated: please use NewDriver instead. This alias will be removed in 7.0.
+func NewDriverWithContext(target string, auth auth.TokenManager, configurers ...func(*config.Config)) (Driver, error) {
+	return NewDriver(target, auth, configurers...)
+}
+
 const routingContextAddressKey = "address"
 
 func routingContextFromUrl(useRouting bool, u *url.URL) (map[string]string, error) {
@@ -323,7 +340,7 @@ type sessionRouter interface {
 	InvalidateServer(server string)
 }
 
-type driverWithContext struct {
+type driver struct {
 	target    *url.URL
 	config    *config.Config
 	pool      *pool.Pool
@@ -341,11 +358,11 @@ type driverWithContext struct {
 	cache                       *homedb.Cache
 }
 
-func (d *driverWithContext) Target() url.URL {
+func (d *driver) Target() url.URL {
 	return *d.target
 }
 
-func (d *driverWithContext) NewSession(ctx context.Context, config SessionConfig) SessionWithContext {
+func (d *driver) NewSession(ctx context.Context, config SessionConfig) Session {
 	if config.DatabaseName == "" {
 		config.DatabaseName = idb.DefaultDatabase
 	}
@@ -368,22 +385,22 @@ func (d *driverWithContext) NewSession(ctx context.Context, config SessionConfig
 	d.mut.Lock()
 	defer d.mut.Unlock()
 	if d.pool == nil {
-		return &erroredSessionWithContext{
+		return &erroredSession{
 			err: &UsageError{Message: "Trying to create session on closed driver"}}
 	}
-	return newSessionWithContext(ctx, d.config, config, d.router, d.pool, d.cache, d.log, reAuthToken)
+	return newSession(ctx, d.config, config, d.router, d.pool, d.cache, d.log, reAuthToken)
 }
 
-func (d *driverWithContext) VerifyConnectivity(ctx context.Context) error {
+func (d *driver) VerifyConnectivity(ctx context.Context) error {
 	_, err := d.GetServerInfo(ctx)
 	return err
 }
 
-func (d *driverWithContext) IsEncrypted() bool {
+func (d *driver) IsEncrypted() bool {
 	return !d.connector.SkipEncryption
 }
 
-func (d *driverWithContext) GetServerInfo(ctx context.Context) (_ ServerInfo, err error) {
+func (d *driver) GetServerInfo(ctx context.Context) (_ ServerInfo, err error) {
 	session := d.NewSession(ctx, SessionConfig{})
 	defer func() {
 		err = deferredClose(ctx, session, err)
@@ -391,7 +408,7 @@ func (d *driverWithContext) GetServerInfo(ctx context.Context) (_ ServerInfo, er
 	return session.getServerInfo(ctx)
 }
 
-func (d *driverWithContext) Close(ctx context.Context) error {
+func (d *driver) Close(ctx context.Context) error {
 	d.mut.Lock()
 	if d.pool == nil {
 		// Safeguard against closing more than once
@@ -407,7 +424,7 @@ func (d *driverWithContext) Close(ctx context.Context) error {
 	return nil
 }
 
-func (d *driverWithContext) VerifyAuthentication(ctx context.Context, auth *AuthToken) (err error) {
+func (d *driver) VerifyAuthentication(ctx context.Context, auth *AuthToken) (err error) {
 	session := d.NewSession(ctx, SessionConfig{Auth: auth, forceReAuth: true, DatabaseName: "system"})
 	defer func() {
 		err = deferredClose(ctx, session, err)
@@ -517,14 +534,14 @@ func (d *driverWithContext) VerifyAuthentication(ctx context.Context, auth *Auth
 // Contexts terminating too early negatively affect connection pooling and degrade the driver performance.
 func ExecuteQuery[T any](
 	ctx context.Context,
-	driver DriverWithContext,
+	driver Driver,
 	query string,
 	parameters map[string]any,
 	newResultTransformer func() ResultTransformer[T],
 	settings ...ExecuteQueryConfigurationOption) (res T, err error) {
 
 	if driver == nil {
-		return *new(T), &UsageError{Message: "nil is not a valid DriverWithContext argument."}
+		return *new(T), &UsageError{Message: "nil is not a valid Driver argument."}
 	}
 
 	if newResultTransformer == nil {
@@ -555,7 +572,7 @@ func ExecuteQuery[T any](
 	return result.(T), err
 }
 
-func (d *driverWithContext) ExecuteQueryBookmarkManager() BookmarkManager {
+func (d *driver) ExecuteQueryBookmarkManager() BookmarkManager {
 	d.executeQueryBookmarkManagerInitializer.Do(func() {
 		if d.executeQueryBookmarkManager == nil { // this allows tests to init the field themselves
 			d.executeQueryBookmarkManager = NewBookmarkManager(BookmarkManagerConfig{})

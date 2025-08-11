@@ -22,11 +22,11 @@ import (
 	"fmt"
 )
 
-// SingleTWithContext maps the single record left to an instance of T with the provided mapper function.
-// It relies on ResultWithContext.Single and propagate its error, if any.
+// SingleT maps the single record left to an instance of T with the provided mapper function.
+// It relies on Result.Single and propagate its error, if any.
 // It accepts a context.Context, which may be canceled or carry a deadline, to control the overall record fetching
 // execution time.
-func SingleTWithContext[T any](ctx context.Context, result ResultWithContext, mapper func(*Record) (T, error)) (T, error) {
+func SingleT[T any](ctx context.Context, result Result, mapper func(*Record) (T, error)) (T, error) {
 	single, err := result.Single(ctx)
 	if err != nil {
 		return *new(T), err
@@ -34,16 +34,34 @@ func SingleTWithContext[T any](ctx context.Context, result ResultWithContext, ma
 	return mapper(single)
 }
 
-// CollectTWithContext maps the records to a slice of T with the provided mapper function.
-// It relies on ResultWithContext.Collect and propagate its error, if any.
+// SingleTWithContext is an alias for SingleT to maintain backward compatibility
+// for users who migrated from v5 to v6 using the WithContext APIs.
+// In v6, SingleT is the primary function and is context-aware.
+//
+// Deprecated: please use SingleT instead. This alias will be removed in 7.0.
+func SingleTWithContext[T any](ctx context.Context, result Result, mapper func(*Record) (T, error)) (T, error) {
+	return SingleT(ctx, result, mapper)
+}
+
+// CollectT maps the records to a slice of T with the provided mapper function.
+// It relies on Result.Collect and propagate its error, if any.
 // It accepts a context.Context, which may be canceled or carry a deadline, to control the overall record fetching
 // execution time.
-func CollectTWithContext[T any](ctx context.Context, result ResultWithContext, mapper func(*Record) (T, error)) ([]T, error) {
+func CollectT[T any](ctx context.Context, result Result, mapper func(*Record) (T, error)) ([]T, error) {
 	records, err := result.Collect(ctx)
 	if err != nil {
 		return nil, err
 	}
 	return mapAll(records, mapper)
+}
+
+// CollectTWithContext is an alias for CollectT to maintain backward compatibility
+// for users who migrated from v5 to v6 using the WithContext APIs.
+// In v6, CollectT is the primary function and is context-aware.
+//
+// Deprecated: please use CollectT instead. This alias will be removed in 7.0.
+func CollectTWithContext[T any](ctx context.Context, result Result, mapper func(*Record) (T, error)) ([]T, error) {
+	return CollectT(ctx, result, mapper)
 }
 
 // Single returns one and only one record from the result stream. Any error passed in
@@ -52,35 +70,44 @@ func CollectTWithContext[T any](ctx context.Context, result ResultWithContext, m
 //
 //	result, err := session.Run(ctx, "...", nil)
 //	record, err := neo4j.Single(ctx, result, err)
-func Single(ctx context.Context, result ResultWithContext, err error) (*Record, error) {
+func Single(ctx context.Context, result Result, err error) (*Record, error) {
 	if err != nil {
 		return nil, err
 	}
 	return result.Single(ctx)
 }
 
-// CollectWithContext aggregates the records into a slice.
-// It relies on ResultWithContext.Collect and propagate its error, if any.
+// Collect aggregates the records into a slice.
+// It relies on Result.Collect and propagate its error, if any.
 //
 //	result, err := session.Run(...)
-//	records, err := neo4j.CollectWithContext(ctx, result, err)
+//	records, err := neo4j.Collect(ctx, result, err)
 //
 // It accepts a context.Context, which may be canceled or carry a deadline, to control the overall record fetching
 // execution time.
-func CollectWithContext(ctx context.Context, result ResultWithContext, err error) ([]*Record, error) {
+func Collect(ctx context.Context, result Result, err error) ([]*Record, error) {
 	if err != nil {
 		return nil, err
 	}
 	return result.Collect(ctx)
 }
 
+// CollectWithContext is an alias for Collect to maintain backward compatibility
+// for users who migrated from v5 to v6 using the WithContext APIs.
+// In v6, Collect is the primary function and is context-aware.
+//
+// Deprecated: please use Collect instead. This alias will be removed in 7.0.
+func CollectWithContext(ctx context.Context, result Result, err error) ([]*Record, error) {
+	return Collect(ctx, result, err)
+}
+
 // AsRecords passes any existing error or casts from to a slice of records.
-// Use in combination with CollectWithContext and transactional functions:
+// Use in combination with Collect and transactional functions:
 //
 //	records, err := neo4j.AsRecords(
 //		session.ExecuteRead(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
 //			result, err := tx.Run(ctx, "...", nil)
-//			return neo4j.CollectWithContext(ctx, result, err)
+//			return neo4j.Collect(ctx, result, err)
 //		}),
 //	)
 func AsRecords(from any, err error) ([]*Record, error) {

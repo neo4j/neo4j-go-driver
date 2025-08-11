@@ -56,7 +56,7 @@ func TestResultGo1_23(outer *testing.T) {
 		conn := &ConnFake{
 			Nexts: []Next{{Record: recs[0]}, {Record: recs[1]}, {Record: recs[2]}, {Summary: sums[0]}},
 		}
-		res := newResultWithContext(conn, streamHandle, cypher, params, &transactionState{}, afterConsumptionHook)
+		res := newResult(conn, streamHandle, cypher, params, &transactionState{}, afterConsumptionHook)
 		i := 0
 		for record, err := range res.Records(ctx) {
 			AssertBoolEqual(t, hookCalled, false)
@@ -81,7 +81,7 @@ func TestResultGo1_23(outer *testing.T) {
 		conn := &ConnFake{
 			Nexts: []Next{{Record: recs[0]}, {Record: recs[1]}, {Err: errs[0]}},
 		}
-		res := newResultWithContext(conn, streamHandle, cypher, params, &transactionState{}, afterConsumptionHook)
+		res := newResult(conn, streamHandle, cypher, params, &transactionState{}, afterConsumptionHook)
 		i := 0
 		for record, err := range res.Records(ctx) {
 			if i < 2 {
@@ -124,7 +124,7 @@ func TestResultGo1_23(outer *testing.T) {
 				conn := &ConnFake{
 					Nexts: []Next{{Record: recs[0]}, {Record: recs[1]}, {Record: recs[2]}, {Summary: sums[0]}},
 				}
-				res := newResultWithContext(conn, streamHandle, cypher, params, &transactionState{}, afterConsumptionHook)
+				res := newResult(conn, streamHandle, cypher, params, &transactionState{}, afterConsumptionHook)
 				i := 0
 				recordsIter := res.Records(ctx)
 				for record, err := range recordsIter {
@@ -224,7 +224,7 @@ func TestResultGo1_23(outer *testing.T) {
 				}
 				nexts = append(nexts, Next{Record: recs[1]}, Next{Summary: sums[0]})
 				conn := &ConnFake{Nexts: nexts, ConsumeSum: sums[0]}
-				res := newResultWithContext(conn, streamHandle, cypher, params, &transactionState{}, nil)
+				res := newResult(conn, streamHandle, cypher, params, &transactionState{}, nil)
 
 				iter1 := res.Records(ctx)
 				if testCase.usePreIter {

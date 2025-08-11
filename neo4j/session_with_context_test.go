@@ -46,41 +46,41 @@ func TestSession(outer *testing.T) {
 	var logger = log.ToVoid()
 	var boltLogger log.BoltLogger = nil
 
-	assertCleanSessionState := func(t *testing.T, sess *sessionWithContext) {
+	assertCleanSessionState := func(t *testing.T, sess *session) {
 		if sess.explicitTx != nil {
 			t.Errorf("Session should not be in tx mode")
 		}
 	}
 
-	createSession := func() (*RouterFake, *PoolFake, *sessionWithContext) {
+	createSession := func() (*RouterFake, *PoolFake, *session) {
 		ctx := context.Background()
 		conf := config.Config{MaxTransactionRetryTime: 3 * time.Millisecond, MaxConnectionPoolSize: 100}
 		router := RouterFake{}
 		pool := PoolFake{}
 		cache, _ := homedb.NewCache(100)
 		sessConfig := SessionConfig{AccessMode: AccessModeRead, BoltLogger: boltLogger}
-		sess := newSessionWithContext(ctx, &conf, sessConfig, &router, &pool, cache, logger, reAuthToken)
+		sess := newSession(ctx, &conf, sessConfig, &router, &pool, cache, logger, reAuthToken)
 		sess.throttleTime = time.Millisecond * 1
 		return &router, &pool, sess
 	}
 
-	createSessionFromConfig := func(sessConfig SessionConfig) (*RouterFake, *PoolFake, *sessionWithContext) {
+	createSessionFromConfig := func(sessConfig SessionConfig) (*RouterFake, *PoolFake, *session) {
 		ctx := context.Background()
 		conf := config.Config{MaxTransactionRetryTime: 3 * time.Millisecond}
 		router := RouterFake{}
 		pool := PoolFake{}
 		cache, _ := homedb.NewCache(100)
-		sess := newSessionWithContext(ctx, &conf, sessConfig, &router, &pool, cache, logger, reAuthToken)
+		sess := newSession(ctx, &conf, sessConfig, &router, &pool, cache, logger, reAuthToken)
 		sess.throttleTime = time.Millisecond * 1
 		return &router, &pool, sess
 	}
 
-	createSessionWithBookmarks := func(bookmarks Bookmarks) (*RouterFake, *PoolFake, *sessionWithContext) {
+	createSessionWithBookmarks := func(bookmarks Bookmarks) (*RouterFake, *PoolFake, *session) {
 		sessConfig := SessionConfig{AccessMode: AccessModeRead, Bookmarks: bookmarks, BoltLogger: boltLogger}
 		return createSessionFromConfig(sessConfig)
 	}
 
-	createSessionWithHomeDbGuess := func(ssrEnabled bool) (*RouterFake, *PoolFake, *sessionWithContext, *int, *int) {
+	createSessionWithHomeDbGuess := func(ssrEnabled bool) (*RouterFake, *PoolFake, *session, *int, *int) {
 		router, pool, sess := createSession()
 		cacheKey := "DEFAULT"
 		databaseName := "db1"

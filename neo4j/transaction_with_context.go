@@ -26,14 +26,14 @@ import (
 // ManagedTransaction represents a transaction managed by the driver and operated on by the user, via transaction functions
 type ManagedTransaction interface {
 	// Run executes a statement on this transaction and returns a result
-	Run(ctx context.Context, cypher string, params map[string]any) (ResultWithContext, error)
+	Run(ctx context.Context, cypher string, params map[string]any) (Result, error)
 }
 
 // ExplicitTransaction represents a transaction in the Neo4j database
 type ExplicitTransaction interface {
 	// Run executes a statement on this transaction and returns a result
 	// Contexts terminating too early negatively affect connection pooling and degrade the driver performance.
-	Run(ctx context.Context, cypher string, params map[string]any) (ResultWithContext, error)
+	Run(ctx context.Context, cypher string, params map[string]any) (Result, error)
 	// Commit commits the transaction
 	// Contexts terminating too early negatively affect connection pooling and degrade the driver performance.
 	Commit(ctx context.Context) error
@@ -67,7 +67,7 @@ type explicitTransaction struct {
 	onClosed  func()
 }
 
-func (tx *explicitTransaction) Run(ctx context.Context, cypher string, params map[string]any) (ResultWithContext, error) {
+func (tx *explicitTransaction) Run(ctx context.Context, cypher string, params map[string]any) (Result, error) {
 	if tx.conn == nil {
 		return nil, transactionAlreadyCompletedError()
 	}
@@ -77,7 +77,7 @@ func (tx *explicitTransaction) Run(ctx context.Context, cypher string, params ma
 		return nil, errorutil.WrapError(tx.txState.err)
 	}
 	// no result consumption hook here since bookmarks are sent after commit, not after pulling results
-	result := newResultWithContext(tx.conn, stream, cypher, params, tx.txState, nil)
+	result := newResult(tx.conn, stream, cypher, params, tx.txState, nil)
 	tx.txState.resultErrorHandlers = append(tx.txState.resultErrorHandlers, result.errorHandler)
 	return result, nil
 }
@@ -127,20 +127,20 @@ type managedTransaction struct {
 	txState   *transactionState
 }
 
-func (tx *managedTransaction) Run(ctx context.Context, cypher string, params map[string]any) (ResultWithContext, error) {
+func (tx *managedTransaction) Run(ctx context.Context, cypher string, params map[string]any) (Result, error) {
 	stream, err := tx.conn.RunTx(ctx, tx.txHandle, db.Command{Cypher: cypher, Params: params, FetchSize: tx.fetchSize})
 	if err != nil {
 		return nil, errorutil.WrapError(err)
 	}
 	// no result consumption hook here since bookmarks are sent after commit, not after pulling results
-	return newResultWithContext(tx.conn, stream, cypher, params, tx.txState, nil), nil
+	return newResult(tx.conn, stream, cypher, params, tx.txState, nil), nil
 }
 
 // Represents an auto commit transaction.
 // Does not implement the ExplicitTransaction nor the ManagedTransaction interface.
 type autocommitTransaction struct {
 	conn     db.Connection
-	res      ResultWithContext
+	res      Result
 	closed   bool
 	onClosed func()
 }

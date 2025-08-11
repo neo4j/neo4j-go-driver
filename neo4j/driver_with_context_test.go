@@ -21,13 +21,14 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	. "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/testutil"
 	"net/url"
 	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
 	"unsafe"
+
+	. "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/testutil"
 )
 
 func TestDriverExecuteQuery(outer *testing.T) {
@@ -46,7 +47,7 @@ func TestDriverExecuteQuery(outer *testing.T) {
 	outer.Run("nil driver is not allowed", func(t *testing.T) {
 		_, err := ExecuteQuery(ctx, nil, "RETURN 42", nil, EagerResultTransformer)
 
-		AssertErrorMessageContains(t, err, "nil is not a valid DriverWithContext argument.")
+		AssertErrorMessageContains(t, err, "nil is not a valid Driver argument.")
 	})
 
 	type testCase[T any] struct {
@@ -412,7 +413,7 @@ func TestDriverExecuteQuery(outer *testing.T) {
 					AssertDeepEquals(t, testCase.expectedSessionConfig, config)
 					return testCase.createSession
 				},
-				delegate: &driverWithContext{
+				delegate: &driver{
 					executeQueryBookmarkManager: defaultBookmarkManager,
 					mut:                         sync.Mutex{},
 				},
@@ -433,7 +434,7 @@ func TestDriverExecuteQuery(outer *testing.T) {
 					executeWriteErr: fmt.Errorf("oopsie, write failed"),
 				}
 			},
-			delegate: &driverWithContext{
+			delegate: &driver{
 				mut: sync.Mutex{},
 			},
 		}
@@ -512,7 +513,7 @@ func (f *failingResultTransformer) Complete([]string, ResultSummary) (*EagerResu
 }
 
 type driverDelegate struct {
-	delegate   *driverWithContext
+	delegate   *driver
 	newSession func(context.Context, SessionConfig) SessionWithContext
 }
 
