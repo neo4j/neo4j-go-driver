@@ -308,7 +308,7 @@ defer driver.Close()
 
 ### Custom Logger
 
-The `Log` field of the `config.Config` struct is defined to be of interface `neo4j/log.Logger` which has the following definition:
+The `Log` field of the `config.Config` struct is defined to be of interface `log.Logger` which has the following definition:
 
 ```go
 type Logger interface {
@@ -342,7 +342,7 @@ session := driver.NewSession(neo4j.SessionConfig{BoltLogger: boltLogger})
 
 ### Custom Bolt Logger
 
-The `BoltLogger` field of the `neo4j.SessionConfig` struct is defined to be of interface `neo4j/log.BoltLogger` which has the following definition:
+The `BoltLogger` field of the `neo4j.SessionConfig` struct is defined to be of interface `log.BoltLogger` which has the following definition:
 
 ```go
 type BoltLogger interface {
