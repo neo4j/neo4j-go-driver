@@ -17,7 +17,7 @@
 
 // Benchmark tool that uses driver 1.8 as baseline.
 // The tool requires a running Neo4j instance to connect to.
-// Run with: go run main.go bolt://localhost:7687 user pass
+// Run with: go run main.go neo4j://localhost user pass
 package main
 
 import (
