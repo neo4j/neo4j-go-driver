@@ -72,11 +72,30 @@ func CollectT[T any](result Result, mapper func(*Record) (T, error)) ([]T, error
 	return mapAll(records, mapper)
 }
 
+// SingleWithContext returns one and only one record from the result stream. Any error passed in
+// or reported while navigating the result stream is returned without any conversion.
+// If the result stream contains zero or more than one records error is returned.
+//
+//	result, err := session.Run(...)
+//	record, err := neo4j.SingleWithContext(ctx, result, err)
+//
+// It accepts a context.Context, which may be canceled or carry a deadline, to control the overall record fetching
+// execution time.
+func SingleWithContext(ctx context.Context, result ResultWithContext, err error) (*Record, error) {
+	if err != nil {
+		return nil, err
+	}
+	return result.Single(ctx)
+}
+
 // Single returns one and only one record from the result stream. Any error passed in
 // or reported while navigating the result stream is returned without any conversion.
 // If the result stream contains zero or more than one records error is returned.
 //
 //	record, err := neo4j.Single(session.Run(...))
+//
+// Deprecated: use SingleWithContext instead (the entry point of context-aware
+// APIs is NewDriverWithContext)
 func Single(result Result, err error) (*Record, error) {
 	if err != nil {
 		return nil, err
