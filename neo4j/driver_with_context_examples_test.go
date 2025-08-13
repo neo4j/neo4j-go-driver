@@ -121,7 +121,7 @@ func ExampleDriverWithContext_verifyAuthentication() {
 	handleError(err)
 }
 
-func ExampleDriverWithContext_verifyAuthenticationDriverLevel() {
+func ExampleDriver_verifyAuthenticationDriverLevel() {
 	driver, err := NewDriver(getUrl(), NoAuth())
 	handleError(err)
 	// verify `NoAuth()` configured at driver creation is valid
