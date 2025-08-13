@@ -1580,11 +1580,9 @@ func serializeNotifications(slice []neo4j.Notification, version db.ProtocolVersi
 	var res []map[string]any
 	for i, notification := range slice {
 		res = append(res, map[string]any{
-			"code":        notification.Code(),
-			"title":       notification.Title(),
-			"description": notification.Description(),
-			//lint:ignore SA1019 Severity is supported at least until 6.0
-			"severity":         notification.Severity(),
+			"code":             notification.Code(),
+			"title":            notification.Title(),
+			"description":      notification.Description(),
 			"severityLevel":    string(notification.SeverityLevel()),
 			"rawSeverityLevel": notification.RawSeverityLevel(),
 			"category":         string(notification.Category()),
