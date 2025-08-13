@@ -27,9 +27,7 @@ import (
 	"testing"
 
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/dbtype"
-
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/test-integration/dbserver"
-
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
 )
 
