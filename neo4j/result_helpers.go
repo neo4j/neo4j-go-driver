@@ -47,31 +47,6 @@ func SingleT[T any](result Result, mapper func(*Record) (T, error)) (T, error) {
 	return mapper(single)
 }
 
-// CollectTWithContext maps the records to a slice of T with the provided mapper function.
-// It relies on ResultWithContext.Collect and propagate its error, if any.
-// It accepts a context.Context, which may be canceled or carry a deadline, to control the overall record fetching
-// execution time.
-func CollectTWithContext[T any](ctx context.Context, result ResultWithContext, mapper func(*Record) (T, error)) ([]T, error) {
-	records, err := result.Collect(ctx)
-	if err != nil {
-		return nil, err
-	}
-	return mapAll(records, mapper)
-}
-
-// CollectT maps the records to a slice of T with the provided mapper function.
-// It relies on Result.Collect and propagate its error, if any.
-//
-// Deprecated: use CollectTWithContext instead (the entry point of context-aware
-// APIs is NewDriverWithContext)
-func CollectT[T any](result Result, mapper func(*Record) (T, error)) ([]T, error) {
-	records, err := result.Collect()
-	if err != nil {
-		return nil, err
-	}
-	return mapAll(records, mapper)
-}
-
 // SingleWithContext returns one and only one record from the result stream. Any error passed in
 // or reported while navigating the result stream is returned without any conversion.
 // If the result stream contains zero or more than one records error is returned.
@@ -103,18 +78,29 @@ func Single(result Result, err error) (*Record, error) {
 	return result.Single()
 }
 
-// Collect aggregates the records into a slice.
-// It relies on Result.Collect and propagate its error, if any.
-//
-//	records, err := neo4j.Collect(session.Run(...))
-//
-// Deprecated: use CollectWithContext instead (the entry point of context-aware
-// APIs is NewDriverWithContext)
-func Collect(result Result, err error) ([]*Record, error) {
+// CollectTWithContext maps the records to a slice of T with the provided mapper function.
+// It relies on ResultWithContext.Collect and propagate its error, if any.
+// It accepts a context.Context, which may be canceled or carry a deadline, to control the overall record fetching
+// execution time.
+func CollectTWithContext[T any](ctx context.Context, result ResultWithContext, mapper func(*Record) (T, error)) ([]T, error) {
+	records, err := result.Collect(ctx)
 	if err != nil {
 		return nil, err
 	}
-	return result.Collect()
+	return mapAll(records, mapper)
+}
+
+// CollectT maps the records to a slice of T with the provided mapper function.
+// It relies on Result.Collect and propagate its error, if any.
+//
+// Deprecated: use CollectTWithContext instead (the entry point of context-aware
+// APIs is NewDriverWithContext)
+func CollectT[T any](result Result, mapper func(*Record) (T, error)) ([]T, error) {
+	records, err := result.Collect()
+	if err != nil {
+		return nil, err
+	}
+	return mapAll(records, mapper)
 }
 
 // CollectWithContext aggregates the records into a slice.
@@ -130,6 +116,20 @@ func CollectWithContext(ctx context.Context, result ResultWithContext, err error
 		return nil, err
 	}
 	return result.Collect(ctx)
+}
+
+// Collect aggregates the records into a slice.
+// It relies on Result.Collect and propagate its error, if any.
+//
+//	records, err := neo4j.Collect(session.Run(...))
+//
+// Deprecated: use CollectWithContext instead (the entry point of context-aware
+// APIs is NewDriverWithContext)
+func Collect(result Result, err error) ([]*Record, error) {
+	if err != nil {
+		return nil, err
+	}
+	return result.Collect()
 }
 
 // AsRecords passes any existing error or casts from to a slice of records.
