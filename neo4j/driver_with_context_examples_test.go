@@ -103,7 +103,7 @@ func ExampleExecuteQuery_defaultBookmarkManagerExplicitReuse() {
 	fmt.Println(count)
 }
 
-func ExampleDriverWithContext_verifyAuthentication() {
+func ExampleDriver_verifyAuthentication() {
 	driver, err := NewDriver(getUrl(), NoAuth())
 	handleError(err)
 	someToken := BasicAuth("neo4j", "password", "")
