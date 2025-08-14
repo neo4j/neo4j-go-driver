@@ -24,6 +24,7 @@ import (
 
 // SingleT maps the single record left to an instance of T with the provided mapper function.
 // It relies on Result.Single and propagate its error, if any.
+//
 // It accepts a context.Context, which may be canceled or carry a deadline, to control the overall record fetching
 // execution time.
 func SingleT[T any](ctx context.Context, result Result, mapper func(*Record) (T, error)) (T, error) {
@@ -43,8 +44,34 @@ func SingleTWithContext[T any](ctx context.Context, result Result, mapper func(*
 	return SingleT(ctx, result, mapper)
 }
 
+// Single returns one and only one record from the result stream. Any error passed in
+// or reported while navigating the result stream is returned without any conversion.
+// If the result stream contains zero or more than one records error is returned.
+//
+//	result, err := session.Run(ctx, "...", nil)
+//	record, err := neo4j.Single(ctx, result, err)
+//
+// It accepts a context.Context, which may be canceled or carry a deadline, to control the overall record fetching
+// execution time.
+func Single(ctx context.Context, result Result, err error) (*Record, error) {
+	if err != nil {
+		return nil, err
+	}
+	return result.Single(ctx)
+}
+
+// SingleWithContext is an alias for Single to maintain backward compatibility
+// for users who migrated from v5 to v6 using the WithContext APIs.
+// In v6, Single is the primary function and is context-aware.
+//
+// Deprecated: please use Single instead. This alias will be removed in 7.0.
+func SingleWithContext(ctx context.Context, result Result, err error) (*Record, error) {
+	return Single(ctx, result, err)
+}
+
 // CollectT maps the records to a slice of T with the provided mapper function.
 // It relies on Result.Collect and propagate its error, if any.
+//
 // It accepts a context.Context, which may be canceled or carry a deadline, to control the overall record fetching
 // execution time.
 func CollectT[T any](ctx context.Context, result Result, mapper func(*Record) (T, error)) ([]T, error) {
@@ -62,19 +89,6 @@ func CollectT[T any](ctx context.Context, result Result, mapper func(*Record) (T
 // Deprecated: please use CollectT instead. This alias will be removed in 7.0.
 func CollectTWithContext[T any](ctx context.Context, result Result, mapper func(*Record) (T, error)) ([]T, error) {
 	return CollectT(ctx, result, mapper)
-}
-
-// Single returns one and only one record from the result stream. Any error passed in
-// or reported while navigating the result stream is returned without any conversion.
-// If the result stream contains zero or more than one records error is returned.
-//
-//	result, err := session.Run(ctx, "...", nil)
-//	record, err := neo4j.Single(ctx, result, err)
-func Single(ctx context.Context, result Result, err error) (*Record, error) {
-	if err != nil {
-		return nil, err
-	}
-	return result.Single(ctx)
 }
 
 // Collect aggregates the records into a slice.
