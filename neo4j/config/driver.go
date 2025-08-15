@@ -39,17 +39,7 @@ type Config struct {
 	// The InsecureSkipVerify attribute of TlsConfig is always derived from the initial URI scheme.
 	// The ServerName attribute of TlsConfig is always derived from the initial URI host.
 	//
-	// Use case: Trust self-signed certificates:
-	//   certPool := x509.NewCertPool()
-	//   cert, err := os.ReadFile("path/to/ca.crt")
-	//   if err != nil {
-	//       return err
-	//   }
-	//   certPool.AppendCertsFromPEM(cert)
-	//   config.TlsConfig = &tls.Config{
-	//       RootCAs: certPool,
-	//       MinVersion: tls.VersionTLS12,
-	//   }
+	// ExampleConfig_tlsSelfSignedCertificates shows how to configure TLS for self-signed certificates.
 	//
 	// This is considered an advanced setting, use it at your own risk.
 	// Introduced in 5.0.

@@ -19,8 +19,13 @@ package neo4j
 
 import (
 	"context"
+	"crypto/tls"
+	"crypto/x509"
 	"errors"
 	"fmt"
+	"os"
+
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/config"
 )
 
 var myDriver Driver
@@ -136,6 +141,32 @@ func ExampleDriver_verifyAuthenticationDriverLevel() {
 	}
 	// some other error occurred
 	handleError(err)
+}
+
+func ExampleConfig_tlsSelfSignedCertificates() {
+	// Create a certificate pool and add your CA certificate
+	certPool := x509.NewCertPool()
+	cert, err := os.ReadFile("path/to/ca.crt")
+	handleError(err)
+
+	// Add the CA certificate to the pool
+	certPool.AppendCertsFromPEM(cert)
+
+	// Create a driver with custom TLS configuration for self-signed certificates
+	driver, err := NewDriver(getUrl(), getAuth(), func(config *config.Config) {
+		config.TlsConfig = &tls.Config{
+			RootCAs:    certPool,
+			MinVersion: tls.VersionTLS12,
+		}
+	})
+	handleError(err)
+	defer handleClose(ctx, driver)
+
+	// Use the driver as normal - it will now trust your self-signed certificates
+	result, err := ExecuteQuery(ctx, driver, "RETURN 1 as num", nil, EagerResultTransformer)
+	handleError(err)
+
+	fmt.Printf("Query executed successfully, returned %d records\n", len(result.Records))
 }
 
 func handleError(err error) {
