@@ -21,12 +21,13 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/db"
-	. "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/testutil"
 	"net"
 	"reflect"
 	"sync"
 	"testing"
+
+	"github.com/neo4j/neo4j-go-driver/v6/neo4j/db"
+	. "github.com/neo4j/neo4j-go-driver/v6/neo4j/internal/testutil"
 )
 
 func TestMessageQueue(outer *testing.T) {

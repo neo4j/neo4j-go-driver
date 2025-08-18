@@ -26,9 +26,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/dbtype"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/test-integration/dbserver"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
+	"github.com/neo4j/neo4j-go-driver/v6/neo4j"
+	"github.com/neo4j/neo4j-go-driver/v6/neo4j/dbtype"
+	"github.com/neo4j/neo4j-go-driver/v6/neo4j/test-integration/dbserver"
 )
 
 // Not the best place for this...

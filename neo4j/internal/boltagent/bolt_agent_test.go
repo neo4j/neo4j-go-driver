@@ -18,8 +18,9 @@
 package boltagent
 
 import (
-	. "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/testutil"
 	"testing"
+
+	. "github.com/neo4j/neo4j-go-driver/v6/neo4j/internal/testutil"
 )
 
 func init() {

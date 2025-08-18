@@ -20,7 +20,7 @@ package pool
 import (
 	"sync/atomic"
 
-	idb "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
+	idb "github.com/neo4j/neo4j-go-driver/v6/neo4j/internal/db"
 )
 
 type ssrTracker struct {

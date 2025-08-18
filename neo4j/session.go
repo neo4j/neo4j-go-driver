@@ -23,18 +23,18 @@ import (
 	"math"
 	"time"
 
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/db"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/homedb"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/racing"
+	"github.com/neo4j/neo4j-go-driver/v6/neo4j/db"
+	"github.com/neo4j/neo4j-go-driver/v6/neo4j/internal/homedb"
+	"github.com/neo4j/neo4j-go-driver/v6/neo4j/internal/racing"
 
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/config"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/collections"
-	idb "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/errorutil"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/retry"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/telemetry"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/log"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/notifications"
+	"github.com/neo4j/neo4j-go-driver/v6/neo4j/config"
+	"github.com/neo4j/neo4j-go-driver/v6/neo4j/internal/collections"
+	idb "github.com/neo4j/neo4j-go-driver/v6/neo4j/internal/db"
+	"github.com/neo4j/neo4j-go-driver/v6/neo4j/internal/errorutil"
+	"github.com/neo4j/neo4j-go-driver/v6/neo4j/internal/retry"
+	"github.com/neo4j/neo4j-go-driver/v6/neo4j/internal/telemetry"
+	"github.com/neo4j/neo4j-go-driver/v6/neo4j/log"
+	"github.com/neo4j/neo4j-go-driver/v6/neo4j/notifications"
 )
 
 // ManagedTransactionWork represents a unit of work that will be executed against the provided

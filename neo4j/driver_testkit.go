@@ -23,11 +23,11 @@ import (
 	"context"
 	"fmt"
 
-	idb "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/errorutil"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/router"
-	itime "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/time"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/log"
+	idb "github.com/neo4j/neo4j-go-driver/v6/neo4j/internal/db"
+	"github.com/neo4j/neo4j-go-driver/v6/neo4j/internal/errorutil"
+	"github.com/neo4j/neo4j-go-driver/v6/neo4j/internal/router"
+	itime "github.com/neo4j/neo4j-go-driver/v6/neo4j/internal/time"
+	"github.com/neo4j/neo4j-go-driver/v6/neo4j/log"
 )
 
 type RoutingTable = idb.RoutingTable

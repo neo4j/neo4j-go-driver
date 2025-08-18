@@ -19,8 +19,9 @@ package boltagent
 
 import (
 	"fmt"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/metadata"
 	"runtime"
+
+	"github.com/neo4j/neo4j-go-driver/v6/neo4j/internal/metadata"
 )
 
 var os = runtime.GOOS

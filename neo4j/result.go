@@ -20,9 +20,9 @@ package neo4j
 import (
 	"context"
 
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/db"
-	idb "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/errorutil"
+	"github.com/neo4j/neo4j-go-driver/v6/neo4j/db"
+	idb "github.com/neo4j/neo4j-go-driver/v6/neo4j/internal/db"
+	"github.com/neo4j/neo4j-go-driver/v6/neo4j/internal/errorutil"
 )
 
 type Result interface {

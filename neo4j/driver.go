@@ -25,16 +25,16 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/homedb"
+	"github.com/neo4j/neo4j-go-driver/v6/neo4j/internal/homedb"
 
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/auth"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/config"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/connector"
-	idb "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/errorutil"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/pool"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/router"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/log"
+	"github.com/neo4j/neo4j-go-driver/v6/neo4j/auth"
+	"github.com/neo4j/neo4j-go-driver/v6/neo4j/config"
+	"github.com/neo4j/neo4j-go-driver/v6/neo4j/internal/connector"
+	idb "github.com/neo4j/neo4j-go-driver/v6/neo4j/internal/db"
+	"github.com/neo4j/neo4j-go-driver/v6/neo4j/internal/errorutil"
+	"github.com/neo4j/neo4j-go-driver/v6/neo4j/internal/pool"
+	"github.com/neo4j/neo4j-go-driver/v6/neo4j/internal/router"
+	"github.com/neo4j/neo4j-go-driver/v6/neo4j/log"
 )
 
 // AccessMode defines modes that routing driver decides to which cluster member

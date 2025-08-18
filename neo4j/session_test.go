@@ -27,14 +27,14 @@ import (
 	"testing"
 	"time"
 
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/config"
-	iauth "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/auth"
-	idb "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/errorutil"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/homedb"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/db"
-	. "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/testutil"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/log"
+	"github.com/neo4j/neo4j-go-driver/v6/neo4j/config"
+	"github.com/neo4j/neo4j-go-driver/v6/neo4j/db"
+	iauth "github.com/neo4j/neo4j-go-driver/v6/neo4j/internal/auth"
+	idb "github.com/neo4j/neo4j-go-driver/v6/neo4j/internal/db"
+	"github.com/neo4j/neo4j-go-driver/v6/neo4j/internal/errorutil"
+	"github.com/neo4j/neo4j-go-driver/v6/neo4j/internal/homedb"
+	. "github.com/neo4j/neo4j-go-driver/v6/neo4j/internal/testutil"
+	"github.com/neo4j/neo4j-go-driver/v6/neo4j/log"
 )
 
 type transactionFunc func(context.Context, ManagedTransactionWork, ...func(*TransactionConfig)) (any, error)

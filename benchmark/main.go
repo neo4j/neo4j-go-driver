@@ -29,7 +29,7 @@ import (
 	"time"
 
 	neo4j18 "github.com/neo4j/neo4j-go-driver/neo4j"
-	neo4j "github.com/neo4j/neo4j-go-driver/v5/neo4j"
+	neo4j "github.com/neo4j/neo4j-go-driver/v6/neo4j"
 )
 
 func getSetup(ctx context.Context, driver neo4j.Driver) *neo4j.Node {

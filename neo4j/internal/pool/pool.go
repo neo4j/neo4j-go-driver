@@ -23,19 +23,20 @@ package pool
 import (
 	"container/list"
 	"context"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/homedb"
 	"math"
 	"sort"
 	"sync"
 	"time"
 
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/config"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/db"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/bolt"
-	idb "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/errorutil"
-	itime "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/time"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/log"
+	"github.com/neo4j/neo4j-go-driver/v6/neo4j/internal/homedb"
+
+	"github.com/neo4j/neo4j-go-driver/v6/neo4j/config"
+	"github.com/neo4j/neo4j-go-driver/v6/neo4j/db"
+	"github.com/neo4j/neo4j-go-driver/v6/neo4j/internal/bolt"
+	idb "github.com/neo4j/neo4j-go-driver/v6/neo4j/internal/db"
+	"github.com/neo4j/neo4j-go-driver/v6/neo4j/internal/errorutil"
+	itime "github.com/neo4j/neo4j-go-driver/v6/neo4j/internal/time"
+	"github.com/neo4j/neo4j-go-driver/v6/neo4j/log"
 )
 
 // DefaultConnectionLivenessCheckTimeout disables the liveness check of connections.

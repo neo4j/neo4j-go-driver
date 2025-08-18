@@ -18,11 +18,12 @@
 package neo4j_test
 
 import (
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
-	. "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/testutil"
 	"testing"
 	"testing/quick"
 	"time"
+
+	"github.com/neo4j/neo4j-go-driver/v6/neo4j"
+	. "github.com/neo4j/neo4j-go-driver/v6/neo4j/internal/testutil"
 )
 
 func TestGetRecordValue(outer *testing.T) {

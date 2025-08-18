@@ -18,9 +18,10 @@
 package neo4j
 
 import (
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/db"
 	"reflect"
 	"testing"
+
+	"github.com/neo4j/neo4j-go-driver/v6/neo4j/db"
 )
 
 func TestProfiledPlan(st *testing.T) {

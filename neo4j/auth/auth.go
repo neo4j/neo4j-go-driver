@@ -22,11 +22,11 @@ import (
 	"reflect"
 	"time"
 
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/db"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/auth"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/collections"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/racing"
-	itime "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/time"
+	"github.com/neo4j/neo4j-go-driver/v6/neo4j/db"
+	"github.com/neo4j/neo4j-go-driver/v6/neo4j/internal/auth"
+	"github.com/neo4j/neo4j-go-driver/v6/neo4j/internal/collections"
+	"github.com/neo4j/neo4j-go-driver/v6/neo4j/internal/racing"
+	itime "github.com/neo4j/neo4j-go-driver/v6/neo4j/internal/time"
 )
 
 // TokenManager is an interface for components that can provide auth tokens.

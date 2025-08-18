@@ -22,8 +22,8 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/config"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/notifications"
+	"github.com/neo4j/neo4j-go-driver/v6/neo4j/config"
+	"github.com/neo4j/neo4j-go-driver/v6/neo4j/notifications"
 )
 
 func ExampleConfig_disableNoCategories() {

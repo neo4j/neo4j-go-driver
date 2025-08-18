@@ -23,9 +23,9 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
-	itime "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/time"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/log"
+	"github.com/neo4j/neo4j-go-driver/v6/neo4j/internal/db"
+	itime "github.com/neo4j/neo4j-go-driver/v6/neo4j/internal/time"
+	"github.com/neo4j/neo4j-go-driver/v6/neo4j/log"
 )
 
 // Represents a server with a number of connections that either is in use (borrowed) or

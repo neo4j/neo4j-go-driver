@@ -21,10 +21,10 @@ import (
 	"math"
 	"time"
 
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/config"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/bolt"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/pool"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/notifications"
+	"github.com/neo4j/neo4j-go-driver/v6/neo4j/config"
+	"github.com/neo4j/neo4j-go-driver/v6/neo4j/internal/bolt"
+	"github.com/neo4j/neo4j-go-driver/v6/neo4j/internal/pool"
+	"github.com/neo4j/neo4j-go-driver/v6/neo4j/notifications"
 )
 
 func defaultConfig() *config.Config {

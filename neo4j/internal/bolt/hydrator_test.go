@@ -19,18 +19,19 @@ package bolt
 
 import (
 	"fmt"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/gql"
 	"math"
 	"reflect"
 	"runtime/debug"
 	"testing"
 	"time"
 
-	idb "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
+	"github.com/neo4j/neo4j-go-driver/v6/neo4j/internal/gql"
 
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/db"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/dbtype"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/packstream"
+	idb "github.com/neo4j/neo4j-go-driver/v6/neo4j/internal/db"
+
+	"github.com/neo4j/neo4j-go-driver/v6/neo4j/db"
+	"github.com/neo4j/neo4j-go-driver/v6/neo4j/dbtype"
+	"github.com/neo4j/neo4j-go-driver/v6/neo4j/internal/packstream"
 )
 
 type hydratorTestCase struct {

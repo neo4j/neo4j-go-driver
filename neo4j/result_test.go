@@ -23,9 +23,9 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/db"
-	idb "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
-	. "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/testutil"
+	"github.com/neo4j/neo4j-go-driver/v6/neo4j/db"
+	idb "github.com/neo4j/neo4j-go-driver/v6/neo4j/internal/db"
+	. "github.com/neo4j/neo4j-go-driver/v6/neo4j/internal/testutil"
 )
 
 type iter struct {

@@ -23,8 +23,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/test-integration/dbserver"
+	"github.com/neo4j/neo4j-go-driver/v6/neo4j"
+	"github.com/neo4j/neo4j-go-driver/v6/neo4j/test-integration/dbserver"
 )
 
 func TestTransaction(outer *testing.T) {

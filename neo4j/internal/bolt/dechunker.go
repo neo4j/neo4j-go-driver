@@ -23,8 +23,8 @@ import (
 	"io"
 	"time"
 
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/errorutil"
-	rio "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/racing"
+	"github.com/neo4j/neo4j-go-driver/v6/neo4j/internal/errorutil"
+	rio "github.com/neo4j/neo4j-go-driver/v6/neo4j/internal/racing"
 )
 
 // dechunkMessage takes a buffer to be reused and returns the reusable buffer

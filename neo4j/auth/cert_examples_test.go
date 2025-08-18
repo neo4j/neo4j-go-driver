@@ -20,9 +20,9 @@ package auth_test
 import (
 	"log"
 
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/auth"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/config"
+	"github.com/neo4j/neo4j-go-driver/v6/neo4j"
+	"github.com/neo4j/neo4j-go-driver/v6/neo4j/auth"
+	"github.com/neo4j/neo4j-go-driver/v6/neo4j/config"
 )
 
 func ExampleNewStaticClientCertificateProvider() {

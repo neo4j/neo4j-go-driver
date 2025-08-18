@@ -22,9 +22,9 @@ import (
 	"net/url"
 	"time"
 
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/auth"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/log"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/notifications"
+	"github.com/neo4j/neo4j-go-driver/v6/neo4j/auth"
+	"github.com/neo4j/neo4j-go-driver/v6/neo4j/log"
+	"github.com/neo4j/neo4j-go-driver/v6/neo4j/notifications"
 )
 
 // A Config contains options that can be used to customize certain
