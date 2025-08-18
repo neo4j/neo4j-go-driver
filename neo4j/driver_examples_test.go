@@ -143,7 +143,7 @@ func ExampleDriver_verifyAuthenticationDriverLevel() {
 	handleError(err)
 }
 
-func ExampleConfig_tlsSelfSignedCertificates() {
+func ExampleDriver_tlsSelfSignedCertificates() {
 	// Create a certificate pool and add your CA certificate
 	certPool := x509.NewCertPool()
 	cert, err := os.ReadFile("path/to/ca.crt")
