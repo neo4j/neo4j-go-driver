@@ -163,7 +163,7 @@ func ExampleConfig_tlsSelfSignedCertificates() {
 	defer handleClose(ctx, driver)
 
 	// Use the driver as normal - it will now trust your self-signed certificates
-	result, err := ExecuteQuery(ctx, driver, "RETURN 1 as num", nil, EagerResultTransformer)
+	result, err := ExecuteQuery(ctx, driver, "RETURN 1 AS num", nil, EagerResultTransformer)
 	handleError(err)
 
 	fmt.Printf("Query executed successfully, returned %d records\n", len(result.Records))
