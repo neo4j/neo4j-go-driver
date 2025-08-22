@@ -414,14 +414,6 @@ func (d *driver) GetServerInfo(ctx context.Context) (_ ServerInfo, err error) {
 	return session.getServerInfo(ctx)
 }
 
-// Close the driver and all underlying connections.
-// This function may not be called while the driver is in use (i.e., concurrently).
-//
-// Connections that are still in use will be closed lazily when returned to the connection pool.
-// This can lead to behavior that is hard to predict and which depends on driver implementation details.
-// Therefore, it is strongly recommended to make sure you are done using the driver and have closed
-// all resources spawned from it (such as sessions or transactions) while calling this method.gg
-
 func (d *driver) Close(ctx context.Context) error {
 	d.mut.Lock()
 	if d.pool == nil {
