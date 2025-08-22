@@ -19,11 +19,12 @@ package test_integration
 
 import (
 	"context"
+	"testing"
+
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/config"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/log"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/test-integration/dbserver"
-	"testing"
 )
 
 func TestResultSummary(outer *testing.T) {
@@ -34,7 +35,7 @@ func TestResultSummary(outer *testing.T) {
 	const extraDatabase = "extra"
 
 	var server dbserver.DbServer
-	var driver neo4j.DriverWithContext
+	var driver neo4j.Driver
 	var bookmark string
 	noParams := map[string]any{}
 	ctx := context.Background()

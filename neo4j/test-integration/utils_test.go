@@ -20,11 +20,11 @@ package test_integration
 import (
 	"context"
 	"fmt"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/test-integration/dbserver"
 	"reflect"
 	"sort"
 	"testing"
 
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/test-integration/dbserver"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
 )
 
@@ -48,21 +48,21 @@ func transactionWithIntWork(t *testing.T, tx neo4j.ExplicitTransaction, work neo
 	return result.(int64)
 }
 
-func readTransactionWithIntWork(ctx context.Context, t *testing.T, session neo4j.SessionWithContext, work neo4j.ManagedTransactionWork, configurers ...func(*neo4j.TransactionConfig)) int64 {
+func readTransactionWithIntWork(ctx context.Context, t *testing.T, session neo4j.Session, work neo4j.ManagedTransactionWork, configurers ...func(*neo4j.TransactionConfig)) int64 {
 	result, err := session.ExecuteRead(ctx, work, configurers...)
 	assertNil(t, err)
 
 	return result.(int64)
 }
 
-func writeTransactionWithIntWork(ctx context.Context, t *testing.T, session neo4j.SessionWithContext, work neo4j.ManagedTransactionWork, configurers ...func(*neo4j.TransactionConfig)) int64 {
+func writeTransactionWithIntWork(ctx context.Context, t *testing.T, session neo4j.Session, work neo4j.ManagedTransactionWork, configurers ...func(*neo4j.TransactionConfig)) int64 {
 	result, err := session.ExecuteWrite(ctx, work, configurers...)
 	assertNil(t, err)
 
 	return result.(int64)
 }
 
-func newSessionAndTx(ctx context.Context, t *testing.T, driver neo4j.DriverWithContext, mode neo4j.AccessMode, configurers ...func(*neo4j.TransactionConfig)) (neo4j.SessionWithContext, neo4j.ExplicitTransaction) {
+func newSessionAndTx(ctx context.Context, t *testing.T, driver neo4j.Driver, mode neo4j.AccessMode, configurers ...func(*neo4j.TransactionConfig)) (neo4j.Session, neo4j.ExplicitTransaction) {
 	session := driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: mode})
 
 	tx, err := session.BeginTransaction(ctx, configurers...)
@@ -71,10 +71,10 @@ func newSessionAndTx(ctx context.Context, t *testing.T, driver neo4j.DriverWithC
 	return session, tx
 }
 
-func createNode(ctx context.Context, t *testing.T, session neo4j.SessionWithContext, label string, props map[string]any) {
+func createNode(ctx context.Context, t *testing.T, session neo4j.Session, label string, props map[string]any) {
 	var (
 		err     error
-		result  neo4j.ResultWithContext
+		result  neo4j.Result
 		summary neo4j.ResultSummary
 	)
 
@@ -94,7 +94,7 @@ func createNode(ctx context.Context, t *testing.T, session neo4j.SessionWithCont
 func updateNodeInTx(ctx context.Context, t *testing.T, tx neo4j.ExplicitTransaction, label string, newProps map[string]any) {
 	var (
 		err     error
-		result  neo4j.ResultWithContext
+		result  neo4j.Result
 		summary neo4j.ResultSummary
 	)
 
@@ -115,7 +115,7 @@ func updateNodeWork(ctx context.Context, t *testing.T, label string, newProps ma
 	return func(tx neo4j.ManagedTransaction) (any, error) {
 		var (
 			err    error
-			result neo4j.ResultWithContext
+			result neo4j.Result
 		)
 
 		if len(newProps) == 0 {

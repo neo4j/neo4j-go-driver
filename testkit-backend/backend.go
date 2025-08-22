@@ -24,9 +24,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/config"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/log"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/notifications"
 	"io"
 	"math"
 	"net"
@@ -36,6 +33,9 @@ import (
 	"sync"
 	"time"
 
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/config"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/log"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/notifications"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/auth"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/db"
@@ -46,9 +46,9 @@ import (
 type backend struct {
 	rd                              *bufio.Reader // Socket to read requests from
 	wr                              io.Writer     // Socket to write responses (and logs) on, don't buffer (WriteString on bufio was weird...)
-	drivers                         map[string]neo4j.DriverWithContext
+	drivers                         map[string]neo4j.Driver
 	sessionStates                   map[string]*sessionState
-	results                         map[string]neo4j.ResultWithContext
+	results                         map[string]neo4j.Result
 	managedTransactions             map[string]neo4j.ManagedTransaction
 	explicitTransactions            map[string]neo4j.ExplicitTransaction
 	recordedErrors                  map[string]error
@@ -72,7 +72,7 @@ type backend struct {
 // To implement transactional functions a bit of extra state is needed on the
 // driver session.
 type sessionState struct {
-	session          neo4j.SessionWithContext
+	session          neo4j.Session
 	retryableState   int
 	retryableErrorId string
 }
@@ -144,9 +144,9 @@ func newBackend(rd *bufio.Reader, wr io.Writer) *backend {
 	return &backend{
 		rd:                              rd,
 		wr:                              wr,
-		drivers:                         make(map[string]neo4j.DriverWithContext),
+		drivers:                         make(map[string]neo4j.Driver),
 		sessionStates:                   make(map[string]*sessionState),
-		results:                         make(map[string]neo4j.ResultWithContext),
+		results:                         make(map[string]neo4j.Result),
 		managedTransactions:             make(map[string]neo4j.ManagedTransaction),
 		explicitTransactions:            make(map[string]neo4j.ExplicitTransaction),
 		recordedErrors:                  make(map[string]error),
@@ -629,7 +629,7 @@ func (b *backend) handleRequest(req map[string]any) {
 		}
 		// Parse URI (or rather type cast)
 		uri := data["uri"].(string)
-		driver, err := neo4j.NewDriverWithContext(uri, authToken, func(c *config.Config) {
+		driver, err := neo4j.NewDriver(uri, authToken, func(c *config.Config) {
 			// Setup custom logger that redirects log entries back to frontend
 			c.Log = &streamLog{writeLine: b.writeLineLocked}
 			// Optional custom user agent from frontend
@@ -1485,7 +1485,7 @@ func serializeAuth(token neo4j.AuthToken) map[string]any {
 	}
 }
 
-func (b *backend) writeRecord(result neo4j.ResultWithContext, record *neo4j.Record, expectRecord bool) {
+func (b *backend) writeRecord(result neo4j.Result, record *neo4j.Record, expectRecord bool) {
 	if expectRecord && record == nil {
 		b.writeResponse("BackendError", map[string]any{
 			"msg": "Found no record where one was expected.",

@@ -21,23 +21,24 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	iauth "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/auth"
-	idb "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/errorutil"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/homedb"
 	"io"
 	"reflect"
 	"sync"
 	"testing"
 	"time"
 
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/config"
+	iauth "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/auth"
+	idb "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/errorutil"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/homedb"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/db"
 	. "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/testutil"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/log"
 )
 
 type transactionFunc func(context.Context, ManagedTransactionWork, ...func(*TransactionConfig)) (any, error)
-type transactionFuncApi func(session SessionWithContext) transactionFunc
+type transactionFuncApi func(session Session) transactionFunc
 
 var reAuthToken = &idb.ReAuthToken{FromSession: false, Manager: iauth.Token{Tokens: map[string]any{"scheme": "none"}}}
 
@@ -45,41 +46,41 @@ func TestSession(outer *testing.T) {
 	var logger = log.ToVoid()
 	var boltLogger log.BoltLogger = nil
 
-	assertCleanSessionState := func(t *testing.T, sess *sessionWithContext) {
+	assertCleanSessionState := func(t *testing.T, sess *session) {
 		if sess.explicitTx != nil {
 			t.Errorf("Session should not be in tx mode")
 		}
 	}
 
-	createSession := func() (*RouterFake, *PoolFake, *sessionWithContext) {
+	createSession := func() (*RouterFake, *PoolFake, *session) {
 		ctx := context.Background()
-		conf := Config{MaxTransactionRetryTime: 3 * time.Millisecond, MaxConnectionPoolSize: 100}
+		conf := config.Config{MaxTransactionRetryTime: 3 * time.Millisecond, MaxConnectionPoolSize: 100}
 		router := RouterFake{}
 		pool := PoolFake{}
 		cache, _ := homedb.NewCache(100)
 		sessConfig := SessionConfig{AccessMode: AccessModeRead, BoltLogger: boltLogger}
-		sess := newSessionWithContext(ctx, &conf, sessConfig, &router, &pool, cache, logger, reAuthToken)
+		sess := newSession(ctx, &conf, sessConfig, &router, &pool, cache, logger, reAuthToken)
 		sess.throttleTime = time.Millisecond * 1
 		return &router, &pool, sess
 	}
 
-	createSessionFromConfig := func(sessConfig SessionConfig) (*RouterFake, *PoolFake, *sessionWithContext) {
+	createSessionFromConfig := func(sessConfig SessionConfig) (*RouterFake, *PoolFake, *session) {
 		ctx := context.Background()
-		conf := Config{MaxTransactionRetryTime: 3 * time.Millisecond}
+		conf := config.Config{MaxTransactionRetryTime: 3 * time.Millisecond}
 		router := RouterFake{}
 		pool := PoolFake{}
 		cache, _ := homedb.NewCache(100)
-		sess := newSessionWithContext(ctx, &conf, sessConfig, &router, &pool, cache, logger, reAuthToken)
+		sess := newSession(ctx, &conf, sessConfig, &router, &pool, cache, logger, reAuthToken)
 		sess.throttleTime = time.Millisecond * 1
 		return &router, &pool, sess
 	}
 
-	createSessionWithBookmarks := func(bookmarks Bookmarks) (*RouterFake, *PoolFake, *sessionWithContext) {
+	createSessionWithBookmarks := func(bookmarks Bookmarks) (*RouterFake, *PoolFake, *session) {
 		sessConfig := SessionConfig{AccessMode: AccessModeRead, Bookmarks: bookmarks, BoltLogger: boltLogger}
 		return createSessionFromConfig(sessConfig)
 	}
 
-	createSessionWithHomeDbGuess := func(ssrEnabled bool) (*RouterFake, *PoolFake, *sessionWithContext, *int, *int) {
+	createSessionWithHomeDbGuess := func(ssrEnabled bool) (*RouterFake, *PoolFake, *session, *int, *int) {
 		router, pool, sess := createSession()
 		cacheKey := "DEFAULT"
 		databaseName := "db1"
@@ -207,8 +208,8 @@ func TestSession(outer *testing.T) {
 		})
 
 		transactionFunctions := map[string]transactionFuncApi{
-			"read tx func":  func(s SessionWithContext) transactionFunc { return s.ExecuteRead },
-			"write tx func": func(s SessionWithContext) transactionFunc { return s.ExecuteWrite },
+			"read tx func":  func(s Session) transactionFunc { return s.ExecuteRead },
+			"write tx func": func(s Session) transactionFunc { return s.ExecuteWrite },
 		}
 
 		for name, txFuncApi := range transactionFunctions {
@@ -707,30 +708,30 @@ func TestSession(outer *testing.T) {
 		ct.Run("Does not put back connection twice to the pool", func(inner *testing.T) {
 			type testCase struct {
 				name       string
-				completeTx func(context.Context, SessionWithContext, ExplicitTransaction) error
+				completeTx func(context.Context, Session, ExplicitTransaction) error
 			}
 			cases := []testCase{
 				{
 					name: "session close",
-					completeTx: func(ctx context.Context, session SessionWithContext, _ ExplicitTransaction) error {
+					completeTx: func(ctx context.Context, session Session, _ ExplicitTransaction) error {
 						return session.Close(ctx)
 					},
 				},
 				{
 					name: "tx commit",
-					completeTx: func(ctx context.Context, _ SessionWithContext, transaction ExplicitTransaction) error {
+					completeTx: func(ctx context.Context, _ Session, transaction ExplicitTransaction) error {
 						return transaction.Commit(ctx)
 					},
 				},
 				{
 					name: "tx rollback",
-					completeTx: func(ctx context.Context, _ SessionWithContext, transaction ExplicitTransaction) error {
+					completeTx: func(ctx context.Context, _ Session, transaction ExplicitTransaction) error {
 						return transaction.Rollback(ctx)
 					},
 				},
 				{
 					name: "tx close",
-					completeTx: func(ctx context.Context, _ SessionWithContext, transaction ExplicitTransaction) error {
+					completeTx: func(ctx context.Context, _ Session, transaction ExplicitTransaction) error {
 						return transaction.Close(ctx)
 					},
 				},

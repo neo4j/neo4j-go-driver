@@ -36,9 +36,9 @@ func TestTypes(outer *testing.T) {
 	ctx := context.Background()
 	server := dbserver.GetDbServer(ctx)
 	var err error
-	var driver neo4j.DriverWithContext
-	var session neo4j.SessionWithContext
-	var result neo4j.ResultWithContext
+	var driver neo4j.Driver
+	var session neo4j.Session
+	var result neo4j.Result
 
 	driver = server.Driver()
 	defer func() { _ = driver.Close(ctx) }()

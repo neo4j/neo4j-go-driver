@@ -84,7 +84,7 @@ func TestResult(outer *testing.T) {
 	// Initialization
 	outer.Run("Initialization", func(t *testing.T) {
 		conn := &ConnFake{}
-		res := newResultWithContext(conn, streamHandle, cypher, params, &transactionState{}, nil)
+		res := newResult(conn, streamHandle, cypher, params, &transactionState{}, nil)
 		rec := res.Record()
 		if rec != nil {
 			t.Errorf("Should be no record")
@@ -146,7 +146,7 @@ func TestResult(outer *testing.T) {
 	for _, c := range iterCases {
 		outer.Run(fmt.Sprintf("Next %s", c.name), func(t *testing.T) {
 			conn := &ConnFake{Nexts: c.stream}
-			res := newResultWithContext(conn, streamHandle, cypher, params, &transactionState{}, nil)
+			res := newResult(conn, streamHandle, cypher, params, &transactionState{}, nil)
 			for i, call := range c.rounds {
 				gotNext := res.Next(context.Background())
 				if gotNext != call.expectNext {
@@ -181,7 +181,7 @@ func TestResult(outer *testing.T) {
 		var nextSecond *Record
 		conn := &ConnFake{Nexts: []Next{{Record: recs[0]}}}
 
-		result := newResultWithContext(conn, streamHandle, cypher, params, &transactionState{}, nil)
+		result := newResult(conn, streamHandle, cypher, params, &transactionState{}, nil)
 
 		AssertTrue(t, result.PeekRecord(ctx, &peekedFirst))
 		AssertTrue(t, result.PeekRecord(ctx, &peekedSecond))
@@ -199,7 +199,7 @@ func TestResult(outer *testing.T) {
 		inner.Run("peeks single record", func(t *testing.T) {
 			conn := &ConnFake{Nexts: []Next{{Record: record1}}}
 
-			result := newResultWithContext(conn, streamHandle, cypher, params, &transactionState{}, nil)
+			result := newResult(conn, streamHandle, cypher, params, &transactionState{}, nil)
 
 			AssertTrue(t, result.Peek(ctx))
 			AssertDeepEquals(t, record1, result.Record())
@@ -214,7 +214,7 @@ func TestResult(outer *testing.T) {
 		inner.Run("peeks once and fetches subsequent records", func(t *testing.T) {
 			conn := &ConnFake{Nexts: []Next{{Record: record1}, {Record: record2}}}
 
-			result := newResultWithContext(conn, streamHandle, cypher, params, &transactionState{}, nil)
+			result := newResult(conn, streamHandle, cypher, params, &transactionState{}, nil)
 
 			AssertTrue(t, result.Peek(ctx))
 			AssertDeepEquals(t, record1, result.Record())
@@ -235,7 +235,7 @@ func TestResult(outer *testing.T) {
 			ConsumeErr: nil,
 			Nexts:      []Next{{Record: recs[0]}},
 		}
-		res := newResultWithContext(conn, streamHandle, cypher, params, &transactionState{}, nil)
+		res := newResult(conn, streamHandle, cypher, params, &transactionState{}, nil)
 		// Get one record to make sure that Record() is cleared
 		res.Next(ctx)
 		AssertNotNil(t, res.Record())
@@ -253,7 +253,7 @@ func TestResult(outer *testing.T) {
 			ConsumeErr: errs[0],
 			Nexts:      []Next{{Record: recs[0]}},
 		}
-		res := newResultWithContext(conn, streamHandle, cypher, params, &transactionState{}, nil)
+		res := newResult(conn, streamHandle, cypher, params, &transactionState{}, nil)
 		// Get one record to make sure that Record() is cleared
 		res.Next(ctx)
 		AssertNotNil(t, res.Record())
@@ -270,7 +270,7 @@ func TestResult(outer *testing.T) {
 		conn := &ConnFake{
 			Nexts: []Next{{Record: recs[0]}, {Summary: sums[0]}},
 		}
-		res := newResultWithContext(conn, streamHandle, cypher, params, &transactionState{}, nil)
+		res := newResult(conn, streamHandle, cypher, params, &transactionState{}, nil)
 		rec, err := res.Single(ctx)
 		AssertNotNil(t, rec)
 		AssertNoError(t, err)
@@ -283,7 +283,7 @@ func TestResult(outer *testing.T) {
 		conn := &ConnFake{
 			Nexts: []Next{{Summary: sums[0]}},
 		}
-		res := newResultWithContext(conn, streamHandle, cypher, params, &transactionState{}, nil)
+		res := newResult(conn, streamHandle, cypher, params, &transactionState{}, nil)
 		rec, err := res.Single(ctx)
 		AssertNil(t, rec)
 		assertUsageError(t, err)
@@ -302,7 +302,7 @@ func TestResult(outer *testing.T) {
 			},
 			ConsumeSum: sums[0],
 		}
-		res := newResultWithContext(conn, streamHandle, cypher, params, &transactionState{}, nil)
+		res := newResult(conn, streamHandle, cypher, params, &transactionState{}, nil)
 		rec, err := res.Single(ctx)
 		AssertNil(t, rec)
 		assertUsageError(t, err)
@@ -323,7 +323,7 @@ func TestResult(outer *testing.T) {
 		conn := &ConnFake{
 			Nexts: []Next{{Err: errs[0]}},
 		}
-		res := newResultWithContext(conn, streamHandle, cypher, params, &transactionState{}, nil)
+		res := newResult(conn, streamHandle, cypher, params, &transactionState{}, nil)
 		rec, err := res.Single(ctx)
 		AssertNil(t, rec)
 		AssertError(t, err)
@@ -337,7 +337,7 @@ func TestResult(outer *testing.T) {
 		conn := &ConnFake{
 			Nexts: []Next{{Record: recs[0]}, {Record: recs[1]}, {Summary: sums[0]}},
 		}
-		res := newResultWithContext(conn, streamHandle, cypher, params, &transactionState{}, nil)
+		res := newResult(conn, streamHandle, cypher, params, &transactionState{}, nil)
 		coll, err := res.Collect(ctx)
 		AssertNoError(t, err)
 		AssertLen(t, coll, 2)
@@ -352,7 +352,7 @@ func TestResult(outer *testing.T) {
 		conn := &ConnFake{
 			Nexts: []Next{{Record: recs[0]}, {Record: recs[1]}, {Record: recs[2]}, {Summary: sums[0]}},
 		}
-		res := newResultWithContext(conn, streamHandle, cypher, params, &transactionState{}, nil)
+		res := newResult(conn, streamHandle, cypher, params, &transactionState{}, nil)
 		res.Next(ctx)
 		AssertNotNil(t, res.Record())
 		coll, err := res.Collect(ctx)
@@ -369,7 +369,7 @@ func TestResult(outer *testing.T) {
 		conn := &ConnFake{
 			Nexts: []Next{{Summary: sums[0]}},
 		}
-		res := newResultWithContext(conn, streamHandle, cypher, params, &transactionState{}, nil)
+		res := newResult(conn, streamHandle, cypher, params, &transactionState{}, nil)
 		coll, err := res.Collect(ctx)
 		AssertNoError(t, err)
 		AssertLen(t, coll, 0)
@@ -381,7 +381,7 @@ func TestResult(outer *testing.T) {
 		conn := &ConnFake{
 			Nexts: []Next{{Summary: sums[0]}},
 		}
-		res := newResultWithContext(conn, streamHandle, cypher, params, &transactionState{}, nil)
+		res := newResult(conn, streamHandle, cypher, params, &transactionState{}, nil)
 		res.Next(ctx)
 		AssertNil(t, res.Record())
 		coll, err := res.Collect(ctx)
@@ -395,7 +395,7 @@ func TestResult(outer *testing.T) {
 		conn := &ConnFake{
 			Nexts: []Next{{Err: errs[0]}},
 		}
-		res := newResultWithContext(conn, streamHandle, cypher, params, &transactionState{}, nil)
+		res := newResult(conn, streamHandle, cypher, params, &transactionState{}, nil)
 		coll, err := res.Collect(ctx)
 		AssertError(t, err)
 		AssertLen(t, coll, 0)
@@ -407,7 +407,7 @@ func TestResult(outer *testing.T) {
 		conn := &ConnFake{
 			Nexts: []Next{{Record: recs[0]}, {Err: errs[0]}},
 		}
-		res := newResultWithContext(conn, streamHandle, cypher, params, &transactionState{}, nil)
+		res := newResult(conn, streamHandle, cypher, params, &transactionState{}, nil)
 		coll, err := res.Collect(ctx)
 		AssertError(t, err)
 		AssertLen(t, coll, 0)
@@ -416,8 +416,8 @@ func TestResult(outer *testing.T) {
 	})
 
 	outer.Run("IsOpen", func(t *testing.T) {
-		openResult := &resultWithContext{summary: nil}
-		closedResult := &resultWithContext{summary: &db.Summary{}}
+		openResult := &result{summary: nil}
+		closedResult := &result{summary: &db.Summary{}}
 
 		AssertTrue(t, openResult.IsOpen())
 		AssertFalse(t, closedResult.IsOpen())
@@ -426,18 +426,18 @@ func TestResult(outer *testing.T) {
 	outer.Run("Consuming closed result fails", func(inner *testing.T) {
 		testCases := []struct {
 			scenario string
-			callback func(*testing.T, *resultWithContext) error
+			callback func(*testing.T, *result) error
 		}{
 			{
 				scenario: "with Next and Err",
-				callback: func(t *testing.T, result *resultWithContext) error {
+				callback: func(t *testing.T, result *result) error {
 					AssertFalse(t, result.Next(ctx))
 					return result.Err()
 				},
 			},
 			{
 				scenario: "with several Next calls and Err",
-				callback: func(t *testing.T, result *resultWithContext) error {
+				callback: func(t *testing.T, result *result) error {
 					AssertFalse(t, result.Next(ctx))
 					AssertFalse(t, result.Next(ctx))
 					return result.Err()
@@ -445,14 +445,14 @@ func TestResult(outer *testing.T) {
 			},
 			{
 				scenario: "with Peek and Err",
-				callback: func(t *testing.T, result *resultWithContext) error {
+				callback: func(t *testing.T, result *result) error {
 					AssertFalse(t, result.Peek(ctx))
 					return result.Err()
 				},
 			},
 			{
 				scenario: "with several Peek calls and Err",
-				callback: func(t *testing.T, result *resultWithContext) error {
+				callback: func(t *testing.T, result *result) error {
 					AssertFalse(t, result.Peek(ctx))
 					AssertFalse(t, result.Peek(ctx))
 					return result.Err()
@@ -460,7 +460,7 @@ func TestResult(outer *testing.T) {
 			},
 			{
 				scenario: "with NextRecord and Err",
-				callback: func(t *testing.T, result *resultWithContext) error {
+				callback: func(t *testing.T, result *result) error {
 					var record *Record
 					AssertFalse(t, result.NextRecord(ctx, &record))
 					return result.Err()
@@ -468,7 +468,7 @@ func TestResult(outer *testing.T) {
 			},
 			{
 				scenario: "with several NextRecord calls and Err",
-				callback: func(t *testing.T, result *resultWithContext) error {
+				callback: func(t *testing.T, result *result) error {
 					var record *Record
 					AssertFalse(t, result.NextRecord(ctx, &record))
 					AssertFalse(t, result.NextRecord(ctx, &record))
@@ -477,7 +477,7 @@ func TestResult(outer *testing.T) {
 			},
 			{
 				scenario: "with PeekRecord and Err",
-				callback: func(t *testing.T, result *resultWithContext) error {
+				callback: func(t *testing.T, result *result) error {
 					var record *Record
 					AssertFalse(t, result.PeekRecord(ctx, &record))
 					return result.Err()
@@ -485,7 +485,7 @@ func TestResult(outer *testing.T) {
 			},
 			{
 				scenario: "with several PeekRecord calls and Err",
-				callback: func(t *testing.T, result *resultWithContext) error {
+				callback: func(t *testing.T, result *result) error {
 					var record *Record
 					AssertFalse(t, result.PeekRecord(ctx, &record))
 					AssertFalse(t, result.PeekRecord(ctx, &record))
@@ -496,7 +496,7 @@ func TestResult(outer *testing.T) {
 
 		for _, testCase := range testCases {
 			inner.Run(testCase.scenario, func(t *testing.T) {
-				result := &resultWithContext{summary: &db.Summary{}, txState: &transactionState{}}
+				result := &result{summary: &db.Summary{}, txState: &transactionState{}}
 
 				err := testCase.callback(t, result)
 
@@ -512,42 +512,42 @@ func TestResult(outer *testing.T) {
 
 		type consumptionTestCases struct {
 			description string
-			callback    func(*resultWithContext) error
+			callback    func(*result) error
 		}
 
 		testCases := []consumptionTestCases{
-			{"after Single", func(r *resultWithContext) error {
+			{"after Single", func(r *result) error {
 				_, err := r.Single(ctx)
 				return err
 			}},
-			{"only once after more than Single call", func(r *resultWithContext) error {
+			{"only once after more than Single call", func(r *result) error {
 				_, _ = r.Single(ctx)
 				_, _ = r.Single(ctx) // ignore "result already consumed" error
 				return nil
 			}},
-			{"after Consume", func(r *resultWithContext) error {
+			{"after Consume", func(r *result) error {
 				_, err := r.Consume(ctx)
 				return err
 			}},
-			{"only once after more than Consume call", func(r *resultWithContext) error {
+			{"only once after more than Consume call", func(r *result) error {
 				_, _ = r.Consume(ctx)
 				_, err := r.Consume(ctx)
 				return err
 			}},
-			{"after Collect", func(r *resultWithContext) error {
+			{"after Collect", func(r *result) error {
 				_, err := r.Collect(ctx)
 				return err
 			}},
-			{"only once after more than Collect call", func(r *resultWithContext) error {
+			{"only once after more than Collect call", func(r *result) error {
 				_, _ = r.Collect(ctx)
 				_, err := r.Collect(ctx)
 				return err
 			}},
-			{"after buffering", func(r *resultWithContext) error {
+			{"after buffering", func(r *result) error {
 				r.buffer(ctx)
 				return nil
 			}},
-			{"only once after more than one buffering call", func(r *resultWithContext) error {
+			{"only once after more than one buffering call", func(r *result) error {
 				r.buffer(ctx)
 				r.buffer(ctx)
 				return nil
@@ -557,7 +557,7 @@ func TestResult(outer *testing.T) {
 		for _, testCase := range testCases {
 			inner.Run(testCase.description, func(t *testing.T) {
 				count := 0
-				result := &resultWithContext{
+				result := &result{
 					conn: &ConnFake{
 						Nexts: []Next{{Record: record1}, {Summary: sums[0]}},
 					},
@@ -584,7 +584,7 @@ func TestResult(outer *testing.T) {
 			conn := &ConnFake{
 				Nexts: []Next{{Record: recs[0]}, {Record: recs[1]}, {Record: recs[2]}, {Summary: sums[0]}},
 			}
-			res := newResultWithContext(conn, streamHandle, cypher, params, &transactionState{}, afterConsumptionHook)
+			res := newResult(conn, streamHandle, cypher, params, &transactionState{}, afterConsumptionHook)
 			i := 0
 			doRecordsRange(res.Records(ctx), func(record *Record, err error, break_ func()) {
 				AssertBoolEqual(t, hookCalled, false)
@@ -609,7 +609,7 @@ func TestResult(outer *testing.T) {
 			conn := &ConnFake{
 				Nexts: []Next{{Record: recs[0]}, {Record: recs[1]}, {Err: errs[0]}},
 			}
-			res := newResultWithContext(conn, streamHandle, cypher, params, &transactionState{}, afterConsumptionHook)
+			res := newResult(conn, streamHandle, cypher, params, &transactionState{}, afterConsumptionHook)
 			i := 0
 			doRecordsRange(res.Records(ctx), func(record *Record, err error, break_ func()) {
 				if i < 2 {
@@ -652,7 +652,7 @@ func TestResult(outer *testing.T) {
 					conn := &ConnFake{
 						Nexts: []Next{{Record: recs[0]}, {Record: recs[1]}, {Record: recs[2]}, {Summary: sums[0]}},
 					}
-					res := newResultWithContext(conn, streamHandle, cypher, params, &transactionState{}, afterConsumptionHook)
+					res := newResult(conn, streamHandle, cypher, params, &transactionState{}, afterConsumptionHook)
 					i := 0
 					recordsIter := res.Records(ctx)
 					doRecordsRange(recordsIter, func(record *Record, err error, break_ func()) {
@@ -692,7 +692,7 @@ func TestResult(outer *testing.T) {
 
 			type iterBreakTestCase struct {
 				description      string
-				closer           func(ResultWithContext) error
+				closer           func(Result) error
 				usePreIter       bool
 				pullPreIterFirst bool
 			}
@@ -700,28 +700,28 @@ func TestResult(outer *testing.T) {
 			iterBreakTestCases := []iterBreakTestCase{
 				{
 					description: "by single",
-					closer: func(res ResultWithContext) error {
+					closer: func(res Result) error {
 						_, err := res.Single(ctx)
 						return err
 					},
 				},
 				{
 					description: "by consume",
-					closer: func(res ResultWithContext) error {
+					closer: func(res Result) error {
 						_, err := res.Consume(ctx)
 						return err
 					},
 				},
 				{
 					description: "by collect",
-					closer: func(res ResultWithContext) error {
+					closer: func(res Result) error {
 						_, err := res.Collect(ctx)
 						return err
 					},
 				},
 				{
 					description: "by iter",
-					closer: func(res ResultWithContext) error {
+					closer: func(res Result) error {
 						return doRecordsRangeRet(res.Records(ctx), func(record *Record, err error, break_ func(), return_ func(error)) {
 							if err != nil {
 								return_(err)
@@ -751,7 +751,7 @@ func TestResult(outer *testing.T) {
 					}
 					nexts = append(nexts, Next{Record: recs[1]}, Next{Summary: sums[0]})
 					conn := &ConnFake{Nexts: nexts, ConsumeSum: sums[0]}
-					res := newResultWithContext(conn, streamHandle, cypher, params, &transactionState{}, nil)
+					res := newResult(conn, streamHandle, cypher, params, &transactionState{}, nil)
 
 					iter1 := res.Records(ctx)
 					if testCase.usePreIter {
@@ -787,6 +787,227 @@ func TestResult(outer *testing.T) {
 							AssertError(t, err)
 							i += 1
 						})
+						AssertIntEqual(t, i, 1)
+					}
+				})
+			}
+		})
+	})
+
+	outer.Run("range iter", func(inner1 *testing.T) {
+		inner1.Run("range iter success", func(t *testing.T) {
+			hookCalled := false
+			afterConsumptionHook := func() {
+				hookCalled = true
+			}
+
+			conn := &ConnFake{
+				Nexts: []Next{{Record: recs[0]}, {Record: recs[1]}, {Record: recs[2]}, {Summary: sums[0]}},
+			}
+			res := newResult(conn, streamHandle, cypher, params, &transactionState{}, afterConsumptionHook)
+			i := 0
+			for record, err := range res.Records(ctx) {
+				AssertBoolEqual(t, hookCalled, false)
+				AssertNoError(t, err)
+				AssertDeepEquals(t, record, recs[i])
+				i += 1
+			}
+			AssertIntEqual(t, i, 3)
+			AssertNil(t, res.Err())
+			AssertBoolEqual(t, hookCalled, true)
+			summary, err := res.Consume(ctx)
+			AssertNoError(t, err)
+			AssertNotNil(t, summary)
+		})
+
+		inner1.Run("range iter error", func(t *testing.T) {
+			hookCalled := false
+			afterConsumptionHook := func() {
+				hookCalled = true
+			}
+
+			conn := &ConnFake{
+				Nexts: []Next{{Record: recs[0]}, {Record: recs[1]}, {Err: errs[0]}},
+			}
+			res := newResult(conn, streamHandle, cypher, params, &transactionState{}, afterConsumptionHook)
+			i := 0
+			for record, err := range res.Records(ctx) {
+				if i < 2 {
+					AssertNoError(t, err)
+					AssertDeepEquals(t, record, recs[i])
+				} else {
+					AssertError(t, err)
+					AssertNil(t, record)
+				}
+				i += 1
+			}
+			AssertIntEqual(t, i, 3)
+			AssertError(t, res.Err())
+			summary, err := res.Consume(ctx)
+			AssertError(t, err)
+			AssertNil(t, summary)
+			AssertBoolEqual(t, hookCalled, false)
+		})
+
+		inner1.Run("range iter break", func(inner2 *testing.T) {
+			inner2.Parallel()
+
+			type iterBreakTestCase struct {
+				description string
+				reuseIter   bool
+			}
+
+			iterBreakTestCases := []iterBreakTestCase{
+				{"reusing iter", true},
+				{"new iter", false},
+			}
+
+			for _, testCase := range iterBreakTestCases {
+				inner2.Run(testCase.description, func(t *testing.T) {
+					hookCalled := false
+					afterConsumptionHook := func() {
+						hookCalled = true
+					}
+
+					conn := &ConnFake{
+						Nexts: []Next{{Record: recs[0]}, {Record: recs[1]}, {Record: recs[2]}, {Summary: sums[0]}},
+					}
+					res := newResult(conn, streamHandle, cypher, params, &transactionState{}, afterConsumptionHook)
+					i := 0
+					recordsIter := res.Records(ctx)
+					for record, err := range recordsIter {
+						AssertBoolEqual(t, hookCalled, false)
+						AssertNoError(t, err)
+						AssertDeepEquals(t, record, recs[i])
+						i += 1
+						if i == 2 {
+							break
+						}
+					}
+					AssertNil(t, res.Err())
+					AssertBoolEqual(t, hookCalled, false)
+
+					if !testCase.reuseIter {
+						recordsIter = res.Records(ctx)
+					}
+					for record, err := range recordsIter {
+						AssertBoolEqual(t, hookCalled, false)
+						AssertNoError(t, err)
+						AssertDeepEquals(t, record, recs[i])
+						i += 1
+					}
+
+					AssertIntEqual(t, i, 3)
+					AssertNil(t, res.Err())
+					AssertBoolEqual(t, hookCalled, true)
+					summary, err := res.Consume(ctx)
+					AssertNoError(t, err)
+					AssertNotNil(t, summary)
+				})
+			}
+		})
+
+		inner1.Run("range iter on closed", func(inner2 *testing.T) {
+			inner2.Parallel()
+
+			type iterBreakTestCase struct {
+				description      string
+				closer           func(Result) error
+				usePreIter       bool
+				pullPreIterFirst bool
+			}
+
+			iterBreakTestCases := []iterBreakTestCase{
+				{
+					description: "by single",
+					closer: func(res Result) error {
+						_, err := res.Single(ctx)
+						return err
+					},
+				},
+				{
+					description: "by consume",
+					closer: func(res Result) error {
+						_, err := res.Consume(ctx)
+						return err
+					},
+				},
+				{
+					description: "by collect",
+					closer: func(res Result) error {
+						_, err := res.Collect(ctx)
+						return err
+					},
+				},
+				{
+					description: "by iter",
+					closer: func(res Result) error {
+						for _, err := range res.Records(ctx) {
+							if err != nil {
+								return err
+							}
+						}
+						return nil
+					},
+				},
+			}
+
+			extraBreakTestCases := make([]iterBreakTestCase, 0, len(iterBreakTestCases)*2)
+			for _, testCase := range iterBreakTestCases {
+				extraBreakTestCase := testCase
+				extraBreakTestCase.usePreIter = true
+				extraBreakTestCase.description = fmt.Sprintf("%s with pre iter", testCase.description)
+				extraBreakTestCases = append(extraBreakTestCases, extraBreakTestCase)
+				extraBreakTestCase.pullPreIterFirst = true
+				extraBreakTestCase.description = fmt.Sprintf("%s with pre iter failing first", testCase.description)
+				extraBreakTestCases = append(extraBreakTestCases, extraBreakTestCase)
+			}
+			iterBreakTestCases = append(iterBreakTestCases, extraBreakTestCases...)
+
+			for _, testCase := range iterBreakTestCases {
+				inner2.Run(testCase.description, func(t *testing.T) {
+					nexts := []Next{}
+					if testCase.usePreIter {
+						nexts = append(nexts, Next{Record: recs[0]})
+					}
+					nexts = append(nexts, Next{Record: recs[1]}, Next{Summary: sums[0]})
+					conn := &ConnFake{Nexts: nexts, ConsumeSum: sums[0]}
+					res := newResult(conn, streamHandle, cypher, params, &transactionState{}, nil)
+
+					iter1 := res.Records(ctx)
+					if testCase.usePreIter {
+						for _, err := range iter1 {
+							AssertNoError(t, err)
+							break
+						}
+					}
+
+					AssertNoError(t, testCase.closer(res))
+
+					iter2 := res.Records(ctx)
+
+					if testCase.pullPreIterFirst {
+						i := 0
+						for _, err := range iter1 {
+							AssertError(t, err)
+							i += 1
+						}
+						AssertIntEqual(t, i, 1)
+					}
+
+					i := 0
+					for _, err := range iter2 {
+						AssertError(t, err)
+						i += 1
+					}
+					AssertIntEqual(t, i, 1)
+
+					if !testCase.pullPreIterFirst {
+						i = 0
+						for _, err := range iter1 {
+							AssertError(t, err)
+							i += 1
+						}
 						AssertIntEqual(t, i, 1)
 					}
 				})

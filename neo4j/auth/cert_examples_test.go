@@ -18,10 +18,11 @@
 package auth_test
 
 import (
+	"log"
+
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/auth"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/config"
-	"log"
 )
 
 func ExampleNewStaticClientCertificateProvider() {
@@ -34,7 +35,7 @@ func ExampleNewStaticClientCertificateProvider() {
 	if err != nil {
 		log.Fatalf("Failed to load certificate: %v", err)
 	}
-	_, _ = neo4j.NewDriverWithContext("bolt://localhost:7687", neo4j.BasicAuth("neo4j", "password", ""), func(config *config.Config) {
+	_, _ = neo4j.NewDriver("bolt://localhost:7687", neo4j.BasicAuth("neo4j", "password", ""), func(config *config.Config) {
 		config.ClientCertificateProvider = provider
 	})
 }
@@ -49,7 +50,7 @@ func ExampleNewRotatingClientCertificateProvider() {
 	if err != nil {
 		log.Fatalf("Failed to load certificate: %v", err)
 	}
-	_, _ = neo4j.NewDriverWithContext("bolt://localhost:7687", neo4j.BasicAuth("neo4j", "password", ""), func(config *config.Config) {
+	_, _ = neo4j.NewDriver("bolt://localhost:7687", neo4j.BasicAuth("neo4j", "password", ""), func(config *config.Config) {
 		config.ClientCertificateProvider = provider
 	})
 	// Some time later we update the certificate
