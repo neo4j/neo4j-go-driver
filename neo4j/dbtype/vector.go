@@ -18,9 +18,6 @@
 package dbtype
 
 // Numeric represents the supported numeric types for Vector elements.
-//
-// Numeric is part of the Vector preview feature
-// (see README on what it means in terms of support and compatibility guarantees)
 type Numeric interface {
 	~float64 | ~float32 | ~int8 | ~int16 | ~int32 | ~int64
 }
