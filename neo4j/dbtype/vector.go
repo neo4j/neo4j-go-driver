@@ -28,7 +28,4 @@ type Numeric interface {
 // Vector represents a fixed-length array of numeric values.
 // Currently serialized as a Bolt LIST<Int64|Float64>.
 // Future versions will use native Bolt Vector serialization.
-//
-// Vector is part of the Vector preview feature
-// (see README on what it means in terms of support and compatibility guarantees)
 type Vector[T Numeric] []T
