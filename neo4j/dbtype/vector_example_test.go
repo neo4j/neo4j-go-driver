@@ -28,48 +28,36 @@ import (
 
 // ExampleVector demonstrates how to use Vector with the Neo4j Go driver.
 func ExampleVector() {
-	// Create a float64 vector
-	vec := dbtype.Vector[float64]{1.0, 2.0, 3.0}
-
-	// Connect to Neo4j
-	driver, err := neo4j.NewDriverWithContext(getUrl(), neo4j.BasicAuth("neo4j", "password", ""))
+	driver, err := neo4j.NewDriver(getUrl(), neo4j.BasicAuth("neo4j", "password", ""))
 	if err != nil {
 		panic(err)
 	}
 	defer driver.Close(context.Background())
 
-	session := driver.NewSession(context.Background(), neo4j.SessionConfig{})
-	defer session.Close(context.Background())
+	// Write the vector
+	ctx := context.Background()
+	vec := dbtype.Vector[float64]{1.0, 2.0, 3.0}
 
-	// Write the vector to the database
-	_, err = session.ExecuteWrite(context.Background(), func(tx neo4j.ManagedTransaction) (any, error) {
-		_, err := tx.Run(context.Background(),
-			"CREATE (n:VectorExample {vec: $vec}) RETURN n", map[string]any{"vec": vec})
-		return nil, err
-	})
+	_, err = neo4j.ExecuteQuery(ctx, driver,
+		"CREATE (n:VectorExample {vec: $vec}) RETURN n",
+		map[string]any{"vec": vec},
+		neo4j.EagerResultTransformer)
 	if err != nil {
 		panic(err)
 	}
 
-	// Read the vector back from the database
-	result, err := session.ExecuteRead(context.Background(), func(tx neo4j.ManagedTransaction) (any, error) {
-		records, err := tx.Run(context.Background(),
-			"MATCH (n:VectorExample) RETURN n.vec LIMIT 1", nil)
-		if err != nil {
-			return nil, err
-		}
-		if records.Next(context.Background()) {
-			if v, ok := records.Record().Values[0].(dbtype.Vector[float64]); ok {
-				return v, nil
-			}
-		}
-		return nil, nil
-	})
+	// Read the vector back
+	result, err := neo4j.ExecuteQuery(ctx, driver,
+		"MATCH (n:VectorExample) RETURN n.vec AS vec LIMIT 1",
+		nil,
+		neo4j.EagerResultTransformer)
 	if err != nil {
 		panic(err)
 	}
 
-	fmt.Printf("Read vector: %v\n", result)
+	if v, ok := result.Records[0].Values[0].(dbtype.Vector[float64]); ok {
+		fmt.Printf("Read vector: %v\n", v)
+	}
 }
 
 func getUrl() string {
