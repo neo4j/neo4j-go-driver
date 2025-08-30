@@ -21,10 +21,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/config"
 	"testing"
 	"time"
 
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/config"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/dbtype"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/test-integration/dbserver"
@@ -371,7 +371,7 @@ func TestExamples(outer *testing.T) {
 
 // tag::hello-world[]
 func helloWorld(ctx context.Context, uri, username, password string) (string, error) {
-	driver, err := neo4j.NewDriverWithContext(uri, neo4j.BasicAuth(username, password, ""))
+	driver, err := neo4j.NewDriver(uri, neo4j.BasicAuth(username, password, ""))
 	if err != nil {
 		return "", err
 	}
@@ -404,41 +404,41 @@ func helloWorld(ctx context.Context, uri, username, password string) (string, er
 // end::hello-world[]
 
 // tag::driver-lifecycle[]
-func createDriver(uri, username, password string) (neo4j.DriverWithContext, error) {
-	return neo4j.NewDriverWithContext(uri, neo4j.BasicAuth(username, password, ""))
+func createDriver(uri, username, password string) (neo4j.Driver, error) {
+	return neo4j.NewDriver(uri, neo4j.BasicAuth(username, password, ""))
 }
 
 // call on application exit
-func closeDriver(ctx context.Context, driver neo4j.DriverWithContext) error {
+func closeDriver(ctx context.Context, driver neo4j.Driver) error {
 	return driver.Close(ctx)
 }
 
 // end::driver-lifecycle[]
 
 // tag::basic-auth[]
-func createDriverWithBasicAuth(uri, username, password string) (neo4j.DriverWithContext, error) {
-	return neo4j.NewDriverWithContext(uri, neo4j.BasicAuth(username, password, ""))
+func createDriverWithBasicAuth(uri, username, password string) (neo4j.Driver, error) {
+	return neo4j.NewDriver(uri, neo4j.BasicAuth(username, password, ""))
 }
 
 // end::basic-auth[]
 
 // tag::kerberos-auth[]
-func createDriverWithKerberosAuth(uri, ticket string) (neo4j.DriverWithContext, error) {
-	return neo4j.NewDriverWithContext(uri, neo4j.KerberosAuth(ticket))
+func createDriverWithKerberosAuth(uri, ticket string) (neo4j.Driver, error) {
+	return neo4j.NewDriver(uri, neo4j.KerberosAuth(ticket))
 }
 
 // end::kerberos-auth[]
 
 // tag::bearer-auth[]
-func createDriverWithBearerAuth(uri, token string) (neo4j.DriverWithContext, error) {
-	return neo4j.NewDriverWithContext(uri, neo4j.BearerAuth(token))
+func createDriverWithBearerAuth(uri, token string) (neo4j.Driver, error) {
+	return neo4j.NewDriver(uri, neo4j.BearerAuth(token))
 }
 
 // end::bearer-auth[]
 
 // tag::custom-auth[]
-func createDriverWithCustomAuth(uri, principal, credentials, realm, scheme string, parameters map[string]any) (neo4j.DriverWithContext, error) {
-	return neo4j.NewDriverWithContext(uri, neo4j.CustomAuth(scheme, principal, credentials, realm, parameters))
+func createDriverWithCustomAuth(uri, principal, credentials, realm, scheme string, parameters map[string]any) (neo4j.Driver, error) {
+	return neo4j.NewDriver(uri, neo4j.CustomAuth(scheme, principal, credentials, realm, parameters))
 }
 
 // end::custom-auth[]
@@ -450,9 +450,9 @@ func createDriverWithCustomAuth(uri, principal, credentials, realm, scheme strin
 // end::config-trust[]
 
 // tag::config-custom-resolver[]
-func createDriverWithAddressResolver(virtualURI, username, password string, addresses ...config.ServerAddress) (neo4j.DriverWithContext, error) {
+func createDriverWithAddressResolver(virtualURI, username, password string, addresses ...config.ServerAddress) (neo4j.Driver, error) {
 	// Address resolver is only valid for neo4j uri
-	return neo4j.NewDriverWithContext(virtualURI, neo4j.BasicAuth(username, password, ""), func(settings *config.Config) {
+	return neo4j.NewDriver(virtualURI, neo4j.BasicAuth(username, password, ""), func(settings *config.Config) {
 		settings.AddressResolver = func(address config.ServerAddress) []config.ServerAddress {
 			return addresses
 		}
@@ -466,9 +466,9 @@ func addPerson(ctx context.Context, name string) error {
 	)
 
 	driver, err := createDriverWithAddressResolver("neo4j://x.acme.com", username, password,
-		neo4j.NewServerAddress("a.acme.com", "7676"),
-		neo4j.NewServerAddress("b.acme.com", "8787"),
-		neo4j.NewServerAddress("c.acme.com", "9898"))
+		config.NewServerAddress("a.acme.com", "7676"),
+		config.NewServerAddress("b.acme.com", "8787"),
+		config.NewServerAddress("c.acme.com", "9898"))
 	if err != nil {
 		return err
 	}
@@ -493,8 +493,8 @@ func addPerson(ctx context.Context, name string) error {
 // end::config-custom-resolver[]
 
 // tag::config-connection-pool[]
-func createDriverWithCustomizedConnectionPool(uri, username, password string) (neo4j.DriverWithContext, error) {
-	return neo4j.NewDriverWithContext(uri, neo4j.BasicAuth(username, password, ""), func(config *config.Config) {
+func createDriverWithCustomizedConnectionPool(uri, username, password string) (neo4j.Driver, error) {
+	return neo4j.NewDriver(uri, neo4j.BasicAuth(username, password, ""), func(config *config.Config) {
 		config.MaxConnectionLifetime = 30 * time.Minute
 		config.MaxConnectionPoolSize = 50
 		config.ConnectionAcquisitionTimeout = 2 * time.Minute
@@ -504,8 +504,8 @@ func createDriverWithCustomizedConnectionPool(uri, username, password string) (n
 // end::config-connection-pool[]
 
 // tag::config-connection-timeout[]
-func createDriverWithConnectionTimeout(uri, username, password string) (neo4j.DriverWithContext, error) {
-	return neo4j.NewDriverWithContext(uri, neo4j.BasicAuth(username, password, ""), func(config *config.Config) {
+func createDriverWithConnectionTimeout(uri, username, password string) (neo4j.Driver, error) {
+	return neo4j.NewDriver(uri, neo4j.BasicAuth(username, password, ""), func(config *config.Config) {
 		config.SocketConnectTimeout = 15 * time.Second
 	})
 }
@@ -514,8 +514,8 @@ func createDriverWithConnectionTimeout(uri, username, password string) (neo4j.Dr
 
 // tag::config-max-retry-time[]
 // This driver is used to run queries, needs actual TLS configuration as well.
-func createDriverWithMaxRetryTime(uri, username, password string) (neo4j.DriverWithContext, error) {
-	return neo4j.NewDriverWithContext(uri, neo4j.BasicAuth(username, password, ""), func(config *config.Config) {
+func createDriverWithMaxRetryTime(uri, username, password string) (neo4j.Driver, error) {
+	return neo4j.NewDriver(uri, neo4j.BasicAuth(username, password, ""), func(config *config.Config) {
 		config.MaxTransactionRetryTime = 15 * time.Second
 	})
 }
@@ -523,7 +523,7 @@ func createDriverWithMaxRetryTime(uri, username, password string) (neo4j.DriverW
 // end::config-max-retry-time[]
 
 // tag::service-unavailable[]
-func createItem(ctx context.Context, driver neo4j.DriverWithContext) error {
+func createItem(ctx context.Context, driver neo4j.Driver) error {
 	session := driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
 	defer session.Close(ctx)
 
@@ -541,7 +541,7 @@ func createItem(ctx context.Context, driver neo4j.DriverWithContext) error {
 
 // end::service-unavailable[]
 
-func countNodes(ctx context.Context, driver neo4j.DriverWithContext, label string, property string, value string) (int64, error) {
+func countNodes(ctx context.Context, driver neo4j.Driver, label string, property string, value string) (int64, error) {
 	session := driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead})
 	defer session.Close(ctx)
 
@@ -558,7 +558,7 @@ func countNodes(ctx context.Context, driver neo4j.DriverWithContext, label strin
 }
 
 // tag::session[]
-func addPersonInSession(ctx context.Context, driver neo4j.DriverWithContext, name string) error {
+func addPersonInSession(ctx context.Context, driver neo4j.Driver, name string) error {
 	session := driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
 	defer session.Close(ctx)
 
@@ -577,7 +577,7 @@ func addPersonInSession(ctx context.Context, driver neo4j.DriverWithContext, nam
 // end::session[]
 
 // tag::autocommit-transaction[]
-func addPersonInAutoCommitTx(ctx context.Context, driver neo4j.DriverWithContext, name string) error {
+func addPersonInAutoCommitTx(ctx context.Context, driver neo4j.Driver, name string) error {
 	session := driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
 	defer session.Close(ctx)
 
@@ -596,7 +596,7 @@ func addPersonInAutoCommitTx(ctx context.Context, driver neo4j.DriverWithContext
 // end::autocommit-transaction[]
 
 // tag::transaction-function[]
-func addPersonInTxFunc(ctx context.Context, driver neo4j.DriverWithContext, name string) error {
+func addPersonInTxFunc(ctx context.Context, driver neo4j.Driver, name string) error {
 	session := driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
 	defer session.Close(ctx)
 
@@ -615,7 +615,7 @@ func addPersonInTxFunc(ctx context.Context, driver neo4j.DriverWithContext, name
 // end::transaction-function[]
 
 // tag::transaction-timeout-config[]
-func configTxTimeout(ctx context.Context, driver neo4j.DriverWithContext, name string) error {
+func configTxTimeout(ctx context.Context, driver neo4j.Driver, name string) error {
 	session := driver.NewSession(ctx, neo4j.SessionConfig{})
 	defer session.Close(ctx)
 
@@ -634,7 +634,7 @@ func configTxTimeout(ctx context.Context, driver neo4j.DriverWithContext, name s
 // end::transaction-timeout-config[]
 
 // tag::transaction-metadata-config[]
-func configTxMetadata(ctx context.Context, driver neo4j.DriverWithContext, name string) error {
+func configTxMetadata(ctx context.Context, driver neo4j.Driver, name string) error {
 	session := driver.NewSession(ctx, neo4j.SessionConfig{})
 	defer session.Close(ctx)
 
@@ -722,7 +722,7 @@ func printFriendsTxFunc(ctx context.Context) neo4j.ManagedTransactionWork {
 	}
 }
 
-func addAndEmploy(ctx context.Context, driver neo4j.DriverWithContext, person string, company string) (neo4j.Bookmarks, error) {
+func addAndEmploy(ctx context.Context, driver neo4j.Driver, person string, company string) (neo4j.Bookmarks, error) {
 	session := driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
 	defer session.Close(ctx)
 
@@ -739,7 +739,7 @@ func addAndEmploy(ctx context.Context, driver neo4j.DriverWithContext, person st
 	return session.LastBookmarks(), nil
 }
 
-func makeFriend(ctx context.Context, driver neo4j.DriverWithContext, person1 string, person2 string, bookmarks neo4j.Bookmarks) (neo4j.Bookmarks, error) {
+func makeFriend(ctx context.Context, driver neo4j.Driver, person1 string, person2 string, bookmarks neo4j.Bookmarks) (neo4j.Bookmarks, error) {
 	session := driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite, Bookmarks: bookmarks})
 	defer session.Close(ctx)
 
@@ -750,7 +750,7 @@ func makeFriend(ctx context.Context, driver neo4j.DriverWithContext, person1 str
 	return session.LastBookmarks(), nil
 }
 
-func addEmployAndMakeFriends(ctx context.Context, driver neo4j.DriverWithContext) error {
+func addEmployAndMakeFriends(ctx context.Context, driver neo4j.Driver) error {
 	var bookmarks1, bookmarks2, bookmarks3 neo4j.Bookmarks
 	var err error
 
@@ -808,7 +808,7 @@ func matchPersonNodeTxFunc(ctx context.Context, name string) neo4j.ManagedTransa
 	}
 }
 
-func addPersonNode(ctx context.Context, driver neo4j.DriverWithContext, name string) (int64, error) {
+func addPersonNode(ctx context.Context, driver neo4j.Driver, name string) (int64, error) {
 	session := driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
 	defer session.Close(ctx)
 
@@ -842,7 +842,7 @@ func TestExamplesDatabaseSelection(t *testing.T) {
 }
 
 // tag::result-consume[]
-func getPeople(ctx context.Context, driver neo4j.DriverWithContext) ([]string, error) {
+func getPeople(ctx context.Context, driver neo4j.Driver) ([]string, error) {
 	session := driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead})
 	defer session.Close(ctx)
 
@@ -874,12 +874,12 @@ func getPeople(ctx context.Context, driver neo4j.DriverWithContext) ([]string, e
 // end::result-consume[]
 
 // tag::result-retain[]
-func addPersonsAsEmployees(ctx context.Context, driver neo4j.DriverWithContext, companyName string) (int, error) {
+func addPersonsAsEmployees(ctx context.Context, driver neo4j.Driver, companyName string) (int, error) {
 	session := driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
 	defer session.Close(ctx)
 
 	results, err := session.Run(ctx, "MATCH (a:Person) RETURN a.name AS name", nil)
-	persons, err := neo4j.CollectWithContext(ctx, results, err)
+	persons, err := neo4j.Collect(ctx, results, err)
 	if err != nil {
 		return 0, err
 	}
@@ -908,7 +908,7 @@ func addPersonsAsEmployees(ctx context.Context, driver neo4j.DriverWithContext, 
 
 // end::result-retain[]
 
-func echo(ctx context.Context, session neo4j.SessionWithContext, value any) (*neo4j.Record, error) {
+func echo(ctx context.Context, session neo4j.Session, value any) (*neo4j.Record, error) {
 	record, err := session.ExecuteRead(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
 		result, err := tx.Run(ctx, "RETURN $value as fieldName", map[string]any{"value": value})
 

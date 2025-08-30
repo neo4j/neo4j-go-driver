@@ -100,7 +100,7 @@ func assertBooleansSlice(bools1 []bool, bools2 []any) {
 	}
 }
 
-func runBigDataThing(ctx context.Context, driver neo4j.DriverWithContext) {
+func runBigDataThing(ctx context.Context, driver neo4j.Driver) {
 	const batchSize = 10000
 	const nodeCount = 30000
 

@@ -20,8 +20,9 @@ package neo4j_test
 import (
 	"context"
 	"fmt"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
 	"os"
+
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
 )
 
 type Person struct {
@@ -167,9 +168,9 @@ func insertPerson(ctx context.Context, tx neo4j.ManagedTransaction, newPerson *P
 	return err
 }
 
-func createDriver() (neo4j.DriverWithContext, error) {
+func createDriver() (neo4j.Driver, error) {
 	credentials := neo4j.BasicAuth(os.Getenv("USERNAME"), os.Getenv("PASSWORD"), "")
-	return neo4j.NewDriverWithContext(os.Getenv("URL"), credentials)
+	return neo4j.NewDriver(os.Getenv("URL"), credentials)
 }
 
 type ctxCloser interface {

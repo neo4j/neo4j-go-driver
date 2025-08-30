@@ -31,7 +31,7 @@ import (
 
 // TokenManager is an interface for components that can provide auth tokens.
 // The `neo4j` package provides default implementations of `auth.TokenManager` for common authentication schemes.
-// See `neo4j.NewDriverWithContext`.
+// See `neo4j.NewDriver`.
 // Custom implementations of this class can be used to provide more complex authentication refresh functionality.
 //
 // WARNING:

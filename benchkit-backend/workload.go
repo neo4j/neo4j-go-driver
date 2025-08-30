@@ -20,9 +20,10 @@ package main
 import (
 	"errors"
 	"fmt"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
 	"strconv"
 	"sync"
+
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
 )
 
 type workloads struct {
@@ -142,7 +143,7 @@ func (w *workload) convertRoutingToAccessMode() error {
 	return nil
 }
 
-func (w *workload) execute(driver neo4j.DriverWithContext) error {
+func (w *workload) execute(driver neo4j.Driver) error {
 	if driver == nil {
 		return errors.New("uninitialized driver: call /ready first")
 	}
@@ -187,9 +188,9 @@ func (w *workload) execute(driver neo4j.DriverWithContext) error {
 // executeParallel abstracts the common pattern of executing tasks in parallel.
 // It takes a slice of workloadQuery and a function that defines how to execute each query.
 func (w *workload) executeParallel(
-	driver neo4j.DriverWithContext,
+	driver neo4j.Driver,
 	queries []workloadQuery,
-	executeFunc func(neo4j.DriverWithContext, workloadQuery) error) error {
+	executeFunc func(neo4j.Driver, workloadQuery) error) error {
 
 	// A wait group to wait for all goroutines to finish
 	var wg sync.WaitGroup
@@ -222,7 +223,7 @@ func (w *workload) executeParallel(
 	return nil
 }
 
-func (w *workload) executeQuery(driver neo4j.DriverWithContext, query workloadQuery) error {
+func (w *workload) executeQuery(driver neo4j.Driver, query workloadQuery) error {
 	// Prepare a slice to hold the configuration options
 	var opts []neo4j.ExecuteQueryConfigurationOption
 
@@ -243,11 +244,11 @@ func (w *workload) executeQuery(driver neo4j.DriverWithContext, query workloadQu
 	return nil
 }
 
-func (w *workload) executeQueryParallelSessions(driver neo4j.DriverWithContext) error {
+func (w *workload) executeQueryParallelSessions(driver neo4j.Driver) error {
 	return w.executeParallel(driver, w.Queries, w.executeQuery)
 }
 
-func (w *workload) executeQuerySequentialSessions(driver neo4j.DriverWithContext) error {
+func (w *workload) executeQuerySequentialSessions(driver neo4j.Driver) error {
 	for _, query := range w.Queries {
 		err := w.executeQuery(driver, query)
 		if err != nil {
@@ -257,7 +258,7 @@ func (w *workload) executeQuerySequentialSessions(driver neo4j.DriverWithContext
 	return nil
 }
 
-func (w *workload) createSession(driver neo4j.DriverWithContext) neo4j.SessionWithContext {
+func (w *workload) createSession(driver neo4j.Driver) neo4j.Session {
 	sessionConfig := neo4j.SessionConfig{
 		AccessMode:   w.AccessMode,
 		DatabaseName: *w.Database,
@@ -265,7 +266,7 @@ func (w *workload) createSession(driver neo4j.DriverWithContext) neo4j.SessionWi
 	return driver.NewSession(ctx, sessionConfig)
 }
 
-func (w *workload) sessionRun(session neo4j.SessionWithContext, query workloadQuery) error {
+func (w *workload) sessionRun(session neo4j.Session, query workloadQuery) error {
 	result, err := session.Run(ctx, query.Text, query.Parameters)
 	if err != nil {
 		return err
@@ -276,9 +277,9 @@ func (w *workload) sessionRun(session neo4j.SessionWithContext, query workloadQu
 	return err
 }
 
-func (w *workload) sessionRunParallelSessions(driver neo4j.DriverWithContext) error {
+func (w *workload) sessionRunParallelSessions(driver neo4j.Driver) error {
 	// Define how to execute a session run in parallel
-	sessionRunFunc := func(driver neo4j.DriverWithContext, query workloadQuery) error {
+	sessionRunFunc := func(driver neo4j.Driver, query workloadQuery) error {
 		session := w.createSession(driver)
 		defer session.Close(ctx)
 		return w.sessionRun(session, query)
@@ -286,7 +287,7 @@ func (w *workload) sessionRunParallelSessions(driver neo4j.DriverWithContext) er
 	return w.executeParallel(driver, w.Queries, sessionRunFunc)
 }
 
-func (w *workload) sessionRunSequentialSessions(driver neo4j.DriverWithContext) error {
+func (w *workload) sessionRunSequentialSessions(driver neo4j.Driver) error {
 	for _, query := range w.Queries {
 		session := w.createSession(driver)
 		err := w.sessionRun(session, query)
@@ -298,7 +299,7 @@ func (w *workload) sessionRunSequentialSessions(driver neo4j.DriverWithContext) 
 	return nil
 }
 
-func (w *workload) sessionRunSequentialTransactions(driver neo4j.DriverWithContext) error {
+func (w *workload) sessionRunSequentialTransactions(driver neo4j.Driver) error {
 	session := w.createSession(driver)
 	defer session.Close(ctx)
 
@@ -311,7 +312,7 @@ func (w *workload) sessionRunSequentialTransactions(driver neo4j.DriverWithConte
 	return nil
 }
 
-func (w *workload) executeRead(session neo4j.SessionWithContext, query workloadQuery) error {
+func (w *workload) executeRead(session neo4j.Session, query workloadQuery) error {
 	_, err := session.ExecuteRead(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
 		result, err := tx.Run(ctx, query.Text, query.Parameters)
 		if err != nil {
@@ -323,9 +324,9 @@ func (w *workload) executeRead(session neo4j.SessionWithContext, query workloadQ
 	return err
 }
 
-func (w *workload) executeReadParallelSessions(driver neo4j.DriverWithContext) error {
+func (w *workload) executeReadParallelSessions(driver neo4j.Driver) error {
 	// Define how to execute an execute read in parallel
-	executeReadFunc := func(driver neo4j.DriverWithContext, query workloadQuery) error {
+	executeReadFunc := func(driver neo4j.Driver, query workloadQuery) error {
 		session := w.createSession(driver)
 		defer session.Close(ctx)
 		return w.executeRead(session, query)
@@ -333,7 +334,7 @@ func (w *workload) executeReadParallelSessions(driver neo4j.DriverWithContext) e
 	return w.executeParallel(driver, w.Queries, executeReadFunc)
 }
 
-func (w *workload) executeReadSequentialSessions(driver neo4j.DriverWithContext) error {
+func (w *workload) executeReadSequentialSessions(driver neo4j.Driver) error {
 	for _, query := range w.Queries {
 		session := w.createSession(driver)
 		err := w.executeRead(session, query)
@@ -345,7 +346,7 @@ func (w *workload) executeReadSequentialSessions(driver neo4j.DriverWithContext)
 	return nil
 }
 
-func (w *workload) executeReadSequentialTransactions(driver neo4j.DriverWithContext) error {
+func (w *workload) executeReadSequentialTransactions(driver neo4j.Driver) error {
 	session := w.createSession(driver)
 	defer session.Close(ctx)
 
@@ -358,7 +359,7 @@ func (w *workload) executeReadSequentialTransactions(driver neo4j.DriverWithCont
 	return nil
 }
 
-func (w *workload) executeReadSequentialQueries(driver neo4j.DriverWithContext) error {
+func (w *workload) executeReadSequentialQueries(driver neo4j.Driver) error {
 	session := w.createSession(driver)
 	defer session.Close(ctx)
 
@@ -380,7 +381,7 @@ func (w *workload) executeReadSequentialQueries(driver neo4j.DriverWithContext) 
 	return err
 }
 
-func (w *workload) executeWrite(session neo4j.SessionWithContext, query workloadQuery) error {
+func (w *workload) executeWrite(session neo4j.Session, query workloadQuery) error {
 	_, err := session.ExecuteWrite(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
 		result, err := tx.Run(ctx, query.Text, query.Parameters)
 		if err != nil {
@@ -392,9 +393,9 @@ func (w *workload) executeWrite(session neo4j.SessionWithContext, query workload
 	return err
 }
 
-func (w *workload) executeWriteParallelSessions(driver neo4j.DriverWithContext) error {
+func (w *workload) executeWriteParallelSessions(driver neo4j.Driver) error {
 	// Define how to execute an execute write in parallel
-	executeWriteFunc := func(driver neo4j.DriverWithContext, query workloadQuery) error {
+	executeWriteFunc := func(driver neo4j.Driver, query workloadQuery) error {
 		session := w.createSession(driver)
 		defer session.Close(ctx)
 		return w.executeWrite(session, query)
@@ -402,7 +403,7 @@ func (w *workload) executeWriteParallelSessions(driver neo4j.DriverWithContext) 
 	return w.executeParallel(driver, w.Queries, executeWriteFunc)
 }
 
-func (w *workload) executeWriteSequentialSessions(driver neo4j.DriverWithContext) error {
+func (w *workload) executeWriteSequentialSessions(driver neo4j.Driver) error {
 	for _, query := range w.Queries {
 		session := w.createSession(driver)
 		err := w.executeWrite(session, query)
@@ -414,7 +415,7 @@ func (w *workload) executeWriteSequentialSessions(driver neo4j.DriverWithContext
 	return nil
 }
 
-func (w *workload) executeWriteSequentialTransactions(driver neo4j.DriverWithContext) error {
+func (w *workload) executeWriteSequentialTransactions(driver neo4j.Driver) error {
 	session := w.createSession(driver)
 	defer session.Close(ctx)
 
@@ -427,7 +428,7 @@ func (w *workload) executeWriteSequentialTransactions(driver neo4j.DriverWithCon
 	return nil
 }
 
-func (w *workload) executeWriteSequentialQueries(driver neo4j.DriverWithContext) error {
+func (w *workload) executeWriteSequentialQueries(driver neo4j.Driver) error {
 	session := w.createSession(driver)
 	defer session.Close(ctx)
 

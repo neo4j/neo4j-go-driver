@@ -18,26 +18,17 @@
 package neo4j
 
 import (
+	"math"
+	"time"
+
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/config"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/bolt"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/pool"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/notifications"
-	"math"
-	"net/url"
-	"time"
 )
 
-// Deprecated: please use config.Config directly. This alias will be removed in 6.0.
-type Config = config.Config
-
-// Deprecated: please use config.ServerAddressResolver directly. This alias will be removed in 6.0.
-type ServerAddressResolver = config.ServerAddressResolver
-
-// Deprecated: please use config.ServerAddress directly. This alias will be removed in 6.0.
-type ServerAddress = config.ServerAddress
-
-func defaultConfig() *Config {
-	return &Config{
+func defaultConfig() *config.Config {
+	return &config.Config{
 		AddressResolver:                      nil,
 		MaxTransactionRetryTime:              30 * time.Second,
 		MaxConnectionPoolSize:                100,
@@ -46,7 +37,6 @@ func defaultConfig() *Config {
 		ConnectionLivenessCheckTimeout:       pool.DefaultConnectionLivenessCheckTimeout,
 		SocketConnectTimeout:                 5 * time.Second,
 		SocketKeepalive:                      true,
-		RootCAs:                              nil,
 		UserAgent:                            UserAgent,
 		FetchSize:                            FetchDefault,
 		NotificationsMinSeverity:             notifications.DefaultLevel,
@@ -57,7 +47,7 @@ func defaultConfig() *Config {
 	}
 }
 
-func validateAndNormaliseConfig(config *Config) error {
+func validateAndNormaliseConfig(config *config.Config) error {
 	// Max Transaction Retry Time
 	if config.MaxTransactionRetryTime < 0 {
 		return &UsageError{Message: "Maximum transaction retry time cannot be smaller than 0"}
@@ -101,20 +91,9 @@ func validateAndNormaliseConfig(config *Config) error {
 	return nil
 }
 
-func newServerAddressURL(hostname string, port string) *url.URL {
-	if hostname == "" {
-		return nil
-	}
-
-	hostAndPort := hostname
-	if port != "" {
-		hostAndPort = hostAndPort + ":" + port
-	}
-
-	return &url.URL{Host: hostAndPort}
-}
-
-// NewServerAddress generates a ServerAddress with provided hostname and port information.
-func NewServerAddress(hostname string, port string) ServerAddress {
-	return newServerAddressURL(hostname, port)
+// NewServerAddress generates a config.ServerAddress with provided hostname and port information.
+//
+// Deprecated: Use config.NewServerAddress instead. This function will be removed in v7.
+func NewServerAddress(hostname string, port string) config.ServerAddress {
+	return config.NewServerAddress(hostname, port)
 }

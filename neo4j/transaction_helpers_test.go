@@ -20,9 +20,10 @@ package neo4j_test
 import (
 	"context"
 	"fmt"
+	"testing"
+
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
 	. "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/testutil"
-	"testing"
 )
 
 func TestExecuteRead(outer *testing.T) {
@@ -76,15 +77,10 @@ func TestExecuteWrite(outer *testing.T) {
 }
 
 type fakeSession struct {
-	neo4j.SessionWithContext
+	neo4j.Session
 }
 
 func (f *fakeSession) LastBookmarks() neo4j.Bookmarks {
-	panic("implement me")
-}
-
-//lint:ignore U1000 needed for interface adherence
-func (f *fakeSession) lastBookmark() string {
 	panic("implement me")
 }
 
@@ -100,16 +96,11 @@ func (f *fakeSession) ExecuteWrite(_ context.Context, work neo4j.ManagedTransact
 	return work(&FakeTransaction{})
 }
 
-func (f *fakeSession) Run(context.Context, string, map[string]any, ...func(*neo4j.TransactionConfig)) (neo4j.ResultWithContext, error) {
+func (f *fakeSession) Run(context.Context, string, map[string]any, ...func(*neo4j.TransactionConfig)) (neo4j.Result, error) {
 	panic("implement me")
 }
 
 func (f *fakeSession) Close(context.Context) error {
-	panic("implement me")
-}
-
-//lint:ignore U1000 needed for interface adherence
-func (f *fakeSession) legacy() neo4j.Session {
 	panic("implement me")
 }
 
@@ -127,11 +118,6 @@ type FakeTransaction struct {
 	neo4j.ManagedTransaction
 }
 
-func (f *FakeTransaction) Run(ctx context.Context, cypher string, params map[string]any) (neo4j.ResultWithContext, error) {
-	panic("implement me")
-}
-
-//lint:ignore U1000 needed for interface adherence
-func (f *FakeTransaction) legacy() neo4j.Transaction {
+func (f *FakeTransaction) Run(ctx context.Context, cypher string, params map[string]any) (neo4j.Result, error) {
 	panic("implement me")
 }

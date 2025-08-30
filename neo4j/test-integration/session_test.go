@@ -20,11 +20,11 @@ package test_integration
 import (
 	"context"
 	"fmt"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/config"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/log"
 	"testing"
 	"time"
 
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/config"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/log"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/db"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/test-integration/dbserver"
@@ -40,9 +40,9 @@ func TestSession(outer *testing.T) {
 	outer.Run("with read access mode", func(inner *testing.T) {
 		var (
 			err     error
-			driver  neo4j.DriverWithContext
-			session neo4j.SessionWithContext
-			result  neo4j.ResultWithContext
+			driver  neo4j.Driver
+			session neo4j.Session
+			result  neo4j.Result
 			summary neo4j.ResultSummary
 		)
 
@@ -158,9 +158,9 @@ func TestSession(outer *testing.T) {
 	outer.Run("with write access mode", func(inner *testing.T) {
 		var (
 			err     error
-			driver  neo4j.DriverWithContext
-			session neo4j.SessionWithContext
-			result  neo4j.ResultWithContext
+			driver  neo4j.Driver
+			session neo4j.Session
+			result  neo4j.Result
 			summary neo4j.ResultSummary
 		)
 
@@ -321,7 +321,7 @@ func TestSession(outer *testing.T) {
 		})
 
 		inner.Run("when session is closed, pending query result should be discarded", func(t *testing.T) {
-			var result neo4j.ResultWithContext
+			var result neo4j.Result
 			var err error
 
 			innerExecutor := func() error {
@@ -337,13 +337,13 @@ func TestSession(outer *testing.T) {
 
 			assertNil(t, innerExecutor())
 
-			records, _ := neo4j.CollectWithContext(ctx, result, err)
+			records, _ := neo4j.Collect(ctx, result, err)
 			assertNotNil(t, records)
 			assertEquals(t, len(records), 0)
 		})
 
 		inner.Run("when session is closed, last pending result shoud be discarded", func(t *testing.T) {
-			var result1, result2 neo4j.ResultWithContext
+			var result1, result2 neo4j.Result
 			var err1, err2 error
 
 			innerExecutor := func() error {
@@ -363,13 +363,13 @@ func TestSession(outer *testing.T) {
 
 			assertNil(t, innerExecutor())
 
-			records1, _ := neo4j.CollectWithContext(ctx, result1, err1)
+			records1, _ := neo4j.Collect(ctx, result1, err1)
 			assertNotNil(t, records1)
 			assertEquals(t, len(records1), 100)
 			assertEquals(t, records1[0].Values[0], 1)
 			assertEquals(t, records1[99].Values[0], 100)
 
-			records2, _ := neo4j.CollectWithContext(ctx, result2, err2)
+			records2, _ := neo4j.Collect(ctx, result2, err2)
 			assertNotNil(t, records2)
 			assertEquals(t, len(records2), 0)
 		})
@@ -392,13 +392,13 @@ func TestSession(outer *testing.T) {
 				}
 
 				result1, err := tx.Run(ctx, "UNWIND RANGE(1,100) AS N CREATE (n:TxRollbackOnClose { id: N, text: 'Text '+N }) RETURN N", nil)
-				records1, err = neo4j.CollectWithContext(ctx, result1, err)
+				records1, err = neo4j.Collect(ctx, result1, err)
 				if err != nil {
 					return err
 				}
 
 				result2, err := tx.Run(ctx, "MATCH (n:TxRollbackOnClose) RETURN n.id, n.text ORDER BY n.id", nil)
-				records2, err = neo4j.CollectWithContext(ctx, result2, err)
+				records2, err = neo4j.Collect(ctx, result2, err)
 				if err != nil {
 					return err
 				}
@@ -424,15 +424,15 @@ func TestSession(outer *testing.T) {
 			defer newSession.Close(ctx)
 
 			result3, err := newSession.Run(ctx, "MATCH (n:TxRollbackOnClose) RETURN n.id, n.text", nil)
-			records3, _ := neo4j.CollectWithContext(ctx, result3, err)
+			records3, _ := neo4j.Collect(ctx, result3, err)
 			assertEquals(t, len(records3), 0)
 		})
 	})
 
 	outer.Run("V3", func(inner *testing.T) {
 		var (
-			driver  neo4j.DriverWithContext
-			session neo4j.SessionWithContext
+			driver  neo4j.Driver
+			session neo4j.Session
 		)
 
 		driver = server.Driver()

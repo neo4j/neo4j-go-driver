@@ -22,6 +22,7 @@ package neo4j
 import (
 	"context"
 	"fmt"
+
 	idb "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/errorutil"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/router"
@@ -31,8 +32,8 @@ import (
 
 type RoutingTable = idb.RoutingTable
 
-func ForceRoutingTableUpdate(d DriverWithContext, database string, bookmarks []string, logger log.BoltLogger) error {
-	driver := d.(*driverWithContext)
+func ForceRoutingTableUpdate(d Driver, database string, bookmarks []string, logger log.BoltLogger) error {
+	driver := d.(*driver)
 	ctx := context.Background()
 	driver.router.Invalidate(database)
 	getBookmarks := func(context.Context) ([]string, error) {
@@ -56,12 +57,12 @@ func ForceRoutingTableUpdate(d DriverWithContext, database string, bookmarks []s
 	return errorutil.WrapError(err)
 }
 
-func RegisterDnsResolver(d DriverWithContext, hook func(address string) []string) {
-	d.(*driverWithContext).connector.TestKitDnsResolver = hook
+func RegisterDnsResolver(d Driver, hook func(address string) []string) {
+	d.(*driver).connector.TestKitDnsResolver = hook
 }
 
-func GetRoutingTable(d DriverWithContext, database string) (*RoutingTable, error) {
-	driver := d.(*driverWithContext)
+func GetRoutingTable(d Driver, database string) (*RoutingTable, error) {
+	driver := d.(*driver)
 	router, ok := driver.router.(*router.Router)
 	if !ok {
 		return nil, fmt.Errorf("GetRoutingTable is only supported for direct drivers")

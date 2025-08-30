@@ -19,9 +19,10 @@ package test_integration
 
 import (
 	"context"
+	"testing"
+
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/test-integration/dbserver"
-	"testing"
 )
 
 func TestContext(outer *testing.T) {
@@ -54,7 +55,7 @@ func TestContext(outer *testing.T) {
 	})
 }
 
-func listTransactionWorkloads(ctx context.Context, driver neo4j.DriverWithContext, server dbserver.DbServer) []string {
+func listTransactionWorkloads(ctx context.Context, driver neo4j.Driver, server dbserver.DbServer) []string {
 	session := driver.NewSession(ctx, neo4j.SessionConfig{})
 	defer session.Close(ctx)
 	transactionQuery := server.GetTransactionWorkloadsQuery()

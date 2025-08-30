@@ -64,12 +64,6 @@ func (l *console) Debugf(name, id string, msg string, args ...any) {
 	fmt.Fprintf(os.Stdout, "%s  DEBUG  [%s %s] %s\n", now.Format(timeFormat), name, id, fmt.Sprintf(msg, args...))
 }
 
-// Console is a simple logger that logs to stdout/console.
-// Turn the different log levels on/off as wished, all are off by default.
-//
-// Deprecated: use log.ToConsole() instead.
-type Console = console
-
 // ToConsole returns a simple logger that logs to stdout/console.
 //
 // level is the minimum log level that will be logged.

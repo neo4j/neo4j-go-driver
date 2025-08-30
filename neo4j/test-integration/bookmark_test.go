@@ -33,7 +33,7 @@ func TestBookmark(outer *testing.T) {
 	ctx := context.Background()
 	server := dbserver.GetDbServer(ctx)
 
-	createNodeInTx := func(driver neo4j.DriverWithContext) string {
+	createNodeInTx := func(driver neo4j.Driver) string {
 		session := driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
 		defer session.Close(ctx)
 
@@ -56,13 +56,13 @@ func TestBookmark(outer *testing.T) {
 	}
 
 	outer.Run("session constructed with no bookmarks", func(inner *testing.T) {
-		setUp := func() (neo4j.DriverWithContext, neo4j.SessionWithContext) {
+		setUp := func() (neo4j.Driver, neo4j.Session) {
 			driver := server.Driver()
 			session := driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
 			return driver, session
 		}
 
-		tearDown := func(session neo4j.SessionWithContext, driver neo4j.DriverWithContext) {
+		tearDown := func(session neo4j.Session, driver neo4j.Driver) {
 			if session != nil {
 				session.Close(ctx)
 			}
@@ -208,7 +208,7 @@ func TestBookmark(outer *testing.T) {
 	})
 
 	outer.Run("session constructed with one bookmark", func(inner *testing.T) {
-		setUp := func() (neo4j.DriverWithContext, neo4j.SessionWithContext, string) {
+		setUp := func() (neo4j.Driver, neo4j.Session, string) {
 			driver := server.Driver()
 			bookmark := createNodeInTx(driver)
 			session := driver.NewSession(ctx, neo4j.SessionConfig{
@@ -218,7 +218,7 @@ func TestBookmark(outer *testing.T) {
 			return driver, session, bookmark
 		}
 
-		tearDown := func(session neo4j.SessionWithContext, driver neo4j.DriverWithContext) {
+		tearDown := func(session neo4j.Session, driver neo4j.Driver) {
 			if session != nil {
 				session.Close(ctx)
 			}
@@ -299,8 +299,8 @@ func TestBookmark(outer *testing.T) {
 
 	outer.Run("session constructed with two sets of bookmarks", func(inner *testing.T) {
 		var (
-			driver    neo4j.DriverWithContext
-			session   neo4j.SessionWithContext
+			driver    neo4j.Driver
+			session   neo4j.Session
 			bookmark1 string
 			bookmark2 string
 		)
@@ -358,7 +358,7 @@ func TestBookmark(outer *testing.T) {
 
 	outer.Run("session constructed with unreachable bookmark", func(inner *testing.T) {
 
-		setUp := func() (neo4j.DriverWithContext, neo4j.SessionWithContext, string) {
+		setUp := func() (neo4j.Driver, neo4j.Session, string) {
 			driver := server.Driver()
 
 			bookmark := createNodeInTx(driver)
@@ -370,7 +370,7 @@ func TestBookmark(outer *testing.T) {
 			return driver, session, bookmark
 		}
 
-		tearDown := func(session neo4j.SessionWithContext, driver neo4j.DriverWithContext) {
+		tearDown := func(session neo4j.Session, driver neo4j.Driver) {
 			if session != nil {
 				session.Close(ctx)
 			}

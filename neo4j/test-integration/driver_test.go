@@ -19,11 +19,11 @@ package test_integration
 
 import (
 	"context"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/config"
 	"math"
 	"testing"
 	"time"
 
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/config"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/test-integration/dbserver"
 )
@@ -44,7 +44,7 @@ func TestDriver(outer *testing.T) {
 
 		inner.Run("should return error upon bad connection", func(t *testing.T) {
 			auth := neo4j.BasicAuth("bad user", "bad pass", "bad area")
-			driver, err := neo4j.NewDriverWithContext(server.BoltURI(), auth, server.ConfigFunc())
+			driver, err := neo4j.NewDriver(server.BoltURI(), auth, server.ConfigFunc())
 			assertNil(t, err)
 			defer func() { _ = driver.Close(ctx) }()
 			err = driver.VerifyConnectivity(ctx)
@@ -54,13 +54,13 @@ func TestDriver(outer *testing.T) {
 
 	outer.Run("Direct", func(inner *testing.T) {
 
-		setUp := func() (neo4j.DriverWithContext, neo4j.SessionWithContext) {
+		setUp := func() (neo4j.Driver, neo4j.Session) {
 			driver := server.Driver()
 			session := driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})
 			return driver, session
 		}
 
-		tearDown := func(driver neo4j.DriverWithContext, session neo4j.SessionWithContext) {
+		tearDown := func(driver neo4j.Driver, session neo4j.Session) {
 			if session != nil {
 				_ = session.Close(ctx)
 			}
@@ -113,10 +113,10 @@ func TestDriver(outer *testing.T) {
 	outer.Run("Pooling without Connection Acquisition Timeout", func(inner *testing.T) {
 		var (
 			err    error
-			driver neo4j.DriverWithContext
+			driver neo4j.Driver
 		)
 
-		driver, err = neo4j.NewDriverWithContext(server.BoltURI(), server.AuthToken(), server.ConfigFunc(), func(config *config.Config) {
+		driver, err = neo4j.NewDriver(server.BoltURI(), server.AuthToken(), server.ConfigFunc(), func(config *config.Config) {
 			config.MaxConnectionPoolSize = 2
 			config.ConnectionAcquisitionTimeout = 0
 		})
@@ -152,10 +152,10 @@ func TestDriver(outer *testing.T) {
 	outer.Run("Pooling with Connection Acquisition Timeout", func(inner *testing.T) {
 		var (
 			err    error
-			driver neo4j.DriverWithContext
+			driver neo4j.Driver
 		)
 
-		driver, err = neo4j.NewDriverWithContext(server.BoltURI(), server.AuthToken(), server.ConfigFunc(), func(config *config.Config) {
+		driver, err = neo4j.NewDriver(server.BoltURI(), server.AuthToken(), server.ConfigFunc(), func(config *config.Config) {
 			config.MaxConnectionPoolSize = 2
 			config.ConnectionAcquisitionTimeout = 10 * time.Second
 		})

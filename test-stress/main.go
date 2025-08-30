@@ -95,7 +95,7 @@ func main() {
 
 	ctx := context.Background()
 	auth := neo4j.BasicAuth(user, password, "")
-	driver, err := neo4j.NewDriverWithContext(uri, auth)
+	driver, err := neo4j.NewDriver(uri, auth)
 	if err != nil {
 		panic(err)
 	}
