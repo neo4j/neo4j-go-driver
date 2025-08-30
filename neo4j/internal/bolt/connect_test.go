@@ -340,9 +340,9 @@ func TestSelectProtocol(ot *testing.T) {
 		{
 			name: "ServerGreater",
 			offers: []protocolVersion{
-				{back: 7, minor: 8, major: 5},
+				{back: 8, minor: 9, major: 5},
 			},
-			expected: protocolVersion{minor: 8, major: 5},
+			expected: protocolVersion{minor: 7, major: 5},
 		},
 		{
 			name: "ServerLess",
@@ -356,13 +356,20 @@ func TestSelectProtocol(ot *testing.T) {
 
 	for _, c := range cases {
 		ot.Run(c.name, func(t *testing.T) {
-			restore := setTestHandshakeProposals([4]protocolVersion{
+			restoreHandshake := setTestHandshakeProposals([4]protocolVersion{
 				{major: 0xFF, minor: 0x01, back: 0x00},
 				{major: 5, minor: 7, back: 7},
 				{major: 4, minor: 4, back: 2},
 				{major: 3, minor: 0, back: 0},
 			})
-			defer restore()
+			defer restoreHandshake()
+
+			restoreSupported := setTestSupportedVersions([]protocolVersion{
+				{major: 5, minor: 7, back: 7},
+				{major: 4, minor: 4, back: 2},
+				{major: 3, minor: 0, back: 0},
+			})
+			defer restoreSupported()
 
 			candidate, err := selectProtocol(c.offers)
 			if err != nil {
@@ -381,4 +388,12 @@ func setTestHandshakeProposals(testProposals [4]protocolVersion) func() {
 	orig := handshakeProposals
 	handshakeProposals = testProposals
 	return func() { handshakeProposals = orig }
+}
+
+// setTestSupportedVersions temporarily overrides the global supportedVersions variable and returns a
+// function to restore the original value.
+func setTestSupportedVersions(testVersions []protocolVersion) func() {
+	orig := supportedVersions
+	supportedVersions = testVersions
+	return func() { supportedVersions = orig }
 }
