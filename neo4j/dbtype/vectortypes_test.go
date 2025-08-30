@@ -23,6 +23,7 @@ import (
 )
 
 func TestVectorAPI(t *testing.T) {
+	t.Parallel()
 	float64Vec := Vector[float64]{1.0, 2.0, 3.0, 4.0, 5.0}
 	float32Vec := Vector[float32]{0.1, 0.2, 0.3, 0.4, 0.5}
 
@@ -38,6 +39,7 @@ func TestVectorAPI(t *testing.T) {
 
 	for _, tt := range typeTests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			if reflect.TypeOf(tt.vec) != tt.expected {
 				t.Errorf("Expected %s to be of type %v", tt.name, tt.expected)
 			}
@@ -46,6 +48,7 @@ func TestVectorAPI(t *testing.T) {
 
 	// Test vector operations
 	t.Run("length", func(t *testing.T) {
+		t.Parallel()
 		if len(float64Vec) != 5 {
 			t.Errorf("Expected float64Vec to have length 5, got %d", len(float64Vec))
 		}
@@ -55,6 +58,7 @@ func TestVectorAPI(t *testing.T) {
 	})
 
 	t.Run("access", func(t *testing.T) {
+		t.Parallel()
 		if float64Vec[0] != 1.0 {
 			t.Errorf("Expected float64Vec[0] to be 1.0, got %f", float64Vec[0])
 		}
@@ -64,6 +68,7 @@ func TestVectorAPI(t *testing.T) {
 	})
 
 	t.Run("modification", func(t *testing.T) {
+		t.Parallel()
 		float64Vec[0] = 10.0
 		if float64Vec[0] != 10.0 {
 			t.Errorf("Expected float64Vec[0] to be 10.0 after modification, got %f", float64Vec[0])
@@ -71,6 +76,7 @@ func TestVectorAPI(t *testing.T) {
 	})
 
 	t.Run("make", func(t *testing.T) {
+		t.Parallel()
 		largeVec := make(Vector[float64], 100)
 		if len(largeVec) != 100 {
 			t.Errorf("Expected largeVec to have length 100, got %d", len(largeVec))
@@ -78,6 +84,7 @@ func TestVectorAPI(t *testing.T) {
 	})
 
 	t.Run("append", func(t *testing.T) {
+		t.Parallel()
 		vec := Vector[float64]{1.0, 2.0}
 		vec = append(vec, 3.0)
 		if len(vec) != 3 {
@@ -89,6 +96,7 @@ func TestVectorAPI(t *testing.T) {
 	})
 
 	t.Run("maps", func(t *testing.T) {
+		t.Parallel()
 		params := map[string]any{
 			"float64_vec": float64Vec,
 			"float32_vec": float32Vec,
@@ -108,6 +116,7 @@ func TestVectorAPI(t *testing.T) {
 	})
 
 	t.Run("slices", func(t *testing.T) {
+		t.Parallel()
 		vecSlice := []Vector[float64]{float64Vec, {6.0, 7.0, 8.0}}
 		if len(vecSlice) != 2 {
 			t.Errorf("Expected vecSlice to have length 2, got %d", len(vecSlice))
@@ -115,6 +124,7 @@ func TestVectorAPI(t *testing.T) {
 	})
 
 	t.Run("comparison", func(t *testing.T) {
+		t.Parallel()
 		vec1 := Vector[float64]{1.0, 2.0, 3.0}
 		vec2 := Vector[float64]{1.0, 2.0, 3.0}
 		vec3 := Vector[float64]{1.0, 2.0, 4.0}
@@ -130,6 +140,7 @@ func TestVectorAPI(t *testing.T) {
 }
 
 func TestVectorElementInterface(t *testing.T) {
+	t.Parallel()
 	// Test all supported element types
 	type testCase struct {
 		name string
@@ -148,6 +159,7 @@ func TestVectorElementInterface(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
 			// Test that the vector can be created (compilation test)
 			if tc.vec == nil {
 				t.Errorf("Vector creation failed for %s", tc.name)
@@ -163,7 +175,9 @@ func TestVectorElementInterface(t *testing.T) {
 }
 
 func TestVectorEmptyAndNil(t *testing.T) {
+	t.Parallel()
 	t.Run("empty", func(t *testing.T) {
+		t.Parallel()
 		emptyVec := Vector[float64]{}
 		if len(emptyVec) != 0 {
 			t.Errorf("Expected emptyVec to have length 0, got %d", len(emptyVec))
@@ -171,6 +185,7 @@ func TestVectorEmptyAndNil(t *testing.T) {
 	})
 
 	t.Run("nil", func(t *testing.T) {
+		t.Parallel()
 		var nilVec Vector[float64]
 		if len(nilVec) != 0 {
 			t.Errorf("Expected nilVec to have length 0, got %d", len(nilVec))

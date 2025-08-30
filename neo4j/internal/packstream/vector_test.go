@@ -24,6 +24,7 @@ import (
 )
 
 func TestVectorPacking(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name     string
 		packFunc func(*Packer)
@@ -127,6 +128,7 @@ func TestVectorPacking(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			p := &Packer{}
 			p.Begin([]byte{})
 			tt.packFunc(p)
@@ -145,6 +147,7 @@ func TestVectorPacking(t *testing.T) {
 }
 
 func TestVectorUnpacking(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name       string
 		data       []byte
@@ -243,6 +246,7 @@ func TestVectorUnpacking(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			u := &Unpacker{}
 			u.Reset(tt.data)
 			u.Next() // Move to the struct
@@ -262,6 +266,7 @@ func TestVectorUnpacking(t *testing.T) {
 }
 
 func TestVectorRoundTrip(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name       string
 		packFunc   func(*Packer)
@@ -332,6 +337,7 @@ func TestVectorRoundTrip(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			// Pack
 			p := &Packer{}
 			p.Begin([]byte{})
