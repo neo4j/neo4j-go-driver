@@ -855,10 +855,6 @@ func (b *bolt6) IsSsrEnabled() bool {
 }
 
 func (b *bolt6) ReAuth(ctx context.Context, auth *idb.ReAuthToken) error {
-	return b.reAuth(ctx, auth)
-}
-
-func (b *bolt6) reAuth(ctx context.Context, auth *idb.ReAuthToken) error {
 	token, err := auth.Manager.GetAuthToken(ctx)
 	if err != nil {
 		return err
