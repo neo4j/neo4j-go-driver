@@ -17,12 +17,10 @@
 
 package dbtype
 
-// Numeric represents the supported numeric types for Vector elements.
-type Numeric interface {
+// VectorElement represents the supported element types for Vector.
+type VectorElement interface {
 	~float64 | ~float32 | ~int8 | ~int16 | ~int32 | ~int64
 }
 
 // Vector represents a fixed-length array of numeric values.
-// Currently serialized as a Bolt LIST<Int64|Float64>.
-// Future versions will use native Bolt Vector serialization.
-type Vector[T Numeric] []T
+type Vector[T VectorElement] []T

@@ -129,8 +129,8 @@ func TestVectorAPI(t *testing.T) {
 	})
 }
 
-func TestVectorNumericInterface(t *testing.T) {
-	// Test all supported numeric types
+func TestVectorElementInterface(t *testing.T) {
+	// Test all supported element types
 	type testCase struct {
 		name string
 		vec  any

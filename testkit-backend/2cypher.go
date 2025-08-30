@@ -230,7 +230,7 @@ func valueResponse(name string, v any) map[string]any {
 }
 
 // Helper to convert Vector types to CypherVector format
-func vectorToCypher[T dbtype.Numeric](dtype string, vec dbtype.Vector[T]) map[string]any {
+func vectorToCypher[T dbtype.VectorElement](dtype string, vec dbtype.Vector[T]) map[string]any {
 	// Convert vector to hex string
 	var hexData string
 	switch v := any(vec).(type) {
