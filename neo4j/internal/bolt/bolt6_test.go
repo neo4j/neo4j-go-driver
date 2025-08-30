@@ -520,22 +520,7 @@ func TestBolt6(outer *testing.T) {
 			inner.Run(fmt.Sprintf("%s for %s", test.description, test.Method), func(t *testing.T) {
 				bolt, cleanup := connectToServer(t, func(srv *bolt6server) {
 					go func() {
-						srv.waitForHandshake()
-						srv.acceptManifestVersion()
-						offerings := []protocolVersion{
-							{major: 6, minor: 0, back: 0},
-							{major: 5, minor: 8, back: 8},
-							{major: 4, minor: 4, back: 2},
-						}
-						srv.sendManifestOfferings(offerings)
-						major, minor := srv.waitForManifestConfirmation()
-						if major != 6 || minor != 0 {
-							panic(fmt.Sprintf("Expected client to choose Bolt 6.0, but got %d.%d", major, minor))
-						}
-						srv.waitForHelloWithoutAuthToken()
-						srv.acceptHello()
-						srv.waitForLogon()
-						srv.acceptLogon()
+						srv.acceptBolt6WithManifest()
 						fieldAssertion := func(fieldNum int) func(fields []any) {
 							return func(fields []any) {
 								if test.ExpectedMinSev != nil {
