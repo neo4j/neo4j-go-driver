@@ -33,12 +33,12 @@ import (
 	"sync"
 	"time"
 
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/config"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/log"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/notifications"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/auth"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/config"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/db"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/log"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/notifications"
 )
 
 // Handles a testkit backend session.
@@ -1356,6 +1356,7 @@ func (b *backend) handleRequest(req map[string]any) {
 				"Feature:API:Summary:GqlStatusObjects",
 				"Feature:API:Type.Spatial",
 				"Feature:API:Type.Temporal",
+				"Feature:API:Type.Vector",
 				"Feature:Auth:Bearer",
 				"Feature:Auth:Custom",
 				"Feature:Auth:Kerberos",
