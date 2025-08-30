@@ -168,54 +168,54 @@ func cypherToNative(c any) (any, error) {
 
 		switch dtype {
 		case "i8":
-			vec := make(dbtype.Vector[int8], len(bytes))
-			for i, b := range bytes {
-				vec[i] = int8(b)
+			vec := make(dbtype.Vector[int8], 0, len(bytes))
+			for _, b := range bytes {
+				vec = append(vec, int8(b))
 			}
 			return vec, nil
 		case "i16":
 			if len(bytes)%2 != 0 {
 				return nil, fmt.Errorf("invalid data length for i16: %d", len(bytes))
 			}
-			vec := make(dbtype.Vector[int16], len(bytes)/2)
+			vec := make(dbtype.Vector[int16], 0, len(bytes)/2)
 			for i := 0; i < len(bytes); i += 2 {
-				vec[i/2] = int16(binary.BigEndian.Uint16(bytes[i : i+2]))
+				vec = append(vec, int16(binary.BigEndian.Uint16(bytes[i:i+2])))
 			}
 			return vec, nil
 		case "i32":
 			if len(bytes)%4 != 0 {
 				return nil, fmt.Errorf("invalid data length for i32: %d", len(bytes))
 			}
-			vec := make(dbtype.Vector[int32], len(bytes)/4)
+			vec := make(dbtype.Vector[int32], 0, len(bytes)/4)
 			for i := 0; i < len(bytes); i += 4 {
-				vec[i/4] = int32(binary.BigEndian.Uint32(bytes[i : i+4]))
+				vec = append(vec, int32(binary.BigEndian.Uint32(bytes[i:i+4])))
 			}
 			return vec, nil
 		case "i64":
 			if len(bytes)%8 != 0 {
 				return nil, fmt.Errorf("invalid data length for i64: %d", len(bytes))
 			}
-			vec := make(dbtype.Vector[int64], len(bytes)/8)
+			vec := make(dbtype.Vector[int64], 0, len(bytes)/8)
 			for i := 0; i < len(bytes); i += 8 {
-				vec[i/8] = int64(binary.BigEndian.Uint64(bytes[i : i+8]))
+				vec = append(vec, int64(binary.BigEndian.Uint64(bytes[i:i+8])))
 			}
 			return vec, nil
 		case "f32":
 			if len(bytes)%4 != 0 {
 				return nil, fmt.Errorf("invalid data length for f32: %d", len(bytes))
 			}
-			vec := make(dbtype.Vector[float32], len(bytes)/4)
+			vec := make(dbtype.Vector[float32], 0, len(bytes)/4)
 			for i := 0; i < len(bytes); i += 4 {
-				vec[i/4] = math.Float32frombits(binary.BigEndian.Uint32(bytes[i : i+4]))
+				vec = append(vec, math.Float32frombits(binary.BigEndian.Uint32(bytes[i:i+4])))
 			}
 			return vec, nil
 		case "f64":
 			if len(bytes)%8 != 0 {
 				return nil, fmt.Errorf("invalid data length for f64: %d", len(bytes))
 			}
-			vec := make(dbtype.Vector[float64], len(bytes)/8)
+			vec := make(dbtype.Vector[float64], 0, len(bytes)/8)
 			for i := 0; i < len(bytes); i += 8 {
-				vec[i/8] = math.Float64frombits(binary.BigEndian.Uint64(bytes[i : i+8]))
+				vec = append(vec, math.Float64frombits(binary.BigEndian.Uint64(bytes[i:i+8])))
 			}
 			return vec, nil
 		default:

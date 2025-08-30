@@ -273,9 +273,9 @@ func (p *Packer) VectorFloat64(vec []float64) {
 	}
 
 	totalSize := len(vec) * 8
-	values := make([]byte, totalSize)
-	for i, v := range vec {
-		binary.BigEndian.PutUint64(values[i*8:], math.Float64bits(v))
+	values := make([]byte, 0, totalSize)
+	for _, v := range vec {
+		values = binary.BigEndian.AppendUint64(values, math.Float64bits(v))
 	}
 	p.Bytes(values)
 }
@@ -290,9 +290,9 @@ func (p *Packer) VectorFloat32(vec []float32) {
 	}
 
 	totalSize := len(vec) * 4
-	values := make([]byte, totalSize)
-	for i, v := range vec {
-		binary.BigEndian.PutUint32(values[i*4:], math.Float32bits(v))
+	values := make([]byte, 0, totalSize)
+	for _, v := range vec {
+		values = binary.BigEndian.AppendUint32(values, math.Float32bits(v))
 	}
 	p.Bytes(values)
 }
@@ -307,9 +307,9 @@ func (p *Packer) VectorInt8(vec []int8) {
 	}
 
 	totalSize := len(vec)
-	values := make([]byte, totalSize)
-	for i, v := range vec {
-		values[i] = byte(v)
+	values := make([]byte, 0, totalSize)
+	for _, v := range vec {
+		values = append(values, byte(v))
 	}
 	p.Bytes(values)
 }
@@ -324,9 +324,9 @@ func (p *Packer) VectorInt16(vec []int16) {
 	}
 
 	totalSize := len(vec) * 2
-	values := make([]byte, totalSize)
-	for i, v := range vec {
-		binary.BigEndian.PutUint16(values[i*2:], uint16(v))
+	values := make([]byte, 0, totalSize)
+	for _, v := range vec {
+		values = binary.BigEndian.AppendUint16(values, uint16(v))
 	}
 	p.Bytes(values)
 }
@@ -341,9 +341,9 @@ func (p *Packer) VectorInt32(vec []int32) {
 	}
 
 	totalSize := len(vec) * 4
-	values := make([]byte, totalSize)
-	for i, v := range vec {
-		binary.BigEndian.PutUint32(values[i*4:], uint32(v))
+	values := make([]byte, 0, totalSize)
+	for _, v := range vec {
+		values = binary.BigEndian.AppendUint32(values, uint32(v))
 	}
 	p.Bytes(values)
 }
@@ -358,9 +358,9 @@ func (p *Packer) VectorInt64(vec []int64) {
 	}
 
 	totalSize := len(vec) * 8
-	values := make([]byte, totalSize)
-	for i, v := range vec {
-		binary.BigEndian.PutUint64(values[i*8:], uint64(v))
+	values := make([]byte, 0, totalSize)
+	for _, v := range vec {
+		values = binary.BigEndian.AppendUint64(values, uint64(v))
 	}
 	p.Bytes(values)
 }

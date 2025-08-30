@@ -235,39 +235,39 @@ func vectorToCypher[T dbtype.VectorElement](dtype string, vec dbtype.Vector[T]) 
 	var hexData string
 	switch v := any(vec).(type) {
 	case dbtype.Vector[int8]:
-		bytes := make([]byte, len(v))
-		for i, val := range v {
-			bytes[i] = byte(val)
+		bytes := make([]byte, 0, len(v))
+		for _, val := range v {
+			bytes = append(bytes, byte(val))
 		}
 		hexData = addSpacesToHex(fmt.Sprintf("%x", bytes))
 	case dbtype.Vector[int16]:
-		bytes := make([]byte, len(v)*2)
-		for i, val := range v {
-			binary.BigEndian.PutUint16(bytes[i*2:], uint16(val))
+		bytes := make([]byte, 0, len(v)*2)
+		for _, val := range v {
+			bytes = binary.BigEndian.AppendUint16(bytes, uint16(val))
 		}
 		hexData = addSpacesToHex(fmt.Sprintf("%x", bytes))
 	case dbtype.Vector[int32]:
-		bytes := make([]byte, len(v)*4)
-		for i, val := range v {
-			binary.BigEndian.PutUint32(bytes[i*4:], uint32(val))
+		bytes := make([]byte, 0, len(v)*4)
+		for _, val := range v {
+			bytes = binary.BigEndian.AppendUint32(bytes, uint32(val))
 		}
 		hexData = addSpacesToHex(fmt.Sprintf("%x", bytes))
 	case dbtype.Vector[int64]:
-		bytes := make([]byte, len(v)*8)
-		for i, val := range v {
-			binary.BigEndian.PutUint64(bytes[i*8:], uint64(val))
+		bytes := make([]byte, 0, len(v)*8)
+		for _, val := range v {
+			bytes = binary.BigEndian.AppendUint64(bytes, uint64(val))
 		}
 		hexData = addSpacesToHex(fmt.Sprintf("%x", bytes))
 	case dbtype.Vector[float32]:
-		bytes := make([]byte, len(v)*4)
-		for i, val := range v {
-			binary.BigEndian.PutUint32(bytes[i*4:], math.Float32bits(val))
+		bytes := make([]byte, 0, len(v)*4)
+		for _, val := range v {
+			bytes = binary.BigEndian.AppendUint32(bytes, math.Float32bits(val))
 		}
 		hexData = addSpacesToHex(fmt.Sprintf("%x", bytes))
 	case dbtype.Vector[float64]:
-		bytes := make([]byte, len(v)*8)
-		for i, val := range v {
-			binary.BigEndian.PutUint64(bytes[i*8:], math.Float64bits(val))
+		bytes := make([]byte, 0, len(v)*8)
+		for _, val := range v {
+			bytes = binary.BigEndian.AppendUint64(bytes, math.Float64bits(val))
 		}
 		hexData = addSpacesToHex(fmt.Sprintf("%x", bytes))
 	default:

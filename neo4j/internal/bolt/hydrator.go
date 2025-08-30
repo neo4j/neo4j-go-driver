@@ -1122,9 +1122,9 @@ func (h *hydrator) vector(n uint32) any {
 			})
 			return nil
 		}
-		result := make(dbtype.Vector[float64], len(values)/8)
-		for i := range result {
-			result[i] = math.Float64frombits(binary.BigEndian.Uint64(values[i*8 : (i+1)*8]))
+		result := make(dbtype.Vector[float64], 0, len(values)/8)
+		for i := range len(values) / 8 {
+			result = append(result, math.Float64frombits(binary.BigEndian.Uint64(values[i*8:(i+1)*8])))
 		}
 		return result
 	case 0xc6: // FLOAT_32
@@ -1135,15 +1135,15 @@ func (h *hydrator) vector(n uint32) any {
 			})
 			return nil
 		}
-		result := make(dbtype.Vector[float32], len(values)/4)
-		for i := range result {
-			result[i] = math.Float32frombits(binary.BigEndian.Uint32(values[i*4 : (i+1)*4]))
+		result := make(dbtype.Vector[float32], 0, len(values)/4)
+		for i := range len(values) / 4 {
+			result = append(result, math.Float32frombits(binary.BigEndian.Uint32(values[i*4:(i+1)*4])))
 		}
 		return result
 	case 0xc8: // INT_8
-		result := make(dbtype.Vector[int8], len(values))
-		for i := range result {
-			result[i] = int8(values[i])
+		result := make(dbtype.Vector[int8], 0, len(values))
+		for i := range len(values) {
+			result = append(result, int8(values[i]))
 		}
 		return result
 	case 0xc9: // INT_16
@@ -1154,9 +1154,9 @@ func (h *hydrator) vector(n uint32) any {
 			})
 			return nil
 		}
-		result := make(dbtype.Vector[int16], len(values)/2)
-		for i := range result {
-			result[i] = int16(binary.BigEndian.Uint16(values[i*2 : (i+1)*2]))
+		result := make(dbtype.Vector[int16], 0, len(values)/2)
+		for i := range len(values) / 2 {
+			result = append(result, int16(binary.BigEndian.Uint16(values[i*2:(i+1)*2])))
 		}
 		return result
 	case 0xca: // INT_32
@@ -1167,9 +1167,9 @@ func (h *hydrator) vector(n uint32) any {
 			})
 			return nil
 		}
-		result := make(dbtype.Vector[int32], len(values)/4)
-		for i := range result {
-			result[i] = int32(binary.BigEndian.Uint32(values[i*4 : (i+1)*4]))
+		result := make(dbtype.Vector[int32], 0, len(values)/4)
+		for i := range len(values) / 4 {
+			result = append(result, int32(binary.BigEndian.Uint32(values[i*4:(i+1)*4])))
 		}
 		return result
 	case 0xcb: // INT_64
@@ -1180,9 +1180,9 @@ func (h *hydrator) vector(n uint32) any {
 			})
 			return nil
 		}
-		result := make(dbtype.Vector[int64], len(values)/8)
-		for i := range result {
-			result[i] = int64(binary.BigEndian.Uint64(values[i*8 : (i+1)*8]))
+		result := make(dbtype.Vector[int64], 0, len(values)/8)
+		for i := range len(values) / 8 {
+			result = append(result, int64(binary.BigEndian.Uint64(values[i*8:(i+1)*8])))
 		}
 		return result
 	default:
