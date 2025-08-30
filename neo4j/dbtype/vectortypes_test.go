@@ -20,6 +20,8 @@ package dbtype
 import (
 	"reflect"
 	"testing"
+
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/testutil"
 )
 
 func TestVectorAPI(t *testing.T) {
@@ -49,50 +51,37 @@ func TestVectorAPI(t *testing.T) {
 	// Test vector operations
 	t.Run("length", func(t *testing.T) {
 		t.Parallel()
-		if len(float64Vec) != 5 {
-			t.Errorf("Expected float64Vec to have length 5, got %d", len(float64Vec))
-		}
-		if len(float32Vec) != 5 {
-			t.Errorf("Expected float32Vec to have length 5, got %d", len(float32Vec))
-		}
+		testutil.AssertLen(t, float64Vec, 5)
+		testutil.AssertLen(t, float32Vec, 5)
 	})
 
 	t.Run("access", func(t *testing.T) {
 		t.Parallel()
-		if float64Vec[0] != 1.0 {
-			t.Errorf("Expected float64Vec[0] to be 1.0, got %f", float64Vec[0])
-		}
-		if float32Vec[1] != 0.2 {
-			t.Errorf("Expected float32Vec[1] to be 0.2, got %f", float32Vec[1])
-		}
+		accessVec64 := Vector[float64]{1.0, 2.0, 3.0, 4.0, 5.0}
+		accessVec32 := Vector[float32]{0.1, 0.2, 0.3, 0.4, 0.5}
+		testutil.AssertDeepEquals(t, accessVec64[0], 1.0)
+		testutil.AssertDeepEquals(t, accessVec32[1], float32(0.2))
 	})
 
 	t.Run("modification", func(t *testing.T) {
 		t.Parallel()
-		float64Vec[0] = 10.0
-		if float64Vec[0] != 10.0 {
-			t.Errorf("Expected float64Vec[0] to be 10.0 after modification, got %f", float64Vec[0])
-		}
+		modVec := Vector[float64]{1.0, 2.0, 3.0, 4.0, 5.0}
+		modVec[0] = 10.0
+		testutil.AssertDeepEquals(t, modVec[0], 10.0)
 	})
 
 	t.Run("make", func(t *testing.T) {
 		t.Parallel()
 		largeVec := make(Vector[float64], 100)
-		if len(largeVec) != 100 {
-			t.Errorf("Expected largeVec to have length 100, got %d", len(largeVec))
-		}
+		testutil.AssertLen(t, largeVec, 100)
 	})
 
 	t.Run("append", func(t *testing.T) {
 		t.Parallel()
 		vec := Vector[float64]{1.0, 2.0}
 		vec = append(vec, 3.0)
-		if len(vec) != 3 {
-			t.Errorf("Expected vec to have length 3 after append, got %d", len(vec))
-		}
-		if vec[2] != 3.0 {
-			t.Errorf("Expected vec[2] to be 3.0, got %f", vec[2])
-		}
+		testutil.AssertLen(t, vec, 3)
+		testutil.AssertDeepEquals(t, vec[2], 3.0)
 	})
 
 	t.Run("maps", func(t *testing.T) {
@@ -102,25 +91,19 @@ func TestVectorAPI(t *testing.T) {
 			"float32_vec": float32Vec,
 		}
 
-		if vec, ok := params["float64_vec"].(Vector[float64]); !ok {
-			t.Errorf("Expected float64_vec to be of type Vector[float64]")
-		} else if len(vec) != 5 {
-			t.Errorf("Expected float64_vec to have length 5, got %d", len(vec))
-		}
+		vec64, ok := params["float64_vec"].(Vector[float64])
+		testutil.AssertTrue(t, ok)
+		testutil.AssertLen(t, vec64, 5)
 
-		if vec, ok := params["float32_vec"].(Vector[float32]); !ok {
-			t.Errorf("Expected float32_vec to be of type Vector[float32]")
-		} else if len(vec) != 5 {
-			t.Errorf("Expected float32_vec to have length 5, got %d", len(vec))
-		}
+		vec32, ok := params["float32_vec"].(Vector[float32])
+		testutil.AssertTrue(t, ok)
+		testutil.AssertLen(t, vec32, 5)
 	})
 
 	t.Run("slices", func(t *testing.T) {
 		t.Parallel()
 		vecSlice := []Vector[float64]{float64Vec, {6.0, 7.0, 8.0}}
-		if len(vecSlice) != 2 {
-			t.Errorf("Expected vecSlice to have length 2, got %d", len(vecSlice))
-		}
+		testutil.AssertLen(t, vecSlice, 2)
 	})
 
 	t.Run("comparison", func(t *testing.T) {
@@ -129,13 +112,8 @@ func TestVectorAPI(t *testing.T) {
 		vec2 := Vector[float64]{1.0, 2.0, 3.0}
 		vec3 := Vector[float64]{1.0, 2.0, 4.0}
 
-		if !reflect.DeepEqual(vec1, vec2) {
-			t.Errorf("Expected vec1 and vec2 to be equal")
-		}
-
-		if reflect.DeepEqual(vec1, vec3) {
-			t.Errorf("Expected vec1 and vec3 to be different")
-		}
+		testutil.AssertDeepEquals(t, vec1, vec2)
+		testutil.AssertNotDeepEquals(t, vec1, vec3)
 	})
 }
 
@@ -161,15 +139,11 @@ func TestVectorElementInterface(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 			// Test that the vector can be created (compilation test)
-			if tc.vec == nil {
-				t.Errorf("Vector creation failed for %s", tc.name)
-			}
+			testutil.AssertNotNil(t, tc.vec)
 
 			// Test length using reflection
 			vecValue := reflect.ValueOf(tc.vec)
-			if vecValue.Len() != tc.len {
-				t.Errorf("Expected %s vector to have length %d, got %d", tc.name, tc.len, vecValue.Len())
-			}
+			testutil.AssertIntEqual(t, vecValue.Len(), tc.len)
 		})
 	}
 }
@@ -179,25 +153,17 @@ func TestVectorEmptyAndNil(t *testing.T) {
 	t.Run("empty", func(t *testing.T) {
 		t.Parallel()
 		emptyVec := Vector[float64]{}
-		if len(emptyVec) != 0 {
-			t.Errorf("Expected emptyVec to have length 0, got %d", len(emptyVec))
-		}
+		testutil.AssertLen(t, emptyVec, 0)
 	})
 
 	t.Run("nil", func(t *testing.T) {
 		t.Parallel()
 		var nilVec Vector[float64]
-		if len(nilVec) != 0 {
-			t.Errorf("Expected nilVec to have length 0, got %d", len(nilVec))
-		}
+		testutil.AssertLen(t, nilVec, 0)
 
 		// Test that we can append to nil vectors
 		nilVec = append(nilVec, 1.0)
-		if len(nilVec) != 1 {
-			t.Errorf("Expected nilVec to have length 1 after append, got %d", len(nilVec))
-		}
-		if nilVec[0] != 1.0 {
-			t.Errorf("Expected nilVec[0] to be 1.0, got %f", nilVec[0])
-		}
+		testutil.AssertLen(t, nilVec, 1)
+		testutil.AssertDeepEquals(t, nilVec[0], 1.0)
 	})
 }

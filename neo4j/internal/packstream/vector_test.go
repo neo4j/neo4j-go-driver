@@ -21,6 +21,8 @@ import (
 	"encoding/hex"
 	"reflect"
 	"testing"
+
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/testutil"
 )
 
 func TestVectorPacking(t *testing.T) {
@@ -133,9 +135,7 @@ func TestVectorPacking(t *testing.T) {
 			p.Begin([]byte{})
 			tt.packFunc(p)
 			result, err := p.End()
-			if err != nil {
-				t.Fatalf("Packing failed: %v", err)
-			}
+			testutil.AssertNoError(t, err)
 
 			if !reflect.DeepEqual(result, tt.expected) {
 				t.Errorf("Packed result differs from expected")
@@ -252,9 +252,7 @@ func TestVectorUnpacking(t *testing.T) {
 			u.Next() // Move to the struct
 
 			result := tt.unpackFunc(u)
-			if u.Err != nil {
-				t.Fatalf("Unpacking failed: %v", u.Err)
-			}
+			testutil.AssertNoError(t, u.Err)
 
 			if !reflect.DeepEqual(result, tt.expected) {
 				t.Errorf("Unpacked result differs from expected")
@@ -343,18 +341,14 @@ func TestVectorRoundTrip(t *testing.T) {
 			p.Begin([]byte{})
 			tt.packFunc(p)
 			packed, err := p.End()
-			if err != nil {
-				t.Fatalf("Packing failed: %v", err)
-			}
+			testutil.AssertNoError(t, err)
 
 			// Unpack
 			u := &Unpacker{}
 			u.Reset(packed)
 			u.Next() // Move to the struct
 			result := tt.unpackFunc(u)
-			if u.Err != nil {
-				t.Fatalf("Unpacking failed: %v", u.Err)
-			}
+			testutil.AssertNoError(t, u.Err)
 
 			// Compare
 			if !reflect.DeepEqual(result, tt.input) {
