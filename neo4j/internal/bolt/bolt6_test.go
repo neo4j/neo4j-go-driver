@@ -317,38 +317,6 @@ func TestBolt6(outer *testing.T) {
 		bolt.Close(context.Background())
 	})
 
-	outer.Run("Routing in hello in 5.1+", func(t *testing.T) {
-		routingContext := map[string]string{"some": "thing"}
-		conn, srv, cleanup := setupBolt6Pipe(t)
-		defer cleanup()
-		go func() {
-			srv.acceptBolt6ManifestOnly()
-			hmap := srv.waitForHelloWithoutAuthToken()
-			helloRoutingContext := hmap["routing"].(map[string]any)
-			if len(helloRoutingContext) != len(routingContext) {
-				panic("Routing contexts differ")
-			}
-			srv.acceptHello()
-			srv.waitForLogon()
-			srv.acceptLogon()
-		}()
-		bolt, err := Connect(
-			context.Background(),
-			"serverName",
-			conn,
-			auth,
-			"007",
-			routingContext,
-			noopErrorListener{},
-			logger,
-			nil,
-			idb.NotificationConfig{},
-			DefaultReadBufferSize,
-		)
-		AssertNoError(t, err)
-		bolt.Close(context.Background())
-	})
-
 	outer.Run("No routing in hello", func(t *testing.T) {
 		conn, srv, cleanup := setupBolt6Pipe(t)
 		defer cleanup()
@@ -380,84 +348,7 @@ func TestBolt6(outer *testing.T) {
 		bolt.Close(context.Background())
 	})
 
-	outer.Run("No routing in hello 5.1+", func(t *testing.T) {
-		conn, srv, cleanup := setupBolt6Pipe(t)
-		defer cleanup()
-		go func() {
-			srv.acceptBolt6ManifestOnly()
-			hmap := srv.waitForHelloWithoutAuthToken()
-			_, exists := hmap["routing"].(map[string]any)
-			if exists {
-				panic("Should be no routing entry")
-			}
-			srv.acceptHello()
-			srv.waitForLogon()
-			srv.acceptLogon()
-		}()
-		bolt, err := Connect(
-			context.Background(),
-			"serverName",
-			conn,
-			auth,
-			"007",
-			nil,
-			noopErrorListener{},
-			logger,
-			nil,
-			idb.NotificationConfig{},
-			DefaultReadBufferSize,
-		)
-		AssertNoError(t, err)
-		bolt.Close(context.Background())
-	})
-
 	outer.Run("Failed authentication", func(t *testing.T) {
-		conn, srv, cleanup := setupBolt6Pipe(t)
-		defer cleanup()
-		defer conn.Close()
-		go func() {
-			srv.waitForHandshake()
-			srv.acceptManifestVersion()
-			offerings := []protocolVersion{
-				{major: 6, minor: 0, back: 0},
-				{major: 5, minor: 8, back: 8},
-				{major: 4, minor: 4, back: 2},
-			}
-			srv.sendManifestOfferings(offerings)
-			major, minor := srv.waitForManifestConfirmation()
-			if major != 6 || minor != 0 {
-				panic(fmt.Sprintf("Expected client to choose Bolt 6.0, but got %d.%d", major, minor))
-			}
-			srv.waitForHelloWithoutAuthToken()
-			srv.acceptHello()
-			srv.waitForLogon()
-			srv.rejectLogonWithoutAuthToken()
-		}()
-		bolt, err := Connect(
-			context.Background(),
-			"serverName",
-			conn,
-			auth,
-			"007",
-			nil,
-			noopErrorListener{},
-			logger,
-			nil,
-			idb.NotificationConfig{},
-			DefaultReadBufferSize,
-		)
-		AssertNil(t, bolt)
-		AssertError(t, err)
-		dbErr, isDbErr := err.(*db.Neo4jError)
-		if !isDbErr {
-			panic(err)
-		}
-		if !dbErr.IsAuthenticationFailed() {
-			t.Errorf("Should be authentication error: %s", dbErr)
-		}
-	})
-
-	outer.Run("Failed authentication in 5.1+", func(t *testing.T) {
 		conn, srv, cleanup := setupBolt6Pipe(t)
 		defer cleanup()
 		defer conn.Close()
