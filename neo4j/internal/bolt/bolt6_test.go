@@ -151,40 +151,79 @@ func TestBolt6(outer *testing.T) {
 		return bolt, cleanup
 	}
 
-	outer.Run("Connect success", func(t *testing.T) {
-		bolt, cleanup := connectToServer(t, func(srv *bolt6server) {
-			srv.waitForHandshake()
-			// For Bolt 6, we expect manifest negotiation, so we don't check for version 6 in handshake
-			srv.acceptManifestVersion()
-			// Send protocol offerings including Bolt 6
-			offerings := []protocolVersion{
-				{major: 6, minor: 0, back: 0},
-				{major: 5, minor: 8, back: 8},
-				{major: 4, minor: 4, back: 2},
-			}
-			srv.sendManifestOfferings(offerings)
-			// Wait for client's choice
-			major, minor := srv.waitForManifestConfirmation()
-			if major != 6 || minor != 0 {
-				panic(fmt.Sprintf("Expected client to choose Bolt 6.0, but got %d.%d", major, minor))
-			}
-			// 5.3+ hello must contain mandatory bolt_agent dictionary and mandatory product field
-			hmap := srv.waitForHelloWithoutAuthToken()
-			boltAgent, exists := hmap["bolt_agent"]
-			AssertTrue(t, exists)
-			AssertStringContain(t, boltAgent.(map[string]any)["product"].(string), "neo4j-go/")
-			srv.acceptHello()
+	// Test protocol version negotiation with different server offering orders
+	outer.Run("Connect success with protocol version negotiation", func(t *testing.T) {
+		testCases := []struct {
+			name        string
+			offerings   []protocolVersion
+			description string
+		}{
+			{
+				name: "Bolt 6.0 first",
+				offerings: []protocolVersion{
+					{major: 6, minor: 0, back: 0},
+					{major: 5, minor: 8, back: 8},
+					{major: 4, minor: 4, back: 2},
+				},
+				description: "Standard case with Bolt 6.0 offered first",
+			},
+			{
+				name: "Bolt 6.0 in middle position",
+				offerings: []protocolVersion{
+					{major: 5, minor: 8, back: 8},
+					{major: 6, minor: 0, back: 0},
+					{major: 4, minor: 4, back: 2},
+				},
+				description: "Bolt 6.0 offered in middle position",
+			},
+			{
+				name: "Bolt 6.0 in last position",
+				offerings: []protocolVersion{
+					{major: 5, minor: 8, back: 8},
+					{major: 4, minor: 4, back: 2},
+					{major: 6, minor: 0, back: 0},
+				},
+				description: "Bolt 6.0 offered in last position",
+			},
+			{
+				name: "newer version offered but not selected",
+				offerings: []protocolVersion{
+					{major: 6, minor: 1, back: 0},
+					{major: 6, minor: 0, back: 0},
+					{major: 5, minor: 8, back: 8},
+					{major: 4, minor: 4, back: 2},
+				},
+				description: "Server offers newer version (6.1) but driver selects supported version (6.0)",
+			},
+		}
 
-			srv.waitForLogon()
-			srv.acceptLogon()
-		})
-		defer cleanup()
-		defer bolt.Close(context.Background())
+		for _, tc := range testCases {
+			t.Run(tc.name, func(t *testing.T) {
+				bolt, cleanup := connectToServer(t, func(srv *bolt6server) {
+					srv.waitForHandshake()
+					srv.acceptManifestVersion()
+					srv.sendManifestOfferings(tc.offerings)
+					// Wait for client's choice - should always pick Bolt 6.0
+					major, minor := srv.waitForManifestConfirmation()
+					if major != 6 || minor != 0 {
+						panic(fmt.Sprintf("Expected client to choose Bolt 6.0, but got %d.%d", major, minor))
+					}
+					hmap := srv.waitForHelloWithoutAuthToken()
+					boltAgent, exists := hmap["bolt_agent"]
+					AssertTrue(t, exists)
+					AssertStringContain(t, boltAgent.(map[string]any)["product"].(string), "neo4j-go/")
+					srv.acceptHello()
+					srv.waitForLogon()
+					srv.acceptLogon()
+				})
+				defer cleanup()
+				defer bolt.Close(context.Background())
 
-		// Check Bolt properties
-		AssertStringEqual(t, bolt.ServerName(), "serverName")
-		AssertTrue(t, bolt.IsAlive())
-		AssertTrue(t, reflect.DeepEqual(bolt.queue.in.connReadTimeout, time.Duration(-1)))
+				AssertStringEqual(t, bolt.ServerName(), "serverName")
+				AssertTrue(t, bolt.IsAlive())
+				AssertTrue(t, reflect.DeepEqual(bolt.queue.in.connReadTimeout, time.Duration(-1)))
+			})
+		}
 	})
 
 	outer.Run("Connect success with timeout hint", func(t *testing.T) {
