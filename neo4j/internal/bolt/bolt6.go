@@ -858,26 +858,6 @@ func (b *bolt6) ReAuth(ctx context.Context, auth *idb.ReAuthToken) error {
 	return b.reAuth(ctx, auth)
 }
 
-func (b *bolt6) fallbackReAuth(ctx context.Context, auth *idb.ReAuthToken) error {
-	if err := checkReAuth(auth, b); err != nil {
-		return err
-	}
-	if b.resetAuth {
-		b.log.Infof(log.Bolt6, b.logId, "Closing connection because auth token expired (informed by other connection)")
-		b.Close(ctx)
-		return nil
-	}
-	token, err := auth.Manager.GetAuthToken(ctx)
-	if err != nil {
-		return err
-	}
-	if !reflect.DeepEqual(b.auth, token.Tokens) {
-		b.log.Infof(log.Bolt6, b.logId, "Closing connection because auth token expired (informed by auth manager)")
-		b.Close(ctx)
-	}
-	return nil
-}
-
 func (b *bolt6) reAuth(ctx context.Context, auth *idb.ReAuthToken) error {
 	token, err := auth.Manager.GetAuthToken(ctx)
 	if err != nil {
