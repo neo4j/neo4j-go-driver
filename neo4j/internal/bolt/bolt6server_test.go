@@ -393,20 +393,7 @@ func setupBolt6Pipe(t *testing.T) (net.Conn, *bolt6server, func()) {
 
 // acceptBolt6WithManifest handles the complete Bolt 6 manifest negotiation setup
 func (s *bolt6server) acceptBolt6WithManifest() {
-	s.waitForHandshake()
-	s.acceptManifestVersion()
-	// Send protocol offerings including Bolt 6
-	offerings := []protocolVersion{
-		{major: 6, minor: 0, back: 0},
-		{major: 5, minor: 8, back: 8},
-		{major: 4, minor: 4, back: 2},
-	}
-	s.sendManifestOfferings(offerings)
-	// Wait for client's choice
-	major, minor := s.waitForManifestConfirmation()
-	if major != 6 || minor != 0 {
-		panic(fmt.Sprintf("Expected client to choose Bolt 6.0, but got %d.%d", major, minor))
-	}
+	s.acceptBolt6ManifestOnly()
 	// For Bolt 6, we expect a hello message after manifest negotiation
 	s.waitForHelloWithoutAuthToken()
 	s.acceptHello()
@@ -416,20 +403,7 @@ func (s *bolt6server) acceptBolt6WithManifest() {
 
 // acceptBolt6WithManifestAndHints handles the complete Bolt 6 manifest negotiation setup with timeout hints
 func (s *bolt6server) acceptBolt6WithManifestAndHints(hints map[string]any) {
-	s.waitForHandshake()
-	s.acceptManifestVersion()
-	// Send protocol offerings including Bolt 6
-	offerings := []protocolVersion{
-		{major: 6, minor: 0, back: 0},
-		{major: 5, minor: 8, back: 8},
-		{major: 4, minor: 4, back: 2},
-	}
-	s.sendManifestOfferings(offerings)
-	// Wait for client's choice
-	major, minor := s.waitForManifestConfirmation()
-	if major != 6 || minor != 0 {
-		panic(fmt.Sprintf("Expected client to choose Bolt 6.0, but got %d.%d", major, minor))
-	}
+	s.acceptBolt6ManifestOnly()
 	// For Bolt 6, we expect a hello message after manifest negotiation
 	s.waitForHelloWithoutAuthToken()
 	s.acceptHelloWithHints(hints)
