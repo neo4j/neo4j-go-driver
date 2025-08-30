@@ -1579,18 +1579,7 @@ func TestBolt6(outer *testing.T) {
 				tcpConn, srv, cleanup := setupBolt6Pipe(t)
 				defer cleanup()
 				go func() {
-					srv.waitForHandshake()
-					srv.acceptManifestVersion()
-					offerings := []protocolVersion{
-						{major: 6, minor: 0, back: 0},
-						{major: 5, minor: 8, back: 8},
-						{major: 4, minor: 4, back: 2},
-					}
-					srv.sendManifestOfferings(offerings)
-					major, minor := srv.waitForManifestConfirmation()
-					if major != 6 || minor != 0 {
-						panic(fmt.Sprintf("Expected client to choose Bolt 6.0, but got %d.%d", major, minor))
-					}
+					srv.acceptBolt6ManifestOnly()
 					srv.waitForHelloWithoutAuthToken()
 					srv.acceptHello()
 					logon := srv.waitForLogon()
