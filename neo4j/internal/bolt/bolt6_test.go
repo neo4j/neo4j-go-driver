@@ -554,7 +554,7 @@ func TestBolt6(outer *testing.T) {
 								} else {
 									AssertMapDoesNotHaveKey(t, fields[fieldNum].(map[string]any), "notifications_minimum_severity")
 								}
-								// For Bolt 6, the key is 'notifications_disabled_classifications'
+								// For Bolt 5.5+ and Bolt 6, the key is 'notifications_disabled_classifications'
 								if test.ExpectDisCats {
 									AssertDeepEquals(t, fields[fieldNum].(map[string]any)["notifications_disabled_classifications"], test.ExpectedDisCats)
 								} else {
