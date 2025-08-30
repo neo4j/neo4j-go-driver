@@ -519,30 +519,28 @@ func TestBolt6(outer *testing.T) {
 		for _, test := range testCases {
 			inner.Run(fmt.Sprintf("%s for %s", test.description, test.Method), func(t *testing.T) {
 				bolt, cleanup := connectToServer(t, func(srv *bolt6server) {
-					go func() {
-						srv.acceptBolt6WithManifest()
-						fieldAssertion := func(fieldNum int) func(fields []any) {
-							return func(fields []any) {
-								if test.ExpectedMinSev != nil {
-									AssertStringEqual(t, fields[fieldNum].(map[string]any)["notifications_minimum_severity"].(string), *test.ExpectedMinSev)
-								} else {
-									AssertMapDoesNotHaveKey(t, fields[fieldNum].(map[string]any), "notifications_minimum_severity")
-								}
-								// For Bolt 5.5+ and Bolt 6, the key is 'notifications_disabled_classifications'
-								if test.ExpectDisCats {
-									AssertDeepEquals(t, fields[fieldNum].(map[string]any)["notifications_disabled_classifications"], test.ExpectedDisCats)
-								} else {
-									AssertMapDoesNotHaveKey(t, fields[fieldNum].(map[string]any), "notifications_disabled_classifications")
-								}
+					srv.acceptBolt6WithManifest()
+					fieldAssertion := func(fieldNum int) func(fields []any) {
+						return func(fields []any) {
+							if test.ExpectedMinSev != nil {
+								AssertStringEqual(t, fields[fieldNum].(map[string]any)["notifications_minimum_severity"].(string), *test.ExpectedMinSev)
+							} else {
+								AssertMapDoesNotHaveKey(t, fields[fieldNum].(map[string]any), "notifications_minimum_severity")
+							}
+							// For Bolt 5.5+ and Bolt 6, the key is 'notifications_disabled_classifications'
+							if test.ExpectDisCats {
+								AssertDeepEquals(t, fields[fieldNum].(map[string]any)["notifications_disabled_classifications"], test.ExpectedDisCats)
+							} else {
+								AssertMapDoesNotHaveKey(t, fields[fieldNum].(map[string]any), "notifications_disabled_classifications")
 							}
 						}
-						if test.Method == "run" {
-							srv.waitForRun(fieldAssertion(2))
-						} else {
-							srv.waitForTxBegin(fieldAssertion(0))
-						}
-						srv.sendFailureMsg("Neo.ClientError.Statement.SyntaxError", "Syntax error")
-					}()
+					}
+					if test.Method == "run" {
+						srv.waitForRun(fieldAssertion(2))
+					} else {
+						srv.waitForTxBegin(fieldAssertion(0))
+					}
+					srv.sendFailureMsg("Neo.ClientError.Statement.SyntaxError", "Syntax error")
 				})
 				defer cleanup()
 				defer bolt.Close(context.Background())
