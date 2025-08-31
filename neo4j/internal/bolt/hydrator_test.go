@@ -19,12 +19,13 @@ package bolt
 
 import (
 	"fmt"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/gql"
 	"math"
 	"reflect"
 	"runtime/debug"
 	"testing"
 	"time"
+
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/gql"
 
 	idb "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
 
@@ -858,6 +859,242 @@ func TestHydrator(outer *testing.T) {
 					Err:     fmt.Errorf("unknown time zone LA/Confidential"),
 				},
 			}},
+		},
+		{
+			name: "Vector Float64",
+			build: func() {
+				packer.StructHeader(byte(msgRecord), 1)
+				packer.ArrayHeader(1)
+				packer.StructHeader('V', 2)
+				packer.Bytes([]byte{0xc1}) // FLOAT_64 marker
+				packer.Bytes([]byte{
+					0x3f, 0xb9, 0x99, 0x99, 0x99, 0x99, 0x99, 0x9a,
+					0x3f, 0xc9, 0x99, 0x99, 0x99, 0x99, 0x99, 0x9a,
+				})
+			},
+			x: &db.Record{Values: []any{dbtype.Vector[float64]{0.1, 0.2}}},
+		},
+		{
+			name: "Vector Float32",
+			build: func() {
+				packer.StructHeader(byte(msgRecord), 1)
+				packer.ArrayHeader(1)
+				packer.StructHeader('V', 2)
+				packer.Bytes([]byte{0xc6}) // FLOAT_32 marker
+				packer.Bytes([]byte{
+					0x3d, 0xcc, 0xcc, 0xcd,
+					0x3e, 0x4c, 0xcc, 0xcd,
+				})
+			},
+			x: &db.Record{Values: []any{dbtype.Vector[float32]{0.1, 0.2}}},
+		},
+		{
+			name: "Vector Int8",
+			build: func() {
+				packer.StructHeader(byte(msgRecord), 1)
+				packer.ArrayHeader(1)
+				packer.StructHeader('V', 2)
+				packer.Bytes([]byte{0xc8}) // INT_8 marker
+				packer.Bytes([]byte{0x01, 0x02, 0x03})
+			},
+			x: &db.Record{Values: []any{dbtype.Vector[int8]{1, 2, 3}}},
+		},
+		{
+			name: "Vector Int16",
+			build: func() {
+				packer.StructHeader(byte(msgRecord), 1)
+				packer.ArrayHeader(1)
+				packer.StructHeader('V', 2)
+				packer.Bytes([]byte{0xc9}) // INT_16 marker
+				packer.Bytes([]byte{
+					0x00, 0x01,
+					0x00, 0x02,
+					0x00, 0x03,
+				})
+			},
+			x: &db.Record{Values: []any{dbtype.Vector[int16]{1, 2, 3}}},
+		},
+		{
+			name: "Vector Int32",
+			build: func() {
+				packer.StructHeader(byte(msgRecord), 1)
+				packer.ArrayHeader(1)
+				packer.StructHeader('V', 2)
+				packer.Bytes([]byte{0xca}) // INT_32 marker
+				packer.Bytes([]byte{
+					0x00, 0x00, 0x00, 0x01,
+					0x00, 0x00, 0x00, 0x02,
+					0x00, 0x00, 0x00, 0x03,
+				})
+			},
+			x: &db.Record{Values: []any{dbtype.Vector[int32]{1, 2, 3}}},
+		},
+		{
+			name: "Vector Int64",
+			build: func() {
+				packer.StructHeader(byte(msgRecord), 1)
+				packer.ArrayHeader(1)
+				packer.StructHeader('V', 2)
+				packer.Bytes([]byte{0xcb}) // INT_64 marker
+				packer.Bytes([]byte{
+					0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01,
+					0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02,
+					0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x03,
+				})
+			},
+			x: &db.Record{Values: []any{dbtype.Vector[int64]{1, 2, 3}}},
+		},
+		{
+			name: "Vector Empty Float64",
+			build: func() {
+				packer.StructHeader(byte(msgRecord), 1)
+				packer.ArrayHeader(1)
+				packer.StructHeader('V', 2)
+				packer.Bytes([]byte{0xc1}) // FLOAT_64 marker
+				packer.Bytes([]byte{})
+			},
+			x: &db.Record{Values: []any{dbtype.Vector[float64]{}}},
+		},
+		{
+			name: "Vector Invalid Type Marker",
+			build: func() {
+				packer.StructHeader(byte(msgRecord), 1)
+				packer.ArrayHeader(1)
+				packer.StructHeader('V', 2)
+				packer.Bytes([]byte{0xff}) // Invalid marker
+				packer.Bytes([]byte{0x01, 0x02, 0x03, 0x04})
+			},
+			err: &db.ProtocolError{
+				MessageType: "vector",
+				Err:         "Unknown vector type marker: 255",
+			},
+		},
+		{
+			name: "Vector Invalid Length Float64",
+			build: func() {
+				packer.StructHeader(byte(msgRecord), 1)
+				packer.ArrayHeader(1)
+				packer.StructHeader('V', 2)
+				packer.Bytes([]byte{0xc1})             // FLOAT_64 marker
+				packer.Bytes([]byte{0x01, 0x02, 0x03}) // Invalid length (not multiple of 8)
+			},
+			err: &db.ProtocolError{
+				MessageType: "vector",
+				Err:         "Vector values must be multiple of 8 bytes for float64",
+			},
+		},
+		{
+			name: "Vector Invalid Length Float32",
+			build: func() {
+				packer.StructHeader(byte(msgRecord), 1)
+				packer.ArrayHeader(1)
+				packer.StructHeader('V', 2)
+				packer.Bytes([]byte{0xc6})             // FLOAT_32 marker
+				packer.Bytes([]byte{0x01, 0x02, 0x03}) // Invalid length (not multiple of 4)
+			},
+			err: &db.ProtocolError{
+				MessageType: "vector",
+				Err:         "Vector values must be multiple of 4 bytes for float32",
+			},
+		},
+		{
+			name: "Vector Invalid Length Int16",
+			build: func() {
+				packer.StructHeader(byte(msgRecord), 1)
+				packer.ArrayHeader(1)
+				packer.StructHeader('V', 2)
+				packer.Bytes([]byte{0xc9})             // INT_16 marker
+				packer.Bytes([]byte{0x01, 0x02, 0x03}) // Invalid length (not multiple of 2)
+			},
+			err: &db.ProtocolError{
+				MessageType: "vector",
+				Err:         "Vector values must be multiple of 2 bytes for int16",
+			},
+		},
+		{
+			name: "Vector Invalid Length Int32",
+			build: func() {
+				packer.StructHeader(byte(msgRecord), 1)
+				packer.ArrayHeader(1)
+				packer.StructHeader('V', 2)
+				packer.Bytes([]byte{0xca})             // INT_32 marker
+				packer.Bytes([]byte{0x01, 0x02, 0x03}) // Invalid length (not multiple of 4)
+			},
+			err: &db.ProtocolError{
+				MessageType: "vector",
+				Err:         "Vector values must be multiple of 4 bytes for int32",
+			},
+		},
+		{
+			name: "Vector Invalid Length Int64",
+			build: func() {
+				packer.StructHeader(byte(msgRecord), 1)
+				packer.ArrayHeader(1)
+				packer.StructHeader('V', 2)
+				packer.Bytes([]byte{0xcb})             // INT_64 marker
+				packer.Bytes([]byte{0x01, 0x02, 0x03}) // Invalid length (not multiple of 8)
+			},
+			err: &db.ProtocolError{
+				MessageType: "vector",
+				Err:         "Vector values must be multiple of 8 bytes for int64",
+			},
+		},
+		{
+			name: "Vector Wrong Struct Length",
+			build: func() {
+				packer.StructHeader(byte(msgRecord), 1)
+				packer.ArrayHeader(1)
+				packer.StructHeader('V', 3) // Wrong length (should be 2)
+				packer.Bytes([]byte{0xc1})
+				packer.Bytes([]byte{0x01, 0x02, 0x03, 0x04})
+				packer.Int(42) // Extra field
+			},
+			err: &db.ProtocolError{
+				MessageType: "vector",
+				Err:         "Invalid length of struct, expected 2 but was 3",
+			},
+		},
+		{
+			name: "Vector Wrong Type Marker Length",
+			build: func() {
+				packer.StructHeader(byte(msgRecord), 1)
+				packer.ArrayHeader(1)
+				packer.StructHeader('V', 2)
+				packer.Bytes([]byte{0xc1, 0xc2}) // Wrong length (should be 1)
+				packer.Bytes([]byte{0x01, 0x02, 0x03, 0x04})
+			},
+			err: &db.ProtocolError{
+				MessageType: "vector",
+				Err:         "Vector type marker must be exactly 1 byte",
+			},
+		},
+		{
+			name: "Vector Wrong Type Marker Format",
+			build: func() {
+				packer.StructHeader(byte(msgRecord), 1)
+				packer.ArrayHeader(1)
+				packer.StructHeader('V', 2)
+				packer.String("not a byte array") // Wrong type
+				packer.Bytes([]byte{0x01, 0x02, 0x03, 0x04})
+			},
+			err: &db.ProtocolError{
+				MessageType: "vector",
+				Err:         "Expected byte array for vector type marker",
+			},
+		},
+		{
+			name: "Vector Wrong Values Format",
+			build: func() {
+				packer.StructHeader(byte(msgRecord), 1)
+				packer.ArrayHeader(1)
+				packer.StructHeader('V', 2)
+				packer.Bytes([]byte{0xc1})        // FLOAT_64 marker
+				packer.String("not a byte array") // Wrong type
+			},
+			err: &db.ProtocolError{
+				MessageType: "vector",
+				Err:         "Expected byte array for vector values",
+			},
 		},
 	}
 

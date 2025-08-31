@@ -26,6 +26,7 @@ import (
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/db"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/dbtype"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/packstream"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/testutil"
 )
 
 func TestDehydrateHydrate(ot *testing.T) {
@@ -144,4 +145,25 @@ func TestDehydrateHydrate(ot *testing.T) {
 		do := dehydrateAndHydrate(t, di).(dbtype.Duration)
 		assertDurationSame(t, di, do)
 	})
+
+	// Vector tests
+	vectorTestCases := []struct {
+		name string
+		data any
+	}{
+		{"Vector Float64", dbtype.Vector[float64]{0.1, 0.2, 0.3}},
+		{"Vector Float32", dbtype.Vector[float32]{0.1, 0.2, 0.3}},
+		{"Vector Int8", dbtype.Vector[int8]{1, 2, 3, 4, 5}},
+		{"Vector Int16", dbtype.Vector[int16]{10, 20, 30, 40, 50}},
+		{"Vector Int32", dbtype.Vector[int32]{100, 200, 300, 400, 500}},
+		{"Vector Int64", dbtype.Vector[int64]{1000, 2000, 3000, 4000, 5000}},
+		{"Vector Empty", dbtype.Vector[float64]{}},
+	}
+
+	for _, tc := range vectorTestCases {
+		ot.Run(tc.name, func(t *testing.T) {
+			vo := dehydrateAndHydrate(t, tc.data)
+			testutil.AssertDeepEquals(t, tc.data, vo)
+		})
+	}
 }
