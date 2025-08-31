@@ -21,12 +21,13 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/db"
-	. "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/testutil"
 	"net"
 	"reflect"
 	"sync"
 	"testing"
+
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/db"
+	. "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/testutil"
 )
 
 func TestMessageQueue(outer *testing.T) {
@@ -283,7 +284,7 @@ func TestMessageQueue(outer *testing.T) {
 					go func() {
 						err := queue.receive(ctx)
 
-						AssertErrorMessageContains(t, err, test.expectedErrorMsg)
+						AssertErrorMessageContains(t, err, "%s", test.expectedErrorMsg)
 						done <- struct{}{}
 					}()
 

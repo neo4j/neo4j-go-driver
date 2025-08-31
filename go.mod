@@ -1,3 +1,3 @@
 module github.com/neo4j/neo4j-go-driver/v5
 
-go 1.23
+go 1.24

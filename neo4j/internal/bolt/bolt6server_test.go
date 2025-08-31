@@ -83,23 +83,6 @@ func (s *bolt6server) sendIgnoredMsg() {
 }
 
 // Returns the first hello field
-func (s *bolt6server) waitForHello() map[string]any {
-	msg := s.receiveMsg()
-	s.assertStructType(msg, msgHello)
-	m := msg.fields[0].(map[string]any)
-	// Hello should contain some musts
-	_, exists := m["scheme"]
-	if !exists {
-		s.sendFailureMsg("?", "Missing scheme in hello")
-	}
-	_, exists = m["user_agent"]
-	if !exists {
-		s.sendFailureMsg("?", "Missing user_agent in hello")
-	}
-	return m
-}
-
-// Returns the first hello field
 func (s *bolt6server) waitForHelloWithoutAuthToken() map[string]any {
 	msg := s.receiveMsg()
 	s.assertStructType(msg, msgHello)
@@ -210,14 +193,6 @@ func (s *bolt6server) waitForRoute(assertRoute func(fields []any)) {
 	}
 }
 
-func (s *bolt6server) acceptVersion(major, minor byte) {
-	acceptedVer := []byte{0x00, 0x00, minor, major}
-	_, err := s.conn.Write(acceptedVer)
-	if err != nil {
-		panic(err)
-	}
-}
-
 // acceptManifestVersion responds with manifest marker to trigger manifest negotiation
 func (s *bolt6server) acceptManifestVersion() {
 	manifestMarker := []byte{0x00, 0x00, 0x01, 0xFF}
@@ -304,35 +279,6 @@ func (s *bolt6server) acceptHelloWithHints(hints map[string]any) {
 		"server":        "fake/4.5",
 		"hints":         hints,
 	})
-}
-
-func (s *bolt6server) rejectHelloUnauthorized() {
-	s.send(msgFailure, map[string]any{
-		"code":    "Neo.ClientError.Security.Unauthorized",
-		"message": "",
-	})
-}
-
-// Utility when something else but connect is to be tested
-func (s *bolt6server) accept(ver byte) {
-	s.waitForHandshake()
-	s.acceptVersion(ver, 0)
-	s.waitForHello()
-	s.acceptHello()
-}
-
-func (s *bolt6server) acceptWithMinor(major, minor byte) {
-	s.waitForHandshake()
-	s.acceptVersion(major, minor)
-	if minor >= 1 {
-		s.waitForHelloWithoutAuthToken()
-		s.acceptHello()
-		s.waitForLogon()
-		s.acceptLogon()
-	} else {
-		s.waitForHello()
-		s.acceptHello()
-	}
 }
 
 // Utility to wait and serve an auto commit query

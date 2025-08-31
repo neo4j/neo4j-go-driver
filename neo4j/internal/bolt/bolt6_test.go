@@ -1510,7 +1510,7 @@ func TestBolt6(outer *testing.T) {
 				_, err := bolt.Run(test.ctx, idb.Command{Cypher: "UNWIND [1,2] AS k RETURN k"}, idb.TxConfig{Mode: idb.ReadMode})
 
 				latch.Wait()
-				AssertErrorMessageContains(t, err, test.errorMatch)
+				AssertErrorMessageContains(t, err, "%s", test.errorMatch)
 			})
 		}
 	})
