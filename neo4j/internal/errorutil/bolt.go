@@ -45,6 +45,10 @@ func (crt *ConnectionReadTimeout) Error() string {
 		crt.Err)
 }
 
+func (crt *ConnectionReadTimeout) Unwrap() error {
+	return crt.Err
+}
+
 type ConnectionWriteTimeout struct {
 	UserContext context.Context
 	Err         error
@@ -58,6 +62,10 @@ func (cwt *ConnectionWriteTimeout) Error() string {
 	return fmt.Sprintf("Timeout while writing to connection [user-provided context deadline: %s]: %s", userDeadline, cwt.Err)
 }
 
+func (crt *ConnectionWriteTimeout) Unwrap() error {
+	return crt.Err
+}
+
 type ConnectionReadCanceled struct {
 	Err error
 }
@@ -66,12 +74,20 @@ func (crc *ConnectionReadCanceled) Error() string {
 	return fmt.Sprintf("Reading from connection has been canceled: %s", crc.Err)
 }
 
+func (crt *ConnectionReadCanceled) Unwrap() error {
+	return crt.Err
+}
+
 type ConnectionWriteCanceled struct {
 	Err error
 }
 
 func (cwc *ConnectionWriteCanceled) Error() string {
 	return fmt.Sprintf("Writing to connection has been canceled: %s", cwc.Err)
+}
+
+func (crt *ConnectionWriteCanceled) Unwrap() error {
+	return crt.Err
 }
 
 type timeout interface {

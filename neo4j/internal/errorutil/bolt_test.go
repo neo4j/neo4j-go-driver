@@ -19,10 +19,12 @@ package errorutil_test
 
 import (
 	"context"
+	"errors"
+	"testing"
+
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/db"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/errorutil"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/testutil"
-	"testing"
 )
 
 func TestIsFatalDuringDiscovery(outer *testing.T) {
@@ -135,6 +137,38 @@ func TestIsFatalDuringDiscovery(outer *testing.T) {
 	for _, testCase := range testCases {
 		outer.Run(testCase.description, func(t *testing.T) {
 			testutil.AssertBoolEqual(t, errorutil.IsFatalDuringDiscovery(testCase.err), testCase.isFatal)
+		})
+	}
+}
+
+func TestErrorSupportsUnwrap(outer *testing.T) {
+	type testCase struct {
+		description string
+		err         error
+	}
+
+	inner := errors.New("the inner error")
+
+	testCases := []testCase{
+		{
+			description: "ConnectionReadTimeout support Unwrap",
+			err:         &errorutil.ConnectionReadTimeout{Err: inner},
+		}, {
+			description: "ConnectionWriteTimeout support Unwrap",
+			err:         &errorutil.ConnectionWriteTimeout{Err: inner},
+		}, {
+			description: "ConnectionReadCanceled support Unwrap",
+			err:         &errorutil.ConnectionReadCanceled{Err: inner},
+		}, {
+			description: "ConnectionWriteCanceled support Unwrap",
+			err:         &errorutil.ConnectionWriteCanceled{Err: inner},
+		},
+	}
+
+	for _, testCase := range testCases {
+		outer.Run(testCase.description, func(t *testing.T) {
+
+			testutil.AssertBoolEqual(t, errors.Is(testCase.err, inner), true)
 		})
 	}
 }
