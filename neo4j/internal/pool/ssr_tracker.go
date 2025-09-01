@@ -24,27 +24,27 @@ import (
 )
 
 type ssrTracker struct {
-	ssrEnabledCount  atomic.Uint64
-	ssrDisabledCount atomic.Uint64
+	ssrEnabledCount  uint64
+	ssrDisabledCount uint64
 }
 
 func (s *ssrTracker) addConnection(c idb.Connection) {
 	if c.IsSsrEnabled() {
-		s.ssrEnabledCount.Add(1)
+		atomic.AddUint64(&s.ssrEnabledCount, 1)
 	} else {
-		s.ssrDisabledCount.Add(1)
+		atomic.AddUint64(&s.ssrDisabledCount, 1)
 	}
 }
 
 func (s *ssrTracker) removeConnection(c idb.Connection) {
 	if c.IsSsrEnabled() {
-		s.ssrEnabledCount.Add(^uint64(0))
+		atomic.AddUint64(&s.ssrEnabledCount, ^uint64(0))
 	} else {
-		s.ssrDisabledCount.Add(^uint64(0))
+		atomic.AddUint64(&s.ssrDisabledCount, ^uint64(0))
 	}
 }
 
 func (s *ssrTracker) ssrEnabled() bool {
-	return s.ssrEnabledCount.Load() > 0 &&
-		s.ssrDisabledCount.Load() == 0
+	return atomic.LoadUint64(&s.ssrEnabledCount) > 0 &&
+		atomic.LoadUint64(&s.ssrDisabledCount) == 0
 }
