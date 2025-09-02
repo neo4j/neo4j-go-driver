@@ -1,6 +1,6 @@
 module main
 
-go 1.23
+go 1.24
 
 replace github.com/neo4j/neo4j-go-driver/v6 => ../
 

@@ -284,7 +284,7 @@ func TestMessageQueue(outer *testing.T) {
 					go func() {
 						err := queue.receive(ctx)
 
-						AssertErrorMessageContains(t, err, test.expectedErrorMsg)
+						AssertErrorMessageContains(t, err, "%s", test.expectedErrorMsg)
 						done <- struct{}{}
 					}()
 

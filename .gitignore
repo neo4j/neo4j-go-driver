@@ -7,6 +7,9 @@
 # GoLang
 .idea/
 
+# VSCode
+*.code-workspace
+
 testkit/CAs/
 testkit-backend/testkit-backend
 test-stress/test-stress

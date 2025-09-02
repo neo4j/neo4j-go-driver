@@ -25,12 +25,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/neo4j/neo4j-go-driver/v6/neo4j/db"
 	iauth "github.com/neo4j/neo4j-go-driver/v6/neo4j/internal/auth"
 	idb "github.com/neo4j/neo4j-go-driver/v6/neo4j/internal/db"
-	"github.com/neo4j/neo4j-go-driver/v6/neo4j/notifications"
-
-	"github.com/neo4j/neo4j-go-driver/v6/neo4j/db"
 	. "github.com/neo4j/neo4j-go-driver/v6/neo4j/internal/testutil"
+	"github.com/neo4j/neo4j-go-driver/v6/neo4j/notifications"
 )
 
 func TestBolt3(outer *testing.T) {
@@ -934,7 +933,7 @@ func TestBolt3(outer *testing.T) {
 				_, err := bolt.Run(test.ctx, idb.Command{Cypher: "UNWIND [1,2] AS k RETURN k"}, idb.TxConfig{Mode: idb.ReadMode})
 
 				latch.Wait()
-				AssertErrorMessageContains(t, err, test.errorMatch)
+				AssertErrorMessageContains(t, err, "%s", test.errorMatch)
 			})
 		}
 	})

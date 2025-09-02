@@ -71,7 +71,7 @@ func (n *NotificationConfig) ToMeta(meta map[string]any, version db.ProtocolVers
 	}
 
 	disabledKey := "notifications_disabled_categories"
-	if version.Minor >= 5 {
+	if version.Major >= 6 || (version.Major == 5 && version.Minor >= 5) {
 		disabledKey = "notifications_disabled_classifications"
 	}
 	if n.DisCats.DisablesNone() || n.DisClas.DisablesNone() {

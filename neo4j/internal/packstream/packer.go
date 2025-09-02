@@ -224,8 +224,16 @@ func (p *Packer) Float64Map(m map[string]float64) {
 }
 
 func (p *Packer) Bytes(b []byte) {
+	err := p.bytesHeader(int64(len(b)))
+	if err != nil {
+		p.err = err
+		return
+	}
+	p.buf = append(p.buf, b...)
+}
+
+func (p *Packer) bytesHeader(l int64) error {
 	hdr := make([]byte, 0, 1+4)
-	l := int64(len(b))
 	switch {
 	case l < 0x100:
 		hdr = append(hdr, 0xcc, byte(l))
@@ -238,11 +246,25 @@ func (p *Packer) Bytes(b []byte) {
 		hdr[0] = 0xce
 		binary.BigEndian.PutUint32(hdr[1:], uint32(l))
 	default:
-		p.err = &OverflowError{msg: fmt.Sprintf("Trying to pack too large byte array of size %d", l)}
-		return
+		return &OverflowError{msg: fmt.Sprintf("Trying to pack too large byte array of size %d", l)}
 	}
 	p.buf = append(p.buf, hdr...)
-	p.buf = append(p.buf, b...)
+	return nil
+}
+
+func (p *Packer) prepareVectorData(totalSize int) error {
+	err := p.bytesHeader(int64(totalSize))
+	if err != nil {
+		p.err = err
+		return err
+	}
+
+	if cap(p.buf)-len(p.buf) < totalSize {
+		newBuf := make([]byte, len(p.buf), max(cap(p.buf)*2, len(p.buf)+totalSize))
+		copy(newBuf, p.buf)
+		p.buf = newBuf
+	}
+	return nil
 }
 
 func (p *Packer) Bool(b bool) {
@@ -260,5 +282,119 @@ func (p *Packer) Nil() {
 func (p *Packer) checkOverflowInt(i uint64) {
 	if i > math.MaxInt64 {
 		p.err = &OverflowError{msg: "Trying to pack uint64 that doesn't fit into int64"}
+	}
+}
+
+func (p *Packer) VectorFloat64(vec []float64) {
+	p.StructHeader('V', 2)
+	p.Bytes([]byte{0xc1}) // FLOAT_64 marker
+
+	if len(vec) == 0 {
+		p.Bytes([]byte{}) // empty values
+		return
+	}
+
+	totalSize := len(vec) * 8
+	if err := p.prepareVectorData(totalSize); err != nil {
+		return
+	}
+
+	for _, v := range vec {
+		p.buf = binary.BigEndian.AppendUint64(p.buf, math.Float64bits(v))
+	}
+}
+
+func (p *Packer) VectorFloat32(vec []float32) {
+	p.StructHeader('V', 2)
+	p.Bytes([]byte{0xc6}) // FLOAT_32 marker
+
+	if len(vec) == 0 {
+		p.Bytes([]byte{}) // empty values
+		return
+	}
+
+	totalSize := len(vec) * 4
+	if err := p.prepareVectorData(totalSize); err != nil {
+		return
+	}
+
+	for _, v := range vec {
+		p.buf = binary.BigEndian.AppendUint32(p.buf, math.Float32bits(v))
+	}
+}
+
+func (p *Packer) VectorInt8(vec []int8) {
+	p.StructHeader('V', 2)
+	p.Bytes([]byte{0xc8}) // INT_8 marker
+
+	if len(vec) == 0 {
+		p.Bytes([]byte{}) // empty values
+		return
+	}
+
+	totalSize := len(vec)
+	if err := p.prepareVectorData(totalSize); err != nil {
+		return
+	}
+
+	for _, v := range vec {
+		p.buf = append(p.buf, byte(v))
+	}
+}
+
+func (p *Packer) VectorInt16(vec []int16) {
+	p.StructHeader('V', 2)
+	p.Bytes([]byte{0xc9}) // INT_16 marker
+
+	if len(vec) == 0 {
+		p.Bytes([]byte{}) // empty values
+		return
+	}
+
+	totalSize := len(vec) * 2
+	if err := p.prepareVectorData(totalSize); err != nil {
+		return
+	}
+
+	for _, v := range vec {
+		p.buf = binary.BigEndian.AppendUint16(p.buf, uint16(v))
+	}
+}
+
+func (p *Packer) VectorInt32(vec []int32) {
+	p.StructHeader('V', 2)
+	p.Bytes([]byte{0xca}) // INT_32 marker
+
+	if len(vec) == 0 {
+		p.Bytes([]byte{}) // empty values
+		return
+	}
+
+	totalSize := len(vec) * 4
+	if err := p.prepareVectorData(totalSize); err != nil {
+		return
+	}
+
+	for _, v := range vec {
+		p.buf = binary.BigEndian.AppendUint32(p.buf, uint32(v))
+	}
+}
+
+func (p *Packer) VectorInt64(vec []int64) {
+	p.StructHeader('V', 2)
+	p.Bytes([]byte{0xcb}) // INT_64 marker
+
+	if len(vec) == 0 {
+		p.Bytes([]byte{}) // empty values
+		return
+	}
+
+	totalSize := len(vec) * 8
+	if err := p.prepareVectorData(totalSize); err != nil {
+		return
+	}
+
+	for _, v := range vec {
+		p.buf = binary.BigEndian.AppendUint64(p.buf, uint64(v))
 	}
 }

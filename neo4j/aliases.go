@@ -31,20 +31,21 @@ import (
 // unnecessary copying/conversions between structs since serializing/deserializing is
 // handled within bolt package and bolt package is used from this package.
 type (
-	Point2D       = dbtype.Point2D
-	Point3D       = dbtype.Point3D
-	Date          = dbtype.Date
-	LocalTime     = dbtype.LocalTime
-	LocalDateTime = dbtype.LocalDateTime
-	Time          = dbtype.Time
-	OffsetTime    = dbtype.Time
-	Duration      = dbtype.Duration
-	Entity        = dbtype.Entity
-	Node          = dbtype.Node
-	Relationship  = dbtype.Relationship
-	Path          = dbtype.Path
-	Record        = db.Record
-	InvalidValue  = dbtype.InvalidValue
+	Point2D                        = dbtype.Point2D
+	Point3D                        = dbtype.Point3D
+	Date                           = dbtype.Date
+	LocalTime                      = dbtype.LocalTime
+	LocalDateTime                  = dbtype.LocalDateTime
+	Time                           = dbtype.Time
+	OffsetTime                     = dbtype.Time
+	Duration                       = dbtype.Duration
+	Entity                         = dbtype.Entity
+	Node                           = dbtype.Node
+	Relationship                   = dbtype.Relationship
+	Path                           = dbtype.Path
+	Record                         = db.Record
+	InvalidValue                   = dbtype.InvalidValue
+	Vector[T dbtype.VectorElement] = dbtype.Vector[T]
 )
 
 // DateOf creates a neo4j.Date from time.Time.

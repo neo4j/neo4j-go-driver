@@ -28,13 +28,12 @@ import (
 	"sync"
 	"time"
 
-	"github.com/neo4j/neo4j-go-driver/v6/neo4j/internal/homedb"
-
 	"github.com/neo4j/neo4j-go-driver/v6/neo4j/config"
 	"github.com/neo4j/neo4j-go-driver/v6/neo4j/db"
 	"github.com/neo4j/neo4j-go-driver/v6/neo4j/internal/bolt"
 	idb "github.com/neo4j/neo4j-go-driver/v6/neo4j/internal/db"
 	"github.com/neo4j/neo4j-go-driver/v6/neo4j/internal/errorutil"
+	"github.com/neo4j/neo4j-go-driver/v6/neo4j/internal/homedb"
 	itime "github.com/neo4j/neo4j-go-driver/v6/neo4j/internal/time"
 	"github.com/neo4j/neo4j-go-driver/v6/neo4j/log"
 )
@@ -67,7 +66,7 @@ type Pool struct {
 	log        log.Logger
 	logId      string
 	cache      *homedb.Cache
-	ssrTracker ssrTracker
+	ssrTracker *ssrTracker
 }
 
 type serverPenalty struct {
@@ -88,7 +87,7 @@ func New(config *config.Config, connect Connect, logger log.Logger, logId string
 		logId:      logId,
 		log:        logger,
 		cache:      cache,
-		ssrTracker: ssrTracker{},
+		ssrTracker: &ssrTracker{},
 	}
 	p.log.Infof(log.Pool, p.logId, "Created")
 	return p

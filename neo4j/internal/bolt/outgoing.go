@@ -408,6 +408,18 @@ func (o *outgoing) packX(x any) {
 			o.packer.Strings(s)
 		case []float64:
 			o.packer.Float64s(s)
+		case dbtype.Vector[int8]:
+			o.packer.VectorInt8(s)
+		case dbtype.Vector[int16]:
+			o.packer.VectorInt16(s)
+		case dbtype.Vector[int32]:
+			o.packer.VectorInt32(s)
+		case dbtype.Vector[int64]:
+			o.packer.VectorInt64(s)
+		case dbtype.Vector[float32]:
+			o.packer.VectorFloat32(s)
+		case dbtype.Vector[float64]:
+			o.packer.VectorFloat64(s)
 		case []any:
 			o.packer.ArrayHeader(len(s))
 			for _, e := range s {

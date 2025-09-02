@@ -18,12 +18,14 @@
 package main
 
 import (
+	"encoding/binary"
 	"fmt"
+	"math"
+	"strings"
 	"time"
 
-	"github.com/neo4j/neo4j-go-driver/v6/neo4j/dbtype"
-
 	"github.com/neo4j/neo4j-go-driver/v6/neo4j"
+	"github.com/neo4j/neo4j-go-driver/v6/neo4j/dbtype"
 )
 
 // Converts native type to proxied "cypher" to be sent to frontend.
@@ -204,6 +206,18 @@ func nativeToCypher(v any) map[string]any {
 				"z":      x.Z,
 			},
 		}
+	case dbtype.Vector[int8]:
+		return vectorToCypher("i8", x)
+	case dbtype.Vector[int16]:
+		return vectorToCypher("i16", x)
+	case dbtype.Vector[int32]:
+		return vectorToCypher("i32", x)
+	case dbtype.Vector[int64]:
+		return vectorToCypher("i64", x)
+	case dbtype.Vector[float32]:
+		return vectorToCypher("f32", x)
+	case dbtype.Vector[float64]:
+		return vectorToCypher("f64", x)
 	}
 
 	panic(fmt.Sprintf("Don't know how to patch %T", v))
@@ -212,6 +226,80 @@ func nativeToCypher(v any) map[string]any {
 // Helper to wrap proxied "cypher" value into a response
 func valueResponse(name string, v any) map[string]any {
 	return map[string]any{"name": name, "data": map[string]any{"value": v}}
+}
+
+// Helper to convert Vector types to CypherVector format
+func vectorToCypher[T dbtype.VectorElement](dtype string, vec dbtype.Vector[T]) map[string]any {
+	// Convert vector to hex string
+	var hexData string
+	switch v := any(vec).(type) {
+	case dbtype.Vector[int8]:
+		bytes := make([]byte, 0, len(v))
+		for _, val := range v {
+			bytes = append(bytes, byte(val))
+		}
+		hexData = addSpacesToHex(fmt.Sprintf("%x", bytes))
+	case dbtype.Vector[int16]:
+		bytes := make([]byte, 0, len(v)*2)
+		for _, val := range v {
+			bytes = binary.BigEndian.AppendUint16(bytes, uint16(val))
+		}
+		hexData = addSpacesToHex(fmt.Sprintf("%x", bytes))
+	case dbtype.Vector[int32]:
+		bytes := make([]byte, 0, len(v)*4)
+		for _, val := range v {
+			bytes = binary.BigEndian.AppendUint32(bytes, uint32(val))
+		}
+		hexData = addSpacesToHex(fmt.Sprintf("%x", bytes))
+	case dbtype.Vector[int64]:
+		bytes := make([]byte, 0, len(v)*8)
+		for _, val := range v {
+			bytes = binary.BigEndian.AppendUint64(bytes, uint64(val))
+		}
+		hexData = addSpacesToHex(fmt.Sprintf("%x", bytes))
+	case dbtype.Vector[float32]:
+		bytes := make([]byte, 0, len(v)*4)
+		for _, val := range v {
+			bytes = binary.BigEndian.AppendUint32(bytes, math.Float32bits(val))
+		}
+		hexData = addSpacesToHex(fmt.Sprintf("%x", bytes))
+	case dbtype.Vector[float64]:
+		bytes := make([]byte, 0, len(v)*8)
+		for _, val := range v {
+			bytes = binary.BigEndian.AppendUint64(bytes, math.Float64bits(val))
+		}
+		hexData = addSpacesToHex(fmt.Sprintf("%x", bytes))
+	default:
+		panic(fmt.Sprintf("unsupported vector type: %T", v))
+	}
+
+	return map[string]any{
+		"name": "CypherVector",
+		"data": map[string]any{
+			"dtype": dtype,
+			"data":  hexData,
+		},
+	}
+}
+
+// Helper to add spaces between bytes in hex string
+func addSpacesToHex(hexStr string) string {
+	if len(hexStr) == 0 {
+		return hexStr
+	}
+
+	var result strings.Builder
+	for i := 0; i < len(hexStr); i += 2 {
+		if i > 0 {
+			result.WriteString(" ")
+		}
+		if i+1 < len(hexStr) {
+			result.WriteString(hexStr[i : i+2])
+		} else {
+			result.WriteString(hexStr[i:])
+		}
+	}
+	return result.String()
 }
 
 func spatialReference(spatialRefId uint32) string {
