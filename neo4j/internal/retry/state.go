@@ -71,6 +71,13 @@ func (s *State) Continue(ctx context.Context) bool {
 		s.start = itime.Now()
 	}
 
+	select {
+	case <-ctx.Done():
+		s.Errs = append(s.Errs, ctx.Err())
+		return false
+	default:
+	}
+
 	if len(s.Errs) == 0 {
 		return true
 	}
@@ -110,6 +117,7 @@ func (s *State) Continue(ctx context.Context) bool {
 				Cause:  err.Error(),
 				Errors: s.Errs,
 			}}
+			return false
 		}
 	}
 	return true
