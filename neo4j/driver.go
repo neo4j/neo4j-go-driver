@@ -36,8 +36,13 @@ type Driver interface {
 	// establishing a network connection with the remote. Returns nil if succesful
 	// or error describing the problem.
 	VerifyConnectivity() error
-	// Close the driver and all underlying connections
+	// Close the driver and all underlying connections.
 	// This function may not be called while the driver is in use (i.e., concurrently).
+	//
+	// Connections that are still in use will be closed lazily when returned to the connection pool.
+	// This can lead to behavior that is hard to predict and which depends on driver implementation details.
+	// Therefore, it is strongly recommended to make sure you are done using the driver and have closed
+	// all resources spawned from it (such as sessions or transactions) before calling the method
 	Close() error
 	// IsEncrypted determines whether the driver communication with the server
 	// is encrypted. This is a static check. The function can also be called on

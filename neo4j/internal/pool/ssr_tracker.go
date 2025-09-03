@@ -30,17 +30,17 @@ type ssrTracker struct {
 
 func (s *ssrTracker) addConnection(c idb.Connection) {
 	if c.IsSsrEnabled() {
-		atomic.AddUint64(&s.ssrEnabledCount, ^uint64(0))
+		atomic.AddUint64(&s.ssrEnabledCount, 1)
 	} else {
-		atomic.AddUint64(&s.ssrDisabledCount, ^uint64(0))
+		atomic.AddUint64(&s.ssrDisabledCount, 1)
 	}
 }
 
 func (s *ssrTracker) removeConnection(c idb.Connection) {
 	if c.IsSsrEnabled() {
-		atomic.AddUint64(&s.ssrEnabledCount, 1)
+		atomic.AddUint64(&s.ssrEnabledCount, ^uint64(0))
 	} else {
-		atomic.AddUint64(&s.ssrDisabledCount, 1)
+		atomic.AddUint64(&s.ssrDisabledCount, ^uint64(0))
 	}
 }
 
