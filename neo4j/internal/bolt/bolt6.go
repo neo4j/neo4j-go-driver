@@ -38,24 +38,19 @@ import (
 )
 
 const (
-	bolt5Ready        = iota // Ready for use
-	bolt5Streaming           // Receiving result from auto commit query
-	bolt5Tx                  // Transaction pending
-	bolt5StreamingTx         // Receiving result from a query within a transaction
-	bolt5Failed              // Recoverable error, needs reset
-	bolt5Dead                // Non recoverable protocol or connection error
-	bolt5Unauthorized        // Initial state, not sent hello message with authentication
+	bolt6Ready        = iota // Ready for use
+	bolt6Streaming           // Receiving result from auto commit query
+	bolt6Tx                  // Transaction pending
+	bolt6StreamingTx         // Receiving result from a query within a transaction
+	bolt6Failed              // Recoverable error, needs reset
+	bolt6Dead                // Non recoverable protocol or connection error
+	bolt6Unauthorized        // Initial state, not sent hello message with authentication
 )
 
 // Default fetch size
-const bolt5FetchSize = 1000
+const bolt6FetchSize = 1000
 
-const (
-	telemetryEnabledHintName = "telemetry.enabled"
-	ssrEnabledHintName       = "ssr.enabled"
-)
-
-type internalTx5 struct {
+type internalTx6 struct {
 	mode               idb.AccessMode
 	bookmarks          []string
 	timeout            time.Duration
@@ -65,7 +60,7 @@ type internalTx5 struct {
 	notificationConfig idb.NotificationConfig
 }
 
-func (i *internalTx5) toMeta(logger log.Logger, logId string, version db.ProtocolVersion) map[string]any {
+func (i *internalTx6) toMeta(logger log.Logger, logId string, version db.ProtocolVersion) map[string]any {
 	if i == nil {
 		return nil
 	}
@@ -79,7 +74,7 @@ func (i *internalTx5) toMeta(logger log.Logger, logId string, version db.Protoco
 	ms := i.timeout.Milliseconds()
 	if i.timeout.Nanoseconds()%int64(time.Millisecond) > 0 {
 		ms++
-		logger.Infof(log.Bolt5, logId, "The transaction timeout was rounded up to the next millisecond due to a fractional millisecond value in the config.")
+		logger.Infof(log.Bolt6, logId, "The transaction timeout was rounded up to the next millisecond due to a fractional millisecond value in the config.")
 	}
 	if ms > 0 {
 		meta["tx_timeout"] = ms
@@ -97,7 +92,7 @@ func (i *internalTx5) toMeta(logger log.Logger, logId string, version db.Protoco
 	return meta
 }
 
-type bolt5 struct {
+type bolt6 struct {
 	state                   int
 	txId                    idb.TxHandle
 	streams                 openstreams
@@ -124,16 +119,16 @@ type bolt5 struct {
 	pinHomeDatabaseCallback func(context.Context, string)
 }
 
-func NewBolt5(
+func NewBolt6(
 	serverName string,
 	conn io.ReadWriteCloser,
 	errorListener ConnectionErrorListener,
 	logger log.Logger,
 	boltLog log.BoltLogger,
-) *bolt5 {
+) *bolt6 {
 	now := itime.Now()
-	b := &bolt5{
-		state:         bolt5Unauthorized,
+	b := &bolt6{
+		state:         bolt6Unauthorized,
 		conn:          conn,
 		serverName:    serverName,
 		birthDate:     now,
@@ -149,7 +144,7 @@ func NewBolt5(
 			buf: make([]byte, 4096),
 			hyd: hydrator{
 				boltLogger: boltLog,
-				boltMajor:  5,
+				boltMajor:  6,
 				useUtc:     true,
 			},
 			connReadTimeout: -1,
@@ -168,43 +163,43 @@ func NewBolt5(
 	return b
 }
 
-func (b *bolt5) checkStreams() {
+func (b *bolt6) checkStreams() {
 	if b.streams.num <= 0 {
 		// Perform state transition from streaming, if in that state otherwise keep the current
 		// state as we are in some kind of bad shape
 		switch b.state {
-		case bolt5StreamingTx:
-			b.state = bolt5Tx
-		case bolt5Streaming:
-			b.state = bolt5Ready
+		case bolt6StreamingTx:
+			b.state = bolt6Tx
+		case bolt6Streaming:
+			b.state = bolt6Ready
 		}
 	}
 }
 
-func (b *bolt5) ServerName() string {
+func (b *bolt6) ServerName() string {
 	return b.serverName
 }
 
-func (b *bolt5) ConnId() string {
+func (b *bolt6) ConnId() string {
 	return b.connId
 }
 
-func (b *bolt5) ServerVersion() string {
+func (b *bolt6) ServerVersion() string {
 	return b.serverVersion
 }
 
-// Sets b.err and b.state to bolt5Failed or bolt5Dead when fatal is true.
-func (b *bolt5) setError(err error, fatal bool) {
+// Sets b.err and b.state to bolt6Failed or bolt6Dead when fatal is true.
+func (b *bolt6) setError(err error, fatal bool) {
 	// Has no effect, can reduce nested ifs
 	if err == nil {
 		return
 	}
 
-	wasDead := b.state == bolt5Dead
+	wasDead := b.state == bolt6Dead
 	// No previous error
 	if b.err == nil {
 		b.err = err
-		b.state = bolt5Failed
+		b.state = bolt6Failed
 	}
 
 	// Increase severity even if it was a previous error
@@ -212,7 +207,7 @@ func (b *bolt5) setError(err error, fatal bool) {
 		if ctxErr := handleTerminatedContextError(err, b.conn); ctxErr != nil {
 			b.err = ctxErr
 		}
-		b.state = bolt5Dead
+		b.state = bolt6Dead
 	}
 
 	// Forward error to current stream if there is one
@@ -224,15 +219,15 @@ func (b *bolt5) setError(err error, fatal bool) {
 	// Do not log big cypher statements as errors
 	neo4jErr, casted := err.(*db.Neo4jError)
 	if casted && neo4jErr.Classification() == "ClientError" {
-		b.log.Debugf(log.Bolt5, b.logId, "%s", err)
+		b.log.Debugf(log.Bolt6, b.logId, "%s", err)
 	} else if wasDead {
-		b.log.Debugf(log.Bolt5, b.logId, "Already broken connection: %s", err)
+		b.log.Debugf(log.Bolt6, b.logId, "Already broken connection: %s", err)
 	} else {
-		b.log.Error(log.Bolt5, b.logId, err)
+		b.log.Error(log.Bolt6, b.logId, err)
 	}
 }
 
-func (b *bolt5) Connect(
+func (b *bolt6) Connect(
 	ctx context.Context,
 	minor int,
 	auth *idb.ReAuthToken,
@@ -240,7 +235,7 @@ func (b *bolt5) Connect(
 	routingContext map[string]string,
 	notificationConfig idb.NotificationConfig,
 ) error {
-	if err := b.assertState(bolt5Unauthorized); err != nil {
+	if err := b.assertState(bolt6Unauthorized); err != nil {
 		return err
 	}
 
@@ -262,23 +257,12 @@ func (b *bolt5) Connect(
 	if routingContext != nil {
 		hello["routing"] = routingContext
 	}
-	// On bolt >= 5.3 add bolt agent information to hello
-	if b.minor >= 3 {
-		info := boltagent.New()
-		hello["bolt_agent"] = map[string]string{
-			"product":  info.Product(),
-			"platform": info.Platform(),
-			"language": info.Language(),
-		}
-	}
-	if b.minor == 0 {
-		// Merge authentication keys into hello, avoid overwriting existing keys
-		for k, v := range token.Tokens {
-			_, exists := hello[k]
-			if !exists {
-				hello[k] = v
-			}
-		}
+
+	info := boltagent.New()
+	hello["bolt_agent"] = map[string]string{
+		"product":  info.Product(),
+		"platform": info.Platform(),
+		"language": info.Language(),
 	}
 
 	if err := checkNotificationFiltering(notificationConfig, b); err != nil {
@@ -286,9 +270,7 @@ func (b *bolt5) Connect(
 	}
 	notificationConfig.ToMeta(hello, b.Version())
 	b.queue.appendHello(hello, b.helloResponseHandler())
-	if b.minor > 0 {
-		b.queue.appendLogon(token.Tokens, b.logonResponseHandler())
-	}
+	b.queue.appendLogon(token.Tokens, b.logonResponseHandler())
 	if b.queue.send(ctx); b.err != nil {
 		return b.err
 	}
@@ -299,19 +281,19 @@ func (b *bolt5) Connect(
 		return b.err
 	}
 
-	b.state = bolt5Ready
+	b.state = bolt6Ready
 	b.streams.reset()
-	b.log.Infof(log.Bolt5, b.logId, "Connected")
+	b.log.Infof(log.Bolt6, b.logId, "Connected")
 	return nil
 }
 
-func (b *bolt5) TxBegin(
+func (b *bolt6) TxBegin(
 	ctx context.Context,
 	txConfig idb.TxConfig,
 	syncMessages bool,
 ) (idb.TxHandle, error) {
 	// Ok, to begin transaction while streaming auto-commit, just empty the stream and continue.
-	if b.state == bolt5Streaming {
+	if b.state == bolt6Streaming {
 		if b.bufferStream(ctx); b.err != nil {
 			return 0, b.err
 		}
@@ -319,14 +301,14 @@ func (b *bolt5) TxBegin(
 	// Makes all outstanding streams invalid
 	b.streams.reset()
 
-	if err := b.assertState(bolt5Ready); err != nil {
+	if err := b.assertState(bolt6Ready); err != nil {
 		return 0, err
 	}
 	if err := checkNotificationFiltering(txConfig.NotificationConfig, b); err != nil {
 		return 0, err
 	}
 
-	tx := internalTx5{
+	tx := internalTx6{
 		mode:               txConfig.Mode,
 		bookmarks:          txConfig.Bookmarks,
 		timeout:            txConfig.Timeout,
@@ -350,24 +332,24 @@ func (b *bolt5) TxBegin(
 		return 0, b.err
 	}
 
-	b.state = bolt5Tx
+	b.state = bolt6Tx
 	b.txId = idb.TxHandle(time.Now().Unix())
 	return b.txId, nil
 }
 
 // Should NOT set b.err or change b.state as this is used to guard against
 // misuse from clients that stick to their connections when they shouldn't.
-func (b *bolt5) assertTxHandle(h1, h2 idb.TxHandle) error {
+func (b *bolt6) assertTxHandle(h1, h2 idb.TxHandle) error {
 	if h1 != h2 {
 		err := errors.New(errorutil.InvalidTransactionError)
-		b.log.Error(log.Bolt5, b.logId, err)
+		b.log.Error(log.Bolt6, b.logId, err)
 		return err
 	}
 	return nil
 }
 
 // Should NOT set b.err or b.state since the connection is still valid
-func (b *bolt5) assertState(allowed ...int) error {
+func (b *bolt6) assertState(allowed ...int) error {
 	// Forward prior error instead, this former error is probably the
 	// root cause of any state error. Like a call to Run with malformed
 	// cypher causes an error and another call to Commit would cause the
@@ -381,11 +363,11 @@ func (b *bolt5) assertState(allowed ...int) error {
 		}
 	}
 	err := fmt.Errorf("invalid state %d, expected: %+v", b.state, allowed)
-	b.log.Error(log.Bolt5, b.logId, err)
+	b.log.Error(log.Bolt6, b.logId, err)
 	return err
 }
 
-func (b *bolt5) TxCommit(ctx context.Context, txh idb.TxHandle) error {
+func (b *bolt6) TxCommit(ctx context.Context, txh idb.TxHandle) error {
 	if err := b.assertTxHandle(b.txId, txh); err != nil {
 		return err
 	}
@@ -398,7 +380,7 @@ func (b *bolt5) TxCommit(ctx context.Context, txh idb.TxHandle) error {
 	}
 
 	// Should be in vanilla tx state now
-	if err := b.assertState(bolt5Tx); err != nil {
+	if err := b.assertState(bolt6Tx); err != nil {
 		return err
 	}
 
@@ -414,11 +396,11 @@ func (b *bolt5) TxCommit(ctx context.Context, txh idb.TxHandle) error {
 	}
 
 	// Transition into ready state
-	b.state = bolt5Ready
+	b.state = bolt6Ready
 	return nil
 }
 
-func (b *bolt5) TxRollback(ctx context.Context, txh idb.TxHandle) error {
+func (b *bolt6) TxRollback(ctx context.Context, txh idb.TxHandle) error {
 	if err := b.assertTxHandle(b.txId, txh); err != nil {
 		return err
 	}
@@ -431,7 +413,7 @@ func (b *bolt5) TxRollback(ctx context.Context, txh idb.TxHandle) error {
 	}
 
 	// Should be in vanilla tx state now
-	if err := b.assertState(bolt5Tx); err != nil {
+	if err := b.assertState(bolt6Tx); err != nil {
 		return err
 	}
 
@@ -446,13 +428,13 @@ func (b *bolt5) TxRollback(ctx context.Context, txh idb.TxHandle) error {
 		return b.err
 	}
 
-	b.state = bolt5Ready
+	b.state = bolt6Ready
 	return nil
 }
 
 // Discards all records in current stream if in streaming state and there is a current stream.
-func (b *bolt5) discardStream(ctx context.Context) {
-	if b.state != bolt5Streaming && b.state != bolt5StreamingTx {
+func (b *bolt6) discardStream(ctx context.Context) {
+	if b.state != bolt6Streaming && b.state != bolt6StreamingTx {
 		return
 	}
 
@@ -480,7 +462,7 @@ func (b *bolt5) discardStream(ctx context.Context) {
 		}
 		discarded = true
 		stream.fetchSize = -1 // request infinite batch to consume the rest
-		if b.state == bolt5StreamingTx && stream.qid != b.lastQid {
+		if b.state == bolt6StreamingTx && stream.qid != b.lastQid {
 			b.queue.appendDiscardNQid(stream.fetchSize, stream.qid, b.discardResponseHandler(stream))
 		} else {
 			b.queue.appendDiscardN(stream.fetchSize, b.discardResponseHandler(stream))
@@ -491,8 +473,8 @@ func (b *bolt5) discardStream(ctx context.Context) {
 	}
 }
 
-func (b *bolt5) discardAllStreams(ctx context.Context) {
-	if b.state != bolt5Streaming && b.state != bolt5StreamingTx {
+func (b *bolt6) discardAllStreams(ctx context.Context) {
+	if b.state != bolt6Streaming && b.state != bolt6StreamingTx {
 		return
 	}
 
@@ -503,7 +485,7 @@ func (b *bolt5) discardAllStreams(ctx context.Context) {
 }
 
 // bufferStream pulls all the records of the current stream if there is a current stream.
-func (b *bolt5) bufferStream(ctx context.Context) {
+func (b *bolt6) bufferStream(ctx context.Context) {
 	stream := b.streams.curr
 	if stream == nil {
 		return
@@ -530,7 +512,7 @@ func (b *bolt5) bufferStream(ctx context.Context) {
 }
 
 // pauseStream pulls all the records of the current stream ongoing batch of records and unsets the stream as current
-func (b *bolt5) pauseStream(ctx context.Context) {
+func (b *bolt6) pauseStream(ctx context.Context) {
 	stream := b.streams.curr
 	if stream == nil {
 		return
@@ -551,25 +533,25 @@ func (b *bolt5) pauseStream(ctx context.Context) {
 }
 
 // resumeStream marks the current stream as current and requests PULL
-func (b *bolt5) resumeStream(ctx context.Context, s *stream) {
+func (b *bolt6) resumeStream(ctx context.Context, s *stream) {
 	b.streams.resume(s)
 	b.appendPullN(s)
 	b.queue.send(ctx)
 }
 
-func (b *bolt5) run(ctx context.Context, cypher string, params map[string]any, rawFetchSize int, tx *internalTx5) (*stream, error) {
+func (b *bolt6) run(ctx context.Context, cypher string, params map[string]any, rawFetchSize int, tx *internalTx6) (*stream, error) {
 	// If already streaming, consume the whole thing first
-	if b.state == bolt5Streaming {
+	if b.state == bolt6Streaming {
 		if b.bufferStream(ctx); b.err != nil {
 			return nil, b.err
 		}
-	} else if b.state == bolt5StreamingTx {
+	} else if b.state == bolt6StreamingTx {
 		if b.pauseStream(ctx); b.err != nil {
 			return nil, b.err
 		}
 	}
 
-	if err := b.assertState(bolt5Tx, bolt5Ready, bolt5StreamingTx); err != nil {
+	if err := b.assertState(bolt6Tx, bolt6Ready, bolt6StreamingTx); err != nil {
 		return nil, err
 	}
 
@@ -592,37 +574,37 @@ func (b *bolt5) run(ctx context.Context, cypher string, params map[string]any, r
 		}
 	}
 
-	if b.state == bolt5Ready {
-		b.state = bolt5Streaming
-	} else if b.state == bolt5Tx {
-		b.state = bolt5StreamingTx
+	if b.state == bolt6Ready {
+		b.state = bolt6Streaming
+	} else if b.state == bolt6Tx {
+		b.state = bolt6StreamingTx
 	}
 	return stream, nil
 }
 
-func (b *bolt5) normalizeFetchSize(fetchSize int) int {
+func (b *bolt6) normalizeFetchSize(fetchSize int) int {
 	if fetchSize < 0 {
 		return -1
 	}
 	if fetchSize == 0 {
-		return bolt5FetchSize
+		return bolt6FetchSize
 	}
 	return fetchSize
 }
 
-func (b *bolt5) Run(
+func (b *bolt6) Run(
 	ctx context.Context,
 	cmd idb.Command,
 	txConfig idb.TxConfig,
 ) (idb.StreamHandle, error) {
-	if err := b.assertState(bolt5Streaming, bolt5Ready); err != nil {
+	if err := b.assertState(bolt6Streaming, bolt6Ready); err != nil {
 		return nil, err
 	}
 	if err := checkNotificationFiltering(txConfig.NotificationConfig, b); err != nil {
 		return nil, err
 	}
 
-	tx := internalTx5{
+	tx := internalTx6{
 		mode:               txConfig.Mode,
 		bookmarks:          txConfig.Bookmarks,
 		timeout:            txConfig.Timeout,
@@ -638,7 +620,7 @@ func (b *bolt5) Run(
 	return stream, nil
 }
 
-func (b *bolt5) RunTx(ctx context.Context, txh idb.TxHandle, cmd idb.Command) (idb.StreamHandle, error) {
+func (b *bolt6) RunTx(ctx context.Context, txh idb.TxHandle, cmd idb.Command) (idb.StreamHandle, error) {
 	if err := b.assertTxHandle(b.txId, txh); err != nil {
 		return nil, err
 	}
@@ -650,7 +632,7 @@ func (b *bolt5) RunTx(ctx context.Context, txh idb.TxHandle, cmd idb.Command) (i
 	return stream, nil
 }
 
-func (b *bolt5) Keys(streamHandle idb.StreamHandle) ([]string, error) {
+func (b *bolt6) Keys(streamHandle idb.StreamHandle) ([]string, error) {
 	// Don't care about if the stream is the current or even if it belongs to this connection.
 	// Do NOT set b.err for this error
 	stream, err := b.streams.getUnsafe(streamHandle)
@@ -661,7 +643,7 @@ func (b *bolt5) Keys(streamHandle idb.StreamHandle) ([]string, error) {
 }
 
 // Next reads one record from the stream.
-func (b *bolt5) Next(ctx context.Context, streamHandle idb.StreamHandle) (
+func (b *bolt6) Next(ctx context.Context, streamHandle idb.StreamHandle) (
 	*db.Record, *db.Summary, error) {
 	// Do NOT set b.err for this error
 	stream, err := b.streams.getUnsafe(streamHandle)
@@ -694,7 +676,7 @@ func (b *bolt5) Next(ctx context.Context, streamHandle idb.StreamHandle) (
 	}
 }
 
-func (b *bolt5) Consume(ctx context.Context, streamHandle idb.StreamHandle) (
+func (b *bolt6) Consume(ctx context.Context, streamHandle idb.StreamHandle) (
 	*db.Summary, error) {
 	// Do NOT set b.err for this error
 	stream, err := b.streams.getUnsafe(streamHandle)
@@ -714,7 +696,7 @@ func (b *bolt5) Consume(ctx context.Context, streamHandle idb.StreamHandle) (
 
 	// We should be streaming otherwise it is an internal error, shouldn't be
 	// a safe stream while not streaming.
-	if err = b.assertState(bolt5Streaming, bolt5StreamingTx); err != nil {
+	if err = b.assertState(bolt6Streaming, bolt6StreamingTx); err != nil {
 		return nil, err
 	}
 
@@ -733,7 +715,7 @@ func (b *bolt5) Consume(ctx context.Context, streamHandle idb.StreamHandle) (
 	return stream.sum, stream.err
 }
 
-func (b *bolt5) Buffer(ctx context.Context,
+func (b *bolt6) Buffer(ctx context.Context,
 	streamHandle idb.StreamHandle) error {
 	// Do NOT set b.err for this error
 	stream, err := b.streams.getUnsafe(streamHandle)
@@ -754,7 +736,7 @@ func (b *bolt5) Buffer(ctx context.Context,
 
 	// We should be streaming otherwise it is an internal error, shouldn't be
 	// a safe stream while not streaming.
-	if err = b.assertState(bolt5Streaming, bolt5StreamingTx); err != nil {
+	if err = b.assertState(bolt6Streaming, bolt6StreamingTx); err != nil {
 		return err
 	}
 
@@ -771,29 +753,29 @@ func (b *bolt5) Buffer(ctx context.Context,
 	return stream.Err()
 }
 
-func (b *bolt5) Bookmark() string {
+func (b *bolt6) Bookmark() string {
 	return b.bookmark
 }
 
-func (b *bolt5) IsAlive() bool {
-	return b.state != bolt5Dead
+func (b *bolt6) IsAlive() bool {
+	return b.state != bolt6Dead
 }
 
-func (b *bolt5) HasFailed() bool {
-	return b.state == bolt5Failed
+func (b *bolt6) HasFailed() bool {
+	return b.state == bolt6Failed
 }
 
-func (b *bolt5) Birthdate() time.Time {
+func (b *bolt6) Birthdate() time.Time {
 	return b.birthDate
 }
 
-func (b *bolt5) IdleDate() time.Time {
+func (b *bolt6) IdleDate() time.Time {
 	return b.idleDate
 }
 
-func (b *bolt5) Reset(ctx context.Context) {
+func (b *bolt6) Reset(ctx context.Context) {
 	defer func() {
-		b.log.Debugf(log.Bolt5, b.logId, "Resetting connection internal state")
+		b.log.Debugf(log.Bolt6, b.logId, "Resetting connection internal state")
 		b.txId = 0
 		b.bookmark = ""
 		b.databaseName = idb.DefaultDatabase
@@ -802,7 +784,7 @@ func (b *bolt5) Reset(ctx context.Context) {
 		b.streams.reset()
 	}()
 
-	if b.state == bolt5Ready {
+	if b.state == bolt6Ready {
 		// No need for reset
 		return
 	}
@@ -810,12 +792,12 @@ func (b *bolt5) Reset(ctx context.Context) {
 	b.ForceReset(ctx)
 }
 
-func (b *bolt5) ForceReset(ctx context.Context) {
-	if b.state == bolt5Dead {
+func (b *bolt6) ForceReset(ctx context.Context) {
+	if b.state == bolt6Dead {
 		return
 	}
 
-	// Reset any pending error, should be matching bolt5_failed, so
+	// Reset any pending error, should be matching bolt6_failed, so
 	// it should be recoverable.
 	b.err = nil
 
@@ -831,13 +813,13 @@ func (b *bolt5) ForceReset(ctx context.Context) {
 	}
 }
 
-func (b *bolt5) GetRoutingTable(ctx context.Context,
+func (b *bolt6) GetRoutingTable(ctx context.Context,
 	routingContext map[string]string, bookmarks []string, database, impersonatedUser string) (*idb.RoutingTable, error) {
-	if err := b.assertState(bolt5Ready); err != nil {
+	if err := b.assertState(bolt6Ready); err != nil {
 		return nil, err
 	}
 
-	b.log.Infof(log.Bolt5, b.logId, "Retrieving routing table")
+	b.log.Infof(log.Bolt6, b.logId, "Retrieving routing table")
 	extras := map[string]any{}
 	if database != idb.DefaultDatabase {
 		extras["db"] = database
@@ -860,65 +842,38 @@ func (b *bolt5) GetRoutingTable(ctx context.Context,
 	return routingTable, nil
 }
 
-func (b *bolt5) SetBoltLogger(boltLogger log.BoltLogger) {
+func (b *bolt6) SetBoltLogger(boltLogger log.BoltLogger) {
 	b.queue.setBoltLogger(boltLogger)
 }
 
-func (b *bolt5) SetPinHomeDatabaseCallback(callback func(context.Context, string)) {
+func (b *bolt6) SetPinHomeDatabaseCallback(callback func(context.Context, string)) {
 	b.pinHomeDatabaseCallback = callback
 }
 
-func (b *bolt5) IsSsrEnabled() bool {
+func (b *bolt6) IsSsrEnabled() bool {
 	return b.ssrEnabled
 }
 
-func (b *bolt5) ReAuth(ctx context.Context, auth *idb.ReAuthToken) error {
-	if b.minor == 0 {
-		return b.fallbackReAuth(ctx, auth)
-	}
-	return b.reAuth(ctx, auth)
-}
-
-func (b *bolt5) fallbackReAuth(ctx context.Context, auth *idb.ReAuthToken) error {
-	if err := checkReAuth(auth, b); err != nil {
-		return err
-	}
-	if b.resetAuth {
-		b.log.Infof(log.Bolt5, b.logId, "Closing connection because auth token expired (informed by other connection)")
-		b.Close(ctx)
-		return nil
-	}
-	token, err := auth.Manager.GetAuthToken(ctx)
-	if err != nil {
-		return err
-	}
-	if !reflect.DeepEqual(b.auth, token.Tokens) {
-		b.log.Infof(log.Bolt5, b.logId, "Closing connection because auth token expired (informed by auth manager)")
-		b.Close(ctx)
-	}
-	return nil
-}
-
-func (b *bolt5) reAuth(ctx context.Context, auth *idb.ReAuthToken) error {
+func (b *bolt6) ReAuth(ctx context.Context, auth *idb.ReAuthToken) error {
 	token, err := auth.Manager.GetAuthToken(ctx)
 	if err != nil {
 		return err
 	}
 	if b.resetAuth {
 		b.log.Infof(
-			log.Bolt5, b.logId,
+			log.Bolt6, b.logId,
 			"Re-authenticating connection because auth token expired (informed by other connection)")
 		b.queue.appendLogoff(b.logoffResponseHandler())
 		b.queue.appendLogon(token.Tokens, b.logonResponseHandler())
 	} else if !reflect.DeepEqual(b.auth, token.Tokens) {
 		b.log.Infof(
-			log.Bolt5, b.logId,
+			log.Bolt6, b.logId,
 			"Re-authenticating connection because auth token expired (informed by auth manager)")
 		b.queue.appendLogoff(b.logoffResponseHandler())
 		b.queue.appendLogon(token.Tokens, b.logonResponseHandler())
 	} else if auth.ForceReAuth {
 		b.log.Infof(
-			log.Bolt5, b.logId,
+			log.Bolt6, b.logId,
 			"Re-authenticating connection because auth token expired (forced by verifyAuthentication)")
 		b.queue.appendLogoff(b.logoffResponseHandler())
 		b.queue.appendLogon(token.Tokens, b.logonResponseHandler())
@@ -944,10 +899,10 @@ func (b *bolt5) reAuth(ctx context.Context, auth *idb.ReAuthToken) error {
 
 // Close closes the underlying connection.
 // Beware: could be called on another thread when driver is closed.
-func (b *bolt5) Close(ctx context.Context) {
-	b.log.Infof(log.Bolt5, b.logId, "Close")
-	if b.state != bolt5Dead {
-		b.state = bolt5Dead
+func (b *bolt6) Close(ctx context.Context) {
+	b.log.Infof(log.Bolt6, b.logId, "Close")
+	if b.state != bolt6Dead {
+		b.state = bolt6Dead
 		b.queue.appendGoodbye()
 		b.queue.send(ctx)
 	}
@@ -956,32 +911,32 @@ func (b *bolt5) Close(ctx context.Context) {
 	}
 }
 
-func (b *bolt5) SelectDatabase(database string) {
+func (b *bolt6) SelectDatabase(database string) {
 	b.databaseName = database
 }
 
-func (b *bolt5) Database() string {
+func (b *bolt6) Database() string {
 	return b.databaseName
 }
 
-func (b *bolt5) Version() db.ProtocolVersion {
+func (b *bolt6) Version() db.ProtocolVersion {
 	return db.ProtocolVersion{
-		Major: 5,
+		Major: 6,
 		Minor: b.minor,
 	}
 }
 
-func (b *bolt5) ResetAuth() {
+func (b *bolt6) ResetAuth() {
 	b.resetAuth = true
 }
 
-func (b *bolt5) GetCurrentAuth() (auth.TokenManager, iauth.Token) {
+func (b *bolt6) GetCurrentAuth() (auth.TokenManager, iauth.Token) {
 	token := iauth.Token{Tokens: b.auth}
 	return b.authManager, token
 }
 
-func (b *bolt5) Telemetry(api telemetry.API, onSuccess func()) {
-	if b.telemetryEnabled && b.Version().Minor >= 4 {
+func (b *bolt6) Telemetry(api telemetry.API, onSuccess func()) {
+	if b.telemetryEnabled {
 		b.queue.appendTelemetry(api.AsInt(), b.telemetryResponseHandler(func(*success) {
 			if onSuccess != nil {
 				onSuccess()
@@ -990,10 +945,10 @@ func (b *bolt5) Telemetry(api telemetry.API, onSuccess func()) {
 	}
 }
 
-func (b *bolt5) appendPullN(stream *stream) {
-	if b.state == bolt5Streaming {
+func (b *bolt6) appendPullN(stream *stream) {
+	if b.state == bolt6Streaming {
 		b.queue.appendPullN(stream.fetchSize, b.pullResponseHandler(stream))
-	} else if b.state == bolt5StreamingTx {
+	} else if b.state == bolt6StreamingTx {
 		if stream.qid == b.lastQid {
 			b.queue.appendPullN(stream.fetchSize, b.pullResponseHandler(stream))
 		} else {
@@ -1002,25 +957,25 @@ func (b *bolt5) appendPullN(stream *stream) {
 	}
 }
 
-func (b *bolt5) helloResponseHandler() responseHandler {
+func (b *bolt6) helloResponseHandler() responseHandler {
 	return b.expectedSuccessHandler(b.onHelloSuccess)
 }
 
-func (b *bolt5) logoffResponseHandler() responseHandler {
+func (b *bolt6) logoffResponseHandler() responseHandler {
 	return b.expectedSuccessHandler(onSuccessNoOp)
 }
 
-func (b *bolt5) logonResponseHandler() responseHandler {
+func (b *bolt6) logonResponseHandler() responseHandler {
 	return b.expectedSuccessHandler(onSuccessNoOp)
 }
 
-func (b *bolt5) routeResponseHandler(table **idb.RoutingTable) responseHandler {
+func (b *bolt6) routeResponseHandler(table **idb.RoutingTable) responseHandler {
 	return b.expectedSuccessHandler(func(routeSuccess *success) {
 		*table = routeSuccess.routingTable
 	})
 }
 
-func (b *bolt5) beginResponseHandler(ctx context.Context) responseHandler {
+func (b *bolt6) beginResponseHandler(ctx context.Context) responseHandler {
 	return b.expectedSuccessHandler(func(beginSuccess *success) {
 		if b.pinHomeDatabaseCallback != nil && beginSuccess.db != "" {
 			b.pinHomeDatabaseCallback(ctx, beginSuccess.db)
@@ -1028,7 +983,7 @@ func (b *bolt5) beginResponseHandler(ctx context.Context) responseHandler {
 	})
 }
 
-func (b *bolt5) runResponseHandler(ctx context.Context, stream *stream) responseHandler {
+func (b *bolt6) runResponseHandler(ctx context.Context, stream *stream) responseHandler {
 	return b.expectedSuccessHandler(func(runSuccess *success) {
 		if b.pinHomeDatabaseCallback != nil && runSuccess.db != "" {
 			b.pinHomeDatabaseCallback(ctx, runSuccess.db)
@@ -1044,15 +999,15 @@ func (b *bolt5) runResponseHandler(ctx context.Context, stream *stream) response
 	})
 }
 
-func (b *bolt5) commitResponseHandler() responseHandler {
+func (b *bolt6) commitResponseHandler() responseHandler {
 	return b.expectedSuccessHandler(b.onCommitSuccess)
 }
 
-func (b *bolt5) rollbackResponseHandler() responseHandler {
+func (b *bolt6) rollbackResponseHandler() responseHandler {
 	return b.expectedSuccessHandler(onSuccessNoOp)
 }
 
-func (b *bolt5) discardResponseHandler(stream *stream) responseHandler {
+func (b *bolt6) discardResponseHandler(stream *stream) responseHandler {
 	return responseHandler{
 		onIgnored: func(*ignored) {
 			stream.err = fmt.Errorf("stream interrupted while discarding results")
@@ -1079,7 +1034,7 @@ func (b *bolt5) discardResponseHandler(stream *stream) responseHandler {
 	}
 }
 
-func (b *bolt5) pullResponseHandler(stream *stream) responseHandler {
+func (b *bolt6) pullResponseHandler(stream *stream) responseHandler {
 	return responseHandler{
 		onRecord: func(record *db.Record) {
 			if record != nil {
@@ -1121,23 +1076,23 @@ func (b *bolt5) pullResponseHandler(stream *stream) responseHandler {
 	}
 }
 
-func (b *bolt5) resetResponseHandler() responseHandler {
+func (b *bolt6) resetResponseHandler() responseHandler {
 	return responseHandler{
 		onSuccess: func(resetSuccess *success) {
-			b.state = bolt5Ready
+			b.state = bolt6Ready
 		},
 		onFailure: func(ctx context.Context, failure *db.Neo4jError) {
 			_ = b.errorListener.OnNeo4jError(ctx, b, failure)
-			b.state = bolt5Dead
+			b.state = bolt6Dead
 		},
 	}
 }
 
-func (b *bolt5) telemetryResponseHandler(onSuccess func(*success)) responseHandler {
+func (b *bolt6) telemetryResponseHandler(onSuccess func(*success)) responseHandler {
 	return b.expectedSuccessHandler(onSuccess)
 }
 
-func (b *bolt5) expectedSuccessHandler(onSuccess func(*success)) responseHandler {
+func (b *bolt6) expectedSuccessHandler(onSuccess func(*success)) responseHandler {
 	return responseHandler{
 		onSuccess: onSuccess,
 		onFailure: b.onFailure,
@@ -1145,7 +1100,7 @@ func (b *bolt5) expectedSuccessHandler(onSuccess func(*success)) responseHandler
 	}
 }
 
-func (b *bolt5) onHelloSuccess(helloSuccess *success) {
+func (b *bolt6) onHelloSuccess(helloSuccess *success) {
 	b.connId = helloSuccess.connectionId
 	b.serverVersion = helloSuccess.server
 
@@ -1157,17 +1112,17 @@ func (b *bolt5) onHelloSuccess(helloSuccess *success) {
 	b.initializeSsrEnabledHint(helloSuccess.configurationHints)
 }
 
-func (b *bolt5) onCommitSuccess(commitSuccess *success) {
+func (b *bolt6) onCommitSuccess(commitSuccess *success) {
 	if len(commitSuccess.bookmark) > 0 {
 		b.bookmark = commitSuccess.bookmark
 	}
 }
 
-func (b *bolt5) onNextMessage() {
+func (b *bolt6) onNextMessage() {
 	b.idleDate = itime.Now()
 }
 
-func (b *bolt5) onFailure(ctx context.Context, failure *db.Neo4jError) {
+func (b *bolt6) onFailure(ctx context.Context, failure *db.Neo4jError) {
 	var err error
 	err = failure
 	if callbackErr := b.errorListener.OnNeo4jError(ctx, b, failure); callbackErr != nil {
@@ -1176,8 +1131,8 @@ func (b *bolt5) onFailure(ctx context.Context, failure *db.Neo4jError) {
 	b.setError(err, isFatalError(failure))
 }
 
-func (b *bolt5) onIoError(ctx context.Context, err error) {
-	if b.state != bolt5Failed && b.state != bolt5Dead {
+func (b *bolt6) onIoError(ctx context.Context, err error) {
+	if b.state != bolt6Failed && b.state != bolt6Dead {
 		// Don't call callback when connections break after sending RESET.
 		// The server chooses to close the connection on some errors.
 		b.errorListener.OnIoError(ctx, b, err)
@@ -1185,53 +1140,53 @@ func (b *bolt5) onIoError(ctx context.Context, err error) {
 	b.setError(err, true)
 }
 
-func (b *bolt5) initializeReadTimeoutHint(hints map[string]any) {
+func (b *bolt6) initializeReadTimeoutHint(hints map[string]any) {
 	readTimeoutHint, ok := hints[readTimeoutHintName]
 	if !ok {
 		return
 	}
 	readTimeout, ok := readTimeoutHint.(int64)
 	if !ok {
-		b.log.Infof(log.Bolt5, b.logId, `invalid %q value: %v, ignoring hint. Only strictly positive integer values are accepted`, readTimeoutHintName, readTimeoutHint)
+		b.log.Infof(log.Bolt6, b.logId, `invalid %q value: %v, ignoring hint. Only strictly positive integer values are accepted`, readTimeoutHintName, readTimeoutHint)
 		return
 	}
 	if readTimeout <= 0 {
-		b.log.Infof(log.Bolt5, b.logId, `invalid %q integer value: %d. Only strictly positive values are accepted"`, readTimeoutHintName, readTimeout)
+		b.log.Infof(log.Bolt6, b.logId, `invalid %q integer value: %d. Only strictly positive values are accepted"`, readTimeoutHintName, readTimeout)
 		return
 	}
 	b.queue.in.connReadTimeout = time.Duration(readTimeout) * time.Second
 }
 
-func (b *bolt5) initializeTelemetryEnabledHint(hints map[string]any) {
+func (b *bolt6) initializeTelemetryEnabledHint(hints map[string]any) {
 	telemetryEnabledHint, ok := hints[telemetryEnabledHintName]
 	if !ok {
 		return
 	}
 	telemetryEnabled, ok := telemetryEnabledHint.(bool)
 	if !ok {
-		b.log.Infof(log.Bolt5, b.logId, `invalid %q value: %v, ignoring hint. Only boolean values are accepted`, telemetryEnabledHintName, telemetryEnabledHint)
+		b.log.Infof(log.Bolt6, b.logId, `invalid %q value: %v, ignoring hint. Only boolean values are accepted`, telemetryEnabledHintName, telemetryEnabledHint)
 		return
 	}
 	b.telemetryEnabled = telemetryEnabled
 }
 
-func (b *bolt5) initializeSsrEnabledHint(hints map[string]any) {
+func (b *bolt6) initializeSsrEnabledHint(hints map[string]any) {
 	ssrEnabledHint, ok := hints[ssrEnabledHintName]
 	if !ok {
 		return
 	}
 	ssrEnabled, ok := ssrEnabledHint.(bool)
 	if !ok {
-		b.log.Infof(log.Bolt5, b.logId, `invalid %q value: %v, ignoring hint. Only boolean values are accepted`, ssrEnabledHintName, ssrEnabledHint)
+		b.log.Infof(log.Bolt6, b.logId, `invalid %q value: %v, ignoring hint. Only boolean values are accepted`, ssrEnabledHintName, ssrEnabledHint)
 		return
 	}
 	b.ssrEnabled = ssrEnabled
 }
 
-func (b *bolt5) extractSummary(success *success, stream *stream) *db.Summary {
+func (b *bolt6) extractSummary(success *success, stream *stream) *db.Summary {
 	summary := success.summary()
 	summary.Agent = b.serverVersion
-	summary.Major = 5
+	summary.Major = 6
 	summary.Minor = b.minor
 	summary.ServerName = b.serverName
 	summary.TFirst = stream.tfirst

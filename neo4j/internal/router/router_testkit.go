@@ -19,7 +19,7 @@
 
 package router
 
-import idb "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
+import idb "github.com/neo4j/neo4j-go-driver/v6/neo4j/internal/db"
 
 func (r *Router) GetTable(database string) *idb.RoutingTable {
 	return r.getTable(database)

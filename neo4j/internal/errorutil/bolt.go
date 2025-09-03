@@ -20,9 +20,10 @@ package errorutil
 import (
 	"context"
 	"fmt"
-	idb "github.com/neo4j/neo4j-go-driver/v5/neo4j/db"
 	"strings"
 	"time"
+
+	idb "github.com/neo4j/neo4j-go-driver/v6/neo4j/db"
 )
 
 const InvalidTransactionError = "invalid transaction handle"

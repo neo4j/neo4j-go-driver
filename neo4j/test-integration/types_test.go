@@ -24,8 +24,8 @@ import (
 	"sort"
 	"testing"
 
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/test-integration/dbserver"
+	"github.com/neo4j/neo4j-go-driver/v6/neo4j"
+	"github.com/neo4j/neo4j-go-driver/v6/neo4j/test-integration/dbserver"
 )
 
 func TestTypes(outer *testing.T) {
@@ -36,9 +36,9 @@ func TestTypes(outer *testing.T) {
 	ctx := context.Background()
 	server := dbserver.GetDbServer(ctx)
 	var err error
-	var driver neo4j.DriverWithContext
-	var session neo4j.SessionWithContext
-	var result neo4j.ResultWithContext
+	var driver neo4j.Driver
+	var session neo4j.Session
+	var result neo4j.Result
 
 	driver = server.Driver()
 	defer func() { _ = driver.Close(ctx) }()

@@ -20,31 +20,31 @@ package pool
 import (
 	"sync/atomic"
 
-	idb "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
+	idb "github.com/neo4j/neo4j-go-driver/v6/neo4j/internal/db"
 )
 
 type ssrTracker struct {
-	ssrEnabledCount  uint64
-	ssrDisabledCount uint64
+	ssrEnabledCount  atomic.Uint64
+	ssrDisabledCount atomic.Uint64
 }
 
 func (s *ssrTracker) addConnection(c idb.Connection) {
 	if c.IsSsrEnabled() {
-		atomic.AddUint64(&s.ssrEnabledCount, ^uint64(0))
+		s.ssrEnabledCount.Add(1)
 	} else {
-		atomic.AddUint64(&s.ssrDisabledCount, ^uint64(0))
+		s.ssrDisabledCount.Add(1)
 	}
 }
 
 func (s *ssrTracker) removeConnection(c idb.Connection) {
 	if c.IsSsrEnabled() {
-		atomic.AddUint64(&s.ssrEnabledCount, 1)
+		s.ssrEnabledCount.Add(^uint64(0))
 	} else {
-		atomic.AddUint64(&s.ssrDisabledCount, 1)
+		s.ssrDisabledCount.Add(^uint64(0))
 	}
 }
 
 func (s *ssrTracker) ssrEnabled() bool {
-	return atomic.LoadUint64(&s.ssrEnabledCount) > 0 &&
-		atomic.LoadUint64(&s.ssrDisabledCount) == 0
+	return s.ssrEnabledCount.Load() > 0 &&
+		s.ssrDisabledCount.Load() == 0
 }

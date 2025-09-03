@@ -19,10 +19,11 @@ package racing_test
 
 import (
 	"context"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/racing"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/testutil"
 	"testing"
 	"time"
+
+	"github.com/neo4j/neo4j-go-driver/v6/neo4j/internal/racing"
+	"github.com/neo4j/neo4j-go-driver/v6/neo4j/internal/testutil"
 )
 
 func TestMutex(outer *testing.T) {

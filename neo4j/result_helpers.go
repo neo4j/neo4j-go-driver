@@ -6,13 +6,13 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      https://www.apache.org/licenses/LICENSE-2.0
+ *     https://www.apache.org/licenses/LICENSE-2.0
  *
- *  Unless required by applicable law or agreed to in writing, software
- *  distributed under the License is distributed on an "AS IS" BASIS,
- *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *  See the License for the specific language governing permissions and
- *  limitations under the License.
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 
 package neo4j
@@ -22,11 +22,12 @@ import (
 	"fmt"
 )
 
-// SingleTWithContext maps the single record left to an instance of T with the provided mapper function.
-// It relies on ResultWithContext.Single and propagate its error, if any.
+// SingleT maps the single record left to an instance of T with the provided mapper function.
+// It relies on Result.Single and propagate its error, if any.
+//
 // It accepts a context.Context, which may be canceled or carry a deadline, to control the overall record fetching
 // execution time.
-func SingleTWithContext[T any](ctx context.Context, result ResultWithContext, mapper func(*Record) (T, error)) (T, error) {
+func SingleT[T any](ctx context.Context, result Result, mapper func(*Record) (T, error)) (T, error) {
 	single, err := result.Single(ctx)
 	if err != nil {
 		return *new(T), err
@@ -34,24 +35,46 @@ func SingleTWithContext[T any](ctx context.Context, result ResultWithContext, ma
 	return mapper(single)
 }
 
-// SingleT maps the single record left to an instance of T with the provided mapper function.
-// It relies on Result.Single and propagate its error, if any.
+// SingleTWithContext is an alias for SingleT to maintain backward compatibility
+// for users who migrated from v5 to v6 using the WithContext APIs.
+// In v6, SingleT is the primary function and is context-aware.
 //
-// Deprecated: use SingleTWithContext instead (the entry point of context-aware
-// APIs is NewDriverWithContext)
-func SingleT[T any](result Result, mapper func(*Record) (T, error)) (T, error) {
-	single, err := result.Single()
-	if err != nil {
-		return *new(T), err
-	}
-	return mapper(single)
+// Deprecated: please use SingleT instead. This alias will be removed in 7.0.
+func SingleTWithContext[T any](ctx context.Context, result Result, mapper func(*Record) (T, error)) (T, error) {
+	return SingleT(ctx, result, mapper)
 }
 
-// CollectTWithContext maps the records to a slice of T with the provided mapper function.
-// It relies on ResultWithContext.Collect and propagate its error, if any.
+// Single returns one and only one record from the result stream. Any error passed in
+// or reported while navigating the result stream is returned without any conversion.
+// If the result stream contains zero or more than one records error is returned.
+//
+//	result, err := session.Run(ctx, "...", nil)
+//	record, err := neo4j.Single(ctx, result, err)
+//
 // It accepts a context.Context, which may be canceled or carry a deadline, to control the overall record fetching
 // execution time.
-func CollectTWithContext[T any](ctx context.Context, result ResultWithContext, mapper func(*Record) (T, error)) ([]T, error) {
+func Single(ctx context.Context, result Result, err error) (*Record, error) {
+	if err != nil {
+		return nil, err
+	}
+	return result.Single(ctx)
+}
+
+// SingleWithContext is an alias for Single to maintain backward compatibility
+// for users who migrated from v5 to v6 using the WithContext APIs.
+// In v6, Single is the primary function and is context-aware.
+//
+// Deprecated: please use Single instead. This alias will be removed in 7.0.
+func SingleWithContext(ctx context.Context, result Result, err error) (*Record, error) {
+	return Single(ctx, result, err)
+}
+
+// CollectT maps the records to a slice of T with the provided mapper function.
+// It relies on Result.Collect and propagate its error, if any.
+//
+// It accepts a context.Context, which may be canceled or carry a deadline, to control the overall record fetching
+// execution time.
+func CollectT[T any](ctx context.Context, result Result, mapper func(*Record) (T, error)) ([]T, error) {
 	records, err := result.Collect(ctx)
 	if err != nil {
 		return nil, err
@@ -59,66 +82,48 @@ func CollectTWithContext[T any](ctx context.Context, result ResultWithContext, m
 	return mapAll(records, mapper)
 }
 
-// CollectT maps the records to a slice of T with the provided mapper function.
-// It relies on Result.Collect and propagate its error, if any.
+// CollectTWithContext is an alias for CollectT to maintain backward compatibility
+// for users who migrated from v5 to v6 using the WithContext APIs.
+// In v6, CollectT is the primary function and is context-aware.
 //
-// Deprecated: use CollectTWithContext instead (the entry point of context-aware
-// APIs is NewDriverWithContext)
-func CollectT[T any](result Result, mapper func(*Record) (T, error)) ([]T, error) {
-	records, err := result.Collect()
-	if err != nil {
-		return nil, err
-	}
-	return mapAll(records, mapper)
-}
-
-// Single returns one and only one record from the result stream. Any error passed in
-// or reported while navigating the result stream is returned without any conversion.
-// If the result stream contains zero or more than one records error is returned.
-//
-//	record, err := neo4j.Single(session.Run(...))
-func Single(result Result, err error) (*Record, error) {
-	if err != nil {
-		return nil, err
-	}
-	return result.Single()
+// Deprecated: please use CollectT instead. This alias will be removed in 7.0.
+func CollectTWithContext[T any](ctx context.Context, result Result, mapper func(*Record) (T, error)) ([]T, error) {
+	return CollectT(ctx, result, mapper)
 }
 
 // Collect aggregates the records into a slice.
 // It relies on Result.Collect and propagate its error, if any.
 //
-//	records, err := neo4j.Collect(session.Run(...))
-//
-// Deprecated: use CollectWithContext instead (the entry point of context-aware
-// APIs is NewDriverWithContext)
-func Collect(result Result, err error) ([]*Record, error) {
-	if err != nil {
-		return nil, err
-	}
-	return result.Collect()
-}
-
-// CollectWithContext aggregates the records into a slice.
-// It relies on ResultWithContext.Collect and propagate its error, if any.
-//
 //	result, err := session.Run(...)
-//	records, err := neo4j.CollectWithContext(ctx, result, err)
+//	records, err := neo4j.Collect(ctx, result, err)
 //
 // It accepts a context.Context, which may be canceled or carry a deadline, to control the overall record fetching
 // execution time.
-func CollectWithContext(ctx context.Context, result ResultWithContext, err error) ([]*Record, error) {
+func Collect(ctx context.Context, result Result, err error) ([]*Record, error) {
 	if err != nil {
 		return nil, err
 	}
 	return result.Collect(ctx)
 }
 
+// CollectWithContext is an alias for Collect to maintain backward compatibility
+// for users who migrated from v5 to v6 using the WithContext APIs.
+// In v6, Collect is the primary function and is context-aware.
+//
+// Deprecated: please use Collect instead. This alias will be removed in 7.0.
+func CollectWithContext(ctx context.Context, result Result, err error) ([]*Record, error) {
+	return Collect(ctx, result, err)
+}
+
 // AsRecords passes any existing error or casts from to a slice of records.
 // Use in combination with Collect and transactional functions:
 //
-//	records, err := neo4j.AsRecords(session.ExecuteRead(func (tx neo4j.Transaction) {
-//	    return neo4j.Collect(tx.Run(...))
-//	}))
+//	records, err := neo4j.AsRecords(
+//		session.ExecuteRead(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
+//			result, err := tx.Run(ctx, "...", nil)
+//			return neo4j.Collect(ctx, result, err)
+//		}),
+//	)
 func AsRecords(from any, err error) ([]*Record, error) {
 	if err != nil {
 		return nil, err

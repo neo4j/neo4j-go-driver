@@ -19,12 +19,13 @@ package homedb
 
 import (
 	"encoding/json"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/auth"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/errorutil"
 	"math"
 	"sort"
 	"sync"
 	"time"
+
+	"github.com/neo4j/neo4j-go-driver/v6/neo4j/internal/auth"
+	"github.com/neo4j/neo4j-go-driver/v6/neo4j/internal/errorutil"
 )
 
 // DefaultCacheMaxSize defines the maximum number of entries the cache can hold.

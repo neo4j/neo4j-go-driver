@@ -26,11 +26,11 @@ import (
 	"net"
 	"time"
 
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/config"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/bolt"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/errorutil"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/log"
+	"github.com/neo4j/neo4j-go-driver/v6/neo4j/config"
+	"github.com/neo4j/neo4j-go-driver/v6/neo4j/internal/bolt"
+	"github.com/neo4j/neo4j-go-driver/v6/neo4j/internal/db"
+	"github.com/neo4j/neo4j-go-driver/v6/neo4j/internal/errorutil"
+	"github.com/neo4j/neo4j-go-driver/v6/neo4j/log"
 )
 
 type Connector struct {
@@ -172,9 +172,6 @@ func (c Connector) tlsConfig(serverName string) *tls.Config {
 		config = c.Config.TlsConfig.Clone()
 	} else {
 		config = &tls.Config{
-			// Use RootCAs from the connector's config.
-			//lint:ignore SA1019 RootCAs is supported until 6.0
-			RootCAs: c.Config.RootCAs,
 			// It's safe to set MinVersion and other settings here since we're initializing a new config.
 			MinVersion: tls.VersionTLS12,
 		}

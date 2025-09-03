@@ -19,8 +19,9 @@ package neo4j
 
 import (
 	"context"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/collections"
 	"sync"
+
+	"github.com/neo4j/neo4j-go-driver/v6/neo4j/internal/collections"
 )
 
 // Bookmarks is a holder for server-side bookmarks which are used for causally-chained sessions.

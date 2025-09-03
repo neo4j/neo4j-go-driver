@@ -15,23 +15,12 @@
  * limitations under the License.
  */
 
-package neo4j
+package dbtype
 
-import (
-	"reflect"
-	"testing"
-)
-
-func assertErrorEq(t *testing.T, err1, err2 error) {
-	t.Helper()
-	if !reflect.DeepEqual(err1, err2) {
-		t.Errorf("Wrong type of error, '%s' != '%s'", err1, err2)
-	}
+// VectorElement represents the supported element types for Vector.
+type VectorElement interface {
+	~float64 | ~float32 | ~int8 | ~int16 | ~int32 | ~int64
 }
 
-func assertUsageError(t *testing.T, err error) {
-	t.Helper()
-	if !IsUsageError(err) {
-		t.Errorf("Expected %T but was %T:%s", &UsageError{}, err, err)
-	}
-}
+// Vector represents a fixed-length array of numeric values.
+type Vector[T VectorElement] []T

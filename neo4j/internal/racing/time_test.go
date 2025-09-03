@@ -20,10 +20,11 @@ package racing_test
 import (
 	"context"
 	"errors"
-	rio "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/racing"
-	. "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/testutil"
 	"testing"
 	"time"
+
+	rio "github.com/neo4j/neo4j-go-driver/v6/neo4j/internal/racing"
+	. "github.com/neo4j/neo4j-go-driver/v6/neo4j/internal/testutil"
 )
 
 func TestRacingSleep(outer *testing.T) {

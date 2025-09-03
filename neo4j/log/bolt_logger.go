@@ -50,9 +50,6 @@ func formatId(id string) string {
 	return fmt.Sprintf("[%s] ", id)
 }
 
-// Deprecated: use log.BoltToConsole() instead.
-type ConsoleBoltLogger = consoleBoltLogger
-
 // BoltToConsole returns a BoltLogger implementation that writes to stdout.
 func BoltToConsole() BoltLogger {
 	return &consoleBoltLogger{}
