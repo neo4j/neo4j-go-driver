@@ -183,7 +183,6 @@ func TestSession(outer *testing.T) {
 
 		inner.Run("Fails fast on context timeout", func(t *testing.T) {
 			_, pool, sess := createSession()
-			sess.driverConfig.MaxTransactionRetryTime = 10 * time.Second
 			pool.BorrowConn = &ConnFake{Alive: false}
 			numRetries := 0
 			ctx := context.Background()
