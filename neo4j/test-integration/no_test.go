@@ -6,13 +6,13 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      https://www.apache.org/licenses/LICENSE-2.0
+ *     https://www.apache.org/licenses/LICENSE-2.0
  *
- *  Unless required by applicable law or agreed to in writing, software
- *  distributed under the License is distributed on an "AS IS" BASIS,
- *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *  See the License for the specific language governing permissions and
- *  limitations under the License.
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 
 package test_integration
@@ -20,16 +20,15 @@ package test_integration
 import (
 	"context"
 	"crypto/rand"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/dbtype"
 	"math"
 	"math/big"
 	"reflect"
 	"strings"
 	"testing"
 
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/test-integration/dbserver"
-
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
+	"github.com/neo4j/neo4j-go-driver/v6/neo4j"
+	"github.com/neo4j/neo4j-go-driver/v6/neo4j/dbtype"
+	"github.com/neo4j/neo4j-go-driver/v6/neo4j/test-integration/dbserver"
 )
 
 // Not the best place for this...
@@ -219,7 +218,7 @@ func randomInt() int64 {
 	return bid.Int64()
 }
 
-func createRandomNode(ctx context.Context, t *testing.T, sess neo4j.SessionWithContext) int64 {
+func createRandomNode(ctx context.Context, t *testing.T, sess neo4j.Session) int64 {
 	nodex, err := sess.ExecuteWrite(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
 		res, err := tx.Run(ctx, "CREATE (n:RandomNode{val: $r}) RETURN n", map[string]any{"r": randomInt()})
 		if err != nil {
@@ -235,7 +234,7 @@ func createRandomNode(ctx context.Context, t *testing.T, sess neo4j.SessionWithC
 	return node.Props["val"].(int64)
 }
 
-func findRandomNode(ctx context.Context, t *testing.T, sess neo4j.SessionWithContext, randomId int64) *neo4j.Node {
+func findRandomNode(ctx context.Context, t *testing.T, sess neo4j.Session, randomId int64) *neo4j.Node {
 	nodex, err := sess.ExecuteRead(ctx, func(tx neo4j.ManagedTransaction) (any, error) {
 		res, err := tx.Run(ctx, "MATCH (n:RandomNode{val: $r}) RETURN n", map[string]any{"r": randomId})
 		if err != nil {
@@ -256,14 +255,14 @@ func findRandomNode(ctx context.Context, t *testing.T, sess neo4j.SessionWithCon
 	return &node
 }
 
-func assertRandomNode(ctx context.Context, t *testing.T, sess neo4j.SessionWithContext, randomId int64) {
+func assertRandomNode(ctx context.Context, t *testing.T, sess neo4j.Session, randomId int64) {
 	node := findRandomNode(ctx, t, sess, randomId)
 	if node == nil {
 		t.Error("Should have found random node but didn't")
 	}
 }
 
-func assertNoRandomNode(ctx context.Context, t *testing.T, sess neo4j.SessionWithContext, randomId int64) {
+func assertNoRandomNode(ctx context.Context, t *testing.T, sess neo4j.Session, randomId int64) {
 	node := findRandomNode(ctx, t, sess, randomId)
 	if node != nil {
 		t.Error("Shouldn't find random node but did")

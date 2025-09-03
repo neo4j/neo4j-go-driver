@@ -21,8 +21,8 @@ import (
 	"context"
 	"testing"
 
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/test-integration/dbserver"
+	"github.com/neo4j/neo4j-go-driver/v6/neo4j"
+	"github.com/neo4j/neo4j-go-driver/v6/neo4j/test-integration/dbserver"
 )
 
 func TestRouting(outer *testing.T) {
@@ -33,13 +33,13 @@ func TestRouting(outer *testing.T) {
 
 	server := dbserver.GetDbServer(ctx)
 
-	var session neo4j.SessionWithContext
-	var result neo4j.ResultWithContext
+	var session neo4j.Session
+	var result neo4j.Result
 	var summary neo4j.ResultSummary
 	var err error
 
-	getDriver := func(address string) neo4j.DriverWithContext {
-		driver, err := neo4j.NewDriverWithContext(address, server.AuthToken(), server.ConfigFunc())
+	getDriver := func(address string) neo4j.Driver {
+		driver, err := neo4j.NewDriver(address, server.AuthToken(), server.ConfigFunc())
 		if err != nil {
 			panic(err.Error())
 		}

@@ -18,9 +18,9 @@
 package notifications
 
 import (
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/db"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/gql"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/notifications"
+	"github.com/neo4j/neo4j-go-driver/v6/neo4j/db"
+	"github.com/neo4j/neo4j-go-driver/v6/neo4j/internal/gql"
+	"github.com/neo4j/neo4j-go-driver/v6/neo4j/notifications"
 )
 
 func newSuccessGqlStatusObject() *db.GqlStatusObject {

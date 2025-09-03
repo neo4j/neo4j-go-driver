@@ -19,10 +19,11 @@ package errorutil
 
 import (
 	"fmt"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/db"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/gql"
 	"io"
 	"net"
+
+	"github.com/neo4j/neo4j-go-driver/v6/neo4j/db"
+	"github.com/neo4j/neo4j-go-driver/v6/neo4j/internal/gql"
 )
 
 const unknownNeo4jCode = "Neo.DatabaseError.General.UnknownError"

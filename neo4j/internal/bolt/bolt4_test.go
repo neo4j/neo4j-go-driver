@@ -20,17 +20,17 @@ package bolt
 import (
 	"context"
 	"fmt"
-	iauth "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/auth"
-	idb "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/notifications"
 	"io"
 	"reflect"
 	"sync"
 	"testing"
 	"time"
 
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/db"
-	. "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/testutil"
+	"github.com/neo4j/neo4j-go-driver/v6/neo4j/db"
+	iauth "github.com/neo4j/neo4j-go-driver/v6/neo4j/internal/auth"
+	idb "github.com/neo4j/neo4j-go-driver/v6/neo4j/internal/db"
+	. "github.com/neo4j/neo4j-go-driver/v6/neo4j/internal/testutil"
+	"github.com/neo4j/neo4j-go-driver/v6/neo4j/notifications"
 )
 
 // bolt4.Connect is tested through Connect, no need to test it here
@@ -1448,7 +1448,7 @@ func TestBolt4(outer *testing.T) {
 				_, err := bolt.Run(test.ctx, idb.Command{Cypher: "UNWIND [1,2] AS k RETURN k"}, idb.TxConfig{Mode: idb.ReadMode})
 
 				latch.Wait()
-				AssertErrorMessageContains(t, err, test.errorMatch)
+				AssertErrorMessageContains(t, err, "%s", test.errorMatch)
 			})
 		}
 	})

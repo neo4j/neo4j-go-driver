@@ -26,11 +26,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/config"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/db"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/connector"
-	idb "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
-	. "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/testutil"
+	"github.com/neo4j/neo4j-go-driver/v6/neo4j/config"
+	"github.com/neo4j/neo4j-go-driver/v6/neo4j/db"
+	"github.com/neo4j/neo4j-go-driver/v6/neo4j/internal/connector"
+	idb "github.com/neo4j/neo4j-go-driver/v6/neo4j/internal/db"
+	. "github.com/neo4j/neo4j-go-driver/v6/neo4j/internal/testutil"
 )
 
 type noopErrorListener struct{}

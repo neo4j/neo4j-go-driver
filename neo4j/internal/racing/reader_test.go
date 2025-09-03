@@ -21,12 +21,13 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	rio "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/racing"
-	. "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/testutil"
 	"net"
 	"reflect"
 	"testing"
 	"time"
+
+	rio "github.com/neo4j/neo4j-go-driver/v6/neo4j/internal/racing"
+	. "github.com/neo4j/neo4j-go-driver/v6/neo4j/internal/testutil"
 )
 
 func TestRacingReader(outer *testing.T) {

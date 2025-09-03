@@ -6,60 +6,162 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      https://www.apache.org/licenses/LICENSE-2.0
+ *     https://www.apache.org/licenses/LICENSE-2.0
  *
- *  Unless required by applicable law or agreed to in writing, software
- *  distributed under the License is distributed on an "AS IS" BASIS,
- *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *  See the License for the specific language governing permissions and
- *  limitations under the License.
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 
 package neo4j
 
 import (
 	"context"
+
+	"github.com/neo4j/neo4j-go-driver/v6/neo4j/internal/db"
+	"github.com/neo4j/neo4j-go-driver/v6/neo4j/internal/errorutil"
 )
 
-// Transaction represents a transaction in the Neo4j database
-// ExplicitTransaction is available via SessionWithContext.
-// SessionWithContext is available via the context-aware driver/returned
-// by NewDriverWithContext.
-//
-// Deprecated: use ExplicitTransaction instead. Transaction will be removed in 6.0.
-type Transaction interface {
+// ManagedTransaction represents a transaction managed by the driver and operated on by the user, via transaction functions
+type ManagedTransaction interface {
 	// Run executes a statement on this transaction and returns a result
-	Run(cypher string, params map[string]any) (Result, error)
+	Run(ctx context.Context, cypher string, params map[string]any) (Result, error)
+}
+
+// ExplicitTransaction represents a transaction in the Neo4j database
+type ExplicitTransaction interface {
+	// Run executes a statement on this transaction and returns a result
+	// Contexts terminating too early negatively affect connection pooling and degrade the driver performance.
+	Run(ctx context.Context, cypher string, params map[string]any) (Result, error)
 	// Commit commits the transaction
-	Commit() error
+	// Contexts terminating too early negatively affect connection pooling and degrade the driver performance.
+	Commit(ctx context.Context) error
 	// Rollback rolls back the transaction
-	Rollback() error
+	// Contexts terminating too early negatively affect connection pooling and degrade the driver performance.
+	Rollback(ctx context.Context) error
 	// Close rolls back the actual transaction if it's not already committed/rolled back
 	// and closes all resources associated with this transaction
-	Close() error
+	// Contexts terminating too early negatively affect connection pooling and degrade the driver performance.
+	Close(ctx context.Context) error
+}
+
+type transactionState struct {
+	err                 error
+	resultErrorHandlers []func(error)
+}
+
+func (t *transactionState) onError(err error) {
+	t.err = err
+	for _, resultErrorHandler := range t.resultErrorHandlers {
+		resultErrorHandler(err)
+	}
 }
 
 // Transaction implementation when explicit transaction started
-type transaction struct {
-	delegate ExplicitTransaction
+type explicitTransaction struct {
+	conn      db.Connection
+	fetchSize int
+	txHandle  db.TxHandle
+	txState   *transactionState
+	onClosed  func()
 }
 
-func (tx *transaction) Run(cypher string, params map[string]any) (Result, error) {
-	result, err := tx.delegate.Run(context.Background(), cypher, params)
-	if err != nil {
-		return nil, err
+func (tx *explicitTransaction) Run(ctx context.Context, cypher string, params map[string]any) (Result, error) {
+	if tx.conn == nil {
+		return nil, transactionAlreadyCompletedError()
 	}
-	return result.legacy(), nil
+	stream, err := tx.conn.RunTx(ctx, tx.txHandle, db.Command{Cypher: cypher, Params: params, FetchSize: tx.fetchSize})
+	if err != nil {
+		tx.txState.onError(err)
+		return nil, errorutil.WrapError(tx.txState.err)
+	}
+	// no result consumption hook here since bookmarks are sent after commit, not after pulling results
+	result := newResult(tx.conn, stream, cypher, params, tx.txState, nil)
+	tx.txState.resultErrorHandlers = append(tx.txState.resultErrorHandlers, result.errorHandler)
+	return result, nil
 }
 
-func (tx *transaction) Commit() error {
-	return tx.delegate.Commit(context.Background())
+func (tx *explicitTransaction) Commit(ctx context.Context) error {
+	if tx.txState.err != nil {
+		return transactionAlreadyCompletedError()
+	}
+	if tx.conn == nil {
+		return transactionAlreadyCompletedError()
+	}
+	tx.txState.err = tx.conn.TxCommit(ctx, tx.txHandle)
+	tx.onClosed()
+	return errorutil.WrapError(tx.txState.err)
 }
 
-func (tx *transaction) Rollback() error {
-	return tx.delegate.Rollback(context.Background())
+func (tx *explicitTransaction) Close(ctx context.Context) error {
+	if tx.conn == nil {
+		// repeated calls to Close => NOOP
+		return nil
+	}
+	return tx.Rollback(ctx)
 }
 
-func (tx *transaction) Close() error {
-	return tx.delegate.Close(context.Background())
+func (tx *explicitTransaction) Rollback(ctx context.Context) error {
+	if tx.txState.err != nil {
+		return nil
+	}
+	if tx.conn == nil {
+		return transactionAlreadyCompletedError()
+	}
+	if !tx.conn.IsAlive() || tx.conn.HasFailed() {
+		// tx implicitly rolled back by having failed
+		tx.txState.err = nil
+	} else {
+		tx.txState.err = tx.conn.TxRollback(ctx, tx.txHandle)
+	}
+	tx.onClosed()
+	return errorutil.WrapError(tx.txState.err)
+}
+
+// ManagedTransaction implementation used as parameter to transactional functions
+type managedTransaction struct {
+	conn      db.Connection
+	fetchSize int
+	txHandle  db.TxHandle
+	txState   *transactionState
+}
+
+func (tx *managedTransaction) Run(ctx context.Context, cypher string, params map[string]any) (Result, error) {
+	stream, err := tx.conn.RunTx(ctx, tx.txHandle, db.Command{Cypher: cypher, Params: params, FetchSize: tx.fetchSize})
+	if err != nil {
+		return nil, errorutil.WrapError(err)
+	}
+	// no result consumption hook here since bookmarks are sent after commit, not after pulling results
+	return newResult(tx.conn, stream, cypher, params, tx.txState, nil), nil
+}
+
+// Represents an auto commit transaction.
+// Does not implement the ExplicitTransaction nor the ManagedTransaction interface.
+type autocommitTransaction struct {
+	conn     db.Connection
+	res      Result
+	closed   bool
+	onClosed func()
+}
+
+func (tx *autocommitTransaction) done(ctx context.Context) {
+	if !tx.closed {
+		tx.res.buffer(ctx)
+		tx.closed = true
+		tx.onClosed()
+	}
+}
+
+func (tx *autocommitTransaction) discard(ctx context.Context) {
+	if !tx.closed {
+		tx.res.Consume(ctx)
+		tx.closed = true
+		tx.onClosed()
+	}
+}
+
+func transactionAlreadyCompletedError() *UsageError {
+	return &UsageError{Message: "cannot use this transaction, because it has been committed or rolled back either because of an error or explicit termination"}
 }

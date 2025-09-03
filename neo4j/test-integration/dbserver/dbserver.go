@@ -25,9 +25,9 @@ import (
 	"strconv"
 	"sync"
 
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/config"
+	"github.com/neo4j/neo4j-go-driver/v6/neo4j/config"
 
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
+	"github.com/neo4j/neo4j-go-driver/v6/neo4j"
 )
 
 var (
@@ -187,8 +187,8 @@ func (s DbServer) AuthToken() neo4j.AuthToken {
 	return neo4j.BasicAuth(s.Username, s.Password, "")
 }
 
-func (s DbServer) Driver(configurers ...func(*config.Config)) neo4j.DriverWithContext {
-	driver, err := neo4j.NewDriverWithContext(s.URI(), s.AuthToken(), configurers...)
+func (s DbServer) Driver(configurers ...func(*config.Config)) neo4j.Driver {
+	driver, err := neo4j.NewDriver(s.URI(), s.AuthToken(), configurers...)
 	if err != nil {
 		panic(err)
 	}

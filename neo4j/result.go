@@ -6,86 +6,317 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      https://www.apache.org/licenses/LICENSE-2.0
+ *     https://www.apache.org/licenses/LICENSE-2.0
  *
- *  Unless required by applicable law or agreed to in writing, software
- *  distributed under the License is distributed on an "AS IS" BASIS,
- *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *  See the License for the specific language governing permissions and
- *  limitations under the License.
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 
 package neo4j
 
 import (
 	"context"
+
+	"github.com/neo4j/neo4j-go-driver/v6/neo4j/db"
+	idb "github.com/neo4j/neo4j-go-driver/v6/neo4j/internal/db"
+	"github.com/neo4j/neo4j-go-driver/v6/neo4j/internal/errorutil"
 )
 
-// Result is created via the Session type.
-//
-// Deprecated: use ResultWithContext instead.
 type Result interface {
 	// Keys returns the keys available on the result set.
 	Keys() ([]string, error)
-	// Next returns true only if there is a record to be processed.
-	Next() bool
 	// NextRecord returns true if there is a record to be processed, record parameter is set
 	// to point to current record.
-	NextRecord(record **Record) bool
+	NextRecord(ctx context.Context, record **Record) bool
+	// Next returns true only if there is a record to be processed.
+	Next(ctx context.Context) bool
 	// PeekRecord returns true if there is a record after the current one to be processed without advancing the record
 	// stream, record parameter is set to point to that record if present.
-	PeekRecord(record **Record) bool
+	PeekRecord(ctx context.Context, record **Record) bool
+	// Peek returns true only if there is a record after the current one to be processed without advancing the record
+	// stream
+	Peek(ctx context.Context) bool
 	// Err returns the latest error that caused this Next to return false.
 	Err() error
 	// Record returns the current record.
 	Record() *Record
 	// Collect fetches all remaining records and returns them.
-	Collect() ([]*Record, error)
-	// Single returns one and only one record from the stream.
-	// If the result stream contains zero or more than one records, error is returned.
-	Single() (*Record, error)
+	Collect(ctx context.Context) ([]*Record, error)
+	// Records returns a single-use iterator over the records in this result.
+	// This method's signature is in the style of and compatible with iter.Seq2 (go 1.23.0 and newer).
+	Records(ctx context.Context) func(yield func(*Record, error) bool)
+	// Single returns the only remaining record from the stream.
+	// If none or more than one record is left, an error is returned.
+	// The result is fully consumed after this call and its summary is immediately available when calling Consume.
+	Single(ctx context.Context) (*Record, error)
 	// Consume discards all remaining records and returns the summary information
 	// about the statement execution.
-	Consume() (ResultSummary, error)
+	Consume(ctx context.Context) (ResultSummary, error)
+	// IsOpen determines whether this result cursor is available
+	IsOpen() bool
+	buffer(ctx context.Context)
+	errorHandler(err error)
 }
 
-// deprecated: use resultWithContext instead
+// ResultWithContext is an alias for Result to maintain backward compatibility
+// for users who migrated from v5 to v6 using the WithContext APIs.
+// In v6, Result is the primary interface and is context-aware.
+//
+// Deprecated: please use Result instead. This alias will be removed in 7.0.
+type ResultWithContext = Result
+
+const consumedResultError = "result cursor is not available anymore"
+
+const resultFailedError = "result failed due to invalid transaction"
+
 type result struct {
-	delegate ResultWithContext
+	conn                 idb.Connection
+	streamHandle         idb.StreamHandle
+	cypher               string
+	params               map[string]any
+	record               *Record
+	summary              *db.Summary
+	err                  error
+	peekedRecord         *Record
+	peekedSummary        *db.Summary
+	peeked               bool
+	txState              *transactionState
+	afterConsumptionHook func()
+}
+
+func newResult(
+	connection idb.Connection,
+	stream idb.StreamHandle,
+	cypher string,
+	params map[string]any,
+	txState *transactionState,
+	afterConsumptionHook func(),
+) Result {
+	return &result{
+		conn:                 connection,
+		streamHandle:         stream,
+		cypher:               cypher,
+		params:               params,
+		txState:              txState,
+		afterConsumptionHook: afterConsumptionHook,
+	}
 }
 
 func (r *result) Keys() ([]string, error) {
-	return r.delegate.Keys()
+	return r.conn.Keys(r.streamHandle)
 }
 
-func (r *result) Next() bool {
-	return r.delegate.Next(context.Background())
+func (r *result) NextRecord(ctx context.Context, out **Record) bool {
+	hasNext := r.Next(ctx)
+	if out != nil {
+		*out = r.record
+	}
+	return hasNext
 }
 
-func (r *result) NextRecord(out **Record) bool {
-	return r.delegate.NextRecord(context.Background(), out)
+func (r *result) Next(ctx context.Context) bool {
+	r.checkOpen()
+	if r.err != nil {
+		return false
+	}
+	r.advance(ctx)
+	if r.summary != nil {
+		r.callAfterConsumptionHook()
+	}
+	return r.record != nil
 }
 
-func (r *result) PeekRecord(out **Record) bool {
-	return r.delegate.PeekRecord(context.Background(), out)
+func (r *result) PeekRecord(ctx context.Context, out **Record) bool {
+	hasNext := r.Peek(ctx)
+	if out != nil {
+		*out = r.peekedRecord
+	}
+	return hasNext
 }
 
-func (r *result) Record() *Record {
-	return r.delegate.Record()
+func (r *result) Peek(ctx context.Context) bool {
+	r.checkOpen()
+	if r.err != nil {
+		return false
+	}
+	r.peek(ctx)
+	return r.peekedRecord != nil
 }
 
 func (r *result) Err() error {
-	return r.delegate.Err()
+	return errorutil.WrapError(r.err)
 }
 
-func (r *result) Collect() ([]*Record, error) {
-	return r.delegate.Collect(context.Background())
+func (r *result) Record() *Record {
+	if r.peekedRecord != nil {
+		return r.peekedRecord
+	}
+	return r.record
 }
 
-func (r *result) Single() (*Record, error) {
-	return r.delegate.Single(context.Background())
+func (r *result) Records(ctx context.Context) func(yield func(*Record, error) bool) {
+	return func(yield func(*db.Record, error) bool) {
+		for {
+			r.checkOpen()
+			if r.err != nil {
+				break
+			}
+			r.advance(ctx)
+			if r.record == nil || r.err != nil || r.summary != nil {
+				break
+			}
+			if !yield(r.record, nil) {
+				return
+			}
+		}
+		if r.err != nil {
+			yield(nil, errorutil.WrapError(r.err))
+		}
+		if r.summary != nil {
+			r.callAfterConsumptionHook()
+		}
+	}
 }
 
-func (r *result) Consume() (ResultSummary, error) {
-	return r.delegate.Consume(context.Background())
+func (r *result) Collect(ctx context.Context) ([]*Record, error) {
+	if r.err != nil {
+		return nil, errorutil.WrapError(r.err)
+	}
+	if r.summary != nil {
+		return []*Record{}, nil
+	}
+	recs := make([]*Record, 0, 1024)
+	var err error
+	r.Records(ctx)(func(r *Record, innerErr error) bool {
+		if innerErr != nil {
+			err = innerErr
+			return false
+		}
+
+		recs = append(recs, r)
+		return true
+	})
+	if err != nil {
+		return nil, err
+	}
+	return recs, nil
+}
+
+func (r *result) Single(ctx context.Context) (*Record, error) {
+	// Try retrieving the single record
+	r.advance(ctx)
+	if r.err != nil {
+		return nil, errorutil.WrapError(r.err)
+	}
+	if r.summary != nil {
+		r.err = &UsageError{Message: "Result contains no more records"}
+		return nil, r.err
+	}
+
+	// This is the potential single record
+	single := r.record
+
+	// Probe connection for more records
+	r.advance(ctx)
+	if r.record != nil {
+		// There were more records, consume the stream since the user didn't
+		// expect more records and should therefore not use them.
+		r.summary, _ = r.conn.Consume(ctx, r.streamHandle)
+		r.err = &UsageError{Message: "Result contains more than one record"}
+		r.record = nil
+		return nil, r.err
+	}
+	if r.err != nil {
+		// Might be more records or not, anyway something is bad.
+		// Both r.record and r.summary are nil at this point which is good.
+		return nil, errorutil.WrapError(r.err)
+	}
+	// We got the expected summary
+	// r.record contains the single record and r.summary the summary.
+	r.record = single
+	r.callAfterConsumptionHook()
+	return single, nil
+}
+
+func (r *result) Consume(ctx context.Context) (ResultSummary, error) {
+	// Already failed, reuse the internal error, might have been
+	// set by Single to indicate some kind of usage error that "destroyed"
+	// the result.
+	if r.err != nil {
+		return nil, errorutil.WrapError(r.err)
+	}
+
+	r.record = nil
+	r.summary, r.err = r.conn.Consume(ctx, r.streamHandle)
+	if r.err != nil {
+		return nil, errorutil.WrapError(r.err)
+	}
+	r.callAfterConsumptionHook()
+	return r.toResultSummary(), nil
+}
+
+func (r *result) IsOpen() bool {
+	return r.isOpen()
+}
+
+func (r *result) buffer(ctx context.Context) {
+	if r.err = r.conn.Buffer(ctx, r.streamHandle); r.err == nil {
+		r.callAfterConsumptionHook()
+	}
+}
+
+func (r *result) toResultSummary() ResultSummary {
+	return &resultSummary{
+		sum:    r.summary,
+		cypher: r.cypher,
+		params: r.params,
+	}
+}
+
+func (r *result) advance(ctx context.Context) {
+	if r.peeked {
+		r.record, r.peekedRecord = r.peekedRecord, nil
+		r.summary, r.peekedSummary = r.peekedSummary, nil
+		r.peeked = false
+	} else {
+		r.record, r.summary, r.err = r.conn.Next(ctx, r.streamHandle)
+		if r.err != nil {
+			r.txState.onError(r.err)
+		}
+	}
+}
+
+func (r *result) peek(ctx context.Context) {
+	if !r.peeked {
+		r.peekedRecord, r.peekedSummary, r.err = r.conn.Next(ctx, r.streamHandle)
+		r.peeked = true
+	}
+}
+
+func (r *result) checkOpen() {
+	alreadyChecked := r.err != nil && r.err.Error() == consumedResultError
+	if !alreadyChecked && !r.isOpen() {
+		r.err = &UsageError{Message: consumedResultError}
+	}
+}
+
+func (r *result) isOpen() bool {
+	return r.summary == nil
+}
+
+func (r *result) callAfterConsumptionHook() {
+	if r.afterConsumptionHook == nil {
+		return
+	}
+	r.afterConsumptionHook()
+	r.afterConsumptionHook = nil
+}
+
+func (r *result) errorHandler(error) {
+	if r.err == nil {
+		r.err = &UsageError{Message: resultFailedError}
+	}
 }

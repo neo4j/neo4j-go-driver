@@ -19,10 +19,11 @@ package neo4j_test
 
 import (
 	"context"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
-	. "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/testutil"
 	"testing"
 	"testing/quick"
+
+	"github.com/neo4j/neo4j-go-driver/v6/neo4j"
+	. "github.com/neo4j/neo4j-go-driver/v6/neo4j/internal/testutil"
 )
 
 func TestCombineBookmarks(t *testing.T) {

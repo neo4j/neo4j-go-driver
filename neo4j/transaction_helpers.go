@@ -6,13 +6,13 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      https://www.apache.org/licenses/LICENSE-2.0
+ *     https://www.apache.org/licenses/LICENSE-2.0
  *
- *  Unless required by applicable law or agreed to in writing, software
- *  distributed under the License is distributed on an "AS IS" BASIS,
- *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *  See the License for the specific language governing permissions and
- *  limitations under the License.
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 
 package neo4j
@@ -26,10 +26,10 @@ type ManagedTransactionWorkT[T any] func(tx ManagedTransaction) (T, error)
 // ExecuteRead executes the given unit of work in a read transaction with
 // retry logic in place, via the provided session.
 //
-// This is the generic variant of SessionWithContext.ExecuteRead.
+// This is the generic variant of Session.ExecuteRead.
 //
 // If an error occurs, the zero value of T is returned.
-func ExecuteRead[T any](ctx context.Context, session SessionWithContext,
+func ExecuteRead[T any](ctx context.Context, session Session,
 	work ManagedTransactionWorkT[T],
 	configurers ...func(config *TransactionConfig)) (T, error) {
 
@@ -39,10 +39,10 @@ func ExecuteRead[T any](ctx context.Context, session SessionWithContext,
 // ExecuteWrite executes the given unit of work in a write transaction with
 // retry logic in place, via the provided session.
 //
-// This is the generic variant of SessionWithContext.ExecuteWrite.
+// This is the generic variant of Session.ExecuteWrite.
 //
 // If an error occurs, the zero value of T is returned.
-func ExecuteWrite[T any](ctx context.Context, session SessionWithContext,
+func ExecuteWrite[T any](ctx context.Context, session Session,
 	work ManagedTransactionWorkT[T],
 	configurers ...func(config *TransactionConfig)) (T, error) {
 

@@ -28,11 +28,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
-	pool2 "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/pool"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/testutil"
-	itime "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/time"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/log"
+	"github.com/neo4j/neo4j-go-driver/v6/neo4j/internal/db"
+	pool2 "github.com/neo4j/neo4j-go-driver/v6/neo4j/internal/pool"
+	"github.com/neo4j/neo4j-go-driver/v6/neo4j/internal/testutil"
+	itime "github.com/neo4j/neo4j-go-driver/v6/neo4j/internal/time"
+	"github.com/neo4j/neo4j-go-driver/v6/neo4j/log"
 )
 
 var logger = log.ToVoid()

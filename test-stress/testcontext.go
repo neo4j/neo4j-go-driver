@@ -22,12 +22,12 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
+	"github.com/neo4j/neo4j-go-driver/v6/neo4j"
 )
 
 // TestContext provides state data shared across tests
 type TestContext struct {
-	driver    neo4j.DriverWithContext
+	driver    neo4j.Driver
 	stop      int32
 	bookmarks atomic.Value
 
@@ -38,7 +38,7 @@ type TestContext struct {
 }
 
 // NewTestContext returns a new TestContext
-func NewTestContext(driver neo4j.DriverWithContext) *TestContext {
+func NewTestContext(driver neo4j.Driver) *TestContext {
 	result := &TestContext{
 		driver:                 driver,
 		stop:                   0,

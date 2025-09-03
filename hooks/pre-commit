@@ -14,8 +14,9 @@ verlt() {
 
 go_version=$(go version | grep -o "go\([0-9.]\)\+" | grep -o "\([0-9.]\)\+")
 staticcheck_version="latest"
-if verlt $go_version "1.23.0"; then  # go 1.18 and below
-	>&2 echo "Project requires go1.23 or newer"
+if verlt $go_version "1.24.0"; then
+	>&2 echo "Project requires go1.24 or newer"
+    exit 1
 fi
 
 echo "# pre-commit hook"

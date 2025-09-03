@@ -14,6 +14,14 @@ Read [Go official release policy](https://go.dev/doc/devel/release#policy) to le
 
 Make sure your application has been set up to use go modules (there should be a go.mod file in your application root).
 
+#### 6.x
+
+Add the driver with:
+
+```shell
+go get github.com/neo4j/neo4j-go-driver/v6
+```
+
 #### 5.x
 
 Add the driver with:
@@ -32,7 +40,7 @@ go get github.com/neo4j/neo4j-go-driver/v4
 
 #### 1.x
 
-For versions 1.x of the driver (notice the absence of `/v4` or `/v5`), run instead the following:
+For versions 1.x of the driver (notice the absence of `/v4`, `/v5` or `/v6`), run instead the following:
 
 ```shell
 go get github.com/neo4j/neo4j-go-driver
@@ -41,7 +49,7 @@ go get github.com/neo4j/neo4j-go-driver
 ## Documentation
 
 Drivers manual that describes general driver concepts in depth [here](https://neo4j.com/docs/go-manual/current/).
-Go package API documentation [here](https://pkg.go.dev/github.com/neo4j/neo4j-go-driver/v5/neo4j).
+Go package API documentation [here](https://pkg.go.dev/github.com/neo4j/neo4j-go-driver/v6/neo4j).
 
 ## Preview Features
 
@@ -80,12 +88,12 @@ package main
 import (
     "context"
     "fmt"
-    "github.com/neo4j/neo4j-go-driver/v5/neo4j"
+    "github.com/neo4j/neo4j-go-driver/v6/neo4j"
 )
 
 func main() {
     dbUri := "neo4j://localhost" // scheme://host(:port) (default port is 7687)
-    driver, err := neo4j.NewDriverWithContext(dbUri, neo4j.BasicAuth("neo4j", "letmein!", ""))
+    driver, err := neo4j.NewDriver(dbUri, neo4j.BasicAuth("neo4j", "letmein!", ""))
     if err != nil {
         panic(err)
     }
@@ -105,7 +113,7 @@ func main() {
     fmt.Printf("%v\n", item)
 }
 
-func insertItem(ctx context.Context, driver neo4j.DriverWithContext) (*Item, error) {
+func insertItem(ctx context.Context, driver neo4j.Driver) (*Item, error) {
     result, err := neo4j.ExecuteQuery(ctx, driver,
         "CREATE (n:Item { id: $id, name: $name }) RETURN n",
         map[string]any{
@@ -284,23 +292,23 @@ Note:
 
 ## Logging
 
-Logging at the driver level can be configured by setting `Log` field of `neo4j.Config` through configuration functions that can be passed to `neo4j.NewDriver` function.
+Logging at the driver level can be configured by setting `Log` field of `config.Config` through configuration functions that can be passed to `neo4j.NewDriver` function.
 
 ### Console Logger
 
-For simplicity, we provide a predefined console logger which can be constructed by `neo4j.ConsoleLogger` function. To enable console logger, you need to specify which level you need to enable (`neo4j.ERROR`, `neo4j.WARNING`, `neo4j.INFO` and `neo4j.DEBUG` which are ordered by the level of detail).
+For simplicity, we provide a predefined console logger which can be constructed by `log.ToConsole` function. To enable console logger, you need to specify which level you need to enable (`log.ERROR`, `log.WARNING`, `log.INFO` and `log.DEBUG` which are ordered by the level of detail).
 
 A simple code snippet that will enable console logging is as follows;
 
 ```go
-useConsoleLogger := func(level neo4j.LogLevel) func(config *neo4j.Config) {
-	return func(config *neo4j.Config) {
-		config.Log = neo4j.ConsoleLogger(level)
+useConsoleLogger := func(level log.Level) func(config *config.Config) {
+	return func(config *config.Config) {
+		config.Log = log.ToConsole(level)
 	}
 }
 
 // Construct a new driver
-if driver, err = neo4j.NewDriver(uri, neo4j.BasicAuth(username, password, ""), useConsoleLogger(neo4j.ERROR)); err != nil {
+if driver, err = neo4j.NewDriver(uri, neo4j.BasicAuth(username, password, ""), useConsoleLogger(log.ERROR)); err != nil {
 	return err
 }
 defer driver.Close()
@@ -308,7 +316,7 @@ defer driver.Close()
 
 ### Custom Logger
 
-The `Log` field of the `neo4j.Config` struct is defined to be of interface `neo4j/log.Logger` which has the following definition:
+The `Log` field of the `config.Config` struct is defined to be of interface `log.Logger` which has the following definition:
 
 ```go
 type Logger interface {
@@ -328,10 +336,10 @@ This is **disabled** by default.
 
 ### Console Bolt logger
 
-For simplicity, we provide a predefined console logger which can be constructed by `neo4j.ConsoleBoltLogger`.
+For simplicity, we provide a predefined console logger which can be constructed by `log.BoltToConsole`.
 
 ```go
-boltLogger := neo4j.ConsoleBoltLogger()
+boltLogger := log.BoltToConsole()
 
 # for ExecuteQuery
 result, err := neo4j.ExecuteQuery(ctx, driver, query, params, transformer, neo4j.ExecuteQueryWithBoltLogger(boltLogger))
@@ -342,7 +350,7 @@ session := driver.NewSession(neo4j.SessionConfig{BoltLogger: boltLogger})
 
 ### Custom Bolt Logger
 
-The `BoltLogger` field of the `neo4j.SessionConfig` struct is defined to be of interface `neo4j/log.BoltLogger` which has the following definition:
+The `BoltLogger` field of the `neo4j.SessionConfig` struct is defined to be of interface `log.BoltLogger` which has the following definition:
 
 ```go
 type BoltLogger interface {

@@ -23,8 +23,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/test-integration/dbserver"
+	"github.com/neo4j/neo4j-go-driver/v6/neo4j"
+	"github.com/neo4j/neo4j-go-driver/v6/neo4j/test-integration/dbserver"
 )
 
 func TestTransaction(outer *testing.T) {
@@ -35,10 +35,10 @@ func TestTransaction(outer *testing.T) {
 	ctx := context.Background()
 	server := dbserver.GetDbServer(ctx)
 	var err error
-	var driver neo4j.DriverWithContext
-	var session neo4j.SessionWithContext
+	var driver neo4j.Driver
+	var session neo4j.Session
 	var tx neo4j.ExplicitTransaction
-	var result neo4j.ResultWithContext
+	var result neo4j.Result
 
 	driver = server.Driver()
 	session = driver.NewSession(ctx, neo4j.SessionConfig{AccessMode: neo4j.AccessModeWrite})

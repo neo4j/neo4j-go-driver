@@ -21,7 +21,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
+	"github.com/neo4j/neo4j-go-driver/v6/neo4j"
 )
 
 func nCopiesInt(n int, x int) []int {
@@ -100,7 +100,7 @@ func assertBooleansSlice(bools1 []bool, bools2 []any) {
 	}
 }
 
-func runBigDataThing(ctx context.Context, driver neo4j.DriverWithContext) {
+func runBigDataThing(ctx context.Context, driver neo4j.Driver) {
 	const batchSize = 10000
 	const nodeCount = 30000
 

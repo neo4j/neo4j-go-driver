@@ -18,10 +18,15 @@
 package main
 
 import (
+	"encoding/binary"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/dbtype"
+	"math"
+	"strings"
 	"time"
+
+	"github.com/neo4j/neo4j-go-driver/v6/neo4j/dbtype"
 )
 
 // Converts received proxied "cypher" types to Go native types.
@@ -143,6 +148,79 @@ func cypherToNative(c any) (any, error) {
 			}, nil
 		}
 		panic(fmt.Errorf("unknown spatial reference ID: %s", spatialReference))
+	case "CypherVector":
+		dtype := d["dtype"].(string)
+		data := d["data"].(string)
+
+		// Parse hex string to bytes
+		hexData := strings.ReplaceAll(data, " ", "")
+		var bytes []byte
+		var err error
+		if hexData == "" {
+			// Empty hex string means empty vector
+			bytes = []byte{}
+		} else {
+			bytes, err = hex.DecodeString(hexData)
+			if err != nil {
+				return nil, fmt.Errorf("failed to decode hex data: %v", err)
+			}
+		}
+
+		switch dtype {
+		case "i8":
+			vec := make(dbtype.Vector[int8], 0, len(bytes))
+			for _, b := range bytes {
+				vec = append(vec, int8(b))
+			}
+			return vec, nil
+		case "i16":
+			if len(bytes)%2 != 0 {
+				return nil, fmt.Errorf("invalid data length for i16: %d", len(bytes))
+			}
+			vec := make(dbtype.Vector[int16], 0, len(bytes)/2)
+			for i := 0; i < len(bytes); i += 2 {
+				vec = append(vec, int16(binary.BigEndian.Uint16(bytes[i:i+2])))
+			}
+			return vec, nil
+		case "i32":
+			if len(bytes)%4 != 0 {
+				return nil, fmt.Errorf("invalid data length for i32: %d", len(bytes))
+			}
+			vec := make(dbtype.Vector[int32], 0, len(bytes)/4)
+			for i := 0; i < len(bytes); i += 4 {
+				vec = append(vec, int32(binary.BigEndian.Uint32(bytes[i:i+4])))
+			}
+			return vec, nil
+		case "i64":
+			if len(bytes)%8 != 0 {
+				return nil, fmt.Errorf("invalid data length for i64: %d", len(bytes))
+			}
+			vec := make(dbtype.Vector[int64], 0, len(bytes)/8)
+			for i := 0; i < len(bytes); i += 8 {
+				vec = append(vec, int64(binary.BigEndian.Uint64(bytes[i:i+8])))
+			}
+			return vec, nil
+		case "f32":
+			if len(bytes)%4 != 0 {
+				return nil, fmt.Errorf("invalid data length for f32: %d", len(bytes))
+			}
+			vec := make(dbtype.Vector[float32], 0, len(bytes)/4)
+			for i := 0; i < len(bytes); i += 4 {
+				vec = append(vec, math.Float32frombits(binary.BigEndian.Uint32(bytes[i:i+4])))
+			}
+			return vec, nil
+		case "f64":
+			if len(bytes)%8 != 0 {
+				return nil, fmt.Errorf("invalid data length for f64: %d", len(bytes))
+			}
+			vec := make(dbtype.Vector[float64], 0, len(bytes)/8)
+			for i := 0; i < len(bytes); i += 8 {
+				vec = append(vec, math.Float64frombits(binary.BigEndian.Uint64(bytes[i:i+8])))
+			}
+			return vec, nil
+		default:
+			return nil, fmt.Errorf("unsupported vector dtype: %s", dtype)
+		}
 	}
 	panic(fmt.Sprintf("Don't know how to convert %s to native", n))
 }

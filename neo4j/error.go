@@ -20,15 +20,18 @@ package neo4j
 import (
 	"context"
 	"fmt"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/db"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/errorutil"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/retry"
+
+	"github.com/neo4j/neo4j-go-driver/v6/neo4j/db"
+	"github.com/neo4j/neo4j-go-driver/v6/neo4j/internal/errorutil"
+	"github.com/neo4j/neo4j-go-driver/v6/neo4j/internal/retry"
 )
 
 // IsRetryable determines whether an operation can be retried based on the error
 // it triggered. This API is meant for use in scenarios where users want to
 // implement their own retry mechanism.
 // A similar logic is used by the driver for transaction functions.
+//
+// NOTE: This does not apply when running auto-commit transactions (Session.Run/SessionWithContext.Run)
 func IsRetryable(err error) bool {
 	if err == nil {
 		return false
