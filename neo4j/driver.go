@@ -418,6 +418,7 @@ func (d *driver) Close(ctx context.Context) error {
 	d.mut.Lock()
 	if d.pool == nil {
 		// Safeguard against closing more than once
+		d.mut.Unlock()
 		return nil
 	}
 	pool := d.pool

@@ -219,6 +219,20 @@ func TestNewDriverAndClose(t *testing.T) {
 	}
 }
 
+func TestDriverMultipleCloseCalls(t *testing.T) {
+	ctx := context.Background()
+	driver, err := NewDriver("bolt://localhost:7687", NoAuth())
+	AssertNoError(t, err)
+
+	// Test multiple Close calls - should not deadlock
+	for i := range 10 {
+		err = driver.Close(ctx)
+		if err != nil {
+			t.Errorf("Close() call %d unexpected error = %v", i+1, err)
+		}
+	}
+}
+
 func TestDriverSessionCreation(t *testing.T) {
 	driverSessionCreationTests := []struct {
 		name      string
