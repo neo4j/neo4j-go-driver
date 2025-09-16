@@ -21,7 +21,6 @@ package neo4j
 import (
 	"context"
 	"fmt"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/homedb"
 	"net/url"
 	"strings"
 	"sync"
@@ -30,6 +29,7 @@ import (
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/connector"
 	idb "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/errorutil"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/homedb"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/pool"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/router"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/log"
@@ -398,13 +398,13 @@ func (d *driverWithContext) GetServerInfo(ctx context.Context) (_ ServerInfo, er
 
 func (d *driverWithContext) Close(ctx context.Context) error {
 	d.mut.Lock()
+	defer d.mut.Unlock()
 	if d.pool == nil {
 		// Safeguard against closing more than once
 		return nil
 	}
 	pool := d.pool
 	d.pool = nil
-	d.mut.Unlock()
 
 	pool.Close(ctx)
 	pool = nil
