@@ -34,8 +34,12 @@ func init() {
 
 func extrasExecuteQueryAuthConfig(backend *backend, data map[string]any, config *neo4j.ExecuteQueryConfiguration) error {
 	// Append Auth configuration if it exists
-	if data["authorizationToken"] != nil {
-		token, err := getAuth(data["authorizationToken"].(map[string]any)["data"].(map[string]any))
+	if data["config"] == nil {
+		return nil
+	}
+	executeQueryConfig := data["config"].(map[string]any)
+	if executeQueryConfig["authorizationToken"] != nil {
+		token, err := getAuth(executeQueryConfig["authorizationToken"].(map[string]any)["data"].(map[string]any))
 		if err != nil {
 			return err
 		}

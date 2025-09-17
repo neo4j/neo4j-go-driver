@@ -34,11 +34,15 @@ func init() {
 
 func extrasExecuteQueryTxConfig(backend *backend, data map[string]any, config *neo4j.ExecuteQueryConfiguration) error {
 	// Append configurers to config if they exist.
-	if data["timeout"] != nil {
-		config.TransactionConfigurers = append(config.TransactionConfigurers, neo4j.WithTxTimeout(backend.toTimeout(data)))
+	if data["config"] == nil {
+		return nil
 	}
-	if data["txMeta"] != nil {
-		config.TransactionConfigurers = append(config.TransactionConfigurers, neo4j.WithTxMetadata(backend.toTxMetadata(data)))
+	executeQueryConfig := data["config"].(map[string]any)
+	if executeQueryConfig["timeout"] != nil {
+		config.TransactionConfigurers = append(config.TransactionConfigurers, neo4j.WithTxTimeout(backend.toTimeout(executeQueryConfig)))
+	}
+	if executeQueryConfig["txMeta"] != nil {
+		config.TransactionConfigurers = append(config.TransactionConfigurers, neo4j.WithTxMetadata(backend.toTxMetadata(executeQueryConfig)))
 	}
 	return nil
 }
