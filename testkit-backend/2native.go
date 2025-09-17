@@ -26,6 +26,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/neo4j/neo4j-go-driver/v6/neo4j/db"
 	"github.com/neo4j/neo4j-go-driver/v6/neo4j/dbtype"
 )
 
@@ -221,6 +222,24 @@ func cypherToNative(c any) (any, error) {
 		default:
 			return nil, fmt.Errorf("unsupported vector dtype: %s", dtype)
 		}
+	case "CypherUnknownType":
+		name := d["name"].(string)
+		major := asInt(d["minimumProtocolMajor"].(json.Number))
+		minor := asInt(d["minimumProtocolMinor"].(json.Number))
+
+		var message *string
+		if msg, ok := d["message"].(string); ok {
+			message = &msg
+		}
+
+		return &dbtype.UnsupportedType{
+			Name: name,
+			MinimumProtocolVersion: db.ProtocolVersion{
+				Major: major,
+				Minor: minor,
+			},
+			Message: message,
+		}, nil
 	}
 	panic(fmt.Sprintf("Don't know how to convert %s to native", n))
 }

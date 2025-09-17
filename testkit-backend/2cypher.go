@@ -218,6 +218,19 @@ func nativeToCypher(v any) map[string]any {
 		return vectorToCypher("f32", x)
 	case dbtype.Vector[float64]:
 		return vectorToCypher("f64", x)
+	case *dbtype.UnsupportedType:
+		data := map[string]any{
+			"name":                 x.Name,
+			"minimumProtocolMajor": x.MinimumProtocolVersion.Major,
+			"minimumProtocolMinor": x.MinimumProtocolVersion.Minor,
+		}
+		if x.Message != nil {
+			data["message"] = *x.Message
+		}
+		return map[string]any{
+			"name": "CypherUnknownType",
+			"data": data,
+		}
 	}
 
 	panic(fmt.Sprintf("Don't know how to patch %T", v))

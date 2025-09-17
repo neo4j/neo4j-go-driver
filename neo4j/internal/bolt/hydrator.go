@@ -517,6 +517,8 @@ func (h *hydrator) value() any {
 			return h.localTime(n)
 		case 'E':
 			return h.duration(n)
+		case '?':
+			return h.unsupportedType(n)
 		default:
 			return h.unknownStructError(t)
 		}
@@ -1190,6 +1192,39 @@ func (h *hydrator) vector(n uint32) any {
 			Err:         fmt.Sprintf("Unknown vector type marker: %d", typeMarker[0]),
 		})
 		return nil
+	}
+}
+
+func (h *hydrator) unsupportedType(n uint32) any {
+	h.assertLength("unsupported", 4, n)
+	if h.getErr() != nil {
+		return nil
+	}
+
+	h.unp.Next()
+	name := h.unp.String()
+
+	h.unp.Next()
+	major := int(h.unp.Int())
+
+	h.unp.Next()
+	minor := int(h.unp.Int())
+
+	h.unp.Next()
+	extra := h.amap()
+
+	var message *string
+	if msg, ok := extra["message"].(string); ok {
+		message = &msg
+	}
+
+	return &dbtype.UnsupportedType{
+		Name: name,
+		MinimumProtocolVersion: db.ProtocolVersion{
+			Major: major,
+			Minor: minor,
+		},
+		Message: message,
 	}
 }
 
