@@ -133,16 +133,24 @@ func TestServer(ot *testing.T) {
 		}
 	})
 
-	ot.Run("closeAll clears all connections", func(t *testing.T) {
+	ot.Run("startClosing sets closing flag", func(t *testing.T) {
 		s := NewServer()
 		// Register and return three connections
 		_, _ = populateServer(s, time.Now(), 3, 3)
-		s.closeAll(context.Background(), closeConnection)
-		if s.idle.Len() != 0 {
-			t.Errorf("Expected 0 idle connections, found %d", s.idle.Len())
-		}
-		if s.busy.Len() != 0 {
-			t.Errorf("Expected 0 busy connections, found %d", s.busy.Len())
+		s.startClosing(context.Background(), closeConnection)
+		testutil.AssertTrue(t, s.closing)
+	})
+
+	ot.Run("closing flag makes returnBusy close connections", func(t *testing.T) {
+		s := NewServer()
+		// Register and return three connections
+		_, busy_connections := populateServer(s, time.Now(), 0, 3)
+		s.startClosing(context.Background(), closeConnection)
+		for i, c := range busy_connections {
+			testutil.AssertFalse(t, c.Closed)
+			s.returnBusy(context.Background(), c, closeConnection)
+			testutil.AssertTrue(t, c.Closed)
+			testutil.AssertIntEqual(t, s.busy.Len(), 2-i)
 		}
 	})
 }

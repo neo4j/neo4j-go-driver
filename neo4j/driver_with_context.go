@@ -21,7 +21,6 @@ package neo4j
 import (
 	"context"
 	"fmt"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/homedb"
 	"net/url"
 	"strings"
 	"sync"
@@ -30,6 +29,7 @@ import (
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/connector"
 	idb "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/errorutil"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/homedb"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/pool"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/router"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/log"
@@ -83,7 +83,13 @@ type DriverWithContext interface {
 	// If the error is on that list, an `neo4j.InvalidAuthenticationError` is returned.
 	// Otherwise, the original error is returned.
 	VerifyAuthentication(ctx context.Context, auth *AuthToken) error
-	// Close the driver and all underlying connections
+	// Close the driver and all underlying connections.
+	// This function may not be called while the driver is in use (i.e., concurrently).
+	//
+	// Connections that are still in use will be closed lazily when returned to the connection pool.
+	// This can lead to behavior that is hard to predict and which depends on driver implementation details.
+	// Therefore, it is strongly recommended to make sure you are done using the driver and have closed
+	// all resources spawned from it (such as sessions or transactions) before calling the method
 	Close(ctx context.Context) error
 	// IsEncrypted determines whether the driver communication with the server
 	// is encrypted. This is a static check. The function can also be called on
@@ -392,13 +398,13 @@ func (d *driverWithContext) GetServerInfo(ctx context.Context) (_ ServerInfo, er
 
 func (d *driverWithContext) Close(ctx context.Context) error {
 	d.mut.Lock()
+	defer d.mut.Unlock()
 	if d.pool == nil {
 		// Safeguard against closing more than once
 		return nil
 	}
 	pool := d.pool
 	d.pool = nil
-	d.mut.Unlock()
 
 	pool.Close(ctx)
 	pool = nil

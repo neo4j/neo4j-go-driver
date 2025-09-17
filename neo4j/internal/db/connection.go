@@ -124,6 +124,8 @@ type Connection interface {
 	Bookmark() string
 	// ServerName returns the name of the remote server
 	ServerName() string
+	// ConnId returns the connection id as assigned by the server ("" if not available)
+	ConnId() string
 	// ServerVersion returns the server version on pattern Neo4j/1.2.3
 	ServerVersion() string
 	// IsAlive returns true if the connection is fully functional.

@@ -174,6 +174,10 @@ func (b *bolt4) ServerName() string {
 	return b.serverName
 }
 
+func (b *bolt4) ConnId() string {
+	return b.connId
+}
+
 func (b *bolt4) ServerVersion() string {
 	return b.serverVersion
 }
@@ -185,6 +189,7 @@ func (b *bolt4) setError(err error, fatal bool) {
 		return
 	}
 
+	wasDead := b.state == bolt5Dead
 	// No previous error
 	if b.err == nil {
 		b.err = err
@@ -209,6 +214,8 @@ func (b *bolt4) setError(err error, fatal bool) {
 	neo4jErr, casted := err.(*db.Neo4jError)
 	if casted && neo4jErr.Classification() == "ClientError" {
 		b.log.Debugf(log.Bolt4, b.logId, "%s", err)
+	} else if wasDead {
+		b.log.Debugf(log.Bolt4, b.logId, "Already broken connection: %s", err)
 	} else {
 		b.log.Error(log.Bolt4, b.logId, err)
 	}

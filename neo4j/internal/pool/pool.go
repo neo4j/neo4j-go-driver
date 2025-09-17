@@ -23,7 +23,6 @@ package pool
 import (
 	"container/list"
 	"context"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/homedb"
 	"math"
 	"sort"
 	"sync"
@@ -34,6 +33,7 @@ import (
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/bolt"
 	idb "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/errorutil"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/homedb"
 	itime "github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/time"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/log"
 )
@@ -66,7 +66,7 @@ type Pool struct {
 	log        log.Logger
 	logId      string
 	cache      *homedb.Cache
-	ssrTracker ssrTracker
+	ssrTracker *ssrTracker
 }
 
 type serverPenalty struct {
@@ -87,7 +87,7 @@ func New(config *config.Config, connect Connect, logger log.Logger, logId string
 		logId:      logId,
 		log:        logger,
 		cache:      cache,
-		ssrTracker: ssrTracker{},
+		ssrTracker: &ssrTracker{},
 	}
 	p.log.Infof(log.Pool, p.logId, "Created")
 	return p
@@ -108,12 +108,22 @@ func (p *Pool) Close(ctx context.Context) {
 	p.queueMut.Unlock()
 	// Go through each server and close all connections to it
 	p.serversMut.Lock()
-	for n, s := range p.servers {
-		s.closeAll(ctx, p.closeConnection)
-		delete(p.servers, n)
+	pendingConnections := 0
+	for _, s := range p.servers {
+		s.startClosing(ctx, p.closeConnection)
+		pendingConnections += s.size()
 	}
 	p.serversMut.Unlock()
-	p.log.Infof(log.Pool, p.logId, "Closed")
+	if pendingConnections == 0 {
+		p.log.Infof(log.Pool, p.logId, "Closed")
+	} else {
+		p.log.Warnf(
+			log.Pool,
+			p.logId,
+			"Called close with %d in-flight connections (will be closed when work is done).",
+			pendingConnections,
+		)
+	}
 }
 
 // For testing
@@ -194,8 +204,8 @@ func (p *Pool) Borrow(
 	auth *idb.ReAuthToken,
 ) (idb.Connection, error) {
 	for {
-		if p.closed {
-			return nil, &errorutil.PoolClosed{}
+		if err := p.checkClosed(); err != nil {
+			return nil, err
 		}
 		serverNames := getServerNames()
 		if len(serverNames) == 0 {
@@ -294,6 +304,10 @@ func (p *Pool) tryBorrow(
 	var unlock = new(sync.Once)
 	defer unlock.Do(p.serversMut.Unlock)
 
+	if err := p.checkClosed(); err != nil {
+		return nil, err
+	}
+
 	srv := p.servers[serverName]
 	for {
 		if srv != nil {
@@ -351,6 +365,13 @@ func (p *Pool) tryBorrow(
 	return c, nil
 }
 
+func (p *Pool) checkClosed() error {
+	if p.closed {
+		return &errorutil.PoolClosed{}
+	}
+	return nil
+}
+
 func (p *Pool) unreg(ctx context.Context, serverName string, c idb.Connection, now time.Time) {
 	p.serversMut.Lock()
 	defer p.serversMut.Unlock()
@@ -390,19 +411,38 @@ func (p *Pool) removeIdleOlderThanLocked(ctx context.Context, s *server, now tim
 func (p *Pool) closeConnection(ctx context.Context, c idb.Connection) {
 	p.ssrTracker.removeConnection(c)
 	// Close connection in another thread to avoid potential long blocking operation during close.
-	go c.Close(ctx)
+	go func() {
+		ctx, cancelFunc := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancelFunc()
+		c.Close(ctx)
+		if ctxErr := ctx.Err(); ctxErr != nil {
+			p.log.Debugf(
+				log.Pool,
+				p.logId,
+				"Connection %s timed out during graceful shutdown: %s",
+				c.ConnId(),
+				ctxErr,
+			)
+		}
+	}()
 }
 
 func (p *Pool) Return(ctx context.Context, c idb.Connection) {
 	if p.closed {
 		p.log.Warnf(log.Pool, p.logId, "Trying to return connection to closed pool")
-		return
 	}
 
 	// Get the name of the server that the connection belongs to.
 	serverName := c.ServerName()
 	isAlive := c.IsAlive()
-	p.log.Debugf(log.Pool, p.logId, "Returning connection to %s {alive:%t}", serverName, isAlive)
+	p.log.Debugf(
+		log.Pool,
+		p.logId,
+		"Returning connection %s to %s {alive:%t}",
+		c.ConnId(),
+		serverName,
+		isAlive,
+	)
 
 	// If the connection is dead, remove all other idle connections on the same server that older
 	// or of the same age as the dead connection, otherwise perform normal cleanup of old connections

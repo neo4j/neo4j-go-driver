@@ -185,6 +185,10 @@ func (b *bolt5) ServerName() string {
 	return b.serverName
 }
 
+func (b *bolt5) ConnId() string {
+	return b.connId
+}
+
 func (b *bolt5) ServerVersion() string {
 	return b.serverVersion
 }
@@ -196,6 +200,7 @@ func (b *bolt5) setError(err error, fatal bool) {
 		return
 	}
 
+	wasDead := b.state == bolt5Dead
 	// No previous error
 	if b.err == nil {
 		b.err = err
@@ -220,6 +225,8 @@ func (b *bolt5) setError(err error, fatal bool) {
 	neo4jErr, casted := err.(*db.Neo4jError)
 	if casted && neo4jErr.Classification() == "ClientError" {
 		b.log.Debugf(log.Bolt5, b.logId, "%s", err)
+	} else if wasDead {
+		b.log.Debugf(log.Bolt5, b.logId, "Already broken connection: %s", err)
 	} else {
 		b.log.Error(log.Bolt5, b.logId, err)
 	}
@@ -945,7 +952,7 @@ func (b *bolt5) Close(ctx context.Context) {
 		b.queue.send(ctx)
 	}
 	if err := b.conn.Close(); err != nil {
-		b.log.Warnf(log.Driver, b.serverName, "could not close underlying socket")
+		b.log.Warnf(log.Driver, b.serverName, "Could not close underlying socket: %v", err)
 	}
 }
 
