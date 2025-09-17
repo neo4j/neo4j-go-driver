@@ -181,7 +181,7 @@ func (b *backend) writeError(err error) {
 			"gqlStatus":         gqlErrorInfo.gqlStatus,
 			"statusDescription": gqlErrorInfo.gqlStatusDescription,
 			"classification":    gqlErrorInfo.gqlClassification,
-			"rawClassification": gqlErrorInfo.gqlRawClassification,
+			"rawClassification": emptyStringToNil(gqlErrorInfo.gqlRawClassification),
 			"diagnosticRecord":  gqlErrorInfo.gqlDiagnosticRecord,
 			"cause":             gqlErrorInfo.cause,
 			"retryable":         retriable,
