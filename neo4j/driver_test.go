@@ -18,6 +18,7 @@
 package neo4j
 
 import (
+	"context"
 	"reflect"
 	"testing"
 
@@ -206,6 +207,20 @@ func TestNewDriverAndClose(t *testing.T) {
 	err = driver.Close()
 	if err != nil {
 		t.Errorf("should allow the close call on a closed driver")
+	}
+}
+
+func TestDriverMultipleCloseCalls(t *testing.T) {
+	ctx := context.Background()
+	driver, err := NewDriverWithContext("bolt://localhost:7687", NoAuth())
+	AssertNoError(t, err)
+	
+	// Test multiple Close calls - should not deadlock
+	for i := 0; i < 10; i++ {
+		err = driver.Close(ctx)
+		if err != nil {
+			t.Errorf("Close() call %d unexpected error = %v", i+1, err)
+		}
 	}
 }
 
