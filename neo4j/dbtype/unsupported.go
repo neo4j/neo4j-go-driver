@@ -43,5 +43,5 @@ type UnsupportedType struct {
 
 // String returns a string representation of the UnsupportedType.
 func (u *UnsupportedType) String() string {
-	return fmt.Sprintf("UnsupportedType<%s>", u.Name)
+	return fmt.Sprintf("UnsupportedType[%s]", u.Name)
 }

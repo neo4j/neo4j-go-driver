@@ -24,14 +24,28 @@ import (
 )
 
 func TestUnsupportedTypes(t *testing.T) {
-	t.Run("String representation of UnsupportedType", func(t *testing.T) {
+	t.Run("String representation of UnsupportedType with nil message", func(t *testing.T) {
 		unsupported := &UnsupportedType{
 			Name:                   "UUID",
 			MinimumProtocolVersion: db.ProtocolVersion{Major: 6, Minor: 0},
 			Message:                nil,
 		}
 		actual := unsupported.String()
-		expect := "UnsupportedType<UUID>"
+		expect := "UnsupportedType[UUID]"
+		if actual != expect {
+			t.Errorf("Expected %s but was %s", expect, actual)
+		}
+	})
+
+	t.Run("String representation of UnsupportedType with non-nil message", func(t *testing.T) {
+		message := "This type requires a newer driver version"
+		unsupported := &UnsupportedType{
+			Name:                   "CustomType",
+			MinimumProtocolVersion: db.ProtocolVersion{Major: 6, Minor: 0},
+			Message:                &message,
+		}
+		actual := unsupported.String()
+		expect := "UnsupportedType[CustomType]"
 		if actual != expect {
 			t.Errorf("Expected %s but was %s", expect, actual)
 		}

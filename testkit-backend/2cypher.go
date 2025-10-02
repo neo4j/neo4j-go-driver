@@ -220,15 +220,14 @@ func nativeToCypher(v any) map[string]any {
 		return vectorToCypher("f64", x)
 	case *dbtype.UnsupportedType:
 		data := map[string]any{
-			"name":                 x.Name,
-			"minimumProtocolMajor": x.MinimumProtocolVersion.Major,
-			"minimumProtocolMinor": x.MinimumProtocolVersion.Minor,
+			"name":            x.Name,
+			"minimumProtocol": fmt.Sprintf("%d.%d", x.MinimumProtocolVersion.Major, x.MinimumProtocolVersion.Minor),
 		}
 		if x.Message != nil {
 			data["message"] = *x.Message
 		}
 		return map[string]any{
-			"name": "CypherUnknownType",
+			"name": "CypherUnsupportedType",
 			"data": data,
 		}
 	}

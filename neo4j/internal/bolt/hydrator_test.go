@@ -1130,7 +1130,7 @@ func TestHydrator(outer *testing.T) {
 				&dbtype.UnsupportedType{
 					Name:                   "UUID",
 					MinimumProtocolVersion: db.ProtocolVersion{Major: 255, Minor: 0},
-					Message:                stringPtr("Some configuration message"),
+					Message:                ptr("Some configuration message"),
 				},
 			}},
 		},
@@ -1187,9 +1187,9 @@ func TestHydrator(outer *testing.T) {
 	}
 }
 
-// Helper function to create string pointer
-func stringPtr(s string) *string {
-	return &s
+// Helper function to create a pointer (e.g., for an untyped literal)
+func ptr[T any](x T) *T {
+	return &x
 }
 
 func TestHydratorBolt5(outer *testing.T) {
