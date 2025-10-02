@@ -36,9 +36,16 @@ import (
 // If your application requires handling this type, you must upgrade your driver to a
 // version that supports it.
 type UnsupportedType struct {
-	Name                   string
+	// Name is the name of the type.
+	Name string
+	// MinimumProtocolVersion returns the minimum required Bolt protocol version that supports this type.
+	// To understand which driver version this corresponds to, refer to the driver's release notes or documentation.
+	//
+	// Note: Bolt versions are not generally equivalent to driver versions.
+	// See https://neo4j.com/docs/go-manual/current/data-types/ for which driver version is required for new types.
 	MinimumProtocolVersion db.ProtocolVersion
-	Message                *string
+	// Message contains any additional information provided by the server about this type.
+	Message *string
 }
 
 // String returns a string representation of the UnsupportedType.
