@@ -1,4 +1,4 @@
-//go:build !internal_neo4j_go_driver_time_mock
+//go:build internal_neo4j_testkit_no_rt_helper
 
 /*
  * Copyright (c) "Neo4j"
@@ -17,9 +17,18 @@
  * limitations under the License.
  */
 
-package time
+package main
 
-import "time"
+const extrasNameRtHelper = "rtHelper"
 
-var Now = time.Now
-var Since = time.Since
+func init() {
+	registerExtra(
+		extrasNameRtHelper,
+		ExtrasRegisterEntry{
+			extraBlockedTestKitFeatures: []string{
+				"Backend:RTFetch",
+				"Backend:RTForceUpdate",
+			},
+		},
+	)
+}

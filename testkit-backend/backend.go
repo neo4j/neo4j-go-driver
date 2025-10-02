@@ -20,16 +20,11 @@ package main
 import (
 	"bufio"
 	"context"
-	"crypto/tls"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/config"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/log"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/notifications"
 	"io"
 	"math"
-	"net"
 	"net/url"
 	"regexp"
 	"strings"
@@ -37,36 +32,25 @@ import (
 	"time"
 
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
-	"github.com/neo4j/neo4j-go-driver/v5/neo4j/auth"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/db"
 )
 
 // Handles a testkit backend session.
 // Tracks all objects (and errors) that is created by testkit frontend.
 type backend struct {
-	rd                              *bufio.Reader // Socket to read requests from
-	wr                              io.Writer     // Socket to write responses (and logs) on, don't buffer (WriteString on bufio was weird...)
-	drivers                         map[string]neo4j.DriverWithContext
-	sessionStates                   map[string]*sessionState
-	results                         map[string]neo4j.ResultWithContext
-	managedTransactions             map[string]neo4j.ManagedTransaction
-	explicitTransactions            map[string]neo4j.ExplicitTransaction
-	recordedErrors                  map[string]error
-	resolvedAddresses               map[string][]any
-	dnsResolutions                  map[string][]any
-	authTokenManagers               map[string]auth.TokenManager
-	resolvedGetAuthTokens           map[string]neo4j.AuthToken
-	resolvedHandleSecurityException map[string]bool
-	resolvedBasicTokens             map[string]AuthToken
-	resolvedBearerTokens            map[string]AuthTokenAndExpiration
-	id                              int // ID to use for next object created by frontend
-	wrLock                          sync.Mutex
-	suppliedBookmarks               map[string]neo4j.Bookmarks
-	consumedBookmarks               map[string]struct{}
-	bookmarkManagers                map[string]neo4j.BookmarkManager
-	clientCertificateProviders      map[string]auth.ClientCertificateProvider
-	resolvedClientCertificates      map[string]auth.ClientCertificate
-	closed                          bool
+	rd                   *bufio.Reader // Socket to read requests from
+	wr                   io.Writer     // Socket to write responses (and logs) on, don't buffer (WriteString on bufio was weird...)
+	drivers              map[string]neo4j.DriverWithContext
+	sessionStates        map[string]*sessionState
+	results              map[string]neo4j.ResultWithContext
+	managedTransactions  map[string]neo4j.ManagedTransaction
+	explicitTransactions map[string]neo4j.ExplicitTransaction
+	recordedErrors       map[string]error
+	resolvedAddresses    map[string][]any
+	id                   int // ID to use for next object created by frontend
+	wrLock               sync.Mutex
+	closed               bool
+	extrasData           map[string]any
 }
 
 // To implement transactional functions a bit of extra state is needed on the
@@ -75,61 +59,6 @@ type sessionState struct {
 	session          neo4j.SessionWithContext
 	retryableState   int
 	retryableErrorId string
-}
-
-type GenericTokenManager struct {
-	GetAuthTokenFunc            func() neo4j.AuthToken
-	HandleSecurityExceptionFunc func(neo4j.AuthToken, *db.Neo4jError) bool
-}
-
-type AuthToken struct {
-	token neo4j.AuthToken
-}
-
-type AuthTokenAndExpiration struct {
-	token      neo4j.AuthToken
-	expiration *time.Time
-}
-
-func (g GenericTokenManager) GetAuthToken(_ context.Context) (neo4j.AuthToken, error) {
-	return g.GetAuthTokenFunc(), nil
-}
-
-func (g GenericTokenManager) HandleSecurityException(_ context.Context, token neo4j.AuthToken, securityException *db.Neo4jError) (bool, error) {
-	handled := g.HandleSecurityExceptionFunc(token, securityException)
-	return handled, nil
-}
-
-type TestKitClientCertificateProvider struct {
-	id      string
-	backend *backend
-}
-
-func NewTestKitClientCertificateProvider(id string, backend *backend) *TestKitClientCertificateProvider {
-	return &TestKitClientCertificateProvider{
-		id:      id,
-		backend: backend,
-	}
-}
-
-func (p TestKitClientCertificateProvider) GetCertificate() *tls.Certificate {
-	requestId := p.backend.nextId()
-	p.backend.writeResponse("ClientCertificateProviderRequest", map[string]any{
-		"id":                          requestId,
-		"clientCertificateProviderId": p.id,
-	})
-	for {
-		p.backend.process()
-		if clientCertificate, ok := p.backend.resolvedClientCertificates[requestId]; ok {
-			delete(p.backend.resolvedClientCertificates, requestId)
-
-			provider, err := auth.NewStaticClientCertificateProvider(clientCertificate)
-			if err != nil {
-				panic(fmt.Sprintf("Unable to create provider for client certificate: %v : %s", clientCertificate, err))
-			}
-			return provider.GetCertificate()
-		}
-	}
 }
 
 const (
@@ -142,28 +71,18 @@ var ctx = context.Background()
 
 func newBackend(rd *bufio.Reader, wr io.Writer) *backend {
 	return &backend{
-		rd:                              rd,
-		wr:                              wr,
-		drivers:                         make(map[string]neo4j.DriverWithContext),
-		sessionStates:                   make(map[string]*sessionState),
-		results:                         make(map[string]neo4j.ResultWithContext),
-		managedTransactions:             make(map[string]neo4j.ManagedTransaction),
-		explicitTransactions:            make(map[string]neo4j.ExplicitTransaction),
-		recordedErrors:                  make(map[string]error),
-		resolvedAddresses:               make(map[string][]any),
-		dnsResolutions:                  make(map[string][]any),
-		authTokenManagers:               make(map[string]auth.TokenManager),
-		resolvedGetAuthTokens:           make(map[string]neo4j.AuthToken),
-		resolvedHandleSecurityException: make(map[string]bool),
-		resolvedBasicTokens:             make(map[string]AuthToken),
-		resolvedBearerTokens:            make(map[string]AuthTokenAndExpiration),
-		id:                              0,
-		bookmarkManagers:                make(map[string]neo4j.BookmarkManager),
-		suppliedBookmarks:               make(map[string]neo4j.Bookmarks),
-		consumedBookmarks:               make(map[string]struct{}),
-		clientCertificateProviders:      make(map[string]auth.ClientCertificateProvider),
-		resolvedClientCertificates:      make(map[string]auth.ClientCertificate),
-		closed:                          false,
+		rd:                   rd,
+		wr:                   wr,
+		drivers:              make(map[string]neo4j.DriverWithContext),
+		sessionStates:        make(map[string]*sessionState),
+		results:              make(map[string]neo4j.ResultWithContext),
+		managedTransactions:  make(map[string]neo4j.ManagedTransaction),
+		explicitTransactions: make(map[string]neo4j.ExplicitTransaction),
+		recordedErrors:       make(map[string]error),
+		resolvedAddresses:    make(map[string][]any),
+		id:                   0,
+		closed:               false,
+		extrasData:           newBackendExtraData(),
 	}
 }
 
@@ -242,18 +161,12 @@ func (b *backend) writeError(err error) {
 		neo4j.IsTransactionExecutionLimit(err)
 
 	if isDriverError {
-		var msg, errorType, gqlStatus, gqlStatusDescription, gqlClassification, gqlRawClassification string
-		var gqlDiagnosticRecord map[string]any
-		var cause *db.Neo4jError
+		var msg, errorType string
+		var gqlErrorInfo extrasGqlErrorInfo
 		if neo4jError, ok := err.(*neo4j.Neo4jError); ok {
 			msg = neo4jError.Msg
-			gqlStatus = neo4jError.GqlStatus
-			gqlStatusDescription = neo4jError.GqlStatusDescription
-			gqlClassification = string(neo4jError.GqlClassification)
-			gqlRawClassification = neo4jError.GqlRawClassification
-			gqlDiagnosticRecord = serializeParameters(neo4jError.GqlDiagnosticRecord)
+			gqlErrorInfo = extrasGqlErrorFromNeo4jError(neo4jError)
 			errorType = "Neo4jError"
-			cause = neo4jError.GqlCause
 		} else {
 			msg = err.Error()
 			errorType = strings.Split(err.Error(), ":")[0]
@@ -265,12 +178,12 @@ func (b *backend) writeError(err error) {
 			"errorType":         errorType,
 			"msg":               msg,
 			"code":              code,
-			"gqlStatus":         gqlStatus,
-			"statusDescription": gqlStatusDescription,
-			"classification":    gqlClassification,
-			"rawClassification": emptyStringToNil(gqlRawClassification),
-			"diagnosticRecord":  gqlDiagnosticRecord,
-			"cause":             b.serializeGqlErrorCause(cause),
+			"gqlStatus":         gqlErrorInfo.gqlStatus,
+			"statusDescription": gqlErrorInfo.gqlStatusDescription,
+			"classification":    gqlErrorInfo.gqlClassification,
+			"rawClassification": emptyStringToNil(gqlErrorInfo.gqlRawClassification),
+			"diagnosticRecord":  gqlErrorInfo.gqlDiagnosticRecord,
+			"cause":             gqlErrorInfo.cause,
 			"retryable":         retriable,
 		})
 		return
@@ -290,21 +203,6 @@ func (b *backend) writeError(err error) {
 	// This simplifies debugging errors from the frontend perspective, it will also make sure
 	// that the frontend doesn't hang when backend suddenly disappears.
 	b.writeResponse("BackendError", map[string]any{"msg": err.Error()})
-}
-
-func (b *backend) serializeGqlErrorCause(cause *db.Neo4jError) map[string]any {
-	if cause == nil {
-		return nil
-	}
-	return map[string]any{"name": "GqlError", "data": map[string]any{
-		"msg":               cause.Msg,
-		"gqlStatus":         cause.GqlStatus,
-		"statusDescription": cause.GqlStatusDescription,
-		"classification":    string(cause.GqlClassification),
-		"rawClassification": emptyStringToNil(cause.GqlRawClassification),
-		"diagnosticRecord":  serializeParameters(cause.GqlDiagnosticRecord),
-		"cause":             b.serializeGqlErrorCause(cause.GqlCause),
-	}}
 }
 
 func (b *backend) nextId() string {
@@ -442,15 +340,6 @@ func (b *backend) toParams(parameters map[string]any) (map[string]any, error) {
 	return result, nil
 }
 
-func (b *backend) toClientCertificate(data map[string]any) auth.ClientCertificate {
-	clientCertificateData := data["clientCertificate"].(map[string]any)["data"].(map[string]any)
-	return auth.ClientCertificate{
-		CertFile: clientCertificateData["certfile"].(string),
-		KeyFile:  clientCertificateData["keyfile"].(string),
-		Password: b.toStringPointer(clientCertificateData["password"]),
-	}
-}
-
 func (b *backend) toStringPointer(v any) *string {
 	if v == nil {
 		return nil
@@ -504,8 +393,8 @@ func (b *backend) handleTransactionFunc(isRead bool, data map[string]any) {
 	}
 }
 
-func (b *backend) customAddressResolverFunction() config.ServerAddressResolver {
-	return func(address config.ServerAddress) []config.ServerAddress {
+func (b *backend) customAddressResolverFunction() ServerAddressResolver {
+	return func(address ServerAddress) []ServerAddress {
 		id := b.nextId()
 		b.writeResponse("ResolverResolutionRequired", map[string]string{
 			"id":      id,
@@ -514,37 +403,9 @@ func (b *backend) customAddressResolverFunction() config.ServerAddressResolver {
 		for b.process() {
 			if addresses, ok := b.resolvedAddresses[id]; ok {
 				delete(b.resolvedAddresses, id)
-				result := make([]config.ServerAddress, len(addresses))
+				result := make([]ServerAddress, len(addresses))
 				for i, address := range addresses {
 					result[i] = NewServerAddress(address.(string))
-				}
-				return result
-			}
-		}
-		return nil
-	}
-}
-
-func (b *backend) dnsResolverFunction() func(address string) []string {
-	return func(address string) []string {
-		id := b.nextId()
-		host, port, err := net.SplitHostPort(address)
-		if err != nil {
-			b.writeError(fmt.Errorf(
-				"couldn't parse address for custom DNS resulution (probably a bug in backend): %w", err,
-			))
-			return nil
-		}
-		b.writeResponse("DomainNameResolutionRequired", map[string]string{
-			"id":   id,
-			"name": host,
-		})
-		for b.process() {
-			if addresses, ok := b.dnsResolutions[id]; ok {
-				delete(b.dnsResolutions, id)
-				result := make([]string, len(addresses))
-				for i, address := range addresses {
-					result[i] = fmt.Sprintf("%s:%s", address, port)
 				}
 				return result
 			}
@@ -558,7 +419,7 @@ type serverAddress struct {
 	port     string
 }
 
-func NewServerAddress(address string) config.ServerAddress {
+func NewServerAddress(address string) ServerAddress {
 	parsedAddress, err := url.Parse("//" + address)
 	if err != nil {
 		panic(err)
@@ -590,46 +451,20 @@ func (b *backend) handleRequest(req map[string]any) {
 	fmt.Printf("REQ: %s %s\n", name, dataJson)
 	switch name {
 
-	case "DomainNameResolutionCompleted":
-		requestId := data["requestId"].(string)
-		addresses := data["addresses"].([]any)
-		b.dnsResolutions[requestId] = addresses
-
 	case "ResolverResolutionCompleted":
 		requestId := data["requestId"].(string)
 		addresses := data["addresses"].([]any)
 		b.resolvedAddresses[requestId] = addresses
 
-	case "BookmarksSupplierCompleted":
-		requestId := data["requestId"].(string)
-		rawBookmarks := data["bookmarks"].([]any)
-		bookmarks := make(neo4j.Bookmarks, len(rawBookmarks))
-		for i, bookmark := range rawBookmarks {
-			bookmarks[i] = bookmark.(string)
-		}
-		b.suppliedBookmarks[requestId] = bookmarks
-
-	case "BookmarksConsumerCompleted":
-		requestId := data["requestId"].(string)
-		b.consumedBookmarks[requestId] = struct{}{}
-
 	case "NewDriver":
-		rawAuth := data["authorizationToken"]
-		var err error
-		var authToken auth.TokenManager
-		if rawAuth == nil {
-			managerId := data["authTokenManagerId"].(string)
-			authToken = b.authTokenManagers[managerId]
-		} else {
-			authToken, err = getAuth(rawAuth.(map[string]any)["data"].(map[string]any))
-			if err != nil {
-				b.writeError(err)
-				return
-			}
+		authToken, err := getDriverAuthToken(b, data)
+		if err != nil {
+			b.writeError(err)
+			return
 		}
 		// Parse URI (or rather type cast)
 		uri := data["uri"].(string)
-		driver, err := neo4j.NewDriverWithContext(uri, authToken, func(c *config.Config) {
+		driver, err := neo4j.NewDriverWithContext(uri, authToken, func(c *Config) {
 			// Setup custom logger that redirects log entries back to frontend
 			c.Log = &streamLog{writeLine: b.writeLineLocked}
 			// Optional custom user agent from frontend
@@ -642,9 +477,6 @@ func (b *backend) handleRequest(req map[string]any) {
 			}
 			if data["connectionAcquisitionTimeoutMs"] != nil {
 				c.ConnectionAcquisitionTimeout = time.Millisecond * time.Duration(asInt64(data["connectionAcquisitionTimeoutMs"].(json.Number)))
-			}
-			if data["livenessCheckTimeoutMs"] != nil {
-				c.ConnectionLivenessCheckTimeout = time.Millisecond * time.Duration(asInt64(data["livenessCheckTimeoutMs"].(json.Number)))
 			}
 			if data["maxConnectionLifetimeMs"] != nil {
 				c.MaxConnectionLifetime = time.Millisecond * time.Duration(asInt64(data["maxConnectionLifetimeMs"].(json.Number)))
@@ -661,40 +493,12 @@ func (b *backend) handleRequest(req map[string]any) {
 			if data["connectionTimeoutMs"] != nil {
 				c.SocketConnectTimeout = time.Millisecond * time.Duration(asInt64(data["connectionTimeoutMs"].(json.Number)))
 			}
-			if data["notificationsMinSeverity"] != nil {
-				minSeverity, err := mapNotificationMinSeverityLevel(data["notificationsMinSeverity"].(string))
+
+			for _, configurer := range extrasDriverConfigurers {
+				err = configurer(b, data, c)
 				if err != nil {
 					b.writeError(err)
 					return
-				}
-				c.NotificationsMinSeverity = minSeverity
-			}
-			if data["notificationsDisabledCategories"] != nil {
-				notiDisCats := data["notificationsDisabledCategories"].([]any)
-				if len(notiDisCats) == 0 {
-					c.NotificationsDisabledCategories = notifications.DisableNoCategories()
-				} else {
-					cats := convertSlice(notiDisCats, anyToNotificationCategory)
-					c.NotificationsDisabledCategories = notifications.DisableCategories(cats...)
-				}
-			}
-			if data["telemetryDisabled"] != nil {
-				c.TelemetryDisabled = data["telemetryDisabled"].(bool)
-			}
-
-			clientCertificateProviderId := data["clientCertificateProviderId"]
-			if clientCertificateProviderId != nil {
-				provider := b.clientCertificateProviders[clientCertificateProviderId.(string)]
-				c.ClientCertificateProvider = provider
-			} else {
-				if data["clientCertificate"] != nil {
-					clientCertificate := b.toClientCertificate(data)
-					provider, err := auth.NewStaticClientCertificateProvider(clientCertificate)
-					if err != nil {
-						b.writeError(err)
-						return
-					}
-					c.ClientCertificateProvider = provider
 				}
 			}
 		})
@@ -703,32 +507,17 @@ func (b *backend) handleRequest(req map[string]any) {
 			return
 		}
 
-		if data["domainNameResolverRegistered"] != nil && data["domainNameResolverRegistered"].(bool) {
-			neo4j.RegisterDnsResolver(driver, b.dnsResolverFunction())
+		for _, handler := range extrasNewDriverHandlers {
+			err = handler(b, data, driver)
+			if err != nil {
+				b.writeError(err)
+				return
+			}
 		}
 
 		idKey := b.nextId()
 		b.drivers[idKey] = driver
 		b.writeResponse("Driver", map[string]any{"id": idKey})
-
-	case "NewClientCertificateProvider":
-		provider := NewTestKitClientCertificateProvider(b.nextId(), b)
-		b.clientCertificateProviders[provider.id] = TestKitClientCertificateProvider{id: provider.id, backend: b}
-		b.writeResponse("ClientCertificateProvider", map[string]any{"id": provider.id})
-
-	case "ClientCertificateProviderClose":
-		providerId := data["id"].(string)
-		delete(b.clientCertificateProviders, providerId)
-		b.writeResponse("ClientCertificateProvider", map[string]any{"id": providerId})
-
-	case "ClientCertificateProviderCompleted":
-		requestId := data["requestId"].(string)
-		if data["clientCertificate"] != nil {
-			clientCertificate := b.toClientCertificate(data)
-			b.resolvedClientCertificates[requestId] = clientCertificate
-		} else {
-			b.resolvedClientCertificates[requestId] = auth.ClientCertificate{}
-		}
 
 	case "DriverClose":
 		driverId := data["driverId"].(string)
@@ -753,83 +542,6 @@ func (b *backend) handleRequest(req map[string]any) {
 			"address":         serverInfo.Address(),
 			"agent":           serverInfo.Agent(),
 			"protocolVersion": fmt.Sprintf("%d.%d", protocolVersion.Major, protocolVersion.Minor),
-		})
-
-	case "ExecuteQuery":
-		driver := b.drivers[data["driverId"].(string)]
-		var configurers []neo4j.ExecuteQueryConfigurationOption
-		if rawConfig := data["config"]; rawConfig != nil {
-			executeQueryConfig := rawConfig.(map[string]any)
-			configurers = append(configurers, func(config *neo4j.ExecuteQueryConfiguration) {
-				config.BoltLogger = &streamLog{writeLine: b.writeLineLocked}
-
-				routing := executeQueryConfig["routing"]
-				if routing != nil {
-					switch routing {
-					case "r":
-						config.Routing = neo4j.Read
-					case "w":
-						config.Routing = neo4j.Write
-					default:
-						b.writeError(fmt.Errorf("unexpected executequery routing value: %v", routing))
-						return
-					}
-				}
-				impersonatedUser := executeQueryConfig["impersonatedUser"]
-				if impersonatedUser != nil {
-					config.ImpersonatedUser = impersonatedUser.(string)
-				}
-				database := executeQueryConfig["database"]
-				if database != nil {
-					config.Database = database.(string)
-				}
-				bookmarkManagerId := executeQueryConfig["bookmarkManagerId"]
-				if bookmarkManagerId != nil {
-					if number, ok := bookmarkManagerId.(json.Number); ok {
-						id := number.String()
-						if id != "-1" {
-							b.writeError(fmt.Errorf("unexpected bookmark manager id: %s", id))
-							return
-						}
-						config.BookmarkManager = nil
-					} else {
-						config.BookmarkManager = b.bookmarkManagers[bookmarkManagerId.(string)]
-					}
-				}
-				// Append configurers to config if they exist.
-				if executeQueryConfig["timeout"] != nil {
-					config.TransactionConfigurers = append(config.TransactionConfigurers, neo4j.WithTxTimeout(b.toTimeout(executeQueryConfig)))
-				}
-				if executeQueryConfig["txMeta"] != nil {
-					config.TransactionConfigurers = append(config.TransactionConfigurers, neo4j.WithTxMetadata(b.toTxMetadata(executeQueryConfig)))
-				}
-				// Append Auth configuration if it exists
-				if executeQueryConfig["authorizationToken"] != nil {
-					token, err := getAuth(executeQueryConfig["authorizationToken"].(map[string]any)["data"].(map[string]any))
-					if err != nil {
-						b.writeError(err)
-						return
-					}
-					config.Auth = &token
-				}
-			})
-		}
-
-		cypher, params, err := b.toCypherAndParams(data)
-		if err != nil {
-			b.writeError(err)
-			return
-		}
-		eagerResult, err := neo4j.ExecuteQuery[*neo4j.EagerResult](
-			ctx, driver, cypher, params, neo4j.EagerResultTransformer, configurers...)
-		if err != nil {
-			b.writeError(err)
-			return
-		}
-		b.writeResponse("EagerResult", map[string]any{
-			"keys":    eagerResult.Keys,
-			"records": serializeRecords(eagerResult.Records),
-			"summary": serializeSummary(eagerResult.Summary),
 		})
 
 	case "NewSession":
@@ -865,60 +577,18 @@ func (b *backend) handleRequest(req map[string]any) {
 		if data["impersonatedUser"] != nil {
 			sessionConfig.ImpersonatedUser = data["impersonatedUser"].(string)
 		}
-		if data["bookmarkManagerId"] != nil {
-			bmmId := data["bookmarkManagerId"].(string)
-			bookmarkManager := b.bookmarkManagers[bmmId]
-			if bookmarkManager == nil {
-				b.writeError(fmt.Errorf("could not find bookmark manager with ID %s", bmmId))
-				return
-			}
-			sessionConfig.BookmarkManager = bookmarkManager
-		}
 
-		if data["notificationsMinSeverity"] != nil {
-			minSeverity, err := mapNotificationMinSeverityLevel(data["notificationsMinSeverity"].(string))
+		for _, configurer := range extrasSessionConfigurers {
+			err = configurer(b, data, &sessionConfig)
 			if err != nil {
 				b.writeError(err)
 				return
 			}
-			sessionConfig.NotificationsMinSeverity = minSeverity
-		}
-		if data["notificationsDisabledCategories"] != nil {
-			notiDisCats := data["notificationsDisabledCategories"].([]any)
-			if len(notiDisCats) == 0 {
-				sessionConfig.NotificationsDisabledCategories = notifications.DisableNoCategories()
-			} else {
-				cats := convertSlice(notiDisCats, anyToNotificationCategory)
-				sessionConfig.NotificationsDisabledCategories = notifications.DisableCategories(cats...)
-			}
-		}
-		if data["authorizationToken"] != nil {
-			authToken, err := getAuth(data["authorizationToken"].(map[string]any)["data"].(map[string]any))
-			if err != nil {
-				b.writeError(err)
-				return
-			}
-			sessionConfig.Auth = &authToken
 		}
 		session := driver.NewSession(ctx, sessionConfig)
 		idKey := b.nextId()
 		b.sessionStates[idKey] = &sessionState{session: session}
 		b.writeResponse("Session", map[string]any{"id": idKey})
-
-	case "NewBookmarkManager":
-		bookmarkManagerId := b.nextId()
-		b.bookmarkManagers[bookmarkManagerId] = neo4j.NewBookmarkManager(
-			b.bookmarkManagerConfig(bookmarkManagerId, data))
-		b.writeResponse("BookmarkManager", map[string]any{
-			"id": bookmarkManagerId,
-		})
-
-	case "BookmarkManagerClose":
-		bookmarkManagerId := data["id"].(string)
-		delete(b.bookmarkManagers, bookmarkManagerId)
-		b.writeResponse("BookmarkManager", map[string]any{
-			"id": bookmarkManagerId,
-		})
 
 	case "SessionClose":
 		sessionId := data["sessionId"].(string)
@@ -1071,58 +741,10 @@ func (b *backend) handleRequest(req map[string]any) {
 		}
 		b.writeResponse("Summary", serializeSummary(summary))
 
-	case "ForcedRoutingTableUpdate":
-		databaseRaw := data["database"]
-		var database string
-		if databaseRaw != nil {
-			database = databaseRaw.(string)
-		}
-		var bookmarks []string
-		bookmarksRaw := data["bookmarks"]
-		if bookmarksRaw != nil {
-			bookmarksSlice := bookmarksRaw.([]any)
-			bookmarks = make([]string, len(bookmarksSlice))
-			for i, bookmark := range bookmarksSlice {
-				bookmarks[i] = bookmark.(string)
-			}
-		}
-		driverId := data["driverId"].(string)
-		driver := b.drivers[driverId]
-		err := neo4j.ForceRoutingTableUpdate(driver, database, bookmarks, &streamLog{writeLine: b.writeLineLocked})
-		if err != nil {
-			b.writeError(err)
-			return
-		}
-		b.writeResponse("Driver", map[string]any{"id": driverId})
-
-	case "GetRoutingTable":
-		driver := b.drivers[data["driverId"].(string)]
-		databaseRaw := data["database"]
-		var database string
-		if databaseRaw != nil {
-			database = databaseRaw.(string)
-		}
-		table, err := neo4j.GetRoutingTable(driver, database)
-		if err != nil {
-			b.writeError(err)
-			return
-		}
-		var databaseName any = table.DatabaseName
-		if databaseName == "" {
-			databaseName = nil
-		}
-		b.writeResponse("RoutingTable", map[string]any{
-			"database": databaseName,
-			"ttl":      table.TimeToLive,
-			"routers":  table.Routers,
-			"readers":  table.Readers,
-			"writers":  table.Writers,
-		})
-
 	case "CheckMultiDBSupport":
 		driver := b.drivers[data["driverId"].(string)]
 		session := driver.NewSession(ctx, neo4j.SessionConfig{
-			BoltLogger: log.BoltToConsole(),
+			BoltLogger: extrasLogBoltToConsole(),
 		})
 		result, err := session.Run(ctx, "RETURN 42", nil)
 		defer func() {
@@ -1162,253 +784,9 @@ func (b *backend) handleRequest(req map[string]any) {
 		}
 		b.writeResponse("Driver", map[string]any{"id": driverId})
 
-	case "FakeTimeInstall":
-		if err := neo4j.FreezeTime(); err != nil {
-			b.writeError(err)
-			return
-		}
-		b.writeResponse("FakeTimeAck", nil)
-
-	case "FakeTimeUninstall":
-		if err := neo4j.UnfreezeTime(); err != nil {
-			b.writeError(err)
-			return
-		}
-		b.writeResponse("FakeTimeAck", nil)
-
-	case "FakeTimeTick":
-		milliseconds := asInt64(data["incrementMs"].(json.Number))
-		if err := neo4j.TickTime(time.Duration(milliseconds) * time.Millisecond); err != nil {
-			b.writeError(err)
-			return
-		}
-		b.writeResponse("FakeTimeAck", nil)
-
-	case "VerifyAuthentication":
-		driverId := data["driverId"].(string)
-		var token *neo4j.AuthToken
-		if data["authorizationToken"] != nil {
-			authToken, err := getAuth(data["authorizationToken"].(map[string]any)["data"].(map[string]any))
-			if err != nil {
-				b.writeError(err)
-				return
-			}
-			token = &authToken
-		}
-		if err := b.drivers[driverId].VerifyAuthentication(ctx, token); err != nil {
-			invalidAuthError := &neo4j.InvalidAuthenticationError{}
-			if errors.As(err, &invalidAuthError) {
-				b.writeResponse("DriverIsAuthenticated", map[string]any{"id": driverId, "authenticated": false})
-			} else {
-				b.writeError(err)
-			}
-		} else {
-			b.writeResponse("DriverIsAuthenticated", map[string]any{"id": driverId, "authenticated": true})
-		}
-
-	case "NewAuthTokenManager":
-		managerId := b.nextId()
-		manager := GenericTokenManager{
-			GetAuthTokenFunc: func() neo4j.AuthToken {
-				id := b.nextId()
-				b.writeResponse(
-					"AuthTokenManagerGetAuthRequest",
-					map[string]any{
-						"id":                 id,
-						"authTokenManagerId": managerId,
-					})
-				for b.process() {
-					if token, ok := b.resolvedGetAuthTokens[id]; ok {
-						delete(b.resolvedGetAuthTokens, id)
-						return token
-					}
-				}
-				return neo4j.AuthToken{}
-			},
-			HandleSecurityExceptionFunc: func(token neo4j.AuthToken, error *db.Neo4jError) bool {
-				id := b.nextId()
-				b.writeResponse(
-					"AuthTokenManagerHandleSecurityExceptionRequest",
-					map[string]any{
-						"id":                 id,
-						"authTokenManagerId": managerId,
-						"auth":               serializeAuth(token),
-						"errorCode":          error.Code,
-					})
-				for b.process() {
-					if handled, ok := b.resolvedHandleSecurityException[id]; ok {
-						delete(b.resolvedHandleSecurityException, id)
-						return handled
-					}
-				}
-				return false
-			},
-		}
-		b.authTokenManagers[managerId] = manager
-		b.writeResponse("AuthTokenManager", map[string]any{"id": managerId})
-	case "AuthTokenManagerGetAuthCompleted":
-		id := data["requestId"].(string)
-		token, err := getAuth(data["auth"].(map[string]any)["data"].(map[string]any))
-		if err != nil {
-			b.writeError(err)
-			return
-		}
-		b.resolvedGetAuthTokens[id] = token
-	case "AuthTokenManagerHandleSecurityExceptionCompleted":
-		handled := data["handled"].(bool)
-		id := data["requestId"].(string)
-		b.resolvedHandleSecurityException[id] = handled
-	case "NewBasicAuthTokenManager":
-		managerId := b.nextId()
-
-		manager := auth.BasicTokenManager(
-			func(context.Context) (neo4j.AuthToken, error) {
-				id := b.nextId()
-				b.writeResponse(
-					"BasicAuthTokenProviderRequest",
-					map[string]any{
-						"id":                      id,
-						"basicAuthTokenManagerId": managerId,
-					})
-				for b.process() {
-					if basicToken, ok := b.resolvedBasicTokens[id]; ok {
-						delete(b.resolvedBasicTokens, id)
-						return basicToken.token, nil
-					}
-				}
-				return neo4j.AuthToken{}, nil
-			})
-		b.authTokenManagers[managerId] = manager
-		b.writeResponse("BasicAuthTokenManager", map[string]any{"id": managerId})
-	case "BasicAuthTokenProviderCompleted":
-		id := data["requestId"].(string)
-		token, _ := getAuth(data["auth"].(map[string]any)["data"].(map[string]any))
-		b.resolvedBasicTokens[id] = AuthToken{token}
-	case "NewBearerAuthTokenManager":
-		managerId := b.nextId()
-
-		manager := auth.BearerTokenManager(
-			func(context.Context) (neo4j.AuthToken, *time.Time, error) {
-				id := b.nextId()
-				b.writeResponse(
-					"BearerAuthTokenProviderRequest",
-					map[string]any{
-						"id":                       id,
-						"bearerAuthTokenManagerId": managerId,
-					})
-				for b.process() {
-					if bearerToken, ok := b.resolvedBearerTokens[id]; ok {
-						delete(b.resolvedBearerTokens, id)
-						return bearerToken.token, bearerToken.expiration, nil
-					}
-				}
-				return neo4j.AuthToken{}, nil, nil
-			})
-		b.authTokenManagers[managerId] = manager
-		b.writeResponse("BearerAuthTokenManager", map[string]any{"id": managerId})
-	case "BearerAuthTokenProviderCompleted":
-		id := data["requestId"].(string)
-		bearerToken := data["auth"].(map[string]any)["data"].(map[string]any)
-		token, err := getAuth(bearerToken["auth"].(map[string]any)["data"].(map[string]any))
-		if err != nil {
-			b.writeError(err)
-			return
-		}
-		var expiration *time.Time
-		expiresInRaw := bearerToken["expiresInMs"]
-		if expiresInRaw != nil {
-			expiresIn := time.Millisecond * time.Duration(asInt64(bearerToken["expiresInMs"].(json.Number)))
-			expirationTime := neo4j.Now().Add(expiresIn)
-			expiration = &expirationTime
-		}
-		b.resolvedBearerTokens[id] = AuthTokenAndExpiration{token, expiration}
-	case "AuthTokenManagerClose":
-		id := data["id"].(string)
-		delete(b.authTokenManagers, id)
-		b.writeResponse("AuthTokenManager", map[string]any{"id": id})
-
 	case "GetFeatures":
 		b.writeResponse("FeatureList", map[string]any{
-			"features": []string{
-				// === FUNCTIONAL FEATURES ===
-				"Feature:API:BookmarkManager",
-				"Feature:API:ConnectionAcquisitionTimeout",
-				"Feature:API:Driver.ExecuteQuery",
-				"Feature:API:Driver.ExecuteQuery:WithAuth",
-				"Feature:API:Driver:GetServerInfo",
-				"Feature:API:Driver.IsEncrypted",
-				"Feature:API:Driver:MaxConnectionLifetime",
-				"Feature:API:Driver:NotificationsConfig",
-				"Feature:API:Driver.VerifyAuthentication",
-				"Feature:API:Driver.VerifyConnectivity",
-				//"Feature:API:Driver.SupportsSessionAuth",
-				"Feature:API:Liveness.Check",
-				"Feature:API:Result.List",
-				"Feature:API:Result.Peek",
-				//"Feature:API:Result.Single",
-				//"Feature:API:Result.SingleOptional",
-				"Feature:API:RetryableExceptions",
-				"Feature:API:Session:AuthConfig",
-				"Feature:API:Session:NotificationsConfig",
-				"Feature:API:SSLClientCertificate",
-				//"Feature:API:SSLConfig",
-				//"Feature:API:SSLSchemes",
-				"Feature:API:Summary:GqlStatusObjects",
-				"Feature:API:Type.Spatial",
-				"Feature:API:Type.Temporal",
-				"Feature:Auth:Bearer",
-				"Feature:Auth:Custom",
-				"Feature:Auth:Kerberos",
-				"Feature:Auth:Managed",
-				"Feature:Bolt:3.0",
-				"Feature:Bolt:4.2",
-				"Feature:Bolt:4.3",
-				"Feature:Bolt:4.4",
-				"Feature:Bolt:5.0",
-				"Feature:Bolt:5.1",
-				"Feature:Bolt:5.2",
-				"Feature:Bolt:5.3",
-				"Feature:Bolt:5.4",
-				"Feature:Bolt:5.5",
-				"Feature:Bolt:5.6",
-				"Feature:Bolt:5.7",
-				"Feature:Bolt:5.8",
-				//"Feature:Bolt:HandshakeManifestV1",
-				"Feature:Bolt:Patch:UTC",
-				"Feature:Bolt:HandshakeManifestV1",
-				"Feature:Impersonation",
-				//"Feature:TLS:1.1",
-				"Feature:TLS:1.2",
-				"Feature:TLS:1.3",
-
-				// === OPTIMIZATIONS ===
-				"AuthorizationExpiredTreatment",
-				"Optimization:AuthPipelining",
-				"Optimization:ConnectionReuse",
-				"Optimization:EagerTransactionBegin",
-				"Optimization:ExecuteQueryPipelining",
-				"Optimization:HomeDatabaseCache",
-				"Optimization:HomeDbCacheBasicPrincipalIsImpersonatedUser",
-				"Optimization:ImplicitDefaultArguments",
-				"Optimization:MinimalBookmarksSet",
-				"Optimization:MinimalResets",
-				//"Optimization:MinimalVerifyAuthentication",
-				"Optimization:PullPipelining",
-				//"Optimization:ResultListFetchAll",
-
-				// === IMPLEMENTATION DETAILS ===
-				"Detail:ClosedDriverIsEncrypted",
-				"Detail:DefaultSecurityConfigValueEquality",
-				//"Detail:NumberIsNumber",
-
-				// === CONFIGURATION HINTS (BOLT 4.3+) ===
-				"ConfHint:connection.recv_timeout_seconds",
-
-				// === BACKEND FEATURES FOR TESTING ===
-				"Backend:MockTime",
-				"Backend:RTFetch",
-				"Backend:RTForceUpdate",
-			},
+			"features": features,
 		})
 
 	case "StartTest":
@@ -1434,7 +812,11 @@ func (b *backend) handleRequest(req map[string]any) {
 		b.writeResponse("RunTest", nil)
 
 	default:
-		b.writeError(errors.New("Unknown request: " + name))
+		if extraHandler, ok := extrasRequestHandlers[name]; ok {
+			extraHandler(b, data)
+		} else {
+			b.writeError(errors.New("Unknown request: " + name))
+		}
 	}
 }
 
@@ -1478,13 +860,6 @@ func getAuth(authTokenMap map[string]any) (neo4j.AuthToken, error) {
 	return authToken, nil
 }
 
-func serializeAuth(token neo4j.AuthToken) map[string]any {
-	return map[string]any{
-		"name": "AuthorizationToken",
-		"data": token.Tokens,
-	}
-}
-
 func (b *backend) writeRecord(result neo4j.ResultWithContext, record *neo4j.Record, expectRecord bool) {
 	if expectRecord && record == nil {
 		b.writeResponse("BackendError", map[string]any{
@@ -1516,7 +891,7 @@ func (b *backend) writeRecord(result neo4j.ResultWithContext, record *neo4j.Reco
 }
 
 func mustSkip(testName string) (string, bool) {
-	skippedTests := testSkips()
+	skippedTests := testSkips
 	for testPattern, exclusionReason := range skippedTests {
 		if matches(testPattern, testName) {
 			return exclusionReason, true
@@ -1527,7 +902,10 @@ func mustSkip(testName string) (string, bool) {
 
 func mustSkipSubTest(testName string, arguments map[string]any) (string, bool) {
 	if strings.Contains(testName, "test_should_echo_all_timezone_ids") {
-		return mustSkipTimeZoneSubTest(arguments)
+		return mustSkipTimeZoneEchoSubTest(arguments)
+	}
+	if strings.Contains(testName, "test_date_time_cypher_created_tz_id") {
+		return mustSkipTimeZoneCypherSubTest(arguments)
 	}
 	return "", false
 }
@@ -1578,51 +956,8 @@ func serializeNotifications(slice []neo4j.Notification, version db.ProtocolVersi
 		return []map[string]any{}
 	}
 	var res []map[string]any
-	for i, notification := range slice {
-		res = append(res, map[string]any{
-			"code":        notification.Code(),
-			"title":       notification.Title(),
-			"description": notification.Description(),
-			//lint:ignore SA1019 Severity is supported at least until 6.0
-			"severity":         notification.Severity(),
-			"severityLevel":    string(notification.SeverityLevel()),
-			"rawSeverityLevel": notification.RawSeverityLevel(),
-			"category":         string(notification.Category()),
-			"rawCategory":      notification.RawCategory(),
-		})
-		if notification.Position() != nil {
-			res[i]["position"] = map[string]any{
-				"offset": notification.Position().Offset(),
-				"line":   notification.Position().Line(),
-				"column": notification.Position().Column(),
-			}
-		}
-	}
-	return res
-}
-
-func serializeGqlStatusObjects(slice []neo4j.GqlStatusObject) []map[string]any {
-	var res []map[string]any
-	for i, status := range slice {
-		res = append(res, map[string]any{
-			"isNotification":    status.IsNotification(),
-			"gqlStatus":         status.GqlStatus(),
-			"statusDescription": status.StatusDescription(),
-			"rawClassification": emptyStringToNil(status.RawClassification()),
-			"classification":    string(status.Classification()),
-			"rawSeverity":       emptyStringToNil(status.RawSeverity()),
-			"severity":          string(status.Severity()),
-			"diagnosticRecord":  serializeParameters(status.DiagnosticRecord()),
-		})
-		if status.Position() != nil {
-			res[i]["position"] = map[string]any{
-				"offset": status.Position().Offset(),
-				"line":   status.Position().Line(),
-				"column": status.Position().Column(),
-			}
-		} else {
-			res[i]["position"] = nil
-		}
+	for _, notification := range slice {
+		res = append(res, serializeNotification(notification))
 	}
 	return res
 }
@@ -1665,7 +1000,7 @@ func serializeSummary(summary neo4j.ResultSummary) map[string]any {
 			"parameters": serializeParameters(summary.Query().Parameters()),
 		},
 		"notifications":    serializeNotifications(summary.Notifications(), protocolVersion),
-		"gqlStatusObjects": serializeGqlStatusObjects(summary.GqlStatusObjects()),
+		"gqlStatusObjects": serializeGqlStatusObjects(summary),
 		"plan":             serializePlan(summary.Plan()),
 		"profile":          serializeProfile(summary.Profile()),
 	}
@@ -1760,40 +1095,7 @@ func firstRecordInvalidValue(record *db.Record) *neo4j.InvalidValue {
 	return nil
 }
 
-// you can use '*' as wildcards anywhere in the qualified test name (useful to exclude a whole class e.g.)
-func testSkips() map[string]string {
-	return map[string]string{
-		// Won't fix - accepted/idiomatic behavioral differences
-		"stub.iteration.test_result_scope.TestResultScope.*":                                                                                       "Won't fix - Results are always valid but don't return records when out of scope",
-		"stub.connectivity_check.test_get_server_info.TestGetServerInfo.test_routing_fail_when_no_reader_are_available":                            "Won't fix - Go driver retries routing table when no readers are available",
-		"stub.connectivity_check.test_verify_connectivity.TestVerifyConnectivity.test_routing_fail_when_no_reader_are_available":                   "Won't fix - Go driver retries routing table when no readers are available",
-		"stub.driver_parameters.test_connection_acquisition_timeout_ms.TestConnectionAcquisitionTimeoutMs.test_does_not_encompass_router_*":        "Won't fix - ConnectionAcquisitionTimeout spans the whole process including db resolution, RT updates, connection acquisition from the pool, and creation of new connections.",
-		"stub.driver_parameters.test_connection_acquisition_timeout_ms.TestConnectionAcquisitionTimeoutMs.test_router_handshake_has_own_timeout_*": "Won't fix - ConnectionAcquisitionTimeout spans the whole process including db resolution, RT updates, connection acquisition from the pool, and creation of new connections.",
-		"stub.routing.test_routing_v*.RoutingV*.test_should_successfully_check_if_support_for_multi_db_is_available":                               "Won't fix - driver.SupportsMultiDb() is not implemented",
-		"stub.routing.test_no_routing_v*.NoRoutingV*.test_should_check_multi_db_support":                                                           "Won't fix - driver.SupportsMultiDb() is not implemented",
-		"stub.routing.test_routing_v3.RoutingV3.test_should_fail_discovery_when_router_fails_with_procedure_not_found_code":                        "Won't fix - only Bolt 3 affected (not officially supported by this driver) + this is only a difference in how errors are surfaced",
-		"stub.routing.test_routing_v3.RoutingV3.test_should_fail_when_writing_on_unexpectedly_interrupting_writer_on_pull_using_tx_run":            "Won't fix - only Bolt 3 affected (not officially supported by this driver): broken servers are not removed from routing table",
-		"stub.routing.test_routing_v3.RoutingV3.test_should_fail_when_writing_on_unexpectedly_interrupting_writer_on_run_using_tx_run":             "Won't fix - only Bolt 3 affected (not officially supported by this driver): broken servers are not removed from routing table",
-		"stub.routing.test_routing_v3.RoutingV3.test_should_fail_when_writing_on_unexpectedly_interrupting_writer_using_tx_run":                    "Won't fix - only Bolt 3 affected (not officially supported by this driver): broken servers are not removed from routing table",
-
-		// To fix/to decide whether to fix
-		"stub.routing.*.*.test_should_successfully_acquire_rt_when_router_ip_changes":                                                      "Backend lacks custom DNS resolution and Go driver RT discovery differs.",
-		"stub.routing.test_routing_v*.RoutingV*.test_should_revert_to_initial_router_if_known_router_throws_protocol_errors":               "Driver always uses configured URL first and custom resolver only if that fails",
-		"stub.routing.test_routing_v*.RoutingV*.test_should_request_rt_from_all_initial_routers_until_successful_on_authorization_expired": "Driver always uses configured URL first and custom resolver only if that fails",
-		"stub.routing.test_routing_v*.RoutingV*test_should_request_rt_from_all_initial_routers_until_successful_on_unknown_failure":        "Driver always uses configured URL first and custom resolver only if that fails",
-		"stub.routing.test_routing_v*.RoutingV*.test_should_read_successfully_from_reachable_db_after_trying_unreachable_db":               "Driver retries to fetch a routing table up to 100 times if it's empty",
-		"stub.routing.test_routing_v*.RoutingV*.test_should_write_successfully_after_leader_switch_using_tx_run":                           "Driver retries to fetch a routing table up to 100 times if it's empty",
-		"stub.routing.test_routing_v*.RoutingV*.test_should_fail_when_writing_without_writers_using_session_run":                           "Driver retries to fetch a routing table up to 100 times if it's empty",
-		"stub.routing.test_routing_v*.RoutingV*.test_should_accept_routing_table_without_writers_and_then_rediscover":                      "Driver retries to fetch a routing table up to 100 times if it's empty",
-		"stub.routing.test_routing_v*.RoutingV*.test_should_fail_on_routing_table_with_no_reader":                                          "Driver retries to fetch a routing table up to 100 times if it's empty",
-		"stub.routing.test_routing_v*.RoutingV*.test_should_fail_discovery_when_router_fails_with_unknown_code":                            "Unify: other drivers have a list of fast failing errors during discover: on anything else, the driver will try the next router",
-		"stub.routing.test_routing_v*.RoutingV*.test_should_drop_connections_failing_liveness_check":                                       "Liveness check error handling is not (yet) unified: https://github.com/neo-technology/drivers-adr/pull/83",
-		"stub.*.test_0_timeout": "Fixme: driver omits 0 as tx timeout value",
-		"stub.summary.test_summary.TestSummaryBasicInfo*.test_server_info": "pending unification: should the server address be pre or post DNS resolution?",
-	}
-}
-
-func mustSkipTimeZoneSubTest(arguments map[string]any) (string, bool) {
+func mustSkipTimeZoneEchoSubTest(arguments map[string]any) (string, bool) {
 	rawDateTime := arguments["dt"].(map[string]any)
 	dateTimeData := rawDateTime["data"].(map[string]any)
 	timeZoneName := dateTimeData["timezone_id"].(string)
@@ -1820,6 +1122,15 @@ func mustSkipTimeZoneSubTest(arguments map[string]any) (string, bool) {
 	return "", false
 }
 
+func mustSkipTimeZoneCypherSubTest(arguments map[string]any) (string, bool) {
+	timeZoneName := arguments["tz_id"].(string)
+	_, err := time.LoadLocation(timeZoneName)
+	if err != nil {
+		return fmt.Sprintf("time zone not supported: %s", err), true
+	}
+	return "", false
+}
+
 // some TestKit tests send large integer values which require to configure
 // the JSON deserializer to use json.Number instead of float64 (lossy conversions
 // would happen otherwise)
@@ -1838,83 +1149,12 @@ func patchNumbersInMap(dictionary map[string]any) error {
 	return nil
 }
 
-func (b *backend) bookmarkManagerConfig(bookmarkManagerId string,
-	config map[string]any) neo4j.BookmarkManagerConfig {
-
-	var initialBookmarks neo4j.Bookmarks
-	if config["initialBookmarks"] != nil {
-		initialBookmarks = convertInitialBookmarks(config["initialBookmarks"].([]any))
-	}
-	result := neo4j.BookmarkManagerConfig{InitialBookmarks: initialBookmarks}
-	supplierRegistered := config["bookmarksSupplierRegistered"]
-	if supplierRegistered != nil && supplierRegistered.(bool) {
-		result.BookmarkSupplier = b.supplyBookmarks(bookmarkManagerId)
-	}
-	consumerRegistered := config["bookmarksConsumerRegistered"]
-	if consumerRegistered != nil && consumerRegistered.(bool) {
-		result.BookmarkConsumer = b.consumeBookmarks(bookmarkManagerId)
-	}
-	return result
-}
-
-func (b *backend) supplyBookmarks(bookmarkManagerId string) func(context.Context) (neo4j.Bookmarks, error) {
-	return func(ctx context.Context) (neo4j.Bookmarks, error) {
-		id := b.nextId()
-		msg := map[string]any{"id": id, "bookmarkManagerId": bookmarkManagerId}
-		b.writeResponse("BookmarksSupplierRequest", msg)
-		b.process()
-		return b.suppliedBookmarks[id], nil
-	}
-}
-
-func (b *backend) consumeBookmarks(bookmarkManagerId string) func(context.Context, neo4j.Bookmarks) error {
-	return func(_ context.Context, bookmarks neo4j.Bookmarks) error {
-		id := b.nextId()
-		b.writeResponse("BookmarksConsumerRequest", map[string]any{
-			"id":                id,
-			"bookmarkManagerId": bookmarkManagerId,
-			"bookmarks":         bookmarks,
-		})
-		for b.process() {
-			if _, found := b.consumedBookmarks[id]; found {
-				delete(b.consumedBookmarks, id)
-				break
-			}
-		}
-		return nil
-	}
-}
-
-func convertInitialBookmarks(bookmarks []any) neo4j.Bookmarks {
-	result := make(neo4j.Bookmarks, len(bookmarks))
-	for i, bookmark := range bookmarks {
-		result[i] = bookmark.(string)
-	}
-	return result
-}
-
-func anyToNotificationCategory(v any) notifications.NotificationCategory {
-	return notifications.NotificationCategory(v.(string))
-}
-
 func convertSlice[T any](slice []any, transform func(any) T) []T {
 	res := make([]T, len(slice))
 	for i, cat := range slice {
 		res[i] = transform(cat)
 	}
 	return res
-}
-
-func mapNotificationMinSeverityLevel(rawMinSeverityLevel string) (notifications.NotificationMinimumSeverityLevel, error) {
-	switch rawMinSeverityLevel {
-	case "OFF":
-		return notifications.DisabledLevel, nil
-	case "WARNING":
-		return notifications.WarningLevel, nil
-	case "INFORMATION":
-		return notifications.InformationLevel, nil
-	}
-	return "", fmt.Errorf("unknown min severity level %s", rawMinSeverityLevel)
 }
 
 func mapGetString(data map[string]any, key string) string {

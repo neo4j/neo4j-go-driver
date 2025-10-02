@@ -1,4 +1,4 @@
-//go:build !internal_neo4j_go_driver_time_mock
+//go:build internal_neo4j_testkit_no_home_db_cache
 
 /*
  * Copyright (c) "Neo4j"
@@ -17,9 +17,20 @@
  * limitations under the License.
  */
 
-package time
+package main
 
-import "time"
+const extrasNameHomeDbCache = "homeDbCache"
 
-var Now = time.Now
-var Since = time.Since
+func init() {
+	registerExtra(
+		extrasNameHomeDbCache,
+		ExtrasRegisterEntry{
+			extraBlockedTestKitFeatures: []string{
+				"Feature:Bolt:HandshakeManifestV1",
+				"Feature:Bolt:5.8",
+				"Optimization:HomeDatabaseCache",
+				"Optimization:HomeDbCacheBasicPrincipalIsImpersonatedUser",
+			},
+		},
+	)
+}

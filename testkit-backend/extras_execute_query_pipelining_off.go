@@ -1,4 +1,4 @@
-//go:build !internal_neo4j_go_driver_time_mock
+//go:build internal_neo4j_testkit_no_execute_query_pipelining
 
 /*
  * Copyright (c) "Neo4j"
@@ -17,9 +17,17 @@
  * limitations under the License.
  */
 
-package time
+package main
 
-import "time"
+const extrasNameExecuteQueryPipelining = "executeQueryPipelining"
 
-var Now = time.Now
-var Since = time.Since
+func init() {
+	registerExtra(
+		extrasNameExecuteQueryPipelining,
+		ExtrasRegisterEntry{
+			extraBlockedTestKitFeatures: []string{
+				"Optimization:ExecuteQueryPipelining",
+			},
+		},
+	)
+}

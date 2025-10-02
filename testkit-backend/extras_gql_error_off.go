@@ -1,4 +1,4 @@
-//go:build !internal_neo4j_go_driver_time_mock
+//go:build internal_neo4j_testkit_no_gql_error
 
 /*
  * Copyright (c) "Neo4j"
@@ -17,9 +17,25 @@
  * limitations under the License.
  */
 
-package time
+package main
 
-import "time"
+import (
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
+)
 
-var Now = time.Now
-var Since = time.Since
+const extrasNameGqlError = "gqlError"
+
+func init() {
+	registerExtra(
+		extrasNameGqlError,
+		ExtrasRegisterEntry{
+			extraBlockedTestKitFeatures: []string{
+				"Feature:Bolt:5.7",
+			},
+		},
+	)
+}
+
+func extrasGqlErrorFromNeo4jError(neo4jError *neo4j.Neo4jError) extrasGqlErrorInfo {
+	return extrasGqlErrorInfo{}
+}

@@ -1,4 +1,4 @@
-//go:build !internal_neo4j_go_driver_time_mock
+//go:build !internal_neo4j_testkit_no_stable_execute_query
 
 /*
  * Copyright (c) "Neo4j"
@@ -17,9 +17,14 @@
  * limitations under the License.
  */
 
-package time
+package main
 
-import "time"
+import "github.com/neo4j/neo4j-go-driver/v5/neo4j"
 
-var Now = time.Now
-var Since = time.Since
+func neo4jRead() neo4j.RoutingControl {
+	return neo4j.Read
+}
+
+func neo4jWrite() neo4j.RoutingControl {
+	return neo4j.Write
+}

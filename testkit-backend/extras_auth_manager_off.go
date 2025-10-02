@@ -1,4 +1,4 @@
-//go:build !internal_neo4j_go_driver_time_mock
+//go:build internal_neo4j_testkit_no_auth_manager
 
 /*
  * Copyright (c) "Neo4j"
@@ -17,9 +17,25 @@
  * limitations under the License.
  */
 
-package time
+package main
 
-import "time"
+import (
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
+)
 
-var Now = time.Now
-var Since = time.Since
+const extrasAuthManager = "authManager"
+
+func init() {
+	registerExtra(
+		extrasAuthManager,
+		ExtrasRegisterEntry{
+			extraBlockedTestKitFeatures: []string{
+				"Feature:Auth:Managed",
+			},
+		},
+	)
+}
+
+func getDriverAuthToken(backend *backend, data map[string]any) (neo4j.AuthToken, error) {
+	return getAuth(data["authorizationToken"].(map[string]any)["data"].(map[string]any))
+}

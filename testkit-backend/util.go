@@ -1,5 +1,3 @@
-//go:build !internal_neo4j_go_driver_time_mock
-
 /*
  * Copyright (c) "Neo4j"
  * Neo4j Sweden AB [https://neo4j.com]
@@ -17,9 +15,13 @@
  * limitations under the License.
  */
 
-package time
+package main
 
-import "time"
-
-var Now = time.Now
-var Since = time.Since
+func contains[T comparable](slice []T, item T) bool {
+	for _, v := range slice {
+		if v == item {
+			return true
+		}
+	}
+	return false
+}

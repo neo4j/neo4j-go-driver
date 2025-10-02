@@ -1,4 +1,4 @@
-//go:build !internal_neo4j_go_driver_time_mock
+//go:build !internal_neo4j_testkit_no_liveness_check
 
 /*
  * Copyright (c) "Neo4j"
@@ -17,9 +17,28 @@
  * limitations under the License.
  */
 
-package time
+package main
 
-import "time"
+import (
+	"encoding/json"
+	"time"
+)
 
-var Now = time.Now
-var Since = time.Since
+const extrasNameLivenessCheck = "livenessCheck"
+
+func init() {
+	registerExtra(
+		extrasNameLivenessCheck,
+		ExtrasRegisterEntry{
+			extraDriverConfigurer: extrasLivenessCheck,
+		},
+	)
+}
+
+func extrasLivenessCheck(backend *backend, data map[string]any, config *Config) error {
+	// Append configurers to config if they exist.
+	if data["livenessCheckTimeoutMs"] != nil {
+		config.ConnectionLivenessCheckTimeout = time.Millisecond * time.Duration(asInt64(data["livenessCheckTimeoutMs"].(json.Number)))
+	}
+	return nil
+}

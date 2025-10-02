@@ -1,4 +1,4 @@
-//go:build !internal_neo4j_go_driver_time_mock
+//go:build internal_neo4j_testkit_no_gql_status
 
 /*
  * Copyright (c) "Neo4j"
@@ -17,9 +17,25 @@
  * limitations under the License.
  */
 
-package time
+package main
 
-import "time"
+import "github.com/neo4j/neo4j-go-driver/v5/neo4j"
 
-var Now = time.Now
-var Since = time.Since
+const extrasNameGqlStatus = "gqlStatus"
+
+func init() {
+	registerExtra(
+		extrasNameGqlStatus,
+		ExtrasRegisterEntry{
+			extraBlockedTestKitFeatures: []string{
+				"Feature:API:Summary:GqlStatusObjects",
+				"Feature:Bolt:5.5",
+				"Feature:Bolt:5.6",
+			},
+		},
+	)
+}
+
+func serializeGqlStatusObjects(summary neo4j.ResultSummary) []map[string]any {
+	return make([]map[string]any, 0)
+}

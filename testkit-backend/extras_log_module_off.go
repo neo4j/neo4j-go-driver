@@ -1,4 +1,4 @@
-//go:build !internal_neo4j_go_driver_time_mock
+//go:build internal_neo4j_testkit_no_log_module
 
 /*
  * Copyright (c) "Neo4j"
@@ -17,9 +17,13 @@
  * limitations under the License.
  */
 
-package time
+package main
 
-import "time"
+import (
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/log"
+)
 
-var Now = time.Now
-var Since = time.Since
+func extrasLogBoltToConsole() *log.ConsoleBoltLogger {
+	return neo4j.ConsoleBoltLogger()
+}

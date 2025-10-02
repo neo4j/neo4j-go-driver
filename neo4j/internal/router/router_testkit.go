@@ -1,4 +1,4 @@
-//go:build internal_testkit
+//go:build internal_neo4j_go_driver_testkit
 
 /*
  * Copyright (c) "Neo4j"

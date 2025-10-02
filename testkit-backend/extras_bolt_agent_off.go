@@ -1,4 +1,4 @@
-//go:build !internal_neo4j_go_driver_time_mock
+//go:build internal_neo4j_testkit_no_bolt_agent
 
 /*
  * Copyright (c) "Neo4j"
@@ -17,9 +17,17 @@
  * limitations under the License.
  */
 
-package time
+package main
 
-import "time"
+const extrasNameBoltAgent = "boltAgent"
 
-var Now = time.Now
-var Since = time.Since
+func init() {
+	registerExtra(
+		extrasNameBoltAgent,
+		ExtrasRegisterEntry{
+			extraBlockedTestKitFeatures: []string{
+				"Feature:Bolt:5.3",
+			},
+		},
+	)
+}

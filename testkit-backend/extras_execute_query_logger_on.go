@@ -1,4 +1,4 @@
-//go:build !internal_neo4j_go_driver_time_mock
+//go:build !internal_neo4j_testkit_no_execute_query_logger
 
 /*
  * Copyright (c) "Neo4j"
@@ -17,9 +17,24 @@
  * limitations under the License.
  */
 
-package time
+package main
 
-import "time"
+import (
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
+)
 
-var Now = time.Now
-var Since = time.Since
+const extrasExecuteQueryLogger = "executeQueryLogger"
+
+func init() {
+	registerExtra(
+		extrasExecuteQueryLogger,
+		ExtrasRegisterEntry{
+			extraExecuteQueryConfigurer: extrasExecuteQueryLoggerConfig,
+		},
+	)
+}
+
+func extrasExecuteQueryLoggerConfig(backend *backend, data map[string]any, config *neo4j.ExecuteQueryConfiguration) error {
+	config.BoltLogger = &streamLog{writeLine: backend.writeLineLocked}
+	return nil
+}

@@ -1,4 +1,4 @@
-//go:build !internal_neo4j_go_driver_time_mock
+//go:build !internal_neo4j_testkit_no_telemetry
 
 /*
  * Copyright (c) "Neo4j"
@@ -17,9 +17,22 @@
  * limitations under the License.
  */
 
-package time
+package main
 
-import "time"
+const extrasNameTelemetry = "telemetry"
 
-var Now = time.Now
-var Since = time.Since
+func init() {
+	registerExtra(
+		extrasNameTelemetry,
+		ExtrasRegisterEntry{
+			extraDriverConfigurer: extrasTelemetry,
+		},
+	)
+}
+
+func extrasTelemetry(backend *backend, data map[string]any, config *Config) error {
+	if data["telemetryDisabled"] != nil {
+		config.TelemetryDisabled = data["telemetryDisabled"].(bool)
+	}
+	return nil
+}

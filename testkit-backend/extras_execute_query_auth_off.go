@@ -1,4 +1,4 @@
-//go:build !internal_neo4j_go_driver_time_mock
+//go:build internal_neo4j_testkit_no_execute_query_auth
 
 /*
  * Copyright (c) "Neo4j"
@@ -17,9 +17,17 @@
  * limitations under the License.
  */
 
-package time
+package main
 
-import "time"
+const extrasNameExecuteQueryAuth = "executeQueryAuth"
 
-var Now = time.Now
-var Since = time.Since
+func init() {
+	registerExtra(
+		extrasNameExecuteQueryAuth,
+		ExtrasRegisterEntry{
+			extraBlockedTestKitFeatures: []string{
+				"Feature:API:Driver.ExecuteQuery:WithAuth",
+			},
+		},
+	)
+}

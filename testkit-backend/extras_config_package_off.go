@@ -1,4 +1,4 @@
-//go:build !internal_neo4j_go_driver_time_mock
+//go:build internal_neo4j_testkit_no_config_package
 
 /*
  * Copyright (c) "Neo4j"
@@ -17,9 +17,12 @@
  * limitations under the License.
  */
 
-package time
+package main
 
-import "time"
+import (
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j"
+)
 
-var Now = time.Now
-var Since = time.Since
+type ServerAddressResolver = neo4j.ServerAddressResolver
+type ServerAddress = neo4j.ServerAddress
+type Config = neo4j.Config
