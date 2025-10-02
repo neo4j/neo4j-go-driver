@@ -1094,6 +1094,61 @@ func TestHydrator(outer *testing.T) {
 				Err:         "Expected byte array for vector values",
 			},
 		},
+		{
+			name: "UnsupportedType without message",
+			build: func() {
+				packer.StructHeader(byte(msgRecord), 1)
+				packer.ArrayHeader(1)
+				packer.StructHeader('?', 4)
+				packer.String("UUID")
+				packer.Int(255)
+				packer.Int(0)
+				packer.MapHeader(0)
+			},
+			x: &db.Record{Values: []any{
+				&dbtype.UnsupportedType{
+					Name:                   "UUID",
+					MinimumProtocolVersion: db.ProtocolVersion{Major: 255, Minor: 0},
+					Message:                nil,
+				},
+			}},
+		},
+		{
+			name: "UnsupportedType with message",
+			build: func() {
+				packer.StructHeader(byte(msgRecord), 1)
+				packer.ArrayHeader(1)
+				packer.StructHeader('?', 4)
+				packer.String("UUID")
+				packer.Int(255)
+				packer.Int(0)
+				packer.MapHeader(1)
+				packer.String("message")
+				packer.String("Some configuration message")
+			},
+			x: &db.Record{Values: []any{
+				&dbtype.UnsupportedType{
+					Name:                   "UUID",
+					MinimumProtocolVersion: db.ProtocolVersion{Major: 255, Minor: 0},
+					Message:                ptr("Some configuration message"),
+				},
+			}},
+		},
+		{
+			name: "UnsupportedType invalid length",
+			build: func() {
+				packer.StructHeader(byte(msgRecord), 1)
+				packer.ArrayHeader(1)
+				packer.StructHeader('?', 3)
+				packer.String("UUID")
+				packer.Int(255)
+				packer.Int(0)
+			},
+			err: &db.ProtocolError{
+				MessageType: "unsupported",
+				Err:         "Invalid length of struct, expected 4 but was 3",
+			},
+		},
 	}
 
 	// Shared among calls in real usage so we do the same while testing it.
@@ -1130,6 +1185,11 @@ func TestHydrator(outer *testing.T) {
 			}
 		})
 	}
+}
+
+// Helper function to create a pointer (e.g., for an untyped literal)
+func ptr[T any](x T) *T {
+	return &x
 }
 
 func TestHydratorBolt5(outer *testing.T) {
