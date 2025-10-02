@@ -182,6 +182,25 @@ func TestSession(outer *testing.T) {
 			assertCleanSessionState(t, sess)
 		})
 
+		inner.Run("Fails fast on context timeout", func(t *testing.T) {
+			_, pool, sess := createSession()
+			pool.BorrowConn = &ConnFake{Alive: false}
+			numRetries := 0
+			ctx := context.Background()
+			ctx, cancel := context.WithTimeout(ctx, 0)
+			defer cancel()
+			<-ctx.Done()
+			_, err := sess.ExecuteWrite(ctx, func(tx ManagedTransaction) (any, error) {
+				numRetries++
+				return nil, ctx.Err()
+			})
+			if numRetries > 0 {
+				t.Error("Should fail fast on context timeout")
+			}
+			AssertTrue(t, IsConnectivityError(err))
+			assertCleanSessionState(t, sess)
+		})
+
 		inner.Run("Retrieves default database name for impersonated user", func(t *testing.T) {
 			sessConfig := SessionConfig{ImpersonatedUser: "me"}
 			router, pool, sess := createSessionFromConfig(sessConfig)
