@@ -1,4 +1,5 @@
-FROM ubuntu:20.04
+ARG TIME_WARP=""
+FROM ubuntu:20.04 AS base
 
 ARG go_version_min=1.24.6
 ARG go_version_default=1.24.6
@@ -27,6 +28,18 @@ ENV GOMINBIN=go${go_version_min}
 # Install minimum version of Go alongside latest
 RUN go install golang.org/dl/go${go_version_min}@latest && go${go_version_min} download
 
+
+FROM base AS backend-timewarp
+ARG TIME_WARP
+WORKDIR /home/root/testkit
+COPY testkit-backend .
+RUN go mod init github.com/neo4j/neo4j-go-driver/testkit-backend/v2 \
+    && go get github.com/neo4j/neo4j-go-driver/v6@v${TIME_WARP} \
+    && echo tags: $(./build_tags.sh ${TIME_WARP}) \
+    && go build -tags "$(./build_tags.sh ${TIME_WARP})" -o backend
+ENTRYPOINT ["./backend"]
+
+FROM base AS backend
 # Install python stuff
 ENV PYTHON=python3
 
@@ -34,3 +47,9 @@ ENV PYTHON=python3
 # Assumes Linux Debian based image.
 COPY CAs/* /usr/local/share/ca-certificates/
 RUN update-ca-certificates
+
+FROM backend${TIME_WARP:+"-timewarp"} AS final
+ARG TIME_WARP
+ENV DRIVER_TIME_WARP=$TIME_WARP
+WORKDIR /home/root/testkit
+EXPOSE 9876/tcp

@@ -22,7 +22,7 @@ if __name__ == "__main__":
 
     for go_bin in go_bins:
         for extra_args in (
-            (), ("-tags", "internal_time_mock")
+            (), ("-tags", "internal_neo4j_go_driver_time_mock")
         ):
             cmd = ["test", "-race", *extra_args]
             if os.environ.get("TEST_IN_TEAMCITY", False):

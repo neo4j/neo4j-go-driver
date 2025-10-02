@@ -5,6 +5,12 @@ import sys
 from pathlib import Path
 
 
+ALL_BUILD_TAGS = (
+    "internal_neo4j_go_driver_testkit,"
+    "internal_neo4j_go_driver_time_mock"
+)
+
+
 def get_go_min_bin():
     return os.environ.get('GOMINBIN', 'go')
 

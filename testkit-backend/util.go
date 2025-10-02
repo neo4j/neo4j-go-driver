@@ -1,5 +1,3 @@
-//go:build internal_neo4j_go_driver_testkit
-
 /*
  * Copyright (c) "Neo4j"
  * Neo4j Sweden AB [https://neo4j.com]
@@ -17,10 +15,13 @@
  * limitations under the License.
  */
 
-package router
+package main
 
-import idb "github.com/neo4j/neo4j-go-driver/v6/neo4j/internal/db"
-
-func (r *Router) GetTable(database string) *idb.RoutingTable {
-	return r.getTable(database)
+func contains[T comparable](slice []T, item T) bool {
+	for _, v := range slice {
+		if v == item {
+			return true
+		}
+	}
+	return false
 }

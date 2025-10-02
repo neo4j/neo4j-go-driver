@@ -19,14 +19,19 @@ if verlt $go_version "1.24.0"; then
     exit 1
 fi
 
+tags="\
+internal_neo4j_go_driver_testkit,\
+internal_neo4j_go_driver_time_mock\
+"
+
 echo "# pre-commit hook"
 printf '%-15s' "## staticcheck "
 cd "$(mktemp -d)" && go install honnef.co/go/tools/cmd/staticcheck@"${staticcheck_version}" && cd - > /dev/null
-"${GOBIN:-$(go env GOPATH)/bin}"/staticcheck -tags internal_testkit,internal_time_mock ./...
+"${GOBIN:-$(go env GOPATH)/bin}"/staticcheck -tags "$tags" ./...
 echo "✅"
 
 printf '%-15s' "## go vet "
-go vet -tags internal_testkit,internal_time_mock ./...
+go vet -tags "$tags" ./...
 echo "✅"
 
 printf '%-15s' "## go test "
