@@ -141,6 +141,9 @@ func IsRetryable(err error) bool {
 	if _, ok := err.(*errorutil.PoolTimeout); ok {
 		return true
 	}
+	if _, ok := err.(*errorutil.PoolOutOfServers); ok {
+		return true
+	}
 	var dbError *db.Neo4jError
 	if !errors.As(err, &dbError) {
 		return false

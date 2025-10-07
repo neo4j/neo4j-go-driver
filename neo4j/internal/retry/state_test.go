@@ -70,6 +70,10 @@ func TestState(outer *testing.T) {
 			{conn: nil, err: &errorutil.PoolTimeout{}, expectContinued: true,
 				expectLastErrWasRetryable: true, expectLastErrType: &errorutil.PoolTimeout{}},
 		},
+		"Retry on PoolOutOfServers": {
+			{conn: nil, err: &errorutil.PoolOutOfServers{}, expectContinued: true,
+				expectLastErrWasRetryable: true, expectLastErrType: &errorutil.PoolOutOfServers{}},
+		},
 		"Retry connect timeout": {
 			{conn: nil, err: dbTransientErr, expectContinued: true, freezeTime: true,
 				expectLastErrWasRetryable: true},

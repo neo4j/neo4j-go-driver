@@ -70,7 +70,7 @@ func WrapError(err error) error {
 		return &UsageError{Message: err.Error()}
 	case *TlsError, net.Error:
 		return &ConnectivityError{Inner: err}
-	case *PoolTimeout, *PoolFull:
+	case *PoolTimeout, *PoolFull, *PoolOutOfServers:
 		return &ConnectivityError{Inner: err}
 	case *ReadRoutingTableError:
 		return &ConnectivityError{Inner: err}
