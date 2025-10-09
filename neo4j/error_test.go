@@ -36,7 +36,10 @@ func TestIsRetryable(outer *testing.T) {
 		{true, &ConnectivityError{
 			Inner: fmt.Errorf("hello, is it me you are looking for"),
 		}},
-		{true, &errorutil.PoolOutOfServers{}},
+		// PoolOutOfServers is wrapped by session.getConnection() before users see it
+		{true, &ConnectivityError{
+			Inner: &errorutil.PoolOutOfServers{},
+		}},
 		{true, &db.Neo4jError{
 			Code: "Neo.TransientError.No.Stress",
 			Msg:  "Relax: Retry it Easyyy",
