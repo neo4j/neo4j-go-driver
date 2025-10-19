@@ -29,17 +29,18 @@ import (
 
 func defaultConfig() *config.Config {
 	return &config.Config{
-		AddressResolver:                      nil,
-		MaxTransactionRetryTime:              30 * time.Second,
-		MaxConnectionPoolSize:                100,
-		MaxConnectionLifetime:                1 * time.Hour,
-		ConnectionAcquisitionTimeout:         1 * time.Minute,
-		ConnectionLivenessCheckTimeout:       pool.DefaultConnectionLivenessCheckTimeout,
-		SocketConnectTimeout:                 5 * time.Second,
-		SocketKeepalive:                      true,
-		UserAgent:                            UserAgent,
-		FetchSize:                            FetchDefault,
-		NotificationsMinSeverity:             notifications.DefaultLevel,
+		AddressResolver:                nil,
+		MaxTransactionRetryTime:        30 * time.Second,
+		MaxConnectionPoolSize:          100,
+		MaxConnectionLifetime:          1 * time.Hour,
+		ConnectionAcquisitionTimeout:   1 * time.Minute,
+		ConnectionLivenessCheckTimeout: pool.DefaultConnectionLivenessCheckTimeout,
+		SocketConnectTimeout:           5 * time.Second,
+		SocketKeepalive:                true,
+		UserAgent:                      UserAgent,
+		FetchSize:                      FetchDefault,
+		NotificationsMinSeverity:       notifications.DefaultLevel,
+		//lint:ignore SA1019 NotificationDisabledCategories is supported for backward compatibility
 		NotificationsDisabledCategories:      notifications.NotificationDisabledCategories{},
 		NotificationsDisabledClassifications: notifications.NotificationDisabledClassifications{},
 		TelemetryDisabled:                    false,
@@ -83,6 +84,7 @@ func validateAndNormaliseConfig(config *config.Config) error {
 	}
 
 	// Check notifications have not been configured with both categories and classifications.
+	//lint:ignore SA1019 NotificationDisabledCategories is supported for backward compatibility
 	if len(config.NotificationsDisabledCategories.DisabledCategories()) > 0 &&
 		len(config.NotificationsDisabledClassifications.DisabledClassifications()) > 0 {
 		return &UsageError{Message: "Notifications cannot be disabled for both categories and classifications at the same time."}

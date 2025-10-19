@@ -49,6 +49,7 @@ func TestNotifications(st *testing.T) {
 		Line:   2,
 		Column: 3,
 	}
+	//lint:ignore SA1019 db.Notification is supported for backward compatibility
 	notif1 := db.Notification{
 		Code:        "code1",
 		Title:       "title1",
@@ -56,6 +57,7 @@ func TestNotifications(st *testing.T) {
 		Severity:    "sev1",
 		Position:    &pos1,
 	}
+	//lint:ignore SA1019 db.Notification is supported for backward compatibility
 	notif2 := db.Notification{
 		Code:        "code2",
 		Title:       "title2",
@@ -66,6 +68,7 @@ func TestNotifications(st *testing.T) {
 
 	summary := resultSummary{
 		sum: &db.Summary{
+			//lint:ignore SA1019 db.Notification is supported for backward compatibility
 			Notifications: []db.Notification{notif1, notif2},
 		},
 	}

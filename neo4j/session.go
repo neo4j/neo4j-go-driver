@@ -166,12 +166,12 @@ type SessionConfig struct {
 	// By default, the driver's settings are used.
 	// Else, this option overrides the driver's settings.
 	// Disabling categories allows the server to skip analysis for those, which can speed up query execution.
+	//
+	// Deprecated: Use NotificationsDisabledClassifications instead. This will be removed in a future release.
+	//lint:ignore SA1019 NotificationDisabledCategories is supported for backward compatibility
 	NotificationsDisabledCategories notifications.NotificationDisabledCategories
 	// NotificationsDisabledClassifications is identical to NotificationsDisabledCategories.
 	// This alternative is provided for a consistent naming with neo4j.GqlStatusObject Classification.
-	//
-	// NotificationsDisabledClassifications is part of the GQL compliant notifications preview feature
-	// (see README on what it means in terms of support and compatibility guarantees)
 	NotificationsDisabledClassifications notifications.NotificationDisabledClassifications
 	// Auth is used to overwrite the authentication information for the session.
 	// This requires the server to support re-authentication on the protocol level.

@@ -183,6 +183,7 @@ func (b *bolt3) receiveSuccess(ctx context.Context) *success {
 	case *db.Neo4jError:
 		b.state = bolt3_failed
 		b.err = message
+		//lint:ignore SA1019 Classification is supported for error handling
 		if message.Classification() == "ClientError" {
 			// These could include potentially large cypher statement, only log to debug
 			b.log.Debugf(log.Bolt3, b.logId, "%s", message)
@@ -667,6 +668,7 @@ func (b *bolt3) receiveNext(ctx context.Context) (*db.Record, *db.Summary, error
 		b.currStream.err = b.err
 		b.currStream = nil
 		b.state = bolt3_failed
+		//lint:ignore SA1019 Classification is supported for error handling
 		if message.Classification() == "ClientError" {
 			// These could include potentially large cypher statement, only log to debug
 			b.log.Debugf(log.Bolt3, b.logId, "%s", message)
@@ -793,6 +795,7 @@ func (b *bolt3) GetRoutingTable(ctx context.Context,
 	if err != nil {
 		// Give a better error
 		dbError, isDbError := err.(*db.Neo4jError)
+		//lint:ignore SA1019 Code is supported for error handling
 		if isDbError && dbError.Code == "Neo.ClientError.Procedure.ProcedureNotFound" {
 			return nil, &db.FeatureNotSupportedError{Server: b.serverName, Feature: "routing", Reason: "requires cluster setup"}
 		}

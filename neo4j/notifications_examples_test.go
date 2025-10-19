@@ -30,6 +30,7 @@ func ExampleConfig_disableNoCategories() {
 	ctx := context.Background()
 	driver, err := NewDriver(getUrl(), getAuth(), func(config *config.Config) {
 		// makes the server return all notification categories
+		//lint:ignore SA1019 NotificationDisabledCategories is supported for backward compatibility
 		config.NotificationsDisabledCategories = notifications.DisableNoCategories()
 	})
 	handleError(err)
@@ -54,6 +55,7 @@ func ExampleSessionConfig_disableNoCategories() {
 	session := driver.NewSession(ctx, SessionConfig{
 		// makes the server return all notification categories
 		// this overrides the driver level configuration of the same name
+		//lint:ignore SA1019 NotificationDisabledCategories is supported for backward compatibility
 		NotificationsDisabledCategories: notifications.DisableNoCategories(),
 	})
 
@@ -74,6 +76,7 @@ func ExampleConfig_disableSomeCategories() {
 	ctx := context.Background()
 	driver, err := NewDriver(getUrl(), getAuth(), func(config *config.Config) {
 		// makes the server return all notification categories but deprecations
+		//lint:ignore SA1019 NotificationDisabledCategories is supported for backward compatibility
 		config.NotificationsDisabledCategories = notifications.DisableCategories(notifications.Deprecation)
 	})
 	handleError(err)
@@ -99,6 +102,7 @@ func ExampleSessionConfig_disableSomeCategories() {
 	session := driver.NewSession(ctx, SessionConfig{
 		// makes the server return all notification categories but deprecations
 		// this overrides the driver level configuration of the same name
+		//lint:ignore SA1019 NotificationDisabledCategories is supported for backward compatibility
 		NotificationsDisabledCategories: notifications.DisableCategories(notifications.Deprecation),
 	})
 
