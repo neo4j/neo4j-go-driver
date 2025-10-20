@@ -118,7 +118,7 @@ func sign(x int64) int64 {
 	// }
 	// return 1
 	//
-	// In the context of string formating this is likely negligible, yet a fun exercise ;)
+	// In the context of string formatting this is likely negligible, yet a fun exercise ;)
 	return int64(^(uint64(x)>>63 - 1) | 1)
 }
 
