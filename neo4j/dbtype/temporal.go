@@ -19,6 +19,7 @@ package dbtype
 
 import (
 	"fmt"
+	"strings"
 	"time"
 )
 
@@ -90,26 +91,121 @@ type Duration struct {
 	Nanos   int
 }
 
+func divMod(a, b int64) (int64, int64) {
+	return a / b, a % b
+}
+
+// sign returns -1 for negative numbers and 1 for positive numbers (including 0)
+func sign(x int64) int64 {
+	/*
+	 * x >> 63: only keep sign bit (0...01 for negative, 0...0 for positive)
+	 * -1:      "copy" sign bit to everywhere: 0...0 for negative, 1...1 for positive
+	 * ^:       flip all bits: 1...1 for negative, 0...0 for positive
+	 * |1:      set LSB: 1...1 (=-1) for negative, 0...1 (=1) for positive
+	 */
+
+	/*
+	 * x >> 63: only keep sign bit (0...01 for negative, 0...0 for positive)
+	 * -1:      "copy" sign bit to everywhere: 0...0 for negative, 1...1 for positive
+	 * ^:       flip all bits: 1...1 for negative, 0...0 for positive
+	 * |1:      set LSB: 1...1 (=-1) for negative, 0...1 (=1) for positive
+	 */
+	// This bit-juggling implementation tends to be ever so slightly faster than
+	// the equivalent branching implementation:
+	//
+	// if x < 0 {
+	// 	return -1
+	// }
+	// return 1
+	//
+	// In the context of string formatting this is likely negligible, yet a fun exercise ;)
+	return int64(^(uint64(x)>>63 - 1) | 1)
+}
+
 // String returns the string representation of this Duration in ISO-8601 compliant form.
 func (d Duration) String() string {
-	sign := ""
-	if d.Seconds < 0 && d.Nanos > 0 {
-		d.Seconds++
-		d.Nanos = int(time.Second) - d.Nanos
+	hasTime := d.Seconds|int64(d.Nanos) != 0
+	hasDate := d.Months|d.Days != 0
+	if !hasTime && !hasDate {
+		return "PT0S"
+	}
+	res := []byte("P")
 
-		if d.Seconds == 0 {
-			sign = "-"
+	if hasDate {
+		years, months := divMod(d.Months, 12)
+		if years != 0 {
+			res = fmt.Append(res, years, "Y")
+		}
+		if months != 0 {
+			res = fmt.Append(res, months, "M")
+		}
+		if d.Days != 0 {
+			res = fmt.Append(res, d.Days, "D")
+		}
+	}
+	if hasTime {
+		res = fmt.Append(res, "T")
+
+		minutes1, seconds := divMod(d.Seconds, 60)
+		secondsNanos, nanos := divMod(int64(d.Nanos), int64(time.Second))
+		seconds = seconds + secondsNanos
+
+		// Wrapping seconds again after nanos have been folded into seconds.
+		// If we had int128 at our disposal simple divMod operations would suffice as nanos could be
+		// folded into seconds as the first step without having to worry about overflows.
+		minutes2, seconds := divMod(seconds, 60)
+		minutes := minutes1 + minutes2
+		if minutes != 0 && seconds != 0 {
+			signMinutes := sign(minutes)
+			signSeconds := sign(seconds)
+			if signMinutes != signSeconds {
+				minutes += signSeconds
+				seconds += 60 * signMinutes
+			}
+		}
+		hours, minutes := divMod(minutes, 60)
+
+		if hours != 0 {
+			res = fmt.Append(res, hours, "H")
+		}
+		if minutes != 0 {
+			res = fmt.Append(res, minutes, "M")
+		}
+		if nanos < 0 {
+			if seconds < 0 {
+				nanosStr := strings.TrimRight(fmt.Sprintf(".%09d", -nanos), "0")
+				res = fmt.Append(res, seconds, nanosStr, "S")
+			} else if seconds > 0 {
+				seconds--
+				nanos = int64(time.Second) + nanos
+				nanosStr := strings.TrimRight(fmt.Sprintf(".%09d", nanos), "0")
+				res = fmt.Append(res, seconds, nanosStr, "S")
+			} else {
+				nanosStr := strings.TrimRight(fmt.Sprintf(".%09d", -nanos), "0")
+				res = fmt.Append(res, "-0", nanosStr, "S")
+			}
+		} else if nanos > 0 {
+			if seconds < -1 {
+				seconds++
+				nanos = int64(time.Second) - nanos
+				nanosStr := strings.TrimRight(fmt.Sprintf(".%09d", nanos), "0")
+				res = fmt.Append(res, seconds, nanosStr, "S")
+			} else if seconds > -1 {
+				// 0 100_000_000
+				nanosStr := strings.TrimRight(fmt.Sprintf(".%09d", nanos), "0")
+				res = fmt.Append(res, seconds, nanosStr, "S")
+			} else {
+				seconds++
+				nanos = int64(time.Second) - nanos
+				nanosStr := strings.TrimRight(fmt.Sprintf(".%09d", nanos), "0")
+				res = fmt.Append(res, "-0", nanosStr, "S")
+			}
+		} else if seconds != 0 {
+			res = fmt.Append(res, seconds, "S")
 		}
 	}
 
-	timePart := ""
-	if d.Nanos == 0 {
-		timePart = fmt.Sprintf("%s%d", sign, d.Seconds)
-	} else {
-		timePart = fmt.Sprintf("%s%d.%09d", sign, d.Seconds, d.Nanos)
-	}
-
-	return fmt.Sprintf("P%dM%dDT%sS", d.Months, d.Days, timePart)
+	return string(res)
 }
 
 func (d1 Duration) Equal(d2 Duration) bool {
