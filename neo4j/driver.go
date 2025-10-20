@@ -416,13 +416,13 @@ func (d *driver) GetServerInfo(ctx context.Context) (_ ServerInfo, err error) {
 
 func (d *driver) Close(ctx context.Context) error {
 	d.mut.Lock()
+	defer d.mut.Unlock()
 	if d.pool == nil {
 		// Safeguard against closing more than once
 		return nil
 	}
 	pool := d.pool
 	d.pool = nil
-	d.mut.Unlock()
 
 	pool.Close(ctx)
 	pool = nil

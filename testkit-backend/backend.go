@@ -1357,6 +1357,7 @@ func (b *backend) handleRequest(req map[string]any) {
 				"Feature:API:Type.Spatial",
 				"Feature:API:Type.Temporal",
 				"Feature:API:Type.Vector",
+				"Feature:API:Type.UnsupportedType",
 				"Feature:Auth:Bearer",
 				"Feature:Auth:Custom",
 				"Feature:Auth:Kerberos",
