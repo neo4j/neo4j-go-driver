@@ -120,7 +120,9 @@ type loggableFailure db.Neo4jError
 
 func (f loggableFailure) String() string {
 	return serializeTrace(map[string]any{
-		"code":    f.Code,
+		//lint:ignore SA1019 Code is supported for logging
+		"code": f.Code,
+		//lint:ignore SA1019 Msg is supported for logging
 		"message": f.Msg,
 	})
 }

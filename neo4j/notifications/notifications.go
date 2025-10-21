@@ -17,10 +17,9 @@
 
 package notifications
 
+// Deprecated: Use NotificationClassification instead. This will be removed in a future release.
 type NotificationCategory string
 
-// NotificationClassification is part of the GQL compliant notifications preview feature
-// (see README on what it means in terms of support and compatibility guarantees)
 type NotificationClassification = NotificationCategory
 
 const (
@@ -58,13 +57,12 @@ const (
 	InformationLevel NotificationMinimumSeverityLevel = "INFORMATION"
 )
 
+// Deprecated: Use NotificationDisabledClassifications instead. This will be removed in a future release.
 type NotificationDisabledCategories struct {
 	categories []NotificationCategory
 	none       bool
 }
 
-// NotificationDisabledClassifications is part of the GQL compliant notifications preview feature
-// (see README on what it means in terms of support and compatibility guarantees)
 type NotificationDisabledClassifications struct {
 	classifications []NotificationClassification
 	none            bool
@@ -72,56 +70,52 @@ type NotificationDisabledClassifications struct {
 
 // DisableCategories creates a NotificationDisabledCategories that disables the given categories.
 // Can be used for NotificationsDisabledCategories of config.Config and config.SessionConfig.
+//
+// Deprecated: Use DisableClassifications instead. This will be removed in a future release.
 func DisableCategories(value ...NotificationCategory) NotificationDisabledCategories {
 	return NotificationDisabledCategories{value, false}
 }
 
 // DisableClassifications creates a NotificationDisabledClassifications that disables the given classifications.
 // Can be used for NotificationsDisabledClassifications of config.Config and config.SessionConfig.
-//
-// DisableClassifications is part of the GQL compliant notifications preview feature
-// (see README on what it means in terms of support and compatibility guarantees)
 func DisableClassifications(value ...NotificationClassification) NotificationDisabledClassifications {
 	return NotificationDisabledClassifications{value, false}
 }
 
 // DisableNoCategories creates a NotificationDisabledCategories that enables all categories.
 // Can be used for NotificationsDisabledCategories of config.Config and neo4j.SessionConfig.
+//
+// Deprecated: Use DisableNoClassifications instead. This will be removed in a future release.
 func DisableNoCategories() NotificationDisabledCategories {
 	return NotificationDisabledCategories{nil, true}
 }
 
 // DisableNoClassifications creates a NotificationDisabledClassifications that enables all classifications.
 // Can be used for NotificationsDisabledClassifications of config.Config and neo4j.SessionConfig.
-//
-// DisableNoClassifications is part of the GQL compliant notifications preview feature
-// (see README on what it means in terms of support and compatibility guarantees)
 func DisableNoClassifications() NotificationDisabledClassifications {
 	return NotificationDisabledClassifications{nil, true}
 }
 
 // DisablesNone returns true if all categories are enabled.
+//
+// Deprecated: Use NotificationDisabledClassifications.DisablesNone instead. This will be removed in a future release.
 func (n *NotificationDisabledCategories) DisablesNone() bool {
 	return n.none
 }
 
 // DisablesNone returns true if all classifications are enabled.
-//
-// DisablesNone is part of the GQL compliant notifications preview feature
-// (see README on what it means in terms of support and compatibility guarantees)
 func (n *NotificationDisabledClassifications) DisablesNone() bool {
 	return n.none
 }
 
 // DisabledCategories returns the categories that are disabled.
+//
+// Deprecated: Use NotificationDisabledClassifications.DisabledClassifications instead. This will be removed in a future release.
 func (n *NotificationDisabledCategories) DisabledCategories() []NotificationCategory {
 	return n.categories
 }
 
 // DisabledClassifications returns the classifications that are disabled.
-//
-// DisabledClassifications is part of the GQL compliant notifications preview feature
-// (see README on what it means in terms of support and compatibility guarantees)
 func (n *NotificationDisabledClassifications) DisabledClassifications() []NotificationClassification {
 	return n.classifications
 }

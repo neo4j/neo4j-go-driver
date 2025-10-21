@@ -232,6 +232,7 @@ func (b *backend) writeError(err error) {
 		code = tokenErr.Code
 	}
 	if neo4j.IsNeo4jError(err) {
+		//lint:ignore SA1019 Code is supported for error handling
 		code = err.(*db.Neo4jError).Code
 	}
 	isDriverError := isHydrationError ||
@@ -246,6 +247,7 @@ func (b *backend) writeError(err error) {
 		var gqlDiagnosticRecord map[string]any
 		var cause *db.Neo4jError
 		if neo4jError, ok := err.(*neo4j.Neo4jError); ok {
+			//lint:ignore SA1019 Msg is supported for error handling
 			msg = neo4jError.Msg
 			gqlStatus = neo4jError.GqlStatus
 			gqlStatusDescription = neo4jError.GqlStatusDescription
@@ -297,6 +299,7 @@ func (b *backend) serializeGqlErrorCause(cause *db.Neo4jError) map[string]any {
 		return nil
 	}
 	return map[string]any{"name": "GqlError", "data": map[string]any{
+		//lint:ignore SA1019 Msg is supported for error handling
 		"msg":               cause.Msg,
 		"gqlStatus":         cause.GqlStatus,
 		"statusDescription": cause.GqlStatusDescription,
@@ -672,9 +675,11 @@ func (b *backend) handleRequest(req map[string]any) {
 			if data["notificationsDisabledCategories"] != nil {
 				notiDisCats := data["notificationsDisabledCategories"].([]any)
 				if len(notiDisCats) == 0 {
+					//lint:ignore SA1019 DisableNoCategories is supported for backward compatibility
 					c.NotificationsDisabledCategories = notifications.DisableNoCategories()
 				} else {
 					cats := convertSlice(notiDisCats, anyToNotificationCategory)
+					//lint:ignore SA1019 DisableCategories is supported for backward compatibility
 					c.NotificationsDisabledCategories = notifications.DisableCategories(cats...)
 				}
 			}
@@ -886,9 +891,11 @@ func (b *backend) handleRequest(req map[string]any) {
 		if data["notificationsDisabledCategories"] != nil {
 			notiDisCats := data["notificationsDisabledCategories"].([]any)
 			if len(notiDisCats) == 0 {
+				//lint:ignore SA1019 DisableNoCategories is supported for backward compatibility
 				sessionConfig.NotificationsDisabledCategories = notifications.DisableNoCategories()
 			} else {
 				cats := convertSlice(notiDisCats, anyToNotificationCategory)
+				//lint:ignore SA1019 DisableCategories is supported for backward compatibility
 				sessionConfig.NotificationsDisabledCategories = notifications.DisableCategories(cats...)
 			}
 		}
@@ -1233,7 +1240,8 @@ func (b *backend) handleRequest(req map[string]any) {
 						"id":                 id,
 						"authTokenManagerId": managerId,
 						"auth":               serializeAuth(token),
-						"errorCode":          error.Code,
+						//lint:ignore SA1019 Code is supported for error handling
+						"errorCode": error.Code,
 					})
 				for b.process() {
 					if handled, ok := b.resolvedHandleSecurityException[id]; ok {
@@ -1569,6 +1577,7 @@ func serializeRecord(record *neo4j.Record) map[string]any {
 	return data
 }
 
+//lint:ignore SA1019 Notification is supported for backward compatibility
 func serializeNotifications(slice []neo4j.Notification, version db.ProtocolVersion) []map[string]any {
 	if slice == nil {
 		if version.Major == 5 && version.Minor >= 5 {
@@ -1664,6 +1673,7 @@ func serializeSummary(summary neo4j.ResultSummary) map[string]any {
 			"text":       summary.Query().Text(),
 			"parameters": serializeParameters(summary.Query().Parameters()),
 		},
+		//lint:ignore SA1019 Notifications is supported for backward compatibility
 		"notifications":    serializeNotifications(summary.Notifications(), protocolVersion),
 		"gqlStatusObjects": serializeGqlStatusObjects(summary.GqlStatusObjects()),
 		"plan":             serializePlan(summary.Plan()),
@@ -1893,7 +1903,9 @@ func convertInitialBookmarks(bookmarks []any) neo4j.Bookmarks {
 	return result
 }
 
+//lint:ignore SA1019 NotificationCategory is supported for backward compatibility
 func anyToNotificationCategory(v any) notifications.NotificationCategory {
+	//lint:ignore SA1019 NotificationCategory is supported for backward compatibility
 	return notifications.NotificationCategory(v.(string))
 }
 

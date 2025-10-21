@@ -507,6 +507,7 @@ func (p *Pool) Return(ctx context.Context, c idb.Connection) {
 }
 
 func (p *Pool) OnNeo4jError(ctx context.Context, connection idb.Connection, error *db.Neo4jError) error {
+	//lint:ignore SA1019 Code is supported for error handling
 	if error.Code == "Neo.ClientError.Security.AuthorizationExpired" {
 		serverName := connection.ServerName()
 		p.serversMut.Lock()
@@ -516,6 +517,7 @@ func (p *Pool) OnNeo4jError(ctx context.Context, connection idb.Connection, erro
 			c.ResetAuth()
 		})
 	}
+	//lint:ignore SA1019 Code is supported for error handling
 	if error.Code == "Neo.TransientError.General.DatabaseUnavailable" {
 		p.deactivate(ctx, connection.ServerName())
 	}

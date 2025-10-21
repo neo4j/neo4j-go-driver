@@ -44,39 +44,24 @@ const (
 // Neo4jError is created when the database server fails to fulfill a request.
 type Neo4jError struct {
 	// Code is the Neo4j-specific error code, to be deprecated in favor of GqlStatus.
+	//
+	// Deprecated: Use GqlStatus instead. This will be removed in a future release.
 	Code string
 	// Msg is the specific error message describing the failure.
-	Msg string
-	// GqlStatus returns the GQLSTATUS.
-	// GqlStatus is the error code compliant with the GQL specification.
 	//
-	// GqlStatus is part of the GQL compliant errors preview feature
-	// (see README on what it means in terms of support and compatibility guarantees)
+	// Deprecated: Use GqlStatusDescription instead. This will be removed in a future release.
+	Msg string
+	// GqlStatus is the error code compliant with the GQL specification.
 	GqlStatus string
 	// GqlStatusDescription provides a standard description for the associated GQLStatus code.
-	//
-	// GqlStatusDescription is part of the GQL compliant errors preview feature
-	// (see README on what it means in terms of support and compatibility guarantees)
 	GqlStatusDescription string
 	// GqlClassification is a high-level categorization of the error, specific to GQL error handling.
-	//
-	// GqlClassification is part of the GQL compliant errors preview feature
-	// (see README on what it means in terms of support and compatibility guarantees)
 	GqlClassification ErrorClassification
 	// GqlRawClassification holds the raw classification as received from the server.
-	//
-	// GqlRawClassification is part of the GQL compliant errors preview feature
-	// (see README on what it means in terms of support and compatibility guarantees)
 	GqlRawClassification string
 	// GqlDiagnosticRecord returns further information about the status for diagnostic purposes.
-	//
-	// GqlDiagnosticRecord is part of the GQL compliant errors preview feature
-	// (see README on what it means in terms of support and compatibility guarantees)
 	GqlDiagnosticRecord map[string]any
 	// GqlCause represents the underlying error, if any, which caused the current error.
-	//
-	// GqlCause is part of the GQL compliant errors preview feature
-	// (see README on what it means in terms of support and compatibility guarantees)
 	GqlCause       *Neo4jError
 	parsed         bool
 	classification string // Legacy non-GQL classification
@@ -89,17 +74,19 @@ func (e *Neo4jError) Error() string {
 	return fmt.Sprintf("Neo4jError: %s (%s)", e.Code, e.Msg)
 }
 
-// TODO 6.0: remove in favour of GqlClassification
+// Deprecated: Use GqlClassification instead. This will be removed in a future release.
 func (e *Neo4jError) Classification() string {
 	e.parse()
 	return e.classification
 }
 
+// Deprecated: Use GqlClassification instead. This will be removed in a future release.
 func (e *Neo4jError) Category() string {
 	e.parse()
 	return e.category
 }
 
+// Deprecated: Use GqlStatusDescription for error information instead. This will be removed in a future release.
 func (e *Neo4jError) Title() string {
 	e.parse()
 	return e.title

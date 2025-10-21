@@ -65,13 +65,16 @@ func newUnknownInformationResultGqlStatusObject() *db.GqlStatusObject {
 
 // ToNotification returns a db.Notification that corresponds to the given db.GqlStatusObject.
 // It maps fields from the status to their respective notification fields.
+//
+//lint:ignore SA1019 db.Notification is supported for backward compatibility
 func ToNotification(gqlStatusObject db.GqlStatusObject) *db.Notification {
+	//lint:ignore SA1019 db.Notification is supported for backward compatibility
 	return &db.Notification{
-		//lint:ignore SA1019 Code is supported at least until 6.0
+		//lint:ignore SA1019 Code is supported for backward compatibility
 		Code: gqlStatusObject.Code,
-		//lint:ignore SA1019 Title is supported at least until 6.0
+		//lint:ignore SA1019 Title is supported for backward compatibility
 		Title: gqlStatusObject.Title,
-		//lint:ignore SA1019 Description is supported at least until 6.0
+		//lint:ignore SA1019 Description is supported for backward compatibility
 		Description: gqlStatusObject.Description,
 		Position:    gqlStatusObject.Position,
 		Severity:    gqlStatusObject.Severity,
@@ -81,6 +84,8 @@ func ToNotification(gqlStatusObject db.GqlStatusObject) *db.Notification {
 
 // ToGqlStatusObject returns a db.GqlStatusObject that corresponds to the given db.Notification.
 // It maps fields from the notification to their respective status fields.
+//
+//lint:ignore SA1019 db.Notification is supported for backward compatibility
 func ToGqlStatusObject(notification db.Notification) *db.GqlStatusObject {
 	var defaultStatus *db.GqlStatusObject
 	if notification.Severity == string(notifications.Warning) {

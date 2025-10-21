@@ -18,6 +18,7 @@
 package errorutil_test
 
 import (
+	"errors"
 	"fmt"
 	"testing"
 
@@ -127,6 +128,23 @@ func TestCombineAllErrors(outer *testing.T) {
 
 			AssertDeepEquals(t, testCase.output, output)
 		})
+	}
+}
+
+func TestWrapError(t *testing.T) {
+	// Test that PoolOutOfServers is wrapped as ConnectivityError (making it retryable)
+	err := &errorutil.PoolOutOfServers{}
+	wrapped := errorutil.WrapError(err)
+
+	var connErr *errorutil.ConnectivityError
+	ok := errors.As(wrapped, &connErr)
+	if !ok {
+		t.Fatalf("Expected PoolOutOfServers to be wrapped as ConnectivityError, got %T", wrapped)
+	}
+
+	var poolOutOfServers *errorutil.PoolOutOfServers
+	if !errors.As(connErr.Inner, &poolOutOfServers) {
+		t.Fatalf("Expected inner error to be PoolOutOfServers, got %T", connErr.Inner)
 	}
 }
 

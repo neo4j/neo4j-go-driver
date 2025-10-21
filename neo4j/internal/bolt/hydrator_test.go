@@ -313,6 +313,7 @@ func TestHydrator(outer *testing.T) {
 				packer.String("s2")
 			},
 			x: &success{tlast: -1, tfirst: -1, bookmark: "bm", db: "sys", qid: -1, num: 4,
+				//lint:ignore SA1019 db.Notification is supported for backward compatibility
 				notifications: []db.Notification{
 					{Code: "c1", Title: "t1", Description: "d1", Severity: "s1", Position: &db.InputPosition{Offset: 1, Line: 2, Column: 3}},
 					{Code: "c2", Title: "t2", Description: "d2", Severity: "s2"},

@@ -90,13 +90,12 @@ type ProfiledPlan struct {
 	Time              int64
 }
 
-// StreamSummary is part of the GQL compliant notifications preview feature
-// (see README on what it means in terms of support and compatibility guarantees)
 type StreamSummary struct {
 	HadRecord bool
 	HadKey    bool
 }
 
+// Deprecated: Use GqlStatusObject instead. This will be removed in a future release.
 type Notification struct {
 	Code        string
 	Title       string
@@ -109,9 +108,6 @@ type Notification struct {
 // GqlStatusObject represents a GqlStatusObject generated when executing a statement.
 // A GqlStatusObject can be visualized in a client pinpointing problems or other information about the statement.
 // Contrary to failures or errors, GqlStatusObjects do not affect the execution of the statement.
-//
-// GqlStatusObject is part of the GQL compliant notifications preview feature
-// (see README on what it means in terms of support and compatibility guarantees)
 type GqlStatusObject struct {
 	// Deprecated: for backward compatibility with Notification.Code only.
 	Code string

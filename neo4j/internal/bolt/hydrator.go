@@ -38,19 +38,20 @@ const containsUpdatesKey = "contains-updates"
 
 type ignored struct{}
 type success struct {
-	fields             []string
-	tfirst             int64
-	qid                int64
-	bookmark           string
-	connectionId       string
-	server             string
-	db                 string
-	hasMore            bool
-	tlast              int64
-	qtype              db.StatementType
-	counters           map[string]any
-	plan               *db.Plan
-	profile            *db.ProfiledPlan
+	fields       []string
+	tfirst       int64
+	qid          int64
+	bookmark     string
+	connectionId string
+	server       string
+	db           string
+	hasMore      bool
+	tlast        int64
+	qtype        db.StatementType
+	counters     map[string]any
+	plan         *db.Plan
+	profile      *db.ProfiledPlan
+	//lint:ignore SA1019 db.Notification is supported for backward compatibility
 	notifications      []db.Notification
 	statuses           []db.GqlStatusObject
 	routingTable       *idb.RoutingTable
@@ -204,8 +205,10 @@ func (h *hydrator) failure(n uint32, isNestedError bool) *db.Neo4jError {
 		case "neo4j_code":
 			fallthrough
 		case "code":
+			//lint:ignore SA1019 Code is supported for backward compatibility
 			dberr.Code = h.unp.String()
 		case "message":
+			//lint:ignore SA1019 Msg is supported for backward compatibility
 			dberr.Msg = h.unp.String()
 		case "diagnostic_record":
 			dberr.GqlDiagnosticRecord = h.amap()
@@ -891,9 +894,12 @@ func (h *hydrator) duration(n uint32) any {
 	return dbtype.Duration{Months: mon, Days: day, Seconds: sec, Nanos: int(nan)}
 }
 
+//lint:ignore SA1019 db.Notification is supported for backward compatibility
 func parseNotifications(notificationsx []any) []db.Notification {
+	//lint:ignore SA1019 db.Notification is supported for backward compatibility
 	var notifications []db.Notification
 	if notificationsx != nil {
+		//lint:ignore SA1019 db.Notification is supported for backward compatibility
 		notifications = make([]db.Notification, 0, len(notificationsx))
 		for _, x := range notificationsx {
 			notificationx, ok := x.(map[string]any)
@@ -1010,7 +1016,9 @@ func parseInputPosition(m map[string]any) *db.InputPosition {
 	return pos
 }
 
+//lint:ignore SA1019 db.Notification is supported for backward compatibility
 func parseNotification(m map[string]any) db.Notification {
+	//lint:ignore SA1019 db.Notification is supported for backward compatibility
 	n := db.Notification{}
 	n.Code, _ = m["code"].(string)
 	if description, ok := m["description"].(string); ok {
