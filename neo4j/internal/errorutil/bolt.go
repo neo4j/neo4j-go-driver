@@ -92,23 +92,15 @@ func IsFatalDuringDiscovery(err error) bool {
 		return true
 	}
 	if err, ok := err.(*idb.Neo4jError); ok {
-		//lint:ignore SA1019 Code is supported for error handling
 		if err.Code == "Neo.ClientError.Database.DatabaseNotFound" ||
-			//lint:ignore SA1019 Code is supported for error handling
 			err.Code == "Neo.ClientError.Transaction.InvalidBookmark" ||
-			//lint:ignore SA1019 Code is supported for error handling
 			err.Code == "Neo.ClientError.Transaction.InvalidBookmarkMixture" ||
-			//lint:ignore SA1019 Code is supported for error handling
 			err.Code == "Neo.ClientError.Statement.TypeError" ||
-			//lint:ignore SA1019 Code is supported for error handling
 			err.Code == "Neo.ClientError.Statement.ArgumentError" ||
-			//lint:ignore SA1019 Code is supported for error handling
 			err.Code == "Neo.ClientError.Request.Invalid" {
 			return true
 		}
-		//lint:ignore SA1019 Code is supported for error handling
 		if strings.HasPrefix(err.Code, "Neo.ClientError.Security.") &&
-			//lint:ignore SA1019 Code is supported for error handling
 			err.Code != "Neo.ClientError.Security.AuthorizationExpired" {
 			return true
 		}

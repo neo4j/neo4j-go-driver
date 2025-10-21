@@ -86,7 +86,6 @@ func (m *neo4jAuthTokenManager) GetAuthToken(ctx context.Context) (auth.Token, e
 }
 
 func (m *neo4jAuthTokenManager) HandleSecurityException(ctx context.Context, token auth.Token, securityException *db.Neo4jError) (bool, error) {
-	//lint:ignore SA1019 Code is supported for security exception handling
 	if !m.handledSecurityCodes.Contains(securityException.Code) {
 		return false, nil
 	}

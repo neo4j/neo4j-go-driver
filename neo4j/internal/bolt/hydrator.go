@@ -205,10 +205,8 @@ func (h *hydrator) failure(n uint32, isNestedError bool) *db.Neo4jError {
 		case "neo4j_code":
 			fallthrough
 		case "code":
-			//lint:ignore SA1019 Code is supported for backward compatibility
 			dberr.Code = h.unp.String()
 		case "message":
-			//lint:ignore SA1019 Msg is supported for backward compatibility
 			dberr.Msg = h.unp.String()
 		case "diagnostic_record":
 			dberr.GqlDiagnosticRecord = h.amap()

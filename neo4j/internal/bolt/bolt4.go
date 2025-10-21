@@ -212,7 +212,6 @@ func (b *bolt4) setError(err error, fatal bool) {
 
 	// Do not log big cypher statements as errors
 	neo4jErr, casted := err.(*db.Neo4jError)
-	//lint:ignore SA1019 Classification is supported for error handling
 	if casted && neo4jErr.Classification() == "ClientError" {
 		b.log.Debugf(log.Bolt4, b.logId, "%s", err)
 	} else if wasDead {
@@ -1203,6 +1202,5 @@ func (b *bolt4) extractSummary(success *success, stream *stream) *db.Summary {
 
 func isFatalError(err *db.Neo4jError) bool {
 	// Treat expired auth as fatal so that pool is cleaned up of old connections
-	//lint:ignore SA1019 Code is supported for error handling
 	return err != nil && err.Code == "Status.Security.AuthorizationExpired"
 }

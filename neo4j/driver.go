@@ -441,11 +441,8 @@ func (d *driver) VerifyAuthentication(ctx context.Context, auth *AuthToken) (err
 		return &InvalidAuthenticationError{inner: tokenExpiredError}
 	}
 	if neo4jError, ok := err.(*Neo4jError); ok {
-		//lint:ignore SA1019 Code is supported for authentication error detection
 		if neo4jError.Code == "Neo.ClientError.Security.CredentialsExpired" ||
-			//lint:ignore SA1019 Code is supported for authentication error detection
 			neo4jError.Code == "Neo.ClientError.Security.Forbidden" ||
-			//lint:ignore SA1019 Code is supported for authentication error detection
 			neo4jError.Code == "Neo.ClientError.Security.Unauthorized" {
 			return &InvalidAuthenticationError{inner: neo4jError}
 		}

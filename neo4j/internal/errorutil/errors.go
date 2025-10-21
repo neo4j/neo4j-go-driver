@@ -81,9 +81,7 @@ func WrapError(err error) error {
 	case *ConnectionWriteTimeout:
 		return &ConnectivityError{Inner: err}
 	case *db.Neo4jError:
-		//lint:ignore SA1019 Code is supported for error handling
 		if e.Code == "Neo.ClientError.Security.TokenExpired" {
-			//lint:ignore SA1019 Code and Msg are supported for error handling
 			return &TokenExpiredError{Code: e.Code, Message: e.Msg, cause: e}
 		}
 	}
@@ -130,21 +128,16 @@ func (e *TokenExpiredError) Error() string {
 }
 
 func PolyfillGqlError(dberr *db.Neo4jError) {
-	//lint:ignore SA1019 Code is supported for error handling
 	if dberr.Code == "" {
-		//lint:ignore SA1019 Code is supported for error handling
 		dberr.Code = unknownNeo4jCode
 	}
-	//lint:ignore SA1019 Msg is supported for error handling
 	if dberr.Msg == "" {
-		//lint:ignore SA1019 Msg is supported for error handling
 		dberr.Msg = unknownMessage
 	}
 	if dberr.GqlStatus == "" {
 		dberr.GqlStatus = unknownGqlStatus
 	}
 	if dberr.GqlStatusDescription == "" {
-		//lint:ignore SA1019 Msg is supported for error handling
 		dberr.GqlStatusDescription = fmt.Sprintf("%s %s", unknownGqlStatusDescription, dberr.Msg)
 	}
 	// Ensure diagnostic record exists or fill missing keys
