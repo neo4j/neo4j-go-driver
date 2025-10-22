@@ -177,7 +177,7 @@ func TestHydrator(outer *testing.T) {
 				packer.String("db")
 				packer.String("s")
 			},
-			x: &success{tlast: 124, tfirst: -1, bookmark: "b", qtype: db.StatementTypeWrite, db: "s", qid: -1, num: 4},
+			x: &success{tlast: 124, tfirst: -1, bookmark: "b", qtype: db.QueryTypeWrite, db: "s", qid: -1, num: 4},
 		},
 		{
 			name: "Success summary with plan",
@@ -399,7 +399,7 @@ func TestHydrator(outer *testing.T) {
 				packer.String("has_more")
 				packer.Bool(false)
 			},
-			x: &success{tlast: 7, tfirst: -1, bookmark: "b1", qtype: db.StatementTypeRead, qid: -1, num: 4},
+			x: &success{tlast: 7, tfirst: -1, bookmark: "b1", qtype: db.QueryTypeRead, qid: -1, num: 4},
 		},
 		{
 			name: "Success route response",

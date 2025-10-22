@@ -29,19 +29,47 @@ import (
 )
 
 // StatementType defines the type of the statement
+//
+// Deprecated: Use QueryType instead. This will be removed in a future release.
 type StatementType int
 
 const (
 	// StatementTypeUnknown identifies an unknown statement type
+	//
+	// Deprecated: Use QueryTypeUnknown instead. This will be removed in a future release.
 	StatementTypeUnknown StatementType = 0
 	// StatementTypeReadOnly identifies a read-only statement
+	//
+	// Deprecated: Use QueryTypeReadOnly instead. This will be removed in a future release.
 	StatementTypeReadOnly StatementType = 1
 	// StatementTypeReadWrite identifies a read-write statement
+	//
+	// Deprecated: Use QueryTypeReadWrite instead. This will be removed in a future release.
 	StatementTypeReadWrite StatementType = 2
 	// StatementTypeWriteOnly identifies a write-only statement
+	//
+	// Deprecated: Use QueryTypeWriteOnly instead. This will be removed in a future release.
 	StatementTypeWriteOnly StatementType = 3
 	// StatementTypeSchemaWrite identifies a schema-write statement
+	//
+	// Deprecated: Use QueryTypeSchemaWrite instead. This will be removed in a future release.
 	StatementTypeSchemaWrite StatementType = 4
+)
+
+// QueryType defines the type of the query
+type QueryType = StatementType
+
+const (
+	// QueryTypeUnknown identifies an unknown query type
+	QueryTypeUnknown QueryType = 0
+	// QueryTypeReadOnly identifies a read-only query
+	QueryTypeReadOnly QueryType = 1
+	// QueryTypeReadWrite identifies a read-write query
+	QueryTypeReadWrite QueryType = 2
+	// QueryTypeWriteOnly identifies a write-only query
+	QueryTypeWriteOnly QueryType = 3
+	// QueryTypeSchemaWrite identifies a schema-write query
+	QueryTypeSchemaWrite QueryType = 4
 )
 
 func (st StatementType) String() string {
@@ -65,7 +93,11 @@ type ResultSummary interface {
 	// Query returns the query that has been executed.
 	Query() Query
 	// StatementType returns type of statement that has been executed.
+	//
+	// Deprecated: Use QueryType() instead. This will be removed in a future release.
 	StatementType() StatementType
+	// QueryType returns type of query that has been executed.
+	QueryType() QueryType
 	// Counters returns statistics counts for the statement.
 	Counters() Counters
 	// Plan returns statement plan for the executed statement if available, otherwise null.
@@ -352,6 +384,10 @@ func (s *resultSummary) Query() Query {
 
 func (s *resultSummary) StatementType() StatementType {
 	return StatementType(s.sum.StmntType)
+}
+
+func (s *resultSummary) QueryType() QueryType {
+	return QueryType(s.sum.StmntType)
 }
 
 func (s *resultSummary) Text() string {
