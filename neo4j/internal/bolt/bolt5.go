@@ -223,7 +223,6 @@ func (b *bolt5) setError(err error, fatal bool) {
 
 	// Do not log big cypher statements as errors
 	neo4jErr, casted := err.(*db.Neo4jError)
-	//lint:ignore SA1019 Classification is supported for error handling
 	if casted && neo4jErr.Classification() == "ClientError" {
 		b.log.Debugf(log.Bolt5, b.logId, "%s", err)
 	} else if wasDead {

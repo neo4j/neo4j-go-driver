@@ -111,7 +111,6 @@ func TestSession(outer *testing.T) {
 			assertNil(t, result)
 			neo4jErr, isNeo4jErr := err.(*neo4j.Neo4jError)
 			assertTrue(t, isNeo4jErr)
-			//lint:ignore SA1019 Classification is supported for error handling
 			assertEquals(t, neo4jErr.Classification(), "ClientError")
 		})
 
@@ -125,7 +124,6 @@ func TestSession(outer *testing.T) {
 				//Expect(err).To(BeArithmeticError())
 				neo4jErr, isNeo4jErr := err.(*neo4j.Neo4jError)
 				assertTrue(t, isNeo4jErr)
-				//lint:ignore SA1019 Classification is supported for error handling
 				assertEquals(t, neo4jErr.Classification(), "ClientError")
 				return
 			}
@@ -133,7 +131,6 @@ func TestSession(outer *testing.T) {
 			summary, err = result.Consume(ctx)
 			neo4jErr, isNeo4jErr := err.(*neo4j.Neo4jError)
 			assertTrue(t, isNeo4jErr)
-			//lint:ignore SA1019 Classification is supported for error handling
 			assertEquals(t, neo4jErr.Classification(), "ClientError")
 			//Expect(err).To(BeArithmeticError())
 			assertNil(t, summary)
@@ -141,7 +138,6 @@ func TestSession(outer *testing.T) {
 			assertFalse(t, result.Next(ctx))
 			neo4jErr, isNeo4jErr = err.(*neo4j.Neo4jError)
 			assertTrue(t, isNeo4jErr)
-			//lint:ignore SA1019 Classification is supported for error handling
 			assertEquals(t, neo4jErr.Classification(), "ClientError")
 			//Expect(result.Err()).To(BeArithmeticError())
 		})
@@ -286,7 +282,6 @@ func TestSession(outer *testing.T) {
 			assertNil(t, result)
 			neo4jErr, isNeo4jErr := err.(*neo4j.Neo4jError)
 			assertTrue(t, isNeo4jErr)
-			//lint:ignore SA1019 Classification is supported for error handling
 			assertEquals(t, neo4jErr.Classification(), "ClientError")
 
 			result, err = session.Run(ctx, "RETURN 1", nil)
@@ -524,8 +519,6 @@ func TestSession(outer *testing.T) {
 			// Up to db to determine when error occurs
 			if err != nil {
 				dbErr := err.(*db.Neo4jError)
-				//lint:ignore SA1019 Msg is supported for error handling
-				//lint:ignore SA1019 Msg is supported for error handling
 				assertStringContains(t, dbErr.Msg, "terminated")
 				return
 			}
@@ -535,7 +528,6 @@ func TestSession(outer *testing.T) {
 			// has been terminated. For some reason this should not be considered transient
 			// by the IsTransientError.
 			dbErr := err.(*db.Neo4jError)
-			//lint:ignore SA1019 Msg is supported for error handling
 			assertStringContains(t, dbErr.Msg, "terminated")
 			//Expect(err).To(BeTransientError(nil, ContainSubstring("terminated")))
 		})
@@ -553,7 +545,6 @@ func TestSession(outer *testing.T) {
 			_, err := session3.ExecuteWrite(ctx, updateNodeWork(ctx, t, "WriteTransactionTxTimeOut", map[string]any{"id": 2}), neo4j.WithTxTimeout(1*time.Second))
 			assertNotNil(t, err)
 			dbErr := err.(*db.Neo4jError)
-			//lint:ignore SA1019 Msg is supported for error handling
 			assertStringContains(t, dbErr.Msg, "terminated")
 			//Expect(err).To(BeTransientError(nil, ContainSubstring("terminated")))
 		})

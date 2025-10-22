@@ -390,11 +390,9 @@ func TestBookmark(outer *testing.T) {
 			neo4jErr := err.(*neo4j.Neo4jError)
 			if server.Version.GreaterThan(V4) {
 				// The error is not retryable since it is on the wrong format
-				//lint:ignore SA1019 Code is supported for error handling
 				assertEquals(t, neo4jErr.Code, "Neo.ClientError.Transaction.InvalidBookmark")
 			} else {
 				assertTrue(t, neo4jErr.IsRetriableTransient())
-				//lint:ignore SA1019 Msg is supported for error handling
 				assertStringContains(t, neo4jErr.Msg, "not up to the requested version")
 			}
 		})

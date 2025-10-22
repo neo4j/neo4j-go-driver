@@ -44,12 +44,8 @@ const (
 // Neo4jError is created when the database server fails to fulfill a request.
 type Neo4jError struct {
 	// Code is the Neo4j-specific error code, to be deprecated in favor of GqlStatus.
-	//
-	// Deprecated: Use GqlStatus instead. This will be removed in a future release.
 	Code string
 	// Msg is the specific error message describing the failure.
-	//
-	// Deprecated: Use GqlStatusDescription instead. This will be removed in a future release.
 	Msg string
 	// GqlStatus is the error code compliant with the GQL specification.
 	GqlStatus string
@@ -74,19 +70,16 @@ func (e *Neo4jError) Error() string {
 	return fmt.Sprintf("Neo4jError: %s (%s)", e.Code, e.Msg)
 }
 
-// Deprecated: Use GqlClassification instead. This will be removed in a future release.
 func (e *Neo4jError) Classification() string {
 	e.parse()
 	return e.classification
 }
 
-// Deprecated: Use GqlClassification instead. This will be removed in a future release.
 func (e *Neo4jError) Category() string {
 	e.parse()
 	return e.category
 }
 
-// Deprecated: Use GqlStatusDescription for error information instead. This will be removed in a future release.
 func (e *Neo4jError) Title() string {
 	e.parse()
 	return e.title

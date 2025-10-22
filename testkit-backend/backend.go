@@ -232,7 +232,6 @@ func (b *backend) writeError(err error) {
 		code = tokenErr.Code
 	}
 	if neo4j.IsNeo4jError(err) {
-		//lint:ignore SA1019 Code is supported for error handling
 		code = err.(*db.Neo4jError).Code
 	}
 	isDriverError := isHydrationError ||
@@ -247,7 +246,6 @@ func (b *backend) writeError(err error) {
 		var gqlDiagnosticRecord map[string]any
 		var cause *db.Neo4jError
 		if neo4jError, ok := err.(*neo4j.Neo4jError); ok {
-			//lint:ignore SA1019 Msg is supported for error handling
 			msg = neo4jError.Msg
 			gqlStatus = neo4jError.GqlStatus
 			gqlStatusDescription = neo4jError.GqlStatusDescription
@@ -299,7 +297,6 @@ func (b *backend) serializeGqlErrorCause(cause *db.Neo4jError) map[string]any {
 		return nil
 	}
 	return map[string]any{"name": "GqlError", "data": map[string]any{
-		//lint:ignore SA1019 Msg is supported for error handling
 		"msg":               cause.Msg,
 		"gqlStatus":         cause.GqlStatus,
 		"statusDescription": cause.GqlStatusDescription,
@@ -1240,8 +1237,7 @@ func (b *backend) handleRequest(req map[string]any) {
 						"id":                 id,
 						"authTokenManagerId": managerId,
 						"auth":               serializeAuth(token),
-						//lint:ignore SA1019 Code is supported for error handling
-						"errorCode": error.Code,
+						"errorCode":          error.Code,
 					})
 				for b.process() {
 					if handled, ok := b.resolvedHandleSecurityException[id]; ok {
