@@ -556,13 +556,13 @@ func (h *hydrator) node(num uint32) any {
 	}
 	n := dbtype.Node{}
 	h.unp.Next()
-	//lint:ignore SA1019 Id is supported at least until 6.0
+	//lint:ignore SA1019 Id is supported for backward compatibility
 	n.Id = h.unp.Int()
 	h.unp.Next()
 	n.Labels = h.strings()
 	h.unp.Next()
 	n.Props = h.amap()
-	//lint:ignore SA1019 Id is supported at least until 6.0
+	//lint:ignore SA1019 Id is supported for backward compatibility
 	n.ElementId = fmt.Sprintf("%d", n.Id)
 	return n
 }
@@ -574,7 +574,7 @@ func (h *hydrator) nodeWithElementId(num uint32) any {
 	}
 	n := dbtype.Node{}
 	h.unp.Next()
-	//lint:ignore SA1019 Id is supported at least until 6.0
+	//lint:ignore SA1019 Id is supported for backward compatibility
 	n.Id = h.unp.Int()
 	h.unp.Next()
 	n.Labels = h.strings()
@@ -592,23 +592,23 @@ func (h *hydrator) relationship(n uint32) any {
 	}
 	r := dbtype.Relationship{}
 	h.unp.Next()
-	//lint:ignore SA1019 Id is supported at least until 6.0
+	//lint:ignore SA1019 Id is supported for backward compatibility
 	r.Id = h.unp.Int()
 	h.unp.Next()
-	//lint:ignore SA1019 StartId is supported at least until 6.0
+	//lint:ignore SA1019 StartId is supported for backward compatibility
 	r.StartId = h.unp.Int()
 	h.unp.Next()
-	//lint:ignore SA1019 EndId is supported at least until 6.0
+	//lint:ignore SA1019 EndId is supported for backward compatibility
 	r.EndId = h.unp.Int()
 	h.unp.Next()
 	r.Type = h.unp.String()
 	h.unp.Next()
 	r.Props = h.amap()
-	//lint:ignore SA1019 Id is supported at least until 6.0
+	//lint:ignore SA1019 Id is supported for backward compatibility
 	r.ElementId = fmt.Sprintf("%d", r.Id)
-	//lint:ignore SA1019 StartId is supported at least until 6.0
+	//lint:ignore SA1019 StartId is supported for backward compatibility
 	r.StartElementId = fmt.Sprintf("%d", r.StartId)
-	//lint:ignore SA1019 EndId is supported at least until 6.0
+	//lint:ignore SA1019 EndId is supported for backward compatibility
 	r.EndElementId = fmt.Sprintf("%d", r.EndId)
 	return r
 }
@@ -620,13 +620,13 @@ func (h *hydrator) relationshipWithElementId(n uint32) any {
 	}
 	r := dbtype.Relationship{}
 	h.unp.Next()
-	//lint:ignore SA1019 Id is supported at least until 6.0
+	//lint:ignore SA1019 Id is supported for backward compatibility
 	r.Id = h.unp.Int()
 	h.unp.Next()
-	//lint:ignore SA1019 StartId is supported at least until 6.0
+	//lint:ignore SA1019 StartId is supported for backward compatibility
 	r.StartId = h.unp.Int()
 	h.unp.Next()
-	//lint:ignore SA1019 EndId is supported at least until 6.0
+	//lint:ignore SA1019 EndId is supported for backward compatibility
 	r.EndId = h.unp.Int()
 	h.unp.Next()
 	r.Type = h.unp.String()
@@ -1044,20 +1044,20 @@ func parseGqlStatusObject(m map[string]any) db.GqlStatusObject {
 
 	// Backward compatibility support for older Notification API.
 	if code, ok := m["neo4j_code"].(string); ok {
-		//lint:ignore SA1019 Code is supported at least until 6.0
+		//lint:ignore SA1019 Code is supported for backward compatibility
 		g.Code = code
 		g.IsNotification = true
 	}
 
 	// Backward compatibility support for older Notification API.
 	if title, ok := m["title"].(string); ok {
-		//lint:ignore SA1019 Title is supported at least until 6.0
+		//lint:ignore SA1019 Title is supported for backward compatibility
 		g.Title = title
 	}
 
 	// Backward compatibility support for older Notification API.
 	if description, ok := m["description"].(string); ok {
-		//lint:ignore SA1019 Description is supported at least until 6.0
+		//lint:ignore SA1019 Description is supported for backward compatibility
 		g.Description = description
 	}
 

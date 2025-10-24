@@ -19,7 +19,7 @@
 package dbtype
 
 type Entity interface {
-	// Deprecated: GetId is deprecated and will be removed in 6.0. Use GetElementId instead.
+	// Deprecated: GetId is deprecated. Use GetElementId instead.
 	GetId() int64
 	GetElementId() string
 	GetProperties() map[string]any
@@ -27,7 +27,7 @@ type Entity interface {
 
 // Node represents a node in the neo4j graph database
 type Node struct {
-	// Deprecated: Id is deprecated and will be removed in 6.0. Use ElementId instead.
+	// Deprecated: Id is deprecated. Use ElementId instead.
 	Id        int64          // Id of this Node.
 	ElementId string         // ElementId of this Node.
 	Labels    []string       // Labels attached to this Node.
@@ -48,13 +48,13 @@ func (n Node) GetProperties() map[string]any {
 
 // Relationship represents a relationship in the neo4j graph database
 type Relationship struct {
-	// Deprecated: Id is deprecated and will be removed in 6.0. Use ElementId instead.
+	// Deprecated: Id is deprecated. Use ElementId instead.
 	Id        int64  // Id of this Relationship.
 	ElementId string // ElementId of this Relationship.
-	// Deprecated: StartId is deprecated and will be removed in 6.0. Use StartElementId instead.
+	// Deprecated: StartId is deprecated. Use StartElementId instead.
 	StartId        int64  // Id of the start Node of this Relationship.
 	StartElementId string // ElementId of the start Node of this Relationship.
-	// Deprecated: EndId is deprecated and will be removed in 6.0. Use EndElementId instead.
+	// Deprecated: EndId is deprecated. Use EndElementId instead.
 	EndId        int64          // Id of the end Node of this Relationship.
 	EndElementId string         // ElementId of the end Node of this Relationship.
 	Type         string         // Type of this Relationship.
