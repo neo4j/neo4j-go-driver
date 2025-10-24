@@ -105,6 +105,5 @@ func formatFloat(f float64) string {
 }
 
 func isWholeNumber(f float64) bool {
-	const epsilon = 1e-9
-	return math.Abs(f-math.Trunc(f)) < epsilon
+   return f == math.Trunc(f)
 }
