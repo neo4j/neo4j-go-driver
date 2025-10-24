@@ -101,7 +101,7 @@ func TestSession(outer *testing.T) {
 
 			assertFalse(t, result.Next(ctx))
 
-			assertEquals(t, summary.StatementType(), neo4j.StatementTypeReadOnly)
+			assertEquals(t, summary.QueryType(), neo4j.QueryTypeReadOnly)
 		})
 
 		inner.Run("when an invalid query is executed, it should return error", func(t *testing.T) {

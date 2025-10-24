@@ -47,7 +47,7 @@ type success struct {
 	db           string
 	hasMore      bool
 	tlast        int64
-	qtype        db.StatementType
+	qtype        db.QueryType
 	counters     map[string]any
 	plan         *db.Plan
 	profile      *db.ProfiledPlan
@@ -263,21 +263,21 @@ func (h *hydrator) success(n uint32) *success {
 		case "t_last":
 			succ.tlast = h.unp.Int()
 		case "type":
-			statementType := h.unp.String()
-			switch statementType {
+			queryType := h.unp.String()
+			switch queryType {
 			case "r":
-				succ.qtype = db.StatementTypeRead
+				succ.qtype = db.QueryTypeRead
 			case "w":
-				succ.qtype = db.StatementTypeWrite
+				succ.qtype = db.QueryTypeWrite
 			case "rw":
-				succ.qtype = db.StatementTypeReadWrite
+				succ.qtype = db.QueryTypeReadWrite
 			case "s":
-				succ.qtype = db.StatementTypeSchemaWrite
+				succ.qtype = db.QueryTypeSchemaWrite
 			default:
 				h.setErr(&db.ProtocolError{
 					MessageType: "success",
 					Field:       "type",
-					Err:         fmt.Sprintf("unrecognized success statement type %s", statementType),
+					Err:         fmt.Sprintf("unrecognized success query type %s", queryType),
 				})
 			}
 		case "db":
