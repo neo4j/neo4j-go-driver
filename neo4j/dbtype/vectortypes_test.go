@@ -215,6 +215,14 @@ func TestVectorString(t *testing.T) {
 
 		// Scientific notation floats
 		{"scientific floats", Vector[float64]{1e10, 2e-5, 3.14159e2}, "vector([10000000000.0, 2e-05, 314.159], 3, FLOAT NOT NULL)"},
+
+		// Precision test cases
+		{"float64 precision", Vector[float64]{0.123}, "vector([0.123], 1, FLOAT NOT NULL)"},
+		{"float32 precision", Vector[float32]{0.123}, "vector([0.123], 1, FLOAT32 NOT NULL)"},
+
+		// Sub-normal floats
+		{"subnormal float64", Vector[float64]{math.SmallestNonzeroFloat64}, "vector([5e-324], 1, FLOAT NOT NULL)"},
+		{"subnormal float32", Vector[float32]{math.SmallestNonzeroFloat32}, "vector([1e-45], 1, FLOAT32 NOT NULL)"},
 	}
 
 	for _, tc := range testCases {

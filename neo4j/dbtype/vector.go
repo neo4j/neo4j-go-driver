@@ -77,9 +77,9 @@ func formatVectorData[T VectorElement](v Vector[T]) string {
 func formatElement[T VectorElement](element T) string {
 	switch e := any(element).(type) {
 	case float32:
-		return formatFloat(float64(e))
+		return formatFloat32(e)
 	case float64:
-		return formatFloat(e)
+		return formatFloat64(e)
 	case int8, int16, int32, int64:
 		return fmt.Sprintf("%d", e)
 	default:
@@ -87,7 +87,24 @@ func formatElement[T VectorElement](element T) string {
 	}
 }
 
-func formatFloat(f float64) string {
+func formatFloat32(f float32) string {
+	if math.IsNaN(float64(f)) {
+		return "NaN"
+	}
+	if math.IsInf(float64(f), 1) {
+		return "Infinity"
+	}
+	if math.IsInf(float64(f), -1) {
+		return "-Infinity"
+	}
+	if isWholeNumber32(f) {
+		// Ensure we show at least one decimal place
+		return strconv.FormatFloat(float64(f), 'f', 1, 32)
+	}
+	return strconv.FormatFloat(float64(f), 'g', -1, 32)
+}
+
+func formatFloat64(f float64) string {
 	if math.IsNaN(f) {
 		return "NaN"
 	}
@@ -97,13 +114,17 @@ func formatFloat(f float64) string {
 	if math.IsInf(f, -1) {
 		return "-Infinity"
 	}
-	if isWholeNumber(f) {
+	if isWholeNumber64(f) {
 		// Ensure we show at least one decimal place
 		return strconv.FormatFloat(f, 'f', 1, 64)
 	}
 	return strconv.FormatFloat(f, 'g', -1, 64)
 }
 
-func isWholeNumber(f float64) bool {
-   return f == math.Trunc(f)
+func isWholeNumber32(f float32) bool {
+	return f == float32(math.Trunc(float64(f)))
+}
+
+func isWholeNumber64(f float64) bool {
+	return f == math.Trunc(f)
 }
