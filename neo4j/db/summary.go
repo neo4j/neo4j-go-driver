@@ -18,14 +18,37 @@
 package db
 
 // Definitions of these should correspond to public API
+//
+// Deprecated: Use QueryType instead. This will be removed in a future release.
 type StatementType int
 
 const (
-	StatementTypeUnknown     StatementType = 0
-	StatementTypeRead        StatementType = 1
-	StatementTypeReadWrite   StatementType = 2
-	StatementTypeWrite       StatementType = 3
+	// Deprecated: Use QueryTypeUnknown instead. This will be removed in a future release.
+	StatementTypeUnknown StatementType = 0
+	// Deprecated: Use QueryTypeRead instead. This will be removed in a future release.
+	StatementTypeRead StatementType = 1
+	// Deprecated: Use QueryTypeReadWrite instead. This will be removed in a future release.
+	StatementTypeReadWrite StatementType = 2
+	// Deprecated: Use QueryTypeWrite instead. This will be removed in a future release.
+	StatementTypeWrite StatementType = 3
+	// Deprecated: Use QueryTypeSchemaWrite instead. This will be removed in a future release.
 	StatementTypeSchemaWrite StatementType = 4
+)
+
+// QueryType defines the type of the query
+type QueryType = StatementType
+
+const (
+	// QueryTypeUnknown identifies an unknown query type
+	QueryTypeUnknown QueryType = 0
+	// QueryTypeRead identifies a read query
+	QueryTypeRead QueryType = 1
+	// QueryTypeReadWrite identifies a read-write query
+	QueryTypeReadWrite QueryType = 2
+	// QueryTypeWrite identifies a write query
+	QueryTypeWrite QueryType = 3
+	// QueryTypeSchemaWrite identifies a schema-write query
+	QueryTypeSchemaWrite QueryType = 4
 )
 
 // Counter key names

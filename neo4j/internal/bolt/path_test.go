@@ -77,15 +77,15 @@ func TestBuildPath(ot *testing.T) {
 			for i, rel := range path.Relationships {
 				// Compare expected relationship
 				erel := c.path.Relationships[i]
-				//lint:ignore SA1019 Id is supported at least until 6.0
+				//lint:ignore SA1019 Id is supported for backward compatibility
 				if rel.Id != erel.Id {
 					t.Errorf("Relation %d not as expected, ids differ", i)
 				}
-				//lint:ignore SA1019 StartId is supported at least until 6.0
+				//lint:ignore SA1019 StartId is supported for backward compatibility
 				if rel.StartId != erel.StartId {
 					t.Errorf("Relation %d not as expected, start ids differ", i)
 				}
-				//lint:ignore SA1019 EndId is supported at least until 6.0
+				//lint:ignore SA1019 EndId is supported for backward compatibility
 				if rel.EndId != erel.EndId {
 					t.Errorf("Relation %d not as expected, end ids differ", i)
 				}

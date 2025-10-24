@@ -72,6 +72,7 @@ These types have been aliased:
   `neo4j/dbtype.Point2D` and `neo4j/dbtype.Point3D` (see more details below)
 * All temporal types are aliased from `neo4j` to their equivalent
   in `neo4j/dbtype`
+* `Vector` is aliased from `neo4j` to `neo4j/dbtype.Vector[T]`
 
 ## Spatial types
 
@@ -168,6 +169,16 @@ The four different errors are:
 * `TransactionExecutionLimit`, indicates that a retryable transaction failed due
   to a timeout or other resource limit reached. The struct contains a list 
   of errors where each error represents a failed transaction attempt.
+
+### GQL-compliant errors
+
+Starting with 5.26.0, `Neo4jError` includes GQL-compliant error information for better error handling:
+
+* `GqlStatus` - GQL-compliant error code
+* `GqlStatusDescription` - Standard description for the GQL status code  
+* `GqlClassification` - High-level error classification (CLIENT_ERROR, DATABASE_ERROR, TRANSIENT_ERROR, UNKNOWN)
+* `GqlDiagnosticRecord` - Additional diagnostic information
+* `GqlCause` - Underlying error that caused the current error
 
 ## Error handling
 
@@ -399,3 +410,48 @@ creation of the following happened:
 Explicit transactions can now be committed once, or rolled back once.
 Any further call to commit / roll back will cause an `UsageError` to be 
 returned.
+
+## 6.0 breaking changes
+
+### 5.x deprecation removals
+
+Every deprecated element in 5.x has been removed from 6.0. This includes:
+
+#### Structs
+* `neo4j.Config` (replaced by `config.Config` since 5.8.0)
+
+#### Types  
+* `neo4j.ServerAddressResolver` (replaced by `config.ServerAddressResolver` since 5.8.0)
+* `neo4j.LogLevel` (replaced by `log.Level` since 5.17.0)
+* `neo4j.ERROR`, `neo4j.WARNING`, `neo4j.INFO`, `neo4j.DEBUG` (replaced by `log.ERROR`, `log.WARNING`, `log.INFO`, `log.DEBUG` since 5.17.0)
+* `log.Console`, `log.Void` (replaced by `log.ToConsole`, `log.ToVoid` since 5.17.0)
+* All notification types (replaced by `notifications.*` equivalents since 5.23.0)
+
+#### Functions / Methods
+* `neo4j.NewDriver` (replaced by `neo4j.NewDriverWithContext` since 5.0.0)
+* `neo4j.Single`, `neo4j.SingleT` (replaced by `neo4j.SingleWithContext`, `neo4j.SingleTWithContext` since 5.0.0)
+* `neo4j.Collect`, `neo4j.CollectT` (replaced by `neo4j.CollectWithContext`, `neo4j.CollectTWithContext` since 5.0.0)
+* `neo4j.ConsoleLogger`, `neo4j.ConsoleBoltLogger` (replaced by `log.ToConsole`, `log.BoltToConsole` since 5.17.0)
+
+#### Interfaces
+* `neo4j.Driver` (replaced by `neo4j.DriverWithContext` since 5.0.0)
+* `neo4j.Session` (replaced by `neo4j.SessionWithContext` since 5.0.0)
+* `neo4j.Transaction` (replaced by `neo4j.ExplicitTransaction` since 5.0.0)
+* `neo4j.TransactionWork` (replaced by `neo4j.ManagedTransactionWork` since 5.0.0)
+* `neo4j.Result` (replaced by `neo4j.ResultWithContext` since 5.0.0)
+* `neo4j.ServerAddress` (replaced by `config.ServerAddress` since 5.8.0)
+
+#### Struct fields
+* `neo4j.Config#RootCAs` (replaced by `neo4j.Config#TlsConfig` since 5.0.0)
+
+### Context-aware API evolution
+
+Starting with v5, the driver introduced context-aware APIs with `*WithContext` suffixes (e.g., `neo4j.NewDriverWithContext`, `neo4j.DriverWithContext`). In v6, the original API names now include context support by default, making the `*WithContext` variants redundant.
+
+The `*WithContext` APIs are now deprecated in v6 and will be removed in v7.0. This provides a clean, context-aware API without the `WithContext` suffix.
+
+### Go version requirement
+
+The minimum Go version requirement has been updated to Go 1.24 for v6.0.
+
+For a complete list of all breaking changes, see the [planned breaking changes discussion](https://github.com/neo4j/neo4j-go-driver/discussions/456).

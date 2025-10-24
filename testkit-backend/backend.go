@@ -1685,8 +1685,8 @@ func serializeSummary(summary neo4j.ResultSummary) map[string]any {
 	} else {
 		response["resultConsumedAfter"] = nil
 	}
-	if summary.StatementType() != neo4j.StatementTypeUnknown {
-		response["queryType"] = summary.StatementType().String()
+	if summary.QueryType() != neo4j.QueryTypeUnknown {
+		response["queryType"] = summary.QueryType().String()
 	} else {
 		response["queryType"] = nil
 	}

@@ -23,7 +23,7 @@ import (
 
 // Intermediate representation of part of path
 type relNode struct {
-	// Deprecated: id is deprecated and will be removed in 6.0. Use elementId instead.
+	// Deprecated: id is deprecated. Use elementId instead.
 	id        int64
 	elementId string
 	name      string
@@ -68,11 +68,11 @@ func buildPath(nodes []dbtype.Node, relNodes []*relNode, indexes []int) dbtype.P
 			Props:     reln.props,
 		}
 		if n1start {
-			//lint:ignore SA1019 Id, StartId and EndId are supported at least until 6.0
+			//lint:ignore SA1019 Id, StartId and EndId are supported for backward compatibility
 			rel.StartId, rel.EndId = n1.Id, n2.Id
 			rel.StartElementId, rel.EndElementId = n1.ElementId, n2.ElementId
 		} else {
-			//lint:ignore SA1019 Id, StartId and EndId are supported at least until 6.0
+			//lint:ignore SA1019 Id, StartId and EndId are supported for backward compatibility
 			rel.StartId, rel.EndId = n2.Id, n1.Id
 			rel.StartElementId, rel.EndElementId = n2.ElementId, n1.ElementId
 		}

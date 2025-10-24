@@ -256,7 +256,7 @@ func TestTypes(outer *testing.T) {
 		node := result.Record().Values[0].(neo4j.Node)
 
 		assertNotNil(t, node)
-		//lint:ignore SA1019 Id is supported at least until 6.0
+		//lint:ignore SA1019 Id is supported for backward compatibility
 		assertNotNil(t, node.Id)
 		assertEquals(t, len(node.Labels), 2)
 		assertStringsHas(t, node.Labels, "Person")
@@ -278,7 +278,7 @@ func TestTypes(outer *testing.T) {
 		manager := result.Record().Values[2].(neo4j.Node)
 
 		assertNotNil(t, employee)
-		//lint:ignore SA1019 Id is supported at least until 6.0
+		//lint:ignore SA1019 Id is supported for backward compatibility
 		assertNotNil(t, employee.Id)
 		assertEquals(t, len(employee.Labels), 2)
 		assertStringsHas(t, employee.Labels, "Person")
@@ -288,18 +288,18 @@ func TestTypes(outer *testing.T) {
 		assertMapHas(t, employee.Props, "name", "employee 1")
 
 		assertNotNil(t, worksFor)
-		//lint:ignore SA1019 Id is supported at least until 6.0
+		//lint:ignore SA1019 Id is supported for backward compatibility
 		assertNotNil(t, worksFor.Id)
-		//lint:ignore SA1019 StartId is supported at least until 6.0
+		//lint:ignore SA1019 StartId is supported for backward compatibility
 		assertEquals(t, worksFor.StartId, employee.Id)
-		//lint:ignore SA1019 EndId is supported at least until 6.0
+		//lint:ignore SA1019 EndId is supported for backward compatibility
 		assertEquals(t, worksFor.EndId, manager.Id)
 		assertEquals(t, worksFor.Type, "WORKS_FOR")
 		assertEquals(t, len(worksFor.Props), 1)
 		assertMapHas(t, worksFor.Props, "from", "2017-01-01")
 
 		assertNotNil(t, manager)
-		//lint:ignore SA1019 Id is supported at least until 6.0
+		//lint:ignore SA1019 Id is supported for backward compatibility
 		assertNotNil(t, manager.Id)
 		assertEquals(t, len(manager.Labels), 2)
 		assertStringsHas(t, manager.Labels, "Person")

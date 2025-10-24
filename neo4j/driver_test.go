@@ -951,6 +951,10 @@ func (sum *fakeSummary) StatementType() StatementType {
 	panic("implement me")
 }
 
+func (sum *fakeSummary) QueryType() QueryType {
+	panic("implement me")
+}
+
 func (sum *fakeSummary) Counters() Counters {
 	panic("implement me")
 }
