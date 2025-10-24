@@ -67,8 +67,8 @@ func TestState(outer *testing.T) {
 
 	testCases := map[string][]TStateInvocation{
 		"Retry connect": {
-			{conn: nil, err: &errorutil.PoolTimeout{}, expectContinued: true,
-				expectLastErrWasRetryable: true, expectLastErrType: &errorutil.PoolTimeout{}},
+			{conn: nil, err: &errorutil.PoolTimeout{}, expectContinued: false,
+				expectLastErrWasRetryable: false, expectLastErrType: &errorutil.PoolTimeout{}},
 		},
 		"Retry on PoolOutOfServers": {
 			// Note: PoolOutOfServers is wrapped as ConnectivityError by session.getConnection()

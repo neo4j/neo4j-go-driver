@@ -681,9 +681,11 @@ func (b *backend) handleRequest(req map[string]any) {
 			if data["notificationsDisabledCategories"] != nil {
 				notiDisCats := data["notificationsDisabledCategories"].([]any)
 				if len(notiDisCats) == 0 {
+					//lint:ignore SA1019 DisableNoCategories is supported for backward compatibility
 					c.NotificationsDisabledCategories = notifications.DisableNoCategories()
 				} else {
 					cats := convertSlice(notiDisCats, anyToNotificationCategory)
+					//lint:ignore SA1019 DisableCategories is supported for backward compatibility
 					c.NotificationsDisabledCategories = notifications.DisableCategories(cats...)
 				}
 			}
@@ -909,9 +911,11 @@ func (b *backend) handleRequest(req map[string]any) {
 		if data["notificationsDisabledCategories"] != nil {
 			notiDisCats := data["notificationsDisabledCategories"].([]any)
 			if len(notiDisCats) == 0 {
+				//lint:ignore SA1019 DisableNoCategories is supported for backward compatibility
 				sessionConfig.NotificationsDisabledCategories = notifications.DisableNoCategories()
 			} else {
 				cats := convertSlice(notiDisCats, anyToNotificationCategory)
+				//lint:ignore SA1019 DisableCategories is supported for backward compatibility
 				sessionConfig.NotificationsDisabledCategories = notifications.DisableCategories(cats...)
 			}
 		}
@@ -1525,6 +1529,7 @@ func serializeRecord(record *neo4j.Record) map[string]any {
 	return data
 }
 
+//lint:ignore SA1019 Notification is supported for backward compatibility
 func serializeNotifications(slice []neo4j.Notification, version db.ProtocolVersion) []map[string]any {
 	if slice == nil {
 		if version.Major == 5 && version.Minor >= 5 {
@@ -1620,6 +1625,7 @@ func serializeSummary(summary neo4j.ResultSummary) map[string]any {
 			"text":       summary.Query().Text(),
 			"parameters": serializeParameters(summary.Query().Parameters()),
 		},
+		//lint:ignore SA1019 Notifications is supported for backward compatibility
 		"notifications":    serializeNotifications(summary.Notifications(), protocolVersion),
 		"gqlStatusObjects": serializeGqlStatusObjects(summary.GqlStatusObjects()),
 		"plan":             serializePlan(summary.Plan()),
@@ -1635,8 +1641,8 @@ func serializeSummary(summary neo4j.ResultSummary) map[string]any {
 	} else {
 		response["resultConsumedAfter"] = nil
 	}
-	if summary.StatementType() != neo4j.StatementTypeUnknown {
-		response["queryType"] = summary.StatementType().String()
+	if summary.QueryType() != neo4j.QueryTypeUnknown {
+		response["queryType"] = summary.QueryType().String()
 	} else {
 		response["queryType"] = nil
 	}
@@ -1825,7 +1831,9 @@ func convertInitialBookmarks(bookmarks []any) neo4j.Bookmarks {
 	return result
 }
 
+//lint:ignore SA1019 NotificationCategory is supported for backward compatibility
 func anyToNotificationCategory(v any) notifications.NotificationCategory {
+	//lint:ignore SA1019 NotificationCategory is supported for backward compatibility
 	return notifications.NotificationCategory(v.(string))
 }
 

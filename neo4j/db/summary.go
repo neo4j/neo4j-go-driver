@@ -18,14 +18,37 @@
 package db
 
 // Definitions of these should correspond to public API
+//
+// Deprecated: Use QueryType instead. This will be removed in a future release.
 type StatementType int
 
 const (
-	StatementTypeUnknown     StatementType = 0
-	StatementTypeRead        StatementType = 1
-	StatementTypeReadWrite   StatementType = 2
-	StatementTypeWrite       StatementType = 3
+	// Deprecated: Use QueryTypeUnknown instead. This will be removed in a future release.
+	StatementTypeUnknown StatementType = 0
+	// Deprecated: Use QueryTypeRead instead. This will be removed in a future release.
+	StatementTypeRead StatementType = 1
+	// Deprecated: Use QueryTypeReadWrite instead. This will be removed in a future release.
+	StatementTypeReadWrite StatementType = 2
+	// Deprecated: Use QueryTypeWrite instead. This will be removed in a future release.
+	StatementTypeWrite StatementType = 3
+	// Deprecated: Use QueryTypeSchemaWrite instead. This will be removed in a future release.
 	StatementTypeSchemaWrite StatementType = 4
+)
+
+// QueryType defines the type of the query
+type QueryType = StatementType
+
+const (
+	// QueryTypeUnknown identifies an unknown query type
+	QueryTypeUnknown QueryType = 0
+	// QueryTypeRead identifies a read query
+	QueryTypeRead QueryType = 1
+	// QueryTypeReadWrite identifies a read-write query
+	QueryTypeReadWrite QueryType = 2
+	// QueryTypeWrite identifies a write query
+	QueryTypeWrite QueryType = 3
+	// QueryTypeSchemaWrite identifies a schema-write query
+	QueryTypeSchemaWrite QueryType = 4
 )
 
 // Counter key names
@@ -90,13 +113,12 @@ type ProfiledPlan struct {
 	Time              int64
 }
 
-// StreamSummary is part of the GQL compliant notifications preview feature
-// (see README on what it means in terms of support and compatibility guarantees)
 type StreamSummary struct {
 	HadRecord bool
 	HadKey    bool
 }
 
+// Deprecated: Use GqlStatusObject instead. This will be removed in a future release.
 type Notification struct {
 	Code        string
 	Title       string
@@ -109,9 +131,6 @@ type Notification struct {
 // GqlStatusObject represents a GqlStatusObject generated when executing a statement.
 // A GqlStatusObject can be visualized in a client pinpointing problems or other information about the statement.
 // Contrary to failures or errors, GqlStatusObjects do not affect the execution of the statement.
-//
-// GqlStatusObject is part of the GQL compliant notifications preview feature
-// (see README on what it means in terms of support and compatibility guarantees)
 type GqlStatusObject struct {
 	// Deprecated: for backward compatibility with Notification.Code only.
 	Code string

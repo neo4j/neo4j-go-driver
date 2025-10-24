@@ -177,7 +177,7 @@ func TestHydrator(outer *testing.T) {
 				packer.String("db")
 				packer.String("s")
 			},
-			x: &success{tlast: 124, tfirst: -1, bookmark: "b", qtype: db.StatementTypeWrite, db: "s", qid: -1, num: 4},
+			x: &success{tlast: 124, tfirst: -1, bookmark: "b", qtype: db.QueryTypeWrite, db: "s", qid: -1, num: 4},
 		},
 		{
 			name: "Success summary with plan",
@@ -313,6 +313,7 @@ func TestHydrator(outer *testing.T) {
 				packer.String("s2")
 			},
 			x: &success{tlast: -1, tfirst: -1, bookmark: "bm", db: "sys", qid: -1, num: 4,
+				//lint:ignore SA1019 db.Notification is supported for backward compatibility
 				notifications: []db.Notification{
 					{Code: "c1", Title: "t1", Description: "d1", Severity: "s1", Position: &db.InputPosition{Offset: 1, Line: 2, Column: 3}},
 					{Code: "c2", Title: "t2", Description: "d2", Severity: "s2"},
@@ -398,7 +399,7 @@ func TestHydrator(outer *testing.T) {
 				packer.String("has_more")
 				packer.Bool(false)
 			},
-			x: &success{tlast: 7, tfirst: -1, bookmark: "b1", qtype: db.StatementTypeRead, qid: -1, num: 4},
+			x: &success{tlast: 7, tfirst: -1, bookmark: "b1", qtype: db.QueryTypeRead, qid: -1, num: 4},
 		},
 		{
 			name: "Success route response",

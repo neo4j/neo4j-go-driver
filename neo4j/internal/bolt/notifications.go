@@ -28,7 +28,10 @@ func checkNotificationFiltering(
 	bolt idb.Connection,
 ) error {
 	if notificationConfig.MinSev == notifications.DefaultLevel &&
-		!notificationConfig.DisCats.DisablesNone() && len(notificationConfig.DisCats.DisabledCategories()) == 0 &&
+		//lint:ignore SA1019 NotificationDisabledCategories is supported for backward compatibility
+		!notificationConfig.DisCats.DisablesNone() &&
+		//lint:ignore SA1019 NotificationDisabledCategories is supported for backward compatibility
+		len(notificationConfig.DisCats.DisabledCategories()) == 0 &&
 		!notificationConfig.DisClas.DisablesNone() && len(notificationConfig.DisClas.DisabledClassifications()) == 0 {
 		return nil
 	}

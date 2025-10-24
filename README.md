@@ -151,9 +151,6 @@ func (i *Item) String() string {
 
 ## Server/Driver compatibility
 
-Starting with 5.0, the Neo4j Drivers will be moving to a monthly release cadence.
-A minor version will be released on the last Friday of each month so as to maintain versioning consistency with the core product (Neo4j DBMS) which has also moved to a monthly cadence.
-
 As a policy, patch versions will not be released except on rare occasions.
 Bug fixes and updates will go into the latest minor version and users should upgrade to that.
 Driver upgrades within a major version will never contain breaking API changes.
@@ -166,9 +163,10 @@ See also: https://neo4j.com/developer/kb/neo4j-supported-versions/
 You just need to use `neo4j` as the URL scheme and set host of the URL to one of your core members of the cluster.
 
 ```go
-if driver, err = neo4j.NewDriver("neo4j://localhost:7687", neo4j.BasicAuth("username", "password", "")); err != nil {
-	return err // handle error
-}
+driver, err := neo4j.NewDriver(
+    "neo4j://localhost:7687",
+    neo4j.BasicAuth("username", "password", ""),
+)
 ```
 
 There are a few points that need to be highlighted:
@@ -228,6 +226,7 @@ The mapping between Cypher types and the types used by this driver (to represent
 |         Node | neo4j.Node         |
 | Relationship | neo4j.Relationship |
 |         Path | neo4j.Path         |
+|       Vector | neo4j.Vector[T]    |
 
 ### Spatial Types - Point
 
@@ -290,6 +289,39 @@ Note:
 * When `neo4j.OffsetTime` is converted into `time.Time` or constructed through `OffsetTimeOf(time.Time)`, its `Location` is given a fixed name of `Offset` (i.e. assigned `time.FixedZone("Offset", offsetTime.offset)`).
 * When `time.Time` values are sent/received through the driver, if its `Zone()` returns a name of `Offset` the value is stored with its offset value and with its zone name otherwise.
 
+### Vector Types
+
+Vector types are introduced in Bolt 6.0 and represent an ordered collection of homogeneous numeric values.
+
+The mapping between Cypher Vector types and the types used by this driver:
+
+|  Cypher Type | Driver Type        |
+|-------------:|:-------------------|
+|       Vector | neo4j.Vector[T]    |
+
+Vector supports the following element types:
+
+| Element Type | Go Type |
+|-------------:|:-------|
+|       int8   | int8    |
+|       int16  | int16   |
+|       int32  | int32   |
+|       int64  | int64   |
+|       float32| float32 |
+|       float64| float64 |
+
+You can create a Vector value using:
+
+```go
+vec := neo4j.Vector[float64]{1.0, 2.0, 3.0, 4.0, 5.0}
+
+```
+
+Receiving a vector value as driver type:
+```go
+vecValue := record.Values[0].(neo4j.Vector[float64])
+```
+
 ## Logging
 
 Logging at the driver level can be configured by setting `Log` field of `config.Config` through configuration functions that can be passed to `neo4j.NewDriver` function.
@@ -301,17 +333,9 @@ For simplicity, we provide a predefined console logger which can be constructed 
 A simple code snippet that will enable console logging is as follows;
 
 ```go
-useConsoleLogger := func(level log.Level) func(config *config.Config) {
-	return func(config *config.Config) {
-		config.Log = log.ToConsole(level)
-	}
-}
-
-// Construct a new driver
-if driver, err = neo4j.NewDriver(uri, neo4j.BasicAuth(username, password, ""), useConsoleLogger(log.ERROR)); err != nil {
-	return err
-}
-defer driver.Close()
+driver, err := neo4j.NewDriver(uri, neo4j.BasicAuth(username, password, ""), func(config *config.Config) {
+    config.Log = log.ToConsole(log.ERROR)
+})
 ```
 
 ### Custom Logger
@@ -341,11 +365,11 @@ For simplicity, we provide a predefined console logger which can be constructed 
 ```go
 boltLogger := log.BoltToConsole()
 
-# for ExecuteQuery
+// for ExecuteQuery
 result, err := neo4j.ExecuteQuery(ctx, driver, query, params, transformer, neo4j.ExecuteQueryWithBoltLogger(boltLogger))
 
-# for the regular session APIs (session.Run, session.BeginTransaction, session.ExecuteRead, session.ExecuteWrite)
-session := driver.NewSession(neo4j.SessionConfig{BoltLogger: boltLogger})
+// for the regular session APIs (session.Run, session.BeginTransaction, session.ExecuteRead, session.ExecuteWrite)
+session := driver.NewSession(ctx, neo4j.SessionConfig{BoltLogger: boltLogger})
 ```
 
 ### Custom Bolt Logger
@@ -368,7 +392,7 @@ driver.
 
 ### Prerequisites
 
-The Go driver on this branch requires at least Go 1.18 and relies on [Go
+The Go driver on this branch requires at least Go 1.24 and relies on [Go
 modules](https://go.dev/ref/mod) for dependency resolution.
 
 ### Unit Testing

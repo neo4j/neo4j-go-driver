@@ -136,9 +136,9 @@ func IsRetryable(err error) bool {
 		if _, ok := connectivityErr.Inner.(*errorutil.CommitFailedDeadError); ok {
 			return false
 		}
-		return true
-	}
-	if _, ok := err.(*errorutil.PoolTimeout); ok {
+		if _, ok := connectivityErr.Inner.(*errorutil.PoolTimeout); ok {
+			return false
+		}
 		return true
 	}
 	var dbError *db.Neo4jError

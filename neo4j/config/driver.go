@@ -174,12 +174,13 @@ type Config struct {
 	// NotificationsDisabledCategories defines the categories of notifications the server should not send.
 	// By default, the server's settings are used.
 	// Disabling categories allows the server to skip analysis for those, which can speed up query execution.
-	NotificationsDisabledCategories notifications.NotificationDisabledCategories
-	// NotificationsDisabledClassifications is identical to NotificationsDisabledCategories.
-	// This alternative is provided for a consistent naming with neo4j.GqlStatusObject Classification.
 	//
-	// NotificationsDisabledClassifications is part of the GQL compliant notifications preview feature
-	// (see README on what it means in terms of support and compatibility guarantees)
+	// Deprecated: Use NotificationsDisabledClassifications instead. This will be removed in a future release.
+	//lint:ignore SA1019 NotificationDisabledCategories is supported for backward compatibility
+	NotificationsDisabledCategories notifications.NotificationDisabledCategories
+	// NotificationsDisabledClassifications defines the classifications of notifications the server should not send.
+	// By default, the server's settings are used.
+	// Disabling classifications allows the server to skip analysis for those, which can speed up query execution.
 	NotificationsDisabledClassifications notifications.NotificationDisabledClassifications
 	// By default, if the server requests it, the driver will automatically transmit anonymous usage
 	// statistics to the server it is connected to.

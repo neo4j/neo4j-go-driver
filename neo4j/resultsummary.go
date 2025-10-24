@@ -29,19 +29,47 @@ import (
 )
 
 // StatementType defines the type of the statement
+//
+// Deprecated: Use QueryType instead. This will be removed in a future release.
 type StatementType int
 
 const (
 	// StatementTypeUnknown identifies an unknown statement type
+	//
+	// Deprecated: Use QueryTypeUnknown instead. This will be removed in a future release.
 	StatementTypeUnknown StatementType = 0
 	// StatementTypeReadOnly identifies a read-only statement
+	//
+	// Deprecated: Use QueryTypeReadOnly instead. This will be removed in a future release.
 	StatementTypeReadOnly StatementType = 1
 	// StatementTypeReadWrite identifies a read-write statement
+	//
+	// Deprecated: Use QueryTypeReadWrite instead. This will be removed in a future release.
 	StatementTypeReadWrite StatementType = 2
 	// StatementTypeWriteOnly identifies a write-only statement
+	//
+	// Deprecated: Use QueryTypeWriteOnly instead. This will be removed in a future release.
 	StatementTypeWriteOnly StatementType = 3
 	// StatementTypeSchemaWrite identifies a schema-write statement
+	//
+	// Deprecated: Use QueryTypeSchemaWrite instead. This will be removed in a future release.
 	StatementTypeSchemaWrite StatementType = 4
+)
+
+// QueryType defines the type of the query
+type QueryType = StatementType
+
+const (
+	// QueryTypeUnknown identifies an unknown query type
+	QueryTypeUnknown QueryType = 0
+	// QueryTypeReadOnly identifies a read-only query
+	QueryTypeReadOnly QueryType = 1
+	// QueryTypeReadWrite identifies a read-write query
+	QueryTypeReadWrite QueryType = 2
+	// QueryTypeWriteOnly identifies a write-only query
+	QueryTypeWriteOnly QueryType = 3
+	// QueryTypeSchemaWrite identifies a schema-write query
+	QueryTypeSchemaWrite QueryType = 4
 )
 
 func (st StatementType) String() string {
@@ -65,7 +93,11 @@ type ResultSummary interface {
 	// Query returns the query that has been executed.
 	Query() Query
 	// StatementType returns type of statement that has been executed.
+	//
+	// Deprecated: Use QueryType() instead. This will be removed in a future release.
 	StatementType() StatementType
+	// QueryType returns type of query that has been executed.
+	QueryType() QueryType
 	// Counters returns statistics counts for the statement.
 	Counters() Counters
 	// Plan returns statement plan for the executed statement if available, otherwise null.
@@ -74,6 +106,8 @@ type ResultSummary interface {
 	Profile() ProfiledPlan
 	// Notifications returns a slice of notifications produced while executing the statement.
 	// The list will be empty if no notifications produced while executing the statement.
+	//
+	// Deprecated: Use GqlStatusObjects() instead. This will be removed in a future release.
 	Notifications() []Notification
 	// GqlStatusObjects returns a slice of GqlStatusObjects that arose when executing the query.
 	//
@@ -86,8 +120,6 @@ type ResultSummary interface {
 	//   - A "warning" (``01xxx``) has precedence over a success.
 	//   - A "success" (``00xxx``) has precedence over anything informational (``03xxx``).
 	//
-	// GqlStatusObjects is part of the GQL compliant notifications preview feature
-	// (see README on what it means in terms of support and compatibility guarantees)
 	GqlStatusObjects() []GqlStatusObject
 	// ResultAvailableAfter returns the time it took for the server to make the result available for consumption.
 	// Since 5.0, this returns a negative duration if the server has not sent the corresponding statistic.
@@ -224,6 +256,8 @@ type ProfiledPlan interface {
 // Notification represents notifications generated when executing a statement.
 // A notification can be visualized in a client pinpointing problems or other information about the statement.
 // Contrary to failures or errors, notifications do not affect the execution of the statement.
+//
+// Deprecated: Use GqlStatusObject instead. This will be removed in a future release.
 type Notification interface {
 	// Code returns a notification code for the discovered issue of this notification.
 	Code() string
@@ -234,10 +268,6 @@ type Notification interface {
 	// Position returns the position in the statement where this notification points to.
 	// Not all notifications have a unique position to point to and in that case the position would be set to nil.
 	Position() InputPosition
-	// Severity returns the severity level of this notification.
-	//
-	// Deprecated: please use SeverityLevel (or RawSeverityLevel) instead. Severity will be removed in 6.0.
-	Severity() string
 	// RawSeverityLevel returns the unmapped severity level of this notification.
 	// This is useful when the driver cannot interpret the severity level returned by the server
 	// In that case, SeverityLevel returns UnknownSeverity while RawSeverityLevel returns the raw string
@@ -253,15 +283,13 @@ type Notification interface {
 	// Category returns the mapped category of this notification.
 	// If the category is not a known value, Category returns notifications.Unknown
 	// Call RawCategory to get access to the raw string value
+	//lint:ignore SA1019 NotificationCategory is supported for backward compatibility
 	Category() notifications.NotificationCategory
 }
 
 // GqlStatusObject represents a GqlStatusObject generated when executing a statement.
 // A GqlStatusObject can be visualized in a client pinpointing problems or other information about the statement.
 // Contrary to failures or errors, GqlStatusObjects do not affect the execution of the statement.
-//
-// GqlStatusObject is part of the GQL compliant notifications preview feature
-// (see README on what it means in terms of support and compatibility guarantees)
 type GqlStatusObject interface {
 	// GqlStatus returns the GQLSTATUS.
 	// The following GQLSTATUS codes denote codes that the driver will use for
@@ -356,6 +384,10 @@ func (s *resultSummary) Query() Query {
 
 func (s *resultSummary) StatementType() StatementType {
 	return StatementType(s.sum.StmntType)
+}
+
+func (s *resultSummary) QueryType() QueryType {
+	return QueryType(s.sum.StmntType)
 }
 
 func (s *resultSummary) Text() string {
@@ -625,6 +657,7 @@ func calculateGqlStatusWeight(gqlStatusObject GqlStatusObject) int {
 }
 
 type notification struct {
+	//lint:ignore SA1019 db.Notification is supported for backward compatibility
 	notification *db.Notification
 }
 
@@ -663,6 +696,7 @@ func (n *notification) RawCategory() string {
 	return n.notification.Category
 }
 
+//lint:ignore SA1019 NotificationCategory is supported for backward compatibility
 func (n *notification) Category() notifications.NotificationCategory {
 	switch n.notification.Category {
 	case "HINT":

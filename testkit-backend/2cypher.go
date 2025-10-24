@@ -149,7 +149,7 @@ func nativeToCypher(v any) map[string]any {
 		return map[string]any{
 			"name": "Node",
 			"data": map[string]any{
-				//lint:ignore SA1019 Id is supported at least until 6.0
+				//lint:ignore SA1019 Id is supported for backward compatibility
 				"id":        nativeToCypher(x.Id),
 				"elementId": nativeToCypher(x.ElementId),
 				"labels":    nativeToCypher(x.Labels),
@@ -159,13 +159,13 @@ func nativeToCypher(v any) map[string]any {
 		return map[string]any{
 			"name": "Relationship",
 			"data": map[string]any{
-				//lint:ignore SA1019 Id is supported at least until 6.0
+				//lint:ignore SA1019 Id is supported for backward compatibility
 				"id":        nativeToCypher(x.Id),
 				"elementId": nativeToCypher(x.ElementId),
-				//lint:ignore SA1019 StartId is supported at least until 6.0
+				//lint:ignore SA1019 StartId is supported for backward compatibility
 				"startNodeId":        nativeToCypher(x.StartId),
 				"startNodeElementId": nativeToCypher(x.StartElementId),
-				//lint:ignore SA1019 EndId is supported at least until 6.0
+				//lint:ignore SA1019 EndId is supported for backward compatibility
 				"endNodeId":        nativeToCypher(x.EndId),
 				"endNodeElementId": nativeToCypher(x.EndElementId),
 				"type":             nativeToCypher(x.Type),
