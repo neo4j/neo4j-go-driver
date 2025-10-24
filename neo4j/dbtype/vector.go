@@ -88,9 +88,6 @@ func formatElement[T VectorElement](element T) string {
 }
 
 func formatFloat(f float64, bitSize int) string {
-	if math.IsNaN(f) {
-		return "NaN"
-	}
 	if math.IsInf(f, 1) {
 		return "Infinity"
 	}
