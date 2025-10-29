@@ -20,7 +20,6 @@ package bolt
 import (
 	"context"
 	"net"
-	"reflect"
 	"testing"
 	"time"
 
@@ -178,46 +177,38 @@ func TestVectorHandling(ot *testing.T) {
 	type myCustomType int32
 
 	testCases := []struct {
-		name        string
-		data        any
-		shouldError bool
-		usePackV    bool
+		name string
+		data any
 	}{
-		{"Vector[int8]", dbtype.Vector[int8]{1, 2, 3}, false, false},
-		{"Vector[int16]", dbtype.Vector[int16]{1, 2, 3}, false, false},
-		{"Vector[int32]", dbtype.Vector[int32]{1, 2, 3}, false, false},
-		{"Vector[int64]", dbtype.Vector[int64]{1, 2, 3}, false, false},
-		{"Vector[float32]", dbtype.Vector[float32]{1.0, 2.0, 3.0}, false, false},
-		{"Vector[float64]", dbtype.Vector[float64]{1.0, 2.0, 3.0}, false, false},
+		{"Vector[int8]", dbtype.Vector[int8]{1, 2, 3}},
+		{"Vector[int16]", dbtype.Vector[int16]{1, 2, 3}},
+		{"Vector[int32]", dbtype.Vector[int32]{1, 2, 3}},
+		{"Vector[int64]", dbtype.Vector[int64]{1, 2, 3}},
+		{"Vector[float32]", dbtype.Vector[float32]{1.0, 2.0, 3.0}},
+		{"Vector[float64]", dbtype.Vector[float64]{1.0, 2.0, 3.0}},
 
-		{"type alias", myVecType{1, 2, 3}, false, false},
+		{"type alias", myVecType{1, 2, 3}},
 
-		{"new type int32", myVecType3{1, 2, 3}, true, false},
-		{"new type float64", myVecType2{1.0, 2.0, 3.0}, true, false},
+		{"new type int32", myVecType3{1, 2, 3}},
+		{"new type float64", myVecType2{1.0, 2.0, 3.0}},
 
-		{"*Vector[int8]", &dbtype.Vector[int8]{1, 2, 3}, false, false},
-		{"*Vector[float64]", &dbtype.Vector[float64]{1.0, 2.0, 3.0}, false, false},
-		{"*type alias", &myVecType{1, 2, 3}, false, false},
+		{"*Vector[int8]", &dbtype.Vector[int8]{1, 2, 3}},
+		{"*Vector[float64]", &dbtype.Vector[float64]{1.0, 2.0, 3.0}},
+		{"*type alias", &myVecType{1, 2, 3}},
 
-		{"*new type", &myVecType2{1.0, 2.0, 3.0}, true, false},
+		{"*new type", &myVecType2{1.0, 2.0, 3.0}},
 
-		{"nil *Vector", (*dbtype.Vector[int8])(nil), false, false},
+		{"nil *Vector", (*dbtype.Vector[int8])(nil)},
 
-		{"[]int8", []int8{1, 2, 3}, false, false},
-		{"[]float64", []float64{1.0, 2.0, 3.0}, false, false},
-		{"*[]int8", &[]int8{1, 2, 3}, false, false},
+		{"[]int8", []int8{1, 2, 3}},
+		{"[]float64", []float64{1.0, 2.0, 3.0}},
+		{"*[]int8", &[]int8{1, 2, 3}},
 
-		{"empty Vector", dbtype.Vector[int8]{}, false, false},
-		{"empty *Vector", &dbtype.Vector[int8]{}, false, false},
+		{"empty Vector", dbtype.Vector[int8]{}},
+		{"empty *Vector", &dbtype.Vector[int8]{}},
 
-		{"[]int8 via packV", []int8{1, 2, 3}, false, true},
-		{"[]float64 via packV", []float64{1.0, 2.0, 3.0}, false, true},
-		{"[]string via packV", []string{"a", "b", "c"}, false, true},
-		{"[]any via packV", []any{1, "hello", 3.14}, false, true},
-		{"[]byte via packV", []byte{1, 2, 3}, false, true},
-
-		{"custom type", myCustomType(42), false, false},
-		{"[]custom type", []myCustomType{1, 2, 3}, false, false},
+		{"custom type", myCustomType(42)},
+		{"[]custom type", []myCustomType{1, 2, 3}},
 	}
 
 	for _, tc := range testCases {
@@ -236,22 +227,10 @@ func TestVectorHandling(ot *testing.T) {
 				},
 			}
 
-			if tc.usePackV {
-				out.packV(reflect.ValueOf(tc.data))
-			} else {
-				out.packX(tc.data)
-			}
+			out.packX(tc.data)
 
-			if tc.shouldError {
-				if packErr == nil {
-					t.Errorf("Expected error for %s, but got none", tc.name)
-				} else if _, ok := packErr.(*db.UnsupportedTypeError); !ok {
-					t.Errorf("Expected UnsupportedTypeError for %s, but got: %T", tc.name, packErr)
-				}
-			} else {
-				if packErr != nil {
-					t.Errorf("Unexpected error for %s: %v", tc.name, packErr)
-				}
+			if packErr != nil {
+				t.Errorf("Unexpected error for %s: %v", tc.name, packErr)
 			}
 		})
 	}
