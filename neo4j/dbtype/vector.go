@@ -26,7 +26,7 @@ import (
 
 // VectorElement represents the supported element types for Vector.
 type VectorElement interface {
-	~float64 | ~float32 | ~int8 | ~int16 | ~int32 | ~int64
+	float64 | float32 | int8 | int16 | int32 | int64
 }
 
 // Vector represents a fixed-length array of numeric values.

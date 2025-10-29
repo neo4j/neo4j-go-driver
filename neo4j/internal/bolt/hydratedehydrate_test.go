@@ -20,6 +20,7 @@ package bolt
 import (
 	"context"
 	"net"
+	"reflect"
 	"testing"
 	"time"
 
@@ -164,6 +165,94 @@ func TestDehydrateHydrate(ot *testing.T) {
 		ot.Run(tc.name, func(t *testing.T) {
 			vo := dehydrateAndHydrate(t, tc.data)
 			testutil.AssertDeepEquals(t, tc.data, vo)
+		})
+	}
+}
+
+func TestVectorHandling(ot *testing.T) {
+	ot.Parallel()
+
+	type myVecType = dbtype.Vector[int8]
+	type myVecType2 dbtype.Vector[float64]
+	type myVecType3 dbtype.Vector[int32]
+	type myCustomType int32
+
+	testCases := []struct {
+		name        string
+		data        any
+		shouldError bool
+		usePackV    bool
+	}{
+		{"Vector[int8]", dbtype.Vector[int8]{1, 2, 3}, false, false},
+		{"Vector[int16]", dbtype.Vector[int16]{1, 2, 3}, false, false},
+		{"Vector[int32]", dbtype.Vector[int32]{1, 2, 3}, false, false},
+		{"Vector[int64]", dbtype.Vector[int64]{1, 2, 3}, false, false},
+		{"Vector[float32]", dbtype.Vector[float32]{1.0, 2.0, 3.0}, false, false},
+		{"Vector[float64]", dbtype.Vector[float64]{1.0, 2.0, 3.0}, false, false},
+
+		{"type alias", myVecType{1, 2, 3}, false, false},
+
+		{"new type int32", myVecType3{1, 2, 3}, true, false},
+		{"new type float64", myVecType2{1.0, 2.0, 3.0}, true, false},
+
+		{"*Vector[int8]", &dbtype.Vector[int8]{1, 2, 3}, false, false},
+		{"*Vector[float64]", &dbtype.Vector[float64]{1.0, 2.0, 3.0}, false, false},
+		{"*type alias", &myVecType{1, 2, 3}, false, false},
+
+		{"*new type", &myVecType2{1.0, 2.0, 3.0}, true, false},
+
+		{"nil *Vector", (*dbtype.Vector[int8])(nil), false, false},
+
+		{"[]int8", []int8{1, 2, 3}, false, false},
+		{"[]float64", []float64{1.0, 2.0, 3.0}, false, false},
+		{"*[]int8", &[]int8{1, 2, 3}, false, false},
+
+		{"empty Vector", dbtype.Vector[int8]{}, false, false},
+		{"empty *Vector", &dbtype.Vector[int8]{}, false, false},
+
+		{"[]int8 via packV", []int8{1, 2, 3}, false, true},
+		{"[]float64 via packV", []float64{1.0, 2.0, 3.0}, false, true},
+		{"[]string via packV", []string{"a", "b", "c"}, false, true},
+		{"[]any via packV", []any{1, "hello", 3.14}, false, true},
+		{"[]byte via packV", []byte{1, 2, 3}, false, true},
+
+		{"custom type", myCustomType(42), false, false},
+		{"[]custom type", []myCustomType{1, 2, 3}, false, false},
+	}
+
+	for _, tc := range testCases {
+		ot.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			var packErr error
+			out := &outgoing{
+				chunker: newChunker(),
+				packer:  packstream.Packer{},
+				onPackErr: func(err error) {
+					packErr = err
+				},
+				onIoErr: func(_ context.Context, err error) {
+					t.Errorf("Unexpected io error: %s", err)
+				},
+			}
+
+			if tc.usePackV {
+				out.packV(reflect.ValueOf(tc.data))
+			} else {
+				out.packX(tc.data)
+			}
+
+			if tc.shouldError {
+				if packErr == nil {
+					t.Errorf("Expected error for %s, but got none", tc.name)
+				} else if _, ok := packErr.(*db.UnsupportedTypeError); !ok {
+					t.Errorf("Expected UnsupportedTypeError for %s, but got: %T", tc.name, packErr)
+				}
+			} else {
+				if packErr != nil {
+					t.Errorf("Unexpected error for %s: %v", tc.name, packErr)
+				}
+			}
 		})
 	}
 }

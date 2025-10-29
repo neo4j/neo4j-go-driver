@@ -386,12 +386,47 @@ func (o *outgoing) packX(x any) {
 			return
 		}
 		// Inspect what the pointer points to
-		i := reflect.Indirect(v)
+		i := v.Elem()
+
 		switch i.Kind() {
 		case reflect.Struct:
 			o.packStruct(x)
+			return
+
+		case reflect.Slice:
+			t := i.Type()
+
+			// Pack exact vector types
+			if isExactVector(t) {
+				switch t {
+				case vecInt8T:
+					o.packer.VectorInt8(i.Interface().(dbtype.Vector[int8]))
+				case vecInt16T:
+					o.packer.VectorInt16(i.Interface().(dbtype.Vector[int16]))
+				case vecInt32T:
+					o.packer.VectorInt32(i.Interface().(dbtype.Vector[int32]))
+				case vecInt64T:
+					o.packer.VectorInt64(i.Interface().(dbtype.Vector[int64]))
+				case vecFloat32T:
+					o.packer.VectorFloat32(i.Interface().(dbtype.Vector[float32]))
+				case vecFloat64T:
+					o.packer.VectorFloat64(i.Interface().(dbtype.Vector[float64]))
+				}
+				return
+			}
+
+			// Reject user-defined vector types
+			if convertibleToAnyVector(t) && !isExactVector(t) {
+				o.onPackErr(&db.UnsupportedTypeError{Type: t})
+				return
+			}
+
+			o.packV(i)
+			return
+
 		default:
 			o.packV(i)
+			return
 		}
 	case reflect.Struct:
 		o.packStruct(x)
@@ -426,6 +461,12 @@ func (o *outgoing) packX(x any) {
 				o.packX(e)
 			}
 		default:
+			// Reject user-defined vector types
+			if convertibleToAnyVector(v.Type()) && !isExactVector(v.Type()) {
+				o.onPackErr(&db.UnsupportedTypeError{Type: v.Type()})
+				return
+			}
+
 			num := v.Len()
 			o.packer.ArrayHeader(num)
 			for i := 0; i < num; i++ {
@@ -476,6 +517,40 @@ func (o *outgoing) packX(x any) {
 func typeForPrimitive[T any]() reflect.Type {
 	var v T
 	return reflect.TypeOf(v)
+}
+
+// Supported vector types
+var (
+	vecInt8T    = reflect.TypeOf(dbtype.Vector[int8]{})
+	vecInt16T   = reflect.TypeOf(dbtype.Vector[int16]{})
+	vecInt32T   = reflect.TypeOf(dbtype.Vector[int32]{})
+	vecInt64T   = reflect.TypeOf(dbtype.Vector[int64]{})
+	vecFloat32T = reflect.TypeOf(dbtype.Vector[float32]{})
+	vecFloat64T = reflect.TypeOf(dbtype.Vector[float64]{})
+)
+
+// isExactVector checks if t is exactly a dbtype.Vector[T]
+func isExactVector(t reflect.Type) bool {
+	switch t {
+	case vecInt8T, vecInt16T, vecInt32T, vecInt64T, vecFloat32T, vecFloat64T:
+		return true
+	}
+	return false
+}
+
+// convertibleToAnyVector checks if t is a user-defined type convertible to a vector
+func convertibleToAnyVector(t reflect.Type) bool {
+	// Only user-defined types are considered convertible
+	if t.PkgPath() == "" {
+		return false
+	}
+
+	return t.ConvertibleTo(vecInt8T) ||
+		t.ConvertibleTo(vecInt16T) ||
+		t.ConvertibleTo(vecInt32T) ||
+		t.ConvertibleTo(vecInt64T) ||
+		t.ConvertibleTo(vecFloat32T) ||
+		t.ConvertibleTo(vecFloat64T)
 }
 
 var intT = typeForPrimitive[int]()
