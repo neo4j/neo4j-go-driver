@@ -150,6 +150,24 @@ func (e *Neo4jError) MarkRetriable() {
 	e.retriable = true
 }
 
+// ContainsGqlStatus returns whether there is an error with the given GQLSTATUS in this GQL error chain,
+// beginning the search from this exception.
+func (e *Neo4jError) ContainsGqlStatus(gqlStatus string) bool {
+	return e.FindByGqlStatus(gqlStatus) != nil
+}
+
+// FindByGqlStatus finds the first Neo4jError that has the given GQLSTATUS in this GQL error chain,
+// beginning the search from this exception.
+// Returns nil if no error with the specified GQLSTATUS is found.
+func (e *Neo4jError) FindByGqlStatus(gqlStatus string) *Neo4jError {
+	for cur := e; cur != nil; cur = cur.GqlCause {
+		if cur.GqlStatus == gqlStatus {
+			return cur
+		}
+	}
+	return nil
+}
+
 type FeatureNotSupportedError struct {
 	Server  string
 	Feature string
