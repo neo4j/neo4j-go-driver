@@ -36,7 +36,7 @@ func ExampleVector() {
 
 	// Write the vector
 	ctx := context.Background()
-	vec := dbtype.Vector[float64]{1.0, 2.0, 3.0}
+	vec := dbtype.NewVector(1.0, 2.0, 3.0)
 
 	_, err = neo4j.ExecuteQuery(ctx, driver,
 		"CREATE (n:VectorExample {vec: $vec}) RETURN n",

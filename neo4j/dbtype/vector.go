@@ -26,17 +26,58 @@ import (
 
 // VectorElement represents the supported element types for Vector.
 type VectorElement interface {
-	~float64 | ~float32 | ~int8 | ~int16 | ~int32 | ~int64
+	float64 | float32 | int8 | int16 | int32 | int64
 }
 
 // Vector represents a fixed-length array of numeric values.
-type Vector[T VectorElement] []T
+type Vector[T VectorElement] interface {
+	// Len returns the number of elements in the vector.
+	Len() int
 
-// String returns the string representation of this Vector in the format:
-// vector([data], length, type NOT NULL)
-func (v Vector[T]) String() string {
-	dataStr := formatVectorData(v)
-	length := len(v)
+	// At returns the element at index i. It panics if i is out of range.
+	At(i int) T
+
+	// Slice returns the elements as a new slice. The returned slice is a copy.
+	Slice() []T
+
+	// String returns the string representation of this Vector in the format:
+	// vector([data], length, type NOT NULL).
+	String() string
+}
+
+type vector[T VectorElement] struct {
+	elems []T
+}
+
+// NewVector constructs a Vector from the provided elements.
+func NewVector[T VectorElement](elems ...T) Vector[T] {
+	cp := make([]T, len(elems))
+	copy(cp, elems)
+	return &vector[T]{elems: cp}
+}
+
+// NewVectorFromSlice constructs a Vector from a slice.
+func NewVectorFromSlice[T VectorElement](elems []T) Vector[T] {
+	return NewVector(elems...)
+}
+
+func (v *vector[T]) Len() int {
+	return len(v.elems)
+}
+
+func (v *vector[T]) At(i int) T {
+	return v.elems[i]
+}
+
+func (v *vector[T]) Slice() []T {
+	cp := make([]T, len(v.elems))
+	copy(cp, v.elems)
+	return cp
+}
+
+func (v *vector[T]) String() string {
+	dataStr := formatVectorData(v.elems)
+	length := len(v.elems)
 	typeStr := getVectorTypeString[T]()
 
 	return fmt.Sprintf("vector([%s], %d, %s)", dataStr, length, typeStr)
@@ -62,7 +103,7 @@ func getVectorTypeString[T VectorElement]() string {
 	}
 }
 
-func formatVectorData[T VectorElement](v Vector[T]) string {
+func formatVectorData[T VectorElement](v []T) string {
 	if len(v) == 0 {
 		return ""
 	}

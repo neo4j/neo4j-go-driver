@@ -313,13 +313,20 @@ Vector supports the following element types:
 You can create a Vector value using:
 
 ```go
-vec := neo4j.Vector[float64]{1.0, 2.0, 3.0, 4.0, 5.0}
+vec := neo4j.NewVector(1.0, 2.0, 3.0, 4.0, 5.0)
 
+// Or from a slice
+slice := []float64{1.0, 2.0, 3.0, 4.0, 5.0}
+vec := neo4j.NewVectorFromSlice(slice)
 ```
 
 Receiving a vector value as driver type:
 ```go
 vecValue := record.Values[0].(neo4j.Vector[float64])
+// Access elements
+first := vecValue.At(0)
+length := vecValue.Len()
+slice := vecValue.Slice() // Returns a copy of the underlying slice
 ```
 
 ## Logging
