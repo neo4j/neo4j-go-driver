@@ -355,6 +355,30 @@ func (o *outgoing) packStruct(x any) {
 		o.packer.Int64(v.Days)
 		o.packer.Int64(v.Seconds)
 		o.packer.Int(v.Nanos)
+	case *dbtype.Vector[int8]:
+		o.packer.VectorInt8(v.Elems)
+	case dbtype.Vector[int8]:
+		o.packer.VectorInt8(v.Elems)
+	case *dbtype.Vector[int16]:
+		o.packer.VectorInt16(v.Elems)
+	case dbtype.Vector[int16]:
+		o.packer.VectorInt16(v.Elems)
+	case *dbtype.Vector[int32]:
+		o.packer.VectorInt32(v.Elems)
+	case dbtype.Vector[int32]:
+		o.packer.VectorInt32(v.Elems)
+	case *dbtype.Vector[int64]:
+		o.packer.VectorInt64(v.Elems)
+	case dbtype.Vector[int64]:
+		o.packer.VectorInt64(v.Elems)
+	case *dbtype.Vector[float32]:
+		o.packer.VectorFloat32(v.Elems)
+	case dbtype.Vector[float32]:
+		o.packer.VectorFloat32(v.Elems)
+	case *dbtype.Vector[float64]:
+		o.packer.VectorFloat64(v.Elems)
+	case dbtype.Vector[float64]:
+		o.packer.VectorFloat64(v.Elems)
 	default:
 		o.onPackErr(&db.UnsupportedTypeError{Type: reflect.TypeOf(x)})
 	}
@@ -363,27 +387,6 @@ func (o *outgoing) packStruct(x any) {
 func (o *outgoing) packX(x any) {
 	if x == nil {
 		o.packer.Nil()
-		return
-	}
-
-	switch v := x.(type) {
-	case dbtype.Vector[int8]:
-		o.packer.VectorInt8(v.Slice())
-		return
-	case dbtype.Vector[int16]:
-		o.packer.VectorInt16(v.Slice())
-		return
-	case dbtype.Vector[int32]:
-		o.packer.VectorInt32(v.Slice())
-		return
-	case dbtype.Vector[int64]:
-		o.packer.VectorInt64(v.Slice())
-		return
-	case dbtype.Vector[float32]:
-		o.packer.VectorFloat32(v.Slice())
-		return
-	case dbtype.Vector[float64]:
-		o.packer.VectorFloat64(v.Slice())
 		return
 	}
 

@@ -23,10 +23,9 @@ import (
 	"os"
 
 	"github.com/neo4j/neo4j-go-driver/v6/neo4j"
-	"github.com/neo4j/neo4j-go-driver/v6/neo4j/dbtype"
 )
 
-// ExampleVector demonstrates how to use Vector with the Neo4j Go driver.
+// ExampleVector demonstrates how to use Vector with GetRecordValue and GetProperty.
 func ExampleVector() {
 	driver, err := neo4j.NewDriver(getUrl(), neo4j.BasicAuth("neo4j", "password", ""))
 	if err != nil {
@@ -34,30 +33,34 @@ func ExampleVector() {
 	}
 	defer driver.Close(context.Background())
 
-	// Write the vector
 	ctx := context.Background()
-	vec := dbtype.NewVector(1.0, 2.0, 3.0)
+	vec := neo4j.Vector[float64]{Elems: []float64{1.0, 2.0, 3.0}}
 
-	_, err = neo4j.ExecuteQuery(ctx, driver,
-		"CREATE (n:VectorExample {vec: $vec}) RETURN n",
+	// Create a node with a vector property
+	result, err := neo4j.ExecuteQuery(ctx, driver,
+		"CREATE (n:VectorExample {vec: $vec}) RETURN n, n.vec AS vec",
 		map[string]any{"vec": vec},
 		neo4j.EagerResultTransformer)
 	if err != nil {
 		panic(err)
 	}
 
-	// Read the vector back
-	result, err := neo4j.ExecuteQuery(ctx, driver,
-		"MATCH (n:VectorExample) RETURN n.vec AS vec LIMIT 1",
-		nil,
-		neo4j.EagerResultTransformer)
+	record := result.Records[0]
+
+	// Use GetRecordValue to extract vector from record
+	recordVec, _, err := neo4j.GetRecordValue[neo4j.Vector[float64]](record, "vec")
 	if err != nil {
 		panic(err)
 	}
 
-	if v, ok := result.Records[0].Values[0].(dbtype.Vector[float64]); ok {
-		fmt.Printf("Read vector: %v\n", v)
+	// Use GetProperty to extract vector from node
+	node := record.Values[0].(neo4j.Node)
+	propVec, err := neo4j.GetProperty[neo4j.Vector[float64]](node, "vec")
+	if err != nil {
+		panic(err)
 	}
+
+	fmt.Printf("Record vector: %v, Property vector: %v\n", recordVec, propVec)
 }
 
 func getUrl() string {

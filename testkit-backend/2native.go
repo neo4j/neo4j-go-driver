@@ -172,7 +172,7 @@ func cypherToNative(c any) (any, error) {
 			for _, b := range bytes {
 				vec = append(vec, int8(b))
 			}
-			return dbtype.NewVectorFromSlice(vec), nil
+			return dbtype.Vector[int8]{Elems: vec}, nil
 		case "i16":
 			if len(bytes)%2 != 0 {
 				return nil, fmt.Errorf("invalid data length for i16: %d", len(bytes))
@@ -181,7 +181,7 @@ func cypherToNative(c any) (any, error) {
 			for i := 0; i < len(bytes); i += 2 {
 				vec = append(vec, int16(binary.BigEndian.Uint16(bytes[i:i+2])))
 			}
-			return dbtype.NewVectorFromSlice(vec), nil
+			return dbtype.Vector[int16]{Elems: vec}, nil
 		case "i32":
 			if len(bytes)%4 != 0 {
 				return nil, fmt.Errorf("invalid data length for i32: %d", len(bytes))
@@ -190,7 +190,7 @@ func cypherToNative(c any) (any, error) {
 			for i := 0; i < len(bytes); i += 4 {
 				vec = append(vec, int32(binary.BigEndian.Uint32(bytes[i:i+4])))
 			}
-			return dbtype.NewVectorFromSlice(vec), nil
+			return dbtype.Vector[int32]{Elems: vec}, nil
 		case "i64":
 			if len(bytes)%8 != 0 {
 				return nil, fmt.Errorf("invalid data length for i64: %d", len(bytes))
@@ -199,7 +199,7 @@ func cypherToNative(c any) (any, error) {
 			for i := 0; i < len(bytes); i += 8 {
 				vec = append(vec, int64(binary.BigEndian.Uint64(bytes[i:i+8])))
 			}
-			return dbtype.NewVectorFromSlice(vec), nil
+			return dbtype.Vector[int64]{Elems: vec}, nil
 		case "f32":
 			if len(bytes)%4 != 0 {
 				return nil, fmt.Errorf("invalid data length for f32: %d", len(bytes))
@@ -208,7 +208,7 @@ func cypherToNative(c any) (any, error) {
 			for i := 0; i < len(bytes); i += 4 {
 				vec = append(vec, math.Float32frombits(binary.BigEndian.Uint32(bytes[i:i+4])))
 			}
-			return dbtype.NewVectorFromSlice(vec), nil
+			return dbtype.Vector[float32]{Elems: vec}, nil
 		case "f64":
 			if len(bytes)%8 != 0 {
 				return nil, fmt.Errorf("invalid data length for f64: %d", len(bytes))
@@ -217,7 +217,7 @@ func cypherToNative(c any) (any, error) {
 			for i := 0; i < len(bytes); i += 8 {
 				vec = append(vec, math.Float64frombits(binary.BigEndian.Uint64(bytes[i:i+8])))
 			}
-			return dbtype.NewVectorFromSlice(vec), nil
+			return dbtype.Vector[float64]{Elems: vec}, nil
 		default:
 			return nil, fmt.Errorf("unsupported vector dtype: %s", dtype)
 		}
