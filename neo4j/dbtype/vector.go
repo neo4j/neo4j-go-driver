@@ -35,7 +35,7 @@ type Vector[T VectorElement] struct {
 }
 
 // String returns the string representation of this Vector in the format:
-// vector([data], length, type NOT NULL).
+// vector([data], length, type NOT NULL)
 func (v Vector[T]) String() string {
 	dataStr := formatVectorData(v.Elems)
 	length := len(v.Elems)
