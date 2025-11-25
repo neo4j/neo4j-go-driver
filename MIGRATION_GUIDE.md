@@ -415,8 +415,6 @@ returned.
 
 ### 5.x deprecation removals
 
-Every deprecated element in 5.x has been removed from 6.0. This includes:
-
 #### Structs
 * `neo4j.Config` (replaced by `config.Config` since 5.8.0)
 
