@@ -47,20 +47,27 @@ func ExampleVector() {
 
 	record := result.Records[0]
 
-	// Use GetRecordValue to extract vector from record
+	// Direct map access with explicit type assertion
+	rawRecordVec := record.AsMap()["vec"].(neo4j.Vector[float64])
+
+	// Typed access with GetRecordValue for clearer errors
 	recordVec, _, err := neo4j.GetRecordValue[neo4j.Vector[float64]](record, "vec")
 	if err != nil {
 		panic(err)
 	}
 
-	// Use GetProperty to extract vector from node
+	// Direct property map access with explicit type assertion
 	node := record.Values[0].(neo4j.Node)
+	rawPropVec := node.GetProperties()["vec"].(neo4j.Vector[float64])
+
+	// Typed access with GetProperty for clearer errors
 	propVec, err := neo4j.GetProperty[neo4j.Vector[float64]](node, "vec")
 	if err != nil {
 		panic(err)
 	}
 
-	fmt.Printf("Record vector: %v, Property vector: %v\n", recordVec, propVec)
+	fmt.Printf("record raw=%v, record typed=%v, node raw=%v, node typed=%v\n",
+		rawRecordVec, recordVec, rawPropVec, propVec)
 }
 
 func getUrl() string {
