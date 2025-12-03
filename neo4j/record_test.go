@@ -253,6 +253,26 @@ func TestGetRecordValue(outer *testing.T) {
 			AssertNoError(t, err)
 		})
 
+		inner.Run("vector int64", func(t *testing.T) {
+			entity := record("k", neo4j.Vector[int64]{Elems: []int64{1, 2, 3}})
+
+			value, isNil, err := neo4j.GetRecordValue[neo4j.Vector[int64]](entity, "k")
+
+			AssertDeepEquals(t, value, neo4j.Vector[int64]{Elems: []int64{1, 2, 3}})
+			AssertFalse(t, isNil)
+			AssertNoError(t, err)
+		})
+
+		inner.Run("vector float64", func(t *testing.T) {
+			entity := record("k", neo4j.Vector[float64]{Elems: []float64{1.1, 2.2, 3.3}})
+
+			value, isNil, err := neo4j.GetRecordValue[neo4j.Vector[float64]](entity, "k")
+
+			AssertDeepEquals(t, value, neo4j.Vector[float64]{Elems: []float64{1.1, 2.2, 3.3}})
+			AssertFalse(t, isNil)
+			AssertNoError(t, err)
+		})
+
 	})
 }
 

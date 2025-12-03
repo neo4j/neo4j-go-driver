@@ -203,6 +203,24 @@ func TestGetProperty(outer *testing.T) {
 				AssertDeepEquals(t, prop, []any{1, 2, 3})
 				AssertNoError(t, err)
 			})
+
+			inner.Run("vector int64", func(t *testing.T) {
+				entity := test.make(singleProp("k", neo4j.Vector[int64]{Elems: []int64{1, 2, 3}}))
+
+				prop, err := neo4j.GetProperty[neo4j.Vector[int64]](entity, "k")
+
+				AssertDeepEquals(t, prop, neo4j.Vector[int64]{Elems: []int64{1, 2, 3}})
+				AssertNoError(t, err)
+			})
+
+			inner.Run("vector float64", func(t *testing.T) {
+				entity := test.make(singleProp("k", neo4j.Vector[float64]{Elems: []float64{1.1, 2.2, 3.3}}))
+
+				prop, err := neo4j.GetProperty[neo4j.Vector[float64]](entity, "k")
+
+				AssertDeepEquals(t, prop, neo4j.Vector[float64]{Elems: []float64{1.1, 2.2, 3.3}})
+				AssertNoError(t, err)
+			})
 		})
 
 	}
