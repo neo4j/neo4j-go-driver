@@ -21,4 +21,6 @@ elif [ "$(echo "$version" | cut -d "." -f 1)" != "6" ]; then
 	exit 1
 fi
 
+tags=""
+
 echo $tags
