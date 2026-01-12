@@ -21,6 +21,6 @@ elif [ "$(echo "$version" | cut -d "." -f 1)" != "6" ]; then
 	exit 1
 fi
 
-tags=""
+tags="internal_neo4j_go_driver_testkit,internal_neo4j_go_driver_time_mock"
 
 echo $tags
