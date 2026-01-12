@@ -310,16 +310,23 @@ Vector supports the following element types:
 |       float32| float32 |
 |       float64| float64 |
 
-You can create a Vector value using:
+Creating a Vector value:
 
 ```go
-vec := neo4j.Vector[float64]{1.0, 2.0, 3.0, 4.0, 5.0}
-
+vec := neo4j.Vector[float64]{
+    Elems: []float64{1.0, 2.0, 3.0, 4.0, 5.0},
+}
 ```
 
-Receiving a vector value as driver type:
+Extracting a Vector from query results:
+
 ```go
-vecValue := record.Values[0].(neo4j.Vector[float64])
+// Using GetRecordValue to extract vector from a record
+recordVec, _, err := neo4j.GetRecordValue[neo4j.Vector[float64]](record, "vec")
+
+// Using GetProperty to extract vector from a node or relationship
+node := record.Values[0].(neo4j.Node)
+propVec, err := neo4j.GetProperty[neo4j.Vector[float64]](node, "vec")
 ```
 
 ## Logging

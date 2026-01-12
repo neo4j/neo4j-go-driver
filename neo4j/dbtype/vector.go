@@ -26,17 +26,19 @@ import (
 
 // VectorElement represents the supported element types for Vector.
 type VectorElement interface {
-	~float64 | ~float32 | ~int8 | ~int16 | ~int32 | ~int64
+	float64 | float32 | int8 | int16 | int32 | int64
 }
 
 // Vector represents a fixed-length array of numeric values.
-type Vector[T VectorElement] []T
+type Vector[T VectorElement] struct {
+	Elems []T
+}
 
 // String returns the string representation of this Vector in the format:
 // vector([data], length, type NOT NULL)
 func (v Vector[T]) String() string {
-	dataStr := formatVectorData(v)
-	length := len(v)
+	dataStr := formatVectorData(v.Elems)
+	length := len(v.Elems)
 	typeStr := getVectorTypeString[T]()
 
 	return fmt.Sprintf("vector([%s], %d, %s)", dataStr, length, typeStr)
@@ -62,7 +64,7 @@ func getVectorTypeString[T VectorElement]() string {
 	}
 }
 
-func formatVectorData[T VectorElement](v Vector[T]) string {
+func formatVectorData[T VectorElement](v []T) string {
 	if len(v) == 0 {
 		return ""
 	}

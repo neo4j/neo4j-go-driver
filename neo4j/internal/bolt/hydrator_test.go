@@ -871,7 +871,7 @@ func TestHydrator(outer *testing.T) {
 					0x3f, 0xc9, 0x99, 0x99, 0x99, 0x99, 0x99, 0x9a,
 				})
 			},
-			x: &db.Record{Values: []any{dbtype.Vector[float64]{0.1, 0.2}}},
+			x: &db.Record{Values: []any{dbtype.Vector[float64]{Elems: []float64{0.1, 0.2}}}},
 		},
 		{
 			name: "Vector Float32",
@@ -885,7 +885,7 @@ func TestHydrator(outer *testing.T) {
 					0x3e, 0x4c, 0xcc, 0xcd,
 				})
 			},
-			x: &db.Record{Values: []any{dbtype.Vector[float32]{0.1, 0.2}}},
+			x: &db.Record{Values: []any{dbtype.Vector[float32]{Elems: []float32{0.1, 0.2}}}},
 		},
 		{
 			name: "Vector Int8",
@@ -896,7 +896,7 @@ func TestHydrator(outer *testing.T) {
 				packer.Bytes([]byte{0xc8}) // INT_8 marker
 				packer.Bytes([]byte{0x01, 0x02, 0x03})
 			},
-			x: &db.Record{Values: []any{dbtype.Vector[int8]{1, 2, 3}}},
+			x: &db.Record{Values: []any{dbtype.Vector[int8]{Elems: []int8{1, 2, 3}}}},
 		},
 		{
 			name: "Vector Int16",
@@ -911,7 +911,7 @@ func TestHydrator(outer *testing.T) {
 					0x00, 0x03,
 				})
 			},
-			x: &db.Record{Values: []any{dbtype.Vector[int16]{1, 2, 3}}},
+			x: &db.Record{Values: []any{dbtype.Vector[int16]{Elems: []int16{1, 2, 3}}}},
 		},
 		{
 			name: "Vector Int32",
@@ -926,7 +926,7 @@ func TestHydrator(outer *testing.T) {
 					0x00, 0x00, 0x00, 0x03,
 				})
 			},
-			x: &db.Record{Values: []any{dbtype.Vector[int32]{1, 2, 3}}},
+			x: &db.Record{Values: []any{dbtype.Vector[int32]{Elems: []int32{1, 2, 3}}}},
 		},
 		{
 			name: "Vector Int64",
@@ -941,7 +941,7 @@ func TestHydrator(outer *testing.T) {
 					0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x03,
 				})
 			},
-			x: &db.Record{Values: []any{dbtype.Vector[int64]{1, 2, 3}}},
+			x: &db.Record{Values: []any{dbtype.Vector[int64]{Elems: []int64{1, 2, 3}}}},
 		},
 		{
 			name: "Vector Empty Float64",
@@ -952,7 +952,7 @@ func TestHydrator(outer *testing.T) {
 				packer.Bytes([]byte{0xc1}) // FLOAT_64 marker
 				packer.Bytes([]byte{})
 			},
-			x: &db.Record{Values: []any{dbtype.Vector[float64]{}}},
+			x: &db.Record{Values: []any{dbtype.Vector[float64]{Elems: []float64{}}}},
 		},
 		{
 			name: "Vector Invalid Type Marker",

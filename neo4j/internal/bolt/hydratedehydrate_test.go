@@ -151,13 +151,13 @@ func TestDehydrateHydrate(ot *testing.T) {
 		name string
 		data any
 	}{
-		{"Vector Float64", dbtype.Vector[float64]{0.1, 0.2, 0.3}},
-		{"Vector Float32", dbtype.Vector[float32]{0.1, 0.2, 0.3}},
-		{"Vector Int8", dbtype.Vector[int8]{1, 2, 3, 4, 5}},
-		{"Vector Int16", dbtype.Vector[int16]{10, 20, 30, 40, 50}},
-		{"Vector Int32", dbtype.Vector[int32]{100, 200, 300, 400, 500}},
-		{"Vector Int64", dbtype.Vector[int64]{1000, 2000, 3000, 4000, 5000}},
-		{"Vector Empty", dbtype.Vector[float64]{}},
+		{"Vector Float64", dbtype.Vector[float64]{Elems: []float64{0.1, 0.2, 0.3}}},
+		{"Vector Float32", dbtype.Vector[float32]{Elems: []float32{0.1, 0.2, 0.3}}},
+		{"Vector Int8", dbtype.Vector[int8]{Elems: []int8{1, 2, 3, 4, 5}}},
+		{"Vector Int16", dbtype.Vector[int16]{Elems: []int16{10, 20, 30, 40, 50}}},
+		{"Vector Int32", dbtype.Vector[int32]{Elems: []int32{100, 200, 300, 400, 500}}},
+		{"Vector Int64", dbtype.Vector[int64]{Elems: []int64{1000, 2000, 3000, 4000, 5000}}},
+		{"Vector Empty", dbtype.Vector[float64]{Elems: []float64{}}},
 	}
 
 	for _, tc := range vectorTestCases {

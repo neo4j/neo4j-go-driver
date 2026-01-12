@@ -355,6 +355,30 @@ func (o *outgoing) packStruct(x any) {
 		o.packer.Int64(v.Days)
 		o.packer.Int64(v.Seconds)
 		o.packer.Int(v.Nanos)
+	case *dbtype.Vector[int8]:
+		o.packer.VectorInt8(v.Elems)
+	case dbtype.Vector[int8]:
+		o.packer.VectorInt8(v.Elems)
+	case *dbtype.Vector[int16]:
+		o.packer.VectorInt16(v.Elems)
+	case dbtype.Vector[int16]:
+		o.packer.VectorInt16(v.Elems)
+	case *dbtype.Vector[int32]:
+		o.packer.VectorInt32(v.Elems)
+	case dbtype.Vector[int32]:
+		o.packer.VectorInt32(v.Elems)
+	case *dbtype.Vector[int64]:
+		o.packer.VectorInt64(v.Elems)
+	case dbtype.Vector[int64]:
+		o.packer.VectorInt64(v.Elems)
+	case *dbtype.Vector[float32]:
+		o.packer.VectorFloat32(v.Elems)
+	case dbtype.Vector[float32]:
+		o.packer.VectorFloat32(v.Elems)
+	case *dbtype.Vector[float64]:
+		o.packer.VectorFloat64(v.Elems)
+	case dbtype.Vector[float64]:
+		o.packer.VectorFloat64(v.Elems)
 	default:
 		o.onPackErr(&db.UnsupportedTypeError{Type: reflect.TypeOf(x)})
 	}
@@ -408,18 +432,6 @@ func (o *outgoing) packX(x any) {
 			o.packer.Strings(s)
 		case []float64:
 			o.packer.Float64s(s)
-		case dbtype.Vector[int8]:
-			o.packer.VectorInt8(s)
-		case dbtype.Vector[int16]:
-			o.packer.VectorInt16(s)
-		case dbtype.Vector[int32]:
-			o.packer.VectorInt32(s)
-		case dbtype.Vector[int64]:
-			o.packer.VectorInt64(s)
-		case dbtype.Vector[float32]:
-			o.packer.VectorFloat32(s)
-		case dbtype.Vector[float64]:
-			o.packer.VectorFloat64(s)
 		case []any:
 			o.packer.ArrayHeader(len(s))
 			for _, e := range s {
