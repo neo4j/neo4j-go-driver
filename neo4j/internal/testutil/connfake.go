@@ -31,7 +31,7 @@ import (
 
 type Next struct {
 	Record  *db.Record
-	Summary *db.Summary
+	Summary *idb.Summary
 	Err     error
 }
 
@@ -45,7 +45,7 @@ type RecordedTx struct {
 
 type ConnFake struct {
 	Name                    string
-	ConnectionVersion       db.ProtocolVersion
+	ConnectionVersion       idb.ProtocolVersion
 	Alive                   bool
 	Birth                   time.Time
 	Table                   *idb.RoutingTable
@@ -62,7 +62,7 @@ type ConnFake struct {
 	TxCommitErr             error
 	TxCommitHook            func()
 	TxRollbackErr           error
-	ConsumeSum              *db.Summary
+	ConsumeSum              *idb.Summary
 	ConsumeErr              error
 	ConsumeHook             func()
 	RecordedTxs             []RecordedTx // Appended to by Run/TxBegin
@@ -139,7 +139,7 @@ func (c *ConnFake) Buffer(context.Context, idb.StreamHandle) error {
 	return c.BufferErr
 }
 
-func (c *ConnFake) Consume(context.Context, idb.StreamHandle) (*db.Summary, error) {
+func (c *ConnFake) Consume(context.Context, idb.StreamHandle) (*idb.Summary, error) {
 	if c.ConsumeHook != nil {
 		c.ConsumeHook()
 	}
@@ -183,7 +183,7 @@ func (c *ConnFake) Keys(idb.StreamHandle) ([]string, error) {
 	return nil, nil
 }
 
-func (c *ConnFake) Next(context.Context, idb.StreamHandle) (*db.Record, *db.Summary, error) {
+func (c *ConnFake) Next(context.Context, idb.StreamHandle) (*db.Record, *idb.Summary, error) {
 	if len(c.Nexts) >= 1 {
 		next := c.Nexts[0]
 		// moves to next record only if the current record is not an error or summary
@@ -214,7 +214,7 @@ func (c *ConnFake) ReAuth(ctx context.Context, token *idb.ReAuthToken) error {
 	return nil
 }
 
-func (c *ConnFake) Version() db.ProtocolVersion {
+func (c *ConnFake) Version() idb.ProtocolVersion {
 	return c.ConnectionVersion
 }
 

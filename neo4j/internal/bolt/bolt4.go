@@ -666,7 +666,7 @@ func (b *bolt4) Keys(streamHandle idb.StreamHandle) ([]string, error) {
 
 // Next reads one record from the stream.
 func (b *bolt4) Next(ctx context.Context, streamHandle idb.StreamHandle) (
-	*db.Record, *db.Summary, error) {
+	*db.Record, *idb.Summary, error) {
 	// Do NOT set b.err for this error
 	stream, err := b.streams.getUnsafe(streamHandle)
 	if err != nil {
@@ -699,7 +699,7 @@ func (b *bolt4) Next(ctx context.Context, streamHandle idb.StreamHandle) (
 }
 
 func (b *bolt4) Consume(ctx context.Context, streamHandle idb.StreamHandle) (
-	*db.Summary, error) {
+	*idb.Summary, error) {
 	// Do NOT set b.err for this error
 	stream, err := b.streams.getUnsafe(streamHandle)
 	if err != nil {
@@ -972,8 +972,8 @@ func (b *bolt4) ReAuth(ctx context.Context, auth *idb.ReAuthToken) error {
 	return nil
 }
 
-func (b *bolt4) Version() db.ProtocolVersion {
-	return db.ProtocolVersion{
+func (b *bolt4) Version() idb.ProtocolVersion {
+	return idb.ProtocolVersion{
 		Major: 4,
 		Minor: b.minor,
 	}
@@ -1189,7 +1189,7 @@ func (b *bolt4) initializeReadTimeoutHint(hints map[string]any) {
 	b.queue.in.connReadTimeout = time.Duration(readTimeout) * time.Second
 }
 
-func (b *bolt4) extractSummary(success *success, stream *stream) *db.Summary {
+func (b *bolt4) extractSummary(success *success, stream *stream) *idb.Summary {
 	summary := success.summary()
 	summary.Agent = b.serverVersion
 	summary.Major = 4

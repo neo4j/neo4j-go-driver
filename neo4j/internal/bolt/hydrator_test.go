@@ -177,7 +177,7 @@ func TestHydrator(outer *testing.T) {
 				packer.String("db")
 				packer.String("s")
 			},
-			x: &success{tlast: 124, tfirst: -1, bookmark: "b", qtype: db.QueryTypeWrite, db: "s", qid: -1, num: 4},
+			x: &success{tlast: 124, tfirst: -1, bookmark: "b", qtype: idb.QueryTypeWrite, db: "s", qid: -1, num: 4},
 		},
 		{
 			name: "Success summary with plan",
@@ -211,12 +211,12 @@ func TestHydrator(outer *testing.T) {
 				packer.ArrayHeader(1)
 				packer.String("cid")
 			},
-			x: &success{tlast: -1, tfirst: -1, bookmark: "bm", db: "sys", qid: -1, num: 4, plan: &db.Plan{
+			x: &success{tlast: -1, tfirst: -1, bookmark: "bm", db: "sys", qid: -1, num: 4, plan: &idb.Plan{
 				Operator:    "opType",
 				Arguments:   map[string]any{"arg1": int64(1001)},
 				Identifiers: []string{"id1", "id2"},
-				Children: []db.Plan{
-					{Operator: "cop", Identifiers: []string{"cid"}, Children: []db.Plan{}},
+				Children: []idb.Plan{
+					{Operator: "cop", Identifiers: []string{"cid"}, Children: []idb.Plan{}},
 				},
 			}},
 		},
@@ -261,12 +261,12 @@ func TestHydrator(outer *testing.T) {
 				packer.Int(2)
 			},
 			x: &success{tlast: -1, tfirst: -1, bookmark: "bm", db: "sys", qid: -1, num: 4,
-				profile: &db.ProfiledPlan{
+				profile: &idb.ProfiledPlan{
 					Operator:    "opType",
 					Arguments:   map[string]any{"arg1": int64(1001)},
 					Identifiers: []string{"id1", "id2"},
-					Children: []db.ProfiledPlan{
-						{Operator: "cop", Identifiers: []string{"cid"}, Children: []db.ProfiledPlan{}, DbHits: int64(1), Records: int64(2)},
+					Children: []idb.ProfiledPlan{
+						{Operator: "cop", Identifiers: []string{"cid"}, Children: []idb.ProfiledPlan{}, DbHits: int64(1), Records: int64(2)},
 					},
 					DbHits:  int64(7),
 					Records: int64(4),
@@ -313,9 +313,8 @@ func TestHydrator(outer *testing.T) {
 				packer.String("s2")
 			},
 			x: &success{tlast: -1, tfirst: -1, bookmark: "bm", db: "sys", qid: -1, num: 4,
-				//lint:ignore SA1019 db.Notification is supported for backward compatibility
-				notifications: []db.Notification{
-					{Code: "c1", Title: "t1", Description: "d1", Severity: "s1", Position: &db.InputPosition{Offset: 1, Line: 2, Column: 3}},
+				notifications: []idb.Notification{
+					{Code: "c1", Title: "t1", Description: "d1", Severity: "s1", Position: &idb.InputPosition{Offset: 1, Line: 2, Column: 3}},
 					{Code: "c2", Title: "t2", Description: "d2", Severity: "s2"},
 				}},
 		},
@@ -364,14 +363,14 @@ func TestHydrator(outer *testing.T) {
 				packer.String("sd2")
 			},
 			x: &success{tlast: -1, tfirst: -1, bookmark: "bm", db: "sys", qid: -1, num: 4,
-				statuses: []db.GqlStatusObject{
+				statuses: []idb.GqlStatusObject{
 					{
 						Code:              "n1",
 						Title:             "t1",
 						Description:       "d1",
 						GqlStatus:         "g1",
 						StatusDescription: "sd1",
-						Position:          &db.InputPosition{Offset: 1, Line: 2, Column: 3},
+						Position:          &idb.InputPosition{Offset: 1, Line: 2, Column: 3},
 						Classification:    "c1",
 						Severity:          "s1",
 						DiagnosticRecord:  fullDiagnosticRecord,
@@ -399,7 +398,7 @@ func TestHydrator(outer *testing.T) {
 				packer.String("has_more")
 				packer.Bool(false)
 			},
-			x: &success{tlast: 7, tfirst: -1, bookmark: "b1", qtype: db.QueryTypeRead, qid: -1, num: 4},
+			x: &success{tlast: 7, tfirst: -1, bookmark: "b1", qtype: idb.QueryTypeRead, qid: -1, num: 4},
 		},
 		{
 			name: "Success route response",

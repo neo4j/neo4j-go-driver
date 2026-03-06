@@ -21,14 +21,13 @@ import (
 	"errors"
 	"testing"
 
-	idb "github.com/neo4j/neo4j-go-driver/v6/neo4j/internal/db"
-
 	"github.com/neo4j/neo4j-go-driver/v6/neo4j/db"
+	idb "github.com/neo4j/neo4j-go-driver/v6/neo4j/internal/db"
 	. "github.com/neo4j/neo4j-go-driver/v6/neo4j/internal/testutil"
 )
 
 func TestStream(ot *testing.T) {
-	assertNotBuffered := func(t *testing.T, buf bool, rec *db.Record, sum *db.Summary, err error) {
+	assertNotBuffered := func(t *testing.T, buf bool, rec *db.Record, sum *idb.Summary, err error) {
 		if buf {
 			t.Error("Expected not buffered")
 		}
@@ -37,7 +36,7 @@ func TestStream(ot *testing.T) {
 		}
 	}
 
-	assertBuffered := func(t *testing.T, buf bool, rec *db.Record, sum *db.Summary, err error) {
+	assertBuffered := func(t *testing.T, buf bool, rec *db.Record, sum *idb.Summary, err error) {
 		if !buf {
 			t.Error("Expected buffered")
 		}
@@ -62,7 +61,7 @@ func TestStream(ot *testing.T) {
 
 		// Push record and set summary, buffered
 		s.push(&db.Record{Values: []any{1}})
-		s.sum = &db.Summary{}
+		s.sum = &idb.Summary{}
 		// Get the record
 		buffed, rec, sum, err = s.bufferedNext()
 		assertBuffered(t, buffed, rec, sum, err)
@@ -107,7 +106,7 @@ func TestOpenStreams(ot *testing.T) {
 
 		// Finishing the stream with a summary should detach it and
 		// since it is the one and only stream detach should indicate everything closed.
-		streams.detach(&db.Summary{}, nil)
+		streams.detach(&idb.Summary{}, nil)
 		AssertNil(t, streams.curr)
 		AssertIntEqual(t, streams.num, 0)
 
@@ -128,7 +127,7 @@ func TestOpenStreams(ot *testing.T) {
 		streams.attach(s2)
 		AssertIntEqual(t, streams.num, 2)
 		// Detaching the second stream should just close that stream
-		streams.detach(&db.Summary{}, nil)
+		streams.detach(&idb.Summary{}, nil)
 		AssertIntEqual(t, streams.num, 1)
 		AssertNil(t, streams.curr)
 
@@ -136,7 +135,7 @@ func TestOpenStreams(ot *testing.T) {
 		streams.resume(s)
 		AssertNotNil(t, streams.curr)
 		AssertIntEqual(t, streams.num, 1)
-		streams.detach(&db.Summary{}, nil)
+		streams.detach(&idb.Summary{}, nil)
 		AssertNil(t, streams.curr)
 		AssertIntEqual(t, streams.num, 0)
 	})

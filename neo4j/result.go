@@ -78,10 +78,10 @@ type result struct {
 	cypher               string
 	params               map[string]any
 	record               *Record
-	summary              *db.Summary
+	summary              *idb.Summary
 	err                  error
 	peekedRecord         *Record
-	peekedSummary        *db.Summary
+	peekedSummary        *idb.Summary
 	peeked               bool
 	txState              *transactionState
 	afterConsumptionHook func()

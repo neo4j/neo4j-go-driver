@@ -24,6 +24,7 @@ import (
 	"time"
 
 	"github.com/neo4j/neo4j-go-driver/v6/neo4j/db"
+	idb "github.com/neo4j/neo4j-go-driver/v6/neo4j/internal/db"
 	inotifications "github.com/neo4j/neo4j-go-driver/v6/neo4j/internal/notifications"
 	"github.com/neo4j/neo4j-go-driver/v6/neo4j/notifications"
 )
@@ -37,23 +38,23 @@ const (
 	// StatementTypeUnknown identifies an unknown statement type
 	//
 	// Deprecated: Use QueryTypeUnknown instead. This will be removed in a future release.
-	StatementTypeUnknown StatementType = 0
+	StatementTypeUnknown = StatementType(idb.QueryTypeUnknown)
 	// StatementTypeReadOnly identifies a read-only statement
 	//
 	// Deprecated: Use QueryTypeReadOnly instead. This will be removed in a future release.
-	StatementTypeReadOnly StatementType = 1
+	StatementTypeReadOnly = StatementType(idb.QueryTypeRead)
 	// StatementTypeReadWrite identifies a read-write statement
 	//
 	// Deprecated: Use QueryTypeReadWrite instead. This will be removed in a future release.
-	StatementTypeReadWrite StatementType = 2
+	StatementTypeReadWrite = StatementType(idb.QueryTypeReadWrite)
 	// StatementTypeWriteOnly identifies a write-only statement
 	//
 	// Deprecated: Use QueryTypeWriteOnly instead. This will be removed in a future release.
-	StatementTypeWriteOnly StatementType = 3
+	StatementTypeWriteOnly = StatementType(idb.QueryTypeWrite)
 	// StatementTypeSchemaWrite identifies a schema-write statement
 	//
 	// Deprecated: Use QueryTypeSchemaWrite instead. This will be removed in a future release.
-	StatementTypeSchemaWrite StatementType = 4
+	StatementTypeSchemaWrite = StatementType(idb.QueryTypeSchemaWrite)
 )
 
 // QueryType defines the type of the query
@@ -61,26 +62,26 @@ type QueryType = StatementType
 
 const (
 	// QueryTypeUnknown identifies an unknown query type
-	QueryTypeUnknown QueryType = 0
+	QueryTypeUnknown = QueryType(idb.QueryTypeUnknown)
 	// QueryTypeReadOnly identifies a read-only query
-	QueryTypeReadOnly QueryType = 1
+	QueryTypeReadOnly = QueryType(idb.QueryTypeRead)
 	// QueryTypeReadWrite identifies a read-write query
-	QueryTypeReadWrite QueryType = 2
+	QueryTypeReadWrite = QueryType(idb.QueryTypeReadWrite)
 	// QueryTypeWriteOnly identifies a write-only query
-	QueryTypeWriteOnly QueryType = 3
+	QueryTypeWriteOnly = QueryType(idb.QueryTypeWrite)
 	// QueryTypeSchemaWrite identifies a schema-write query
-	QueryTypeSchemaWrite QueryType = 4
+	QueryTypeSchemaWrite = QueryType(idb.QueryTypeSchemaWrite)
 )
 
-func (st StatementType) String() string {
-	switch st {
-	case StatementTypeReadOnly:
+func (qt QueryType) String() string {
+	switch qt {
+	case QueryTypeReadOnly:
 		return "r"
-	case StatementTypeReadWrite:
+	case QueryTypeReadWrite:
 		return "rw"
-	case StatementTypeWriteOnly:
+	case QueryTypeWriteOnly:
 		return "w"
-	case StatementTypeSchemaWrite:
+	case QueryTypeSchemaWrite:
 		return "s"
 	default:
 		return ""
@@ -187,7 +188,7 @@ type ServerInfo interface {
 type simpleServerInfo struct {
 	address         string
 	agent           string
-	protocolVersion db.ProtocolVersion
+	protocolVersion idb.ProtocolVersion
 }
 
 func (s simpleServerInfo) Address() string {
@@ -199,7 +200,10 @@ func (s simpleServerInfo) Agent() string {
 }
 
 func (s simpleServerInfo) ProtocolVersion() db.ProtocolVersion {
-	return s.protocolVersion
+	return db.ProtocolVersion{
+		Major: s.protocolVersion.Major,
+		Minor: s.protocolVersion.Minor,
+	}
 }
 
 // DatabaseInfo contains basic information of the database the query result has been obtained from.
@@ -354,7 +358,7 @@ type InputPosition interface {
 }
 
 type resultSummary struct {
-	sum    *db.Summary
+	sum    *idb.Summary
 	cypher string
 	params map[string]any
 }
@@ -383,11 +387,11 @@ func (s *resultSummary) Query() Query {
 }
 
 func (s *resultSummary) StatementType() StatementType {
-	return StatementType(s.sum.StmntType)
+	return StatementType(s.sum.QueryType)
 }
 
 func (s *resultSummary) QueryType() QueryType {
-	return QueryType(s.sum.StmntType)
+	return QueryType(s.sum.QueryType)
 }
 
 func (s *resultSummary) Text() string {
@@ -508,7 +512,7 @@ func (d *databaseInfo) Name() string {
 }
 
 type plan struct {
-	plan *db.Plan
+	plan *idb.Plan
 }
 
 func (p *plan) Operator() string {
@@ -539,7 +543,7 @@ func (s *resultSummary) Profile() ProfiledPlan {
 }
 
 type profile struct {
-	profile *db.ProfiledPlan
+	profile *idb.ProfiledPlan
 }
 
 func (p *profile) String() string {
@@ -657,8 +661,7 @@ func calculateGqlStatusWeight(gqlStatusObject GqlStatusObject) int {
 }
 
 type notification struct {
-	//lint:ignore SA1019 db.Notification is supported for backward compatibility
-	notification *db.Notification
+	notification *idb.Notification
 }
 
 func (n *notification) Code() string {
@@ -742,7 +745,7 @@ func (n *notification) Line() int {
 }
 
 type gqlStatusObject struct {
-	gqlStatusObject *db.GqlStatusObject
+	gqlStatusObject *idb.GqlStatusObject
 }
 
 func (g *gqlStatusObject) GqlStatus() string {

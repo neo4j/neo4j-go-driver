@@ -21,13 +21,13 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/neo4j/neo4j-go-driver/v6/neo4j/db"
+	idb "github.com/neo4j/neo4j-go-driver/v6/neo4j/internal/db"
 )
 
 func TestProfiledPlan(st *testing.T) {
-	leaf1 := db.ProfiledPlan{Operator: "bar"}
-	leaf2 := db.ProfiledPlan{Operator: "fighters"}
-	root := &profile{profile: &db.ProfiledPlan{Operator: "foo", Children: []db.ProfiledPlan{leaf1, leaf2}}}
+	leaf1 := idb.ProfiledPlan{Operator: "bar"}
+	leaf2 := idb.ProfiledPlan{Operator: "fighters"}
+	root := &profile{profile: &idb.ProfiledPlan{Operator: "foo", Children: []idb.ProfiledPlan{leaf1, leaf2}}}
 
 	st.Run("Child plans are correctly populated", func(t *testing.T) {
 		expected := []ProfiledPlan{
@@ -44,21 +44,19 @@ func TestProfiledPlan(st *testing.T) {
 }
 
 func TestNotifications(st *testing.T) {
-	pos1 := db.InputPosition{
+	pos1 := idb.InputPosition{
 		Offset: 1,
 		Line:   2,
 		Column: 3,
 	}
-	//lint:ignore SA1019 db.Notification is supported for backward compatibility
-	notif1 := db.Notification{
+	notif1 := idb.Notification{
 		Code:        "code1",
 		Title:       "title1",
 		Description: "desc1",
 		Severity:    "sev1",
 		Position:    &pos1,
 	}
-	//lint:ignore SA1019 db.Notification is supported for backward compatibility
-	notif2 := db.Notification{
+	notif2 := idb.Notification{
 		Code:        "code2",
 		Title:       "title2",
 		Description: "desc2",
@@ -67,9 +65,8 @@ func TestNotifications(st *testing.T) {
 	}
 
 	summary := resultSummary{
-		sum: &db.Summary{
-			//lint:ignore SA1019 db.Notification is supported for backward compatibility
-			Notifications: []db.Notification{notif1, notif2},
+		sum: &idb.Summary{
+			Notifications: []idb.Notification{notif1, notif2},
 		},
 	}
 
@@ -87,9 +84,9 @@ func TestNotifications(st *testing.T) {
 
 func TestCounters(st *testing.T) {
 
-	emptySummary := resultSummary{sum: &db.Summary{}}
+	emptySummary := resultSummary{sum: &idb.Summary{}}
 	summary := resultSummary{
-		sum: &db.Summary{
+		sum: &idb.Summary{
 			Counters: map[string]int{
 				"system-updates": 42,
 			},

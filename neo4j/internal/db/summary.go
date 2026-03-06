@@ -17,66 +17,20 @@
 
 package db
 
-// Definitions of these should correspond to public API
-//
-// Deprecated: Use neo4j.QueryType instead. This will be removed in a future release.
-type StatementType int
-
-const (
-	// Deprecated: Use neo4j.QueryTypeUnknown instead. This will be removed in a future release.
-	StatementTypeUnknown StatementType = 0
-	// Deprecated: Use neo4j.QueryTypeReadOnly instead. This will be removed in a future release.
-	StatementTypeRead StatementType = 1
-	// Deprecated: Use neo4j.QueryTypeReadWrite instead. This will be removed in a future release.
-	StatementTypeReadWrite StatementType = 2
-	// Deprecated: Use neo4j.QueryTypeWriteOnly instead. This will be removed in a future release.
-	StatementTypeWrite StatementType = 3
-	// Deprecated: Use neo4j.QueryTypeSchemaWrite instead. This will be removed in a future release.
-	StatementTypeSchemaWrite StatementType = 4
-)
-
 // QueryType defines the type of the query
-//
-// Deprecated: Use neo4j.QueryType instead. This will be removed in a future release.
-type QueryType = StatementType
+type QueryType int
 
 const (
 	// QueryTypeUnknown identifies an unknown query type
-	//
-	// Deprecated: Use neo4j.QueryTypeUnknown instead. This will be removed in a future release.
 	QueryTypeUnknown QueryType = 0
-	// QueryTypeRead identifies a read query
-	//
-	// Deprecated: Use neo4j.QueryTypeReadOnly instead. This will be removed in a future release.
+	// QueryTypeRead identifies a read-only query
 	QueryTypeRead QueryType = 1
 	// QueryTypeReadWrite identifies a read-write query
-	//
-	// Deprecated: Use neo4j.QueryTypeReadWrite instead. This will be removed in a future release.
 	QueryTypeReadWrite QueryType = 2
-	// QueryTypeWrite identifies a write query
-	//
-	// Deprecated: Use neo4j.QueryTypeWriteOnly instead. This will be removed in a future release.
+	// QueryTypeWrite identifies a write-only query
 	QueryTypeWrite QueryType = 3
 	// QueryTypeSchemaWrite identifies a schema-write query
-	//
-	// Deprecated: Use neo4j.QueryTypeSchemaWrite instead. This will be removed in a future release.
 	QueryTypeSchemaWrite QueryType = 4
-)
-
-// Counter key names
-const (
-	NodesCreated         = "nodes-created"
-	NodesDeleted         = "nodes-deleted"
-	RelationshipsCreated = "relationships-created"
-	RelationshipsDeleted = "relationships-deleted"
-	PropertiesSet        = "properties-set"
-	LabelsAdded          = "labels-added"
-	LabelsRemoved        = "labels-removed"
-	IndexesAdded         = "indexes-added"
-	IndexesRemoved       = "indexes-removed"
-	ConstraintsAdded     = "constraints-added"
-	ConstraintsRemoved   = "constraints-removed"
-	SystemUpdates        = "system-updates"
 )
 
 // Plan describes the actual plan that the database planner produced and used (or will use) to execute your statement.
@@ -85,8 +39,6 @@ const (
 // plans. The statement starts with the root plan. Each sub-plan is of a specific operator, which describes what
 // that part of the plan does - for instance, perform an index lookup or filter results.
 // The Neo4j Manual contains a reference of the available operator types, and these may differ across Neo4j versions.
-//
-// Deprecated: Internal type. This will be removed in a future release.
 type Plan struct {
 	// Operator is the operation this plan is performing.
 	Operator string
@@ -104,8 +56,6 @@ type Plan struct {
 
 // ProfiledPlan is the same as a regular Plan - except this plan has been executed, meaning it also
 // contains detailed information about how much work each step of the plan incurred on the database.
-//
-// Deprecated: Internal type. This will be removed in a future release.
 type ProfiledPlan struct {
 	// Operator contains the operation this plan is performing.
 	Operator string
@@ -129,13 +79,11 @@ type ProfiledPlan struct {
 	Time              int64
 }
 
-// Deprecated: Internal type. This will be removed in a future release.
 type StreamSummary struct {
 	HadRecord bool
 	HadKey    bool
 }
 
-// Deprecated: Use GqlStatusObject instead. This will be removed in a future release.
 type Notification struct {
 	Code        string
 	Title       string
@@ -148,14 +96,9 @@ type Notification struct {
 // GqlStatusObject represents a GqlStatusObject generated when executing a statement.
 // A GqlStatusObject can be visualized in a client pinpointing problems or other information about the statement.
 // Contrary to failures or errors, GqlStatusObjects do not affect the execution of the statement.
-//
-// Deprecated: Internal type. This will be removed in a future release.
 type GqlStatusObject struct {
-	// Deprecated: for backward compatibility with Notification.Code only.
-	Code string
-	// Deprecated: for backward compatibility with Notification.Title only.
-	Title string
-	// Deprecated: for backward compatibility with Notification.Description only.
+	Code        string
+	Title       string
 	Description string
 	// GqlStatus returns the GQLSTATUS.
 	// The following GQLSTATUS codes denote codes that the driver will use for
@@ -194,8 +137,6 @@ type GqlStatusObject struct {
 }
 
 // InputPosition contains information about a specific position in a statement
-//
-// Deprecated: Internal type. This will be removed in a future release.
 type InputPosition struct {
 	// Offset contains the character offset referred to by this position; offset numbers start at 0.
 	Offset int
@@ -210,10 +151,9 @@ type ProtocolVersion struct {
 	Minor int
 }
 
-// Deprecated: Internal type. This will be removed in a future release.
 type Summary struct {
 	Bookmark              string
-	StmntType             StatementType
+	QueryType             QueryType
 	ServerName            string
 	Agent                 string
 	Major                 int

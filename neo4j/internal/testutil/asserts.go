@@ -28,9 +28,10 @@ import (
 	"time"
 
 	"github.com/neo4j/neo4j-go-driver/v6/neo4j/db"
+	idb "github.com/neo4j/neo4j-go-driver/v6/neo4j/internal/db"
 )
 
-func AssertNextOnlyRecord(t *testing.T, rec *db.Record, sum *db.Summary, err error) {
+func AssertNextOnlyRecord(t *testing.T, rec *db.Record, sum *idb.Summary, err error) {
 	t.Helper()
 	if rec == nil {
 		t.Errorf("Expected record")
@@ -43,7 +44,7 @@ func AssertNextOnlyRecord(t *testing.T, rec *db.Record, sum *db.Summary, err err
 	}
 }
 
-func AssertNextOnlySummary(t *testing.T, rec *db.Record, sum *db.Summary, err error) {
+func AssertNextOnlySummary(t *testing.T, rec *db.Record, sum *idb.Summary, err error) {
 	t.Helper()
 	if rec != nil {
 		t.Errorf("Didn't expect record")
@@ -56,7 +57,7 @@ func AssertNextOnlySummary(t *testing.T, rec *db.Record, sum *db.Summary, err er
 	}
 }
 
-func AssertNextOnlyError(t *testing.T, rec *db.Record, sum *db.Summary, err error) {
+func AssertNextOnlyError(t *testing.T, rec *db.Record, sum *idb.Summary, err error) {
 	t.Helper()
 	if rec != nil {
 		t.Errorf("Didn't expect record")
