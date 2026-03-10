@@ -1,0 +1,10 @@
+:include .gitignore
+
+/benchkit/
+/benchkit-backend/
+/benchmark/
+/neo4j/**/*_test.go
+/neo4j/test-integration/
+/test-stress/
+/testkit/
+/testkit-backend/
