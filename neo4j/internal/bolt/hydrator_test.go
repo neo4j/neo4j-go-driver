@@ -266,10 +266,20 @@ func TestHydrator(outer *testing.T) {
 					Arguments:   map[string]any{"arg1": int64(1001)},
 					Identifiers: []string{"id1", "id2"},
 					Children: []idb.ProfiledPlan{
-						{Operator: "cop", Identifiers: []string{"cid"}, Children: []idb.ProfiledPlan{}, DbHits: int64(1), Records: int64(2)},
+						{
+							Operator:    "cop",
+							Identifiers: []string{"cid"},
+							Children:    []idb.ProfiledPlan{},
+							HasDbHits:   true,
+							DbHits:      int64(1),
+							HasRecords:  true,
+							Records:     int64(2),
+						},
 					},
-					DbHits:  int64(7),
-					Records: int64(4),
+					HasDbHits:  true,
+					DbHits:     int64(7),
+					HasRecords: true,
+					Records:    int64(4),
 				}},
 		},
 		{

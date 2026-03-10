@@ -1678,13 +1678,37 @@ func serializeProfile(profile neo4j.ProfiledPlan) map[string]any {
 	if profile == nil {
 		return nil
 	}
-	result := map[string]any{
-		"args":         profile.Arguments(),
-		"children":     serializeProfiles(profile.Children()),
-		"dbHits":       profile.DbHits(),
-		"identifiers":  profile.Identifiers(),
-		"operatorType": profile.Operator(),
-		"rows":         profile.Records(),
+	size := 4
+	if profile.HasDbHits() {
+		size++
+	}
+	if profile.HasRecords() {
+		size++
+	}
+	if profile.HasPageCacheStats() {
+		size += 3
+	}
+	if profile.HasTime() {
+		size++
+	}
+	result := make(map[string]any, size)
+	result["args"] = profile.Arguments()
+	result["children"] = serializeProfiles(profile.Children())
+	result["operatorType"] = profile.Operator()
+	result["identifiers"] = profile.Identifiers()
+	if profile.HasDbHits() {
+		result["dbHits"] = profile.DbHits()
+	}
+	if profile.HasRecords() {
+		result["rows"] = profile.Records()
+	}
+	if profile.HasPageCacheStats() {
+		result["pageCacheMisses"] = profile.PageCacheMisses()
+		result["pageCacheHits"] = profile.PageCacheHits()
+		result["pageCacheHitRatio"] = profile.PageCacheHitRatio()
+	}
+	if profile.HasTime() {
+		result["time"] = profile.Time()
 	}
 	return result
 }
@@ -1692,12 +1716,7 @@ func serializeProfile(profile neo4j.ProfiledPlan) map[string]any {
 func serializeProfiles(children []neo4j.ProfiledPlan) []map[string]any {
 	result := make([]map[string]any, len(children))
 	for i, child := range children {
-		childProfile := serializeProfile(child)
-		childProfile["pageCacheMisses"] = child.PageCacheMisses()
-		childProfile["pageCacheHits"] = child.PageCacheHits()
-		childProfile["pageCacheHitRatio"] = child.PageCacheHitRatio()
-		childProfile["time"] = child.Time()
-		result[i] = childProfile
+		result[i] = serializeProfile(child)
 	}
 	return result
 }

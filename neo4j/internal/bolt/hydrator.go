@@ -964,8 +964,15 @@ func parseProfile(profilex map[string]any) *idb.ProfiledPlan {
 		Identifiers: ids,
 	}
 
-	plan.DbHits, _ = profilex["dbHits"].(int64)
-	plan.Records, _ = profilex["rows"].(int64)
+	plan.DbHits, plan.HasDbHits = profilex["dbHits"].(int64)
+	plan.Records, plan.HasRecords = profilex["rows"].(int64)
+	plan.Time, plan.HasTime = profilex["time"].(int64)
+
+	var hasPageCacheMisses, hasPageCacheHits, hasPageCacheHitRatio bool
+	plan.PageCacheMisses, hasPageCacheMisses = profilex["pageCacheMisses"].(int64)
+	plan.PageCacheHits, hasPageCacheHits = profilex["pageCacheHits"].(int64)
+	plan.PageCacheHitRatio, hasPageCacheHitRatio = profilex["pageCacheHitRatio"].(float64)
+	plan.HasPageCacheStats = hasPageCacheMisses || hasPageCacheHits || hasPageCacheHitRatio
 
 	plan.Children = make([]idb.ProfiledPlan, 0, len(childrenx))
 	for _, c := range childrenx {
@@ -973,18 +980,6 @@ func parseProfile(profilex map[string]any) *idb.ProfiledPlan {
 		if len(childPlanx) > 0 {
 			childPlan := parseProfile(childPlanx)
 			if childPlan != nil {
-				if pageCacheMisses, ok := childPlanx["pageCacheMisses"]; ok {
-					childPlan.PageCacheMisses = pageCacheMisses.(int64)
-				}
-				if pageCacheHits, ok := childPlanx["pageCacheHits"]; ok {
-					childPlan.PageCacheHits = pageCacheHits.(int64)
-				}
-				if pageCacheHitRatio, ok := childPlanx["pageCacheHitRatio"]; ok {
-					childPlan.PageCacheHitRatio = pageCacheHitRatio.(float64)
-				}
-				if planTime, ok := childPlanx["time"]; ok {
-					childPlan.Time = planTime.(int64)
-				}
 				plan.Children = append(plan.Children, *childPlan)
 			}
 		}

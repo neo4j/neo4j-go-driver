@@ -243,17 +243,28 @@ type ProfiledPlan interface {
 	// Identifiers returns a list of identifiers used by this plan. Identifiers used by this part of the plan.
 	// These can be both identifiers introduced by you, or automatically generated.
 	Identifiers() []string
+	// HasDbHits indicates whether DbHits was recorded. If false, the DbHits value has no meaning.
+	HasDbHits() bool
 	// DbHits returns the number of times this part of the plan touched the underlying data stores/
 	DbHits() int64
+	// HasRecords indicates whether Records was recorded. If false, the Records value has no meaning.
+	HasRecords() bool
 	// Records returns the number of records this part of the plan produced.
 	Records() int64
 	// Children returns zero or more child plans. A plan is a tree, where each child is another plan.
 	// The children are where this part of the plan gets its input records - unless this is an operator that
 	// introduces new records on its own.
 	Children() []ProfiledPlan
+	// HasPageCacheStats indicates whether dbHits was recorded. If false, the following values has no meaning:
+	// - PageCacheMisses
+	// - PageCacheHits
+	// - PageCacheHitRatio
+	HasPageCacheStats() bool
 	PageCacheMisses() int64
 	PageCacheHits() int64
 	PageCacheHitRatio() float64
+	// HasTime indicates whether Time was recorded. If false, the Time value has no meaning.
+	HasTime() bool
 	Time() int64
 }
 
@@ -562,9 +573,13 @@ func (p *profile) Identifiers() []string {
 	return p.profile.Identifiers
 }
 
+func (p *profile) HasDbHits() bool { return p.profile.HasDbHits }
+
 func (p *profile) DbHits() int64 {
 	return p.profile.DbHits
 }
+
+func (p *profile) HasRecords() bool { return p.profile.HasRecords }
 
 func (p *profile) Records() int64 {
 	return p.profile.Records
@@ -579,6 +594,10 @@ func (p *profile) Children() []ProfiledPlan {
 	return children
 }
 
+func (p *profile) HasPageCacheStats() bool {
+	return p.profile.HasPageCacheStats
+}
+
 func (p *profile) PageCacheMisses() int64 {
 	return p.profile.PageCacheMisses
 }
@@ -590,6 +609,8 @@ func (p *profile) PageCacheHits() int64 {
 func (p *profile) PageCacheHitRatio() float64 {
 	return p.profile.PageCacheHitRatio
 }
+
+func (p *profile) HasTime() bool { return p.profile.HasTime }
 
 func (p *profile) Time() int64 {
 	return p.profile.Time

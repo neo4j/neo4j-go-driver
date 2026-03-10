@@ -65,17 +65,21 @@ type ProfiledPlan struct {
 	// Identifiers contains a list of identifiers used by this plan. Identifiers used by this part of the plan.
 	// These can be both identifiers introduced by you, or automatically generated.
 	Identifiers []string
+	HasDbHits   bool
 	// DbHits contains the number of times this part of the plan touched the underlying data stores/
 	DbHits int64
 	// Records contains the number of records this part of the plan produced.
-	Records int64
+	HasRecords bool
+	Records    int64
 	// Children contains zero or more child plans. A plan is a tree, where each child is another plan.
 	// The children are where this part of the plan gets its input records - unless this is an operator that
 	// introduces new records on its own.
 	Children          []ProfiledPlan
+	HasPageCacheStats bool
 	PageCacheMisses   int64
 	PageCacheHits     int64
 	PageCacheHitRatio float64
+	HasTime           bool
 	Time              int64
 }
 
