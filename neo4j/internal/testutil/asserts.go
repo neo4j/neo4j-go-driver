@@ -221,10 +221,28 @@ func AssertMapDoesNotHaveKey[K comparable](t *testing.T, m map[K]any, key K) {
 	}
 }
 
-func AssertIntEqual(t *testing.T, ai, ei int) {
+type cmpInt interface {
+	int | int8 | int16 | int32 | int64 | uint | uint8 | uint16 | uint32 | uint64
+}
+
+func AssertIntEqual[T cmpInt](t *testing.T, ai, ei T) {
 	t.Helper()
 	if ai != ei {
 		t.Errorf("%d != %d", ai, ei)
+	}
+	if !reflect.DeepEqual(ai, ei) {
+		t.Errorf("Differs %+v vs %+v", ai, ei)
+	}
+}
+
+type cmpFloat interface {
+	float32 | float64
+}
+
+func AssertFloatEqual[T cmpFloat](t *testing.T, ai, ei T) {
+	t.Helper()
+	if ai != ei {
+		t.Errorf("%f != %f", ai, ei)
 	}
 	if !reflect.DeepEqual(ai, ei) {
 		t.Errorf("Differs %+v vs %+v", ai, ei)

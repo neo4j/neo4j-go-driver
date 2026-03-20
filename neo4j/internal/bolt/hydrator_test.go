@@ -30,6 +30,7 @@ import (
 	idb "github.com/neo4j/neo4j-go-driver/v6/neo4j/internal/db"
 	"github.com/neo4j/neo4j-go-driver/v6/neo4j/internal/gql"
 	"github.com/neo4j/neo4j-go-driver/v6/neo4j/internal/packstream"
+	"github.com/neo4j/neo4j-go-driver/v6/neo4j/internal/util"
 )
 
 type hydratorTestCase struct {
@@ -261,25 +262,21 @@ func TestHydrator(outer *testing.T) {
 				packer.Int(2)
 			},
 			x: &success{tlast: -1, tfirst: -1, bookmark: "bm", db: "sys", qid: -1, num: 4,
-				profile: &idb.ProfiledPlan{
+				profile: &idb.Profile{
 					Operator:    "opType",
 					Arguments:   map[string]any{"arg1": int64(1001)},
 					Identifiers: []string{"id1", "id2"},
-					Children: []idb.ProfiledPlan{
+					Children: []idb.Profile{
 						{
 							Operator:    "cop",
 							Identifiers: []string{"cid"},
-							Children:    []idb.ProfiledPlan{},
-							HasDbHits:   true,
-							DbHits:      int64(1),
-							HasRecords:  true,
-							Records:     int64(2),
+							Children:    []idb.Profile{},
+							DbHits:      util.Ptr(int64(1)),
+							Rows:        util.Ptr(int64(2)),
 						},
 					},
-					HasDbHits:  true,
-					DbHits:     int64(7),
-					HasRecords: true,
-					Records:    int64(4),
+					DbHits: util.Ptr(int64(7)),
+					Rows:   util.Ptr(int64(4)),
 				}},
 		},
 		{
@@ -1140,7 +1137,7 @@ func TestHydrator(outer *testing.T) {
 				&dbtype.UnsupportedType{
 					Name:                   "UUID",
 					MinimumProtocolVersion: db.ProtocolVersion{Major: 255, Minor: 0},
-					Message:                ptr("Some configuration message"),
+					Message:                util.Ptr("Some configuration message"),
 				},
 			}},
 		},
@@ -1195,11 +1192,6 @@ func TestHydrator(outer *testing.T) {
 			}
 		})
 	}
-}
-
-// Helper function to create a pointer (e.g., for an untyped literal)
-func ptr[T any](x T) *T {
-	return &x
 }
 
 func TestHydratorBolt5(outer *testing.T) {

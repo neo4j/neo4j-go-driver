@@ -54,33 +54,19 @@ type Plan struct {
 	Children []Plan
 }
 
-// ProfiledPlan is the same as a regular Plan - except this plan has been executed, meaning it also
+// Profile is the same as a regular Plan - except this plan has been executed, meaning it also
 // contains detailed information about how much work each step of the plan incurred on the database.
-type ProfiledPlan struct {
-	// Operator contains the operation this plan is performing.
-	Operator string
-	// Arguments contains the arguments for the operator used.
-	// Many operators have arguments defining their specific behavior. This map contains those arguments.
-	Arguments map[string]any
-	// Identifiers contains a list of identifiers used by this plan. Identifiers used by this part of the plan.
-	// These can be both identifiers introduced by you, or automatically generated.
-	Identifiers []string
-	HasDbHits   bool
-	// DbHits contains the number of times this part of the plan touched the underlying data stores/
-	DbHits int64
-	// Records contains the number of records this part of the plan produced.
-	HasRecords bool
-	Records    int64
-	// Children contains zero or more child plans. A plan is a tree, where each child is another plan.
-	// The children are where this part of the plan gets its input records - unless this is an operator that
-	// introduces new records on its own.
-	Children          []ProfiledPlan
-	HasPageCacheStats bool
-	PageCacheMisses   int64
-	PageCacheHits     int64
-	PageCacheHitRatio float64
-	HasTime           bool
-	Time              int64
+type Profile struct {
+	Operator          string
+	Arguments         map[string]any
+	Identifiers       []string
+	DbHits            *int64
+	Rows              *int64
+	Children          []Profile
+	PageCacheMisses   *int64
+	PageCacheHits     *int64
+	PageCacheHitRatio *float64
+	Time              *int64
 }
 
 type StreamSummary struct {
@@ -166,7 +152,7 @@ type Summary struct {
 	TFirst                int64
 	TLast                 int64
 	Plan                  *Plan
-	ProfiledPlan          *ProfiledPlan
+	ProfiledPlan          *Profile
 	Notifications         []Notification
 	GqlStatusObjects      []GqlStatusObject
 	Database              string

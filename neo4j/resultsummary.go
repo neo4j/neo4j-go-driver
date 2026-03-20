@@ -26,6 +26,7 @@ import (
 	"github.com/neo4j/neo4j-go-driver/v6/neo4j/db"
 	idb "github.com/neo4j/neo4j-go-driver/v6/neo4j/internal/db"
 	inotifications "github.com/neo4j/neo4j-go-driver/v6/neo4j/internal/notifications"
+	"github.com/neo4j/neo4j-go-driver/v6/neo4j/internal/util"
 	"github.com/neo4j/neo4j-go-driver/v6/neo4j/notifications"
 )
 
@@ -104,7 +105,11 @@ type ResultSummary interface {
 	// Plan returns statement plan for the executed statement if available, otherwise null.
 	Plan() Plan
 	// Profile returns profiled statement plan for the executed statement if available, otherwise null.
+	//
+	// Deprecated: Use QueryProfile instead
 	Profile() ProfiledPlan
+	// QueryProfile returns profiled statement plan for the executed statement if available, otherwise null.
+	QueryProfile() Profile
 	// Notifications returns a slice of notifications produced while executing the statement.
 	// The list will be empty if no notifications produced while executing the statement.
 	//
@@ -234,6 +239,8 @@ type Plan interface {
 
 // ProfiledPlan is the same as a regular Plan - except this plan has been executed, meaning it also
 // contains detailed information about how much work each step of the plan incurred on the database.
+//
+// Deprecated: Use Profile instead
 type ProfiledPlan interface {
 	// Operator returns the operation this plan is performing.
 	Operator() string
@@ -243,29 +250,57 @@ type ProfiledPlan interface {
 	// Identifiers returns a list of identifiers used by this plan. Identifiers used by this part of the plan.
 	// These can be both identifiers introduced by you, or automatically generated.
 	Identifiers() []string
-	// HasDbHits indicates whether DbHits was recorded. If false, the DbHits value has no meaning.
-	HasDbHits() bool
-	// DbHits returns the number of times this part of the plan touched the underlying data stores/
+	// DbHits returns the number of times this part of the plan touched the underlying data stores.
 	DbHits() int64
-	// HasRecords indicates whether Records was recorded. If false, the Records value has no meaning.
-	HasRecords() bool
 	// Records returns the number of records this part of the plan produced.
 	Records() int64
 	// Children returns zero or more child plans. A plan is a tree, where each child is another plan.
 	// The children are where this part of the plan gets its input records - unless this is an operator that
 	// introduces new records on its own.
 	Children() []ProfiledPlan
-	// HasPageCacheStats indicates whether dbHits was recorded. If false, the following values has no meaning:
-	// - PageCacheMisses
-	// - PageCacheHits
-	// - PageCacheHitRatio
-	HasPageCacheStats() bool
+	// PageCacheMisses returns the number of page cache misses caused by executing this part of the plan.
 	PageCacheMisses() int64
+	// PageCacheHits returns the number of page cache hits caused by executing this part of the plan.
 	PageCacheHits() int64
+	// PageCacheHitRatio returns the ratio of page cache hits to total number of lookups.
 	PageCacheHitRatio() float64
-	// HasTime indicates whether Time was recorded. If false, the Time value has no meaning.
-	HasTime() bool
+	// Time returns the amount of time spent in this part of the plan.
 	Time() int64
+}
+
+// Profile is the same as a regular Plan - except this plan has been executed, meaning it also
+// contains detailed information about how much work each step of the plan incurred on the database.
+type Profile interface {
+	// Operator returns the operation this plan is performing.
+	Operator() string
+	// Arguments returns the arguments for the operator used.
+	// Many operators have arguments defining their specific behavior. This map contains those arguments.
+	Arguments() map[string]any
+	// Identifiers returns a list of identifiers used by this plan. Identifiers used by this part of the plan.
+	// These can be both identifiers introduced by you, or automatically generated.
+	Identifiers() []string
+	// DbHits returns the number of times this part of the plan touched the underlying data stores.
+	// The bool indicates whether the value has been recorded. If not, the returned number is meaningless.
+	DbHits() (int64, bool)
+	// Rows returns the number of records this part of the plan produced.
+	// The bool indicates whether the value has been recorded. If not, the returned number is meaningless.
+	Rows() (int64, bool)
+	// Children returns zero or more child plans. A plan is a tree, where each child is another plan.
+	// The children are where this part of the plan gets its input records - unless this is an operator that
+	// introduces new records on its own.
+	Children() []Profile
+	// PageCacheMisses returns the number of page cache misses caused by executing this part of the plan.
+	// The bool indicates whether the value has been recorded. If not, the returned number is meaningless.
+	PageCacheMisses() (int64, bool)
+	// PageCacheHits returns the number of page cache hits caused by executing this part of the plan.
+	// The bool indicates whether the value has been recorded. If not, the returned number is meaningless.
+	PageCacheHits() (int64, bool)
+	// PageCacheHitRatio returns the ratio of page cache hits to total number of lookups.
+	// The bool indicates whether the value has been recorded. If not, the returned number is meaningless.
+	PageCacheHitRatio() (float64, bool)
+	// Time returns the amount of time spent in this part of the plan.
+	// The bool indicates whether the value has been recorded. If not, the returned number is meaningless.
+	Time() (int64, bool)
 }
 
 // Notification represents notifications generated when executing a statement.
@@ -550,11 +585,71 @@ func (s *resultSummary) Profile() ProfiledPlan {
 	if s.sum.ProfiledPlan == nil {
 		return nil
 	}
+	return &profiledPlan{profile: s.sum.ProfiledPlan}
+}
+
+type profiledPlan struct {
+	profile *idb.Profile
+}
+
+func (p *profiledPlan) String() string {
+	return fmt.Sprintf("%v", *p.profile)
+}
+
+func (p *profiledPlan) Operator() string {
+	return p.profile.Operator
+}
+
+func (p *profiledPlan) Arguments() map[string]any {
+	return p.profile.Arguments
+}
+
+func (p *profiledPlan) Identifiers() []string {
+	return p.profile.Identifiers
+}
+
+func (p *profiledPlan) DbHits() int64 {
+	return util.DerefOr(p.profile.DbHits, 0)
+}
+
+func (p *profiledPlan) Records() int64 {
+	return util.DerefOr(p.profile.Rows, 0)
+}
+
+func (p *profiledPlan) Children() []ProfiledPlan {
+	children := make([]ProfiledPlan, len(p.profile.Children))
+	for i, c := range p.profile.Children {
+		child := c
+		children[i] = &profiledPlan{profile: &child}
+	}
+	return children
+}
+
+func (p *profiledPlan) PageCacheMisses() int64 {
+	return util.DerefOr(p.profile.PageCacheMisses, 0)
+}
+
+func (p *profiledPlan) PageCacheHits() int64 {
+	return util.DerefOr(p.profile.PageCacheHits, 0)
+}
+
+func (p *profiledPlan) PageCacheHitRatio() float64 {
+	return util.DerefOr(p.profile.PageCacheHitRatio, 0.0)
+}
+
+func (p *profiledPlan) Time() int64 {
+	return util.DerefOr(p.profile.Time, 0)
+}
+
+func (s *resultSummary) QueryProfile() Profile {
+	if s.sum.ProfiledPlan == nil {
+		return nil
+	}
 	return &profile{profile: s.sum.ProfiledPlan}
 }
 
 type profile struct {
-	profile *idb.ProfiledPlan
+	profile *idb.Profile
 }
 
 func (p *profile) String() string {
@@ -573,20 +668,16 @@ func (p *profile) Identifiers() []string {
 	return p.profile.Identifiers
 }
 
-func (p *profile) HasDbHits() bool { return p.profile.HasDbHits }
-
-func (p *profile) DbHits() int64 {
-	return p.profile.DbHits
+func (p *profile) DbHits() (int64, bool) {
+	return util.DerefOr(p.profile.DbHits, 0), p.profile.DbHits != nil
 }
 
-func (p *profile) HasRecords() bool { return p.profile.HasRecords }
-
-func (p *profile) Records() int64 {
-	return p.profile.Records
+func (p *profile) Rows() (int64, bool) {
+	return util.DerefOr(p.profile.Rows, 0), p.profile.Rows != nil
 }
 
-func (p *profile) Children() []ProfiledPlan {
-	children := make([]ProfiledPlan, len(p.profile.Children))
+func (p *profile) Children() []Profile {
+	children := make([]Profile, len(p.profile.Children))
 	for i, c := range p.profile.Children {
 		child := c
 		children[i] = &profile{profile: &child}
@@ -594,26 +685,20 @@ func (p *profile) Children() []ProfiledPlan {
 	return children
 }
 
-func (p *profile) HasPageCacheStats() bool {
-	return p.profile.HasPageCacheStats
+func (p *profile) PageCacheMisses() (int64, bool) {
+	return util.DerefOr(p.profile.PageCacheMisses, 0), p.profile.PageCacheMisses != nil
 }
 
-func (p *profile) PageCacheMisses() int64 {
-	return p.profile.PageCacheMisses
+func (p *profile) PageCacheHits() (int64, bool) {
+	return util.DerefOr(p.profile.PageCacheHits, 0), p.profile.PageCacheHits != nil
 }
 
-func (p *profile) PageCacheHits() int64 {
-	return p.profile.PageCacheHits
+func (p *profile) PageCacheHitRatio() (float64, bool) {
+	return util.DerefOr(p.profile.PageCacheHitRatio, 0), p.profile.PageCacheHitRatio != nil
 }
 
-func (p *profile) PageCacheHitRatio() float64 {
-	return p.profile.PageCacheHitRatio
-}
-
-func (p *profile) HasTime() bool { return p.profile.HasTime }
-
-func (p *profile) Time() int64 {
-	return p.profile.Time
+func (p *profile) Time() (int64, bool) {
+	return util.DerefOr(p.profile.Time, 0), p.profile.Time != nil
 }
 
 func (s *resultSummary) Notifications() []Notification {

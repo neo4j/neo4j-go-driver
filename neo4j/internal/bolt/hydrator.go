@@ -50,7 +50,7 @@ type success struct {
 	qtype              idb.QueryType
 	counters           map[string]any
 	plan               *idb.Plan
-	profile            *idb.ProfiledPlan
+	profile            *idb.Profile
 	notifications      []idb.Notification
 	statuses           []idb.GqlStatusObject
 	routingTable       *idb.RoutingTable
@@ -956,25 +956,21 @@ func parsePlan(planx map[string]any) *idb.Plan {
 	return plan
 }
 
-func parseProfile(profilex map[string]any) *idb.ProfiledPlan {
+func parseProfile(profilex map[string]any) *idb.Profile {
 	op, ids, args, childrenx := parsePlanOpIdArgsChildren(profilex)
-	plan := &idb.ProfiledPlan{
-		Operator:    op,
-		Arguments:   args,
-		Identifiers: ids,
+	plan := &idb.Profile{
+		Operator:          op,
+		Arguments:         args,
+		Identifiers:       ids,
+		DbHits:            extractOptional[int64](profilex, "dbHits"),
+		Rows:              extractOptional[int64](profilex, "rows"),
+		Time:              extractOptional[int64](profilex, "time"),
+		PageCacheMisses:   extractOptional[int64](profilex, "pageCacheMisses"),
+		PageCacheHits:     extractOptional[int64](profilex, "pageCacheHits"),
+		PageCacheHitRatio: extractOptional[float64](profilex, "pageCacheHitRatio"),
 	}
 
-	plan.DbHits, plan.HasDbHits = profilex["dbHits"].(int64)
-	plan.Records, plan.HasRecords = profilex["rows"].(int64)
-	plan.Time, plan.HasTime = profilex["time"].(int64)
-
-	var hasPageCacheMisses, hasPageCacheHits, hasPageCacheHitRatio bool
-	plan.PageCacheMisses, hasPageCacheMisses = profilex["pageCacheMisses"].(int64)
-	plan.PageCacheHits, hasPageCacheHits = profilex["pageCacheHits"].(int64)
-	plan.PageCacheHitRatio, hasPageCacheHitRatio = profilex["pageCacheHitRatio"].(float64)
-	plan.HasPageCacheStats = hasPageCacheMisses || hasPageCacheHits || hasPageCacheHitRatio
-
-	plan.Children = make([]idb.ProfiledPlan, 0, len(childrenx))
+	plan.Children = make([]idb.Profile, 0, len(childrenx))
 	for _, c := range childrenx {
 		childPlanx, _ := c.(map[string]any)
 		if len(childPlanx) > 0 {
@@ -986,6 +982,13 @@ func parseProfile(profilex map[string]any) *idb.ProfiledPlan {
 	}
 
 	return plan
+}
+
+func extractOptional[T any](profilex map[string]any, key string) *T {
+	if value, ok := profilex[key].(T); ok {
+		return &value
+	}
+	return nil
 }
 
 func parseInputPosition(m map[string]any) *idb.InputPosition {
