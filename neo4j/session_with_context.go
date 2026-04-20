@@ -140,6 +140,11 @@ type SessionConfig struct {
 	// Possible to use custom logger (implement log.BoltLogger interface) or
 	// use neo4j.ConsoleBoltLogger.
 	BoltLogger log.BoltLogger
+	// Logging target that the session will use to log messages.
+	//
+	// Possible to use a custom logger (implement log.Logger interface) or
+	// use neo4j.ConsoleLogger.
+	Logger log.Logger
 	// ImpersonatedUser sets the Neo4j user that the session will be acting as.
 	// If not set, the user configured for the driver will be used.
 	//
@@ -230,9 +235,10 @@ func newSessionWithContext(
 	router sessionRouter,
 	pool sessionPool,
 	cache *homedb.Cache,
-	logger log.Logger,
 	token *idb.ReAuthToken,
 ) *sessionWithContext {
+	logger := sessConfig.Logger
+
 	logId := log.NewId()
 	logger.Debugf(log.Session, logId, "Created")
 
