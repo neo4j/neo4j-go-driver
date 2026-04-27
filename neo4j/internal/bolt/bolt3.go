@@ -874,8 +874,12 @@ func (b *bolt3) GetCurrentAuth() (auth.TokenManager, iauth.Token) {
 	return b.authManager, token
 }
 
-func (b *bolt3) Telemetry(telemetry.API, func()) {
-	// TELEMETRY not support by this protocol version, so we ignore it.
+func (b *bolt3) Telemetry(_ telemetry.API, onSuccess func()) {
+	// TELEMETRY is not supported in this protocol version; resolve immediately
+	// so callers gating retry on telemetry state can proceed.
+	if onSuccess != nil {
+		onSuccess()
+	}
 }
 
 func (b *bolt3) SetPinHomeDatabaseCallback(func(context.Context, string)) {

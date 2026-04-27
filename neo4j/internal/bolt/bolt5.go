@@ -987,6 +987,10 @@ func (b *bolt5) Telemetry(api telemetry.API, onSuccess func()) {
 				onSuccess()
 			}
 		}))
+		return
+	}
+	if onSuccess != nil {
+		onSuccess()
 	}
 }
 

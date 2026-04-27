@@ -225,7 +225,11 @@ func (c *ConnFake) GetCurrentAuth() (auth.TokenManager, iauth.Token) {
 	return nil, iauth.Token{}
 }
 
-func (c *ConnFake) Telemetry(telemetry.API, func()) {}
+func (c *ConnFake) Telemetry(_ telemetry.API, onSuccess func()) {
+	if onSuccess != nil {
+		onSuccess()
+	}
+}
 
 func (c *ConnFake) SetPinHomeDatabaseCallback(callback func(ctx context.Context, database string)) {
 	c.PinHomeDatabaseCallback = callback

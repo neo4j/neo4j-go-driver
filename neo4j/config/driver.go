@@ -198,6 +198,19 @@ type Config struct {
 	//
 	// default: true
 	TelemetryDisabled bool
+	// DisableAutoCommitRetries disables retries using Session.Run.
+	//
+	// Retries on Session.Run are limited to a specific set of errors. Namely those errors marked as
+	// idempotent by the DBMS, i.e., errors that are guaranteed to not have altered the state of any
+	// database. At the time of writing, this set encompasses only admission control errors.
+	//
+	// When set to true, calls to Session.Run will fail without retrying when receiving an error from
+	// the server, even when only idempotent work has occurred. By default, these calls will be rerun
+	// with a one-shot retry to avoid friction when encountering rate limiting and other errors that
+	// can be safely retried.
+	//
+	// default: false
+	DisableAutoCommitRetries bool
 	// ReadBufferSize defines the size of the buffer used for reading data from the network connection.
 	// A larger buffer size can improve performance by reducing the number of read operations required
 	// for large data transfers. Currently, the default value is 8 KiB, but may change in the future.

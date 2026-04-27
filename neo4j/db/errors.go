@@ -150,6 +150,14 @@ func (e *Neo4jError) MarkRetriable() {
 	e.retriable = true
 }
 
+// IsIdempotent reports whether the server marked this error as idempotent in
+// its diagnostic record, meaning the error is guaranteed not to have altered
+// the state of any database. Defaults to false when the field is absent.
+func (e *Neo4jError) IsIdempotent() bool {
+	v, ok := e.GqlDiagnosticRecord["_idempotent"].(bool)
+	return ok && v
+}
+
 // ContainsGqlStatus returns whether there is an error with the given GQLSTATUS in this GQL error chain,
 // beginning the search from this exception.
 func (e *Neo4jError) ContainsGqlStatus(gqlStatus string) bool {
