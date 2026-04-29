@@ -522,7 +522,7 @@ func TestSession(outer *testing.T) {
 				Msg:  "different",
 			}
 		}
-		mkSession := func(conf config.Config, sessConfig SessionConfig) (*PoolFake, *session) {
+		makeSession := func(conf config.Config, sessConfig SessionConfig) (*PoolFake, *session) {
 			ctx := context.Background()
 			pool := &PoolFake{}
 			cache, _ := homedb.NewCache(100)
@@ -541,7 +541,7 @@ func TestSession(outer *testing.T) {
 		}
 
 		inner.Run("retries idempotent error and succeeds on second attempt", func(t *testing.T) {
-			pool, sess := mkSession(config.Config{MaxConnectionPoolSize: 100}, SessionConfig{})
+			pool, sess := makeSession(config.Config{MaxConnectionPoolSize: 100}, SessionConfig{})
 			attempts := 0
 			pool.BorrowHook = func() (idb.Connection, error) {
 				attempts++
@@ -556,7 +556,7 @@ func TestSession(outer *testing.T) {
 		})
 
 		inner.Run("propagates second-attempt error", func(t *testing.T) {
-			pool, sess := mkSession(config.Config{MaxConnectionPoolSize: 100}, SessionConfig{})
+			pool, sess := makeSession(config.Config{MaxConnectionPoolSize: 100}, SessionConfig{})
 			attempts := 0
 			pool.BorrowHook = func() (idb.Connection, error) {
 				attempts++
@@ -573,7 +573,7 @@ func TestSession(outer *testing.T) {
 		})
 
 		inner.Run("does not retry non-idempotent error", func(t *testing.T) {
-			pool, sess := mkSession(config.Config{MaxConnectionPoolSize: 100}, SessionConfig{})
+			pool, sess := makeSession(config.Config{MaxConnectionPoolSize: 100}, SessionConfig{})
 			attempts := 0
 			pool.BorrowHook = func() (idb.Connection, error) {
 				attempts++
@@ -587,7 +587,7 @@ func TestSession(outer *testing.T) {
 		})
 
 		inner.Run("driver-level DisableAutoCommitRetries blocks retry", func(t *testing.T) {
-			pool, sess := mkSession(
+			pool, sess := makeSession(
 				config.Config{MaxConnectionPoolSize: 100, DisableAutoCommitRetries: true},
 				SessionConfig{},
 			)
@@ -605,7 +605,7 @@ func TestSession(outer *testing.T) {
 
 		inner.Run("session-level false overrides driver-level true (retry happens)", func(t *testing.T) {
 			sessionDisable := false
-			pool, sess := mkSession(
+			pool, sess := makeSession(
 				config.Config{MaxConnectionPoolSize: 100, DisableAutoCommitRetries: true},
 				SessionConfig{DisableAutoCommitRetries: &sessionDisable},
 			)
@@ -624,7 +624,7 @@ func TestSession(outer *testing.T) {
 
 		inner.Run("session-level true overrides driver-level false (no retry)", func(t *testing.T) {
 			sessionDisable := true
-			pool, sess := mkSession(
+			pool, sess := makeSession(
 				config.Config{MaxConnectionPoolSize: 100},
 				SessionConfig{DisableAutoCommitRetries: &sessionDisable},
 			)
