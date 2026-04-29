@@ -572,6 +572,27 @@ func TestSession(outer *testing.T) {
 			}
 		})
 
+		inner.Run("does not retry more than once when second attempt is also idempotent", func(t *testing.T) {
+			pool, sess := makeSession(config.Config{MaxConnectionPoolSize: 100}, SessionConfig{})
+			attempts := 0
+			pool.BorrowHook = func() (idb.Connection, error) {
+				attempts++
+				if attempts == 1 {
+					return &ConnFake{Alive: true, RunErr: newIdempotentErr()}, nil
+				}
+				return &ConnFake{Alive: true, RunErr: &db.Neo4jError{
+					Code:                "Neo.ClientError.MadeUp.IdempotentTwo",
+					Msg:                 "still idempotent",
+					GqlDiagnosticRecord: map[string]any{"_idempotent": true},
+				}}, nil
+			}
+			_, err := sess.Run(context.Background(), "RETURN 1", nil)
+			AssertIntEqual(t, attempts, 2)
+			if got := extractCode(t, err); got != "Neo.ClientError.MadeUp.IdempotentTwo" {
+				t.Errorf("expected second-attempt error code, got %q", got)
+			}
+		})
+
 		inner.Run("does not retry non-idempotent error", func(t *testing.T) {
 			pool, sess := makeSession(config.Config{MaxConnectionPoolSize: 100}, SessionConfig{})
 			attempts := 0
