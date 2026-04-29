@@ -1050,3 +1050,31 @@ func assertTokenExpiredError(t *testing.T, err error) {
 	AssertErrorMessageContains(t, err, "Neo.ClientError.Security.TokenExpired")
 	AssertErrorMessageContains(t, err, "oopsie whoopsie")
 }
+
+func TestIsIdempotent(outer *testing.T) {
+	outer.Parallel()
+
+	testCases := []struct {
+		name             string
+		err              error
+		want             bool
+	}{
+		{"non-Neo4jError", io.EOF, false},
+		{"nil diagnostic record", &db.Neo4jError{}, false},
+		{"empty diagnostic record", &db.Neo4jError{GqlDiagnosticRecord: map[string]any{}}, false},
+		{"flag missing", &db.Neo4jError{GqlDiagnosticRecord: map[string]any{"_classification": "TRANSIENT_ERROR"}}, false},
+		{"flag false", &db.Neo4jError{GqlDiagnosticRecord: map[string]any{"_idempotent": false}}, false},
+		{"flag true", &db.Neo4jError{GqlDiagnosticRecord: map[string]any{"_idempotent": true}}, true},
+		{"flag wrong type (string)", &db.Neo4jError{GqlDiagnosticRecord: map[string]any{"_idempotent": "true"}}, false},
+		{"flag nil", &db.Neo4jError{GqlDiagnosticRecord: map[string]any{"_idempotent": nil}}, false},
+		{"wrapped", errorutil.WrapError(&db.Neo4jError{GqlDiagnosticRecord: map[string]any{"_idempotent": true}}), true},
+	}
+
+	for _, tc := range testCases {
+		outer.Run(tc.name, func(t *testing.T) {
+			if got := isIdempotent(tc.err); got != tc.want {
+				t.Errorf("isIdempotent() = %v, want %v", got, tc.want)
+			}
+		})
+	}
+}

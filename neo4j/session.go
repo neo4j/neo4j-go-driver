@@ -791,12 +791,10 @@ func (s *session) Run(ctx context.Context,
 		)
 		if err != nil {
 			s.pool.Return(ctx, conn)
-			var neo4jErr *db.Neo4jError
 			if !disableAutoCommitRetries &&
 				attempt == 0 &&
 				telemetryResolved &&
-				errors.As(err, &neo4jErr) &&
-				neo4jErr.IsIdempotent() {
+				isIdempotent(err) {
 				s.log.Warnf(log.Session, s.logId,
 					"auto-commit transaction failed and will be retried: %s", err)
 				continue
@@ -820,6 +818,18 @@ func (s *session) Run(ctx context.Context,
 
 		return s.autocommitTx.res, nil
 	}
+}
+
+// isIdempotent reports whether err is a *db.Neo4jError whose diagnostic record
+// carries _idempotent: true, meaning the server guarantees the failure left no
+// database state behind. Used only by session.Run's one-shot retry gate.
+func isIdempotent(err error) bool {
+	var n *db.Neo4jError
+	if !errors.As(err, &n) {
+		return false
+	}
+	v, ok := n.GqlDiagnosticRecord["_idempotent"].(bool)
+	return ok && v
 }
 
 func (s *session) Close(ctx context.Context) error {

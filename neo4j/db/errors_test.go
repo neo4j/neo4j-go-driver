@@ -127,33 +127,6 @@ func TestGqlStatusFinders(outer *testing.T) {
 	}
 }
 
-func TestIsIdempotent(outer *testing.T) {
-	outer.Parallel()
-
-	testCases := []struct {
-		name             string
-		diagnosticRecord map[string]any
-		want             bool
-	}{
-		{"nil diagnostic record", nil, false},
-		{"empty diagnostic record", map[string]any{}, false},
-		{"flag missing", map[string]any{"_classification": "TRANSIENT_ERROR"}, false},
-		{"flag false", map[string]any{"_idempotent": false}, false},
-		{"flag true", map[string]any{"_idempotent": true}, true},
-		{"flag wrong type (string)", map[string]any{"_idempotent": "true"}, false},
-		{"flag nil", map[string]any{"_idempotent": nil}, false},
-	}
-
-	for _, tc := range testCases {
-		outer.Run(tc.name, func(t *testing.T) {
-			err := &Neo4jError{GqlDiagnosticRecord: tc.diagnosticRecord}
-			if got := err.IsIdempotent(); got != tc.want {
-				t.Errorf("IsIdempotent() = %v, want %v", got, tc.want)
-			}
-		})
-	}
-}
-
 func buildSingleError(gqlStatus string) *Neo4jError {
 	return &Neo4jError{
 		GqlStatus: gqlStatus,
