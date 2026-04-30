@@ -541,6 +541,7 @@ func TestSession(outer *testing.T) {
 		}
 
 		inner.Run("retries idempotent error and succeeds on second attempt", func(t *testing.T) {
+			t.Parallel()
 			pool, sess := makeSession(config.Config{MaxConnectionPoolSize: 100}, SessionConfig{})
 			attempts := 0
 			pool.BorrowHook = func() (idb.Connection, error) {
@@ -556,6 +557,7 @@ func TestSession(outer *testing.T) {
 		})
 
 		inner.Run("propagates second-attempt error", func(t *testing.T) {
+			t.Parallel()
 			pool, sess := makeSession(config.Config{MaxConnectionPoolSize: 100}, SessionConfig{})
 			attempts := 0
 			pool.BorrowHook = func() (idb.Connection, error) {
@@ -573,6 +575,7 @@ func TestSession(outer *testing.T) {
 		})
 
 		inner.Run("does not retry more than once when second attempt is also idempotent", func(t *testing.T) {
+			t.Parallel()
 			pool, sess := makeSession(config.Config{MaxConnectionPoolSize: 100}, SessionConfig{})
 			attempts := 0
 			pool.BorrowHook = func() (idb.Connection, error) {
@@ -594,6 +597,7 @@ func TestSession(outer *testing.T) {
 		})
 
 		inner.Run("does not retry non-idempotent error", func(t *testing.T) {
+			t.Parallel()
 			pool, sess := makeSession(config.Config{MaxConnectionPoolSize: 100}, SessionConfig{})
 			attempts := 0
 			pool.BorrowHook = func() (idb.Connection, error) {
@@ -608,6 +612,7 @@ func TestSession(outer *testing.T) {
 		})
 
 		inner.Run("driver-level DisableAutoCommitRetries blocks retry", func(t *testing.T) {
+			t.Parallel()
 			pool, sess := makeSession(
 				config.Config{MaxConnectionPoolSize: 100, DisableAutoCommitRetries: true},
 				SessionConfig{},
@@ -625,6 +630,7 @@ func TestSession(outer *testing.T) {
 		})
 
 		inner.Run("session-level false overrides driver-level true (retry happens)", func(t *testing.T) {
+			t.Parallel()
 			sessionDisable := false
 			pool, sess := makeSession(
 				config.Config{MaxConnectionPoolSize: 100, DisableAutoCommitRetries: true},
@@ -644,6 +650,7 @@ func TestSession(outer *testing.T) {
 		})
 
 		inner.Run("session-level true overrides driver-level false (no retry)", func(t *testing.T) {
+			t.Parallel()
 			sessionDisable := true
 			pool, sess := makeSession(
 				config.Config{MaxConnectionPoolSize: 100},
