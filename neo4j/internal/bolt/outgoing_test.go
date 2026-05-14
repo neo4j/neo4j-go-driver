@@ -488,6 +488,21 @@ func TestOutgoing(ot *testing.T) {
 
 	someCustomInt := customInt(someInt)
 
+	type movie struct {
+		Title    string
+		Released int64
+	}
+	type tagged struct {
+		Title string `neo4j:"title"`
+		Skip  string `neo4j:"-"`
+		Empty string `neo4j:",omitempty"`
+	}
+	type base struct{ ID string }
+	type embedded struct {
+		base
+		Name string
+	}
+
 	// Test packing of maps in more detail, essentially tests allowed parameters to Run command
 	// tests for top level appending and sending outgoing messages
 	paramCases := []struct {
@@ -1091,6 +1106,125 @@ func TestOutgoing(ot *testing.T) {
 				"*map[customString]customString": map[string]any{"x": "y"},
 			},
 		},
+		{
+			name: "user struct: untagged fields use verbatim names",
+			inp: map[string]any{
+				"m": movie{Title: "The Matrix", Released: 1999},
+			},
+			expect: map[string]any{
+				"m": map[string]any{"Title": "The Matrix", "Released": int64(1999)},
+			},
+		},
+		{
+			name: "user struct: pointer to struct",
+			inp: map[string]any{
+				"m": &movie{Title: "Speed", Released: 1994},
+			},
+			expect: map[string]any{
+				"m": map[string]any{"Title": "Speed", "Released": int64(1994)},
+			},
+		},
+		{
+			name: "user struct: nil pointer to struct packs as null",
+			inp: map[string]any{
+				"m": (*movie)(nil),
+			},
+			expect: map[string]any{"m": nil},
+		},
+		{
+			name: "user struct: tag renames, skips, and omitempty",
+			inp: map[string]any{
+				"t": tagged{Title: "x"},
+			},
+			expect: map[string]any{
+				"t": map[string]any{"title": "x"},
+			},
+		},
+		{
+			name: "user struct: tag omitempty includes non-zero",
+			inp: map[string]any{
+				"t": tagged{Title: "x", Empty: "y"},
+			},
+			expect: map[string]any{
+				"t": map[string]any{"title": "x", "Empty": "y"},
+			},
+		},
+		{
+			name: "user struct: anonymous embedded struct flattens",
+			inp: map[string]any{
+				"e": embedded{base: base{ID: "1"}, Name: "Alice"},
+			},
+			expect: map[string]any{
+				"e": map[string]any{"ID": "1", "Name": "Alice"},
+			},
+		},
+		{
+			name: "user struct: nested user struct as field value",
+			inp: map[string]any{
+				"e": struct {
+					Inner movie
+				}{Inner: movie{Title: "Heat", Released: 1995}},
+			},
+			expect: map[string]any{
+				"e": map[string]any{
+					"Inner": map[string]any{"Title": "Heat", "Released": int64(1995)},
+				},
+			},
+		},
+		{
+			name: "user struct: slice of structs",
+			inp: map[string]any{
+				"ms": []movie{
+					{Title: "The Matrix", Released: 1999},
+					{Title: "Speed", Released: 1994},
+				},
+			},
+			expect: map[string]any{
+				"ms": []any{
+					map[string]any{"Title": "The Matrix", "Released": int64(1999)},
+					map[string]any{"Title": "Speed", "Released": int64(1994)},
+				},
+			},
+		},
+		{
+			name: "user struct: map of structs as field",
+			inp: map[string]any{
+				"ms": map[string]movie{
+					"matrix": {Title: "The Matrix", Released: 1999},
+				},
+			},
+			expect: map[string]any{
+				"ms": map[string]any{
+					"matrix": map[string]any{"Title": "The Matrix", "Released": int64(1999)},
+				},
+			},
+		},
+		{
+			name: "user struct: time.Time field keeps bolt encoding",
+			inp: map[string]any{
+				"e": struct {
+					At time.Time
+				}{At: time.Unix(1, 2).UTC()},
+			},
+			expect: map[string]any{
+				"e": map[string]any{
+					"At": &testStruct{tag: 'f', fields: []any{int64(1), int64(2), "UTC"}},
+				},
+			},
+		},
+		{
+			name: "user struct: dbtype.Point2D field keeps bolt encoding",
+			inp: map[string]any{
+				"e": struct {
+					P dbtype.Point2D
+				}{P: dbtype.Point2D{SpatialRefId: 1, X: 2, Y: 3}},
+			},
+			expect: map[string]any{
+				"e": map[string]any{
+					"P": &testStruct{tag: 'X', fields: []any{int64(1), float64(2), float64(3)}},
+				},
+			},
+		},
 	}
 
 	paramWrappings := []struct {
@@ -1178,7 +1312,8 @@ func TestOutgoing(ot *testing.T) {
 		}
 	}
 
-	type aStruct struct{}
+	type structWithChan struct{ C chan int }
+	type structWithFunc struct{ F func() }
 
 	// Test packing of stuff that is expected to give an error
 	paramErrorCases := []struct {
@@ -1194,16 +1329,23 @@ func TestOutgoing(ot *testing.T) {
 			err: &db.UnsupportedTypeError{},
 		},
 		{
-			name: "a random struct",
+			name: "struct field of chan type",
 			inp: map[string]any{
-				"m": aStruct{},
+				"m": structWithChan{C: make(chan int)},
 			},
 			err: &db.UnsupportedTypeError{},
 		},
 		{
-			name: "a random *struct",
+			name: "struct field of func type",
 			inp: map[string]any{
-				"m": &aStruct{},
+				"m": structWithFunc{F: func() {}},
+			},
+			err: &db.UnsupportedTypeError{},
+		},
+		{
+			name: "pointer to struct with chan field",
+			inp: map[string]any{
+				"m": &structWithChan{C: make(chan int)},
 			},
 			err: &db.UnsupportedTypeError{},
 		},

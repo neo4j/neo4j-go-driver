@@ -26,13 +26,15 @@ import (
 
 // ManagedTransaction represents a transaction managed by the driver and operated on by the user, via transaction functions
 type ManagedTransaction interface {
-	// Run executes a statement on this transaction and returns a result
+	// Run executes a statement on this transaction and returns a result.
+	// Struct values in params are part of the Object Mapping preview feature; see ExecuteQuery.
 	Run(ctx context.Context, cypher string, params map[string]any) (Result, error)
 }
 
 // ExplicitTransaction represents a transaction in the Neo4j database
 type ExplicitTransaction interface {
-	// Run executes a statement on this transaction and returns a result
+	// Run executes a statement on this transaction and returns a result.
+	// Struct values in params are part of the Object Mapping preview feature; see ExecuteQuery.
 	// Contexts terminating too early negatively affect connection pooling and degrade the driver performance.
 	Run(ctx context.Context, cypher string, params map[string]any) (Result, error)
 	// Commit commits the transaction

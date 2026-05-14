@@ -60,7 +60,8 @@ type Session interface {
 	// retry logic in place
 	// Contexts terminating too early negatively affect connection pooling and degrade the driver performance.
 	ExecuteWrite(ctx context.Context, work ManagedTransactionWork, configurers ...func(*TransactionConfig)) (any, error)
-	// Run executes an auto-commit statement and returns a result
+	// Run executes an auto-commit statement and returns a result.
+	// Struct values in params are part of the Object Mapping preview feature; see ExecuteQuery.
 	// Contexts terminating too early negatively affect connection pooling and degrade the driver performance.
 	Run(ctx context.Context, cypher string, params map[string]any, configurers ...func(*TransactionConfig)) (Result, error)
 	// Close closes any open resources and marks this session as unusable
