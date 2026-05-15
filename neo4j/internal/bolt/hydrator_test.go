@@ -552,6 +552,21 @@ func TestHydrator(outer *testing.T) {
 			}},
 		},
 		{
+			name: "Record of UUIDs",
+			build: func() {
+				packer.StructHeader(byte(msgRecord), 1)
+				packer.ArrayHeader(3)
+				packer.UUID([16]byte{0x55, 0x0e, 0x84, 0x00, 0xe2, 0x9b, 0x41, 0xd4, 0xa7, 0x16, 0x44, 0x66, 0x55, 0x44, 0x00, 0x00})
+				packer.UUID([16]byte{})
+				packer.UUID([16]byte{0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff})
+			},
+			x: &db.Record{Values: []any{
+				dbtype.UUID{0x55, 0x0e, 0x84, 0x00, 0xe2, 0x9b, 0x41, 0xd4, 0xa7, 0x16, 0x44, 0x66, 0x55, 0x44, 0x00, 0x00},
+				dbtype.UUID{},
+				dbtype.UUID{0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff},
+			}},
+		},
+		{
 			name: "Record of temporals",
 			build: func() {
 				packer.StructHeader(byte(msgRecord), 1)
@@ -1101,14 +1116,14 @@ func TestHydrator(outer *testing.T) {
 				packer.StructHeader(byte(msgRecord), 1)
 				packer.ArrayHeader(1)
 				packer.StructHeader('?', 4)
-				packer.String("UUID")
+				packer.String("FutureType")
 				packer.Int(255)
 				packer.Int(0)
 				packer.MapHeader(0)
 			},
 			x: &db.Record{Values: []any{
 				&dbtype.UnsupportedType{
-					Name:                   "UUID",
+					Name:                   "FutureType",
 					MinimumProtocolVersion: db.ProtocolVersion{Major: 255, Minor: 0},
 					Message:                nil,
 				},
@@ -1120,7 +1135,7 @@ func TestHydrator(outer *testing.T) {
 				packer.StructHeader(byte(msgRecord), 1)
 				packer.ArrayHeader(1)
 				packer.StructHeader('?', 4)
-				packer.String("UUID")
+				packer.String("FutureType")
 				packer.Int(255)
 				packer.Int(0)
 				packer.MapHeader(1)
@@ -1129,7 +1144,7 @@ func TestHydrator(outer *testing.T) {
 			},
 			x: &db.Record{Values: []any{
 				&dbtype.UnsupportedType{
-					Name:                   "UUID",
+					Name:                   "FutureType",
 					MinimumProtocolVersion: db.ProtocolVersion{Major: 255, Minor: 0},
 					Message:                ptr("Some configuration message"),
 				},
@@ -1141,7 +1156,7 @@ func TestHydrator(outer *testing.T) {
 				packer.StructHeader(byte(msgRecord), 1)
 				packer.ArrayHeader(1)
 				packer.StructHeader('?', 3)
-				packer.String("UUID")
+				packer.String("FutureType")
 				packer.Int(255)
 				packer.Int(0)
 			},

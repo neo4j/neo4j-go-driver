@@ -218,6 +218,8 @@ func nativeToCypher(v any) map[string]any {
 		return vectorToCypher("f32", x)
 	case dbtype.Vector[float64]:
 		return vectorToCypher("f64", x)
+	case dbtype.UUID:
+		return valueResponse("CypherUUID", x.String())
 	case *dbtype.UnsupportedType:
 		data := map[string]any{
 			"name":            x.Name,

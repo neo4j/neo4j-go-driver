@@ -84,6 +84,8 @@ func cypherToNative(c any) (any, error) {
 		return dbtype.LocalTime(time.Date(0, 0, 0, asInt(hour), asInt(minute), asInt(second), asInt(nanosecond), timeZone)), nil
 	case "CypherString":
 		return d["value"].(string), nil
+	case "CypherUUID":
+		return dbtype.ParseUUID(d["value"].(string))
 	case "CypherInt":
 		return d["value"].(json.Number).Int64()
 	case "CypherBool":

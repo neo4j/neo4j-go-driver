@@ -525,6 +525,8 @@ func (h *hydrator) value() any {
 		}
 	case packstream.PackedByteArray:
 		return h.unp.ByteArray()
+	case packstream.PackedUUID:
+		return dbtype.UUID(h.unp.UUID())
 	case packstream.PackedArray:
 		return h.array()
 	case packstream.PackedMap:

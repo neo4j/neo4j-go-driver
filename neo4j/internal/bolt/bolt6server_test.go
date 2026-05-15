@@ -363,14 +363,14 @@ func (s *bolt6server) acceptBolt6ManifestOnly() {
 	s.acceptManifestVersion()
 	// Send protocol offerings including Bolt 6
 	offerings := []protocolVersion{
-		{major: 6, minor: 0, back: 0},
+		{major: 6, minor: 1, back: 1},
 		{major: 5, minor: 8, back: 8},
 		{major: 4, minor: 4, back: 2},
 	}
 	s.sendManifestOfferings(offerings)
 	// Wait for client's choice
 	major, minor := s.waitForManifestConfirmation()
-	if major != 6 || minor != 0 {
-		panic(fmt.Sprintf("Expected client to choose Bolt 6.0, but got %d.%d", major, minor))
+	if major != 6 || minor != 1 {
+		panic(fmt.Sprintf("Expected client to choose Bolt 6.1, but got %d.%d", major, minor))
 	}
 }
