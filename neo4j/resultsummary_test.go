@@ -20,6 +20,7 @@ package neo4j
 import (
 	"reflect"
 	"testing"
+	"time"
 
 	idb "github.com/neo4j/neo4j-go-driver/v6/neo4j/internal/db"
 	"github.com/neo4j/neo4j-go-driver/v6/neo4j/internal/testutil"
@@ -148,9 +149,9 @@ func TestQueryProfile(st *testing.T) {
 		})
 		st.Run("Test Time", func(t *testing.T) {
 			t.Parallel()
-			time, ok := root.Children()[0].Time()
+			time_, ok := root.Children()[0].Time()
 			testutil.AssertTrue(t, ok)
-			testutil.AssertIntEqual(t, time, 5)
+			testutil.AssertDeepEquals(t, time_, 5*time.Nanosecond)
 			_, ok = root.Children()[1].Time()
 			testutil.AssertFalse(t, ok)
 		})

@@ -1691,7 +1691,7 @@ func serializeProfile(profile neo4j.QueryProfile) map[string]any {
 	pageCacheMisses, hasPageCacheMisses := profile.PageCacheMisses()
 	pageCacheHits, hasPageCacheHits := profile.PageCacheHits()
 	pageCacheHitRatio, hasPageCacheHitRatio := profile.PageCacheHitRatio()
-	time, hasTime := profile.Time()
+	time_, hasTime := profile.Time()
 
 	size := 4 + sumTrue(hasDbHits, hasRows, hasPageCacheMisses, hasPageCacheHits, hasPageCacheHitRatio, hasTime)
 	result := make(map[string]any, size)
@@ -1704,7 +1704,7 @@ func serializeProfile(profile neo4j.QueryProfile) map[string]any {
 	setIfOk(result, "pageCacheMisses", pageCacheMisses, hasPageCacheMisses)
 	setIfOk(result, "pageCacheHits", pageCacheHits, hasPageCacheHits)
 	setIfOk(result, "pageCacheHitRatio", pageCacheHitRatio, hasPageCacheHitRatio)
-	setIfOk(result, "time", time, hasTime)
+	setIfOk(result, "time", time_.Nanoseconds(), hasTime)
 	return result
 }
 

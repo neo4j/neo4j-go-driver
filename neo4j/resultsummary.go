@@ -300,7 +300,7 @@ type QueryProfile interface {
 	PageCacheHitRatio() (float64, bool)
 	// Time returns the amount of time spent in this part of the plan.
 	// The bool indicates whether the value has been recorded. If not, the returned number is meaningless.
-	Time() (int64, bool)
+	Time() (time.Duration, bool)
 }
 
 // Notification represents notifications generated when executing a statement.
@@ -697,8 +697,8 @@ func (p *profile) PageCacheHitRatio() (float64, bool) {
 	return util.DerefOr(p.profile.PageCacheHitRatio, 0), p.profile.PageCacheHitRatio != nil
 }
 
-func (p *profile) Time() (int64, bool) {
-	return util.DerefOr(p.profile.Time, 0), p.profile.Time != nil
+func (p *profile) Time() (time.Duration, bool) {
+	return time.Duration(util.DerefOr(p.profile.Time, 0)) * time.Nanosecond, p.profile.Time != nil
 }
 
 func (s *resultSummary) Notifications() []Notification {
