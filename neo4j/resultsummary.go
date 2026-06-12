@@ -109,7 +109,7 @@ type ResultSummary interface {
 	// Deprecated: Use QueryProfile instead
 	Profile() ProfiledPlan
 	// QueryProfile returns profiled statement plan for the executed statement if available, otherwise null.
-	QueryProfile() Profile
+	QueryProfile() QueryProfile
 	// Notifications returns a slice of notifications produced while executing the statement.
 	// The list will be empty if no notifications produced while executing the statement.
 	//
@@ -240,7 +240,7 @@ type Plan interface {
 // ProfiledPlan is the same as a regular Plan - except this plan has been executed, meaning it also
 // contains detailed information about how much work each step of the plan incurred on the database.
 //
-// Deprecated: Use Profile instead
+// Deprecated: Use QueryProfile instead
 type ProfiledPlan interface {
 	// Operator returns the operation this plan is performing.
 	Operator() string
@@ -268,9 +268,9 @@ type ProfiledPlan interface {
 	Time() int64
 }
 
-// Profile is the same as a regular Plan - except this plan has been executed, meaning it also
+// QueryProfile is the same as a regular Plan - except this plan has been executed, meaning it also
 // contains detailed information about how much work each step of the plan incurred on the database.
-type Profile interface {
+type QueryProfile interface {
 	// Operator returns the operation this plan is performing.
 	Operator() string
 	// Arguments returns the arguments for the operator used.
@@ -288,7 +288,7 @@ type Profile interface {
 	// Children returns zero or more child plans. A plan is a tree, where each child is another plan.
 	// The children are where this part of the plan gets its input records - unless this is an operator that
 	// introduces new records on its own.
-	Children() []Profile
+	Children() []QueryProfile
 	// PageCacheMisses returns the number of page cache misses caused by executing this part of the plan.
 	// The bool indicates whether the value has been recorded. If not, the returned number is meaningless.
 	PageCacheMisses() (int64, bool)
@@ -641,7 +641,7 @@ func (p *profiledPlan) Time() int64 {
 	return util.DerefOr(p.profile.Time, 0)
 }
 
-func (s *resultSummary) QueryProfile() Profile {
+func (s *resultSummary) QueryProfile() QueryProfile {
 	if s.sum.ProfiledPlan == nil {
 		return nil
 	}
@@ -676,8 +676,8 @@ func (p *profile) Rows() (int64, bool) {
 	return util.DerefOr(p.profile.Rows, 0), p.profile.Rows != nil
 }
 
-func (p *profile) Children() []Profile {
-	children := make([]Profile, len(p.profile.Children))
+func (p *profile) Children() []QueryProfile {
+	children := make([]QueryProfile, len(p.profile.Children))
 	for i, c := range p.profile.Children {
 		child := c
 		children[i] = &profile{profile: &child}

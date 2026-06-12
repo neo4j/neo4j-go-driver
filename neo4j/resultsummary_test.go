@@ -26,7 +26,7 @@ import (
 	"github.com/neo4j/neo4j-go-driver/v6/neo4j/internal/util"
 )
 
-func TestProfiled(st *testing.T) {
+func TestQueryProfile(st *testing.T) {
 	st.Parallel()
 
 	leaf1 := idb.Profile{Operator: "bar",
@@ -89,14 +89,14 @@ func TestProfiled(st *testing.T) {
 		})
 	})
 
-	st.Run("ProfiledPlan", func(st *testing.T) {
+	st.Run("QueryProfile", func(st *testing.T) {
 		st.Parallel()
 		root := &profile{profile: &root}
 
 		st.Run("Child plans are correctly populated", func(t *testing.T) {
 			t.Parallel()
 
-			expected := []Profile{
+			expected := []QueryProfile{
 				&profile{profile: &leaf1},
 				&profile{profile: &leaf2},
 			}

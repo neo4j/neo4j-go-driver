@@ -1681,7 +1681,7 @@ func serializePlan(plan neo4j.Plan) map[string]any {
 	}
 }
 
-func serializeProfile(profile neo4j.Profile) map[string]any {
+func serializeProfile(profile neo4j.QueryProfile) map[string]any {
 	if profile == nil {
 		return nil
 	}
@@ -1724,7 +1724,7 @@ func sumTrue(values ...bool) int {
 	return res
 }
 
-func serializeProfiles(children []neo4j.Profile) []map[string]any {
+func serializeProfiles(children []neo4j.QueryProfile) []map[string]any {
 	result := make([]map[string]any, len(children))
 	for i, child := range children {
 		result[i] = serializeProfile(child)
