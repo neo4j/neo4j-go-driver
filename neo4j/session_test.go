@@ -508,6 +508,167 @@ func TestSession(outer *testing.T) {
 		})
 	})
 
+	outer.Run("Idempotent auto-commit retry", func(inner *testing.T) {
+		newIdempotentErr := func() *db.Neo4jError {
+			return &db.Neo4jError{
+				Code:                "Neo.ClientError.MadeUp.Idempotent",
+				Msg:                 "go away",
+				GqlDiagnosticRecord: map[string]any{"_idempotent": true},
+			}
+		}
+		newOtherErr := func() *db.Neo4jError {
+			return &db.Neo4jError{
+				Code: "Neo.ClientError.MadeUp.Other",
+				Msg:  "different",
+			}
+		}
+		makeSession := func(conf config.Config, sessConfig SessionConfig) (*PoolFake, *session) {
+			ctx := context.Background()
+			pool := &PoolFake{}
+			cache, _ := homedb.NewCache(100)
+			sessConfig.AccessMode = AccessModeRead
+			sessConfig.BoltLogger = boltLogger
+			sess := newSession(ctx, &conf, sessConfig, &RouterFake{}, pool, cache, logger, reAuthToken)
+			sess.throttleTime = time.Millisecond * 1
+			return pool, sess
+		}
+		extractCode := func(t *testing.T, err error) string {
+			var n *db.Neo4jError
+			if !errors.As(err, &n) {
+				t.Fatalf("expected *db.Neo4jError, got %T (%v)", err, err)
+			}
+			return n.Code
+		}
+
+		inner.Run("retries idempotent error and succeeds on second attempt", func(t *testing.T) {
+			t.Parallel()
+			pool, sess := makeSession(config.Config{MaxConnectionPoolSize: 100}, SessionConfig{})
+			attempts := 0
+			pool.BorrowHook = func() (idb.Connection, error) {
+				attempts++
+				if attempts == 1 {
+					return &ConnFake{Alive: true, RunErr: newIdempotentErr()}, nil
+				}
+				return &ConnFake{Alive: true}, nil
+			}
+			_, err := sess.Run(context.Background(), "RETURN 1", nil)
+			AssertNil(t, err)
+			AssertIntEqual(t, attempts, 2)
+		})
+
+		inner.Run("propagates second-attempt error", func(t *testing.T) {
+			t.Parallel()
+			pool, sess := makeSession(config.Config{MaxConnectionPoolSize: 100}, SessionConfig{})
+			attempts := 0
+			pool.BorrowHook = func() (idb.Connection, error) {
+				attempts++
+				if attempts == 1 {
+					return &ConnFake{Alive: true, RunErr: newIdempotentErr()}, nil
+				}
+				return &ConnFake{Alive: true, RunErr: newOtherErr()}, nil
+			}
+			_, err := sess.Run(context.Background(), "RETURN 1", nil)
+			AssertIntEqual(t, attempts, 2)
+			if got := extractCode(t, err); got != "Neo.ClientError.MadeUp.Other" {
+				t.Errorf("expected second-attempt error code, got %q", got)
+			}
+		})
+
+		inner.Run("does not retry more than once when second attempt is also idempotent", func(t *testing.T) {
+			t.Parallel()
+			pool, sess := makeSession(config.Config{MaxConnectionPoolSize: 100}, SessionConfig{})
+			attempts := 0
+			pool.BorrowHook = func() (idb.Connection, error) {
+				attempts++
+				if attempts == 1 {
+					return &ConnFake{Alive: true, RunErr: newIdempotentErr()}, nil
+				}
+				return &ConnFake{Alive: true, RunErr: &db.Neo4jError{
+					Code:                "Neo.ClientError.MadeUp.IdempotentTwo",
+					Msg:                 "still idempotent",
+					GqlDiagnosticRecord: map[string]any{"_idempotent": true},
+				}}, nil
+			}
+			_, err := sess.Run(context.Background(), "RETURN 1", nil)
+			AssertIntEqual(t, attempts, 2)
+			if got := extractCode(t, err); got != "Neo.ClientError.MadeUp.IdempotentTwo" {
+				t.Errorf("expected second-attempt error code, got %q", got)
+			}
+		})
+
+		inner.Run("does not retry non-idempotent error", func(t *testing.T) {
+			t.Parallel()
+			pool, sess := makeSession(config.Config{MaxConnectionPoolSize: 100}, SessionConfig{})
+			attempts := 0
+			pool.BorrowHook = func() (idb.Connection, error) {
+				attempts++
+				return &ConnFake{Alive: true, RunErr: newOtherErr()}, nil
+			}
+			_, err := sess.Run(context.Background(), "RETURN 1", nil)
+			AssertIntEqual(t, attempts, 1)
+			if got := extractCode(t, err); got != "Neo.ClientError.MadeUp.Other" {
+				t.Errorf("got %q", got)
+			}
+		})
+
+		inner.Run("driver-level DisableAutoCommitRetries blocks retry", func(t *testing.T) {
+			t.Parallel()
+			pool, sess := makeSession(
+				config.Config{MaxConnectionPoolSize: 100, DisableAutoCommitRetries: true},
+				SessionConfig{},
+			)
+			attempts := 0
+			pool.BorrowHook = func() (idb.Connection, error) {
+				attempts++
+				return &ConnFake{Alive: true, RunErr: newIdempotentErr()}, nil
+			}
+			_, err := sess.Run(context.Background(), "RETURN 1", nil)
+			AssertIntEqual(t, attempts, 1)
+			if got := extractCode(t, err); got != "Neo.ClientError.MadeUp.Idempotent" {
+				t.Errorf("got %q", got)
+			}
+		})
+
+		inner.Run("session-level false overrides driver-level true (retry happens)", func(t *testing.T) {
+			t.Parallel()
+			sessionDisable := false
+			pool, sess := makeSession(
+				config.Config{MaxConnectionPoolSize: 100, DisableAutoCommitRetries: true},
+				SessionConfig{DisableAutoCommitRetries: &sessionDisable},
+			)
+			attempts := 0
+			pool.BorrowHook = func() (idb.Connection, error) {
+				attempts++
+				if attempts == 1 {
+					return &ConnFake{Alive: true, RunErr: newIdempotentErr()}, nil
+				}
+				return &ConnFake{Alive: true}, nil
+			}
+			_, err := sess.Run(context.Background(), "RETURN 1", nil)
+			AssertNil(t, err)
+			AssertIntEqual(t, attempts, 2)
+		})
+
+		inner.Run("session-level true overrides driver-level false (no retry)", func(t *testing.T) {
+			t.Parallel()
+			sessionDisable := true
+			pool, sess := makeSession(
+				config.Config{MaxConnectionPoolSize: 100},
+				SessionConfig{DisableAutoCommitRetries: &sessionDisable},
+			)
+			attempts := 0
+			pool.BorrowHook = func() (idb.Connection, error) {
+				attempts++
+				return &ConnFake{Alive: true, RunErr: newIdempotentErr()}, nil
+			}
+			_, err := sess.Run(context.Background(), "RETURN 1", nil)
+			AssertIntEqual(t, attempts, 1)
+			if got := extractCode(t, err); got != "Neo.ClientError.MadeUp.Idempotent" {
+				t.Errorf("got %q", got)
+			}
+		})
+	})
+
 	outer.Run("Explicit transaction", func(inner *testing.T) {
 		inner.Run("While already in tx", func(t *testing.T) {
 			_, pool, sess := createSession()
@@ -916,4 +1077,32 @@ func assertTokenExpiredError(t *testing.T, err error) {
 	AssertSameType(t, err, &TokenExpiredError{})
 	AssertErrorMessageContains(t, err, "Neo.ClientError.Security.TokenExpired")
 	AssertErrorMessageContains(t, err, "oopsie whoopsie")
+}
+
+func TestIsIdempotent(outer *testing.T) {
+	outer.Parallel()
+
+	testCases := []struct {
+		name             string
+		err              error
+		want             bool
+	}{
+		{"non-Neo4jError", io.EOF, false},
+		{"nil diagnostic record", &db.Neo4jError{}, false},
+		{"empty diagnostic record", &db.Neo4jError{GqlDiagnosticRecord: map[string]any{}}, false},
+		{"flag missing", &db.Neo4jError{GqlDiagnosticRecord: map[string]any{"_classification": "TRANSIENT_ERROR"}}, false},
+		{"flag false", &db.Neo4jError{GqlDiagnosticRecord: map[string]any{"_idempotent": false}}, false},
+		{"flag true", &db.Neo4jError{GqlDiagnosticRecord: map[string]any{"_idempotent": true}}, true},
+		{"flag wrong type (string)", &db.Neo4jError{GqlDiagnosticRecord: map[string]any{"_idempotent": "true"}}, false},
+		{"flag nil", &db.Neo4jError{GqlDiagnosticRecord: map[string]any{"_idempotent": nil}}, false},
+		{"wrapped", errorutil.WrapError(&db.Neo4jError{GqlDiagnosticRecord: map[string]any{"_idempotent": true}}), true},
+	}
+
+	for _, tc := range testCases {
+		outer.Run(tc.name, func(t *testing.T) {
+			if got := isIdempotent(tc.err); got != tc.want {
+				t.Errorf("isIdempotent() = %v, want %v", got, tc.want)
+			}
+		})
+	}
 }

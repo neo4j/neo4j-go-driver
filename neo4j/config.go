@@ -44,6 +44,7 @@ func defaultConfig() *config.Config {
 		NotificationsDisabledCategories:      notifications.NotificationDisabledCategories{},
 		NotificationsDisabledClassifications: notifications.NotificationDisabledClassifications{},
 		TelemetryDisabled:                    false,
+		DisableAutoCommitRetries:             false,
 		ReadBufferSize:                       bolt.DefaultReadBufferSize,
 	}
 }

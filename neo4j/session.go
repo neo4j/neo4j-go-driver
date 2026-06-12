@@ -19,6 +19,7 @@ package neo4j
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"math"
 	"time"
@@ -185,6 +186,21 @@ type SessionConfig struct {
 	//   - `neo4j.BearerAuth`
 	//   - `neo4j.CustomAuth`
 	Auth *AuthToken
+	// DisableAutoCommitRetries allows session level override of the driver config DisableAutoCommitRetries.
+	//
+	// Retries on Session.Run are limited to a specific set of errors. Namely those errors marked as
+	// idempotent by the DBMS, i.e., errors that are guaranteed to not have altered the state of any
+	// database. At the time of writing, this set encompasses only admission control errors.
+	//
+	// When set to true, calls to Session.Run will fail without retrying when receiving an error from
+	// the server, even when only idempotent work has occurred. By default, these calls will be rerun
+	// with a one-shot retry to avoid friction when encountering rate limiting and other errors that
+	// can be safely retried.
+	//
+	// nil applies the driver's configuration setting (Config.DisableAutoCommitRetries).
+	//
+	// default: nil
+	DisableAutoCommitRetries *bool
 
 	forceReAuth bool
 }
@@ -728,60 +744,92 @@ func (s *session) Run(ctx context.Context,
 		return nil, err
 	}
 
-	conn, err := s.getConnection(ctx, s.defaultMode, s.driverConfig.ConnectionLivenessCheckTimeout)
-	if err != nil {
-		return nil, errorutil.WrapError(err)
+	disableAutoCommitRetries := s.driverConfig.DisableAutoCommitRetries
+	if s.config.DisableAutoCommitRetries != nil {
+		disableAutoCommitRetries = *s.config.DisableAutoCommitRetries
 	}
 
-	if !s.driverConfig.TelemetryDisabled {
-		conn.Telemetry(telemetry.AutoCommitTransaction, nil)
-	}
+	// True when telemetry is opted out; otherwise the bolt callback flips
+	// it once telemetry is resolved.
+	telemetryResolved := s.driverConfig.TelemetryDisabled
+	for attempt := 0; ; attempt++ {
+		conn, err := s.getConnection(ctx, s.defaultMode, s.driverConfig.ConnectionLivenessCheckTimeout)
+		if err != nil {
+			return nil, errorutil.WrapError(err)
+		}
 
-	runBookmarks, err := s.getBookmarks(ctx)
-	if err != nil {
-		s.pool.Return(ctx, conn)
-		return nil, errorutil.WrapError(err)
-	}
-	stream, err := conn.Run(
-		ctx,
-		idb.Command{
-			Cypher:    cypher,
-			Params:    params,
-			FetchSize: s.fetchSize,
-		},
-		idb.TxConfig{
-			Mode:             s.defaultMode,
-			Bookmarks:        runBookmarks,
-			Timeout:          config.Timeout,
-			Meta:             config.Metadata,
-			ImpersonatedUser: s.config.ImpersonatedUser,
-			NotificationConfig: idb.NotificationConfig{
-				MinSev:  s.config.NotificationsMinSeverity,
-				DisCats: s.config.NotificationsDisabledCategories,
-				DisClas: s.config.NotificationsDisabledClassifications,
-			},
-		},
-	)
-	if err != nil {
-		s.pool.Return(ctx, conn)
-		return nil, errorutil.WrapError(err)
-	}
+		if !telemetryResolved {
+			conn.Telemetry(telemetry.AutoCommitTransaction, func() {
+				telemetryResolved = true
+			})
+		}
 
-	s.autocommitTx = &autocommitTransaction{
-		conn: conn,
-		res: newResult(conn, stream, cypher, params, &transactionState{}, func() {
-			if err := s.retrieveBookmarks(ctx, conn, runBookmarks); err != nil {
-				s.log.Warnf(log.Session, s.logId, "could not retrieve bookmarks after result consumption: %s\n"+
-					"the result of the initiating auto-commit transaction may not be visible to subsequent operations", err.Error())
-			}
-		}),
-		onClosed: func() {
+		runBookmarks, err := s.getBookmarks(ctx)
+		if err != nil {
 			s.pool.Return(ctx, conn)
-			s.autocommitTx = nil
-		},
-	}
+			return nil, errorutil.WrapError(err)
+		}
+		stream, err := conn.Run(
+			ctx,
+			idb.Command{
+				Cypher:    cypher,
+				Params:    params,
+				FetchSize: s.fetchSize,
+			},
+			idb.TxConfig{
+				Mode:             s.defaultMode,
+				Bookmarks:        runBookmarks,
+				Timeout:          config.Timeout,
+				Meta:             config.Metadata,
+				ImpersonatedUser: s.config.ImpersonatedUser,
+				NotificationConfig: idb.NotificationConfig{
+					MinSev:  s.config.NotificationsMinSeverity,
+					DisCats: s.config.NotificationsDisabledCategories,
+					DisClas: s.config.NotificationsDisabledClassifications,
+				},
+			},
+		)
+		if err != nil {
+			s.pool.Return(ctx, conn)
+			if !disableAutoCommitRetries &&
+				attempt == 0 &&
+				telemetryResolved &&
+				isIdempotent(err) {
+				s.log.Warnf(log.Session, s.logId,
+					"auto-commit transaction failed and will be retried: %s", err)
+				continue
+			}
+			return nil, errorutil.WrapError(err)
+		}
 
-	return s.autocommitTx.res, nil
+		s.autocommitTx = &autocommitTransaction{
+			conn: conn,
+			res: newResult(conn, stream, cypher, params, &transactionState{}, func() {
+				if err := s.retrieveBookmarks(ctx, conn, runBookmarks); err != nil {
+					s.log.Warnf(log.Session, s.logId, "could not retrieve bookmarks after result consumption: %s\n"+
+						"the result of the initiating auto-commit transaction may not be visible to subsequent operations", err.Error())
+				}
+			}),
+			onClosed: func() {
+				s.pool.Return(ctx, conn)
+				s.autocommitTx = nil
+			},
+		}
+
+		return s.autocommitTx.res, nil
+	}
+}
+
+// isIdempotent reports whether err is a *db.Neo4jError whose diagnostic record
+// carries _idempotent: true, meaning the server guarantees the failure left no
+// database state behind. Used only by session.Run's one-shot retry gate.
+func isIdempotent(err error) bool {
+	var n *db.Neo4jError
+	if !errors.As(err, &n) {
+		return false
+	}
+	v, ok := n.GqlDiagnosticRecord["_idempotent"].(bool)
+	return ok && v
 }
 
 func (s *session) Close(ctx context.Context) error {

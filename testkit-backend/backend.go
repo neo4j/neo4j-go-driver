@@ -692,6 +692,9 @@ func (b *backend) handleRequest(req map[string]any) {
 			if data["telemetryDisabled"] != nil {
 				c.TelemetryDisabled = data["telemetryDisabled"].(bool)
 			}
+			if data["disableAutoCommitRetries"] != nil {
+				c.DisableAutoCommitRetries = data["disableAutoCommitRetries"].(bool)
+			}
 
 			clientCertificateProviderId := data["clientCertificateProviderId"]
 			if clientCertificateProviderId != nil {
@@ -926,6 +929,10 @@ func (b *backend) handleRequest(req map[string]any) {
 				return
 			}
 			sessionConfig.Auth = &authToken
+		}
+		if data["disableAutoCommitRetries"] != nil {
+			val := data["disableAutoCommitRetries"].(bool)
+			sessionConfig.DisableAutoCommitRetries = &val
 		}
 		for _, configurer := range extrasSessionConfigurers {
 			err = configurer(b, data, &sessionConfig)
