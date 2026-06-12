@@ -582,10 +582,10 @@ func (p *plan) Children() []Plan {
 }
 
 func (s *resultSummary) Profile() ProfiledPlan {
-	if s.sum.ProfiledPlan == nil {
+	if s.sum.Profile == nil {
 		return nil
 	}
-	return &profiledPlan{profile: s.sum.ProfiledPlan}
+	return &profiledPlan{profile: s.sum.Profile}
 }
 
 type profiledPlan struct {
@@ -642,10 +642,10 @@ func (p *profiledPlan) Time() int64 {
 }
 
 func (s *resultSummary) QueryProfile() QueryProfile {
-	if s.sum.ProfiledPlan == nil {
+	if s.sum.Profile == nil {
 		return nil
 	}
-	return &profile{profile: s.sum.ProfiledPlan}
+	return &profile{profile: s.sum.Profile}
 }
 
 type profile struct {

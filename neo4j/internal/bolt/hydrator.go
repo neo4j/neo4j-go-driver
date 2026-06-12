@@ -80,7 +80,7 @@ func (s *success) summary() *idb.Summary {
 		Counters:              extractIntCounters(s.counters),
 		TLast:                 s.tlast,
 		Plan:                  s.plan,
-		ProfiledPlan:          s.profile,
+		Profile:               s.profile,
 		Notifications:         s.notifications,
 		GqlStatusObjects:      s.statuses,
 		Database:              s.db,

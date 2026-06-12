@@ -152,7 +152,7 @@ type Summary struct {
 	TFirst                int64
 	TLast                 int64
 	Plan                  *Plan
-	ProfiledPlan          *Profile
+	Profile               *Profile
 	Notifications         []Notification
 	GqlStatusObjects      []GqlStatusObject
 	Database              string
