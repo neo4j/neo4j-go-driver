@@ -1172,6 +1172,19 @@ func TestOutgoing(ot *testing.T) {
 			},
 		},
 		{
+			name: "user struct: nested struct applies its own tags",
+			inp: map[string]any{
+				"e": struct {
+					Inner tagged
+				}{Inner: tagged{Title: "x", Skip: "nope", Empty: ""}},
+			},
+			expect: map[string]any{
+				"e": map[string]any{
+					"Inner": map[string]any{"title": "x"},
+				},
+			},
+		},
+		{
 			name: "user struct: slice of structs",
 			inp: map[string]any{
 				"ms": []movie{
