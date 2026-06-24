@@ -33,11 +33,12 @@ import (
 )
 
 type hydratorTestCase struct {
-	name   string
-	build  func() // Builds/encodes stream same was as server would
-	x      any    // Expected hydrated
-	err    error
-	useUtc bool
+	name         string
+	build        func() // Builds/encodes stream same was as server would
+	x            any    // Expected hydrated
+	err          error
+	useUtc       bool
+	supportsUuid bool
 }
 
 func TestHydrator(outer *testing.T) {
@@ -565,6 +566,18 @@ func TestHydrator(outer *testing.T) {
 				dbtype.UUID{},
 				dbtype.UUID{0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff},
 			}},
+			supportsUuid: true,
+		},
+		{
+			name: "Record with UUID rejected when supportsUuid is false",
+			build: func() {
+				packer.StructHeader(byte(msgRecord), 1)
+				packer.ArrayHeader(1)
+				packer.UUID([16]byte{0x55, 0x0e, 0x84, 0x00, 0xe2, 0x9b, 0x41, 0xd4, 0xa7, 0x16, 0x44, 0x66, 0x55, 0x44, 0x00, 0x00})
+			},
+			err: &db.ProtocolError{
+				Err: "received UUID packstream type 0xE0 on Bolt protocol prior to 6.1",
+			},
 		},
 		{
 			name: "Record of temporals",
@@ -1175,6 +1188,7 @@ func TestHydrator(outer *testing.T) {
 				hydrator.err = nil
 			}()
 			hydrator.useUtc = c.useUtc
+			hydrator.supportsUuid = c.supportsUuid
 			if (c.x != nil) == (c.err != nil) {
 				t.Fatalf("test case needs to define either expected result or error (xor)")
 			}

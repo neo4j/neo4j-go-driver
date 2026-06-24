@@ -150,9 +150,14 @@ func NewBolt6(
 			connReadTimeout: -1,
 		},
 		&outgoing{
-			chunker:    newChunker(),
-			packer:     packstream.Packer{},
-			onPackErr:  func(err error) { b.setError(fillServerName(err, b.serverName), true) },
+			chunker: newChunker(),
+			packer:  packstream.Packer{},
+			onPackErr: func(err error) {
+				// A FeatureNotSupportedError is a client-side reject that never reached the wire, so it is recoverable.
+				err = fillServerName(err, b.serverName)
+				_, recoverable := err.(*db.FeatureNotSupportedError)
+				b.setError(err, !recoverable)
+			},
 			onIoErr:    b.onIoError,
 			boltLogger: boltLog,
 			useUtc:     true,
@@ -240,7 +245,9 @@ func (b *bolt6) Connect(
 	}
 
 	b.minor = minor
-	b.queue.out.supportsUuid = b.minor >= 1
+	supportsUuid := b.minor >= 1
+	b.queue.in.hyd.supportsUuid = supportsUuid
+	b.queue.out.supportsUuid = supportsUuid
 
 	if err := checkReAuth(auth, b); err != nil {
 		return err
@@ -560,6 +567,12 @@ func (b *bolt6) run(ctx context.Context, cypher string, params map[string]any, r
 	stream := &stream{fetchSize: fetchSize}
 	b.Version()
 	b.queue.appendRun(cypher, params, tx.toMeta(b.log, b.logId, b.Version()), b.runResponseHandler(ctx, stream))
+	if b.err != nil {
+		// Packing failed client-side; drop the half-built message and its response handler so the connection stays usable.
+		b.queue.out.chunker.reset()
+		b.queue.pop()
+		return nil, b.err
+	}
 	b.queue.appendPullN(fetchSize, b.pullResponseHandler(stream))
 	if b.queue.send(ctx); b.err != nil {
 		return nil, b.err

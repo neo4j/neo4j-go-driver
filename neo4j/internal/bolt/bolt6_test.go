@@ -28,6 +28,7 @@ import (
 	"time"
 
 	"github.com/neo4j/neo4j-go-driver/v6/neo4j/db"
+	"github.com/neo4j/neo4j-go-driver/v6/neo4j/dbtype"
 	iauth "github.com/neo4j/neo4j-go-driver/v6/neo4j/internal/auth"
 	idb "github.com/neo4j/neo4j-go-driver/v6/neo4j/internal/db"
 	. "github.com/neo4j/neo4j-go-driver/v6/neo4j/internal/testutil"
@@ -286,6 +287,36 @@ func TestBolt6(outer *testing.T) {
 			AssertTrue(t, reflect.DeepEqual(bolt.queue.in.connReadTimeout, time.Duration(-1)))
 		})
 	}
+
+	outer.Run("Run with UUID parameter on pre-6.1 connection rejects but keeps connection usable", func(t *testing.T) {
+		bolt, cleanup := connectToServer(t, func(srv *bolt6server) {
+			srv.waitForHandshake()
+			srv.acceptManifestVersion()
+			srv.sendManifestOfferings([]protocolVersion{{major: 6, minor: 0, back: 0}})
+			srv.waitForManifestConfirmation()
+			srv.waitForHelloWithoutAuthToken()
+			srv.acceptHello()
+			srv.waitForLogon()
+			srv.acceptLogon()
+		})
+		defer cleanup()
+		defer bolt.Close(context.Background())
+
+		_, err := bolt.Run(context.Background(),
+			idb.Command{Cypher: "RETURN $u", Params: map[string]any{"u": dbtype.UUID{}}},
+			idb.TxConfig{Mode: idb.ReadMode})
+
+		if _, ok := err.(*db.FeatureNotSupportedError); !ok {
+			t.Fatalf("expected *db.FeatureNotSupportedError, got %v", err)
+		}
+		AssertTrue(t, bolt.IsAlive())
+		if n := bolt.queue.handlers.Len(); n != 0 {
+			t.Fatalf("expected no orphaned response handlers, got %d", n)
+		}
+		if n := len(bolt.queue.out.chunker.buf); n != 0 {
+			t.Fatalf("expected empty outgoing buffer, got %d leftover bytes", n)
+		}
+	})
 
 	outer.Run("Routing in hello", func(t *testing.T) {
 		routingContext := map[string]string{"some": "thing"}
