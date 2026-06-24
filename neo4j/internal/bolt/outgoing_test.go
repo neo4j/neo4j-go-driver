@@ -1185,6 +1185,18 @@ func TestOutgoing(ot *testing.T) {
 			},
 		},
 		{
+			name: "user struct: field tagged - is skipped, so an otherwise unpackable type packs fine",
+			inp: map[string]any{
+				"m": struct {
+					C     chan int `neo4j:"-"`
+					Title string
+				}{C: make(chan int), Title: "x"},
+			},
+			expect: map[string]any{
+				"m": map[string]any{"Title": "x"},
+			},
+		},
+		{
 			name: "user struct: slice of structs",
 			inp: map[string]any{
 				"ms": []movie{
