@@ -1048,7 +1048,11 @@ func (b *bolt4) discardResponseHandler(stream *stream) responseHandler {
 }
 
 func (b *bolt4) pullResponseHandler(stream *stream) responseHandler {
-	return responseHandler{
+	// Build the handler (and its closures) once per stream and re-enqueue the
+	// same value for every RECORD, instead of allocating a fresh handler with new
+	// closures on each record.
+	var handler responseHandler
+	handler = responseHandler{
 		onRecord: func(record *db.Record) {
 			if record != nil {
 				stream.hadRecord = true
@@ -1059,7 +1063,7 @@ func (b *bolt4) pullResponseHandler(stream *stream) responseHandler {
 				record.Keys = stream.keys
 				stream.push(record)
 			}
-			b.queue.pushFront(b.pullResponseHandler(stream))
+			b.queue.pushFront(handler)
 		},
 		onIgnored: func(*ignored) {
 			stream.err = fmt.Errorf("stream interrupted while pulling results")
@@ -1087,7 +1091,7 @@ func (b *bolt4) pullResponseHandler(stream *stream) responseHandler {
 			b.onFailure(ctx, failure) // will detach the stream
 		},
 	}
-
+	return handler
 }
 
 func (b *bolt4) runResponseHandler(stream *stream) responseHandler {

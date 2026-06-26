@@ -18,7 +18,6 @@
 package bolt
 
 import (
-	"container/list"
 	"context"
 	"errors"
 	"fmt"
@@ -28,10 +27,13 @@ import (
 	"github.com/neo4j/neo4j-go-driver/v6/neo4j/log"
 )
 
+// messageQueue tracks pending response handlers in a ring-buffer deque so that
+// the steady-state request/response flow (and the per-record re-enqueue of a
+// streaming PULL handler) allocates nothing once the queue depth has stabilized.
 type messageQueue struct {
 	in               *incoming
 	out              *outgoing
-	handlers         list.List // List[responseHandler]
+	handlers         ringQueue[responseHandler]
 	targetConnection io.ReadWriteCloser
 	err              error
 
@@ -48,7 +50,6 @@ func newMessageQueue(
 	return messageQueue{
 		in:               in,
 		out:              out,
-		handlers:         list.List{},
 		targetConnection: target,
 		onNextMessage:    onNext,
 		onIoErr:          onIoErr,
@@ -140,7 +141,7 @@ func (q *messageQueue) send(ctx context.Context) {
 
 func (q *messageQueue) receiveAll(ctx context.Context) error {
 	for {
-		if q.handlers.Len() == 0 {
+		if q.handlers.length() == 0 {
 			return nil
 		}
 		if err := q.receive(ctx); err != nil {
@@ -155,7 +156,7 @@ func (q *messageQueue) receive(ctx context.Context) error {
 		return q.err
 	}
 
-	if q.handlers.Len() == 0 {
+	if q.handlers.length() == 0 {
 		return errors.New("no more response callback to apply")
 	}
 	handler := q.pop()
@@ -192,11 +193,11 @@ func (q *messageQueue) receive(ctx context.Context) error {
 }
 
 func (q *messageQueue) pushFront(handler responseHandler) {
-	q.handlers.PushFront(handler)
+	q.handlers.pushFront(handler)
 }
 
 func (q *messageQueue) pop() responseHandler {
-	return q.handlers.Remove(q.handlers.Front()).(responseHandler)
+	return q.handlers.popFront()
 }
 
 func (q *messageQueue) receiveMsg(ctx context.Context) any {
@@ -217,7 +218,7 @@ func (q *messageQueue) receiveMsg(ctx context.Context) any {
 }
 
 func (q *messageQueue) enqueueCallback(handler responseHandler) {
-	q.handlers.PushBack(handler)
+	q.handlers.pushBack(handler)
 }
 
 func (q *messageQueue) setLogId(logId string) {
@@ -231,5 +232,5 @@ func (q *messageQueue) setBoltLogger(logger log.BoltLogger) {
 }
 
 func (q *messageQueue) isEmpty() bool {
-	return q.handlers.Len() == 0
+	return q.handlers.length() == 0
 }

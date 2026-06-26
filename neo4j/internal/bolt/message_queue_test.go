@@ -146,17 +146,17 @@ func TestMessageQueue(outer *testing.T) {
 
 		for _, test := range tests {
 			inner.Run(test.description, func(t *testing.T) {
-				initialLength := queue.handlers.Len()
+				initialLength := queue.handlers.length()
 
 				test.action(&queue)
 
-				actualLength := queue.handlers.Len()
+				actualLength := queue.handlers.length()
 				if test.skipsHandler {
 					AssertIntEqual(t, actualLength, initialLength)
 				} else {
 					AssertIntEqual(t, actualLength, initialLength+1)
 					expectedHandler := handlers[test.expectedMessageType]
-					enqueuedHandler := queue.handlers.Back().Value.(responseHandler)
+					enqueuedHandler := queue.handlers.back()
 					assertEqualResponseHandlers(t, expectedHandler, enqueuedHandler)
 				}
 				AssertTrue(t, bytes.Contains(writer.chunker.buf, []byte{test.expectedMessageType}))
@@ -183,7 +183,7 @@ func TestMessageQueue(outer *testing.T) {
 
 		inner.Run("receives single message, executes the first handler", func(t *testing.T) {
 			defer func() {
-				queue.handlers.Init()
+				queue.handlers = ringQueue[responseHandler]{}
 			}()
 			done := make(chan any)
 			called := make(chan bool)
