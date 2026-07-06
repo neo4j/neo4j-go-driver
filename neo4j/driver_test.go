@@ -967,6 +967,10 @@ func (sum *fakeSummary) Profile() ProfiledPlan {
 	panic("implement me")
 }
 
+func (sum *fakeSummary) QueryProfile() QueryProfile {
+	panic("implement me")
+}
+
 func (sum *fakeSummary) Notifications() []Notification {
 	panic("implement me")
 }

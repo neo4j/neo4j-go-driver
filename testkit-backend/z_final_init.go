@@ -86,6 +86,7 @@ func init() {
 		//"Feature:API:SSLConfig",
 		//"Feature:API:SSLSchemes",
 		"Feature:API:Summary:GqlStatusObjects",
+		"Feature:API:Summary:Profile:OptionalStats",
 		"Feature:API:Type.Spatial",
 		"Feature:API:Type.Temporal",
 		"Feature:API:Type.UUID",

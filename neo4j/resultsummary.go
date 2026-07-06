@@ -24,7 +24,9 @@ import (
 	"time"
 
 	"github.com/neo4j/neo4j-go-driver/v6/neo4j/db"
+	idb "github.com/neo4j/neo4j-go-driver/v6/neo4j/internal/db"
 	inotifications "github.com/neo4j/neo4j-go-driver/v6/neo4j/internal/notifications"
+	"github.com/neo4j/neo4j-go-driver/v6/neo4j/internal/util"
 	"github.com/neo4j/neo4j-go-driver/v6/neo4j/notifications"
 )
 
@@ -37,23 +39,23 @@ const (
 	// StatementTypeUnknown identifies an unknown statement type
 	//
 	// Deprecated: Use QueryTypeUnknown instead. This will be removed in a future release.
-	StatementTypeUnknown StatementType = 0
+	StatementTypeUnknown = StatementType(idb.QueryTypeUnknown)
 	// StatementTypeReadOnly identifies a read-only statement
 	//
 	// Deprecated: Use QueryTypeReadOnly instead. This will be removed in a future release.
-	StatementTypeReadOnly StatementType = 1
+	StatementTypeReadOnly = StatementType(idb.QueryTypeRead)
 	// StatementTypeReadWrite identifies a read-write statement
 	//
 	// Deprecated: Use QueryTypeReadWrite instead. This will be removed in a future release.
-	StatementTypeReadWrite StatementType = 2
+	StatementTypeReadWrite = StatementType(idb.QueryTypeReadWrite)
 	// StatementTypeWriteOnly identifies a write-only statement
 	//
 	// Deprecated: Use QueryTypeWriteOnly instead. This will be removed in a future release.
-	StatementTypeWriteOnly StatementType = 3
+	StatementTypeWriteOnly = StatementType(idb.QueryTypeWrite)
 	// StatementTypeSchemaWrite identifies a schema-write statement
 	//
 	// Deprecated: Use QueryTypeSchemaWrite instead. This will be removed in a future release.
-	StatementTypeSchemaWrite StatementType = 4
+	StatementTypeSchemaWrite = StatementType(idb.QueryTypeSchemaWrite)
 )
 
 // QueryType defines the type of the query
@@ -61,26 +63,26 @@ type QueryType = StatementType
 
 const (
 	// QueryTypeUnknown identifies an unknown query type
-	QueryTypeUnknown QueryType = 0
+	QueryTypeUnknown = QueryType(idb.QueryTypeUnknown)
 	// QueryTypeReadOnly identifies a read-only query
-	QueryTypeReadOnly QueryType = 1
+	QueryTypeReadOnly = QueryType(idb.QueryTypeRead)
 	// QueryTypeReadWrite identifies a read-write query
-	QueryTypeReadWrite QueryType = 2
+	QueryTypeReadWrite = QueryType(idb.QueryTypeReadWrite)
 	// QueryTypeWriteOnly identifies a write-only query
-	QueryTypeWriteOnly QueryType = 3
+	QueryTypeWriteOnly = QueryType(idb.QueryTypeWrite)
 	// QueryTypeSchemaWrite identifies a schema-write query
-	QueryTypeSchemaWrite QueryType = 4
+	QueryTypeSchemaWrite = QueryType(idb.QueryTypeSchemaWrite)
 )
 
-func (st StatementType) String() string {
-	switch st {
-	case StatementTypeReadOnly:
+func (qt QueryType) String() string {
+	switch qt {
+	case QueryTypeReadOnly:
 		return "r"
-	case StatementTypeReadWrite:
+	case QueryTypeReadWrite:
 		return "rw"
-	case StatementTypeWriteOnly:
+	case QueryTypeWriteOnly:
 		return "w"
-	case StatementTypeSchemaWrite:
+	case QueryTypeSchemaWrite:
 		return "s"
 	default:
 		return ""
@@ -103,7 +105,11 @@ type ResultSummary interface {
 	// Plan returns statement plan for the executed statement if available, otherwise null.
 	Plan() Plan
 	// Profile returns profiled statement plan for the executed statement if available, otherwise null.
+	//
+	// Deprecated: Use QueryProfile instead
 	Profile() ProfiledPlan
+	// QueryProfile returns profiled statement plan for the executed statement if available, otherwise null.
+	QueryProfile() QueryProfile
 	// Notifications returns a slice of notifications produced while executing the statement.
 	// The list will be empty if no notifications produced while executing the statement.
 	//
@@ -187,7 +193,7 @@ type ServerInfo interface {
 type simpleServerInfo struct {
 	address         string
 	agent           string
-	protocolVersion db.ProtocolVersion
+	protocolVersion idb.ProtocolVersion
 }
 
 func (s simpleServerInfo) Address() string {
@@ -199,7 +205,10 @@ func (s simpleServerInfo) Agent() string {
 }
 
 func (s simpleServerInfo) ProtocolVersion() db.ProtocolVersion {
-	return s.protocolVersion
+	return db.ProtocolVersion{
+		Major: s.protocolVersion.Major,
+		Minor: s.protocolVersion.Minor,
+	}
 }
 
 // DatabaseInfo contains basic information of the database the query result has been obtained from.
@@ -230,6 +239,8 @@ type Plan interface {
 
 // ProfiledPlan is the same as a regular Plan - except this plan has been executed, meaning it also
 // contains detailed information about how much work each step of the plan incurred on the database.
+//
+// Deprecated: Use QueryProfile instead
 type ProfiledPlan interface {
 	// Operator returns the operation this plan is performing.
 	Operator() string
@@ -239,7 +250,7 @@ type ProfiledPlan interface {
 	// Identifiers returns a list of identifiers used by this plan. Identifiers used by this part of the plan.
 	// These can be both identifiers introduced by you, or automatically generated.
 	Identifiers() []string
-	// DbHits returns the number of times this part of the plan touched the underlying data stores/
+	// DbHits returns the number of times this part of the plan touched the underlying data stores.
 	DbHits() int64
 	// Records returns the number of records this part of the plan produced.
 	Records() int64
@@ -247,10 +258,49 @@ type ProfiledPlan interface {
 	// The children are where this part of the plan gets its input records - unless this is an operator that
 	// introduces new records on its own.
 	Children() []ProfiledPlan
+	// PageCacheMisses returns the number of page cache misses caused by executing this part of the plan.
 	PageCacheMisses() int64
+	// PageCacheHits returns the number of page cache hits caused by executing this part of the plan.
 	PageCacheHits() int64
+	// PageCacheHitRatio returns the ratio of page cache hits to total number of lookups.
 	PageCacheHitRatio() float64
+	// Time returns the amount of time spent in this part of the plan.
 	Time() int64
+}
+
+// QueryProfile is the same as a regular Plan - except this plan has been executed, meaning it also
+// contains detailed information about how much work each step of the plan incurred on the database.
+type QueryProfile interface {
+	// Operator returns the operation this plan is performing.
+	Operator() string
+	// Arguments returns the arguments for the operator used.
+	// Many operators have arguments defining their specific behavior. This map contains those arguments.
+	Arguments() map[string]any
+	// Identifiers returns a list of identifiers used by this plan. Identifiers used by this part of the plan.
+	// These can be both identifiers introduced by you, or automatically generated.
+	Identifiers() []string
+	// DbHits returns the number of times this part of the plan touched the underlying data stores.
+	// The bool indicates whether the value has been recorded. If not, the returned number is meaningless.
+	DbHits() (int64, bool)
+	// Rows returns the number of records this part of the plan produced.
+	// The bool indicates whether the value has been recorded. If not, the returned number is meaningless.
+	Rows() (int64, bool)
+	// Children returns zero or more child plans. A plan is a tree, where each child is another plan.
+	// The children are where this part of the plan gets its input records - unless this is an operator that
+	// introduces new records on its own.
+	Children() []QueryProfile
+	// PageCacheMisses returns the number of page cache misses caused by executing this part of the plan.
+	// The bool indicates whether the value has been recorded. If not, the returned number is meaningless.
+	PageCacheMisses() (int64, bool)
+	// PageCacheHits returns the number of page cache hits caused by executing this part of the plan.
+	// The bool indicates whether the value has been recorded. If not, the returned number is meaningless.
+	PageCacheHits() (int64, bool)
+	// PageCacheHitRatio returns the ratio of page cache hits to total number of lookups.
+	// The bool indicates whether the value has been recorded. If not, the returned number is meaningless.
+	PageCacheHitRatio() (float64, bool)
+	// Time returns the amount of time spent in this part of the plan.
+	// The bool indicates whether the value has been recorded. If not, the returned number is meaningless.
+	Time() (time.Duration, bool)
 }
 
 // Notification represents notifications generated when executing a statement.
@@ -354,7 +404,7 @@ type InputPosition interface {
 }
 
 type resultSummary struct {
-	sum    *db.Summary
+	sum    *idb.Summary
 	cypher string
 	params map[string]any
 }
@@ -383,11 +433,11 @@ func (s *resultSummary) Query() Query {
 }
 
 func (s *resultSummary) StatementType() StatementType {
-	return StatementType(s.sum.StmntType)
+	return StatementType(s.sum.QueryType)
 }
 
 func (s *resultSummary) QueryType() QueryType {
-	return QueryType(s.sum.StmntType)
+	return QueryType(s.sum.QueryType)
 }
 
 func (s *resultSummary) Text() string {
@@ -508,7 +558,7 @@ func (d *databaseInfo) Name() string {
 }
 
 type plan struct {
-	plan *db.Plan
+	plan *idb.Plan
 }
 
 func (p *plan) Operator() string {
@@ -532,14 +582,74 @@ func (p *plan) Children() []Plan {
 }
 
 func (s *resultSummary) Profile() ProfiledPlan {
-	if s.sum.ProfiledPlan == nil {
+	if s.sum.Profile == nil {
 		return nil
 	}
-	return &profile{profile: s.sum.ProfiledPlan}
+	return &profiledPlan{profile: s.sum.Profile}
+}
+
+type profiledPlan struct {
+	profile *idb.Profile
+}
+
+func (p *profiledPlan) String() string {
+	return fmt.Sprintf("%v", *p.profile)
+}
+
+func (p *profiledPlan) Operator() string {
+	return p.profile.Operator
+}
+
+func (p *profiledPlan) Arguments() map[string]any {
+	return p.profile.Arguments
+}
+
+func (p *profiledPlan) Identifiers() []string {
+	return p.profile.Identifiers
+}
+
+func (p *profiledPlan) DbHits() int64 {
+	return util.DerefOr(p.profile.DbHits, 0)
+}
+
+func (p *profiledPlan) Records() int64 {
+	return util.DerefOr(p.profile.Rows, 0)
+}
+
+func (p *profiledPlan) Children() []ProfiledPlan {
+	children := make([]ProfiledPlan, len(p.profile.Children))
+	for i, c := range p.profile.Children {
+		child := c
+		children[i] = &profiledPlan{profile: &child}
+	}
+	return children
+}
+
+func (p *profiledPlan) PageCacheMisses() int64 {
+	return util.DerefOr(p.profile.PageCacheMisses, 0)
+}
+
+func (p *profiledPlan) PageCacheHits() int64 {
+	return util.DerefOr(p.profile.PageCacheHits, 0)
+}
+
+func (p *profiledPlan) PageCacheHitRatio() float64 {
+	return util.DerefOr(p.profile.PageCacheHitRatio, 0.0)
+}
+
+func (p *profiledPlan) Time() int64 {
+	return util.DerefOr(p.profile.Time, 0)
+}
+
+func (s *resultSummary) QueryProfile() QueryProfile {
+	if s.sum.Profile == nil {
+		return nil
+	}
+	return &profile{profile: s.sum.Profile}
 }
 
 type profile struct {
-	profile *db.ProfiledPlan
+	profile *idb.Profile
 }
 
 func (p *profile) String() string {
@@ -558,16 +668,16 @@ func (p *profile) Identifiers() []string {
 	return p.profile.Identifiers
 }
 
-func (p *profile) DbHits() int64 {
-	return p.profile.DbHits
+func (p *profile) DbHits() (int64, bool) {
+	return util.DerefOr(p.profile.DbHits, 0), p.profile.DbHits != nil
 }
 
-func (p *profile) Records() int64 {
-	return p.profile.Records
+func (p *profile) Rows() (int64, bool) {
+	return util.DerefOr(p.profile.Rows, 0), p.profile.Rows != nil
 }
 
-func (p *profile) Children() []ProfiledPlan {
-	children := make([]ProfiledPlan, len(p.profile.Children))
+func (p *profile) Children() []QueryProfile {
+	children := make([]QueryProfile, len(p.profile.Children))
 	for i, c := range p.profile.Children {
 		child := c
 		children[i] = &profile{profile: &child}
@@ -575,20 +685,20 @@ func (p *profile) Children() []ProfiledPlan {
 	return children
 }
 
-func (p *profile) PageCacheMisses() int64 {
-	return p.profile.PageCacheMisses
+func (p *profile) PageCacheMisses() (int64, bool) {
+	return util.DerefOr(p.profile.PageCacheMisses, 0), p.profile.PageCacheMisses != nil
 }
 
-func (p *profile) PageCacheHits() int64 {
-	return p.profile.PageCacheHits
+func (p *profile) PageCacheHits() (int64, bool) {
+	return util.DerefOr(p.profile.PageCacheHits, 0), p.profile.PageCacheHits != nil
 }
 
-func (p *profile) PageCacheHitRatio() float64 {
-	return p.profile.PageCacheHitRatio
+func (p *profile) PageCacheHitRatio() (float64, bool) {
+	return util.DerefOr(p.profile.PageCacheHitRatio, 0), p.profile.PageCacheHitRatio != nil
 }
 
-func (p *profile) Time() int64 {
-	return p.profile.Time
+func (p *profile) Time() (time.Duration, bool) {
+	return time.Duration(util.DerefOr(p.profile.Time, 0)) * time.Nanosecond, p.profile.Time != nil
 }
 
 func (s *resultSummary) Notifications() []Notification {
@@ -657,8 +767,7 @@ func calculateGqlStatusWeight(gqlStatusObject GqlStatusObject) int {
 }
 
 type notification struct {
-	//lint:ignore SA1019 db.Notification is supported for backward compatibility
-	notification *db.Notification
+	notification *idb.Notification
 }
 
 func (n *notification) Code() string {
@@ -742,7 +851,7 @@ func (n *notification) Line() int {
 }
 
 type gqlStatusObject struct {
-	gqlStatusObject *db.GqlStatusObject
+	gqlStatusObject *idb.GqlStatusObject
 }
 
 func (g *gqlStatusObject) GqlStatus() string {

@@ -1939,7 +1939,7 @@ func TestBolt5(outer *testing.T) {
 	for _, test := range txTimeoutTestCases {
 		outer.Run(test.description, func(t *testing.T) {
 			tx := internalTx5{timeout: test.input}
-			version := db.ProtocolVersion{Major: 5, Minor: 0}
+			version := idb.ProtocolVersion{Major: 5, Minor: 0}
 			actual, ok := tx.toMeta(logger, "", version)["tx_timeout"]
 			if test.omitted {
 				if ok {

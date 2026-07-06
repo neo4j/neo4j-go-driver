@@ -1636,7 +1636,7 @@ func serializeSummary(summary neo4j.ResultSummary) map[string]any {
 		"notifications":    serializeNotifications(summary.Notifications(), protocolVersion),
 		"gqlStatusObjects": serializeGqlStatusObjects(summary.GqlStatusObjects()),
 		"plan":             serializePlan(summary.Plan()),
-		"profile":          serializeProfile(summary.Profile()),
+		"profile":          serializeProfile(summary.QueryProfile()),
 	}
 	if summary.ResultAvailableAfter() >= 0 {
 		response["resultAvailableAfter"] = summary.ResultAvailableAfter().Milliseconds()
@@ -1681,30 +1681,53 @@ func serializePlan(plan neo4j.Plan) map[string]any {
 	}
 }
 
-func serializeProfile(profile neo4j.ProfiledPlan) map[string]any {
+func serializeProfile(profile neo4j.QueryProfile) map[string]any {
 	if profile == nil {
 		return nil
 	}
-	result := map[string]any{
-		"args":         profile.Arguments(),
-		"children":     serializeProfiles(profile.Children()),
-		"dbHits":       profile.DbHits(),
-		"identifiers":  profile.Identifiers(),
-		"operatorType": profile.Operator(),
-		"rows":         profile.Records(),
-	}
+
+	dbHits, hasDbHits := profile.DbHits()
+	rows, hasRows := profile.Rows()
+	pageCacheMisses, hasPageCacheMisses := profile.PageCacheMisses()
+	pageCacheHits, hasPageCacheHits := profile.PageCacheHits()
+	pageCacheHitRatio, hasPageCacheHitRatio := profile.PageCacheHitRatio()
+	time_, hasTime := profile.Time()
+
+	size := 4 + sumTrue(hasDbHits, hasRows, hasPageCacheMisses, hasPageCacheHits, hasPageCacheHitRatio, hasTime)
+	result := make(map[string]any, size)
+	result["args"] = profile.Arguments()
+	result["children"] = serializeProfiles(profile.Children())
+	result["operatorType"] = profile.Operator()
+	result["identifiers"] = profile.Identifiers()
+	setIfOk(result, "dbHits", dbHits, hasDbHits)
+	setIfOk(result, "rows", rows, hasRows)
+	setIfOk(result, "pageCacheMisses", pageCacheMisses, hasPageCacheMisses)
+	setIfOk(result, "pageCacheHits", pageCacheHits, hasPageCacheHits)
+	setIfOk(result, "pageCacheHitRatio", pageCacheHitRatio, hasPageCacheHitRatio)
+	setIfOk(result, "time", time_.Nanoseconds(), hasTime)
 	return result
 }
 
-func serializeProfiles(children []neo4j.ProfiledPlan) []map[string]any {
+func setIfOk(in map[string]any, at string, to any, ok bool) {
+	if ok {
+		in[at] = to
+	}
+}
+
+func sumTrue(values ...bool) int {
+	res := 0
+	for _, value := range values {
+		if value {
+			res++
+		}
+	}
+	return res
+}
+
+func serializeProfiles(children []neo4j.QueryProfile) []map[string]any {
 	result := make([]map[string]any, len(children))
 	for i, child := range children {
-		childProfile := serializeProfile(child)
-		childProfile["pageCacheMisses"] = child.PageCacheMisses()
-		childProfile["pageCacheHits"] = child.PageCacheHits()
-		childProfile["pageCacheHitRatio"] = child.PageCacheHitRatio()
-		childProfile["time"] = child.Time()
-		result[i] = childProfile
+		result[i] = serializeProfile(child)
 	}
 	return result
 }

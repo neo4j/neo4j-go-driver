@@ -28,9 +28,10 @@ import (
 	"time"
 
 	"github.com/neo4j/neo4j-go-driver/v6/neo4j/db"
+	idb "github.com/neo4j/neo4j-go-driver/v6/neo4j/internal/db"
 )
 
-func AssertNextOnlyRecord(t *testing.T, rec *db.Record, sum *db.Summary, err error) {
+func AssertNextOnlyRecord(t *testing.T, rec *db.Record, sum *idb.Summary, err error) {
 	t.Helper()
 	if rec == nil {
 		t.Errorf("Expected record")
@@ -43,7 +44,7 @@ func AssertNextOnlyRecord(t *testing.T, rec *db.Record, sum *db.Summary, err err
 	}
 }
 
-func AssertNextOnlySummary(t *testing.T, rec *db.Record, sum *db.Summary, err error) {
+func AssertNextOnlySummary(t *testing.T, rec *db.Record, sum *idb.Summary, err error) {
 	t.Helper()
 	if rec != nil {
 		t.Errorf("Didn't expect record")
@@ -56,7 +57,7 @@ func AssertNextOnlySummary(t *testing.T, rec *db.Record, sum *db.Summary, err er
 	}
 }
 
-func AssertNextOnlyError(t *testing.T, rec *db.Record, sum *db.Summary, err error) {
+func AssertNextOnlyError(t *testing.T, rec *db.Record, sum *idb.Summary, err error) {
 	t.Helper()
 	if rec != nil {
 		t.Errorf("Didn't expect record")
@@ -220,10 +221,28 @@ func AssertMapDoesNotHaveKey[K comparable](t *testing.T, m map[K]any, key K) {
 	}
 }
 
-func AssertIntEqual(t *testing.T, ai, ei int) {
+type cmpInt interface {
+	int | int8 | int16 | int32 | int64 | uint | uint8 | uint16 | uint32 | uint64
+}
+
+func AssertIntEqual[T cmpInt](t *testing.T, ai, ei T) {
 	t.Helper()
 	if ai != ei {
 		t.Errorf("%d != %d", ai, ei)
+	}
+	if !reflect.DeepEqual(ai, ei) {
+		t.Errorf("Differs %+v vs %+v", ai, ei)
+	}
+}
+
+type cmpFloat interface {
+	float32 | float64
+}
+
+func AssertFloatEqual[T cmpFloat](t *testing.T, ai, ei T) {
+	t.Helper()
+	if ai != ei {
+		t.Errorf("%f != %f", ai, ei)
 	}
 	if !reflect.DeepEqual(ai, ei) {
 		t.Errorf("Differs %+v vs %+v", ai, ei)

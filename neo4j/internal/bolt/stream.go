@@ -31,7 +31,7 @@ type stream struct {
 	attached   bool
 	keys       []string
 	fifo       list.List
-	sum        *db.Summary
+	sum        *idb.Summary
 	err        error
 	qid        int64
 	fetchSize  int
@@ -44,7 +44,7 @@ type stream struct {
 
 // Acts on buffered data, first return value indicates if buffering
 // is active or not.
-func (s *stream) bufferedNext() (bool, *db.Record, *db.Summary, error) {
+func (s *stream) bufferedNext() (bool, *db.Record, *idb.Summary, error) {
 	e := s.fifo.Front()
 	if e != nil {
 		s.fifo.Remove(e)
@@ -79,8 +79,8 @@ func (s *stream) push(rec *db.Record) {
 	s.fifo.PushBack(rec)
 }
 
-func (s *stream) ToSummary() db.StreamSummary {
-	return db.StreamSummary{
+func (s *stream) ToSummary() idb.StreamSummary {
+	return idb.StreamSummary{
 		HadRecord: s.hadRecord,
 		HadKey:    len(s.keys) > 0,
 	}
@@ -114,7 +114,7 @@ func (o *openstreams) attach(s *stream) {
 // Detaches the current stream from being current and
 // removes it from set of open streams it is no longer open.
 // The stream should be either in failed state or completed.
-func (o *openstreams) detach(sum *db.Summary, err error) {
+func (o *openstreams) detach(sum *idb.Summary, err error) {
 	if o.curr == nil {
 		return
 	}
