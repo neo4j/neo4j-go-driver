@@ -26,6 +26,7 @@ import (
 	"github.com/neo4j/neo4j-go-driver/v6/neo4j/db"
 	"github.com/neo4j/neo4j-go-driver/v6/neo4j/dbtype"
 	idb "github.com/neo4j/neo4j-go-driver/v6/neo4j/internal/db"
+	"github.com/neo4j/neo4j-go-driver/v6/neo4j/internal/mapping"
 	"github.com/neo4j/neo4j-go-driver/v6/neo4j/internal/packstream"
 	"github.com/neo4j/neo4j-go-driver/v6/neo4j/log"
 )
@@ -381,7 +382,16 @@ func (o *outgoing) packStruct(x any) {
 	case dbtype.Vector[float64]:
 		o.packer.VectorFloat64(v.Elems)
 	default:
-		o.onPackErr(&db.UnsupportedTypeError{Type: reflect.TypeOf(x)})
+		m, ok := mapping.StructAsMap(x)
+		if !ok {
+			o.onPackErr(&db.UnsupportedTypeError{Type: reflect.TypeOf(x)})
+			return
+		}
+		if m == nil {
+			o.packer.Nil()
+			return
+		}
+		o.packMap(m)
 	}
 }
 

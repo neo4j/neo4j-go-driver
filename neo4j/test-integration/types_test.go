@@ -420,7 +420,9 @@ func TestTypes(outer *testing.T) {
 	})
 
 	outer.Run("Un-convertible Go types", func(inner *testing.T) {
+		// chan makes this un-convertible; structs themselves pack fine.
 		type unsupportedType struct {
+			Ch chan int
 		}
 
 		inner.Run("Session.Run", func(deepT *testing.T) {
