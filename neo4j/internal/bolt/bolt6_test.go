@@ -199,6 +199,17 @@ func TestBolt6(outer *testing.T) {
 				expectedMinor: 1,
 				description:   "Server offers 6.1; driver picks 6.1 as the highest supported minor",
 			},
+			{
+				name: "newer version offered but not selected",
+				offerings: []protocolVersion{
+					{major: 6, minor: 2, back: 0},
+					{major: 6, minor: 1, back: 1},
+					{major: 5, minor: 8, back: 8},
+					{major: 4, minor: 4, back: 2},
+				},
+				expectedMinor: 1,
+				description:   "Server offers 6.2; driver falls back to 6.1 as the highest supported minor",
+			},
 		}
 
 		for _, tc := range testCases {
