@@ -46,6 +46,7 @@ type (
 	Record                         = db.Record
 	InvalidValue                   = dbtype.InvalidValue
 	Vector[T dbtype.VectorElement] = dbtype.Vector[T]
+	UUID                           = dbtype.UUID
 )
 
 // DateOf creates a neo4j.Date from time.Time.

@@ -35,6 +35,7 @@ const (
 	PackedNil
 	PackedTrue
 	PackedFalse
+	PackedUUID
 )
 
 type Unpacker struct {
@@ -145,6 +146,13 @@ func (u *Unpacker) ByteArray() []byte {
 	return out
 }
 
+func (u *Unpacker) UUID() [16]byte {
+	buf := u.read(16)
+	var out [16]byte
+	copy(out[:], buf)
+	return out
+}
+
 func (u *Unpacker) pop() byte {
 	if u.off < u.len {
 		x := u.buf[u.off]
@@ -243,6 +251,8 @@ func init() {
 	markers[0xd8] = marker{typ: PackedMap, numlenbytes: 1}
 	markers[0xd9] = marker{typ: PackedMap, numlenbytes: 2}
 	markers[0xda] = marker{typ: PackedMap, numlenbytes: 4}
+
+	markers[0xe0] = marker{typ: PackedUUID}
 
 	for i = 0xf0; i < 0x100; i++ {
 		markers[i] = marker{typ: PackedInt, shortlen: int8(i - 0x100)}

@@ -102,12 +102,14 @@ func (c *chunker) send(ctx context.Context, wr io.Writer) error {
 		}
 	}
 
-	// Prepare for reuse
+	c.reset()
+	return nil
+}
+
+func (c *chunker) reset() {
 	c.offset = 0
 	c.buf = c.buf[:0]
 	c.sizes = c.sizes[:0]
-
-	return nil
 }
 
 func processWriteError(err error, ctx context.Context) error {
