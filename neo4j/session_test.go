@@ -303,7 +303,7 @@ func TestSession(outer *testing.T) {
 			conn.ConsumeHook = func() {
 				consumeCalls++
 				conn.Bookm = fmt.Sprintf("consume-%d", consumeCalls)
-				conn.ConsumeSum = &db.Summary{}
+				conn.ConsumeSum = &idb.Summary{}
 			}
 			pool.BorrowConn = conn
 
@@ -800,7 +800,7 @@ func TestSession(outer *testing.T) {
 				}
 				result := &ConnFake{
 					Name: "home",
-					ConnectionVersion: db.ProtocolVersion{
+					ConnectionVersion: idb.ProtocolVersion{
 						Major: 5,
 						Minor: 0,
 					},

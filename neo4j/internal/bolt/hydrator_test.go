@@ -30,6 +30,7 @@ import (
 	idb "github.com/neo4j/neo4j-go-driver/v6/neo4j/internal/db"
 	"github.com/neo4j/neo4j-go-driver/v6/neo4j/internal/gql"
 	"github.com/neo4j/neo4j-go-driver/v6/neo4j/internal/packstream"
+	"github.com/neo4j/neo4j-go-driver/v6/neo4j/internal/util"
 )
 
 type hydratorTestCase struct {
@@ -178,7 +179,7 @@ func TestHydrator(outer *testing.T) {
 				packer.String("db")
 				packer.String("s")
 			},
-			x: &success{tlast: 124, tfirst: -1, bookmark: "b", qtype: db.QueryTypeWrite, db: "s", qid: -1, num: 4},
+			x: &success{tlast: 124, tfirst: -1, bookmark: "b", qtype: idb.QueryTypeWrite, db: "s", qid: -1, num: 4},
 		},
 		{
 			name: "Success summary with plan",
@@ -212,12 +213,12 @@ func TestHydrator(outer *testing.T) {
 				packer.ArrayHeader(1)
 				packer.String("cid")
 			},
-			x: &success{tlast: -1, tfirst: -1, bookmark: "bm", db: "sys", qid: -1, num: 4, plan: &db.Plan{
+			x: &success{tlast: -1, tfirst: -1, bookmark: "bm", db: "sys", qid: -1, num: 4, plan: &idb.Plan{
 				Operator:    "opType",
 				Arguments:   map[string]any{"arg1": int64(1001)},
 				Identifiers: []string{"id1", "id2"},
-				Children: []db.Plan{
-					{Operator: "cop", Identifiers: []string{"cid"}, Children: []db.Plan{}},
+				Children: []idb.Plan{
+					{Operator: "cop", Identifiers: []string{"cid"}, Children: []idb.Plan{}},
 				},
 			}},
 		},
@@ -262,15 +263,21 @@ func TestHydrator(outer *testing.T) {
 				packer.Int(2)
 			},
 			x: &success{tlast: -1, tfirst: -1, bookmark: "bm", db: "sys", qid: -1, num: 4,
-				profile: &db.ProfiledPlan{
+				profile: &idb.Profile{
 					Operator:    "opType",
 					Arguments:   map[string]any{"arg1": int64(1001)},
 					Identifiers: []string{"id1", "id2"},
-					Children: []db.ProfiledPlan{
-						{Operator: "cop", Identifiers: []string{"cid"}, Children: []db.ProfiledPlan{}, DbHits: int64(1), Records: int64(2)},
+					Children: []idb.Profile{
+						{
+							Operator:    "cop",
+							Identifiers: []string{"cid"},
+							Children:    []idb.Profile{},
+							DbHits:      util.Ptr(int64(1)),
+							Rows:        util.Ptr(int64(2)),
+						},
 					},
-					DbHits:  int64(7),
-					Records: int64(4),
+					DbHits: util.Ptr(int64(7)),
+					Rows:   util.Ptr(int64(4)),
 				}},
 		},
 		{
@@ -314,9 +321,8 @@ func TestHydrator(outer *testing.T) {
 				packer.String("s2")
 			},
 			x: &success{tlast: -1, tfirst: -1, bookmark: "bm", db: "sys", qid: -1, num: 4,
-				//lint:ignore SA1019 db.Notification is supported for backward compatibility
-				notifications: []db.Notification{
-					{Code: "c1", Title: "t1", Description: "d1", Severity: "s1", Position: &db.InputPosition{Offset: 1, Line: 2, Column: 3}},
+				notifications: []idb.Notification{
+					{Code: "c1", Title: "t1", Description: "d1", Severity: "s1", Position: &idb.InputPosition{Offset: 1, Line: 2, Column: 3}},
 					{Code: "c2", Title: "t2", Description: "d2", Severity: "s2"},
 				}},
 		},
@@ -365,14 +371,14 @@ func TestHydrator(outer *testing.T) {
 				packer.String("sd2")
 			},
 			x: &success{tlast: -1, tfirst: -1, bookmark: "bm", db: "sys", qid: -1, num: 4,
-				statuses: []db.GqlStatusObject{
+				statuses: []idb.GqlStatusObject{
 					{
 						Code:              "n1",
 						Title:             "t1",
 						Description:       "d1",
 						GqlStatus:         "g1",
 						StatusDescription: "sd1",
-						Position:          &db.InputPosition{Offset: 1, Line: 2, Column: 3},
+						Position:          &idb.InputPosition{Offset: 1, Line: 2, Column: 3},
 						Classification:    "c1",
 						Severity:          "s1",
 						DiagnosticRecord:  fullDiagnosticRecord,
@@ -400,7 +406,7 @@ func TestHydrator(outer *testing.T) {
 				packer.String("has_more")
 				packer.Bool(false)
 			},
-			x: &success{tlast: 7, tfirst: -1, bookmark: "b1", qtype: db.QueryTypeRead, qid: -1, num: 4},
+			x: &success{tlast: 7, tfirst: -1, bookmark: "b1", qtype: idb.QueryTypeRead, qid: -1, num: 4},
 		},
 		{
 			name: "Success route response",
@@ -1159,7 +1165,7 @@ func TestHydrator(outer *testing.T) {
 				&dbtype.UnsupportedType{
 					Name:                   "FutureType",
 					MinimumProtocolVersion: db.ProtocolVersion{Major: 255, Minor: 0},
-					Message:                ptr("Some configuration message"),
+					Message:                util.Ptr("Some configuration message"),
 				},
 			}},
 		},
@@ -1215,11 +1221,6 @@ func TestHydrator(outer *testing.T) {
 			}
 		})
 	}
-}
-
-// Helper function to create a pointer (e.g., for an untyped literal)
-func ptr[T any](x T) *T {
-	return &x
 }
 
 func TestHydratorBolt5(outer *testing.T) {

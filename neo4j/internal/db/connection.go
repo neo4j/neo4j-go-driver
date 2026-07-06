@@ -66,7 +66,7 @@ type NotificationConfig struct {
 	DisClas notifications.NotificationDisabledClassifications
 }
 
-func (n *NotificationConfig) ToMeta(meta map[string]any, version db.ProtocolVersion) {
+func (n *NotificationConfig) ToMeta(meta map[string]any, version ProtocolVersion) {
 	if n.MinSev != notifications.DefaultLevel {
 		meta["notifications_minimum_severity"] = string(n.MinSev)
 	}
@@ -113,9 +113,9 @@ type Connection interface {
 	// Next moves to next item in the stream.
 	// If error is nil, either Record or Summary has a value, if Record is nil there are no more records.
 	// If error is non nil, neither Record or Summary has a value.
-	Next(ctx context.Context, streamHandle StreamHandle) (*db.Record, *db.Summary, error)
+	Next(ctx context.Context, streamHandle StreamHandle) (*db.Record, *Summary, error)
 	// Consume discards all records on the stream and returns the summary otherwise it will return the error.
-	Consume(ctx context.Context, streamHandle StreamHandle) (*db.Summary, error)
+	Consume(ctx context.Context, streamHandle StreamHandle) (*Summary, error)
 	// Buffer buffers all records on the stream, records, summary and error will be received through call to Next
 	// The Connection implementation should preserve/buffer streams automatically if needed when new
 	// streams are created and the server doesn't support multiple streams. Use Buffer to force
@@ -170,7 +170,7 @@ type Connection interface {
 	// If it's `true` (under otherwise same conditions) a `FeatureNotSupportedError` will be returned.
 	ReAuth(context.Context, *ReAuthToken) error
 	// Version returns the protocol version of the connection
-	Version() db.ProtocolVersion
+	Version() ProtocolVersion
 	// ResetAuth clears any authentication token held by this connection
 	ResetAuth()
 	// GetCurrentAuth returns the current authentication manager and token that this connection is authenticated with

@@ -31,7 +31,7 @@ import (
 type iter struct {
 	expectNext bool
 	expectRec  *db.Record
-	expectSum  *db.Summary
+	expectSum  *idb.Summary
 	expectErr  error
 }
 
@@ -76,7 +76,7 @@ func TestResult(outer *testing.T) {
 	}
 	record1 := recs[0]
 	record2 := recs[1]
-	sums := []*db.Summary{{}}
+	sums := []*idb.Summary{{}}
 	errs := []error{
 		errors.New("whatever"),
 	}
@@ -104,7 +104,7 @@ func TestResult(outer *testing.T) {
 		name   string
 		stream []Next
 		rounds []iter
-		sum    db.Summary
+		sum    idb.Summary
 	}{
 		{
 			name: "happy",
@@ -417,7 +417,7 @@ func TestResult(outer *testing.T) {
 
 	outer.Run("IsOpen", func(t *testing.T) {
 		openResult := &result{summary: nil}
-		closedResult := &result{summary: &db.Summary{}}
+		closedResult := &result{summary: &idb.Summary{}}
 
 		AssertTrue(t, openResult.IsOpen())
 		AssertFalse(t, closedResult.IsOpen())
@@ -496,7 +496,7 @@ func TestResult(outer *testing.T) {
 
 		for _, testCase := range testCases {
 			inner.Run(testCase.scenario, func(t *testing.T) {
-				result := &result{summary: &db.Summary{}, txState: &transactionState{}}
+				result := &result{summary: &idb.Summary{}, txState: &transactionState{}}
 
 				err := testCase.callback(t, result)
 

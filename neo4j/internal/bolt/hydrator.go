@@ -38,22 +38,21 @@ const containsUpdatesKey = "contains-updates"
 
 type ignored struct{}
 type success struct {
-	fields       []string
-	tfirst       int64
-	qid          int64
-	bookmark     string
-	connectionId string
-	server       string
-	db           string
-	hasMore      bool
-	tlast        int64
-	qtype        db.QueryType
-	counters     map[string]any
-	plan         *db.Plan
-	profile      *db.ProfiledPlan
-	//lint:ignore SA1019 db.Notification is supported for backward compatibility
-	notifications      []db.Notification
-	statuses           []db.GqlStatusObject
+	fields             []string
+	tfirst             int64
+	qid                int64
+	bookmark           string
+	connectionId       string
+	server             string
+	db                 string
+	hasMore            bool
+	tlast              int64
+	qtype              idb.QueryType
+	counters           map[string]any
+	plan               *idb.Plan
+	profile            *idb.Profile
+	notifications      []idb.Notification
+	statuses           []idb.GqlStatusObject
 	routingTable       *idb.RoutingTable
 	num                uint32
 	configurationHints map[string]any
@@ -74,14 +73,14 @@ func (s *success) String() string {
 	return str
 }
 
-func (s *success) summary() *db.Summary {
-	return &db.Summary{
+func (s *success) summary() *idb.Summary {
+	return &idb.Summary{
 		Bookmark:              s.bookmark,
-		StmntType:             s.qtype,
+		QueryType:             s.qtype,
 		Counters:              extractIntCounters(s.counters),
 		TLast:                 s.tlast,
 		Plan:                  s.plan,
-		ProfiledPlan:          s.profile,
+		Profile:               s.profile,
 		Notifications:         s.notifications,
 		GqlStatusObjects:      s.statuses,
 		Database:              s.db,
@@ -267,13 +266,13 @@ func (h *hydrator) success(n uint32) *success {
 			queryType := h.unp.String()
 			switch queryType {
 			case "r":
-				succ.qtype = db.QueryTypeRead
+				succ.qtype = idb.QueryTypeRead
 			case "w":
-				succ.qtype = db.QueryTypeWrite
+				succ.qtype = idb.QueryTypeWrite
 			case "rw":
-				succ.qtype = db.QueryTypeReadWrite
+				succ.qtype = idb.QueryTypeReadWrite
 			case "s":
-				succ.qtype = db.QueryTypeSchemaWrite
+				succ.qtype = idb.QueryTypeSchemaWrite
 			default:
 				h.setErr(&db.ProtocolError{
 					MessageType: "success",
@@ -901,13 +900,10 @@ func (h *hydrator) duration(n uint32) any {
 	return dbtype.Duration{Months: mon, Days: day, Seconds: sec, Nanos: int(nan)}
 }
 
-//lint:ignore SA1019 db.Notification is supported for backward compatibility
-func parseNotifications(notificationsx []any) []db.Notification {
-	//lint:ignore SA1019 db.Notification is supported for backward compatibility
-	var notifications []db.Notification
+func parseNotifications(notificationsx []any) []idb.Notification {
+	var notifications []idb.Notification
 	if notificationsx != nil {
-		//lint:ignore SA1019 db.Notification is supported for backward compatibility
-		notifications = make([]db.Notification, 0, len(notificationsx))
+		notifications = make([]idb.Notification, 0, len(notificationsx))
 		for _, x := range notificationsx {
 			notificationx, ok := x.(map[string]any)
 			if ok {
@@ -918,10 +914,10 @@ func parseNotifications(notificationsx []any) []db.Notification {
 	return notifications
 }
 
-func parseGqlStatusObjects(statuses []any) []db.GqlStatusObject {
-	var gqlStatusObjects []db.GqlStatusObject
+func parseGqlStatusObjects(statuses []any) []idb.GqlStatusObject {
+	var gqlStatusObjects []idb.GqlStatusObject
 	if statuses != nil {
-		gqlStatusObjects = make([]db.GqlStatusObject, 0, len(statuses))
+		gqlStatusObjects = make([]idb.GqlStatusObject, 0, len(statuses))
 		for _, x := range statuses {
 			status, ok := x.(map[string]any)
 			if ok {
@@ -947,15 +943,15 @@ func parsePlanOpIdArgsChildren(planx map[string]any) (string, []string, map[stri
 	return operator, identifiers, arguments, childrenx
 }
 
-func parsePlan(planx map[string]any) *db.Plan {
+func parsePlan(planx map[string]any) *idb.Plan {
 	op, ids, args, childrenx := parsePlanOpIdArgsChildren(planx)
-	plan := &db.Plan{
+	plan := &idb.Plan{
 		Operator:    op,
 		Arguments:   args,
 		Identifiers: ids,
 	}
 
-	plan.Children = make([]db.Plan, 0, len(childrenx))
+	plan.Children = make([]idb.Plan, 0, len(childrenx))
 	for _, c := range childrenx {
 		childPlanx, _ := c.(map[string]any)
 		if len(childPlanx) > 0 {
@@ -969,35 +965,26 @@ func parsePlan(planx map[string]any) *db.Plan {
 	return plan
 }
 
-func parseProfile(profilex map[string]any) *db.ProfiledPlan {
+func parseProfile(profilex map[string]any) *idb.Profile {
 	op, ids, args, childrenx := parsePlanOpIdArgsChildren(profilex)
-	plan := &db.ProfiledPlan{
-		Operator:    op,
-		Arguments:   args,
-		Identifiers: ids,
+	plan := &idb.Profile{
+		Operator:          op,
+		Arguments:         args,
+		Identifiers:       ids,
+		DbHits:            extractOptional[int64](profilex, "dbHits"),
+		Rows:              extractOptional[int64](profilex, "rows"),
+		Time:              extractOptional[int64](profilex, "time"),
+		PageCacheMisses:   extractOptional[int64](profilex, "pageCacheMisses"),
+		PageCacheHits:     extractOptional[int64](profilex, "pageCacheHits"),
+		PageCacheHitRatio: extractOptional[float64](profilex, "pageCacheHitRatio"),
 	}
 
-	plan.DbHits, _ = profilex["dbHits"].(int64)
-	plan.Records, _ = profilex["rows"].(int64)
-
-	plan.Children = make([]db.ProfiledPlan, 0, len(childrenx))
+	plan.Children = make([]idb.Profile, 0, len(childrenx))
 	for _, c := range childrenx {
 		childPlanx, _ := c.(map[string]any)
 		if len(childPlanx) > 0 {
 			childPlan := parseProfile(childPlanx)
 			if childPlan != nil {
-				if pageCacheMisses, ok := childPlanx["pageCacheMisses"]; ok {
-					childPlan.PageCacheMisses = pageCacheMisses.(int64)
-				}
-				if pageCacheHits, ok := childPlanx["pageCacheHits"]; ok {
-					childPlan.PageCacheHits = pageCacheHits.(int64)
-				}
-				if pageCacheHitRatio, ok := childPlanx["pageCacheHitRatio"]; ok {
-					childPlan.PageCacheHitRatio = pageCacheHitRatio.(float64)
-				}
-				if planTime, ok := childPlanx["time"]; ok {
-					childPlan.Time = planTime.(int64)
-				}
 				plan.Children = append(plan.Children, *childPlan)
 			}
 		}
@@ -1006,11 +993,18 @@ func parseProfile(profilex map[string]any) *db.ProfiledPlan {
 	return plan
 }
 
-func parseInputPosition(m map[string]any) *db.InputPosition {
+func extractOptional[T any](profilex map[string]any, key string) *T {
+	if value, ok := profilex[key].(T); ok {
+		return &value
+	}
+	return nil
+}
+
+func parseInputPosition(m map[string]any) *idb.InputPosition {
 	if m == nil {
 		return nil
 	}
-	pos := &db.InputPosition{}
+	pos := &idb.InputPosition{}
 	if i, ok := m["column"].(int64); ok {
 		pos.Column = int(i)
 	}
@@ -1023,10 +1017,8 @@ func parseInputPosition(m map[string]any) *db.InputPosition {
 	return pos
 }
 
-//lint:ignore SA1019 db.Notification is supported for backward compatibility
-func parseNotification(m map[string]any) db.Notification {
-	//lint:ignore SA1019 db.Notification is supported for backward compatibility
-	n := db.Notification{}
+func parseNotification(m map[string]any) idb.Notification {
+	n := idb.Notification{}
 	n.Code, _ = m["code"].(string)
 	if description, ok := m["description"].(string); ok {
 		n.Description = description
@@ -1040,8 +1032,8 @@ func parseNotification(m map[string]any) db.Notification {
 	return n
 }
 
-func parseGqlStatusObject(m map[string]any) db.GqlStatusObject {
-	g := db.GqlStatusObject{}
+func parseGqlStatusObject(m map[string]any) idb.GqlStatusObject {
+	g := idb.GqlStatusObject{}
 
 	if status, ok := m["gql_status"].(string); ok {
 		g.GqlStatus = status
@@ -1053,20 +1045,17 @@ func parseGqlStatusObject(m map[string]any) db.GqlStatusObject {
 
 	// Backward compatibility support for older Notification API.
 	if code, ok := m["neo4j_code"].(string); ok {
-		//lint:ignore SA1019 Code is supported for backward compatibility
 		g.Code = code
 		g.IsNotification = true
 	}
 
 	// Backward compatibility support for older Notification API.
 	if title, ok := m["title"].(string); ok {
-		//lint:ignore SA1019 Title is supported for backward compatibility
 		g.Title = title
 	}
 
 	// Backward compatibility support for older Notification API.
 	if description, ok := m["description"].(string); ok {
-		//lint:ignore SA1019 Description is supported for backward compatibility
 		g.Description = description
 	}
 

@@ -18,63 +18,57 @@
 package notifications
 
 import (
-	"github.com/neo4j/neo4j-go-driver/v6/neo4j/db"
+	idb "github.com/neo4j/neo4j-go-driver/v6/neo4j/internal/db"
 	"github.com/neo4j/neo4j-go-driver/v6/neo4j/internal/gql"
 	"github.com/neo4j/neo4j-go-driver/v6/neo4j/notifications"
 )
 
-func newSuccessGqlStatusObject() *db.GqlStatusObject {
-	return &db.GqlStatusObject{
+func newSuccessGqlStatusObject() *idb.GqlStatusObject {
+	return &idb.GqlStatusObject{
 		GqlStatus:         "00000",
 		StatusDescription: "note: successful completion",
 		DiagnosticRecord:  gql.NewDefaultDiagnosticRecord(),
 	}
 }
 
-func newNoDataGqlStatusObject() *db.GqlStatusObject {
-	return &db.GqlStatusObject{
+func newNoDataGqlStatusObject() *idb.GqlStatusObject {
+	return &idb.GqlStatusObject{
 		GqlStatus:         "02000",
 		StatusDescription: "note: no data",
 		DiagnosticRecord:  gql.NewDefaultDiagnosticRecord(),
 	}
 }
 
-func newOmittedResultGqlStatusObject() *db.GqlStatusObject {
-	return &db.GqlStatusObject{
+func newOmittedResultGqlStatusObject() *idb.GqlStatusObject {
+	return &idb.GqlStatusObject{
 		GqlStatus:         "00001",
 		StatusDescription: "note: successful completion - omitted result",
 		DiagnosticRecord:  gql.NewDefaultDiagnosticRecord(),
 	}
 }
 
-func newUnknownWarningResultGqlStatusObject() *db.GqlStatusObject {
-	return &db.GqlStatusObject{
+func newUnknownWarningResultGqlStatusObject() *idb.GqlStatusObject {
+	return &idb.GqlStatusObject{
 		GqlStatus:         "01N42",
 		StatusDescription: "warn: unknown warning",
 		DiagnosticRecord:  gql.NewDefaultDiagnosticRecord(),
 	}
 }
 
-func newUnknownInformationResultGqlStatusObject() *db.GqlStatusObject {
-	return &db.GqlStatusObject{
+func newUnknownInformationResultGqlStatusObject() *idb.GqlStatusObject {
+	return &idb.GqlStatusObject{
 		GqlStatus:         "03N42",
 		StatusDescription: "info: unknown notification",
 		DiagnosticRecord:  gql.NewDefaultDiagnosticRecord(),
 	}
 }
 
-// ToNotification returns a db.Notification that corresponds to the given db.GqlStatusObject.
+// ToNotification returns a idb.Notification that corresponds to the given idb.GqlStatusObject.
 // It maps fields from the status to their respective notification fields.
-//
-//lint:ignore SA1019 db.Notification is supported for backward compatibility
-func ToNotification(gqlStatusObject db.GqlStatusObject) *db.Notification {
-	//lint:ignore SA1019 db.Notification is supported for backward compatibility
-	return &db.Notification{
-		//lint:ignore SA1019 Code is supported for backward compatibility
-		Code: gqlStatusObject.Code,
-		//lint:ignore SA1019 Title is supported for backward compatibility
-		Title: gqlStatusObject.Title,
-		//lint:ignore SA1019 Description is supported for backward compatibility
+func ToNotification(gqlStatusObject idb.GqlStatusObject) *idb.Notification {
+	return &idb.Notification{
+		Code:        gqlStatusObject.Code,
+		Title:       gqlStatusObject.Title,
 		Description: gqlStatusObject.Description,
 		Position:    gqlStatusObject.Position,
 		Severity:    gqlStatusObject.Severity,
@@ -82,12 +76,10 @@ func ToNotification(gqlStatusObject db.GqlStatusObject) *db.Notification {
 	}
 }
 
-// ToGqlStatusObject returns a db.GqlStatusObject that corresponds to the given db.Notification.
+// ToGqlStatusObject returns a idb.GqlStatusObject that corresponds to the given idb.Notification.
 // It maps fields from the notification to their respective status fields.
-//
-//lint:ignore SA1019 db.Notification is supported for backward compatibility
-func ToGqlStatusObject(notification db.Notification) *db.GqlStatusObject {
-	var defaultStatus *db.GqlStatusObject
+func ToGqlStatusObject(notification idb.Notification) *idb.GqlStatusObject {
+	var defaultStatus *idb.GqlStatusObject
 	if notification.Severity == string(notifications.Warning) {
 		defaultStatus = newUnknownWarningResultGqlStatusObject()
 	} else {
@@ -115,7 +107,7 @@ func ToGqlStatusObject(notification db.Notification) *db.GqlStatusObject {
 		diagnosticRecord["_classification"] = notification.Category
 	}
 
-	return &db.GqlStatusObject{
+	return &idb.GqlStatusObject{
 		Code:              notification.Code,
 		Title:             notification.Title,
 		Description:       notification.Description,
@@ -129,8 +121,8 @@ func ToGqlStatusObject(notification db.Notification) *db.GqlStatusObject {
 	}
 }
 
-// ToGqlStatusObjectFromSummary creates a new db.GqlStatusObject based on the context of the db.StreamSummary.
-func ToGqlStatusObjectFromSummary(summary db.StreamSummary) *db.GqlStatusObject {
+// ToGqlStatusObjectFromSummary creates a new idb.GqlStatusObject based on the context of the db.StreamSummary.
+func ToGqlStatusObjectFromSummary(summary idb.StreamSummary) *idb.GqlStatusObject {
 	if summary.HadRecord {
 		return newSuccessGqlStatusObject()
 	} else if summary.HadKey {

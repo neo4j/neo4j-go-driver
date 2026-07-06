@@ -424,7 +424,7 @@ func (b *bolt3) discardStream(ctx context.Context) error {
 	}
 
 	var (
-		sum *db.Summary
+		sum *idb.Summary
 		err error
 	)
 	for sum == nil && err == nil {
@@ -442,7 +442,7 @@ func (b *bolt3) bufferStream(ctx context.Context) error {
 
 	n := 0
 	var (
-		sum *db.Summary
+		sum *idb.Summary
 		err error
 		rec *db.Record
 	)
@@ -552,7 +552,7 @@ func (b *bolt3) Keys(streamHandle idb.StreamHandle) ([]string, error) {
 
 // Reads one record from the stream.
 func (b *bolt3) Next(ctx context.Context, streamHandle idb.StreamHandle) (
-	*db.Record, *db.Summary, error) {
+	*db.Record, *idb.Summary, error) {
 	stream, ok := streamHandle.(*stream)
 	if !ok {
 		return nil, nil, errors.New("invalid stream handle")
@@ -574,7 +574,7 @@ func (b *bolt3) Next(ctx context.Context, streamHandle idb.StreamHandle) (
 }
 
 func (b *bolt3) Consume(ctx context.Context, streamHandle idb.StreamHandle) (
-	*db.Summary, error) {
+	*idb.Summary, error) {
 	stream, ok := streamHandle.(*stream)
 	if !ok {
 		return nil, errors.New("invalid stream handle")
@@ -618,7 +618,7 @@ func (b *bolt3) Buffer(ctx context.Context,
 }
 
 // Reads one record from the network.
-func (b *bolt3) receiveNext(ctx context.Context) (*db.Record, *db.Summary, error) {
+func (b *bolt3) receiveNext(ctx context.Context) (*db.Record, *idb.Summary, error) {
 	if err := b.assertState(bolt3_streaming, bolt3_streamingtx); err != nil {
 		return nil, nil, err
 	}
@@ -859,8 +859,8 @@ func (b *bolt3) ReAuth(ctx context.Context, auth *idb.ReAuthToken) error {
 	return nil
 }
 
-func (b *bolt3) Version() db.ProtocolVersion {
-	return db.ProtocolVersion{
+func (b *bolt3) Version() idb.ProtocolVersion {
+	return idb.ProtocolVersion{
 		Major: 3,
 		Minor: b.minor,
 	}
