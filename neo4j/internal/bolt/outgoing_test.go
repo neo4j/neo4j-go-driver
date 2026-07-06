@@ -505,6 +505,11 @@ func TestOutgoing(ot *testing.T) {
 		base
 		Name string
 	}
+	type embeddedPtr struct {
+		*base
+		Name string
+	}
+	type empty struct{}
 
 	// Test packing of maps in more detail, essentially tests allowed parameters to Run command
 	// tests for top level appending and sending outgoing messages
@@ -1185,6 +1190,51 @@ func TestOutgoing(ot *testing.T) {
 			},
 			expect: map[string]any{
 				"e": map[string]any{"ID": "1", "Name": "Alice"},
+			},
+		},
+		{
+			name: "user struct: anonymous pointer embed flattens",
+			inp: map[string]any{
+				"e": embeddedPtr{base: &base{ID: "1"}, Name: "Alice"},
+			},
+			expect: map[string]any{
+				"e": map[string]any{"ID": "1", "Name": "Alice"},
+			},
+		},
+		{
+			name: "user struct: nil anonymous pointer embed skips its fields",
+			inp: map[string]any{
+				"e": embeddedPtr{Name: "Alice"},
+			},
+			expect: map[string]any{
+				"e": map[string]any{"Name": "Alice"},
+			},
+		},
+		{
+			name: "user struct: without fields",
+			inp: map[string]any{
+				"e": empty{},
+			},
+			expect: map[string]any{
+				"e": map[string]any{},
+			},
+		},
+		{
+			name: "user struct: pointer without fields",
+			inp: map[string]any{
+				"e": &empty{},
+			},
+			expect: map[string]any{
+				"e": map[string]any{},
+			},
+		},
+		{
+			name: "user struct: nil pointer without fields",
+			inp: map[string]any{
+				"e": (*empty)(nil),
+			},
+			expect: map[string]any{
+				"e": nil,
 			},
 		},
 		{
