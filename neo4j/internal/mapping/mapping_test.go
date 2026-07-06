@@ -19,7 +19,6 @@ package mapping
 
 import (
 	"reflect"
-	"strings"
 	"testing"
 	"time"
 )
@@ -76,10 +75,10 @@ func TestStructAsMap(t *testing.T) {
 	hello := "hi"
 
 	cases := []struct {
-		name   string
-		in     any
-		want   map[string]any
-		errMsg string
+		name      string
+		in        any
+		want      map[string]any
+		notStruct bool
 	}{
 		{
 			name: "untagged exported fields use field name verbatim",
@@ -107,9 +106,14 @@ func TestStructAsMap(t *testing.T) {
 			want: map[string]any{"ID": "1", "Name": "Alice"},
 		},
 		{
-			name: "pointer-embedded struct stays as a named field",
+			name: "pointer-embedded struct flattens",
 			in:   pointerEmbedded{Base: &Base{ID: "1"}, Name: "Alice"},
-			want: map[string]any{"Base": &Base{ID: "1"}, "Name": "Alice"},
+			want: map[string]any{"ID": "1", "Name": "Alice"},
+		},
+		{
+			name: "nil pointer-embedded struct skips its fields",
+			in:   pointerEmbedded{Name: "Alice"},
+			want: map[string]any{"Name": "Alice"},
 		},
 		{
 			name: "nested struct value passes through unchanged",
@@ -167,24 +171,24 @@ func TestStructAsMap(t *testing.T) {
 			want: map[string]any{"Name": "outer"},
 		},
 		{
-			name:   "non-struct input errors",
-			in:     "not a struct",
-			errMsg: "expected struct",
+			name:      "non-struct input returns ok=false",
+			in:        "not a struct",
+			notStruct: true,
 		},
 	}
 
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			t.Parallel()
-			got, err := StructAsMap(c.in)
-			if c.errMsg != "" {
-				if err == nil || !strings.Contains(err.Error(), c.errMsg) {
-					t.Fatalf("expected error containing %q, got %v", c.errMsg, err)
+			got, ok := StructAsMap(c.in)
+			if c.notStruct {
+				if ok {
+					t.Fatalf("expected ok=false for non-struct input, got map %#v", got)
 				}
 				return
 			}
-			if err != nil {
-				t.Fatalf("unexpected error: %v", err)
+			if !ok {
+				t.Fatalf("unexpected ok=false")
 			}
 			if !reflect.DeepEqual(got, c.want) {
 				t.Fatalf("StructAsMap mismatch\nwant: %#v\n got: %#v", c.want, got)

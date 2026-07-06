@@ -17,13 +17,10 @@
 
 // Package mapping converts a user struct into the map[string]any shape the bolt
 // layer expects for Cypher parameters. Nested struct values are returned as-is;
-// the bolt layer re-enters this package for any user-defined nested struct, so
-// driver-known types (time.Time, dbtype.*, etc.) keep their existing encoding
-// without special-casing here.
+// the bolt layer re-enters this package for each one.
 package mapping
 
 import (
-	"fmt"
 	"reflect"
 	"strings"
 	"sync"
@@ -39,31 +36,51 @@ type fieldInfo struct {
 
 var typeCache sync.Map // map[reflect.Type][]fieldInfo
 
-// StructAsMap walks the exported fields of v (struct or pointer to struct)
-// and returns a map keyed by each field's Cypher property name. A nil pointer
-// returns (nil, nil); the caller maps that to bolt NULL.
-func StructAsMap(v any) (map[string]any, error) {
+// StructAsMap walks the exported fields of v (struct or pointer to struct) and
+// returns a map keyed by each field's Cypher property name. The bool reports
+// whether v was a struct or pointer to struct; it is false for any other type.
+// A nil pointer returns (nil, true).
+func StructAsMap(v any) (map[string]any, bool) {
 	rv := reflect.ValueOf(v)
 	for rv.Kind() == reflect.Ptr {
 		if rv.IsNil() {
-			return nil, nil
+			return nil, true
 		}
 		rv = rv.Elem()
 	}
 	if rv.Kind() != reflect.Struct {
-		return nil, fmt.Errorf("mapping: expected struct or pointer to struct, got %T", v)
+		return nil, false
 	}
 
 	fields := fieldsOf(rv.Type())
 	out := make(map[string]any, len(fields))
 	for _, f := range fields {
-		fv := rv.FieldByIndex(f.index)
+		fv, ok := fieldByIndex(rv, f.index)
+		if !ok {
+			// Field is reachable only through a nil pointer embed.
+			continue
+		}
 		if f.omitEmpty && fv.IsZero() {
 			continue
 		}
 		out[f.name] = fv.Interface()
 	}
-	return out, nil
+	return out, true
+}
+
+// fieldByIndex walks index from v, dereferencing pointer embeds. It reports
+// false if a nil pointer is hit mid-path.
+func fieldByIndex(v reflect.Value, index []int) (reflect.Value, bool) {
+	for _, i := range index {
+		if v.Kind() == reflect.Ptr {
+			if v.IsNil() {
+				return reflect.Value{}, false
+			}
+			v = v.Elem()
+		}
+		v = v.Field(i)
+	}
+	return v, true
 }
 
 func fieldsOf(t reflect.Type) []fieldInfo {
@@ -82,12 +99,17 @@ func buildFields(t reflect.Type, indexPath []int) []fieldInfo {
 		tag := f.Tag.Get(tagName)
 		idx := append(append([]int(nil), indexPath...), i)
 
-		// Recurse into anonymous embeds - their inner fields stay reachable
-		// via FieldByIndex even when the wrapper type is unexported. Pointer
-		// kind skipped to avoid nil-deref on the walk.
-		if f.Anonymous && tag == "" && f.Type.Kind() == reflect.Struct {
-			out = append(out, buildFields(f.Type, idx)...)
-			continue
+		// Flatten anonymous struct embeds, value or pointer; their inner fields
+		// stay reachable through the index path even when the wrapper is unexported.
+		if f.Anonymous && tag == "" {
+			ft := f.Type
+			if ft.Kind() == reflect.Ptr {
+				ft = ft.Elem()
+			}
+			if ft.Kind() == reflect.Struct {
+				out = append(out, buildFields(ft, idx)...)
+				continue
+			}
 		}
 
 		if !f.IsExported() {

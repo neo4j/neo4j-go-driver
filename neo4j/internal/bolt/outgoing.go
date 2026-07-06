@@ -382,8 +382,8 @@ func (o *outgoing) packStruct(x any) {
 	case dbtype.Vector[float64]:
 		o.packer.VectorFloat64(v.Elems)
 	default:
-		m, err := mapping.StructAsMap(x)
-		if err != nil {
+		m, ok := mapping.StructAsMap(x)
+		if !ok {
 			o.onPackErr(&db.UnsupportedTypeError{Type: reflect.TypeOf(x)})
 			return
 		}
