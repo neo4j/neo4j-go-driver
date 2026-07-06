@@ -33,11 +33,12 @@ import (
 )
 
 type hydratorTestCase struct {
-	name   string
-	build  func() // Builds/encodes stream same was as server would
-	x      any    // Expected hydrated
-	err    error
-	useUtc bool
+	name         string
+	build        func() // Builds/encodes stream same was as server would
+	x            any    // Expected hydrated
+	err          error
+	useUtc       bool
+	supportsUuid bool
 }
 
 func TestHydrator(outer *testing.T) {
@@ -550,6 +551,33 @@ func TestHydrator(outer *testing.T) {
 				dbtype.Point2D{SpatialRefId: 1, X: 7.123, Y: 123.7},
 				dbtype.Point3D{SpatialRefId: 2, X: 0.123, Y: 23.71, Z: 3.712},
 			}},
+		},
+		{
+			name: "Record of UUIDs",
+			build: func() {
+				packer.StructHeader(byte(msgRecord), 1)
+				packer.ArrayHeader(3)
+				packer.UUID([16]byte{0x55, 0x0e, 0x84, 0x00, 0xe2, 0x9b, 0x41, 0xd4, 0xa7, 0x16, 0x44, 0x66, 0x55, 0x44, 0x00, 0x00})
+				packer.UUID([16]byte{})
+				packer.UUID([16]byte{0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff})
+			},
+			x: &db.Record{Values: []any{
+				dbtype.UUID{0x55, 0x0e, 0x84, 0x00, 0xe2, 0x9b, 0x41, 0xd4, 0xa7, 0x16, 0x44, 0x66, 0x55, 0x44, 0x00, 0x00},
+				dbtype.UUID{},
+				dbtype.UUID{0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff},
+			}},
+			supportsUuid: true,
+		},
+		{
+			name: "Record with UUID rejected when supportsUuid is false",
+			build: func() {
+				packer.StructHeader(byte(msgRecord), 1)
+				packer.ArrayHeader(1)
+				packer.UUID([16]byte{0x55, 0x0e, 0x84, 0x00, 0xe2, 0x9b, 0x41, 0xd4, 0xa7, 0x16, 0x44, 0x66, 0x55, 0x44, 0x00, 0x00})
+			},
+			err: &db.ProtocolError{
+				Err: "received UUID packstream type 0xE0 on Bolt protocol prior to 6.1",
+			},
 		},
 		{
 			name: "Record of temporals",
@@ -1101,14 +1129,14 @@ func TestHydrator(outer *testing.T) {
 				packer.StructHeader(byte(msgRecord), 1)
 				packer.ArrayHeader(1)
 				packer.StructHeader('?', 4)
-				packer.String("UUID")
+				packer.String("FutureType")
 				packer.Int(255)
 				packer.Int(0)
 				packer.MapHeader(0)
 			},
 			x: &db.Record{Values: []any{
 				&dbtype.UnsupportedType{
-					Name:                   "UUID",
+					Name:                   "FutureType",
 					MinimumProtocolVersion: db.ProtocolVersion{Major: 255, Minor: 0},
 					Message:                nil,
 				},
@@ -1120,7 +1148,7 @@ func TestHydrator(outer *testing.T) {
 				packer.StructHeader(byte(msgRecord), 1)
 				packer.ArrayHeader(1)
 				packer.StructHeader('?', 4)
-				packer.String("UUID")
+				packer.String("FutureType")
 				packer.Int(255)
 				packer.Int(0)
 				packer.MapHeader(1)
@@ -1129,7 +1157,7 @@ func TestHydrator(outer *testing.T) {
 			},
 			x: &db.Record{Values: []any{
 				&dbtype.UnsupportedType{
-					Name:                   "UUID",
+					Name:                   "FutureType",
 					MinimumProtocolVersion: db.ProtocolVersion{Major: 255, Minor: 0},
 					Message:                ptr("Some configuration message"),
 				},
@@ -1141,7 +1169,7 @@ func TestHydrator(outer *testing.T) {
 				packer.StructHeader(byte(msgRecord), 1)
 				packer.ArrayHeader(1)
 				packer.StructHeader('?', 3)
-				packer.String("UUID")
+				packer.String("FutureType")
 				packer.Int(255)
 				packer.Int(0)
 			},
@@ -1160,6 +1188,7 @@ func TestHydrator(outer *testing.T) {
 				hydrator.err = nil
 			}()
 			hydrator.useUtc = c.useUtc
+			hydrator.supportsUuid = c.supportsUuid
 			if (c.x != nil) == (c.err != nil) {
 				t.Fatalf("test case needs to define either expected result or error (xor)")
 			}

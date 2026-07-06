@@ -43,7 +43,7 @@ func (p *protocolVersion) formatProtocol() string {
 }
 
 var (
-	bolt6Ver = protocolVersion{major: 6, minor: 0, back: 0}
+	bolt6Ver = protocolVersion{major: 6, minor: 1, back: 1}
 	bolt5Ver = protocolVersion{major: 5, minor: 8, back: 8}
 	bolt4Ver = protocolVersion{major: 4, minor: 4, back: 2}
 	bolt3Ver = protocolVersion{major: 3, minor: 0, back: 0}

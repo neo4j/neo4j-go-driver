@@ -27,6 +27,7 @@ type PropertyValue interface {
 		Point2D | Point3D |
 		Date | LocalTime | LocalDateTime | Time | Duration | time.Time | /* OffsetTime == Time == dbtype.Time */
 		Vector[int8] | Vector[int16] | Vector[int32] | Vector[int64] | Vector[float32] | Vector[float64] |
+		UUID |
 		[]byte | []any
 }
 

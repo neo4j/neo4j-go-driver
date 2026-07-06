@@ -26,12 +26,12 @@ import (
 func TestUnsupportedTypes(t *testing.T) {
 	t.Run("String representation of UnsupportedType with nil message", func(t *testing.T) {
 		unsupported := &UnsupportedType{
-			Name:                   "UUID",
+			Name:                   "FutureType",
 			MinimumProtocolVersion: db.ProtocolVersion{Major: 6, Minor: 0},
 			Message:                nil,
 		}
 		actual := unsupported.String()
-		expect := "UnsupportedType[UUID]"
+		expect := "UnsupportedType[FutureType]"
 		if actual != expect {
 			t.Errorf("Expected %s but was %s", expect, actual)
 		}

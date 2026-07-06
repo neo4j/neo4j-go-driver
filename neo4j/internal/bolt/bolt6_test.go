@@ -28,6 +28,7 @@ import (
 	"time"
 
 	"github.com/neo4j/neo4j-go-driver/v6/neo4j/db"
+	"github.com/neo4j/neo4j-go-driver/v6/neo4j/dbtype"
 	iauth "github.com/neo4j/neo4j-go-driver/v6/neo4j/internal/auth"
 	idb "github.com/neo4j/neo4j-go-driver/v6/neo4j/internal/db"
 	. "github.com/neo4j/neo4j-go-driver/v6/neo4j/internal/testutil"
@@ -153,9 +154,10 @@ func TestBolt6(outer *testing.T) {
 	// Test protocol version negotiation with different server offering orders
 	outer.Run("Connect success with protocol version negotiation", func(t *testing.T) {
 		testCases := []struct {
-			name        string
-			offerings   []protocolVersion
-			description string
+			name          string
+			offerings     []protocolVersion
+			expectedMinor byte
+			description   string
 		}{
 			{
 				name: "Bolt 6.0 first",
@@ -164,7 +166,8 @@ func TestBolt6(outer *testing.T) {
 					{major: 5, minor: 8, back: 8},
 					{major: 4, minor: 4, back: 2},
 				},
-				description: "Standard case with Bolt 6.0 offered first",
+				expectedMinor: 0,
+				description:   "Standard case with Bolt 6.0 offered first; driver falls back from 6.1 to 6.0",
 			},
 			{
 				name: "Bolt 6.0 in middle position",
@@ -173,7 +176,8 @@ func TestBolt6(outer *testing.T) {
 					{major: 6, minor: 0, back: 0},
 					{major: 4, minor: 4, back: 2},
 				},
-				description: "Bolt 6.0 offered in middle position",
+				expectedMinor: 0,
+				description:   "Bolt 6.0 offered in middle position; driver falls back from 6.1 to 6.0",
 			},
 			{
 				name: "Bolt 6.0 in last position",
@@ -182,17 +186,29 @@ func TestBolt6(outer *testing.T) {
 					{major: 4, minor: 4, back: 2},
 					{major: 6, minor: 0, back: 0},
 				},
-				description: "Bolt 6.0 offered in last position",
+				expectedMinor: 0,
+				description:   "Bolt 6.0 offered in last position; driver falls back from 6.1 to 6.0",
+			},
+			{
+				name: "Bolt 6.1 selected when offered",
+				offerings: []protocolVersion{
+					{major: 6, minor: 1, back: 1},
+					{major: 5, minor: 8, back: 8},
+					{major: 4, minor: 4, back: 2},
+				},
+				expectedMinor: 1,
+				description:   "Server offers 6.1; driver picks 6.1 as the highest supported minor",
 			},
 			{
 				name: "newer version offered but not selected",
 				offerings: []protocolVersion{
-					{major: 6, minor: 1, back: 0},
-					{major: 6, minor: 0, back: 0},
+					{major: 6, minor: 2, back: 0},
+					{major: 6, minor: 1, back: 1},
 					{major: 5, minor: 8, back: 8},
 					{major: 4, minor: 4, back: 2},
 				},
-				description: "Server offers newer version (6.1) but driver selects supported version (6.0)",
+				expectedMinor: 1,
+				description:   "Server offers 6.2; driver falls back to 6.1 as the highest supported minor",
 			},
 		}
 
@@ -202,10 +218,9 @@ func TestBolt6(outer *testing.T) {
 					srv.waitForHandshake()
 					srv.acceptManifestVersion()
 					srv.sendManifestOfferings(tc.offerings)
-					// Wait for client's choice - should always pick Bolt 6.0
 					major, minor := srv.waitForManifestConfirmation()
-					if major != 6 || minor != 0 {
-						panic(fmt.Sprintf("Expected client to choose Bolt 6.0, but got %d.%d", major, minor))
+					if major != 6 || minor != tc.expectedMinor {
+						panic(fmt.Sprintf("Expected client to choose Bolt 6.%d, but got %d.%d", tc.expectedMinor, major, minor))
 					}
 					hmap := srv.waitForHelloWithoutAuthToken()
 					boltAgent, exists := hmap["bolt_agent"]
@@ -283,6 +298,36 @@ func TestBolt6(outer *testing.T) {
 			AssertTrue(t, reflect.DeepEqual(bolt.queue.in.connReadTimeout, time.Duration(-1)))
 		})
 	}
+
+	outer.Run("Run with UUID parameter on pre-6.1 connection rejects but keeps connection usable", func(t *testing.T) {
+		bolt, cleanup := connectToServer(t, func(srv *bolt6server) {
+			srv.waitForHandshake()
+			srv.acceptManifestVersion()
+			srv.sendManifestOfferings([]protocolVersion{{major: 6, minor: 0, back: 0}})
+			srv.waitForManifestConfirmation()
+			srv.waitForHelloWithoutAuthToken()
+			srv.acceptHello()
+			srv.waitForLogon()
+			srv.acceptLogon()
+		})
+		defer cleanup()
+		defer bolt.Close(context.Background())
+
+		_, err := bolt.Run(context.Background(),
+			idb.Command{Cypher: "RETURN $u", Params: map[string]any{"u": dbtype.UUID{}}},
+			idb.TxConfig{Mode: idb.ReadMode})
+
+		if _, ok := err.(*db.FeatureNotSupportedError); !ok {
+			t.Fatalf("expected *db.FeatureNotSupportedError, got %v", err)
+		}
+		AssertTrue(t, bolt.IsAlive())
+		if n := bolt.queue.handlers.Len(); n != 0 {
+			t.Fatalf("expected no orphaned response handlers, got %d", n)
+		}
+		if n := len(bolt.queue.out.chunker.buf); n != 0 {
+			t.Fatalf("expected empty outgoing buffer, got %d leftover bytes", n)
+		}
+	})
 
 	outer.Run("Routing in hello", func(t *testing.T) {
 		routingContext := map[string]string{"some": "thing"}
