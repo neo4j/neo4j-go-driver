@@ -455,6 +455,13 @@ func (d *driver) VerifyAuthentication(ctx context.Context, auth *AuthToken) (err
 //
 //	result, err := ExecuteQuery[*EagerResult](ctx, driver, query, params, EagerResultTransformer)
 //
+// Parameter mapping is part of the Object Mapping preview feature (see README on what it means in
+// terms of support and compatibility guarantees). When a value in params is a user-defined struct
+// (or pointer to one), its exported fields are sent as a Cypher map. Struct tags control this:
+// `neo4j:"name"` renames a field, `neo4j:"-"` skips it, and `neo4j:",omitempty"` (leading comma)
+// drops zero values; the forms combine, e.g. `neo4j:"name,omitempty"`.
+// The same rules apply to Session.Run, ManagedTransaction.Run, and ExplicitTransaction.Run.
+//
 // Passing a nil ResultTransformer function is invalid and will return an error.
 //
 // Likewise, passing a function that returns a nil ResultTransformer is invalid and will return an error.

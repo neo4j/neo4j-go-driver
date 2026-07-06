@@ -28,7 +28,8 @@ type RecordValue interface {
 		Date | LocalTime | LocalDateTime | Time | Duration | time.Time | /* OffsetTime == Time == dbtype.Time */
 		[]byte | []any | map[string]any |
 		Node | Relationship | Path |
-		Vector[int8] | Vector[int16] | Vector[int32] | Vector[int64] | Vector[float32] | Vector[float64]
+		Vector[int8] | Vector[int16] | Vector[int32] | Vector[int64] | Vector[float32] | Vector[float64] |
+		UUID
 }
 
 // GetRecordValue returns the value of the current provided record named by the specified key

@@ -26,18 +26,20 @@ import (
 	"github.com/neo4j/neo4j-go-driver/v6/neo4j/db"
 	"github.com/neo4j/neo4j-go-driver/v6/neo4j/dbtype"
 	idb "github.com/neo4j/neo4j-go-driver/v6/neo4j/internal/db"
+	"github.com/neo4j/neo4j-go-driver/v6/neo4j/internal/mapping"
 	"github.com/neo4j/neo4j-go-driver/v6/neo4j/internal/packstream"
 	"github.com/neo4j/neo4j-go-driver/v6/neo4j/log"
 )
 
 type outgoing struct {
-	chunker    chunker
-	packer     packstream.Packer
-	onPackErr  func(error)
-	onIoErr    func(context.Context, error)
-	boltLogger log.BoltLogger
-	logId      string
-	useUtc     bool
+	chunker      chunker
+	packer       packstream.Packer
+	onPackErr    func(error)
+	onIoErr      func(context.Context, error)
+	boltLogger   log.BoltLogger
+	logId        string
+	useUtc       bool
+	supportsUuid bool
 }
 
 func (o *outgoing) begin() {
@@ -380,7 +382,16 @@ func (o *outgoing) packStruct(x any) {
 	case dbtype.Vector[float64]:
 		o.packer.VectorFloat64(v.Elems)
 	default:
-		o.onPackErr(&db.UnsupportedTypeError{Type: reflect.TypeOf(x)})
+		m, ok := mapping.StructAsMap(x)
+		if !ok {
+			o.onPackErr(&db.UnsupportedTypeError{Type: reflect.TypeOf(x)})
+			return
+		}
+		if m == nil {
+			o.packer.Nil()
+			return
+		}
+		o.packMap(m)
 	}
 }
 
@@ -414,11 +425,15 @@ func (o *outgoing) packX(x any) {
 		switch i.Kind() {
 		case reflect.Struct:
 			o.packStruct(x)
+		case reflect.Array:
+			o.packArray(i.Interface())
 		default:
 			o.packV(i)
 		}
 	case reflect.Struct:
 		o.packStruct(x)
+	case reflect.Array:
+		o.packArray(x)
 	case reflect.Slice:
 		// Optimizations
 		switch s := x.(type) {
@@ -525,6 +540,8 @@ func (o *outgoing) packV(v reflect.Value) {
 		}
 	case reflect.Struct:
 		o.packStruct(v.Interface())
+	case reflect.Array:
+		o.packArray(v.Interface())
 	case reflect.Slice:
 		elemType := v.Type().Elem()
 		if elemType.Kind() == reflect.Uint8 {
@@ -586,4 +603,25 @@ func (o *outgoing) packUtcDateTimeWithTzName(dateTime time.Time) {
 	o.packer.Int64(dateTime.Unix())
 	o.packer.Int(dateTime.Nanosecond())
 	o.packer.String(dateTime.Location().String())
+}
+
+func (o *outgoing) packArray(x any) {
+	switch u := x.(type) {
+	case dbtype.UUID:
+		o.packUUID(u)
+	default:
+		o.onPackErr(&db.UnsupportedTypeError{Type: reflect.TypeOf(x)})
+	}
+}
+
+func (o *outgoing) packUUID(u dbtype.UUID) {
+	if !o.supportsUuid {
+		// Server name is filled in by the bolt-layer onPackErr closure.
+		o.onPackErr(&db.FeatureNotSupportedError{
+			Feature: "UUID type",
+			Reason:  "requires at least Bolt 6.1",
+		})
+		return
+	}
+	o.packer.UUID(u)
 }

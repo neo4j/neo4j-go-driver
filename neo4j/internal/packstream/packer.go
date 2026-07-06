@@ -279,6 +279,11 @@ func (p *Packer) Nil() {
 	p.buf = append(p.buf, 0xc0)
 }
 
+func (p *Packer) UUID(u [16]byte) {
+	p.buf = append(p.buf, 0xe0)
+	p.buf = append(p.buf, u[:]...)
+}
+
 func (p *Packer) checkOverflowInt(i uint64) {
 	if i > math.MaxInt64 {
 		p.err = &OverflowError{msg: "Trying to pack uint64 that doesn't fit into int64"}

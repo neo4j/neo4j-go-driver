@@ -169,6 +169,24 @@ func ExampleDriver_tlsSelfSignedCertificates() {
 	fmt.Printf("Query executed successfully, returned %d records\n", len(result.Records))
 }
 
+func ExampleExecuteQuery_structParameter() {
+	type Movie struct {
+		Title    string `neo4j:"title"`
+		Tagline  string `neo4j:"tagline,omitempty"`
+		Released int64  `neo4j:"released"`
+	}
+
+	movie := Movie{Title: "The Matrix", Released: 1999}
+	_, err := ExecuteQuery[*EagerResult](
+		ctx,
+		myDriver,
+		"CREATE (m:Movie) SET m = $movie RETURN m",
+		map[string]any{"movie": movie},
+		EagerResultTransformer,
+	)
+	handleError(err)
+}
+
 func handleError(err error) {
 	if err != nil {
 		panic(err)

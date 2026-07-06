@@ -128,6 +128,7 @@ func NewBolt3(
 		chunker: newChunker(),
 		packer:  packstream.Packer{},
 		onPackErr: func(err error) {
+			err = fillServerName(err, b.serverName)
 			if b.err == nil {
 				b.err = err
 			}

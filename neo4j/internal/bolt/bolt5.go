@@ -157,7 +157,7 @@ func NewBolt5(
 		&outgoing{
 			chunker:    newChunker(),
 			packer:     packstream.Packer{},
-			onPackErr:  func(err error) { b.setError(err, true) },
+			onPackErr:  func(err error) { b.setError(fillServerName(err, b.serverName), true) },
 			onIoErr:    b.onIoError,
 			boltLogger: boltLog,
 			useUtc:     true,

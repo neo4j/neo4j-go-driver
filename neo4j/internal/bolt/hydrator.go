@@ -117,6 +117,7 @@ type hydrator struct {
 	logId         string
 	boltMajor     int
 	useUtc        bool
+	supportsUuid  bool
 }
 
 func (h *hydrator) setErr(err error) {
@@ -524,6 +525,14 @@ func (h *hydrator) value() any {
 		}
 	case packstream.PackedByteArray:
 		return h.unp.ByteArray()
+	case packstream.PackedUUID:
+		if !h.supportsUuid {
+			h.setErr(&db.ProtocolError{
+				Err: "received UUID packstream type 0xE0 on Bolt protocol prior to 6.1",
+			})
+			return nil
+		}
+		return dbtype.UUID(h.unp.UUID())
 	case packstream.PackedArray:
 		return h.array()
 	case packstream.PackedMap:
