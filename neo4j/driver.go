@@ -527,7 +527,7 @@ func (d *driver) VerifyAuthentication(ctx context.Context, auth *AuthToken) (err
 //		summary, _ := result.Consume(ctx)
 //		return &neo4j.EagerResult{
 //			Keys:    keys,
-//			Rows: records,
+//			Records: records,
 //			Summary: summary,
 //		}, nil
 //	})
