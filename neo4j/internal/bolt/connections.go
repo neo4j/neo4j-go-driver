@@ -22,6 +22,7 @@ import (
 	"context"
 	"io"
 	"net"
+	"time"
 
 	"github.com/neo4j/neo4j-go-driver/v6/neo4j/db"
 	idb "github.com/neo4j/neo4j-go-driver/v6/neo4j/internal/db"
@@ -31,22 +32,33 @@ import (
 // DefaultReadBufferSize specifies the default size (in bytes) of the buffer used for reading data from the network connection.
 const DefaultReadBufferSize = 8192
 
+// bufferedConn wraps a net.Conn with a buffered reader while still exposing the
+// underlying connection's read-deadline control. This lets the read path bound a
+// read with SetReadDeadline rather than allocating a per-read timeout context.
+type bufferedConn struct {
+	io.Reader
+	io.Writer
+	io.Closer
+	conn net.Conn
+}
+
+// SetReadDeadline delegates to the underlying network connection. Reads served
+// from the buffered reader's in-memory buffer return without touching the
+// socket; the deadline applies to the next read that reaches the socket.
+func (b *bufferedConn) SetReadDeadline(t time.Time) error {
+	return b.conn.SetReadDeadline(t)
+}
+
 func bufferedConnection(conn net.Conn, readBufferSize int) io.ReadWriteCloser {
-	var reader io.Reader
+	var reader io.Reader = conn
 	if readBufferSize > 0 {
 		reader = bufio.NewReaderSize(conn, readBufferSize)
-	} else {
-		reader = conn
 	}
-
-	return struct {
-		io.Reader
-		io.Writer
-		io.Closer
-	}{
+	return &bufferedConn{
 		Reader: reader,
 		Writer: conn,
 		Closer: conn,
+		conn:   conn,
 	}
 }
 
