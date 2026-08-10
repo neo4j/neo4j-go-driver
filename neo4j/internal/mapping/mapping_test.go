@@ -240,6 +240,9 @@ func TestMapToStruct(t *testing.T) {
 	type withSlice struct {
 		Tags []string
 	}
+	type withSliceUntyped struct {
+		Things []any
+	}
 	type withPointerSlice struct {
 		Cast []*movie
 	}
@@ -365,6 +368,16 @@ func TestMapToStruct(t *testing.T) {
 			name: "scalar slice",
 			src:  map[string]any{"Tags": []any{"a", "b"}},
 			want: &withSlice{Tags: []string{"a", "b"}},
+		},
+		{
+			name: "typed slice coerces into an untyped slice field",
+			src:  map[string]any{"Things": []string{"a", "b"}},
+			want: &withSliceUntyped{Things: []any{"a", "b"}},
+		},
+		{
+			name: "mixed slice maps into an untyped slice field",
+			src:  map[string]any{"Things": []any{"a", "b", int64(123)}},
+			want: &withSliceUntyped{Things: []any{"a", "b", int64(123)}},
 		},
 		{
 			name: "slice of struct pointers",
