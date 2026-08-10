@@ -618,6 +618,32 @@ func TestMapToStructDoesNotAliasSource(t *testing.T) {
 	})
 }
 
+func TestMapToStructDropsAmbiguousField(t *testing.T) {
+	t.Parallel()
+	type a struct {
+		X string `neo4j:"x"`
+	}
+	type b struct {
+		X string `neo4j:"x"`
+	}
+	type ambiguous struct {
+		a
+		b
+		Y string `neo4j:"y"`
+	}
+	var got ambiguous
+	if err := MapToStruct(map[string]any{"x": "dropped", "y": "kept"}, &got); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	// x is promoted from both a and b at the same depth, so it is ambiguous and skipped.
+	if got.a.X != "" || got.b.X != "" {
+		t.Fatalf("ambiguous field should be skipped, got a.X=%q b.X=%q", got.a.X, got.b.X)
+	}
+	if got.Y != "kept" {
+		t.Fatalf("Y = %q, want %q", got.Y, "kept")
+	}
+}
+
 func TestDecodeFieldsOfCachesPerType(t *testing.T) {
 	t.Parallel()
 	type cached struct {
