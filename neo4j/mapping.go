@@ -66,13 +66,13 @@ func SingleAs[T any](ctx context.Context, result Result) (T, error) {
 // CollectRecordsAs is part of the Object Mapping preview feature (see README on
 // what it means in terms of support and compatibility guarantees).
 func CollectRecordsAs[T any](records []*Record) ([]T, error) {
-	out := make([]T, len(records))
-	for i, record := range records {
+	out := make([]T, 0, len(records))
+	for _, record := range records {
 		v, err := As[T](record)
 		if err != nil {
 			return nil, err
 		}
-		out[i] = v
+		out = append(out, v)
 	}
 	return out, nil
 }
