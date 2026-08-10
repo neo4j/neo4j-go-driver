@@ -241,17 +241,16 @@ func assignMap(dst, sv reflect.Value) error {
 		return typeError(dst.Type(), sv.Interface())
 	}
 	dt := dst.Type()
+	if !sv.Type().Key().AssignableTo(dt.Key()) {
+		return typeError(dt, sv.Interface())
+	}
 	out := reflect.MakeMapWithSize(dt, sv.Len())
 	for iter := sv.MapRange(); iter.Next(); {
-		key := iter.Key()
-		if !key.Type().AssignableTo(dt.Key()) {
-			return typeError(dt, sv.Interface())
-		}
 		val := reflect.New(dt.Elem()).Elem()
 		if err := assign(val, iter.Value().Interface()); err != nil {
 			return err
 		}
-		out.SetMapIndex(key, val)
+		out.SetMapIndex(iter.Key(), val)
 	}
 	dst.Set(out)
 	return nil
