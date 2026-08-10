@@ -180,11 +180,11 @@ func assign(dst reflect.Value, raw any) error {
 	if raw == nil {
 		return nil
 	}
-	if dst.Kind() == reflect.Ptr {
+	for dst.Kind() == reflect.Ptr {
 		if dst.IsNil() {
 			dst.Set(reflect.New(dst.Type().Elem()))
 		}
-		return assign(dst.Elem(), raw)
+		dst = dst.Elem()
 	}
 	sv := reflect.ValueOf(raw)
 	dt := dst.Type()
