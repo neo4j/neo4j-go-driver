@@ -37,14 +37,19 @@ func ExampleAs() {
 		Released int64  `neo4j:"released"`
 	}
 
-	result, err := session.Run(ctx, "MATCH (m:Movie {title: $title}) RETURN m", map[string]any{"title": "The Matrix"})
-	handleError(err)
-	record, err := result.Single(ctx)
-	handleError(err)
-
 	// The record holds a single node column, so As maps its properties onto the
 	// struct fields named by the neo4j tags.
-	movie, err := neo4j.As[Movie](record)
+	movie, err := neo4j.ExecuteRead(ctx, session, func(tx neo4j.ManagedTransaction) (Movie, error) {
+		result, err := tx.Run(ctx, "MATCH (m:Movie {title: $title}) RETURN m", map[string]any{"title": "The Matrix"})
+		if err != nil {
+			return Movie{}, err
+		}
+		record, err := result.Single(ctx)
+		if err != nil {
+			return Movie{}, err
+		}
+		return neo4j.As[Movie](record)
+	})
 	handleError(err)
 	fmt.Println(movie.Title)
 }
@@ -62,10 +67,13 @@ func ExampleCollectAs() {
 		Released int64  `neo4j:"released"`
 	}
 
-	result, err := session.Run(ctx, "MATCH (m:Movie) RETURN m", nil)
-	handleError(err)
-
-	movies, err := neo4j.CollectAs[Movie](ctx, result)
+	movies, err := neo4j.ExecuteRead(ctx, session, func(tx neo4j.ManagedTransaction) ([]Movie, error) {
+		result, err := tx.Run(ctx, "MATCH (m:Movie) RETURN m", nil)
+		if err != nil {
+			return nil, err
+		}
+		return neo4j.CollectAs[Movie](ctx, result)
+	})
 	handleError(err)
 	fmt.Printf("mapped %d movies\n", len(movies))
 }
@@ -83,10 +91,13 @@ func ExampleSingleAs() {
 		Released int64  `neo4j:"released"`
 	}
 
-	result, err := session.Run(ctx, "MATCH (m:Movie {title: $title}) RETURN m", map[string]any{"title": "The Matrix"})
-	handleError(err)
-
-	movie, err := neo4j.SingleAs[Movie](ctx, result)
+	movie, err := neo4j.ExecuteRead(ctx, session, func(tx neo4j.ManagedTransaction) (Movie, error) {
+		result, err := tx.Run(ctx, "MATCH (m:Movie {title: $title}) RETURN m", map[string]any{"title": "The Matrix"})
+		if err != nil {
+			return Movie{}, err
+		}
+		return neo4j.SingleAs[Movie](ctx, result)
+	})
 	handleError(err)
 	fmt.Println(movie.Title)
 }
