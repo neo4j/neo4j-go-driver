@@ -230,6 +230,12 @@ func TestMapToStruct(t *testing.T) {
 	type withTypedMap struct {
 		Scores map[string]int
 	}
+	type withMapAnyKey struct {
+		Scores map[any]int
+	}
+	type withMapUntyped struct {
+		Scores map[any]any
+	}
 	type status string
 	type withNamed struct {
 		State status
@@ -348,6 +354,16 @@ func TestMapToStruct(t *testing.T) {
 			name: "typed map converts its values",
 			src:  map[string]any{"Scores": map[string]any{"a": int64(1), "b": int64(2)}},
 			want: &withTypedMap{Scores: map[string]int{"a": 1, "b": 2}},
+		},
+		{
+			name: "typed map converts its keys",
+			src:  map[string]any{"Scores": map[string]any{"a": int64(1), "b": int64(2)}},
+			want: &withMapAnyKey{Scores: map[any]int{"a": 1, "b": 2}},
+		},
+		{
+			name: "typed map converts keys and values into an untyped map",
+			src:  map[string]any{"Scores": map[string]any{"a": int64(1), "b": int64(2)}},
+			want: &withMapUntyped{Scores: map[any]any{"a": int64(1), "b": int64(2)}},
 		},
 		{
 			name: "scalar pointer field is allocated",
