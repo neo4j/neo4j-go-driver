@@ -187,9 +187,9 @@ func assign(dst reflect.Value, raw any) error {
 		dst = dst.Elem()
 	}
 	sv := reflect.ValueOf(raw)
-	dt := dst.Type()
 	switch dst.Kind() {
 	case reflect.Struct:
+		dt := dst.Type()
 		if sv.Type().AssignableTo(dt) {
 			dst.Set(sv) // driver-native struct, e.g. time.Time or a dbtype value
 			return nil
@@ -204,12 +204,14 @@ func assign(dst reflect.Value, raw any) error {
 	case reflect.Map:
 		return assignMap(dst, raw)
 	default:
+		st := sv.Type()
+		dt := dst.Type()
 		switch {
-		case sv.Type().AssignableTo(dt):
+		case st.AssignableTo(dt):
 			dst.Set(sv)
 		case isNumeric(dst.Kind()) && isNumeric(sv.Kind()):
 			return assignNumeric(dst, sv)
-		case sv.Kind() == dst.Kind() && sv.Type().ConvertibleTo(dt):
+		case sv.Kind() == dst.Kind() && st.ConvertibleTo(dt):
 			dst.Set(sv.Convert(dt)) // named type over the same primitive kind
 		default:
 			return typeError(dt, raw)
