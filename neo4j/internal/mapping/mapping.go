@@ -22,6 +22,7 @@ package mapping
 
 import (
 	"fmt"
+	"math/bits"
 	"reflect"
 	"strings"
 	"sync"
@@ -257,8 +258,8 @@ func assignMap(dst, sv reflect.Value) error {
 	return nil
 }
 
-// assignNumeric converts between numeric kinds, erroring on overflow rather than
-// silently wrapping; a float is never coerced into an integer field.
+// assignNumeric converts between numeric kinds, returning an error rather than
+// silently losing range or precision. A float is never coerced into an integer.
 func assignNumeric(dst, src reflect.Value) error {
 	switch {
 	case src.CanInt():
@@ -275,6 +276,9 @@ func assignNumeric(dst, src reflect.Value) error {
 			}
 			dst.SetUint(uint64(n))
 		case dst.CanFloat():
+			if !intFitsFloat(n, dst.Type().Bits()) {
+				return precisionError(dst.Type(), n)
+			}
 			dst.SetFloat(float64(n))
 		}
 	case src.CanFloat():
@@ -285,11 +289,31 @@ func assignNumeric(dst, src reflect.Value) error {
 		if dst.OverflowFloat(f) {
 			return overflowError(dst.Type(), f)
 		}
+		if dst.Type().Bits() < src.Type().Bits() && float64(float32(f)) != f {
+			return precisionError(dst.Type(), f)
+		}
 		dst.SetFloat(f)
 	default:
 		return typeError(dst.Type(), src.Interface())
 	}
 	return nil
+}
+
+// intFitsFloat reports whether n is exactly representable in a float of the given
+// bit size; the mantissa holds 24 significant bits for float32, 53 for float64.
+func intFitsFloat(n int64, floatBits int) bool {
+	if n == 0 {
+		return true
+	}
+	u := uint64(n)
+	if n < 0 {
+		u = uint64(-n)
+	}
+	mantissa := 53
+	if floatBits == 32 {
+		mantissa = 24
+	}
+	return bits.Len64(u)-bits.TrailingZeros64(u) <= mantissa
 }
 
 func propsOf(raw any) (map[string]any, bool) {
@@ -309,6 +333,10 @@ func typeError(dst reflect.Type, raw any) error {
 
 func overflowError(dst reflect.Type, v any) error {
 	return fmt.Errorf("value %v is out of range for %s", v, dst)
+}
+
+func precisionError(dst reflect.Type, v any) error {
+	return fmt.Errorf("value %v cannot be represented exactly as %s", v, dst)
 }
 
 func isNumeric(k reflect.Kind) bool {

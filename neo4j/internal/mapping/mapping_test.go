@@ -504,6 +504,27 @@ func TestMapToStructErrors(t *testing.T) {
 			t.Fatal("expected error mapping float into integer field")
 		}
 	})
+	t.Run("integer loses precision as float32", func(t *testing.T) {
+		t.Parallel()
+		var w struct{ N float32 }
+		if err := MapToStruct(map[string]any{"N": int64(1<<25 + 1)}, &w); err == nil {
+			t.Fatal("expected precision error for int64 into float32")
+		}
+	})
+	t.Run("integer loses precision as float64", func(t *testing.T) {
+		t.Parallel()
+		var w struct{ N float64 }
+		if err := MapToStruct(map[string]any{"N": int64(1<<53 + 1)}, &w); err == nil {
+			t.Fatal("expected precision error for int64 into float64")
+		}
+	})
+	t.Run("float loses precision as float32", func(t *testing.T) {
+		t.Parallel()
+		var w struct{ N float32 }
+		if err := MapToStruct(map[string]any{"N": float64(0.1)}, &w); err == nil {
+			t.Fatal("expected precision error for float64 into float32")
+		}
+	})
 	t.Run("nested error reports the property path", func(t *testing.T) {
 		t.Parallel()
 		var w struct{ Inner movie }

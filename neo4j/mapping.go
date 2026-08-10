@@ -29,6 +29,9 @@ import (
 // A record with a single node, relationship, or map column maps that value's
 // properties; otherwise its columns map by name.
 //
+// Numeric properties are converted to the field's type; a conversion that would
+// lose range or precision returns an error instead of silently truncating.
+//
 // As is part of the Object Mapping preview feature (see README on what it means
 // in terms of support and compatibility guarantees).
 func As[T any](record *Record) (T, error) {
