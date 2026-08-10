@@ -644,6 +644,37 @@ func TestMapToStructDropsAmbiguousField(t *testing.T) {
 	}
 }
 
+func TestMapToStructAllNumericTypes(t *testing.T) {
+	t.Parallel()
+	type nums struct {
+		I   int
+		I8  int8
+		I16 int16
+		I32 int32
+		I64 int64
+		U   uint
+		U8  uint8
+		U16 uint16
+		U32 uint32
+		U64 uint64
+		F32 float32
+		F64 float64
+	}
+	src := map[string]any{
+		"I": int64(1), "I8": int64(2), "I16": int64(3), "I32": int64(4), "I64": int64(5),
+		"U": int64(6), "U8": int64(7), "U16": int64(8), "U32": int64(9), "U64": int64(10),
+		"F32": float64(1.5), "F64": float64(2.5),
+	}
+	want := nums{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 1.5, 2.5}
+	var got nums
+	if err := MapToStruct(src, &got); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got != want {
+		t.Fatalf("got %#v, want %#v", got, want)
+	}
+}
+
 func TestDecodeFieldsOfCachesPerType(t *testing.T) {
 	t.Parallel()
 	type cached struct {
