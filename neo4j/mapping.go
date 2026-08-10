@@ -32,6 +32,9 @@ import (
 // Numeric properties are converted to the field's type; a conversion that would
 // lose range or precision returns an error instead of silently truncating.
 //
+// Slice and map fields are copied; a node or relationship's properties are not,
+// so a mapped value may still share that data with the record.
+//
 // As is part of the Object Mapping preview feature (see README on what it means
 // in terms of support and compatibility guarantees).
 func As[T any](record *Record) (T, error) {
