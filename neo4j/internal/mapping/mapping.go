@@ -69,8 +69,9 @@ func StructAsMap(v any) (map[string]any, bool) {
 	return out, true
 }
 
-// fieldByIndex walks index from v through pointer embeds. With alloc it allocates
-// nil embeds (false if one is unexported/unsettable); without, it stops false at the first nil.
+// fieldByIndex walks index from v to the target field, following pointer embeds.
+// With alloc it allocates nil embeds, returning false if one is unexported (and
+// so unsettable). Without alloc it returns false at the first nil embed.
 func fieldByIndex(v reflect.Value, index []int, alloc bool) (reflect.Value, bool) {
 	for _, i := range index {
 		if v.Kind() == reflect.Ptr {
