@@ -166,6 +166,33 @@ func TestObjectMapping(outer *testing.T) {
 		assertFalse(t, events[0].At.Equal(events[1].At)) // genuinely two different instants
 	})
 
+	outer.Run("maps a small graph of nodes and relationships", func(t *testing.T) {
+		type actor struct {
+			Name string `neo4j:"name"`
+		}
+		type role struct {
+			Character string `neo4j:"character"`
+		}
+		type credit struct {
+			Actor actor  `neo4j:"actor"`
+			Role  role   `neo4j:"role"`
+			Movie string `neo4j:"movie"`
+		}
+		cleanup(t)
+		result, err := session.Run(ctx,
+			"CREATE (:OMTest {name: 'Keanu'})-[:ACTED_IN {character: 'Neo'}]->(:OMTest {title: 'The Matrix'})", nil)
+		assertNil(t, err)
+		_, err = result.Consume(ctx)
+		assertNil(t, err)
+
+		result, err = session.Run(ctx,
+			"MATCH (a:OMTest)-[r:ACTED_IN]->(m:OMTest) RETURN a AS actor, r AS role, m.title AS movie", nil)
+		assertNil(t, err)
+		got, err := neo4j.SingleAs[credit](ctx, result)
+		assertNil(t, err)
+		assertEquals(t, got, credit{Actor: actor{Name: "Keanu"}, Role: role{Character: "Neo"}, Movie: "The Matrix"})
+	})
+
 	outer.Run("type mismatch returns an error", func(t *testing.T) {
 		cleanup(t)
 		create(t, omPerson{Name: "Alice", Age: 30})
