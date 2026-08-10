@@ -487,11 +487,11 @@ func TestMapToStructErrors(t *testing.T) {
 			t.Fatal("expected error for pointer to non-struct")
 		}
 	})
-	t.Run("type mismatch", func(t *testing.T) {
+	t.Run("does not parse numeric strings", func(t *testing.T) {
 		t.Parallel()
 		var m movie
-		if err := MapToStruct(map[string]any{"Released": "not-a-number"}, &m); err == nil {
-			t.Fatal("expected error for type mismatch")
+		if err := MapToStruct(map[string]any{"Released": "1999"}, &m); err == nil {
+			t.Fatal("expected error; a numeric string must not be parsed into an integer")
 		}
 	})
 	t.Run("scalar into struct field", func(t *testing.T) {
