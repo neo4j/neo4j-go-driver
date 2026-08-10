@@ -141,6 +141,31 @@ func TestObjectMapping(outer *testing.T) {
 		assertEquals(t, got, movie{Title: "Heat", Director: director{Name: "Mann"}})
 	})
 
+	outer.Run("DST-ambiguous local time round-trips both instants", func(t *testing.T) {
+		type event struct {
+			Name string    `neo4j:"name"`
+			At   time.Time `neo4j:"at"`
+		}
+		berlin, err := time.LoadLocation("Europe/Berlin")
+		assertNil(t, err)
+		// On 2025-10-26 the Berlin clock falls back, so 02:30 local occurs twice.
+		pre := time.Date(2025, 10, 26, 0, 30, 0, 0, time.UTC).In(berlin)  // 02:30 CEST (UTC+2)
+		post := time.Date(2025, 10, 26, 1, 30, 0, 0, time.UTC).In(berlin) // 02:30 CET (UTC+1)
+
+		cleanup(t)
+		create(t, event{Name: "post", At: post})
+		create(t, event{Name: "pre", At: pre})
+
+		result, err := session.Run(ctx, "MATCH (n:OMTest) RETURN n ORDER BY n.name", nil)
+		assertNil(t, err)
+		events, err := neo4j.CollectAs[event](ctx, result)
+		assertNil(t, err)
+		assertEquals(t, len(events), 2)
+		assertTrue(t, events[0].At.Equal(post))
+		assertTrue(t, events[1].At.Equal(pre))
+		assertFalse(t, events[0].At.Equal(events[1].At)) // genuinely two different instants
+	})
+
 	outer.Run("type mismatch returns an error", func(t *testing.T) {
 		cleanup(t)
 		create(t, omPerson{Name: "Alice", Age: 30})
