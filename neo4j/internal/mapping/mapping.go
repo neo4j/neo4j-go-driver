@@ -200,9 +200,9 @@ func assign(dst reflect.Value, raw any) error {
 		}
 		return structFromMap(dst, props)
 	case reflect.Slice:
-		return assignSlice(dst, raw)
+		return assignSlice(dst, sv)
 	case reflect.Map:
-		return assignMap(dst, raw)
+		return assignMap(dst, sv)
 	default:
 		st := sv.Type()
 		dt := dst.Type()
@@ -221,10 +221,9 @@ func assign(dst reflect.Value, raw any) error {
 }
 
 // assignSlice builds a fresh slice so the mapped value never aliases the record.
-func assignSlice(dst reflect.Value, raw any) error {
-	sv := reflect.ValueOf(raw)
+func assignSlice(dst, sv reflect.Value) error {
 	if sv.Kind() != reflect.Slice {
-		return typeError(dst.Type(), raw)
+		return typeError(dst.Type(), sv.Interface())
 	}
 	out := reflect.MakeSlice(dst.Type(), sv.Len(), sv.Len())
 	for i := 0; i < sv.Len(); i++ {
@@ -237,17 +236,16 @@ func assignSlice(dst reflect.Value, raw any) error {
 }
 
 // assignMap builds a fresh map so the mapped value never aliases the record.
-func assignMap(dst reflect.Value, raw any) error {
-	sv := reflect.ValueOf(raw)
+func assignMap(dst, sv reflect.Value) error {
 	if sv.Kind() != reflect.Map {
-		return typeError(dst.Type(), raw)
+		return typeError(dst.Type(), sv.Interface())
 	}
 	dt := dst.Type()
 	out := reflect.MakeMapWithSize(dt, sv.Len())
 	for iter := sv.MapRange(); iter.Next(); {
 		key := iter.Key()
 		if !key.Type().AssignableTo(dt.Key()) {
-			return typeError(dt, raw)
+			return typeError(dt, sv.Interface())
 		}
 		val := reflect.New(dt.Elem()).Elem()
 		if err := assign(val, iter.Value().Interface()); err != nil {
