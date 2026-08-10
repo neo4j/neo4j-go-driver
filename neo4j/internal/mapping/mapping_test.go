@@ -352,6 +352,16 @@ func TestMapToStruct(t *testing.T) {
 			want: &withScalarPointer{Name: &name},
 		},
 		{
+			name: "null leaves a struct pointer field nil",
+			src:  map[string]any{"Inner": nil},
+			want: &withPointer{Inner: nil},
+		},
+		{
+			name: "null leaves a scalar pointer field nil",
+			src:  map[string]any{"Name": nil},
+			want: &withScalarPointer{Name: nil},
+		},
+		{
 			name: "scalar slice",
 			src:  map[string]any{"Tags": []any{"a", "b"}},
 			want: &withSlice{Tags: []string{"a", "b"}},
