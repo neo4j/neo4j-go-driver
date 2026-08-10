@@ -586,6 +586,17 @@ func TestMapToStructErrors(t *testing.T) {
 			t.Fatalf("error should name the field and the value types, got: %q", got)
 		}
 	})
+	t.Run("does not coerce integer into uintptr", func(t *testing.T) {
+		t.Parallel()
+		var w struct{ Foo uintptr }
+		err := MapToStruct(map[string]any{"Foo": int64(123456)}, &w)
+		if err == nil {
+			t.Fatal("expected error for uintptr field")
+		}
+		if got := err.Error(); !strings.Contains(got, `"Foo"`) || !strings.Contains(got, "int") || !strings.Contains(got, "uintptr") {
+			t.Fatalf("error should name the field and both types, got: %q", got)
+		}
+	})
 	t.Run("nested error reports the property path", func(t *testing.T) {
 		t.Parallel()
 		var w struct{ Inner movie }
