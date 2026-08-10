@@ -163,7 +163,7 @@ func TestObjectMapping(outer *testing.T) {
 		assertEquals(t, len(events), 2)
 		assertTrue(t, events[0].At.Equal(post))
 		assertTrue(t, events[1].At.Equal(pre))
-		assertFalse(t, events[0].At.Equal(events[1].At)) // genuinely two different instants
+		assertFalse(t, events[0].At.Equal(events[1].At))
 	})
 
 	outer.Run("maps a small graph of nodes and relationships", func(t *testing.T) {
