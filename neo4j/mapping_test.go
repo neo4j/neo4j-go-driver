@@ -78,6 +78,17 @@ func TestAs(t *testing.T) {
 			t.Fatalf("As[*person] = %#v, want %#v", got, &alice)
 		}
 	})
+	t.Run("multi-hop pointer target is allocated", func(t *testing.T) {
+		t.Parallel()
+		rec := &db.Record{Keys: []string{"p"}, Values: []any{Node{Props: props}}}
+		got, err := As[**person](rec)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if got == nil || **got != alice {
+			t.Fatalf("As[**person] = %#v, want %#v", got, &alice)
+		}
+	})
 	t.Run("nil record returns a usage error", func(t *testing.T) {
 		t.Parallel()
 		_, err := As[person](nil)
