@@ -564,6 +564,28 @@ func TestMapToStructErrors(t *testing.T) {
 			t.Fatal("expected precision error for float64 into float32")
 		}
 	})
+	t.Run("map with wrong key type", func(t *testing.T) {
+		t.Parallel()
+		var w struct{ Scores map[int]int }
+		err := MapToStruct(map[string]any{"Scores": map[string]any{"key": int64(1)}}, &w)
+		if err == nil {
+			t.Fatal("expected error for wrong map key type")
+		}
+		if got := err.Error(); !strings.Contains(got, `"Scores"`) || !strings.Contains(got, "map[string]interface") || !strings.Contains(got, "map[int]int") {
+			t.Fatalf("error should name the field and both map types, got: %q", got)
+		}
+	})
+	t.Run("map with wrong value type", func(t *testing.T) {
+		t.Parallel()
+		var w struct{ Scores map[string]string }
+		err := MapToStruct(map[string]any{"Scores": map[string]any{"key": int64(1)}}, &w)
+		if err == nil {
+			t.Fatal("expected error for wrong map value type")
+		}
+		if got := err.Error(); !strings.Contains(got, `"Scores"`) || !strings.Contains(got, "int") || !strings.Contains(got, "string") {
+			t.Fatalf("error should name the field and the value types, got: %q", got)
+		}
+	})
 	t.Run("nested error reports the property path", func(t *testing.T) {
 		t.Parallel()
 		var w struct{ Inner movie }
