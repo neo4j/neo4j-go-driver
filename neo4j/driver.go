@@ -35,6 +35,7 @@ import (
 	"github.com/neo4j/neo4j-go-driver/v6/neo4j/internal/pool"
 	"github.com/neo4j/neo4j-go-driver/v6/neo4j/internal/router"
 	"github.com/neo4j/neo4j-go-driver/v6/neo4j/log"
+	"github.com/neo4j/neo4j-go-driver/v6/neo4j/propertyencryption"
 )
 
 // AccessMode defines modes that routing driver decides to which cluster member
@@ -101,6 +102,18 @@ type Driver interface {
 	// deployment
 	// Contexts terminating too early negatively affect connection pooling and degrade the driver performance.
 	GetServerInfo(ctx context.Context) (ServerInfo, error)
+	// PropertyEncryption encrypts and decrypts individual property values, configured by
+	// config.Config.PropertyEncryptionProfiles. It needs no connection and is unaffected by
+	// Close.
+	//
+	//	encrypted, err := driver.PropertyEncryption().Encrypt(ctx, propertyencryption.EncryptRequest{
+	//		Value: "078-05-1120",
+	//		Key:   propertyencryption.KeyAlias("customer-pii"),
+	//	})
+	//
+	// Property encryption is a preview feature (see README on what it means in terms of
+	// support and compatibility guarantees).
+	PropertyEncryption() *propertyencryption.Encryption
 }
 
 // DriverWithContext is an alias for Driver to maintain backward compatibility
@@ -212,6 +225,10 @@ func NewDriver(target string, auth auth.TokenManager, configurers ...func(*confi
 		configurer(d.config)
 	}
 	if err := validateAndNormaliseConfig(d.config); err != nil {
+		return nil, err
+	}
+	d.propertyEncryption, err = propertyencryption.New(d.config.PropertyEncryptionProfiles)
+	if err != nil {
 		return nil, err
 	}
 	if auth == nil {
@@ -362,10 +379,15 @@ type driver struct {
 	executeQueryBookmarkManager BookmarkManager
 	auth                        auth.TokenManager
 	cache                       *homedb.Cache
+	propertyEncryption          *propertyencryption.Encryption
 }
 
 func (d *driver) Target() url.URL {
 	return *d.target
+}
+
+func (d *driver) PropertyEncryption() *propertyencryption.Encryption {
+	return d.propertyEncryption
 }
 
 func (d *driver) NewSession(ctx context.Context, config SessionConfig) Session {
