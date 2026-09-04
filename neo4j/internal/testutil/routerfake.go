@@ -37,6 +37,7 @@ type RouterFake struct {
 	CleanUpHook            func()
 	GetNameOfDefaultDbHook func(user string) (string, error)
 	GetTableHook           func(database string) *db.RoutingTable
+	RecordedDbSelections   []db.DatabaseSelection // Appended to by GetOrUpdateReaders/GetOrUpdateWriters
 }
 
 func (r *RouterFake) InvalidateReader(database string, server string) {
@@ -69,6 +70,7 @@ func (r *RouterFake) GetOrUpdateReaders(
 	_ log.BoltLogger,
 	_ func(string),
 ) ([]string, error) {
+	r.RecordedDbSelections = append(r.RecordedDbSelections, dbSelection)
 	if r.GetOrUpdateReadersHook != nil {
 		return r.GetOrUpdateReadersHook(bookmarksFn, dbSelection.Name)
 	}
@@ -87,6 +89,7 @@ func (r *RouterFake) GetOrUpdateWriters(
 	_ log.BoltLogger,
 	_ func(string),
 ) ([]string, error) {
+	r.RecordedDbSelections = append(r.RecordedDbSelections, dbSelection)
 	if r.GetOrUpdateWritersHook != nil {
 		return r.GetOrUpdateWritersHook(bookmarksFn, dbSelection.Name)
 	}
