@@ -15,6 +15,8 @@
  * limitations under the License.
  */
 
+//lint:file-ignore SA1019 Id, StartId and EndId are supported for backward compatibility
+
 package bolt
 
 import (
