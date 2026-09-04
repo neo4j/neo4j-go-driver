@@ -400,6 +400,71 @@ func TestHomeDbGuessUsesEmptyTargetDatabase(t *testing.T) {
 	}
 }
 
+func TestTableRefreshUsesImpersonatedUser(t *testing.T) {
+	cases := []struct {
+		name             string
+		dbSelection      db.DatabaseSelection
+		expectedDatabase string
+		expectedUser     string
+	}{
+		{
+			name:             "home database guess",
+			dbSelection:      db.DatabaseSelection{Name: "homedb", IsHomeDbGuess: true, ImpersonatedUser: "alice"},
+			expectedDatabase: "",
+			expectedUser:     "alice",
+		},
+		{
+			name:             "named database",
+			dbSelection:      db.DatabaseSelection{Name: "mydb", ImpersonatedUser: "alice"},
+			expectedDatabase: "mydb",
+			expectedUser:     "alice",
+		},
+		{
+			name:             "no impersonation",
+			dbSelection:      db.DatabaseSelection{Name: "mydb"},
+			expectedDatabase: "mydb",
+			expectedUser:     "",
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			conn := &testutil.ConnFake{
+				Table: &db.RoutingTable{TimeToLive: 100, Readers: []string{"reader1"}, Writers: []string{"writer1"}},
+			}
+			pool := &poolFake{
+				borrow: func([]string, context.CancelFunc, log.BoltLogger) (db.Connection, error) {
+					return conn, nil
+				},
+			}
+			itime.ForceFreezeTime()
+			defer itime.ForceUnfreezeTime()
+			router := New("router", func() []string { return []string{} }, nil, pool, pool2.DefaultConnectionLivenessCheckTimeout, logger, "routerid")
+
+			// Expired cached table, so access refreshes it.
+			router.dbRouters[c.dbSelection.Name] = &databaseRouter{
+				table:   &db.RoutingTable{DatabaseName: c.dbSelection.Name, TimeToLive: 100, Readers: []string{"reader1"}},
+				dueUnix: itime.Now().Unix() - 1,
+			}
+
+			if _, err := router.GetOrUpdateReaders(context.Background(), nilBookmarks, c.dbSelection, nil, nil, nil); err != nil {
+				testutil.AssertNoError(t, err)
+			}
+
+			if len(conn.RecordedRouteRequests) != 1 {
+				t.Fatalf("Expected one routing table read, got %d", len(conn.RecordedRouteRequests))
+			}
+			request := conn.RecordedRouteRequests[0]
+			if request.Database != c.expectedDatabase {
+				t.Errorf("Refreshed the routing table for database %q, expected %q", request.Database, c.expectedDatabase)
+			}
+			if request.ImpersonatedUser != c.expectedUser {
+				t.Errorf("Refreshed the routing table as %q, expected %q", request.ImpersonatedUser, c.expectedUser)
+			}
+		})
+	}
+}
+
 // TODO: Tests here
 
 func TestCleanUp(t *testing.T) {

@@ -225,6 +225,36 @@ func TestSession(outer *testing.T) {
 			AssertIntEqual(t, numDefaultDbLookups, 1)
 		})
 
+		inner.Run("Passes impersonated user to the router when resolving servers", func(t *testing.T) {
+			router, pool, sess := createSessionFromConfig(SessionConfig{ImpersonatedUser: "me"})
+			pool.BorrowConn = &ConnFake{Alive: true}
+			router.GetNameOfDefaultDbHook = func(string) (string, error) { return "mydb", nil }
+			router.GetOrUpdateWritersRet = []string{"aserver"}
+
+			_, err := sess.BeginTransaction(context.Background())
+			AssertNoError(t, err)
+
+			AssertIntEqual(t, len(router.RecordedDbSelections), 1)
+			AssertStringEqual(t, "me", router.RecordedDbSelections[0].ImpersonatedUser)
+		})
+
+		inner.Run("Passes impersonated user to the router when refreshing a guessed home database", func(t *testing.T) {
+			router, pool, sess := createSessionFromConfig(SessionConfig{ImpersonatedUser: "me"})
+			// The home database cache is only consulted with SSR enabled.
+			pool.BorrowConn = &ConnFake{Alive: true, SsrEnabled: true}
+			sess.cache.SetEnabled(true)
+			sess.homeDbGuess = "mydb"
+			router.GetOrUpdateWritersRet = []string{"aserver"}
+
+			_, err := sess.BeginTransaction(context.Background())
+			AssertNoError(t, err)
+
+			AssertIntEqual(t, len(router.RecordedDbSelections), 1)
+			selection := router.RecordedDbSelections[0]
+			AssertTrue(t, selection.IsHomeDbGuess)
+			AssertStringEqual(t, "me", selection.ImpersonatedUser)
+		})
+
 		transactionFunctions := map[string]transactionFuncApi{
 			"read tx func":  func(s SessionWithContext) transactionFunc { return s.ExecuteRead },
 			"write tx func": func(s SessionWithContext) transactionFunc { return s.ExecuteWrite },
