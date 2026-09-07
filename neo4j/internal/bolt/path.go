@@ -62,7 +62,6 @@ func buildPath(nodes []dbtype.Node, relNodes []*relNode, indexes []int) dbtype.P
 		n2 := nodes[n2i]
 
 		rel := dbtype.Relationship{
-			//lint:ignore SA1019 Id is supported for backward compatibility
 			Id:        reln.id,
 			ElementId: reln.elementId,
 			Type:      reln.name,

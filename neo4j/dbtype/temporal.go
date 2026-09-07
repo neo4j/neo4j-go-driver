@@ -195,6 +195,7 @@ func (d Duration) String() string {
 				nanosStr := strings.TrimRight(fmt.Sprintf(".%09d", nanos), "0")
 				res = fmt.Append(res, seconds, nanosStr, "S")
 			} else {
+				seconds++
 				nanos = int64(time.Second) - nanos
 				nanosStr := strings.TrimRight(fmt.Sprintf(".%09d", nanos), "0")
 				res = fmt.Append(res, "-0", nanosStr, "S")
