@@ -461,6 +461,31 @@ func TestMapToStruct(t *testing.T) {
 	}
 }
 
+func TestMapToStructFloatMantissaBoundary(t *testing.T) {
+	t.Parallel()
+	// Largest integer each float represents exactly; pins the lower mantissa boundary.
+	t.Run("largest exact integer for float32", func(t *testing.T) {
+		t.Parallel()
+		var w struct{ N float32 }
+		if err := MapToStruct(map[string]any{"N": int64(1<<24 - 1)}, &w); err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if w.N != 16777215 {
+			t.Fatalf("N = %v, want 16777215", w.N)
+		}
+	})
+	t.Run("largest exact integer for float64", func(t *testing.T) {
+		t.Parallel()
+		var w struct{ N float64 }
+		if err := MapToStruct(map[string]any{"N": int64(1<<53 - 1)}, &w); err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if w.N != 9007199254740991 {
+			t.Fatalf("N = %v, want 9007199254740991", w.N)
+		}
+	})
+}
+
 func TestMapToStructErrors(t *testing.T) {
 	t.Parallel()
 	type movie struct {
@@ -543,10 +568,10 @@ func TestMapToStructErrors(t *testing.T) {
 			t.Fatal("expected error mapping float into integer field")
 		}
 	})
-	t.Run("integer loses precision as float32", func(t *testing.T) {
+	t.Run("integer just past the float32 mantissa loses precision", func(t *testing.T) {
 		t.Parallel()
 		var w struct{ N float32 }
-		if err := MapToStruct(map[string]any{"N": int64(1<<25 + 1)}, &w); err == nil {
+		if err := MapToStruct(map[string]any{"N": int64(1<<24 + 1)}, &w); err == nil {
 			t.Fatal("expected precision error for int64 into float32")
 		}
 	})
