@@ -32,8 +32,8 @@ import (
 // Numeric properties are converted to the field's type; a conversion that would
 // lose range or precision returns an error instead of silently truncating.
 //
-// Slice and map fields are copied; a node or relationship's properties are not,
-// so a mapped value may share that data with the record.
+// Slice and map fields are recursively copied; a node or relationship's
+// properties are not, so a mapped value may share that data with the record.
 //
 // Fields promoted from embedded structs follow encoding/json's rules: a
 // shallower field shadows a deeper one, and a same-depth tie is skipped.
