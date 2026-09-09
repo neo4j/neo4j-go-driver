@@ -13,7 +13,8 @@ verlt() {
 }
 
 go_version=$(go version | grep -o "go\([0-9.]\)\+" | grep -o "\([0-9.]\)\+")
-staticcheck_version="latest"
+# v0.7.0+ needs a newer go than go.mod's baseline; keep in step with testkit/build.py
+staticcheck_version="v0.6.0"
 if verlt $go_version "1.24.0"; then
 	>&2 echo "Project requires go1.24 or newer"
     exit 1
