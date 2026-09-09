@@ -189,7 +189,7 @@ func (r *Router) getOrUpdateTable(
 		if dbSelection.IsHomeDbGuess {
 			targetDatabase = ""
 		}
-		table, err := r.updateTable(ctx, bookmarksFn, targetDatabase, auth, boltLogger, dbRouter)
+		table, err := r.updateTable(ctx, bookmarksFn, targetDatabase, dbSelection.ImpersonatedUser, auth, boltLogger, dbRouter)
 		if err == nil && onRoutingTableUpdated != nil {
 			onRoutingTableUpdated(table.DatabaseName)
 		}
@@ -212,12 +212,12 @@ func (r *Router) getTableLocked(dbRouter *databaseRouter) *idb.RoutingTable {
 	return nil
 }
 
-func (r *Router) updateTable(ctx context.Context, bookmarksFn func(context.Context) ([]string, error), database string, auth *idb.ReAuthToken, boltLogger log.BoltLogger, dbRouter *databaseRouter) (*idb.RoutingTable, error) {
+func (r *Router) updateTable(ctx context.Context, bookmarksFn func(context.Context) ([]string, error), database, impersonatedUser string, auth *idb.ReAuthToken, boltLogger log.BoltLogger, dbRouter *databaseRouter) (*idb.RoutingTable, error) {
 	bookmarks, err := bookmarksFn(ctx)
 	if err != nil {
 		return nil, err
 	}
-	table, err := r.readTable(ctx, dbRouter, bookmarks, database, "", auth, boltLogger)
+	table, err := r.readTable(ctx, dbRouter, bookmarks, database, impersonatedUser, auth, boltLogger)
 	if err != nil {
 		return nil, err
 	}

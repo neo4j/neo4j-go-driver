@@ -17,8 +17,10 @@
 
 package db
 
-// DatabaseSelection encapsulates the database name and whether it is guessed.
+// DatabaseSelection encapsulates the database name, whether it is guessed and the
+// user whose home database it resolves to.
 type DatabaseSelection struct {
-	Name          string
-	IsHomeDbGuess bool
+	Name             string
+	IsHomeDbGuess    bool
+	ImpersonatedUser string
 }
