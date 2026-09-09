@@ -276,7 +276,7 @@ func assignNumeric(dst, src reflect.Value) error {
 			}
 			dst.SetUint(uint64(n))
 		case dst.CanFloat():
-			if !intFitsFloat(n, dst.Type().Bits()) {
+			if !intFitsFloat(n, dst.Type()) {
 				return precisionError(dst.Type(), n)
 			}
 			dst.SetFloat(float64(n))
@@ -299,19 +299,24 @@ func assignNumeric(dst, src reflect.Value) error {
 	return nil
 }
 
-// intFitsFloat reports whether n is exactly representable in a float of the given
-// bit size; the mantissa holds 24 significant bits for float32, 53 for float64.
-func intFitsFloat(n int64, floatBits int) bool {
+// intFitsFloat reports whether n is exactly representable in floatType. Known
+// widths use their mantissa bit count; any other falls back to an exact round-trip.
+func intFitsFloat(n int64, floatType reflect.Type) bool {
 	if n == 0 {
 		return true
+	}
+	var mantissa int
+	switch floatType.Bits() {
+	case 32:
+		mantissa = 24
+	case 64:
+		mantissa = 53
+	default:
+		return reflect.ValueOf(n).Convert(floatType).Convert(reflect.TypeFor[int64]()).Int() == n
 	}
 	u := uint64(n)
 	if n < 0 {
 		u = uint64(-n)
-	}
-	mantissa := 53
-	if floatBits == 32 {
-		mantissa = 24
 	}
 	return bits.Len64(u)-bits.TrailingZeros64(u) <= mantissa
 }
