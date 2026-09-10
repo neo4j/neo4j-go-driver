@@ -35,6 +35,11 @@ type Next struct {
 	Err     error
 }
 
+type RecordedRouteRequest struct {
+	Database         string
+	ImpersonatedUser string
+}
+
 type RecordedTx struct {
 	Origin    string
 	Mode      idb.AccessMode
@@ -65,7 +70,8 @@ type ConnFake struct {
 	ConsumeSum              *idb.Summary
 	ConsumeErr              error
 	ConsumeHook             func()
-	RecordedTxs             []RecordedTx // Appended to by Run/TxBegin
+	RecordedTxs             []RecordedTx           // Appended to by Run/TxBegin
+	RecordedRouteRequests   []RecordedRouteRequest // Appended to by GetRoutingTable
 	BufferErr               error
 	BufferHook              func()
 	DatabaseName            string
@@ -146,7 +152,9 @@ func (c *ConnFake) Consume(context.Context, idb.StreamHandle) (*idb.Summary, err
 	return c.ConsumeSum, c.ConsumeErr
 }
 
-func (c *ConnFake) GetRoutingTable(_ context.Context, _ map[string]string, _ []string, database, _ string) (*idb.RoutingTable, error) {
+func (c *ConnFake) GetRoutingTable(_ context.Context, _ map[string]string, _ []string, database, impersonatedUser string) (*idb.RoutingTable, error) {
+	c.RecordedRouteRequests = append(c.RecordedRouteRequests,
+		RecordedRouteRequest{Database: database, ImpersonatedUser: impersonatedUser})
 	if c.Table != nil {
 		c.Table.DatabaseName = database
 	}

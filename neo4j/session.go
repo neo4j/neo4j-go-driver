@@ -563,8 +563,9 @@ func (s *session) getOrUpdateServers(
 		database = s.homeDbGuess
 	}
 	dbSelection := idb.DatabaseSelection{
-		Name:          database,
-		IsHomeDbGuess: isHomeDbGuess,
+		Name:             database,
+		IsHomeDbGuess:    isHomeDbGuess,
+		ImpersonatedUser: s.config.ImpersonatedUser,
 	}
 	if mode == idb.ReadMode {
 		return s.router.GetOrUpdateReaders(ctx, s.getBookmarks, dbSelection, s.auth, s.config.BoltLogger, onRoutingTableUpdated)
