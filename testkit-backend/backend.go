@@ -39,6 +39,7 @@ import (
 	"github.com/neo4j/neo4j-go-driver/v6/neo4j/db"
 	"github.com/neo4j/neo4j-go-driver/v6/neo4j/log"
 	"github.com/neo4j/neo4j-go-driver/v6/neo4j/notifications"
+	"github.com/neo4j/neo4j-go-driver/v6/neo4j/propertyencryption"
 )
 
 // Handles a testkit backend session.
@@ -68,6 +69,9 @@ type backend struct {
 	resolvedClientCertificates      map[string]auth.ClientCertificate
 	closed                          bool
 	extrasData                      map[string]any
+	// propertyEncryption holds the key repositories the backend created per driver, so
+	// that keys can be seeded directly the way an application would.
+	propertyEncryption map[string]*propertyEncryptionState
 }
 
 // To implement transactional functions a bit of extra state is needed on the
@@ -166,6 +170,7 @@ func newBackend(rd *bufio.Reader, wr io.Writer) *backend {
 		resolvedClientCertificates:      make(map[string]auth.ClientCertificate),
 		closed:                          false,
 		extrasData:                      newBackendExtraData(),
+		propertyEncryption:              make(map[string]*propertyEncryptionState),
 	}
 }
 
@@ -241,7 +246,8 @@ func (b *backend) writeError(err error) {
 		neo4j.IsNeo4jError(err) ||
 		neo4j.IsUsageError(err) ||
 		neo4j.IsConnectivityError(err) ||
-		neo4j.IsTransactionExecutionLimit(err)
+		neo4j.IsTransactionExecutionLimit(err) ||
+		neo4j.IsPropertyEncryptionError(err)
 
 	if isDriverError {
 		var msg, errorType, gqlStatus, gqlStatusDescription, gqlClassification, gqlRawClassification string
@@ -631,6 +637,7 @@ func (b *backend) handleRequest(req map[string]any) {
 		}
 		// Parse URI (or rather type cast)
 		uri := data["uri"].(string)
+		var propertyEncryptionState *propertyEncryptionState
 		driver, err := neo4j.NewDriver(uri, authToken, func(c *config.Config) {
 			// Setup custom logger that redirects log entries back to frontend
 			c.Log = &streamLog{writeLine: b.writeLineLocked}
@@ -695,6 +702,15 @@ func (b *backend) handleRequest(req map[string]any) {
 			if data["disableAutoCommitRetries"] != nil {
 				c.DisableAutoCommitRetries = data["disableAutoCommitRetries"].(bool)
 			}
+			if data["propertyEncryptionProfiles"] != nil {
+				profiles, state, profileErr := buildPropertyEncryptionProfiles(data["propertyEncryptionProfiles"])
+				if profileErr != nil {
+					err = profileErr
+					return
+				}
+				c.PropertyEncryptionProfiles = profiles
+				propertyEncryptionState = state
+			}
 
 			clientCertificateProviderId := data["clientCertificateProviderId"]
 			if clientCertificateProviderId != nil {
@@ -730,6 +746,9 @@ func (b *backend) handleRequest(req map[string]any) {
 
 		idKey := b.nextId()
 		b.drivers[idKey] = driver
+		if propertyEncryptionState != nil {
+			b.propertyEncryption[idKey] = propertyEncryptionState
+		}
 		b.writeResponse("Driver", map[string]any{"id": idKey})
 
 	case "NewClientCertificateProvider":
@@ -1193,6 +1212,137 @@ func (b *backend) handleRequest(req map[string]any) {
 		driver := b.drivers[data["driverId"].(string)]
 		b.writeResponse("DriverIsEncrypted", map[string]any{
 			"encrypted": driver.IsEncrypted(),
+		})
+
+	case "EncryptToBytes":
+		driver := b.drivers[data["driverId"].(string)]
+		reference, err := keyReference(data)
+		if err != nil {
+			b.writeError(err)
+			return
+		}
+		value, err := cypherToNative(data["value"])
+		if err != nil {
+			b.writeError(err)
+			return
+		}
+		request := propertyencryption.EncryptRequest{
+			Value:   value,
+			Key:     reference,
+			Profile: optionalString(data, "profileName"),
+		}
+		if data["aad"] != nil {
+			aad, err := cypherToNative(data["aad"])
+			if err != nil {
+				b.writeError(err)
+				return
+			}
+			request.AAD = aad
+		}
+
+		encryption := driver.PropertyEncryption()
+		// Pinned by the deterministic tests so the ciphertext is reproducible.
+		restoreIV := func() bool { return true }
+		if data["iv"] != nil {
+			iv, err := decodeTestkitHex(data["iv"])
+			if err != nil {
+				b.writeError(err)
+				return
+			}
+			restoreIV = encryption.PinIV(iv)
+		}
+		encrypted, err := encryption.Encrypt(ctx, request)
+		if used := restoreIV(); err == nil && !used {
+			b.writeError(fmt.Errorf("the pinned initialisation vector was not used"))
+			return
+		}
+		if err != nil {
+			b.writeError(err)
+			return
+		}
+		b.writeResponse("EncryptedValue", map[string]any{
+			"encryptedBytes": encodeTestkitHex(encrypted),
+		})
+
+	case "Decrypt":
+		driver := b.drivers[data["driverId"].(string)]
+		encrypted, err := decodeTestkitHex(data["value"])
+		if err != nil {
+			b.writeError(err)
+			return
+		}
+
+		usePersisted, _ := data["usePersistedAad"].(bool)
+		var decrypted any
+		if usePersisted {
+			decrypted, err = driver.PropertyEncryption().Decrypt(ctx, encrypted)
+		} else {
+			if data["aad"] == nil {
+				b.writeError(fmt.Errorf("one of aad or usePersistedAad is required"))
+				return
+			}
+			aad, aadErr := cypherToNative(data["aad"])
+			if aadErr != nil {
+				b.writeError(aadErr)
+				return
+			}
+			decrypted, err = driver.PropertyEncryption().DecryptWithAAD(ctx, encrypted, aad)
+		}
+		if err != nil {
+			b.writeError(err)
+			return
+		}
+		b.writeResponse("DecryptedValue", map[string]any{
+			"decryptedValue": nativeToCypher(decrypted),
+		})
+
+	case "CreateEncapsulatedKey":
+		driver := b.drivers[data["driverId"].(string)]
+		keys, err := driver.PropertyEncryption().Keys(optionalString(data, "profileName"))
+		if err != nil {
+			b.writeError(err)
+			return
+		}
+		key, err := keys.Create(ctx, data["alias"].(string))
+		if err != nil {
+			b.writeError(err)
+			return
+		}
+		b.writeResponse("EncapsulatedKey", map[string]any{
+			"id":    key.ID,
+			"alias": key.Alias,
+		})
+
+	case "ImportEncapsulatedKey":
+		driverId := data["driverId"].(string)
+		state := b.propertyEncryption[driverId]
+		if state == nil {
+			b.writeError(fmt.Errorf("this driver has no property encryption profiles"))
+			return
+		}
+		profileName := data["profileName"].(string)
+		repository := state.repositories[profileName]
+		if repository == nil {
+			b.writeError(fmt.Errorf("no property encryption profile is named %s", profileName))
+			return
+		}
+		encapsulation, err := decodeTestkitHex(data["encapsulation"])
+		if err != nil {
+			b.writeError(err)
+			return
+		}
+		metadata := map[string]string{}
+		if raw, ok := data["metadata"].(map[string]any); ok {
+			for name, value := range raw {
+				metadata[name] = fmt.Sprintf("%v", value)
+			}
+		}
+		// Seeded into the repository directly, not through the driver's API.
+		key := repository.importKey(
+			data["keyId"].(string), data["alias"].(string), encapsulation, metadata)
+		b.writeResponse("EncapsulatedKey", map[string]any{
+			"id":    key.ID,
+			"alias": key.Alias,
 		})
 
 	case "VerifyConnectivity":

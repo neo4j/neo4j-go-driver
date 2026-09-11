@@ -24,6 +24,7 @@ import (
 	"github.com/neo4j/neo4j-go-driver/v6/neo4j/db"
 	"github.com/neo4j/neo4j-go-driver/v6/neo4j/internal/errorutil"
 	"github.com/neo4j/neo4j-go-driver/v6/neo4j/internal/retry"
+	"github.com/neo4j/neo4j-go-driver/v6/neo4j/propertyencryption"
 )
 
 // IsRetryable determines whether an operation can be retried based on the error
@@ -49,6 +50,12 @@ type UsageError = errorutil.UsageError
 type ConnectivityError = errorutil.ConnectivityError
 
 type TransactionExecutionLimit = errorutil.TransactionExecutionLimit
+
+// PropertyEncryptionError is returned when a property value cannot be encrypted or decrypted.
+//
+// This is part of the property encryption preview feature (see README on what it means in
+// terms of support and compatibility guarantees).
+type PropertyEncryptionError = propertyencryption.Error
 
 type InvalidAuthenticationError struct {
 	inner error
@@ -83,6 +90,15 @@ func IsConnectivityError(err error) bool {
 // IsTransactionExecutionLimit returns true if the provided error is an instance of TransactionExecutionLimit.
 func IsTransactionExecutionLimit(err error) bool {
 	_, is := err.(*TransactionExecutionLimit)
+	return is
+}
+
+// IsPropertyEncryptionError returns true if the provided error is an instance of PropertyEncryptionError.
+//
+// This is part of the property encryption preview feature (see README on what it means in
+// terms of support and compatibility guarantees).
+func IsPropertyEncryptionError(err error) bool {
+	_, is := err.(*PropertyEncryptionError)
 	return is
 }
 
