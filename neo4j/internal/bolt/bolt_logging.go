@@ -74,6 +74,7 @@ type loggedSuccess struct {
 	Qid          int64               `json:"qid,omitempty"`
 	ConfigHints  loggableDictionary  `json:"hints,omitempty"`
 	RoutingTable *loggedRoutingTable `json:"routing_table,omitempty"`
+	Patches      []string            `json:"patch_bolt,omitempty"`
 }
 
 func (s loggableSuccess) String() string {
@@ -85,6 +86,7 @@ func (s loggableSuccess) String() string {
 		HasMore:      s.hasMore,
 		Db:           s.db,
 		ConfigHints:  s.configurationHints,
+		Patches:      s.patches,
 	}
 	if s.tfirst > -1 {
 		success.TFirst = s.tfirst
