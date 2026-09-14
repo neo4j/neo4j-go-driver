@@ -39,13 +39,19 @@ type databaseRouter struct {
 	table   *idb.RoutingTable
 }
 
+// updateKey identifies a routing table read in progress.
+type updateKey struct {
+	database  string
+	requester string
+}
+
 // Router is thread safe
 type Router struct {
 	routerContext   map[string]string
 	pool            Pool
 	idlenessTimeout time.Duration
 	dbRouters       map[string]*databaseRouter
-	updating        map[string][]chan struct{}
+	updating        map[updateKey][]chan struct{}
 	dbRoutersMut    sync.Mutex
 	sleep           func(time.Duration)
 	rootRouter      string
@@ -71,7 +77,7 @@ func New(rootRouter string, getRouters func() []string, routerContext map[string
 		pool:            pool,
 		idlenessTimeout: idlenessTimeout,
 		dbRouters:       make(map[string]*databaseRouter),
-		updating:        make(map[string][]chan struct{}),
+		updating:        make(map[updateKey][]chan struct{}),
 		dbRoutersMut:    sync.Mutex{},
 		sleep:           time.Sleep,
 		log:             logger,
@@ -157,6 +163,12 @@ func (r *Router) getOrUpdateTable(
 	boltLogger log.BoltLogger,
 	onRoutingTableUpdated func(string),
 ) (*idb.RoutingTable, error) {
+	// A home database guess resolves the requester's own database, so reads are
+	// tracked per requester rather than per name.
+	key := updateKey{database: dbSelection.Name}
+	if dbSelection.IsHomeDbGuess {
+		key = updateKey{requester: dbSelection.RequesterKey}
+	}
 	r.dbRoutersMut.Lock()
 	var unlock = new(sync.Once)
 	defer unlock.Do(r.dbRoutersMut.Unlock)
@@ -165,11 +177,11 @@ func (r *Router) getOrUpdateTable(
 		if table := r.getTableLocked(dbRouter); table != nil {
 			return table, nil
 		}
-		waiters, ok := r.updating[dbSelection.Name]
+		waiters, ok := r.updating[key]
 		if ok {
 			// Wait for the table to be updated by other goroutine
 			ch := make(chan struct{})
-			r.updating[dbSelection.Name] = append(waiters, ch)
+			r.updating[key] = append(waiters, ch)
 			unlock.Do(r.dbRoutersMut.Unlock)
 			select {
 			case <-ctx.Done():
@@ -181,7 +193,7 @@ func (r *Router) getOrUpdateTable(
 			}
 		}
 		// this goroutine will update the table
-		r.updating[dbSelection.Name] = make([]chan struct{}, 0)
+		r.updating[key] = make([]chan struct{}, 0)
 		unlock.Do(r.dbRoutersMut.Unlock)
 		// Use an empty string for updating the routing table if the home database is a guess,
 		// as we cannot guarantee the guess is correct.
@@ -196,10 +208,10 @@ func (r *Router) getOrUpdateTable(
 		r.dbRoutersMut.Lock()
 		*unlock = sync.Once{}
 		// notify all waiters
-		for _, waiter := range r.updating[dbSelection.Name] {
+		for _, waiter := range r.updating[key] {
 			close(waiter)
 		}
-		delete(r.updating, dbSelection.Name)
+		delete(r.updating, key)
 		return table, err
 	}
 }
