@@ -254,6 +254,37 @@ func TestSession(outer *testing.T) {
 			selection := router.RecordedDbSelections[0]
 			AssertTrue(t, selection.IsHomeDbGuess)
 			AssertStringEqual(t, "me", selection.ImpersonatedUser)
+			// Keys the router's per requester routing table read.
+			AssertStringEqual(t, "basic:me", selection.RequesterKey)
+		})
+
+		inner.Run("Distinguishes requesters by session auth", func(t *testing.T) {
+			requesterKeyFor := func(principal string) string {
+				router := RouterFake{}
+				pool := PoolFake{}
+				cache, _ := homedb.NewCache(100)
+				token := &idb.ReAuthToken{
+					Manager: iauth.Token{Tokens: map[string]any{
+						"scheme": "basic", "principal": principal,
+					}},
+					FromSession: true,
+				}
+				conf := config.Config{MaxTransactionRetryTime: 3 * time.Millisecond}
+				sess := newSession(context.Background(), &conf, SessionConfig{}, &router, &pool, cache, logger, token)
+				pool.BorrowConn = &ConnFake{Alive: true, SsrEnabled: true}
+				sess.cache.SetEnabled(true)
+				sess.homeDbGuess = "mydb"
+				router.GetOrUpdateWritersRet = []string{"aserver"}
+
+				_, err := sess.BeginTransaction(context.Background())
+				AssertNoError(t, err)
+				AssertIntEqual(t, len(router.RecordedDbSelections), 1)
+				return router.RecordedDbSelections[0].RequesterKey
+			}
+
+			alice, bob := requesterKeyFor("alice"), requesterKeyFor("bob")
+			AssertStringEqual(t, "basic:alice", alice)
+			AssertStringEqual(t, "basic:bob", bob)
 		})
 
 		transactionFunctions := map[string]transactionFuncApi{

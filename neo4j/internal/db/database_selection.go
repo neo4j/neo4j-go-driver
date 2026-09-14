@@ -17,10 +17,12 @@
 
 package db
 
-// DatabaseSelection encapsulates the database name, whether it is guessed and the
-// user whose home database it resolves to.
+// DatabaseSelection encapsulates the database name and whether it is guessed.
 type DatabaseSelection struct {
 	Name             string
 	IsHomeDbGuess    bool
 	ImpersonatedUser string
+	// RequesterKey is the home database cache key. It does not distinguish impersonation
+	// from authentication, so ImpersonatedUser is still needed.
+	RequesterKey string
 }

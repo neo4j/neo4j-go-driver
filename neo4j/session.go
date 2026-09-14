@@ -225,6 +225,7 @@ type session struct {
 	bookmarks               *sessionBookmarks
 	resolveHomeDb           bool
 	homeDbGuess             string
+	requesterKey            string
 	pool                    sessionPool
 	router                  sessionRouter
 	cache                   *homedb.Cache
@@ -281,6 +282,7 @@ func newSession(
 		config:        sessConfig,
 		resolveHomeDb: sessConfig.DatabaseName == "",
 		homeDbGuess:   homeDbGuess,
+		requesterKey:  key,
 		sleep:         racing.Sleep,
 		log:           logger,
 		logId:         logId,
@@ -566,6 +568,7 @@ func (s *session) getOrUpdateServers(
 		Name:             database,
 		IsHomeDbGuess:    isHomeDbGuess,
 		ImpersonatedUser: s.config.ImpersonatedUser,
+		RequesterKey:     s.requesterKey,
 	}
 	if mode == idb.ReadMode {
 		return s.router.GetOrUpdateReaders(ctx, s.getBookmarks, dbSelection, s.auth, s.config.BoltLogger, onRoutingTableUpdated)
