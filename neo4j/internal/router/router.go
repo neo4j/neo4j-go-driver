@@ -194,12 +194,8 @@ func (r *Router) getOrUpdateTable(
 		// this goroutine will update the table
 		r.updating[key] = make([]chan struct{}, 0)
 		unlock.Do(r.dbRoutersMut.Unlock)
-		// Use an empty string for updating the routing table if the home database is a guess,
-		// as we cannot guarantee the guess is correct.
-		targetDatabase := dbSelection.Name
-		if dbSelection.IsHomeDbGuess {
-			targetDatabase = ""
-		}
+		// Empty for a home database read, so the server resolves the name.
+		targetDatabase := key.database
 		table, err := r.updateTable(ctx, bookmarksFn, targetDatabase, dbSelection.ImpersonatedUser, auth, boltLogger, dbRouter)
 		if err == nil && onRoutingTableUpdated != nil {
 			onRoutingTableUpdated(table.DatabaseName)
