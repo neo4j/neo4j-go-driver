@@ -32,7 +32,7 @@ import (
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/log"
 )
 
-// homeDbPool resolves an empty database to the requester's home database, as the
+// homeDbPool resolves an empty database to the user's home database, as the
 // server does. Borrows block until release is closed.
 type homeDbPool struct {
 	homeDb  map[string]string
@@ -40,9 +40,9 @@ type homeDbPool struct {
 	entered chan struct{}
 	once    sync.Once
 
-	mut        sync.Mutex
-	borrows    int
-	requesters []string
+	mut     sync.Mutex
+	borrows int
+	users   []string
 }
 
 func (p *homeDbPool) Borrow(_ context.Context, _ func() []string, _ bool, _ log.BoltLogger, _ time.Duration, auth *db.ReAuthToken) (db.Connection, error) {
@@ -55,17 +55,17 @@ func (p *homeDbPool) Borrow(_ context.Context, _ func() []string, _ bool, _ log.
 	principal := principalOf(auth)
 	return &testutil.ConnFake{
 		GetRoutingTableHook: func(database, impersonatedUser string) (*db.RoutingTable, error) {
-			requester := impersonatedUser
-			if requester == "" {
-				requester = principal
+			user := impersonatedUser
+			if user == "" {
+				user = principal
 			}
 			p.mut.Lock()
-			p.requesters = append(p.requesters, requester)
+			p.users = append(p.users, user)
 			p.mut.Unlock()
 
 			resolved := database
 			if resolved == "" {
-				resolved = p.homeDb[requester]
+				resolved = p.homeDb[user]
 			}
 			return &db.RoutingTable{
 				DatabaseName: resolved,
@@ -81,7 +81,7 @@ func (p *homeDbPool) Return(context.Context, db.Connection) {}
 func (p *homeDbPool) recorded() []string {
 	p.mut.Lock()
 	defer p.mut.Unlock()
-	return append([]string(nil), p.requesters...)
+	return append([]string(nil), p.users...)
 }
 
 func principalOf(auth *db.ReAuthToken) string {
@@ -175,30 +175,31 @@ func runConcurrently(t *testing.T, homeDb map[string]string, first, second route
 	return results, pool.recorded()
 }
 
-// TestConcurrentHomeDbResolutionIsPerRequester covers two callers sharing a cached
+// TestConcurrentHomeDbResolutionIsPerUser covers two callers sharing a cached
 // home database guess that is stale for the second.
-func TestConcurrentHomeDbResolutionIsPerRequester(t *testing.T) {
+func TestConcurrentHomeDbResolutionIsPerUser(t *testing.T) {
 	homeDb := map[string]string{"alice": "shared-db", "bob": "bob-db"}
 	guess := db.DatabaseSelection{Name: "shared-db", IsHomeDbGuess: true}
 
-	// The requester key covers impersonation and session auth, so both cases key on it.
+	// The home database cache key covers impersonation and session auth, so both cases
+	// key on it.
 	cases := []struct {
-		name         string
-		first        routerCall
-		second       routerCall
-		wantRequests []string
+		name      string
+		first     routerCall
+		second    routerCall
+		wantUsers []string
 	}{
 		{
-			name:         "impersonated user",
-			first:        routerCall{selection: impersonating(guess, "alice")},
-			second:       routerCall{selection: impersonating(guess, "bob")},
-			wantRequests: []string{"alice", "bob"},
+			name:      "impersonated user",
+			first:     routerCall{selection: impersonating(guess, "alice")},
+			second:    routerCall{selection: impersonating(guess, "bob")},
+			wantUsers: []string{"alice", "bob"},
 		},
 		{
-			name:         "session auth",
-			first:        routerCall{selection: requestedBy(guess, "alice"), auth: sessionAuth("alice")},
-			second:       routerCall{selection: requestedBy(guess, "bob"), auth: sessionAuth("bob")},
-			wantRequests: []string{"alice", "bob"},
+			name:      "session auth",
+			first:     routerCall{selection: withHomeDbCacheKey(guess, "alice"), auth: sessionAuth("alice")},
+			second:    routerCall{selection: withHomeDbCacheKey(guess, "bob"), auth: sessionAuth("bob")},
+			wantUsers: []string{"alice", "bob"},
 		},
 	}
 
@@ -206,7 +207,7 @@ func TestConcurrentHomeDbResolutionIsPerRequester(t *testing.T) {
 		t.Run(c.name, func(t *testing.T) {
 			results, requests := runConcurrently(t, homeDb, c.first, c.second)
 
-			assertRequesters(t, requests, c.wantRequests)
+			assertUsers(t, requests, c.wantUsers)
 			assertResolved(t, results[0], "shared-db")
 			assertResolved(t, results[1], "bob-db")
 		})
@@ -215,7 +216,7 @@ func TestConcurrentHomeDbResolutionIsPerRequester(t *testing.T) {
 
 // TestConcurrentReadsShareOneRequest covers the cases where one read must still serve
 // both callers: a named database, which is not a home database resolution, and two
-// callers that are the same requester.
+// callers that are the same user.
 func TestConcurrentReadsShareOneRequest(t *testing.T) {
 	named := db.DatabaseSelection{Name: "named-db"}
 	guess := db.DatabaseSelection{Name: "shared-db", IsHomeDbGuess: true}
@@ -233,7 +234,7 @@ func TestConcurrentReadsShareOneRequest(t *testing.T) {
 			database: "named-db",
 		},
 		{
-			name:     "same requester",
+			name:     "same user",
 			first:    routerCall{selection: impersonating(guess, "alice")},
 			second:   routerCall{selection: impersonating(guess, "alice")},
 			database: "shared-db",
@@ -255,29 +256,29 @@ func TestConcurrentReadsShareOneRequest(t *testing.T) {
 	}
 }
 
-func requestedBy(selection db.DatabaseSelection, user string) db.DatabaseSelection {
-	selection.RequesterKey = user
+func withHomeDbCacheKey(selection db.DatabaseSelection, user string) db.DatabaseSelection {
+	selection.HomeDbCacheKey = user
 	return selection
 }
 
 func impersonating(selection db.DatabaseSelection, user string) db.DatabaseSelection {
-	selection = requestedBy(selection, user)
+	selection = withHomeDbCacheKey(selection, user)
 	selection.ImpersonatedUser = user
 	return selection
 }
 
-func assertRequesters(t *testing.T, got, want []string) {
+func assertUsers(t *testing.T, got, want []string) {
 	t.Helper()
 	if len(got) != len(want) {
 		t.Fatalf("got %d routing table requests %v, want %d %v", len(got), got, len(want), want)
 	}
 	seen := make(map[string]bool, len(got))
-	for _, requester := range got {
-		seen[requester] = true
+	for _, user := range got {
+		seen[user] = true
 	}
-	for _, requester := range want {
-		if !seen[requester] {
-			t.Errorf("no routing table request was made for %q, got %v", requester, got)
+	for _, user := range want {
+		if !seen[user] {
+			t.Errorf("no routing table request was made for %q, got %v", user, got)
 		}
 	}
 }

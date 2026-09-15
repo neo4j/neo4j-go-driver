@@ -41,8 +41,8 @@ type databaseRouter struct {
 
 // updateKey identifies a routing table read in progress.
 type updateKey struct {
-	database  string
-	requester string
+	database       string
+	homeDbCacheKey string
 }
 
 // Router is thread safe
@@ -163,11 +163,11 @@ func (r *Router) getOrUpdateTable(
 	boltLogger log.BoltLogger,
 	onRoutingTableUpdated func(string),
 ) (*idb.RoutingTable, error) {
-	// A home database guess resolves the requester's own database, so reads are
-	// tracked per requester rather than per name.
+	// A home database guess resolves the home database of whoever asked, so reads are
+	// tracked per home database key rather than per name.
 	key := updateKey{database: dbSelection.Name}
 	if dbSelection.IsHomeDbGuess {
-		key = updateKey{requester: dbSelection.RequesterKey}
+		key = updateKey{homeDbCacheKey: dbSelection.HomeDbCacheKey}
 	}
 	r.dbRoutersMut.Lock()
 	var unlock = new(sync.Once)
