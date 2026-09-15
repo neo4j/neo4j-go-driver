@@ -214,6 +214,53 @@ func TestConcurrentHomeDbResolutionIsPerUser(t *testing.T) {
 	}
 }
 
+// awaitBorrows blocks until n reads are active at once, returning the most it saw.
+func awaitBorrows(pool *homeDbPool, n int) (int, bool) {
+	deadline := time.Now().Add(2 * time.Second)
+	peak := 0
+	for time.Now().Before(deadline) {
+		pool.mut.Lock()
+		peak = pool.borrows
+		pool.mut.Unlock()
+		if peak >= n {
+			return peak, true
+		}
+		time.Sleep(time.Millisecond)
+	}
+	return peak, false
+}
+
+// TestConcurrentHomeDbResolutionsRunInParallel covers home database resolutions for
+// different users, which must run at once rather than queue behind one another.
+func TestConcurrentHomeDbResolutionsRunInParallel(t *testing.T) {
+	users := []string{"alice", "bob", "carol"}
+	homeDb := map[string]string{"alice": "alice-db", "bob": "bob-db", "carol": "carol-db"}
+
+	pool := &homeDbPool{homeDb: homeDb, release: make(chan struct{}), entered: make(chan struct{})}
+	router := New("router", func() []string { return []string{} }, nil, pool, pool2.DefaultConnectionLivenessCheckTimeout, logger, "routerid")
+
+	var wg sync.WaitGroup
+	for _, user := range users {
+		wg.Add(1)
+		go func(user string) {
+			defer wg.Done()
+			_, _ = router.GetOrUpdateReaders(context.Background(), nilBookmarks,
+				impersonating(db.DatabaseSelection{}, user), nil, nil, nil)
+		}(user)
+	}
+
+	peak, inParallel := awaitBorrows(pool, len(users))
+	close(pool.release)
+	wg.Wait()
+
+	if !inParallel {
+		t.Errorf("resolutions serialised, only %d of %d reads ran at once", peak, len(users))
+	}
+	if got := pool.recorded(); len(got) != len(users) {
+		t.Errorf("got %d routing table reads %v, want %d", len(got), got, len(users))
+	}
+}
+
 // TestConcurrentReadsShareOneRequest covers the cases where one read must still serve
 // both callers: a named database, which is not a home database resolution, and two
 // callers that are the same user.

@@ -164,10 +164,9 @@ func (r *Router) getOrUpdateTable(
 	boltLogger log.BoltLogger,
 	onRoutingTableUpdated func(string),
 ) (*idb.RoutingTable, error) {
-	// A home database guess resolves the home database of whoever asked, so reads are
-	// tracked per home database key rather than per name.
+	// Reads that resolve a home database are keyed per user, not per name.
 	key := updateKey{database: dbSelection.Name}
-	if dbSelection.IsHomeDbGuess {
+	if dbSelection.IsHomeDbGuess || dbSelection.Name == "" {
 		key = updateKey{homeDbCacheKey: dbSelection.HomeDbCacheKey}
 	}
 	r.dbRoutersMut.Lock()
