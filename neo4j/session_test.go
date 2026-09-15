@@ -254,12 +254,12 @@ func TestSession(outer *testing.T) {
 			selection := router.RecordedDbSelections[0]
 			AssertTrue(t, selection.IsHomeDbGuess)
 			AssertStringEqual(t, "me", selection.ImpersonatedUser)
-			// Keys the router's per requester routing table read.
-			AssertStringEqual(t, "basic:me", selection.RequesterKey)
+			// Keys the router's per user routing table read.
+			AssertStringEqual(t, "basic:me", selection.HomeDbCacheKey)
 		})
 
-		inner.Run("Distinguishes requesters by session auth", func(t *testing.T) {
-			requesterKeyFor := func(principal string) string {
+		inner.Run("Distinguishes home database keys by session auth", func(t *testing.T) {
+			homeDbCacheKeyFor := func(principal string) string {
 				router := RouterFake{}
 				pool := PoolFake{}
 				cache, _ := homedb.NewCache(100)
@@ -279,10 +279,10 @@ func TestSession(outer *testing.T) {
 				_, err := sess.BeginTransaction(context.Background())
 				AssertNoError(t, err)
 				AssertIntEqual(t, len(router.RecordedDbSelections), 1)
-				return router.RecordedDbSelections[0].RequesterKey
+				return router.RecordedDbSelections[0].HomeDbCacheKey
 			}
 
-			alice, bob := requesterKeyFor("alice"), requesterKeyFor("bob")
+			alice, bob := homeDbCacheKeyFor("alice"), homeDbCacheKeyFor("bob")
 			AssertStringEqual(t, "basic:alice", alice)
 			AssertStringEqual(t, "basic:bob", bob)
 		})
