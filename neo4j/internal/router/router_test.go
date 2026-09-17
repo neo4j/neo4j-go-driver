@@ -463,9 +463,8 @@ func TestTableRefreshUsesImpersonatedUser(t *testing.T) {
 				dueUnix: itime.Now().Unix() - 1,
 			}
 
-			if _, err := router.GetOrUpdateReaders(context.Background(), nilBookmarks, c.dbSelection, nil, nil, nil); err != nil {
-				testutil.AssertNoError(t, err)
-			}
+			_, err := router.GetOrUpdateReaders(context.Background(), nilBookmarks, c.dbSelection, nil, nil, nil)
+			testutil.AssertNoError(t, err)
 
 			if len(conn.RecordedRouteRequests) != 1 {
 				t.Fatalf("Expected one routing table read, got %d", len(conn.RecordedRouteRequests))
