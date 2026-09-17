@@ -1,5 +1,3 @@
-//go:build internal_neo4j_go_driver_time_mock
-
 /*
  * Copyright (c) "Neo4j"
  * Neo4j Sweden AB [https://neo4j.com]
