@@ -30,13 +30,12 @@ type RouterFake struct {
 	InvalidateMode         string
 	InvalidatedServer      string
 	GetOrUpdateReadersRet  []string
-	GetOrUpdateReadersHook func(bookmarks func(context.Context) ([]string, error), database string) ([]string, error)
+	GetOrUpdateReadersHook func(bookmarks func(context.Context) ([]string, error), dbSelection db.DatabaseSelection) ([]string, error)
 	GetOrUpdateWritersRet  []string
-	GetOrUpdateWritersHook func(bookmarks func(context.Context) ([]string, error), database string) ([]string, error)
+	GetOrUpdateWritersHook func(bookmarks func(context.Context) ([]string, error), dbSelection db.DatabaseSelection) ([]string, error)
 	Err                    error
 	CleanUpHook            func()
 	GetNameOfDefaultDbHook func(user string) (string, error)
-	RecordedDbSelections   []db.DatabaseSelection // Appended to by GetOrUpdateReaders/GetOrUpdateWriters
 }
 
 func (r *RouterFake) InvalidateReader(database string, server string) {
@@ -69,9 +68,8 @@ func (r *RouterFake) GetOrUpdateReaders(
 	_ log.BoltLogger,
 	_ func(string),
 ) ([]string, error) {
-	r.RecordedDbSelections = append(r.RecordedDbSelections, dbSelection)
 	if r.GetOrUpdateReadersHook != nil {
-		return r.GetOrUpdateReadersHook(bookmarksFn, dbSelection.Name)
+		return r.GetOrUpdateReadersHook(bookmarksFn, dbSelection)
 	}
 	return r.GetOrUpdateReadersRet, r.Err
 }
@@ -88,9 +86,8 @@ func (r *RouterFake) GetOrUpdateWriters(
 	_ log.BoltLogger,
 	_ func(string),
 ) ([]string, error) {
-	r.RecordedDbSelections = append(r.RecordedDbSelections, dbSelection)
 	if r.GetOrUpdateWritersHook != nil {
-		return r.GetOrUpdateWritersHook(bookmarksFn, dbSelection.Name)
+		return r.GetOrUpdateWritersHook(bookmarksFn, dbSelection)
 	}
 	return r.GetOrUpdateWritersRet, r.Err
 }
