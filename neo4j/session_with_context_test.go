@@ -88,14 +88,6 @@ func TestSession(outer *testing.T) {
 		sess.cache.Set(cacheKey, databaseName)
 		sess.homeDbGuess = cacheKey
 
-		// Fake a routing table lookup for the guessed home database
-		router.GetTableHook = func(guess string) *idb.RoutingTable {
-			if guess == cacheKey {
-				return &idb.RoutingTable{}
-			}
-			return nil
-		}
-
 		// Track number of borrow and return calls
 		borrowCount := 0
 		returnCount := 0
