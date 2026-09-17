@@ -88,7 +88,7 @@ func principalOf(auth *db.ReAuthToken) string {
 	}
 	token, err := auth.Manager.GetAuthToken(context.Background())
 	if err != nil {
-		return ""
+		panic(err)
 	}
 	principal, _ := token.Tokens["principal"].(string)
 	return principal
