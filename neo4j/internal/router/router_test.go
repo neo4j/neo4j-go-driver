@@ -406,21 +406,39 @@ func TestTableRefreshUsesImpersonatedUser(t *testing.T) {
 		expectedUser     string
 	}{
 		{
-			name:             "home database guess",
+			name:             "impersonation home database guess",
 			dbSelection:      db.DatabaseSelection{Name: "homedb", IsHomeDbGuess: true, ImpersonatedUser: "alice"},
 			expectedDatabase: "",
 			expectedUser:     "alice",
 		},
 		{
-			name:             "named database",
+			name:             "impersonation named database",
 			dbSelection:      db.DatabaseSelection{Name: "mydb", ImpersonatedUser: "alice"},
 			expectedDatabase: "mydb",
 			expectedUser:     "alice",
 		},
 		{
-			name:             "no impersonation",
+			name:             "impersonation no database",
+			dbSelection:      db.DatabaseSelection{ImpersonatedUser: "alice"},
+			expectedDatabase: "",
+			expectedUser:     "alice",
+		},
+		{
+			name:             "home database guess",
+			dbSelection:      db.DatabaseSelection{Name: "homedb", IsHomeDbGuess: true},
+			expectedDatabase: "",
+			expectedUser:     "",
+		},
+		{
+			name:             "named database",
 			dbSelection:      db.DatabaseSelection{Name: "mydb"},
 			expectedDatabase: "mydb",
+			expectedUser:     "",
+		},
+		{
+			name:             "no database",
+			dbSelection:      db.DatabaseSelection{},
+			expectedDatabase: "",
 			expectedUser:     "",
 		},
 	}
