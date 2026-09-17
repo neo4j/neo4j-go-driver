@@ -203,8 +203,8 @@ func TestSession(outer *testing.T) {
 				numDefaultDbLookups++
 				return mydb, nil
 			}
-			router.GetOrUpdateWritersHook = func(_ func(context.Context) ([]string, error), database string) ([]string, error) {
-				AssertStringEqual(t, mydb, database)
+			router.GetOrUpdateWritersHook = func(_ func(context.Context) ([]string, error), dbSelection idb.DatabaseSelection) ([]string, error) {
+				AssertStringEqual(t, mydb, dbSelection.Name)
 				return []string{"aserver"}, nil
 			}
 
@@ -221,13 +221,17 @@ func TestSession(outer *testing.T) {
 			router, pool, sess := createSessionFromConfig(SessionConfig{ImpersonatedUser: "me"})
 			pool.BorrowConn = &ConnFake{Alive: true}
 			router.GetNameOfDefaultDbHook = func(string) (string, error) { return "mydb", nil }
-			router.GetOrUpdateWritersRet = []string{"aserver"}
+			var selections []idb.DatabaseSelection
+			router.GetOrUpdateWritersHook = func(_ func(context.Context) ([]string, error), dbSelection idb.DatabaseSelection) ([]string, error) {
+				selections = append(selections, dbSelection)
+				return []string{"aserver"}, nil
+			}
 
 			_, err := sess.BeginTransaction(context.Background())
 			AssertNoError(t, err)
 
-			AssertIntEqual(t, len(router.RecordedDbSelections), 1)
-			AssertStringEqual(t, "me", router.RecordedDbSelections[0].ImpersonatedUser)
+			AssertIntEqual(t, len(selections), 1)
+			AssertStringEqual(t, "me", selections[0].ImpersonatedUser)
 		})
 
 		inner.Run("Passes impersonated user to the router when refreshing a guessed home database", func(t *testing.T) {
@@ -236,13 +240,17 @@ func TestSession(outer *testing.T) {
 			pool.BorrowConn = &ConnFake{Alive: true, SsrEnabled: true}
 			sess.cache.SetEnabled(true)
 			sess.homeDbGuess = "mydb"
-			router.GetOrUpdateWritersRet = []string{"aserver"}
+			var selections []idb.DatabaseSelection
+			router.GetOrUpdateWritersHook = func(_ func(context.Context) ([]string, error), dbSelection idb.DatabaseSelection) ([]string, error) {
+				selections = append(selections, dbSelection)
+				return []string{"aserver"}, nil
+			}
 
 			_, err := sess.BeginTransaction(context.Background())
 			AssertNoError(t, err)
 
-			AssertIntEqual(t, len(router.RecordedDbSelections), 1)
-			selection := router.RecordedDbSelections[0]
+			AssertIntEqual(t, len(selections), 1)
+			selection := selections[0]
 			AssertTrue(t, selection.IsHomeDbGuess)
 			AssertStringEqual(t, "me", selection.ImpersonatedUser)
 			// Keys the router's per user routing table read.
@@ -265,12 +273,16 @@ func TestSession(outer *testing.T) {
 				pool.BorrowConn = &ConnFake{Alive: true, SsrEnabled: true}
 				sess.cache.SetEnabled(true)
 				sess.homeDbGuess = "mydb"
-				router.GetOrUpdateWritersRet = []string{"aserver"}
+				var selections []idb.DatabaseSelection
+				router.GetOrUpdateWritersHook = func(_ func(context.Context) ([]string, error), dbSelection idb.DatabaseSelection) ([]string, error) {
+					selections = append(selections, dbSelection)
+					return []string{"aserver"}, nil
+				}
 
 				_, err := sess.BeginTransaction(context.Background())
 				AssertNoError(t, err)
-				AssertIntEqual(t, len(router.RecordedDbSelections), 1)
-				return router.RecordedDbSelections[0].HomeDbCacheKey
+				AssertIntEqual(t, len(selections), 1)
+				return selections[0].HomeDbCacheKey
 			}
 
 			alice, bob := homeDbCacheKeyFor("alice"), homeDbCacheKeyFor("bob")
@@ -447,8 +459,8 @@ func TestSession(outer *testing.T) {
 				numDefaultDbLookups++
 				return mydb, nil
 			}
-			router.GetOrUpdateReadersHook = func(_ func(context.Context) ([]string, error), database string) ([]string, error) {
-				AssertStringEqual(t, mydb, database)
+			router.GetOrUpdateReadersHook = func(_ func(context.Context) ([]string, error), dbSelection idb.DatabaseSelection) ([]string, error) {
+				AssertStringEqual(t, mydb, dbSelection.Name)
 				return []string{"aserver"}, nil
 			}
 
@@ -615,8 +627,8 @@ func TestSession(outer *testing.T) {
 				numDefaultDbLookups++
 				return mydb, nil
 			}
-			router.GetOrUpdateReadersHook = func(_ func(context.Context) ([]string, error), database string) ([]string, error) {
-				AssertStringEqual(t, mydb, database)
+			router.GetOrUpdateReadersHook = func(_ func(context.Context) ([]string, error), dbSelection idb.DatabaseSelection) ([]string, error) {
+				AssertStringEqual(t, mydb, dbSelection.Name)
 				return []string{"aserver"}, nil
 			}
 
@@ -731,7 +743,7 @@ func TestSession(outer *testing.T) {
 			router, _, session := createSession()
 			defer session.Close(ctx)
 			expectedErr := fmt.Errorf("server retrieval err")
-			router.GetOrUpdateReadersHook = func(func(context.Context) ([]string, error), string) ([]string, error) {
+			router.GetOrUpdateReadersHook = func(func(context.Context) ([]string, error), idb.DatabaseSelection) ([]string, error) {
 				return nil, expectedErr
 			}
 
