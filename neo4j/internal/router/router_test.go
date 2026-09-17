@@ -35,8 +35,6 @@ import (
 	"github.com/neo4j/neo4j-go-driver/v6/neo4j/log"
 )
 
-var logger = log.ToVoid()
-
 // Verifies that concurrent access works as expected relying on the race detector to
 // report suspicious behavior.
 func TestMultithreading(t *testing.T) {
@@ -503,5 +501,3 @@ func TestCleanUp(t *testing.T) {
 		t.Fatal("Should have cleaned up")
 	}
 }
-
-func nilBookmarks(context.Context) ([]string, error) { return nil, nil }
