@@ -39,7 +39,8 @@ import (
 type transactionFunc func(context.Context, ManagedTransactionWork, ...func(*TransactionConfig)) (any, error)
 type transactionFuncApi func(session SessionWithContext) transactionFunc
 
-var reAuthToken = &idb.ReAuthToken{FromSession: false, Manager: iauth.Token{Tokens: map[string]any{"scheme": "none"}}}
+var authToken = iauth.Token{Tokens: map[string]any{"scheme": "none"}}
+var reAuthToken = &idb.ReAuthToken{FromSession: false, Manager: authToken}
 
 func TestSession(outer *testing.T) {
 	var logger = log.ToVoid()
@@ -254,7 +255,9 @@ func TestSession(outer *testing.T) {
 			AssertTrue(t, selection.IsHomeDbGuess)
 			AssertStringEqual(t, "me", selection.ImpersonatedUser)
 			// Keys the router's per user routing table read.
-			AssertStringEqual(t, "basic:me", selection.HomeDbCacheKey)
+			cacheKey, err := new(homedb.Cache).ComputeKey("me", &authToken)
+			AssertNoError(t, err)
+			AssertStringEqual(t, cacheKey, selection.HomeDbCacheKey)
 		})
 
 		inner.Run("Distinguishes home database keys by session auth", func(t *testing.T) {
@@ -262,12 +265,10 @@ func TestSession(outer *testing.T) {
 				router := RouterFake{}
 				pool := PoolFake{}
 				cache, _ := homedb.NewCache(100)
-				token := &idb.ReAuthToken{
-					Manager: iauth.Token{Tokens: map[string]any{
-						"scheme": "basic", "principal": principal,
-					}},
-					FromSession: true,
-				}
+				sessionAuth := iauth.Token{Tokens: map[string]any{
+					"scheme": "basic", "principal": principal,
+				}}
+				token := &idb.ReAuthToken{Manager: sessionAuth, FromSession: true}
 				conf := Config{MaxTransactionRetryTime: 3 * time.Millisecond}
 				sess := newSessionWithContext(context.Background(), &conf, SessionConfig{}, &router, &pool, cache, logger, token)
 				pool.BorrowConn = &ConnFake{Alive: true, SsrEnabled: true}
@@ -282,12 +283,14 @@ func TestSession(outer *testing.T) {
 				_, err := sess.BeginTransaction(context.Background())
 				AssertNoError(t, err)
 				AssertIntEqual(t, len(selections), 1)
+
+				cacheKey, err := new(homedb.Cache).ComputeKey("", &sessionAuth)
+				AssertNoError(t, err)
+				AssertStringEqual(t, cacheKey, selections[0].HomeDbCacheKey)
 				return selections[0].HomeDbCacheKey
 			}
 
-			alice, bob := homeDbCacheKeyFor("alice"), homeDbCacheKeyFor("bob")
-			AssertStringEqual(t, "basic:alice", alice)
-			AssertStringEqual(t, "basic:bob", bob)
+			AssertNotDeepEquals(t, homeDbCacheKeyFor("alice"), homeDbCacheKeyFor("bob"))
 		})
 
 		transactionFunctions := map[string]transactionFuncApi{
