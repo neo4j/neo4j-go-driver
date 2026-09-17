@@ -36,7 +36,6 @@ type RouterFake struct {
 	Err                    error
 	CleanUpHook            func()
 	GetNameOfDefaultDbHook func(user string) (string, error)
-	GetTableHook           func(database string) *db.RoutingTable
 	RecordedDbSelections   []db.DatabaseSelection // Appended to by GetOrUpdateReaders/GetOrUpdateWriters
 }
 
