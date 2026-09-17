@@ -270,7 +270,7 @@ func TestSession(outer *testing.T) {
 					"scheme": "basic", "principal": principal,
 				}}
 				token := &idb.ReAuthToken{Manager: sessionAuth, FromSession: true}
-				conf := config.Config{MaxTransactionRetryTime: 3 * time.Millisecond}
+				conf := config.Config{}
 				sess := newSession(context.Background(), &conf, SessionConfig{}, &router, &pool, cache, logger, token)
 				pool.BorrowConn = &ConnFake{Alive: true, SsrEnabled: true}
 				sess.cache.SetEnabled(true)
