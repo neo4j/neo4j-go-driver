@@ -15,14 +15,14 @@
  * limitations under the License.
  */
 
-package db
+package router
 
-// DatabaseSelection encapsulates the database name and whether it is guessed.
-type DatabaseSelection struct {
-	Name             string
-	IsHomeDbGuess    bool
-	ImpersonatedUser string
-	// HomeDbCacheKey does not distinguish impersonation from authentication, so
-	// ImpersonatedUser is still needed.
-	HomeDbCacheKey string
-}
+import (
+	"context"
+
+	"github.com/neo4j/neo4j-go-driver/v5/neo4j/log"
+)
+
+var logger = log.ToVoid()
+
+func nilBookmarks(context.Context) ([]string, error) { return nil, nil }
