@@ -225,6 +225,7 @@ type session struct {
 	bookmarks               *sessionBookmarks
 	resolveHomeDb           bool
 	homeDbGuess             string
+	homeDbCacheKey          string
 	pool                    sessionPool
 	router                  sessionRouter
 	cache                   *homedb.Cache
@@ -272,21 +273,22 @@ func newSession(
 	}
 
 	session := &session{
-		driverConfig:  config,
-		router:        router,
-		pool:          pool,
-		cache:         cache,
-		defaultMode:   idb.AccessMode(sessConfig.AccessMode),
-		bookmarks:     newSessionBookmarks(sessConfig.BookmarkManager, sessConfig.Bookmarks),
-		config:        sessConfig,
-		resolveHomeDb: sessConfig.DatabaseName == "",
-		homeDbGuess:   homeDbGuess,
-		sleep:         racing.Sleep,
-		log:           logger,
-		logId:         logId,
-		throttleTime:  time.Second * 1,
-		fetchSize:     fetchSize,
-		auth:          token,
+		driverConfig:   config,
+		router:         router,
+		pool:           pool,
+		cache:          cache,
+		defaultMode:    idb.AccessMode(sessConfig.AccessMode),
+		bookmarks:      newSessionBookmarks(sessConfig.BookmarkManager, sessConfig.Bookmarks),
+		config:         sessConfig,
+		resolveHomeDb:  sessConfig.DatabaseName == "",
+		homeDbGuess:    homeDbGuess,
+		homeDbCacheKey: key,
+		sleep:          racing.Sleep,
+		log:            logger,
+		logId:          logId,
+		throttleTime:   time.Second * 1,
+		fetchSize:      fetchSize,
+		auth:           token,
 	}
 	session.pinHomeDatabaseCallback = func(ctx context.Context, database string) {
 		session.pinHomeDatabase(ctx, database)
@@ -563,8 +565,10 @@ func (s *session) getOrUpdateServers(
 		database = s.homeDbGuess
 	}
 	dbSelection := idb.DatabaseSelection{
-		Name:          database,
-		IsHomeDbGuess: isHomeDbGuess,
+		Name:             database,
+		IsHomeDbGuess:    isHomeDbGuess,
+		ImpersonatedUser: s.config.ImpersonatedUser,
+		HomeDbCacheKey:   s.homeDbCacheKey,
 	}
 	if mode == idb.ReadMode {
 		return s.router.GetOrUpdateReaders(ctx, s.getBookmarks, dbSelection, s.auth, s.config.BoltLogger, onRoutingTableUpdated)
