@@ -1303,7 +1303,7 @@ func (b *backend) handleRequest(req map[string]any) {
 			b.writeError(err)
 			return
 		}
-		key, err := keys.Create(ctx, data["alias"].(string))
+		key, err := keys.Create(ctx, data["alias"].(string), nil)
 		if err != nil {
 			b.writeError(err)
 			return

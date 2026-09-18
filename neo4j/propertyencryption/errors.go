@@ -28,7 +28,7 @@ import (
 // Error reports a failure to resolve an encryption key, to encrypt, to decrypt, or to
 // interpret an encrypted value.
 //
-// A KeyEncapsulationService or EncapsulatedKeyRepository failure that is already a driver
+// A KeyEncapsulationService or EncapsulatedKeyRecordRepository failure that is already a driver
 // error is returned unchanged, so that a retryable failure stays retryable. Anything else is
 // wrapped, with the original reachable through errors.Unwrap.
 //

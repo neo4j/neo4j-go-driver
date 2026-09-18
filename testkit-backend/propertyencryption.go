@@ -32,48 +32,48 @@ import (
 // TestKit has no way to supply a key encapsulation service or key repository, so the backend
 // provides them and drives the driver's API against them.
 
-// testkitKeyRepository is an in-memory EncapsulatedKeyRepository.
+// testkitKeyRepository is an in-memory EncapsulatedKeyRecordRepository.
 type testkitKeyRepository struct {
 	mutex   sync.Mutex
-	keys    map[string]propertyencryption.EncapsulatedKey
+	keys    map[string]propertyencryption.EncapsulatedKeyRecord
 	aliases map[string]string
 	nextID  int
 }
 
 func newTestkitKeyRepository() *testkitKeyRepository {
 	return &testkitKeyRepository{
-		keys:    map[string]propertyencryption.EncapsulatedKey{},
+		keys:    map[string]propertyencryption.EncapsulatedKeyRecord{},
 		aliases: map[string]string{},
 	}
 }
 
 func (r *testkitKeyRepository) FindByID(
-	_ context.Context, id string) (propertyencryption.EncapsulatedKey, error) {
+	_ context.Context, id string) (propertyencryption.EncapsulatedKeyRecord, error) {
 
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
-	key, ok := r.keys[id]
+	record, ok := r.keys[id]
 	if !ok {
-		return propertyencryption.EncapsulatedKey{}, propertyencryption.ErrKeyNotFound
+		return propertyencryption.EncapsulatedKeyRecord{}, propertyencryption.ErrKeyNotFound
 	}
-	return key, nil
+	return record, nil
 }
 
 func (r *testkitKeyRepository) FindByAlias(
-	_ context.Context, alias string) (propertyencryption.EncapsulatedKey, error) {
+	_ context.Context, alias string) (propertyencryption.EncapsulatedKeyRecord, error) {
 
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
 	id, ok := r.aliases[alias]
 	if !ok {
-		return propertyencryption.EncapsulatedKey{}, propertyencryption.ErrKeyNotFound
+		return propertyencryption.EncapsulatedKeyRecord{}, propertyencryption.ErrKeyNotFound
 	}
 	return r.keys[id], nil
 }
 
-func (r *testkitKeyRepository) Save(
+func (r *testkitKeyRepository) Create(
 	_ context.Context, alias string, encapsulation []byte,
-	metadata map[string]string) (propertyencryption.EncapsulatedKey, error) {
+	metadata map[string]string) (propertyencryption.EncapsulatedKeyRecord, error) {
 
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
@@ -82,34 +82,38 @@ func (r *testkitKeyRepository) Save(
 	return r.store(id, alias, encapsulation, metadata), nil
 }
 
-func (r *testkitKeyRepository) AddAlias(_ context.Context, id, alias string) error {
+func (r *testkitKeyRepository) SetAlias(_ context.Context, id, alias string) error {
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
-	if _, ok := r.keys[id]; !ok {
+	record, ok := r.keys[id]
+	if !ok {
 		return propertyencryption.ErrKeyNotFound
 	}
-	r.aliases[alias] = id
-	return nil
-}
-
-func (r *testkitKeyRepository) DeleteAlias(_ context.Context, _, alias string) error {
-	r.mutex.Lock()
-	defer r.mutex.Unlock()
-	delete(r.aliases, alias)
+	delete(r.aliases, record.Alias)
+	record.Alias = alias
+	r.keys[id] = record
+	if alias != "" {
+		r.aliases[alias] = id
+	}
 	return nil
 }
 
 func (r *testkitKeyRepository) DeleteByID(_ context.Context, id string) error {
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
+	record, ok := r.keys[id]
+	if !ok {
+		return propertyencryption.ErrKeyNotFound
+	}
 	delete(r.keys, id)
+	delete(r.aliases, record.Alias)
 	return nil
 }
 
 // importKey seeds the repository with a key made elsewhere, under an id TestKit chooses.
 func (r *testkitKeyRepository) importKey(
 	id, alias string, encapsulation []byte,
-	metadata map[string]string) propertyencryption.EncapsulatedKey {
+	metadata map[string]string) propertyencryption.EncapsulatedKeyRecord {
 
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
@@ -119,17 +123,18 @@ func (r *testkitKeyRepository) importKey(
 // store records a key. The caller must hold the mutex.
 func (r *testkitKeyRepository) store(
 	id, alias string, encapsulation []byte,
-	metadata map[string]string) propertyencryption.EncapsulatedKey {
+	metadata map[string]string) propertyencryption.EncapsulatedKeyRecord {
 
-	key := propertyencryption.EncapsulatedKey{
-		ID:            id,
-		Alias:         alias,
-		Encapsulation: encapsulation,
-		Metadata:      metadata,
+	record := propertyencryption.EncapsulatedKeyRecord{
+		EncapsulatedKey: propertyencryption.EncapsulatedKey{ID: id, Alias: alias},
+		Encapsulation:   encapsulation,
+		Metadata:        metadata,
 	}
-	r.keys[id] = key
-	r.aliases[alias] = id
-	return key
+	r.keys[id] = record
+	if alias != "" {
+		r.aliases[alias] = id
+	}
+	return record
 }
 
 // propertyEncryptionState holds the repositories the backend created for a driver.

@@ -61,7 +61,7 @@ func ExampleEncryption() {
 	if err != nil {
 		panic(err)
 	}
-	if _, err = keys.Create(ctx, "current"); err != nil {
+	if _, err = keys.Create(ctx, "current", nil); err != nil {
 		panic(err)
 	}
 
@@ -105,64 +105,72 @@ func ExampleEncryption() {
 	fmt.Println(ssn)
 }
 
-// newKeyRepository returns an EncapsulatedKeyRepository. A real one would persist keys, in
+// newKeyRepository returns a repository backed by a map. A real one would persist keys, in
 // Neo4j or anywhere else the application already stores data.
-func newKeyRepository() propertyencryption.EncapsulatedKeyRepository {
-	return &exampleKeyRepository{keys: map[string]propertyencryption.EncapsulatedKey{}}
+func newKeyRepository() propertyencryption.EncapsulatedKeyRecordRepository {
+	return &exampleKeyRepository{
+		keys:    map[string]propertyencryption.EncapsulatedKeyRecord{},
+		aliases: map[string]string{},
+	}
 }
 
 type exampleKeyRepository struct {
-	keys    map[string]propertyencryption.EncapsulatedKey
+	keys    map[string]propertyencryption.EncapsulatedKeyRecord
 	aliases map[string]string
 	nextID  int
 }
 
 func (r *exampleKeyRepository) FindByID(
-	_ context.Context, id string) (propertyencryption.EncapsulatedKey, error) {
+	_ context.Context, id string) (propertyencryption.EncapsulatedKeyRecord, error) {
 
-	key, ok := r.keys[id]
+	record, ok := r.keys[id]
 	if !ok {
-		return propertyencryption.EncapsulatedKey{}, propertyencryption.ErrKeyNotFound
+		return propertyencryption.EncapsulatedKeyRecord{}, propertyencryption.ErrKeyNotFound
 	}
-	return key, nil
+	return record, nil
 }
 
 func (r *exampleKeyRepository) FindByAlias(
-	_ context.Context, alias string) (propertyencryption.EncapsulatedKey, error) {
+	_ context.Context, alias string) (propertyencryption.EncapsulatedKeyRecord, error) {
 
 	id, ok := r.aliases[alias]
 	if !ok {
-		return propertyencryption.EncapsulatedKey{}, propertyencryption.ErrKeyNotFound
+		return propertyencryption.EncapsulatedKeyRecord{}, propertyencryption.ErrKeyNotFound
 	}
 	return r.keys[id], nil
 }
 
-func (r *exampleKeyRepository) Save(
+func (r *exampleKeyRepository) Create(
 	_ context.Context, alias string, encapsulation []byte,
-	metadata map[string]string) (propertyencryption.EncapsulatedKey, error) {
+	metadata map[string]string) (propertyencryption.EncapsulatedKeyRecord, error) {
 
 	r.nextID++
-	key := propertyencryption.EncapsulatedKey{
-		ID:            fmt.Sprintf("key-%d", r.nextID),
-		Alias:         alias,
+	record := propertyencryption.EncapsulatedKeyRecord{
+		EncapsulatedKey: propertyencryption.EncapsulatedKey{
+			ID:    fmt.Sprintf("key-%d", r.nextID),
+			Alias: alias,
+		},
 		Encapsulation: encapsulation,
 		Metadata:      metadata,
 	}
-	if r.aliases == nil {
-		r.aliases = map[string]string{}
+	r.keys[record.ID] = record
+	if alias != "" {
+		r.aliases[alias] = record.ID
 	}
-	r.keys[key.ID] = key
-	r.aliases[alias] = key.ID
-	return key, nil
+	return record, nil
 }
 
-func (r *exampleKeyRepository) AddAlias(_ context.Context, id, alias string) error {
-	r.aliases[alias] = id
-	return nil
-}
-
-func (r *exampleKeyRepository) DeleteAlias(_ context.Context, _, alias string) error {
-	delete(r.aliases, alias)
+func (r *exampleKeyRepository) SetAlias(_ context.Context, id, alias string) error {
+	record, ok := r.keys[id]
+	if !ok {
+		return propertyencryption.ErrKeyNotFound
+	}
+	delete(r.aliases, record.Alias)
+	record.Alias = alias
+	r.keys[id] = record
+	if alias != "" {
+		r.aliases[alias] = id
+	}
 	return nil
 }
 

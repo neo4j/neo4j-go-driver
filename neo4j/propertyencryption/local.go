@@ -56,17 +56,17 @@ func NewLocalKeyEncapsulationService(kek []byte) (*LocalKeyEncapsulationService,
 
 // Encapsulate generates a data encryption key and wraps it with the key encryption key.
 func (s *LocalKeyEncapsulationService) Encapsulate(
-	_ context.Context, _ map[string]string) (EncapsulationResult, error) {
+	_ context.Context, _ map[string]string) (KeyEncapsulationResult, error) {
 
 	dek, err := ipe.NewDEK()
 	if err != nil {
-		return EncapsulationResult{}, &Error{Message: "could not create a data encryption key", Cause: err}
+		return KeyEncapsulationResult{}, &Error{Message: "could not create a data encryption key", Cause: err}
 	}
 	encapsulation, iv, err := ipe.WrapKey(s.kek, dek)
 	if err != nil {
-		return EncapsulationResult{}, &Error{Message: "could not wrap the data encryption key", Cause: err}
+		return KeyEncapsulationResult{}, &Error{Message: "could not wrap the data encryption key", Cause: err}
 	}
-	return EncapsulationResult{
+	return KeyEncapsulationResult{
 		Key:           dek,
 		Encapsulation: encapsulation,
 		Metadata:      map[string]string{localMetadataIV: base64.StdEncoding.EncodeToString(iv)},

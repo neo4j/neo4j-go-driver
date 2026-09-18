@@ -27,14 +27,15 @@ import (
 
 // Default cache settings, per encryption profile.
 const (
-	DefaultKeyAliasCacheTTL  = 15 * time.Second
-	DefaultKeyAliasCacheSize = 100
+	DefaultKeyAliasIndexTTL  = 15 * time.Second
+	DefaultKeyAliasIndexSize = 100
 	DefaultKeyCacheTTL       = 15 * time.Minute
 	DefaultKeyCacheSize      = 100
 )
 
 // Cache holds at most maxSize entries for ttl each, evicting least recently used first.
 // Expiry is applied during lookups and insertions rather than by a background goroutine.
+// A maxSize of zero disables it, every entry being evicted as it is written.
 // It is safe for concurrent use.
 type Cache[V any] struct {
 	mutex   sync.Mutex
@@ -97,6 +98,25 @@ func (c *Cache[V]) Put(key string, value V) {
 
 	c.entries[key] = c.order.PushFront(&cacheEntry[V]{key: key, value: value, expires: expires})
 	c.evict()
+}
+
+// Remove drops the entry stored under key, if any.
+func (c *Cache[V]) Remove(key string) {
+	c.mutex.Lock()
+	defer c.mutex.Unlock()
+
+	if element, ok := c.entries[key]; ok {
+		c.remove(element)
+	}
+}
+
+// Clear empties the cache.
+func (c *Cache[V]) Clear() {
+	c.mutex.Lock()
+	defer c.mutex.Unlock()
+
+	c.entries = make(map[string]*list.Element)
+	c.order.Init()
 }
 
 // len returns the number of entries held, including any that have expired but not yet been

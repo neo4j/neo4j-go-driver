@@ -124,7 +124,7 @@ type Encryption struct {
 // profileState is a configured profile and its caches.
 type profileState struct {
 	profile    EnvelopeProfile
-	aliasCache *ipe.Cache[string]
+	aliasIndex *ipe.Cache[string]
 	keyCache   *ipe.Cache[*ipe.DataKey]
 }
 
@@ -159,7 +159,7 @@ func New(profiles []Profile) (*Encryption, error) {
 		envelope = envelope.withDefaults()
 		encryption.profiles[envelope.Name] = &profileState{
 			profile:    envelope,
-			aliasCache: ipe.NewCache[string](envelope.KeyAliasCacheTTL, envelope.KeyAliasCacheSize),
+			aliasIndex: ipe.NewCache[string](envelope.KeyAliasIndexTTL, envelope.KeyAliasIndexSize),
 			keyCache:   ipe.NewCache[*ipe.DataKey](envelope.KeyCacheTTL, envelope.KeyCacheSize),
 		}
 		encryption.names = append(encryption.names, envelope.Name)
@@ -373,20 +373,18 @@ func (e *Encryption) profileFor(name string) (*profileState, error) {
 
 // resolve finds the data encryption key a reference names, consulting the caches first.
 func (s *profileState) resolve(ctx context.Context, reference KeyReference) (string, *ipe.DataKey, error) {
-	id := reference.value
 	if reference.kind == keyReferenceAlias {
-		var err error
-		id, err = s.resolveAlias(ctx, reference.value)
-		if err != nil {
-			return "", nil, err
-		}
+		return s.resolveByAlias(ctx, reference.value)
 	}
+	return s.resolveByID(ctx, reference.value)
+}
 
+func (s *profileState) resolveByID(ctx context.Context, id string) (string, *ipe.DataKey, error) {
 	if dataKey, ok := s.keyCache.Get(id); ok {
 		return id, dataKey, nil
 	}
 
-	key, err := s.profile.KeyRepository.FindByID(ctx, id)
+	record, err := s.profile.KeyRepository.FindByID(ctx, id)
 	if err != nil {
 		if errors.Is(err, ErrKeyNotFound) {
 			return "", nil, &Error{Message: "no encryption key has id " + id +
@@ -395,7 +393,7 @@ func (s *profileState) resolve(ctx context.Context, reference KeyReference) (str
 		return "", nil, wrap("could not look up encryption key "+id, err)
 	}
 
-	dataKey, err := s.decapsulate(ctx, key)
+	dataKey, err := s.decapsulate(ctx, record)
 	if err != nil {
 		return "", nil, err
 	}
@@ -403,48 +401,50 @@ func (s *profileState) resolve(ctx context.Context, reference KeyReference) (str
 	return id, dataKey, nil
 }
 
-func (s *profileState) resolveAlias(ctx context.Context, alias string) (string, error) {
-	if id, ok := s.aliasCache.Get(alias); ok {
-		return id, nil
+func (s *profileState) resolveByAlias(ctx context.Context, alias string) (string, *ipe.DataKey, error) {
+	if id, ok := s.aliasIndex.Get(alias); ok {
+		if dataKey, ok := s.keyCache.Get(id); ok {
+			return id, dataKey, nil
+		}
+		// The key has gone, so the mapping is old enough to re-read too.
+		s.aliasIndex.Remove(alias)
 	}
 
-	key, err := s.profile.KeyRepository.FindByAlias(ctx, alias)
+	record, err := s.profile.KeyRepository.FindByAlias(ctx, alias)
 	if err != nil {
 		if errors.Is(err, ErrKeyNotFound) {
-			return "", &Error{Message: "no encryption key has alias " + alias +
+			return "", nil, &Error{Message: "no encryption key has alias " + alias +
 				" in profile " + s.profile.Name, Cause: err}
 		}
-		return "", wrap("could not look up encryption key alias "+alias, err)
+		return "", nil, wrap("could not look up encryption key alias "+alias, err)
 	}
-	if key.ID == "" {
-		return "", &Error{Message: "the key repository returned a key with no id for alias " + alias}
+	if record.ID == "" {
+		return "", nil, &Error{
+			Message: "the key repository returned a key with no id for alias " + alias}
 	}
 
-	s.aliasCache.Put(alias, key.ID)
-	// The encapsulation is already to hand, so there is no need to look the key up again.
-	if _, cached := s.keyCache.Get(key.ID); !cached {
-		dataKey, err := s.decapsulate(ctx, key)
-		if err != nil {
-			return "", err
-		}
-		s.keyCache.Put(key.ID, dataKey)
+	dataKey, err := s.decapsulate(ctx, record)
+	if err != nil {
+		return "", nil, err
 	}
-	return key.ID, nil
+	s.aliasIndex.Put(alias, record.ID)
+	s.keyCache.Put(record.ID, dataKey)
+	return record.ID, dataKey, nil
 }
 
-func (s *profileState) decapsulate(ctx context.Context, key EncapsulatedKey) (*ipe.DataKey, error) {
-	dek, err := s.profile.EncapsulationService.Decapsulate(ctx, key.Encapsulation, key.Metadata)
+func (s *profileState) decapsulate(ctx context.Context, record EncapsulatedKeyRecord) (*ipe.DataKey, error) {
+	dek, err := s.profile.EncapsulationService.Decapsulate(ctx, record.Encapsulation, record.Metadata)
 	if err != nil {
-		return nil, wrap("could not unwrap encryption key "+key.ID, err)
+		return nil, wrap("could not unwrap encryption key "+record.ID, err)
 	}
 	dataKey, err := ipe.NewDataKey(dek)
 	if err != nil {
-		return nil, &Error{Message: "could not prepare encryption key " + key.ID, Cause: err}
+		return nil, &Error{Message: "could not prepare encryption key " + record.ID, Cause: err}
 	}
 	return dataKey, nil
 }
 
-// KeyManager creates the data encryption keys an EnvelopeProfile encrypts with, and is
+// KeyManager manages the data encryption keys an EnvelopeProfile encrypts with, and is
 // obtained from Encryption.Keys.
 //
 // KeyManager is part of the property encryption preview feature (see README on what it means
@@ -453,18 +453,23 @@ type KeyManager struct {
 	state *profileState
 }
 
-// Create makes a data encryption key, protects it with the profile's
-// KeyEncapsulationService and stores it under alias, returning it without any key material.
+// Create makes a data encryption key, protects it with the profile's KeyEncapsulationService
+// and stores it under alias, returning it without any key material.
 //
-// Calling Create with an alias already in use rotates it: the alias moves to the new key,
-// while values encrypted under the old one still decrypt, each having recorded its key id.
-func (m *KeyManager) Create(ctx context.Context, alias string) (EncapsulatedKey, error) {
-	if alias == "" {
-		return EncapsulatedKey{}, &Error{Message: "an encryption key alias cannot be empty"}
-	}
+// An empty alias leaves the key unbound, reachable only by id. Creating a key under an alias
+// already in use rotates it: the alias moves to the new key, while values encrypted under the
+// old one still decrypt, each having recorded its key id.
+//
+// options is passed to the KeyEncapsulationService and stored with the key, for services that
+// need to record which key protected it. It may be nil.
+func (m *KeyManager) Create(
+	ctx context.Context, alias string, options map[string]string) (EncapsulatedKey, error) {
 
 	profile := m.state.profile
-	result, err := profile.EncapsulationService.Encapsulate(ctx, map[string]string{})
+	if options == nil {
+		options = map[string]string{}
+	}
+	result, err := profile.EncapsulationService.Encapsulate(ctx, options)
 	if err != nil {
 		return EncapsulatedKey{}, wrap("could not create an encryption key", err)
 	}
@@ -475,16 +480,81 @@ func (m *KeyManager) Create(ctx context.Context, alias string) (EncapsulatedKey,
 			Message: "the key encapsulation service returned an unusable key", Cause: err}
 	}
 
-	key, err := profile.KeyRepository.Save(ctx, alias, result.Encapsulation, result.Metadata)
+	record, err := profile.KeyRepository.Create(ctx, alias, result.Encapsulation, result.Metadata)
 	if err != nil {
 		return EncapsulatedKey{}, wrap("could not store the new encryption key", err)
 	}
-	if key.ID == "" {
+	if record.ID == "" {
 		return EncapsulatedKey{}, &Error{
 			Message: "the key repository stored the new encryption key without giving it an id"}
 	}
 
-	m.state.aliasCache.Put(alias, key.ID)
-	m.state.keyCache.Put(key.ID, dataKey)
-	return key, nil
+	if alias != "" {
+		m.state.aliasIndex.Put(alias, record.ID)
+	}
+	m.state.keyCache.Put(record.ID, dataKey)
+	return record.EncapsulatedKey, nil
+}
+
+// FindByAlias returns the key currently bound to alias, or an error wrapping ErrKeyNotFound
+// when nothing is bound to it.
+func (m *KeyManager) FindByAlias(ctx context.Context, alias string) (EncapsulatedKey, error) {
+	record, err := m.state.profile.KeyRepository.FindByAlias(ctx, alias)
+	if err != nil {
+		if errors.Is(err, ErrKeyNotFound) {
+			return EncapsulatedKey{}, &Error{Message: "no encryption key has alias " + alias +
+				" in profile " + m.state.profile.Name, Cause: err}
+		}
+		return EncapsulatedKey{}, wrap("could not look up encryption key alias "+alias, err)
+	}
+	return record.EncapsulatedKey, nil
+}
+
+// SetAlias binds alias to the key stored under id, moving it from another key if it is
+// already in use. Use DeleteAlias to unbind one.
+func (m *KeyManager) SetAlias(ctx context.Context, id, alias string) error {
+	if alias == "" {
+		return &Error{Message: "an encryption key alias cannot be empty, use DeleteAlias"}
+	}
+	return m.setAlias(ctx, id, alias)
+}
+
+// DeleteAlias unbinds whatever alias the key stored under id currently has. The key stays,
+// reachable by id, and values encrypted under it still decrypt.
+func (m *KeyManager) DeleteAlias(ctx context.Context, id string) error {
+	return m.setAlias(ctx, id, "")
+}
+
+func (m *KeyManager) setAlias(ctx context.Context, id, alias string) error {
+	if id == "" {
+		return &Error{Message: "an encryption key id cannot be empty"}
+	}
+	if err := m.state.profile.KeyRepository.SetAlias(ctx, id, alias); err != nil {
+		if errors.Is(err, ErrKeyNotFound) {
+			return &Error{Message: "no encryption key has id " + id +
+				" in profile " + m.state.profile.Name, Cause: err}
+		}
+		return wrap("could not set the alias of encryption key "+id, err)
+	}
+	// Any cached mapping may now point at the wrong key.
+	m.state.aliasIndex.Clear()
+	return nil
+}
+
+// DeleteByID removes the key stored under id. Values already encrypted under it can no longer
+// be decrypted.
+func (m *KeyManager) DeleteByID(ctx context.Context, id string) error {
+	if id == "" {
+		return &Error{Message: "an encryption key id cannot be empty"}
+	}
+	if err := m.state.profile.KeyRepository.DeleteByID(ctx, id); err != nil {
+		if errors.Is(err, ErrKeyNotFound) {
+			return &Error{Message: "no encryption key has id " + id +
+				" in profile " + m.state.profile.Name, Cause: err}
+		}
+		return wrap("could not delete encryption key "+id, err)
+	}
+	m.state.keyCache.Remove(id)
+	m.state.aliasIndex.Clear()
+	return nil
 }

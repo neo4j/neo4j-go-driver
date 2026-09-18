@@ -31,88 +31,108 @@ import (
 	ipe "github.com/neo4j/neo4j-go-driver/v6/neo4j/internal/propertyencryption"
 )
 
-// memoryRepository is an EncapsulatedKeyRepository backed by a map, counting calls so that
+// memoryRepository is an EncapsulatedKeyRecordRepository backed by a map, counting calls so
 // caching can be asserted.
 type memoryRepository struct {
 	mutex   sync.Mutex
-	keys    map[string]EncapsulatedKey
+	keys    map[string]EncapsulatedKeyRecord
 	aliases map[string]string
 	nextID  int
 
 	findByID    int
 	findByAlias int
 	saves       int
+	setAliases  int
+	deletes     int
 	// err, when set, is returned by every method.
 	err error
 }
 
 func newMemoryRepository() *memoryRepository {
-	return &memoryRepository{keys: map[string]EncapsulatedKey{}, aliases: map[string]string{}}
+	return &memoryRepository{keys: map[string]EncapsulatedKeyRecord{}, aliases: map[string]string{}}
 }
 
-func (r *memoryRepository) FindByID(_ context.Context, id string) (EncapsulatedKey, error) {
+func (r *memoryRepository) FindByID(_ context.Context, id string) (EncapsulatedKeyRecord, error) {
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
 	r.findByID++
 	if r.err != nil {
-		return EncapsulatedKey{}, r.err
+		return EncapsulatedKeyRecord{}, r.err
 	}
 	key, ok := r.keys[id]
 	if !ok {
-		return EncapsulatedKey{}, ErrKeyNotFound
+		return EncapsulatedKeyRecord{}, ErrKeyNotFound
 	}
 	return key, nil
 }
 
-func (r *memoryRepository) FindByAlias(_ context.Context, alias string) (EncapsulatedKey, error) {
+func (r *memoryRepository) FindByAlias(_ context.Context, alias string) (EncapsulatedKeyRecord, error) {
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
 	r.findByAlias++
 	if r.err != nil {
-		return EncapsulatedKey{}, r.err
+		return EncapsulatedKeyRecord{}, r.err
 	}
 	id, ok := r.aliases[alias]
 	if !ok {
-		return EncapsulatedKey{}, ErrKeyNotFound
+		return EncapsulatedKeyRecord{}, ErrKeyNotFound
 	}
 	return r.keys[id], nil
 }
 
-func (r *memoryRepository) Save(
-	_ context.Context, alias string, encapsulation []byte, metadata map[string]string) (EncapsulatedKey, error) {
+func (r *memoryRepository) Create(
+	_ context.Context, alias string, encapsulation []byte,
+	metadata map[string]string) (EncapsulatedKeyRecord, error) {
 
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
 	r.saves++
 	if r.err != nil {
-		return EncapsulatedKey{}, r.err
+		return EncapsulatedKeyRecord{}, r.err
 	}
 	id := strconv.Itoa(r.nextID)
 	r.nextID++
-	key := EncapsulatedKey{ID: id, Alias: alias, Encapsulation: encapsulation, Metadata: metadata}
-	r.keys[id] = key
-	r.aliases[alias] = id
-	return key, nil
+	record := EncapsulatedKeyRecord{
+		EncapsulatedKey: EncapsulatedKey{ID: id, Alias: alias},
+		Encapsulation:   encapsulation,
+		Metadata:        metadata,
+	}
+	r.keys[id] = record
+	if alias != "" {
+		r.aliases[alias] = id
+	}
+	return record, nil
 }
 
-func (r *memoryRepository) AddAlias(_ context.Context, id, alias string) error {
+func (r *memoryRepository) SetAlias(_ context.Context, id, alias string) error {
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
-	r.aliases[alias] = id
-	return nil
-}
-
-func (r *memoryRepository) DeleteAlias(_ context.Context, _, alias string) error {
-	r.mutex.Lock()
-	defer r.mutex.Unlock()
-	delete(r.aliases, alias)
+	r.setAliases++
+	record, ok := r.keys[id]
+	if !ok {
+		return ErrKeyNotFound
+	}
+	if record.Alias != "" {
+		delete(r.aliases, record.Alias)
+	}
+	record.Alias = alias
+	r.keys[id] = record
+	if alias != "" {
+		r.aliases[alias] = id
+	}
 	return nil
 }
 
 func (r *memoryRepository) DeleteByID(_ context.Context, id string) error {
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
+	r.deletes++
+	record, ok := r.keys[id]
+	if !ok {
+		return ErrKeyNotFound
+	}
 	delete(r.keys, id)
+	delete(r.aliases, record.Alias)
 	return nil
 }
 
@@ -126,6 +146,12 @@ func (r *memoryRepository) saveCount() int {
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
 	return r.saves
+}
+
+func (r *memoryRepository) writeCounts() (setAliases, deletes int) {
+	r.mutex.Lock()
+	defer r.mutex.Unlock()
+	return r.setAliases, r.deletes
 }
 
 // countingService counts decapsulations, the call the key cache avoids.
@@ -205,7 +231,7 @@ func createKey(t *testing.T, encryption *Encryption, profile, alias string) Enca
 	if err != nil {
 		t.Fatalf("Keys returned %v", err)
 	}
-	key, err := keys.Create(context.Background(), alias)
+	key, err := keys.Create(context.Background(), alias, nil)
 	if err != nil {
 		t.Fatalf("Create returned %v", err)
 	}
@@ -416,8 +442,8 @@ func TestResolvingAnAliasDecapsulatesOnce(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Encapsulate returned %v", err)
 	}
-	if _, err := repository.Save(ctx, "k1", result.Encapsulation, result.Metadata); err != nil {
-		t.Fatalf("Save returned %v", err)
+	if _, err := repository.Create(ctx, "k1", result.Encapsulation, result.Metadata); err != nil {
+		t.Fatalf("Create returned %v", err)
 	}
 
 	if _, err := encryption.Encrypt(ctx, EncryptRequest{Value: "a", Key: KeyAlias("k1")}); err != nil {
@@ -727,6 +753,7 @@ func TestKeyManagerCreate(t *testing.T) {
 
 	ctx := context.Background()
 
+	// An empty alias leaves the key reachable only by id.
 	t.Run("empty alias", func(t *testing.T) {
 		t.Parallel()
 		encryption, _, _ := newTestEncryption(t, "p")
@@ -734,8 +761,23 @@ func TestKeyManagerCreate(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Keys returned %v", err)
 		}
-		if _, err := keys.Create(ctx, ""); err == nil {
-			t.Fatal("Create accepted an empty alias")
+		key, err := keys.Create(ctx, "", nil)
+		if err != nil {
+			t.Fatalf("Create returned %v", err)
+		}
+		if key.ID == "" {
+			t.Fatal("Create returned a key with no id")
+		}
+		if key.Alias != "" {
+			t.Errorf("Alias is %q, want empty", key.Alias)
+		}
+		if _, err := encryption.Encrypt(ctx, EncryptRequest{
+			Value: "a", Key: KeyID(key.ID)}); err != nil {
+			t.Errorf("an unbound key could not encrypt: %v", err)
+		}
+		if _, err := encryption.Encrypt(ctx, EncryptRequest{
+			Value: "a", Key: KeyAlias("")}); err == nil {
+			t.Error("an unbound key was reachable by empty alias")
 		}
 	})
 
@@ -782,7 +824,7 @@ func TestKeyManagerCreate(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Keys returned %v", err)
 		}
-		if _, err := keys.Create(ctx, "k1"); err == nil {
+		if _, err := keys.Create(ctx, "k1", nil); err == nil {
 			t.Fatal("Create accepted a key with no id, which could never be decrypted")
 		}
 	})
@@ -804,7 +846,7 @@ func TestKeyManagerCreate(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Keys returned %v", err)
 			}
-			if _, err := keys.Create(ctx, "k1"); err == nil {
+			if _, err := keys.Create(ctx, "k1", nil); err == nil {
 				t.Errorf("Create accepted a %d byte key", size)
 			}
 			if repository.saveCount() != 0 {
@@ -821,9 +863,9 @@ type shortKeyService struct {
 }
 
 func (s shortKeyService) Encapsulate(
-	_ context.Context, _ map[string]string) (EncapsulationResult, error) {
+	_ context.Context, _ map[string]string) (KeyEncapsulationResult, error) {
 
-	return EncapsulationResult{
+	return KeyEncapsulationResult{
 		Key:           make([]byte, s.size),
 		Encapsulation: []byte{1, 2, 3},
 		Metadata:      map[string]string{},
@@ -834,9 +876,15 @@ func (s shortKeyService) Encapsulate(
 // undecryptable.
 type idlessRepository struct{ *memoryRepository }
 
-func (idlessRepository) Save(
-	_ context.Context, alias string, encapsulation []byte, metadata map[string]string) (EncapsulatedKey, error) {
-	return EncapsulatedKey{Alias: alias, Encapsulation: encapsulation, Metadata: metadata}, nil
+func (idlessRepository) Create(
+	_ context.Context, alias string, encapsulation []byte,
+	metadata map[string]string) (EncapsulatedKeyRecord, error) {
+
+	return EncapsulatedKeyRecord{
+		EncapsulatedKey: EncapsulatedKey{Alias: alias},
+		Encapsulation:   encapsulation,
+		Metadata:        metadata,
+	}, nil
 }
 
 func TestEncryptionIsSafeForConcurrentUse(t *testing.T) {
@@ -945,5 +993,234 @@ func TestErrorUnwraps(t *testing.T) {
 	}
 	if got := (&Error{Message: "alone"}).Error(); got != "alone" {
 		t.Errorf("Error() with no cause is %q", got)
+	}
+}
+
+// TestKeyManagerFindByAlias covers the lookup and the missing-alias error.
+func TestKeyManagerFindByAlias(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	encryption, _, _ := newTestEncryption(t, "p")
+	created := createKey(t, encryption, "", "k1")
+
+	keys, err := encryption.Keys("")
+	if err != nil {
+		t.Fatalf("Keys returned %v", err)
+	}
+
+	found, err := keys.FindByAlias(ctx, "k1")
+	if err != nil {
+		t.Fatalf("FindByAlias returned %v", err)
+	}
+	if found.ID != created.ID || found.Alias != "k1" {
+		t.Errorf("found %+v, want id %s alias k1", found, created.ID)
+	}
+
+	_, err = keys.FindByAlias(ctx, "nope")
+	if err == nil {
+		t.Fatal("FindByAlias accepted an unknown alias")
+	}
+	if !errors.Is(err, ErrKeyNotFound) {
+		t.Errorf("FindByAlias returned %v, want it to wrap ErrKeyNotFound", err)
+	}
+}
+
+// TestKeyManagerSetAlias moves an alias between keys and checks the cached mapping does not
+// outlive the move.
+func TestKeyManagerSetAlias(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	encryption, repository, _ := newTestEncryption(t, "p")
+	first := createKey(t, encryption, "", "current")
+	second := createKey(t, encryption, "", "next")
+
+	keys, err := encryption.Keys("")
+	if err != nil {
+		t.Fatalf("Keys returned %v", err)
+	}
+
+	// Caches the alias mapping, so a stale one would be used below.
+	if _, err := encryption.Encrypt(ctx, EncryptRequest{
+		Value: "a", Key: KeyAlias("current")}); err != nil {
+		t.Fatalf("Encrypt returned %v", err)
+	}
+
+	if err := keys.SetAlias(ctx, second.ID, "current"); err != nil {
+		t.Fatalf("SetAlias returned %v", err)
+	}
+	found, err := keys.FindByAlias(ctx, "current")
+	if err != nil {
+		t.Fatalf("FindByAlias returned %v", err)
+	}
+	if found.ID != second.ID {
+		t.Errorf("current resolves to %s, want %s", found.ID, second.ID)
+	}
+
+	encrypted, err := encryption.Encrypt(ctx, EncryptRequest{
+		Value: "a", Key: KeyAlias("current")})
+	if err != nil {
+		t.Fatalf("Encrypt returned %v", err)
+	}
+	structure, err := ipe.DecodeEncrypted(encrypted)
+	if err != nil {
+		t.Fatalf("DecodeEncrypted returned %v", err)
+	}
+	keyID, _ := structure.Metadata.String(ipe.MetadataKeyID)
+	if keyID != second.ID {
+		t.Errorf("encrypted under %s, want the rotated-to key %s", keyID, second.ID)
+	}
+	if keyID == first.ID {
+		t.Error("the alias index served the key the alias moved away from")
+	}
+
+	if err := keys.SetAlias(ctx, second.ID, ""); err == nil {
+		t.Error("SetAlias accepted an empty alias, DeleteAlias is the way to unbind")
+	}
+	writes, _ := repository.writeCounts()
+	if err := keys.SetAlias(ctx, "", "x"); err == nil {
+		t.Error("SetAlias accepted an empty id")
+	}
+	if after, _ := repository.writeCounts(); after != writes {
+		t.Error("SetAlias with an empty id reached the repository")
+	}
+	if err := keys.SetAlias(ctx, "no-such-key", "x"); err == nil {
+		t.Error("SetAlias accepted an unknown id")
+	}
+}
+
+// TestKeyManagerDeleteAlias unbinds an alias and leaves the key reachable by id.
+func TestKeyManagerDeleteAlias(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	encryption, _, _ := newTestEncryption(t, "p")
+	key := createKey(t, encryption, "", "k1")
+	keys, err := encryption.Keys("")
+	if err != nil {
+		t.Fatalf("Keys returned %v", err)
+	}
+
+	if err := keys.DeleteAlias(ctx, key.ID); err != nil {
+		t.Fatalf("DeleteAlias returned %v", err)
+	}
+	if _, err := keys.FindByAlias(ctx, "k1"); err == nil {
+		t.Error("the alias still resolves after DeleteAlias")
+	}
+	if _, err := encryption.Encrypt(ctx, EncryptRequest{
+		Value: "a", Key: KeyAlias("k1")}); err == nil {
+		t.Error("encrypting by the deleted alias succeeded")
+	}
+	if _, err := encryption.Encrypt(ctx, EncryptRequest{
+		Value: "a", Key: KeyID(key.ID)}); err != nil {
+		t.Errorf("the key is no longer reachable by id: %v", err)
+	}
+}
+
+// TestKeyManagerDeleteByID removes the key and makes its values undecryptable.
+func TestKeyManagerDeleteByID(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	encryption, repository, _ := newTestEncryption(t, "p")
+	key := createKey(t, encryption, "", "k1")
+	keys, err := encryption.Keys("")
+	if err != nil {
+		t.Fatalf("Keys returned %v", err)
+	}
+
+	encrypted, err := encryption.Encrypt(ctx, EncryptRequest{
+		Value: "a", Key: KeyAlias("k1")})
+	if err != nil {
+		t.Fatalf("Encrypt returned %v", err)
+	}
+
+	if err := keys.DeleteByID(ctx, key.ID); err != nil {
+		t.Fatalf("DeleteByID returned %v", err)
+	}
+	if _, err := encryption.Decrypt(ctx, encrypted); err == nil {
+		t.Error("a value decrypted after its key was deleted, so the cache outlived the key")
+	}
+	if err := keys.DeleteByID(ctx, "no-such-key"); err == nil {
+		t.Error("DeleteByID accepted an unknown id")
+	}
+	_, deletes := repository.writeCounts()
+	if err := keys.DeleteByID(ctx, ""); err == nil {
+		t.Error("DeleteByID accepted an empty id")
+	}
+	if _, after := repository.writeCounts(); after != deletes {
+		t.Error("DeleteByID with an empty id reached the repository")
+	}
+}
+
+// TestDisableKeyCacheResolvesEveryTime checks nothing is held in memory between calls.
+func TestDisableKeyCacheResolvesEveryTime(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	service := newTestService(t)
+	repository := newMemoryRepository()
+	encryption, err := New([]Profile{EnvelopeProfile{
+		Name:                 "p",
+		EncapsulationService: service,
+		KeyRepository:        repository,
+		DisableKeyCache:      true,
+	}})
+	if err != nil {
+		t.Fatalf("New returned %v", err)
+	}
+	keys, err := encryption.Keys("")
+	if err != nil {
+		t.Fatalf("Keys returned %v", err)
+	}
+	if _, err := keys.Create(ctx, "k1", nil); err != nil {
+		t.Fatalf("Create returned %v", err)
+	}
+
+	before := service.count()
+	for i := 0; i < 3; i++ {
+		if _, err := encryption.Encrypt(ctx, EncryptRequest{
+			Value: "a", Key: KeyAlias("k1")}); err != nil {
+			t.Fatalf("Encrypt returned %v", err)
+		}
+	}
+	if got := service.count() - before; got != 3 {
+		t.Errorf("the key was decapsulated %d times for 3 encrypts, want 3", got)
+	}
+
+	_, findByAlias := repository.counts()
+	if findByAlias < 3 {
+		t.Errorf("the repository saw %d alias lookups for 3 encrypts, want at least 3", findByAlias)
+	}
+}
+
+// TestResolveByAliasDropsAStaleMapping drops an alias mapping once its key has left the key
+// cache.
+func TestResolveByAliasDropsAStaleMapping(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	encryption, repository, _ := newTestEncryption(t, "p")
+	key := createKey(t, encryption, "", "k1")
+
+	state, err := encryption.profileFor("")
+	if err != nil {
+		t.Fatalf("profileFor returned %v", err)
+	}
+	if _, ok := state.aliasIndex.Get("k1"); !ok {
+		t.Fatal("creating the key did not cache its alias mapping")
+	}
+
+	// As the key would leave on eviction or expiry.
+	state.keyCache.Remove(key.ID)
+	repository.err = ErrKeyNotFound
+
+	if _, err := encryption.Encrypt(ctx, EncryptRequest{
+		Value: "a", Key: KeyAlias("k1")}); err == nil {
+		t.Fatal("Encrypt succeeded with an unresolvable alias")
+	}
+	if _, ok := state.aliasIndex.Get("k1"); ok {
+		t.Error("the alias mapping survived its key leaving the key cache")
 	}
 }

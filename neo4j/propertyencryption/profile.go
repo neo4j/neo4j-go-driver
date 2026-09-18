@@ -25,8 +25,8 @@ import (
 
 // Default cache settings for an EnvelopeProfile.
 const (
-	DefaultKeyAliasCacheTTL  = ipe.DefaultKeyAliasCacheTTL
-	DefaultKeyAliasCacheSize = ipe.DefaultKeyAliasCacheSize
+	DefaultKeyAliasIndexTTL  = ipe.DefaultKeyAliasIndexTTL
+	DefaultKeyAliasIndexSize = ipe.DefaultKeyAliasIndexSize
 	DefaultKeyCacheTTL       = ipe.DefaultKeyCacheTTL
 	DefaultKeyCacheSize      = ipe.DefaultKeyCacheSize
 )
@@ -62,7 +62,7 @@ type EnvelopeProfile struct {
 	// KeyRepository stores data encryption keys in their protected form.
 	//
 	// Required.
-	KeyRepository EncapsulatedKeyRepository
+	KeyRepository EncapsulatedKeyRecordRepository
 	// KeyCacheTTL is how long a decapsulated data encryption key is held in memory.
 	//
 	// default: DefaultKeyCacheTTL
@@ -71,15 +71,20 @@ type EnvelopeProfile struct {
 	//
 	// default: DefaultKeyCacheSize
 	KeyCacheSize int
-	// KeyAliasCacheTTL is how long an alias is assumed to still point at the same key, and
+	// KeyAliasIndexTTL is how long an alias is assumed to still point at the same key, and
 	// so the delay before a rotation performed elsewhere is noticed.
 	//
-	// default: DefaultKeyAliasCacheTTL
-	KeyAliasCacheTTL time.Duration
-	// KeyAliasCacheSize is the most alias mappings held in memory at once.
+	// default: DefaultKeyAliasIndexTTL
+	KeyAliasIndexTTL time.Duration
+	// KeyAliasIndexSize is the most alias mappings held in memory at once.
 	//
-	// default: DefaultKeyAliasCacheSize
-	KeyAliasCacheSize int
+	// default: DefaultKeyAliasIndexSize
+	KeyAliasIndexSize int
+	// DisableKeyCache resolves every key through KeyRepository and EncapsulationService
+	// instead of holding decapsulated keys in memory. The alias index is disabled with it.
+	//
+	// default: false
+	DisableKeyCache bool
 }
 
 func (p EnvelopeProfile) validate() error {
@@ -91,29 +96,34 @@ func (p EnvelopeProfile) validate() error {
 			" has no EncapsulationService"}
 	case p.KeyRepository == nil:
 		return &Error{Message: "property encryption profile " + p.Name + " has no KeyRepository"}
-	case p.KeyCacheTTL < 0 || p.KeyAliasCacheTTL < 0:
+	case p.KeyCacheTTL < 0 || p.KeyAliasIndexTTL < 0:
 		return &Error{Message: "property encryption profile " + p.Name +
 			" has a negative cache time to live"}
-	case p.KeyCacheSize < 0 || p.KeyAliasCacheSize < 0:
+	case p.KeyCacheSize < 0 || p.KeyAliasIndexSize < 0:
 		return &Error{Message: "property encryption profile " + p.Name +
-			" has a negative cache size"}
+			" has a negative cache size, use DisableKeyCache instead"}
 	}
 	return nil
 }
 
 // withDefaults applies the default cache settings to any left unset.
 func (p EnvelopeProfile) withDefaults() EnvelopeProfile {
+	if p.DisableKeyCache {
+		p.KeyCacheSize = 0
+		p.KeyAliasIndexSize = 0
+		return p
+	}
 	if p.KeyCacheTTL == 0 {
 		p.KeyCacheTTL = DefaultKeyCacheTTL
 	}
 	if p.KeyCacheSize == 0 {
 		p.KeyCacheSize = DefaultKeyCacheSize
 	}
-	if p.KeyAliasCacheTTL == 0 {
-		p.KeyAliasCacheTTL = DefaultKeyAliasCacheTTL
+	if p.KeyAliasIndexTTL == 0 {
+		p.KeyAliasIndexTTL = DefaultKeyAliasIndexTTL
 	}
-	if p.KeyAliasCacheSize == 0 {
-		p.KeyAliasCacheSize = DefaultKeyAliasCacheSize
+	if p.KeyAliasIndexSize == 0 {
+		p.KeyAliasIndexSize = DefaultKeyAliasIndexSize
 	}
 	return p
 }
