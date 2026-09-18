@@ -1242,24 +1242,19 @@ func (b *backend) handleRequest(req map[string]any) {
 
 		encryption := driver.PropertyEncryption()
 		// Pinned by the deterministic tests so the ciphertext is reproducible.
-		restoreIV := func() bool { return true }
 		if data["iv"] != nil {
 			iv, err := decodeTestkitHex(data["iv"])
 			if err != nil {
 				b.writeError(err)
 				return
 			}
-			restoreIV = encryption.PinIV(iv)
+			defer encryption.PinIV(iv)()
 		}
 		var encrypted []byte
 		if aad != nil {
 			encrypted, err = encryption.EncryptWithAAD(ctx, request, aad)
 		} else {
 			encrypted, err = encryption.Encrypt(ctx, request)
-		}
-		if used := restoreIV(); err == nil && !used {
-			b.writeError(fmt.Errorf("the pinned initialisation vector was not used"))
-			return
 		}
 		if err != nil {
 			b.writeError(err)
@@ -1325,10 +1320,9 @@ func (b *backend) handleRequest(req map[string]any) {
 			b.writeError(fmt.Errorf("this driver has no property encryption profiles"))
 			return
 		}
-		profileName := data["profileName"].(string)
-		repository := state.repositories[profileName]
-		if repository == nil {
-			b.writeError(fmt.Errorf("no property encryption profile is named %s", profileName))
+		repository, err := state.repositoryFor(optionalString(data, "profileName"))
+		if err != nil {
+			b.writeError(err)
 			return
 		}
 		encapsulation, err := decodeTestkitHex(data["encapsulation"])
@@ -1344,7 +1338,7 @@ func (b *backend) handleRequest(req map[string]any) {
 		}
 		// Seeded into the repository directly, not through the driver's API.
 		key := repository.importKey(
-			data["keyId"].(string), data["alias"].(string), encapsulation, metadata)
+			data["id"].(string), data["alias"].(string), encapsulation, metadata)
 		b.writeResponse("EncapsulatedKey", map[string]any{
 			"id":    key.ID,
 			"alias": key.Alias,

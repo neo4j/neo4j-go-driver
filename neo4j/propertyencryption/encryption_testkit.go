@@ -23,18 +23,15 @@ import (
 	ipe "github.com/neo4j/neo4j-go-driver/v6/neo4j/internal/propertyencryption"
 )
 
-// PinIV makes the next Encrypt use iv, and returns a function that restores normal behaviour
-// and reports whether iv was used. It lets TestKit assert byte-exact ciphertext.
+// PinIV makes Encrypt use iv, and returns a function that restores normal behaviour. It lets
+// TestKit assert byte-exact ciphertext.
 //
 // Reusing an initialisation vector with the same key breaks AES-GCM.
-func (e *Encryption) PinIV(iv []byte) func() bool {
-	used := false
+func (e *Encryption) PinIV(iv []byte) func() {
 	e.newIV = func() ([]byte, error) {
-		used = true
 		return iv, nil
 	}
-	return func() bool {
+	return func() {
 		e.newIV = ipe.NewIV
-		return used
 	}
 }

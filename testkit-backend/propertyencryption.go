@@ -142,6 +142,25 @@ type propertyEncryptionState struct {
 	repositories map[string]*testkitKeyRepository
 }
 
+// repositoryFor returns the repository for a profile, or the only one when name is empty.
+func (s *propertyEncryptionState) repositoryFor(name string) (*testkitKeyRepository, error) {
+	if name == "" {
+		if len(s.repositories) != 1 {
+			return nil, fmt.Errorf(
+				"%d property encryption profiles are configured, so one must be named",
+				len(s.repositories))
+		}
+		for _, repository := range s.repositories {
+			return repository, nil
+		}
+	}
+	repository := s.repositories[name]
+	if repository == nil {
+		return nil, fmt.Errorf("no property encryption profile is named %s", name)
+	}
+	return repository, nil
+}
+
 // buildPropertyEncryptionProfiles turns the propertyEncryptionProfiles field of a NewDriver
 // request into configured profiles, and returns the repositories backing them.
 func buildPropertyEncryptionProfiles(
