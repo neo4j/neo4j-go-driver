@@ -1231,13 +1231,13 @@ func (b *backend) handleRequest(req map[string]any) {
 			Key:     reference,
 			Profile: optionalString(data, "profileName"),
 		}
+		var aad any
 		if data["aad"] != nil {
-			aad, err := cypherToNative(data["aad"])
+			aad, err = cypherToNative(data["aad"])
 			if err != nil {
 				b.writeError(err)
 				return
 			}
-			request.AAD = aad
 		}
 
 		encryption := driver.PropertyEncryption()
@@ -1251,7 +1251,12 @@ func (b *backend) handleRequest(req map[string]any) {
 			}
 			restoreIV = encryption.PinIV(iv)
 		}
-		encrypted, err := encryption.Encrypt(ctx, request)
+		var encrypted []byte
+		if aad != nil {
+			encrypted, err = encryption.EncryptWithAAD(ctx, request, aad)
+		} else {
+			encrypted, err = encryption.Encrypt(ctx, request)
+		}
 		if used := restoreIV(); err == nil && !used {
 			b.writeError(fmt.Errorf("the pinned initialisation vector was not used"))
 			return

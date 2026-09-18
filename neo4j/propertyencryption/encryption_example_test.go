@@ -66,11 +66,10 @@ func ExampleEncryption() {
 	}
 
 	// Encrypt, binding the value to the customer it belongs to.
-	encrypted, err := encryption.Encrypt(ctx, propertyencryption.EncryptRequest{
+	encrypted, err := encryption.EncryptWithAAD(ctx, propertyencryption.EncryptRequest{
 		Value: "078-05-1120",
-		AAD:   "customer-1",
 		Key:   propertyencryption.KeyAlias("current"),
-	})
+	}, "customer-1")
 	if err != nil {
 		panic(err)
 	}

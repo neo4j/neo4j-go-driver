@@ -85,20 +85,6 @@ type EncryptRequest struct {
 	//
 	// Required.
 	Key KeyReference
-	// AAD binds the value to a context, such as the node it belongs to. It is authenticated
-	// but not encrypted, and is stored with the value. Passing it again to
-	// Encryption.DecryptWithAAD is what makes a value moved to another context fail to
-	// decrypt.
-	//
-	// AAD accepts bool, string, integer, []byte, dbtype.Date, dbtype.LocalTime, dbtype.Time,
-	// dbtype.Point2D, dbtype.Point3D and dbtype.UUID. The remaining property types are
-	// excluded because two equal values can encode differently.
-	//
-	// Values are not normalised, so a string that may arrive in more than one Unicode form
-	// should be normalised before both encrypting and decrypting.
-	//
-	// Optional.
-	AAD any
 	// Profile names the encryption profile to use. It may be left empty when exactly one
 	// profile is configured.
 	//
@@ -176,7 +162,32 @@ func New(profiles []Profile) (*Encryption, error) {
 //
 // Encrypting the same value twice produces different bytes, so encrypted values cannot be
 // compared or searched in Cypher.
+//
+// Use EncryptWithAAD to bind the value to a context.
 func (e *Encryption) Encrypt(ctx context.Context, request EncryptRequest) ([]byte, error) {
+	return e.encrypt(ctx, request, nil)
+}
+
+// EncryptWithAAD encrypts a property value, binding it to aad, which DecryptWithAAD then
+// needs to decrypt it. aad is authenticated but not encrypted, and is stored with the value.
+//
+// aad accepts bool, string, integer, []byte, dbtype.Date, dbtype.LocalTime, dbtype.Time,
+// dbtype.Point2D, dbtype.Point3D and dbtype.UUID. Other property types are excluded because
+// two equal values can encode differently.
+//
+// aad is not normalised, so normalise a string that may arrive in more than one Unicode form
+// before encrypting and decrypting.
+func (e *Encryption) EncryptWithAAD(
+	ctx context.Context, request EncryptRequest, aad any) ([]byte, error) {
+
+	if aad == nil {
+		return nil, &Error{Message: "no additional authenticated data was supplied, " +
+			"use Encrypt to encrypt without it"}
+	}
+	return e.encrypt(ctx, request, aad)
+}
+
+func (e *Encryption) encrypt(ctx context.Context, request EncryptRequest, aad any) ([]byte, error) {
 	state, err := e.profileFor(request.Profile)
 	if err != nil {
 		return nil, err
@@ -191,14 +202,14 @@ func (e *Encryption) Encrypt(ctx context.Context, request EncryptRequest) ([]byt
 	}
 
 	var metadata ipe.Metadata
-	var aad []byte
-	if request.AAD != nil {
-		encodedAAD, aadErr := ipe.EncodeAAD(request.AAD)
+	var aadBytes []byte
+	if aad != nil {
+		encodedAAD, aadErr := ipe.EncodeAAD(aad)
 		if aadErr != nil {
 			return nil, asError("the additional authenticated data cannot be used", aadErr)
 		}
-		aad = encodedAAD.Bytes
-		metadata.SetBytes(ipe.MetadataAAD, aad)
+		aadBytes = encodedAAD.Bytes
+		metadata.SetBytes(ipe.MetadataAAD, aadBytes)
 		metadata.SetInt(ipe.MetadataAADEncodingSchemeMajor, int64(encodedAAD.Baseline.Major))
 		metadata.SetInt(ipe.MetadataAADEncodingSchemeMinor, int64(encodedAAD.Baseline.Minor))
 	}
@@ -212,7 +223,7 @@ func (e *Encryption) Encrypt(ctx context.Context, request EncryptRequest) ([]byt
 	if err != nil {
 		return nil, &Error{Message: "could not create an initialisation vector", Cause: err}
 	}
-	cipherOutput, err := dataKey.Seal(iv, encoded.Bytes, aad)
+	cipherOutput, err := dataKey.Seal(iv, encoded.Bytes, aadBytes)
 	if err != nil {
 		return nil, &Error{Message: "could not encrypt the value", Cause: err}
 	}

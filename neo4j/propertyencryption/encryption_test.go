@@ -320,13 +320,12 @@ func TestDecryptWithAAD(t *testing.T) {
 	encryption, _, _ := newTestEncryption(t, "p")
 	createKey(t, encryption, "", "k1")
 
-	encrypted, err := encryption.Encrypt(ctx, EncryptRequest{
+	encrypted, err := encryption.EncryptWithAAD(ctx, EncryptRequest{
 		Value: "aad-bound",
-		AAD:   "row-42",
 		Key:   KeyAlias("k1"),
-	})
+	}, "row-42")
 	if err != nil {
-		t.Fatalf("Encrypt returned %v", err)
+		t.Fatalf("EncryptWithAAD returned %v", err)
 	}
 
 	t.Run("matching aad", func(t *testing.T) {
@@ -375,6 +374,14 @@ func TestDecryptWithAADOnAnUnboundValue(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Encrypt returned %v", err)
 	}
+	structure, err := ipe.DecodeEncrypted(encrypted)
+	if err != nil {
+		t.Fatalf("DecodeEncrypted returned %v", err)
+	}
+	if _, bound := structure.Metadata.Bytes(ipe.MetadataAAD); bound {
+		t.Fatal("Encrypt stored additional authenticated data")
+	}
+
 	_, err = encryption.DecryptWithAAD(ctx, encrypted, "row-42")
 	if err == nil {
 		t.Fatal("DecryptWithAAD accepted an aad for a value that has none")
@@ -475,8 +482,6 @@ func TestEncryptRejects(t *testing.T) {
 		{name: "unknown profile", request: EncryptRequest{Value: "a", Key: KeyAlias("k1"), Profile: "nope"}},
 		{name: "nil value", request: EncryptRequest{Key: KeyAlias("k1")}},
 		{name: "map value", request: EncryptRequest{Value: map[string]any{}, Key: KeyAlias("k1")}},
-		{name: "float aad", request: EncryptRequest{Value: "a", AAD: 1.5, Key: KeyAlias("k1")}},
-		{name: "list aad", request: EncryptRequest{Value: "a", AAD: []any{1}, Key: KeyAlias("k1")}},
 	}
 
 	for _, test := range tests {
@@ -485,6 +490,34 @@ func TestEncryptRejects(t *testing.T) {
 
 			if _, err := encryption.Encrypt(ctx, test.request); err == nil {
 				t.Fatal("Encrypt succeeded, want an error")
+			}
+		})
+	}
+}
+
+func TestEncryptWithAADRejects(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	encryption, _, _ := newTestEncryption(t, "p")
+	createKey(t, encryption, "", "k1")
+
+	tests := []struct {
+		name string
+		aad  any
+	}{
+		{name: "nil", aad: nil},
+		{name: "float", aad: 1.5},
+		{name: "list", aad: []any{1}},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
+			if _, err := encryption.EncryptWithAAD(ctx, EncryptRequest{
+				Value: "a", Key: KeyAlias("k1")}, test.aad); err == nil {
+				t.Fatal("EncryptWithAAD succeeded, want an error")
 			}
 		})
 	}
@@ -902,8 +935,8 @@ func TestEncryptionIsSafeForConcurrentUse(t *testing.T) {
 			defer waitGroup.Done()
 			for i := 0; i < 100; i++ {
 				value := fmt.Sprintf("worker %d value %d", worker, i)
-				encrypted, err := encryption.Encrypt(ctx, EncryptRequest{
-					Value: value, AAD: strconv.Itoa(worker), Key: KeyAlias("k1")})
+				encrypted, err := encryption.EncryptWithAAD(ctx, EncryptRequest{
+					Value: value, Key: KeyAlias("k1")}, strconv.Itoa(worker))
 				if err != nil {
 					errs <- err
 					return
