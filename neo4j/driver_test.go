@@ -31,6 +31,7 @@ import (
 
 	"github.com/neo4j/neo4j-go-driver/v6/neo4j/internal/router"
 	. "github.com/neo4j/neo4j-go-driver/v6/neo4j/internal/testutil"
+	"github.com/neo4j/neo4j-go-driver/v6/neo4j/propertyencryption"
 )
 
 func assertNoRouter(t *testing.T, d Driver) {
@@ -778,6 +779,10 @@ func (d *driverDelegate) Close(ctx context.Context) error {
 
 func (d *driverDelegate) IsEncrypted() bool {
 	return d.delegate.IsEncrypted()
+}
+
+func (d *driverDelegate) PropertyEncryption() *propertyencryption.Encryption {
+	return d.delegate.PropertyEncryption()
 }
 
 func (d *driverDelegate) GetServerInfo(ctx context.Context) (ServerInfo, error) {

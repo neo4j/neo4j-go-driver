@@ -25,6 +25,7 @@ import (
 	"github.com/neo4j/neo4j-go-driver/v6/neo4j/auth"
 	"github.com/neo4j/neo4j-go-driver/v6/neo4j/log"
 	"github.com/neo4j/neo4j-go-driver/v6/neo4j/notifications"
+	"github.com/neo4j/neo4j-go-driver/v6/neo4j/propertyencryption"
 )
 
 // A Config contains options that can be used to customize certain
@@ -216,6 +217,26 @@ type Config struct {
 	// for large data transfers. Currently, the default value is 8 KiB, but may change in the future.
 	// Set to 0 or below to disable buffering.
 	ReadBufferSize int
+	// PropertyEncryptionProfiles configures encryption of individual property values,
+	// reached through Driver.PropertyEncryption. Each profile names the key management to
+	// use, and every encrypted value records which profile produced it.
+	//
+	// Profile names must be unique, and must match on any other driver expected to decrypt
+	// those values.
+	//
+	//	c.PropertyEncryptionProfiles = []propertyencryption.Profile{
+	//		propertyencryption.EnvelopeProfile{
+	//			Name:                 "customer-pii",
+	//			EncapsulationService: keyService,
+	//			KeyRepository:        keyRepository,
+	//		},
+	//	}
+	//
+	// This is part of the property encryption preview feature (see README on what it means
+	// in terms of support and compatibility guarantees).
+	//
+	// default: no profiles
+	PropertyEncryptionProfiles []propertyencryption.Profile
 }
 
 // ServerAddressResolver is a function type that defines the resolver function used by the routing driver to
