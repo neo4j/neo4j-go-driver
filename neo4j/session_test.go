@@ -40,7 +40,8 @@ import (
 type transactionFunc func(context.Context, ManagedTransactionWork, ...func(*TransactionConfig)) (any, error)
 type transactionFuncApi func(session Session) transactionFunc
 
-var reAuthToken = &idb.ReAuthToken{FromSession: false, Manager: iauth.Token{Tokens: map[string]any{"scheme": "none"}}}
+var authToken = iauth.Token{Tokens: map[string]any{"scheme": "none"}}
+var reAuthToken = &idb.ReAuthToken{FromSession: false, Manager: authToken}
 
 func TestSession(outer *testing.T) {
 	var logger = log.ToVoid()
@@ -88,14 +89,6 @@ func TestSession(outer *testing.T) {
 		sess.cache.SetEnabled(true)
 		sess.cache.Set(cacheKey, databaseName)
 		sess.homeDbGuess = cacheKey
-
-		// Fake a routing table lookup for the guessed home database
-		router.GetTableHook = func(guess string) *idb.RoutingTable {
-			if guess == cacheKey {
-				return &idb.RoutingTable{}
-			}
-			return nil
-		}
 
 		// Track number of borrow and return calls
 		borrowCount := 0
@@ -212,8 +205,8 @@ func TestSession(outer *testing.T) {
 				numDefaultDbLookups++
 				return mydb, nil
 			}
-			router.GetOrUpdateWritersHook = func(_ func(context.Context) ([]string, error), database string) ([]string, error) {
-				AssertStringEqual(t, mydb, database)
+			router.GetOrUpdateWritersHook = func(_ func(context.Context) ([]string, error), dbSelection idb.DatabaseSelection) ([]string, error) {
+				AssertStringEqual(t, mydb, dbSelection.Name)
 				return []string{"aserver"}, nil
 			}
 
@@ -395,8 +388,8 @@ func TestSession(outer *testing.T) {
 				numDefaultDbLookups++
 				return mydb, nil
 			}
-			router.GetOrUpdateReadersHook = func(_ func(context.Context) ([]string, error), database string) ([]string, error) {
-				AssertStringEqual(t, mydb, database)
+			router.GetOrUpdateReadersHook = func(_ func(context.Context) ([]string, error), dbSelection idb.DatabaseSelection) ([]string, error) {
+				AssertStringEqual(t, mydb, dbSelection.Name)
 				return []string{"aserver"}, nil
 			}
 
@@ -724,8 +717,8 @@ func TestSession(outer *testing.T) {
 				numDefaultDbLookups++
 				return mydb, nil
 			}
-			router.GetOrUpdateReadersHook = func(_ func(context.Context) ([]string, error), database string) ([]string, error) {
-				AssertStringEqual(t, mydb, database)
+			router.GetOrUpdateReadersHook = func(_ func(context.Context) ([]string, error), dbSelection idb.DatabaseSelection) ([]string, error) {
+				AssertStringEqual(t, mydb, dbSelection.Name)
 				return []string{"aserver"}, nil
 			}
 
@@ -840,7 +833,7 @@ func TestSession(outer *testing.T) {
 			router, _, session := createSession()
 			defer session.Close(ctx)
 			expectedErr := fmt.Errorf("server retrieval err")
-			router.GetOrUpdateReadersHook = func(func(context.Context) ([]string, error), string) ([]string, error) {
+			router.GetOrUpdateReadersHook = func(func(context.Context) ([]string, error), idb.DatabaseSelection) ([]string, error) {
 				return nil, expectedErr
 			}
 
@@ -996,6 +989,83 @@ func TestSession(outer *testing.T) {
 			AssertNoError(t, err)
 			err = sess.Close(context.Background())
 			AssertNoError(t, err)
+		})
+	})
+
+	outer.Run("Database selection", func(inner *testing.T) {
+		inner.Run("Passes impersonated user to the router when resolving servers", func(t *testing.T) {
+			router, pool, sess := createSessionFromConfig(SessionConfig{ImpersonatedUser: "me"})
+			pool.BorrowConn = &ConnFake{Alive: true}
+			router.GetNameOfDefaultDbHook = func(string) (string, error) { return "mydb", nil }
+			var selections []idb.DatabaseSelection
+			router.GetOrUpdateWritersHook = func(_ func(context.Context) ([]string, error), dbSelection idb.DatabaseSelection) ([]string, error) {
+				selections = append(selections, dbSelection)
+				return []string{"aserver"}, nil
+			}
+
+			_, err := sess.BeginTransaction(context.Background())
+			AssertNoError(t, err)
+
+			AssertIntEqual(t, len(selections), 1)
+			AssertStringEqual(t, "me", selections[0].ImpersonatedUser)
+		})
+
+		inner.Run("Passes impersonated user to the router when refreshing a guessed home database", func(t *testing.T) {
+			router, pool, sess := createSessionFromConfig(SessionConfig{ImpersonatedUser: "me"})
+			// The home database cache is only consulted with SSR enabled.
+			pool.BorrowConn = &ConnFake{Alive: true, SsrEnabled: true}
+			sess.cache.SetEnabled(true)
+			sess.homeDbGuess = "mydb"
+			var selections []idb.DatabaseSelection
+			router.GetOrUpdateWritersHook = func(_ func(context.Context) ([]string, error), dbSelection idb.DatabaseSelection) ([]string, error) {
+				selections = append(selections, dbSelection)
+				return []string{"aserver"}, nil
+			}
+
+			_, err := sess.BeginTransaction(context.Background())
+			AssertNoError(t, err)
+
+			AssertIntEqual(t, len(selections), 1)
+			selection := selections[0]
+			AssertTrue(t, selection.IsHomeDbGuess)
+			AssertStringEqual(t, "me", selection.ImpersonatedUser)
+			// Keys the router's per user routing table read.
+			cacheKey, err := new(homedb.Cache).ComputeKey("me", &authToken)
+			AssertNoError(t, err)
+			AssertStringEqual(t, cacheKey, selection.HomeDbCacheKey)
+		})
+
+		inner.Run("Distinguishes home database keys by session auth", func(t *testing.T) {
+			homeDbCacheKeyFor := func(principal string) string {
+				router := RouterFake{}
+				pool := PoolFake{}
+				cache, _ := homedb.NewCache(100)
+				sessionAuth := iauth.Token{Tokens: map[string]any{
+					"scheme": "basic", "principal": principal,
+				}}
+				token := &idb.ReAuthToken{Manager: sessionAuth, FromSession: true}
+				conf := config.Config{}
+				sess := newSession(context.Background(), &conf, SessionConfig{}, &router, &pool, cache, logger, token)
+				pool.BorrowConn = &ConnFake{Alive: true, SsrEnabled: true}
+				sess.cache.SetEnabled(true)
+				sess.homeDbGuess = "mydb"
+				var selections []idb.DatabaseSelection
+				router.GetOrUpdateWritersHook = func(_ func(context.Context) ([]string, error), dbSelection idb.DatabaseSelection) ([]string, error) {
+					selections = append(selections, dbSelection)
+					return []string{"aserver"}, nil
+				}
+
+				_, err := sess.BeginTransaction(context.Background())
+				AssertNoError(t, err)
+				AssertIntEqual(t, len(selections), 1)
+
+				cacheKey, err := new(homedb.Cache).ComputeKey("", &sessionAuth)
+				AssertNoError(t, err)
+				AssertStringEqual(t, cacheKey, selections[0].HomeDbCacheKey)
+				return selections[0].HomeDbCacheKey
+			}
+
+			AssertNotDeepEquals(t, homeDbCacheKeyFor("alice"), homeDbCacheKeyFor("bob"))
 		})
 	})
 
