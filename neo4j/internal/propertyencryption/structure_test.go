@@ -19,28 +19,31 @@ package propertyencryption
 
 import (
 	"encoding/hex"
+	"errors"
+	"strings"
 	"testing"
 )
 
 // Encrypted values taken verbatim from TestKit's deterministic fixtures.
 const (
-	fixtureBoolean = "01b6658d64657465726d696e69737469" +
-		"63cc11877fe22670d0d3433e2a9c4dd5" +
-		"fd17994b87424f4f4c45414e0100a282" +
-		"6976cc0c000102030405060708090a0b" +
-		"866b65795f69648b746573746b69742d" +
-		"6b6579"
+	fixtureBoolean = "01b86588454e56454c4f5045018d6465" +
+		"7465726d696e6973746963cc11766afe" +
+		"8a94ffb2fd0e0bc10caed2471a028742" +
+		"4f4f4c45414e0100a2826976cc0c0001" +
+		"02030405060708090a0b866b65795f69" +
+		"648b746573746b69742d6b6579"
 
-	fixtureAADBound = "01b6658d64657465726d696e69737469" +
-		"63cc1a3a8af0d3820a0a549d75e42e59" +
-		"6a18ff85ee74fb51dce4bc0300865354" +
-		"52494e470100a583616164cc0786726f" +
-		"772d3432d0196161645f656e636f6469" +
-		"6e675f736368656d655f6d616a6f7201" +
-		"d0196161645f656e636f64696e675f73" +
-		"6368656d655f6d696e6f7200826976cc" +
-		"0c48494a4b4c4d4e4f50515253866b65" +
-		"795f69648b746573746b69742d6b6579"
+	fixtureAADBound = "01b86588454e56454c4f5045018d6465" +
+		"7465726d696e6973746963cc1a9e19aa" +
+		"f51fbb711fdeb241272be57efcd076c5" +
+		"6200e29a4e44da86535452494e470100" +
+		"a583616164cc0786726f772d3432d019" +
+		"6161645f656e636f64696e675f736368" +
+		"656d655f6d616a6f7201d0196161645f" +
+		"656e636f64696e675f736368656d655f" +
+		"6d696e6f7200826976cc0c48494a4b4c" +
+		"4d4e4f50515253866b65795f69648b74" +
+		"6573746b69742d6b6579"
 
 	fixtureKeyID = "testkit-key"
 )
@@ -205,11 +208,13 @@ func TestEncodeEncryptedRoundTrip(t *testing.T) {
 	metadata.SetBytes(MetadataIV, []byte{1, 2, 3})
 
 	want := Encrypted{
-		ProfileName:  "profile",
-		CipherOutput: []byte{9, 8, 7},
-		TypeName:     TypeString,
-		Baseline:     baseline10,
-		Metadata:     metadata,
+		ProfileType:    ProfileTypeEnvelope,
+		ProfileVersion: EnvelopeProfileVersion,
+		ProfileName:    "profile",
+		CipherOutput:   []byte{9, 8, 7},
+		TypeName:       TypeString,
+		Baseline:       baseline10,
+		Metadata:       metadata,
 	}
 	encoded, err := EncodeEncrypted(want)
 	if err != nil {
@@ -226,7 +231,8 @@ func TestEncodeEncryptedRoundTrip(t *testing.T) {
 	if err != nil {
 		t.Fatalf("DecodeEncrypted returned %v", err)
 	}
-	if got.ProfileName != want.ProfileName || got.TypeName != want.TypeName ||
+	if got.ProfileType != want.ProfileType || got.ProfileVersion != want.ProfileVersion ||
+		got.ProfileName != want.ProfileName || got.TypeName != want.TypeName ||
 		got.Baseline != want.Baseline {
 		t.Errorf("round tripped to %+v, want %+v", got, want)
 	}
@@ -239,8 +245,8 @@ func TestEncodeEncryptedRoundTrip(t *testing.T) {
 func TestDecodeEncryptedIgnoresUnknownMetadata(t *testing.T) {
 	t.Parallel()
 
-	const prefix = fieldVersion + fieldHeader + fieldProfile + fieldCipher + fieldTypeName +
-		fieldMajor + fieldMinor
+	const prefix = fieldVersion + fieldHeader + fieldProfileType + fieldProfileVersion +
+		fieldProfile + fieldCipher + fieldTypeName + fieldMajor + fieldMinor
 
 	// Each case adds one metadata entry this driver has no use for, alongside the iv it
 	// does read. The shapes cover every branch the skip has to walk over.
@@ -275,17 +281,19 @@ func TestDecodeEncryptedIgnoresUnknownMetadata(t *testing.T) {
 
 // The fields of a well-formed encrypted value, so the cases below can name what they change.
 const (
-	fieldVersion  = "01"
-	fieldHeader   = "b665"           // structure, 6 fields, tag "e"
-	fieldProfile  = "8170"           // "p"
-	fieldCipher   = "cc00"           // empty
-	fieldTypeName = "86535452494e47" // "STRING"
-	fieldMajor    = "01"
-	fieldMinor    = "00"
-	fieldMetadata = "a0" // empty
+	fieldVersion        = "01"
+	fieldHeader         = "b865"               // structure, 8 fields, tag "e"
+	fieldProfileType    = "88454e56454c4f5045" // "ENVELOPE"
+	fieldProfileVersion = "01"
+	fieldProfile        = "8170"           // "p"
+	fieldCipher         = "cc00"           // empty
+	fieldTypeName       = "86535452494e47" // "STRING"
+	fieldMajor          = "01"
+	fieldMinor          = "00"
+	fieldMetadata       = "a0" // empty
 
-	validEncrypted = fieldVersion + fieldHeader + fieldProfile + fieldCipher +
-		fieldTypeName + fieldMajor + fieldMinor + fieldMetadata
+	validEncrypted = fieldVersion + fieldHeader + fieldProfileType + fieldProfileVersion +
+		fieldProfile + fieldCipher + fieldTypeName + fieldMajor + fieldMinor + fieldMetadata
 )
 
 // TestDecodeEncryptedRejects covers bytes that are not a valid encrypted value.
@@ -298,22 +306,25 @@ func TestDecodeEncryptedRejects(t *testing.T) {
 	}{
 		{name: "empty", value: ""},
 		{name: "unknown encoding version",
-			value: "02" + fieldHeader + fieldProfile + fieldCipher + fieldTypeName +
-				fieldMajor + fieldMinor + fieldMetadata},
+			value: "02" + fieldHeader + fieldProfileType + fieldProfileVersion +
+				fieldProfile + fieldCipher + fieldTypeName + fieldMajor + fieldMinor +
+				fieldMetadata},
 		{name: "not a structure", value: fieldVersion + "8161"},
 		{name: "wrong structure tag",
-			value: fieldVersion + "b666" + fieldProfile + fieldCipher + fieldTypeName +
-				fieldMajor + fieldMinor + fieldMetadata},
+			value: fieldVersion + "b666" + fieldProfileType + fieldProfileVersion +
+				fieldProfile + fieldCipher + fieldTypeName + fieldMajor + fieldMinor +
+				fieldMetadata},
 		{name: "too few fields",
-			value: fieldVersion + "b565" + fieldProfile + fieldCipher + fieldTypeName +
-				fieldMajor + fieldMinor},
+			value: fieldVersion + "b765" + fieldProfileType + fieldProfileVersion +
+				fieldProfile + fieldCipher + fieldTypeName + fieldMajor + fieldMinor},
 		{name: "profile name is not a string",
-			value: fieldVersion + fieldHeader + "01" + fieldCipher + fieldTypeName +
-				fieldMajor + fieldMinor + fieldMetadata},
+			value: fieldVersion + fieldHeader + fieldProfileType + fieldProfileVersion +
+				"01" + fieldCipher + fieldTypeName + fieldMajor + fieldMinor + fieldMetadata},
 		{name: "metadata is not a dictionary",
-			value: fieldVersion + fieldHeader + fieldProfile + fieldCipher + fieldTypeName +
-				fieldMajor + fieldMinor + "c3"},
-		{name: "truncated", value: fieldVersion + fieldHeader + fieldProfile + fieldCipher},
+			value: fieldVersion + fieldHeader + fieldProfileType + fieldProfileVersion +
+				fieldProfile + fieldCipher + fieldTypeName + fieldMajor + fieldMinor + "c3"},
+		{name: "truncated", value: fieldVersion + fieldHeader + fieldProfileType +
+			fieldProfileVersion + fieldProfile + fieldCipher},
 	}
 
 	for _, test := range tests {
@@ -323,6 +334,58 @@ func TestDecodeEncryptedRejects(t *testing.T) {
 			decoded, err := DecodeEncrypted(mustHex(t, test.value))
 			if err == nil {
 				t.Fatalf("DecodeEncrypted returned %+v, want an error", decoded)
+			}
+		})
+	}
+}
+
+// TestDecodeEncryptedRejectsAnotherProfile checks the profile type and version reach the error.
+func TestDecodeEncryptedRejectsAnotherProfile(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name        string
+		profileType string
+		version     string
+		wantType    string
+		wantVersion int64
+	}{
+		{
+			name:        "unknown profile type",
+			profileType: "8b5354415449435f4b455953", // "STATIC_KEYS"
+			version:     fieldProfileVersion,
+			wantType:    "STATIC_KEYS",
+			wantVersion: 1,
+		},
+		{
+			name:        "newer profile version",
+			profileType: fieldProfileType,
+			version:     "02",
+			wantType:    ProfileTypeEnvelope,
+			wantVersion: 2,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
+			value := fieldVersion + fieldHeader + test.profileType + test.version +
+				fieldProfile + fieldCipher + fieldTypeName + fieldMajor + fieldMinor +
+				fieldMetadata
+			_, err := DecodeEncrypted(mustHex(t, value))
+			var profileErr *UnsupportedProfileError
+			if !errors.As(err, &profileErr) {
+				t.Fatalf("DecodeEncrypted returned %v, want an *UnsupportedProfileError", err)
+			}
+			if profileErr.ProfileType != test.wantType {
+				t.Errorf("ProfileType is %q, want %q", profileErr.ProfileType, test.wantType)
+			}
+			if profileErr.ProfileVersion != test.wantVersion {
+				t.Errorf("ProfileVersion is %d, want %d", profileErr.ProfileVersion, test.wantVersion)
+			}
+			if !strings.Contains(err.Error(), test.wantType) {
+				t.Errorf("the error does not name the profile type: %v", err)
 			}
 		})
 	}

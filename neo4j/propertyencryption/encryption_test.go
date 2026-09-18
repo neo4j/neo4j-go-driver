@@ -122,6 +122,12 @@ func (r *memoryRepository) counts() (findByID, findByAlias int) {
 	return r.findByID, r.findByAlias
 }
 
+func (r *memoryRepository) saveCount() int {
+	r.mutex.Lock()
+	defer r.mutex.Unlock()
+	return r.saves
+}
+
 // countingService counts decapsulations, the call the key cache avoids.
 type countingService struct {
 	KeyEncapsulationService
@@ -780,6 +786,48 @@ func TestKeyManagerCreate(t *testing.T) {
 			t.Fatal("Create accepted a key with no id, which could never be decrypted")
 		}
 	})
+
+	t.Run("encapsulation service returns a key that is not AES-256", func(t *testing.T) {
+		t.Parallel()
+
+		for _, size := range []int{0, 16, 31, 33} {
+			repository := newMemoryRepository()
+			encryption, err := New([]Profile{EnvelopeProfile{
+				Name:                 "p",
+				EncapsulationService: shortKeyService{size: size},
+				KeyRepository:        repository,
+			}})
+			if err != nil {
+				t.Fatalf("New returned %v", err)
+			}
+			keys, err := encryption.Keys("")
+			if err != nil {
+				t.Fatalf("Keys returned %v", err)
+			}
+			if _, err := keys.Create(ctx, "k1"); err == nil {
+				t.Errorf("Create accepted a %d byte key", size)
+			}
+			if repository.saveCount() != 0 {
+				t.Errorf("a %d byte key reached the repository", size)
+			}
+		}
+	})
+}
+
+// shortKeyService returns a key of the wrong size.
+type shortKeyService struct {
+	KeyEncapsulationService
+	size int
+}
+
+func (s shortKeyService) Encapsulate(
+	_ context.Context, _ map[string]string) (EncapsulationResult, error) {
+
+	return EncapsulationResult{
+		Key:           make([]byte, s.size),
+		Encapsulation: []byte{1, 2, 3},
+		Metadata:      map[string]string{},
+	}, nil
 }
 
 // idlessRepository returns keys without an id, which would leave every value it encrypted

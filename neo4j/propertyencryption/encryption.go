@@ -221,11 +221,13 @@ func (e *Encryption) Encrypt(ctx context.Context, request EncryptRequest) ([]byt
 	metadata.SetBytes(ipe.MetadataIV, iv)
 
 	encrypted, err := ipe.EncodeEncrypted(ipe.Encrypted{
-		ProfileName:  state.profile.Name,
-		CipherOutput: cipherOutput,
-		TypeName:     encoded.TypeName,
-		Baseline:     encoded.Baseline,
-		Metadata:     metadata,
+		ProfileType:    ipe.ProfileTypeEnvelope,
+		ProfileVersion: ipe.EnvelopeProfileVersion,
+		ProfileName:    state.profile.Name,
+		CipherOutput:   cipherOutput,
+		TypeName:       encoded.TypeName,
+		Baseline:       encoded.Baseline,
+		Metadata:       metadata,
 	})
 	if err != nil {
 		return nil, &Error{Message: "could not assemble the encrypted value", Cause: err}
@@ -435,7 +437,7 @@ func (s *profileState) decapsulate(ctx context.Context, key EncapsulatedKey) (*i
 	if err != nil {
 		return nil, wrap("could not unwrap encryption key "+key.ID, err)
 	}
-	dataKey, err := ipe.DeriveDataKey(dek)
+	dataKey, err := ipe.NewDataKey(dek)
 	if err != nil {
 		return nil, &Error{Message: "could not prepare encryption key " + key.ID, Cause: err}
 	}
@@ -466,12 +468,8 @@ func (m *KeyManager) Create(ctx context.Context, alias string) (EncapsulatedKey,
 	if err != nil {
 		return EncapsulatedKey{}, wrap("could not create an encryption key", err)
 	}
-	if len(result.Key) == 0 {
-		return EncapsulatedKey{}, &Error{
-			Message: "the key encapsulation service returned no key material"}
-	}
 	// Fail before storing a key that cannot be used.
-	dataKey, err := ipe.DeriveDataKey(result.Key)
+	dataKey, err := ipe.NewDataKey(result.Key)
 	if err != nil {
 		return EncapsulatedKey{}, &Error{
 			Message: "the key encapsulation service returned an unusable key", Cause: err}

@@ -50,77 +50,81 @@ var deterministicFixtures = []deterministicFixture{
 	{
 		value: true,
 		iv:    "000102030405060708090a0b",
-		encrypted: "01b6658d64657465726d696e69737469" +
-			"63cc11877fe22670d0d3433e2a9c4dd5" +
-			"fd17994b87424f4f4c45414e0100a282" +
-			"6976cc0c000102030405060708090a0b" +
-			"866b65795f69648b746573746b69742d" +
-			"6b6579",
+		encrypted: "01b86588454e56454c4f5045018d6465" +
+			"7465726d696e6973746963cc11766afe" +
+			"8a94ffb2fd0e0bc10caed2471a028742" +
+			"4f4f4c45414e0100a2826976cc0c0001" +
+			"02030405060708090a0b866b65795f69" +
+			"648b746573746b69742d6b6579",
 	},
 	{
 		value: int64(32768),
 		iv:    "0c0d0e0f1011121314151617",
-		encrypted: "01b6658d64657465726d696e69737469" +
-			"63cc153022e4a29e68285f6fddac8604" +
-			"5e26b63ba5da995087494e5445474552" +
-			"0100a2826976cc0c0c0d0e0f10111213" +
-			"14151617866b65795f69648b74657374" +
-			"6b69742d6b6579",
+		encrypted: "01b86588454e56454c4f5045018d6465" +
+			"7465726d696e6973746963cc1569a784" +
+			"263a80ca0892009f92ad16223f54f9ea" +
+			"d06187494e54454745520100a2826976" +
+			"cc0c0c0d0e0f1011121314151617866b" +
+			"65795f69648b746573746b69742d6b65" +
+			"79",
 	},
 	{
 		value: 3.25,
 		iv:    "18191a1b1c1d1e1f20212223",
-		encrypted: "01b6658d64657465726d696e69737469" +
-			"63cc1959a942a76621fe2aa1f2d388ab" +
-			"4e91010e4b39b48520328e9585464c4f" +
-			"41540100a2826976cc0c18191a1b1c1d" +
-			"1e1f20212223866b65795f69648b7465" +
-			"73746b69742d6b6579",
+		encrypted: "01b86588454e56454c4f5045018d6465" +
+			"7465726d696e6973746963cc1992e03a" +
+			"fb3af69544000a301a57d5f17255f243" +
+			"10a3dabb5e6885464c4f41540100a282" +
+			"6976cc0c18191a1b1c1d1e1f20212223" +
+			"866b65795f69648b746573746b69742d" +
+			"6b6579",
 	},
 	{
 		value: "hello world",
 		iv:    "2425262728292a2b2c2d2e2f",
-		encrypted: "01b6658d64657465726d696e69737469" +
-			"63cc1c19b0e5f67ee23e78eb73899546" +
-			"4420a6fd3626fc052501e325cee12586" +
-			"535452494e470100a2826976cc0c2425" +
-			"262728292a2b2c2d2e2f866b65795f69" +
-			"648b746573746b69742d6b6579",
+		encrypted: "01b86588454e56454c4f5045018d6465" +
+			"7465726d696e6973746963cc1c1c78d1" +
+			"da0e71dc01f2a5d683cb925ef41e615f" +
+			"6258c77f6ff2dda96486535452494e47" +
+			"0100a2826976cc0c2425262728292a2b" +
+			"2c2d2e2f866b65795f69648b74657374" +
+			"6b69742d6b6579",
 	},
 	{
 		value: []byte{0, 1, 2},
 		iv:    "303132333435363738393a3b",
-		encrypted: "01b6658d64657465726d696e69737469" +
-			"63cc1529ea2acd117b82841138917fc8" +
-			"9cdf15cb4f0d809d8542595445530100" +
-			"a2826976cc0c30313233343536373839" +
-			"3a3b866b65795f69648b746573746b69" +
-			"742d6b6579",
+		encrypted: "01b86588454e56454c4f5045018d6465" +
+			"7465726d696e6973746963cc15e2719b" +
+			"8ded9e86fe2871fe9ee51e3730acd0ce" +
+			"9e118542595445530100a2826976cc0c" +
+			"303132333435363738393a3b866b6579" +
+			"5f69648b746573746b69742d6b6579",
 	},
 	{
 		value: []any{int64(1), int64(2)},
 		iv:    "3c3d3e3f4041424344454647",
-		encrypted: "01b6658d64657465726d696e69737469" +
-			"63cc13b5011505031e789718bd92136f" +
-			"766baa191036844c4953540100a28269" +
-			"76cc0c3c3d3e3f404142434445464786" +
-			"6b65795f69648b746573746b69742d6b" +
-			"6579",
+		encrypted: "01b86588454e56454c4f5045018d6465" +
+			"7465726d696e6973746963cc131a8297" +
+			"1faa128ae4267f07af8a7de4a80728f6" +
+			"844c4953540100a2826976cc0c3c3d3e" +
+			"3f4041424344454647866b65795f6964" +
+			"8b746573746b69742d6b6579",
 	},
 	{
 		value: "aad-bound",
 		iv:    "48494a4b4c4d4e4f50515253",
 		aad:   "row-42",
-		encrypted: "01b6658d64657465726d696e69737469" +
-			"63cc1a3a8af0d3820a0a549d75e42e59" +
-			"6a18ff85ee74fb51dce4bc0300865354" +
-			"52494e470100a583616164cc0786726f" +
-			"772d3432d0196161645f656e636f6469" +
-			"6e675f736368656d655f6d616a6f7201" +
-			"d0196161645f656e636f64696e675f73" +
-			"6368656d655f6d696e6f7200826976cc" +
-			"0c48494a4b4c4d4e4f50515253866b65" +
-			"795f69648b746573746b69742d6b6579",
+		encrypted: "01b86588454e56454c4f5045018d6465" +
+			"7465726d696e6973746963cc1a9e19aa" +
+			"f51fbb711fdeb241272be57efcd076c5" +
+			"6200e29a4e44da86535452494e470100" +
+			"a583616164cc0786726f772d3432d019" +
+			"6161645f656e636f64696e675f736368" +
+			"656d655f6d616a6f7201d0196161645f" +
+			"656e636f64696e675f736368656d655f" +
+			"6d696e6f7200826976cc0c48494a4b4c" +
+			"4d4e4f50515253866b65795f69648b74" +
+			"6573746b69742d6b6579",
 	},
 }
 
@@ -210,9 +214,9 @@ func TestWrapKeyRejects(t *testing.T) {
 func TestEncryptsToKnownBytes(t *testing.T) {
 	t.Parallel()
 
-	key, err := DeriveDataKey(unwrapFixtureKey(t))
+	key, err := NewDataKey(unwrapFixtureKey(t))
 	if err != nil {
-		t.Fatalf("DeriveDataKey returned %v", err)
+		t.Fatalf("NewDataKey returned %v", err)
 	}
 
 	for _, fixture := range deterministicFixtures {
@@ -247,11 +251,13 @@ func TestEncryptsToKnownBytes(t *testing.T) {
 			}
 
 			got, err := EncodeEncrypted(Encrypted{
-				ProfileName:  deterministicName,
-				CipherOutput: cipherOutput,
-				TypeName:     encoded.TypeName,
-				Baseline:     encoded.Baseline,
-				Metadata:     metadata,
+				ProfileType:    ProfileTypeEnvelope,
+				ProfileVersion: EnvelopeProfileVersion,
+				ProfileName:    deterministicName,
+				CipherOutput:   cipherOutput,
+				TypeName:       encoded.TypeName,
+				Baseline:       encoded.Baseline,
+				Metadata:       metadata,
 			})
 			if err != nil {
 				t.Fatalf("EncodeEncrypted returned %v", err)
@@ -267,9 +273,9 @@ func TestEncryptsToKnownBytes(t *testing.T) {
 func TestDecryptsKnownBytes(t *testing.T) {
 	t.Parallel()
 
-	key, err := DeriveDataKey(unwrapFixtureKey(t))
+	key, err := NewDataKey(unwrapFixtureKey(t))
 	if err != nil {
-		t.Fatalf("DeriveDataKey returned %v", err)
+		t.Fatalf("NewDataKey returned %v", err)
 	}
 
 	for _, fixture := range deterministicFixtures {
@@ -302,9 +308,9 @@ func TestDecryptsKnownBytes(t *testing.T) {
 func TestOpenRejects(t *testing.T) {
 	t.Parallel()
 
-	key, err := DeriveDataKey(unwrapFixtureKey(t))
+	key, err := NewDataKey(unwrapFixtureKey(t))
 	if err != nil {
-		t.Fatalf("DeriveDataKey returned %v", err)
+		t.Fatalf("NewDataKey returned %v", err)
 	}
 	iv := mustHex(t, "000102030405060708090a0b")
 	cipherOutput, err := key.Seal(iv, []byte{0xc3}, []byte("context"))
@@ -354,9 +360,9 @@ func TestOpenRejects(t *testing.T) {
 	})
 	t.Run("wrong key", func(t *testing.T) {
 		t.Parallel()
-		other, err := DeriveDataKey([]byte("a different data encryption key!"))
+		other, err := NewDataKey([]byte("a different data encryption key!"))
 		if err != nil {
-			t.Fatalf("DeriveDataKey returned %v", err)
+			t.Fatalf("NewDataKey returned %v", err)
 		}
 		_, err = other.Open(iv, cipherOutput, []byte("context"))
 		if !errors.Is(err, ErrAuthentication) {
@@ -374,9 +380,9 @@ func TestOpenRejects(t *testing.T) {
 func TestSealRejectsWrongIVSize(t *testing.T) {
 	t.Parallel()
 
-	key, err := DeriveDataKey(unwrapFixtureKey(t))
+	key, err := NewDataKey(unwrapFixtureKey(t))
 	if err != nil {
-		t.Fatalf("DeriveDataKey returned %v", err)
+		t.Fatalf("NewDataKey returned %v", err)
 	}
 	for _, size := range []int{0, 11, 13, 16} {
 		if _, err := key.Seal(make([]byte, size), []byte{1}, nil); err == nil {
@@ -385,11 +391,22 @@ func TestSealRejectsWrongIVSize(t *testing.T) {
 	}
 }
 
-func TestDeriveDataKeyRejectsEmpty(t *testing.T) {
+// TestNewDataKeyRejectsKeysThatAreNotAes256 covers every size but 32 bytes.
+func TestNewDataKeyRejectsKeysThatAreNotAes256(t *testing.T) {
 	t.Parallel()
 
-	if _, err := DeriveDataKey(nil); err == nil {
-		t.Fatal("DeriveDataKey accepted an empty data encryption key")
+	for _, size := range []int{0, 1, 16, 24, 31, 33, 64} {
+		var dek []byte
+		if size > 0 {
+			dek = make([]byte, size)
+		}
+		if _, err := NewDataKey(dek); err == nil {
+			t.Errorf("NewDataKey accepted a %d byte data encryption key", size)
+		}
+	}
+
+	if _, err := NewDataKey(make([]byte, KeySize)); err != nil {
+		t.Errorf("NewDataKey rejected a %d byte key: %v", KeySize, err)
 	}
 }
 

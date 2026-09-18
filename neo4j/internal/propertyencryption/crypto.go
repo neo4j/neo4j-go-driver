@@ -20,9 +20,7 @@ package propertyencryption
 import (
 	"crypto/aes"
 	"crypto/cipher"
-	"crypto/hkdf"
 	"crypto/rand"
-	"crypto/sha256"
 	"errors"
 	"fmt"
 )
@@ -34,9 +32,6 @@ const (
 	IVSize = 12
 	// TagSize is the AES-GCM authentication tag size in bytes.
 	TagSize = 16
-	// keyDerivationInfo separates property encryption keys from other keys derived from the
-	// same data encryption key.
-	keyDerivationInfo = "neo4j/property-encryption/v1"
 )
 
 // ErrAuthentication reports a cipher output that failed authentication, which AES-GCM cannot
@@ -44,23 +39,20 @@ const (
 var ErrAuthentication = errors.New("the encrypted value could not be authenticated, " +
 	"the key or the additional authenticated data may be wrong, or the value may have been altered")
 
-// DataKey is an AES-GCM cipher derived from a data encryption key. Derivation happens once
-// per data encryption key, keeping HKDF and the AES key schedule off the path of every call.
+// DataKey is an AES-GCM cipher built from a data encryption key. It is built once per data
+// encryption key, keeping the AES key schedule off the path of every call.
 type DataKey struct {
 	aead cipher.AEAD
 }
 
-// DeriveDataKey expands a data encryption key into the key used for property encryption,
-// using HKDF-SHA256 with an empty salt.
-func DeriveDataKey(dek []byte) (*DataKey, error) {
-	if len(dek) == 0 {
-		return nil, errors.New("the key encapsulation service returned an empty data encryption key")
+// NewDataKey prepares the cipher for a data encryption key, which must be AES-256.
+func NewDataKey(dek []byte) (*DataKey, error) {
+	if len(dek) != KeySize {
+		return nil, fmt.Errorf(
+			"a data encryption key must be %d bytes, an AES-256 key, but is %d",
+			KeySize, len(dek))
 	}
-	derived, err := hkdf.Key(sha256.New, dek, nil, keyDerivationInfo, KeySize)
-	if err != nil {
-		return nil, fmt.Errorf("deriving the property encryption key: %w", err)
-	}
-	block, err := aes.NewCipher(derived)
+	block, err := aes.NewCipher(dek)
 	if err != nil {
 		return nil, fmt.Errorf("preparing the property encryption cipher: %w", err)
 	}
@@ -109,8 +101,8 @@ func NewDEK() ([]byte, error) {
 // WrapKey encapsulates a data encryption key under a local key encryption key, returning the
 // encapsulation and the initialisation vector needed to reverse it.
 //
-// The key encryption key is used directly rather than through HKDF, which the encapsulation
-// format requires for a key to remain usable across drivers.
+// The key encryption key encrypts the data encryption key as supplied, which the
+// encapsulation format requires for a key to remain usable across drivers.
 func WrapKey(kek, dek []byte) (encapsulation, iv []byte, err error) {
 	aead, err := localAEAD(kek)
 	if err != nil {

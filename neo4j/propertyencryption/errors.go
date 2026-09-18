@@ -80,7 +80,9 @@ func asError(message string, err error) error {
 	}
 	var valueErr *ipe.ValueError
 	var malformedErr *ipe.MalformedError
-	if errors.As(err, &valueErr) || errors.As(err, &malformedErr) {
+	var profileErr *ipe.UnsupportedProfileError
+	if errors.As(err, &valueErr) || errors.As(err, &malformedErr) ||
+		errors.As(err, &profileErr) {
 		return &Error{Message: message, Cause: err}
 	}
 	return wrap(message, err)

@@ -29,7 +29,10 @@ const (
 	// structure and the encoding scheme.
 	encryptedValueVersion = 0x01
 	encryptedTag          = 0x65
-	encryptedFields       = 6
+	encryptedFields       = 8
+
+	ProfileTypeEnvelope    = "ENVELOPE"
+	EnvelopeProfileVersion = 1
 )
 
 // Metadata keys written by the Envelope profile.
@@ -44,11 +47,27 @@ const (
 // Encrypted carries an encrypted value together with what is needed to decrypt and interpret
 // it. It is a driver-defined structure and is not sent over the wire.
 type Encrypted struct {
-	ProfileName  string
-	CipherOutput []byte
-	TypeName     string
-	Baseline     Version
-	Metadata     Metadata
+	ProfileType    string
+	ProfileVersion int64
+	ProfileName    string
+	CipherOutput   []byte
+	TypeName       string
+	Baseline       Version
+	Metadata       Metadata
+}
+
+// UnsupportedProfileError reports an encrypted value produced by a profile type or profile
+// version this driver does not implement.
+type UnsupportedProfileError struct {
+	ProfileType    string
+	ProfileVersion int64
+}
+
+func (e *UnsupportedProfileError) Error() string {
+	return fmt.Sprintf(
+		"the encrypted value was produced by profile type %q version %d, "+
+			"which this driver does not support",
+		e.ProfileType, e.ProfileVersion)
 }
 
 // Metadata is the profile-specific metadata dictionary of an Encrypted structure.
@@ -121,6 +140,8 @@ func EncodeEncrypted(e Encrypted) ([]byte, error) {
 	var packer packstream.Packer
 	packer.Begin(append(make([]byte, 0, 128), encryptedValueVersion))
 	packer.StructHeader(encryptedTag, encryptedFields)
+	packer.String(e.ProfileType)
+	packer.Int64(e.ProfileVersion)
 	packer.String(e.ProfileName)
 	packer.Bytes(e.CipherOutput)
 	packer.String(e.TypeName)
@@ -176,10 +197,24 @@ func DecodeEncrypted(value []byte) (Encrypted, error) {
 	}
 
 	encrypted := Encrypted{
-		ProfileName:  d.string(),
-		CipherOutput: d.bytes(),
-		TypeName:     d.string(),
+		ProfileType:    d.string(),
+		ProfileVersion: d.int(),
 	}
+	if d.err != nil {
+		return Encrypted{}, d.err
+	}
+	// Checked before the rest is read, which may not be interpretable under another profile.
+	if encrypted.ProfileType != ProfileTypeEnvelope ||
+		encrypted.ProfileVersion != EnvelopeProfileVersion {
+		return Encrypted{}, &UnsupportedProfileError{
+			ProfileType:    encrypted.ProfileType,
+			ProfileVersion: encrypted.ProfileVersion,
+		}
+	}
+
+	encrypted.ProfileName = d.string()
+	encrypted.CipherOutput = d.bytes()
+	encrypted.TypeName = d.string()
 	encrypted.Baseline = Version{Major: int(d.int()), Minor: int(d.int())}
 	encrypted.Metadata = d.metadata()
 
