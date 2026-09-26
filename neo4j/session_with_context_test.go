@@ -58,8 +58,8 @@ func TestSession(outer *testing.T) {
 		router := RouterFake{}
 		pool := PoolFake{}
 		cache, _ := homedb.NewCache(100)
-		sessConfig := SessionConfig{AccessMode: AccessModeRead, BoltLogger: boltLogger}
-		sess := newSessionWithContext(ctx, &conf, sessConfig, &router, &pool, cache, logger, reAuthToken)
+		sessConfig := SessionConfig{AccessMode: AccessModeRead, BoltLogger: boltLogger, Logger: logger}
+		sess := newSessionWithContext(ctx, &conf, sessConfig, &router, &pool, cache, reAuthToken)
 		sess.throttleTime = time.Millisecond * 1
 		return &router, &pool, sess
 	}
@@ -70,7 +70,8 @@ func TestSession(outer *testing.T) {
 		router := RouterFake{}
 		pool := PoolFake{}
 		cache, _ := homedb.NewCache(100)
-		sess := newSessionWithContext(ctx, &conf, sessConfig, &router, &pool, cache, logger, reAuthToken)
+		sessConfig.Logger = logger
+		sess := newSessionWithContext(ctx, &conf, sessConfig, &router, &pool, cache, reAuthToken)
 		sess.throttleTime = time.Millisecond * 1
 		return &router, &pool, sess
 	}
