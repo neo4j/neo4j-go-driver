@@ -549,10 +549,19 @@ func TestDecryptRejects(t *testing.T) {
 	})
 	t.Run("tampered", func(t *testing.T) {
 		t.Parallel()
-		tampered := append([]byte(nil), encrypted...)
-		tampered[len(tampered)-1] ^= 0xff
-		if _, err := encryption.Decrypt(ctx, tampered); err == nil {
-			t.Fatal("Decrypt accepted an altered value")
+		// Flip a ciphertext byte, not a metadata one.
+		structure, err := ipe.DecodeEncrypted(encrypted)
+		if err != nil {
+			t.Fatalf("DecodeEncrypted returned %v", err)
+		}
+		structure.CipherOutput[0] ^= 0xff
+		tampered, err := ipe.EncodeEncrypted(structure)
+		if err != nil {
+			t.Fatalf("EncodeEncrypted returned %v", err)
+		}
+		_, err = encryption.Decrypt(ctx, tampered)
+		if !errors.Is(err, ipe.ErrAuthentication) {
+			t.Fatalf("Decrypt returned %v, want ErrAuthentication", err)
 		}
 	})
 	t.Run("unknown profile", func(t *testing.T) {
