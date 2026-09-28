@@ -136,10 +136,8 @@ func TestEncryptsToKnownBytes(t *testing.T) {
 				t.Fatalf("EncodeValue(%#v) returned %v", fixture.value, err)
 			}
 
-			var metadata Metadata
-			metadata.SetString(MetadataKeyID, deterministicKeyID)
 			iv := mustHex(t, fixture.iv)
-			metadata.SetBytes(MetadataIV, iv)
+			metadata := Metadata{MetadataKeyID: deterministicKeyID, MetadataIV: iv}
 
 			var aad []byte
 			if fixture.aad != nil {
@@ -148,9 +146,9 @@ func TestEncryptsToKnownBytes(t *testing.T) {
 					t.Fatalf("EncodeAAD(%#v) returned %v", fixture.aad, err)
 				}
 				aad = encodedAAD.Bytes
-				metadata.SetBytes(MetadataAAD, aad)
-				metadata.SetInt(MetadataAADEncodingSchemeMajor, int64(encodedAAD.Baseline.Major))
-				metadata.SetInt(MetadataAADEncodingSchemeMinor, int64(encodedAAD.Baseline.Minor))
+				metadata[MetadataAAD] = aad
+				metadata[MetadataAADEncodingSchemeMajor] = int64(encodedAAD.Baseline.Major)
+				metadata[MetadataAADEncodingSchemeMinor] = int64(encodedAAD.Baseline.Minor)
 			}
 
 			cipherOutput, err := key.Seal(iv, encoded.Bytes, aad)

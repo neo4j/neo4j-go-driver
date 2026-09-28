@@ -82,7 +82,7 @@ func TestDecodeEncryptedFixtures(t *testing.T) {
 		if _, ok := encrypted.Metadata.Bytes(MetadataAAD); ok {
 			t.Error("aad is present, it must be omitted when the caller supplied none")
 		}
-		if got := encrypted.Metadata.len(); got != 2 {
+		if got := len(encrypted.Metadata); got != 2 {
 			t.Errorf("metadata has %d entries, want 2", got)
 		}
 	})
@@ -113,7 +113,7 @@ func TestDecodeEncryptedFixtures(t *testing.T) {
 		if !ok || minor != 0 {
 			t.Errorf("aad scheme minor is %d (present: %t), want 0", minor, ok)
 		}
-		if got := encrypted.Metadata.len(); got != 5 {
+		if got := len(encrypted.Metadata); got != 5 {
 			t.Errorf("metadata has %d entries, want 5", got)
 		}
 	})
@@ -146,56 +146,21 @@ func TestEncodeEncryptedMatchesFixtures(t *testing.T) {
 	}
 }
 
-// TestEncodeEncryptedSortsMetadata checks metadata key ordering. Keys are inserted out of
-// order because randomised map iteration would otherwise make an unsorted implementation
-// fail only intermittently.
-func TestEncodeEncryptedSortsMetadata(t *testing.T) {
+// TestEncodeEncryptedSortsMetadataByUtf8Bytes checks the ordering is over raw UTF-8 bytes,
+// not locale or code point order. The fixture tests pin the order of the real keys.
+func TestEncodeEncryptedSortsMetadataByUtf8Bytes(t *testing.T) {
 	t.Parallel()
 
-	var metadata Metadata
-	metadata.SetString(MetadataKeyID, "0")
-	metadata.SetBytes(MetadataIV, []byte{1})
-	metadata.SetInt(MetadataAADEncodingSchemeMinor, 0)
-	metadata.SetInt(MetadataAADEncodingSchemeMajor, 1)
-	metadata.SetBytes(MetadataAAD, []byte{2})
-
-	want := []string{
-		MetadataAAD,
-		MetadataAADEncodingSchemeMajor,
-		MetadataAADEncodingSchemeMinor,
-		MetadataIV,
-		MetadataKeyID,
+	encoded, err := EncodeEncrypted(Encrypted{
+		Metadata: Metadata{"é": "", "z": "", "Z": "", "aa": "", "a": ""},
+	})
+	if err != nil {
+		t.Fatalf("EncodeEncrypted returned %v", err)
 	}
-	for attempt := 0; attempt < 20; attempt++ {
-		got := metadata.sortedKeys()
-		if len(got) != len(want) {
-			t.Fatalf("got %d keys, want %d", len(got), len(want))
-		}
-		for i := range want {
-			if got[i] != want[i] {
-				t.Fatalf("key %d is %q, want %q", i, got[i], want[i])
-			}
-		}
-	}
-}
-
-// TestEncodeEncryptedSortsByUtf8Bytes checks the ordering is over raw UTF-8 bytes.
-func TestEncodeEncryptedSortsByUtf8Bytes(t *testing.T) {
-	t.Parallel()
-
-	var metadata Metadata
-	metadata.SetString("é", "")
-	metadata.SetString("z", "")
-	metadata.SetString("Z", "")
-	metadata.SetString("aa", "")
-	metadata.SetString("a", "")
-
-	want := []string{"Z", "a", "aa", "z", "é"}
-	got := metadata.sortedKeys()
-	for i := range want {
-		if got[i] != want[i] {
-			t.Fatalf("keys sorted to %q, want %q", got, want)
-		}
+	// Z, a, aa, z, é, each with an empty string value.
+	want := "a5" + "815a80" + "816180" + "82616180" + "817a80" + "82c3a980"
+	if got := hex.EncodeToString(encoded); !strings.HasSuffix(got, want) {
+		t.Fatalf("metadata encoded to ...%s, want ...%s", got[len(got)-len(want):], want)
 	}
 }
 
@@ -203,9 +168,7 @@ func TestEncodeEncryptedSortsByUtf8Bytes(t *testing.T) {
 func TestEncodeEncryptedRoundTrip(t *testing.T) {
 	t.Parallel()
 
-	var metadata Metadata
-	metadata.SetString(MetadataKeyID, "a-key")
-	metadata.SetBytes(MetadataIV, []byte{1, 2, 3})
+	metadata := Metadata{MetadataKeyID: "a-key", MetadataIV: []byte{1, 2, 3}}
 
 	want := Encrypted{
 		ProfileType:    ProfileTypeEnvelope,

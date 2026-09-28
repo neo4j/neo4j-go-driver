@@ -19,6 +19,7 @@ package propertyencryption
 
 import (
 	"fmt"
+	"maps"
 	"slices"
 
 	"github.com/neo4j/neo4j-go-driver/v6/neo4j/internal/packstream"
@@ -70,68 +71,23 @@ func (e *UnsupportedProfileError) Error() string {
 		e.ProfileType, e.ProfileVersion)
 }
 
-// Metadata is the profile-specific metadata dictionary of an Encrypted structure.
-type Metadata struct {
-	strings map[string]string
-	bytes   map[string][]byte
-	ints    map[string]int64
-}
+// Metadata is the profile-specific metadata dictionary of an Encrypted structure. Values are
+// string, []byte or int64.
+type Metadata map[string]any
 
-func (m *Metadata) SetString(key, value string) {
-	if m.strings == nil {
-		m.strings = map[string]string{}
-	}
-	m.strings[key] = value
-}
-
-func (m *Metadata) SetBytes(key string, value []byte) {
-	if m.bytes == nil {
-		m.bytes = map[string][]byte{}
-	}
-	m.bytes[key] = value
-}
-
-func (m *Metadata) SetInt(key string, value int64) {
-	if m.ints == nil {
-		m.ints = map[string]int64{}
-	}
-	m.ints[key] = value
-}
-
-func (m *Metadata) String(key string) (string, bool) {
-	v, ok := m.strings[key]
+func (m Metadata) String(key string) (string, bool) {
+	v, ok := m[key].(string)
 	return v, ok
 }
 
-func (m *Metadata) Bytes(key string) ([]byte, bool) {
-	v, ok := m.bytes[key]
+func (m Metadata) Bytes(key string) ([]byte, bool) {
+	v, ok := m[key].([]byte)
 	return v, ok
 }
 
-func (m *Metadata) Int(key string) (int64, bool) {
-	v, ok := m.ints[key]
+func (m Metadata) Int(key string) (int64, bool) {
+	v, ok := m[key].(int64)
 	return v, ok
-}
-
-func (m *Metadata) len() int {
-	return len(m.strings) + len(m.bytes) + len(m.ints)
-}
-
-// sortedKeys returns every key in ascending order of its UTF-8 bytes. The ordering is part
-// of the format.
-func (m *Metadata) sortedKeys() []string {
-	keys := make([]string, 0, m.len())
-	for key := range m.strings {
-		keys = append(keys, key)
-	}
-	for key := range m.bytes {
-		keys = append(keys, key)
-	}
-	for key := range m.ints {
-		keys = append(keys, key)
-	}
-	slices.Sort(keys)
-	return keys
 }
 
 // EncodeEncrypted encodes an Encrypted structure into the bytes handed to the user, a
@@ -148,25 +104,23 @@ func EncodeEncrypted(e Encrypted) ([]byte, error) {
 	packer.Int(e.Baseline.Major)
 	packer.Int(e.Baseline.Minor)
 
-	packer.MapHeader(e.Metadata.len())
-	for _, key := range e.Metadata.sortedKeys() {
+	// Keys are ordered by their UTF-8 bytes, which is part of the format.
+	packer.MapHeader(len(e.Metadata))
+	for _, key := range slices.Sorted(maps.Keys(e.Metadata)) {
 		packer.String(key)
-		switch {
-		case has(e.Metadata.strings, key):
-			packer.String(e.Metadata.strings[key])
-		case has(e.Metadata.bytes, key):
-			packer.Bytes(e.Metadata.bytes[key])
+		switch value := e.Metadata[key].(type) {
+		case string:
+			packer.String(value)
+		case []byte:
+			packer.Bytes(value)
+		case int64:
+			packer.Int64(value)
 		default:
-			packer.Int64(e.Metadata.ints[key])
+			return nil, fmt.Errorf("metadata entry %q has unsupported type %T", key, value)
 		}
 	}
 
 	return packer.End()
-}
-
-func has[T any](m map[string]T, key string) bool {
-	_, ok := m[key]
-	return ok
 }
 
 // DecodeEncrypted decodes the bytes produced by EncodeEncrypted.
@@ -228,17 +182,17 @@ func DecodeEncrypted(value []byte) (Encrypted, error) {
 }
 
 func (d *decoder) metadata() Metadata {
-	var metadata Metadata
 	d.unpacker.Next()
 	if d.unpacker.Curr != packstream.PackedMap {
 		d.malformed("the Encrypted metadata must be a dictionary")
-		return metadata
+		return nil
 	}
 	entries := d.unpacker.Len()
 	if d.unpacker.Err != nil {
-		return metadata
+		return nil
 	}
 
+	metadata := make(Metadata, entries)
 	for i := uint32(0); i < entries; i++ {
 		key := d.string()
 		if d.err != nil {
@@ -247,11 +201,11 @@ func (d *decoder) metadata() Metadata {
 		d.unpacker.Next()
 		switch d.unpacker.Curr {
 		case packstream.PackedStr:
-			metadata.SetString(key, d.unpacker.String())
+			metadata[key] = d.unpacker.String()
 		case packstream.PackedByteArray:
-			metadata.SetBytes(key, d.unpacker.ByteArray())
+			metadata[key] = d.unpacker.ByteArray()
 		case packstream.PackedInt:
-			metadata.SetInt(key, d.unpacker.Int())
+			metadata[key] = d.unpacker.Int()
 		default:
 			d.malformed("the Encrypted metadata entry %q is not a string, bytes or integer", key)
 			return metadata

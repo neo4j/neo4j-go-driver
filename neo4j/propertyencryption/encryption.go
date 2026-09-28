@@ -208,7 +208,7 @@ func (e *Encryption) encrypt(ctx context.Context, request EncryptRequest, aad an
 		return nil, asError("the value cannot be encrypted", err)
 	}
 
-	var metadata ipe.Metadata
+	metadata := ipe.Metadata{}
 	var aadBytes []byte
 	if aad != nil {
 		encodedAAD, aadErr := ipe.EncodeAAD(aad)
@@ -216,9 +216,9 @@ func (e *Encryption) encrypt(ctx context.Context, request EncryptRequest, aad an
 			return nil, asError("the additional authenticated data cannot be used", aadErr)
 		}
 		aadBytes = encodedAAD.Bytes
-		metadata.SetBytes(ipe.MetadataAAD, aadBytes)
-		metadata.SetInt(ipe.MetadataAADEncodingSchemeMajor, int64(encodedAAD.Baseline.Major))
-		metadata.SetInt(ipe.MetadataAADEncodingSchemeMinor, int64(encodedAAD.Baseline.Minor))
+		metadata[ipe.MetadataAAD] = aadBytes
+		metadata[ipe.MetadataAADEncodingSchemeMajor] = int64(encodedAAD.Baseline.Major)
+		metadata[ipe.MetadataAADEncodingSchemeMinor] = int64(encodedAAD.Baseline.Minor)
 	}
 
 	keyID, dataKey, err := state.resolve(ctx, request.Key)
@@ -235,8 +235,8 @@ func (e *Encryption) encrypt(ctx context.Context, request EncryptRequest, aad an
 		return nil, &Error{Message: "could not encrypt the value", Cause: err}
 	}
 
-	metadata.SetString(ipe.MetadataKeyID, keyID)
-	metadata.SetBytes(ipe.MetadataIV, iv)
+	metadata[ipe.MetadataKeyID] = keyID
+	metadata[ipe.MetadataIV] = iv
 
 	encrypted, err := ipe.EncodeEncrypted(ipe.Encrypted{
 		ProfileType:    ipe.ProfileTypeEnvelope,
