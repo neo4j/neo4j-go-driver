@@ -359,8 +359,19 @@ func TestDecryptWithAAD(t *testing.T) {
 	})
 
 	t.Run("nil aad", func(t *testing.T) {
-		if _, err := encryption.DecryptWithAAD(ctx, encrypted, nil); err == nil {
-			t.Fatal("DecryptWithAAD accepted a nil aad")
+		_, err := encryption.DecryptWithAAD(ctx, encrypted, nil)
+		assertEncryptionError(t, err, "no additional authenticated data was supplied")
+	})
+
+	t.Run("typed aad", func(t *testing.T) {
+		for _, aad := range []any{int64(42), []byte{1, 2}, dbtype.Point2D{SpatialRefId: 7203, X: 1, Y: 2}} {
+			bound, err := encryption.EncryptWithAAD(ctx, EncryptRequest{Value: "v", Key: KeyAlias("k1")}, aad)
+			if err != nil {
+				t.Fatalf("EncryptWithAAD(%T) returned %v", aad, err)
+			}
+			if decrypted, err := encryption.DecryptWithAAD(ctx, bound, aad); err != nil || decrypted != "v" {
+				t.Errorf("DecryptWithAAD(%T) returned %#v, %v", aad, decrypted, err)
+			}
 		}
 	})
 }
@@ -387,13 +398,7 @@ func TestDecryptWithAADOnAnUnboundValue(t *testing.T) {
 	}
 
 	_, err = encryption.DecryptWithAAD(ctx, encrypted, "row-42")
-	if err == nil {
-		t.Fatal("DecryptWithAAD accepted an aad for a value that has none")
-	}
-	var encryptionErr *Error
-	if !errors.As(err, &encryptionErr) {
-		t.Fatalf("DecryptWithAAD returned %T, want an *Error", err)
-	}
+	assertEncryptionError(t, err, "not encrypted with additional authenticated data")
 }
 
 // TestCachesAvoidRepeatedKeyResolution checks repeated calls reach neither the repository
@@ -479,22 +484,39 @@ func TestEncryptRejects(t *testing.T) {
 	tests := []struct {
 		name    string
 		request EncryptRequest
+		want    string
 	}{
-		{name: "no key", request: EncryptRequest{Value: "a"}},
-		{name: "unknown alias", request: EncryptRequest{Value: "a", Key: KeyAlias("nope")}},
-		{name: "unknown id", request: EncryptRequest{Value: "a", Key: KeyID("nope")}},
-		{name: "unknown profile", request: EncryptRequest{Value: "a", Key: KeyAlias("k1"), Profile: "nope"}},
-		{name: "map value", request: EncryptRequest{Value: map[string]any{}, Key: KeyAlias("k1")}},
+		{name: "no key", request: EncryptRequest{Value: "a"}, want: "no encryption key was named"},
+		{name: "unknown alias", request: EncryptRequest{Value: "a", Key: KeyAlias("nope")},
+			want: "no encryption key has alias nope"},
+		{name: "unknown id", request: EncryptRequest{Value: "a", Key: KeyID("nope")},
+			want: "no encryption key has id nope"},
+		{name: "unknown profile", request: EncryptRequest{Value: "a", Key: KeyAlias("k1"), Profile: "nope"},
+			want: "no property encryption profile is named nope"},
+		{name: "map value", request: EncryptRequest{Value: map[string]any{}, Key: KeyAlias("k1")},
+			want: "is not a Neo4j property type"},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
 
-			if _, err := encryption.Encrypt(ctx, test.request); err == nil {
-				t.Fatal("Encrypt succeeded, want an error")
-			}
+			_, err := encryption.Encrypt(ctx, test.request)
+			assertEncryptionError(t, err, test.want)
 		})
+	}
+}
+
+// assertEncryptionError checks err is an *Error whose message mentions want.
+func assertEncryptionError(t *testing.T, err error, want string) {
+	t.Helper()
+
+	var encryptionErr *Error
+	if !errors.As(err, &encryptionErr) {
+		t.Fatalf("got %T (%v), want an *Error", err, err)
+	}
+	if !strings.Contains(err.Error(), want) {
+		t.Errorf("error is %q, want it to mention %q", err, want)
 	}
 }
 
@@ -508,20 +530,21 @@ func TestEncryptWithAADRejects(t *testing.T) {
 	tests := []struct {
 		name string
 		aad  any
+		want string
 	}{
-		{name: "nil", aad: nil},
-		{name: "float", aad: 1.5},
-		{name: "list", aad: []any{1}},
+		{name: "nil", aad: nil, want: "no additional authenticated data was supplied"},
+		{name: "float", aad: 1.5, want: "FLOAT is not supported as additional authenticated data"},
+		{name: "list", aad: []any{1}, want: "LIST is not supported as additional authenticated data"},
+		{name: "map", aad: map[string]any{}, want: "is not a Neo4j property type"},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
 
-			if _, err := encryption.EncryptWithAAD(ctx, EncryptRequest{
-				Value: "a", Key: KeyAlias("k1")}, test.aad); err == nil {
-				t.Fatal("EncryptWithAAD succeeded, want an error")
-			}
+			_, err := encryption.EncryptWithAAD(ctx, EncryptRequest{
+				Value: "a", Key: KeyAlias("k1")}, test.aad)
+			assertEncryptionError(t, err, test.want)
 		})
 	}
 }
@@ -540,15 +563,13 @@ func TestDecryptRejects(t *testing.T) {
 
 	t.Run("empty", func(t *testing.T) {
 		t.Parallel()
-		if _, err := encryption.Decrypt(ctx, nil); err == nil {
-			t.Fatal("Decrypt accepted no bytes")
-		}
+		_, err := encryption.Decrypt(ctx, nil)
+		assertEncryptionError(t, err, "cannot be empty")
 	})
 	t.Run("not an encrypted value", func(t *testing.T) {
 		t.Parallel()
-		if _, err := encryption.Decrypt(ctx, []byte("just a string")); err == nil {
-			t.Fatal("Decrypt accepted arbitrary bytes")
-		}
+		_, err := encryption.Decrypt(ctx, []byte("just a string"))
+		assertEncryptionError(t, err, "unknown encrypted value encoding version")
 	})
 	t.Run("tampered", func(t *testing.T) {
 		t.Parallel()
@@ -570,17 +591,15 @@ func TestDecryptRejects(t *testing.T) {
 	t.Run("unknown profile", func(t *testing.T) {
 		t.Parallel()
 		other, _, _ := newTestEncryption(t, "different")
-		if _, err := other.Decrypt(ctx, encrypted); err == nil {
-			t.Fatal("Decrypt accepted a value from a profile it does not have")
-		}
+		_, err := other.Decrypt(ctx, encrypted)
+		assertEncryptionError(t, err, "no property encryption profile is named p")
 	})
 	t.Run("unknown key", func(t *testing.T) {
 		t.Parallel()
 		// A profile of the same name but a repository that has never seen the key.
 		other, _, _ := newTestEncryption(t, "p")
-		if _, err := other.Decrypt(ctx, encrypted); err == nil {
-			t.Fatal("Decrypt accepted a value whose key is unknown")
-		}
+		_, err := other.Decrypt(ctx, encrypted)
+		assertEncryptionError(t, err, "no encryption key has id 0")
 	})
 }
 
@@ -597,10 +616,12 @@ func TestDecryptWithADifferentKeyFails(t *testing.T) {
 		t.Fatalf("Encrypt returned %v", err)
 	}
 
+	// The same key id, so the failure is the key material and not the lookup.
 	second, _, _ := newTestEncryption(t, "p")
 	createKey(t, second, "", "k1")
-	if _, err := second.Decrypt(ctx, encrypted); err == nil {
-		t.Fatal("a value decrypted under an unrelated key")
+	_, err = second.Decrypt(ctx, encrypted)
+	if !errors.Is(err, ipe.ErrAuthentication) {
+		t.Fatalf("Decrypt returned %v, want ErrAuthentication", err)
 	}
 }
 

@@ -20,6 +20,7 @@ package propertyencryption
 import (
 	"encoding/hex"
 	"errors"
+	"fmt"
 	"testing"
 )
 
@@ -128,7 +129,7 @@ func TestEncryptsToKnownBytes(t *testing.T) {
 	key := fixtureKey(t)
 
 	for _, fixture := range deterministicFixtures {
-		t.Run(fixture.encrypted[:24], func(t *testing.T) {
+		t.Run(fmt.Sprintf("%v", fixture.value), func(t *testing.T) {
 			t.Parallel()
 
 			encoded, err := EncodeValue(fixture.value)
@@ -182,7 +183,7 @@ func TestDecryptsKnownBytes(t *testing.T) {
 	key := fixtureKey(t)
 
 	for _, fixture := range deterministicFixtures {
-		t.Run(fixture.encrypted[:24], func(t *testing.T) {
+		t.Run(fmt.Sprintf("%v", fixture.value), func(t *testing.T) {
 			t.Parallel()
 
 			encrypted, err := DecodeEncrypted(mustHex(t, fixture.encrypted))

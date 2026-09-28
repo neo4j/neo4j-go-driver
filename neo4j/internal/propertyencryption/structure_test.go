@@ -296,9 +296,10 @@ func TestDecodeEncryptedRejects(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
 
-			decoded, err := DecodeEncrypted(mustHex(t, test.value))
-			if err == nil {
-				t.Fatalf("DecodeEncrypted returned %+v, want an error", decoded)
+			_, err := DecodeEncrypted(mustHex(t, test.value))
+			var malformed *MalformedError
+			if !errors.As(err, &malformed) {
+				t.Fatalf("DecodeEncrypted returned %v, want a *MalformedError", err)
 			}
 		})
 	}
