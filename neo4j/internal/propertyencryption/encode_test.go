@@ -20,6 +20,7 @@ package propertyencryption
 import (
 	"encoding/hex"
 	"errors"
+	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -161,6 +162,54 @@ func TestEncodeValueUsesUtcDateTimeStructures(t *testing.T) {
 	}
 	if tag := offset.Bytes[1]; tag != 'I' {
 		t.Errorf("zoned date time with an offset used tag %q, want %q", tag, 'I')
+	}
+}
+
+type (
+	namedBool   bool
+	namedString string
+	namedInt    int32
+	namedUint   uint16
+	namedFloat  float32
+	namedBytes  []byte
+	namedList   []namedString
+)
+
+// TestEncodeValueNamedTypes checks a named type encodes as its underlying kind, the same as
+// when it is passed as a query parameter.
+func TestEncodeValueNamedTypes(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		value    any
+		wantHex  string
+		wantType string
+	}{
+		{value: namedBool(true), wantHex: "c3", wantType: TypeBoolean},
+		{value: namedString("a"), wantHex: "8161", wantType: TypeString},
+		{value: namedInt(-1), wantHex: "ff", wantType: TypeInteger},
+		{value: namedUint(200), wantHex: "c900c8", wantType: TypeInteger},
+		{value: namedFloat(0.5), wantHex: "c13fe0000000000000", wantType: TypeFloat},
+		{value: namedBytes{0, 1, 2}, wantHex: "cc03000102", wantType: TypeBytes},
+		{value: namedList{"a"}, wantHex: "918161", wantType: TypeList},
+		{value: []namedBytes{{1}, {2}}, wantHex: "92cc0101cc0102", wantType: TypeList},
+	}
+
+	for _, test := range tests {
+		t.Run(fmt.Sprintf("%T", test.value), func(t *testing.T) {
+			t.Parallel()
+
+			encoded, err := EncodeValue(test.value)
+			if err != nil {
+				t.Fatalf("EncodeValue(%#v) returned %v", test.value, err)
+			}
+			if got := hex.EncodeToString(encoded.Bytes); got != test.wantHex {
+				t.Errorf("encoded to %s, want %s", got, test.wantHex)
+			}
+			if encoded.TypeName != test.wantType {
+				t.Errorf("type name is %q, want %q", encoded.TypeName, test.wantType)
+			}
+		})
 	}
 }
 

@@ -187,16 +187,29 @@ func (e *encoder) value(x any, inList bool) elemKind {
 	return e.reflected(x, inList)
 }
 
-// reflected handles pointers and slices.
+// reflected handles pointers, slices and named types by kind.
 func (e *encoder) reflected(x any, inList bool) elemKind {
 	rv := reflect.ValueOf(x)
 	switch rv.Kind() {
+	case reflect.Bool:
+		return e.pack(TypeBoolean, func() { e.packer.Bool(rv.Bool()) })
+	case reflect.String:
+		return e.pack(TypeString, func() { e.packer.String(rv.String()) })
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+		return e.packInt(rv.Int())
+	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+		return e.packUint(rv.Uint())
+	case reflect.Float32, reflect.Float64:
+		return e.pack(TypeFloat, func() { e.packer.Float64(rv.Float()) })
 	case reflect.Pointer:
 		if rv.IsNil() {
 			return e.value(nil, inList)
 		}
 		return e.value(rv.Elem().Interface(), inList)
 	case reflect.Slice:
+		if rv.Type().Elem().Kind() == reflect.Uint8 {
+			return e.pack(TypeBytes, func() { e.packer.Bytes(rv.Bytes()) })
+		}
 		if inList {
 			e.setErr("a list stored as a property cannot contain another list")
 			return elemKind{}
