@@ -20,8 +20,8 @@ package propertyencryption
 import (
 	"context"
 	"encoding/base64"
-	"fmt"
 
+	"github.com/neo4j/neo4j-go-driver/v6/neo4j/internal/errorutil"
 	ipe "github.com/neo4j/neo4j-go-driver/v6/neo4j/internal/propertyencryption"
 )
 
@@ -38,20 +38,20 @@ const localMetadataIV = "iv"
 // LocalKeyEncapsulationService is part of the property encryption preview feature (see README
 // on what it means in terms of support and compatibility guarantees).
 type LocalKeyEncapsulationService struct {
-	kek []byte
+	kek *ipe.DataKey
 }
 
 // NewLocalKeyEncapsulationService returns a service that wraps data encryption keys with kek,
-// which must be 32 bytes. kek is copied, so the caller may reuse or clear it.
+// which must be 32 bytes. kek is not retained, so the caller may clear it.
 //
 // NewLocalKeyEncapsulationService is part of the property encryption preview feature (see
 // README on what it means in terms of support and compatibility guarantees).
 func NewLocalKeyEncapsulationService(kek []byte) (*LocalKeyEncapsulationService, error) {
-	if len(kek) != ipe.KeySize {
-		return nil, &Error{Message: fmt.Sprintf(
-			"a local key encryption key must be %d bytes but is %d", ipe.KeySize, len(kek))}
+	key, err := ipe.NewDataKey(kek)
+	if err != nil {
+		return nil, &errorutil.UsageError{Message: "invalid local key encryption key: " + err.Error()}
 	}
-	return &LocalKeyEncapsulationService{kek: append([]byte(nil), kek...)}, nil
+	return &LocalKeyEncapsulationService{kek: key}, nil
 }
 
 // Encapsulate generates a data encryption key and wraps it with the key encryption key.
@@ -62,7 +62,11 @@ func (s *LocalKeyEncapsulationService) Encapsulate(
 	if err != nil {
 		return KeyEncapsulationResult{}, &Error{Message: "could not create a data encryption key", Cause: err}
 	}
-	encapsulation, iv, err := ipe.WrapKey(s.kek, dek)
+	iv, err := ipe.NewIV()
+	if err != nil {
+		return KeyEncapsulationResult{}, &Error{Message: "could not wrap the data encryption key", Cause: err}
+	}
+	encapsulation, err := s.kek.Seal(iv, dek, nil)
 	if err != nil {
 		return KeyEncapsulationResult{}, &Error{Message: "could not wrap the data encryption key", Cause: err}
 	}
@@ -87,7 +91,7 @@ func (s *LocalKeyEncapsulationService) Decapsulate(
 		return nil, &Error{Message: "the encapsulated key has unreadable " + localMetadataIV +
 			" metadata", Cause: err}
 	}
-	dek, err := ipe.UnwrapKey(s.kek, encapsulation, iv)
+	dek, err := s.kek.Open(iv, encapsulation, nil)
 	if err != nil {
 		return nil, &Error{Message: "could not unwrap the data encryption key, " +
 			"the key encryption key may be wrong", Cause: err}

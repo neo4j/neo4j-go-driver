@@ -19,6 +19,8 @@ package propertyencryption
 
 import (
 	"context"
+	"encoding/base64"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"strconv"
@@ -1018,10 +1020,85 @@ func TestLocalKeyEncapsulationServiceRejectsShortKeys(t *testing.T) {
 	t.Parallel()
 
 	for _, size := range []int{0, 16, 24, 31, 33} {
-		if _, err := NewLocalKeyEncapsulationService(make([]byte, size)); err == nil {
-			t.Errorf("NewLocalKeyEncapsulationService accepted a %d byte key", size)
+		_, err := NewLocalKeyEncapsulationService(make([]byte, size))
+		var usageErr *errorutil.UsageError
+		if !errors.As(err, &usageErr) {
+			t.Errorf("NewLocalKeyEncapsulationService(%d byte key) returned %v, want a *UsageError", size, err)
 		}
 	}
+}
+
+// The key material TestKit's deterministic fixtures are built with.
+const (
+	fixtureKEK = "f0de94eb5a2d4da6f17ea74b14e9e556" +
+		"d367cb22b053e01798aa2677bfcf5761"
+	fixtureEncapsulation = "9e1f562dee78c6c2d47f4378d2949774" +
+		"c3a56339b824abaf276c4ca7fcf5a8cd" +
+		"63976ae348104d6757b9e419bf9ea325"
+	fixtureKeyIV = "P02Pc7vInYIQ7k93"
+	fixtureDEK   = "9a108cc9bfff252dba716c60dfb3dfcc1194b03b24c1373bcf266882f3d6156b"
+)
+
+// TestLocalKeyEncapsulationServiceMatchesFixture checks the key wrapping format, which the
+// other drivers' local services must be able to consume.
+func TestLocalKeyEncapsulationServiceMatchesFixture(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	service, err := NewLocalKeyEncapsulationService(mustHex(t, fixtureKEK))
+	if err != nil {
+		t.Fatalf("NewLocalKeyEncapsulationService returned %v", err)
+	}
+	encapsulation := mustHex(t, fixtureEncapsulation)
+	metadata := map[string]string{"iv": fixtureKeyIV}
+
+	dek, err := service.Decapsulate(ctx, encapsulation, metadata)
+	if err != nil {
+		t.Fatalf("Decapsulate returned %v", err)
+	}
+	if got := hex.EncodeToString(dek); got != fixtureDEK {
+		t.Fatalf("unwrapped to %s, want %s", got, fixtureDEK)
+	}
+
+	t.Run("wrong key encryption key", func(t *testing.T) {
+		t.Parallel()
+		wrong := mustHex(t, fixtureKEK)
+		wrong[0] ^= 0xff
+		other, err := NewLocalKeyEncapsulationService(wrong)
+		if err != nil {
+			t.Fatalf("NewLocalKeyEncapsulationService returned %v", err)
+		}
+		_, err = other.Decapsulate(ctx, encapsulation, metadata)
+		if !errors.Is(err, ipe.ErrAuthentication) {
+			t.Fatalf("Decapsulate returned %v, want ErrAuthentication", err)
+		}
+	})
+	t.Run("tampered encapsulation", func(t *testing.T) {
+		t.Parallel()
+		tampered := append([]byte(nil), encapsulation...)
+		tampered[0] ^= 0xff
+		_, err := service.Decapsulate(ctx, tampered, metadata)
+		if !errors.Is(err, ipe.ErrAuthentication) {
+			t.Fatalf("Decapsulate returned %v, want ErrAuthentication", err)
+		}
+	})
+	t.Run("wrong iv size", func(t *testing.T) {
+		t.Parallel()
+		short := map[string]string{"iv": base64.StdEncoding.EncodeToString(make([]byte, 8))}
+		if _, err := service.Decapsulate(ctx, encapsulation, short); err == nil {
+			t.Fatal("Decapsulate accepted an 8 byte iv")
+		}
+	})
+}
+
+func mustHex(t *testing.T, s string) []byte {
+	t.Helper()
+
+	decoded, err := hex.DecodeString(s)
+	if err != nil {
+		t.Fatalf("bad test hex %q: %v", s, err)
+	}
+	return decoded
 }
 
 func TestLocalKeyEncapsulationServiceCopiesTheKey(t *testing.T) {

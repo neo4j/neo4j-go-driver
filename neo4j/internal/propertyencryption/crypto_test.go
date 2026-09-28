@@ -18,21 +18,13 @@
 package propertyencryption
 
 import (
-	"bytes"
-	"encoding/base64"
 	"encoding/hex"
 	"errors"
 	"testing"
 )
 
-// The key material TestKit's deterministic fixtures are built with.
+// The data encryption key TestKit's deterministic fixtures are encrypted with.
 const (
-	deterministicKEK = "f0de94eb5a2d4da6f17ea74b14e9e556" +
-		"d367cb22b053e01798aa2677bfcf5761"
-	deterministicEncapsulation = "9e1f562dee78c6c2d47f4378d2949774" +
-		"c3a56339b824abaf276c4ca7fcf5a8cd" +
-		"63976ae348104d6757b9e419bf9ea325"
-	deterministicKeyIV  = "P02Pc7vInYIQ7k93"
 	deterministicKeyID  = "testkit-key"
 	deterministicName   = "deterministic"
 	deterministicDEKHex = "9a108cc9bfff252dba716c60dfb3dfcc1194b03b24c1373bcf266882f3d6156b"
@@ -128,96 +120,12 @@ var deterministicFixtures = []deterministicFixture{
 	},
 }
 
-// TestUnwrapKeyMatchesFixture checks the local key encapsulation format, which other drivers
-// must be able to produce and consume.
-func TestUnwrapKeyMatchesFixture(t *testing.T) {
-	t.Parallel()
-
-	dek := unwrapFixtureKey(t)
-	if got := hex.EncodeToString(dek); got != deterministicDEKHex {
-		t.Fatalf("unwrapped to %s, want %s", got, deterministicDEKHex)
-	}
-}
-
-// TestWrapKeyRoundTrip covers wrapping and unwrapping a freshly generated key.
-func TestWrapKeyRoundTrip(t *testing.T) {
-	t.Parallel()
-
-	kek := mustHex(t, deterministicKEK)
-	dek, err := NewDEK()
-	if err != nil {
-		t.Fatalf("NewDEK returned %v", err)
-	}
-
-	encapsulation, iv, err := WrapKey(kek, dek)
-	if err != nil {
-		t.Fatalf("WrapKey returned %v", err)
-	}
-	if len(iv) != IVSize {
-		t.Errorf("iv is %d bytes, want %d", len(iv), IVSize)
-	}
-	if len(encapsulation) != KeySize+TagSize {
-		t.Errorf("encapsulation is %d bytes, want %d", len(encapsulation), KeySize+TagSize)
-	}
-
-	unwrapped, err := UnwrapKey(kek, encapsulation, iv)
-	if err != nil {
-		t.Fatalf("UnwrapKey returned %v", err)
-	}
-	if !bytes.Equal(unwrapped, dek) {
-		t.Errorf("unwrapped to %x, want %x", unwrapped, dek)
-	}
-}
-
-// TestWrapKeyRejects covers a wrong key, a wrong size and a tampered encapsulation.
-func TestWrapKeyRejects(t *testing.T) {
-	t.Parallel()
-
-	kek := mustHex(t, deterministicKEK)
-	encapsulation := mustHex(t, deterministicEncapsulation)
-	iv := mustBase64(t, deterministicKeyIV)
-
-	t.Run("short key encryption key", func(t *testing.T) {
-		t.Parallel()
-		if _, _, err := WrapKey(kek[:16], make([]byte, KeySize)); err == nil {
-			t.Fatal("WrapKey accepted a 128 bit key encryption key")
-		}
-	})
-	t.Run("wrong key encryption key", func(t *testing.T) {
-		t.Parallel()
-		wrong := append([]byte(nil), kek...)
-		wrong[0] ^= 0xff
-		_, err := UnwrapKey(wrong, encapsulation, iv)
-		if !errors.Is(err, ErrAuthentication) {
-			t.Fatalf("UnwrapKey returned %v, want ErrAuthentication", err)
-		}
-	})
-	t.Run("tampered encapsulation", func(t *testing.T) {
-		t.Parallel()
-		tampered := append([]byte(nil), encapsulation...)
-		tampered[0] ^= 0xff
-		_, err := UnwrapKey(kek, tampered, iv)
-		if !errors.Is(err, ErrAuthentication) {
-			t.Fatalf("UnwrapKey returned %v, want ErrAuthentication", err)
-		}
-	})
-	t.Run("wrong iv size", func(t *testing.T) {
-		t.Parallel()
-		if _, err := UnwrapKey(kek, encapsulation, iv[:8]); err == nil {
-			t.Fatal("UnwrapKey accepted an 8 byte iv")
-		}
-	})
-}
-
 // TestEncryptsToKnownBytes checks the exact bytes produced with the key and initialisation
 // vector both pinned, covering value encoding, the cipher, metadata and structure encoding.
 func TestEncryptsToKnownBytes(t *testing.T) {
 	t.Parallel()
 
-	key, err := NewDataKey(unwrapFixtureKey(t))
-	if err != nil {
-		t.Fatalf("NewDataKey returned %v", err)
-	}
+	key := fixtureKey(t)
 
 	for _, fixture := range deterministicFixtures {
 		t.Run(fixture.encrypted[:24], func(t *testing.T) {
@@ -273,10 +181,7 @@ func TestEncryptsToKnownBytes(t *testing.T) {
 func TestDecryptsKnownBytes(t *testing.T) {
 	t.Parallel()
 
-	key, err := NewDataKey(unwrapFixtureKey(t))
-	if err != nil {
-		t.Fatalf("NewDataKey returned %v", err)
-	}
+	key := fixtureKey(t)
 
 	for _, fixture := range deterministicFixtures {
 		t.Run(fixture.encrypted[:24], func(t *testing.T) {
@@ -308,10 +213,7 @@ func TestDecryptsKnownBytes(t *testing.T) {
 func TestOpenRejects(t *testing.T) {
 	t.Parallel()
 
-	key, err := NewDataKey(unwrapFixtureKey(t))
-	if err != nil {
-		t.Fatalf("NewDataKey returned %v", err)
-	}
+	key := fixtureKey(t)
 	iv := mustHex(t, "000102030405060708090a0b")
 	cipherOutput, err := key.Seal(iv, []byte{0xc3}, []byte("context"))
 	if err != nil {
@@ -380,10 +282,7 @@ func TestOpenRejects(t *testing.T) {
 func TestSealRejectsWrongIVSize(t *testing.T) {
 	t.Parallel()
 
-	key, err := NewDataKey(unwrapFixtureKey(t))
-	if err != nil {
-		t.Fatalf("NewDataKey returned %v", err)
-	}
+	key := fixtureKey(t)
 	for _, size := range []int{0, 11, 13, 16} {
 		if _, err := key.Seal(make([]byte, size), []byte{1}, nil); err == nil {
 			t.Errorf("Seal accepted a %d byte iv", size)
@@ -432,26 +331,12 @@ func TestNewIVIsRandom(t *testing.T) {
 	}
 }
 
-func unwrapFixtureKey(t *testing.T) []byte {
+func fixtureKey(t *testing.T) *DataKey {
 	t.Helper()
 
-	dek, err := UnwrapKey(
-		mustHex(t, deterministicKEK),
-		mustHex(t, deterministicEncapsulation),
-		mustBase64(t, deterministicKeyIV),
-	)
+	key, err := NewDataKey(mustHex(t, deterministicDEKHex))
 	if err != nil {
-		t.Fatalf("UnwrapKey returned %v", err)
+		t.Fatalf("NewDataKey returned %v", err)
 	}
-	return dek
-}
-
-func mustBase64(t *testing.T, s string) []byte {
-	t.Helper()
-
-	decoded, err := base64.StdEncoding.DecodeString(s)
-	if err != nil {
-		t.Fatalf("bad test base64 %q: %v", s, err)
-	}
-	return decoded
+	return key
 }

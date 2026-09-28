@@ -39,20 +39,18 @@ const (
 var ErrAuthentication = errors.New("the encrypted value could not be authenticated, " +
 	"the key or the additional authenticated data may be wrong, or the value may have been altered")
 
-// DataKey is an AES-GCM cipher built from a data encryption key. It is built once per data
-// encryption key, keeping the AES key schedule off the path of every call.
+// DataKey is an AES-GCM cipher built from an AES-256 key. It is built once per key, keeping
+// the AES key schedule off the path of every call.
 type DataKey struct {
 	aead cipher.AEAD
 }
 
-// NewDataKey prepares the cipher for a data encryption key, which must be AES-256.
-func NewDataKey(dek []byte) (*DataKey, error) {
-	if len(dek) != KeySize {
-		return nil, fmt.Errorf(
-			"a data encryption key must be %d bytes, an AES-256 key, but is %d",
-			KeySize, len(dek))
+// NewDataKey prepares the cipher for key, which must be AES-256.
+func NewDataKey(key []byte) (*DataKey, error) {
+	if len(key) != KeySize {
+		return nil, fmt.Errorf("an AES-256 key must be %d bytes but is %d", KeySize, len(key))
 	}
-	block, err := aes.NewCipher(dek)
+	block, err := aes.NewCipher(key)
 	if err != nil {
 		return nil, fmt.Errorf("preparing the property encryption cipher: %w", err)
 	}
@@ -96,55 +94,6 @@ func NewDEK() ([]byte, error) {
 		return nil, fmt.Errorf("generating a data encryption key: %w", err)
 	}
 	return dek, nil
-}
-
-// WrapKey encapsulates a data encryption key under a local key encryption key, returning the
-// encapsulation and the initialisation vector needed to reverse it.
-//
-// The key encryption key encrypts the data encryption key as supplied, which the
-// encapsulation format requires for a key to remain usable across drivers.
-func WrapKey(kek, dek []byte) (encapsulation, iv []byte, err error) {
-	aead, err := localAEAD(kek)
-	if err != nil {
-		return nil, nil, err
-	}
-	iv, err = NewIV()
-	if err != nil {
-		return nil, nil, err
-	}
-	return aead.Seal(nil, iv, dek, nil), iv, nil
-}
-
-// UnwrapKey reverses WrapKey.
-func UnwrapKey(kek, encapsulation, iv []byte) ([]byte, error) {
-	aead, err := localAEAD(kek)
-	if err != nil {
-		return nil, err
-	}
-	if len(iv) != IVSize {
-		return nil, fmt.Errorf("the key encapsulation initialisation vector must be %d bytes but is %d",
-			IVSize, len(iv))
-	}
-	dek, err := aead.Open(nil, iv, encapsulation, nil)
-	if err != nil {
-		return nil, ErrAuthentication
-	}
-	return dek, nil
-}
-
-func localAEAD(kek []byte) (cipher.AEAD, error) {
-	if len(kek) != KeySize {
-		return nil, fmt.Errorf("the key encryption key must be %d bytes but is %d", KeySize, len(kek))
-	}
-	block, err := aes.NewCipher(kek)
-	if err != nil {
-		return nil, fmt.Errorf("preparing the key encapsulation cipher: %w", err)
-	}
-	aead, err := cipher.NewGCM(block)
-	if err != nil {
-		return nil, fmt.Errorf("preparing the key encapsulation cipher: %w", err)
-	}
-	return aead, nil
 }
 
 // NewIV draws a fresh initialisation vector. AES-GCM security depends on never reusing one
