@@ -63,14 +63,18 @@ func wrap(message string, err error) error {
 }
 
 func isDriverError(err error) bool {
+	var encryptionErr *Error
 	var neo4jErr *db.Neo4jError
 	var usageErr *errorutil.UsageError
 	var connectivityErr *errorutil.ConnectivityError
 	var tokenErr *errorutil.TokenExpiredError
-	return errors.As(err, &neo4jErr) ||
+	var limitErr *errorutil.TransactionExecutionLimit
+	return errors.As(err, &encryptionErr) ||
+		errors.As(err, &neo4jErr) ||
 		errors.As(err, &usageErr) ||
 		errors.As(err, &connectivityErr) ||
-		errors.As(err, &tokenErr)
+		errors.As(err, &tokenErr) ||
+		errors.As(err, &limitErr)
 }
 
 // asError converts a codec failure into an Error, keeping message as the description.

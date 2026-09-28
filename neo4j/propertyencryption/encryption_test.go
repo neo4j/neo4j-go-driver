@@ -801,24 +801,37 @@ func TestNonDriverErrorsFromCallbacksAreWrapped(t *testing.T) {
 	}
 }
 
-// TestUsageErrorsArePropagated covers the other driver error a callback might raise.
-func TestUsageErrorsArePropagated(t *testing.T) {
+// TestOtherDriverErrorsArePropagated covers the remaining driver errors a callback might
+// raise, each returned as is rather than wrapped.
+func TestOtherDriverErrorsArePropagated(t *testing.T) {
 	t.Parallel()
 
 	ctx := context.Background()
-	service := newTestService(t)
-	repository := newMemoryRepository()
-	encryption, err := New([]Profile{EnvelopeProfile{
-		Name: "p", EncapsulationService: service, KeyRepository: repository}})
-	if err != nil {
-		t.Fatalf("New returned %v", err)
+	driverErrs := []error{
+		&errorutil.UsageError{Message: "bad usage"},
+		&errorutil.ConnectivityError{Inner: errors.New("gone")},
+		&errorutil.TransactionExecutionLimit{Errors: []error{errors.New("gone")}},
+		&Error{Message: "the key store said no"},
 	}
-	usageErr := &errorutil.UsageError{Message: "bad usage"}
-	repository.err = usageErr
 
-	_, err = encryption.Encrypt(ctx, EncryptRequest{Value: "a", Key: KeyAlias("k1")})
-	if !errors.Is(err, usageErr) {
-		t.Fatalf("Encrypt returned %v, want the usage error", err)
+	for _, driverErr := range driverErrs {
+		t.Run(fmt.Sprintf("%T", driverErr), func(t *testing.T) {
+			t.Parallel()
+
+			service := newTestService(t)
+			repository := newMemoryRepository()
+			encryption, err := New([]Profile{EnvelopeProfile{
+				Name: "p", EncapsulationService: service, KeyRepository: repository}})
+			if err != nil {
+				t.Fatalf("New returned %v", err)
+			}
+			repository.err = driverErr
+
+			_, err = encryption.Encrypt(ctx, EncryptRequest{Value: "a", Key: KeyAlias("k1")})
+			if err != driverErr {
+				t.Fatalf("Encrypt returned %v, want the callback's own error unwrapped", err)
+			}
+		})
 	}
 }
 
