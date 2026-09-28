@@ -109,7 +109,8 @@ type EncapsulatedKeyRecordRepository interface {
 	// FindByAlias returns the key currently bound to alias, or ErrKeyNotFound.
 	FindByAlias(ctx context.Context, alias string) (EncapsulatedKeyRecord, error)
 	// Create stores a new key under alias and returns it with the id it was assigned. The id
-	// must be unique and must never be reused. alias may be empty, leaving the key unbound.
+	// must be unique and must never be reused. alias may be empty, leaving the key unbound,
+	// and is moved from another key if it is already in use.
 	Create(ctx context.Context, alias string, encapsulation []byte, metadata map[string]string) (EncapsulatedKeyRecord, error)
 	// SetAlias binds alias to the key stored under id, moving it from another key if it is
 	// already in use. An empty alias unbinds whatever the key currently has.
