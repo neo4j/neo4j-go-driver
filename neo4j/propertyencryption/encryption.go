@@ -100,10 +100,7 @@ type EncryptRequest struct {
 // in terms of support and compatibility guarantees).
 type Encryption struct {
 	profiles map[string]*profileState
-	// sole is the only profile's name when exactly one is configured, so that callers may
-	// leave the profile out.
-	sole string
-	// names lists the configured profiles for error messages.
+	// names lists the configured profiles, sorted, for error messages.
 	names []string
 	newIV func() ([]byte, error)
 }
@@ -158,9 +155,6 @@ func New(profiles []Profile) (*Encryption, error) {
 		encryption.names = append(encryption.names, envelope.Name)
 	}
 	sort.Strings(encryption.names)
-	if len(encryption.names) == 1 {
-		encryption.sole = encryption.names[0]
-	}
 	return encryption, nil
 }
 
@@ -366,23 +360,19 @@ func (e *Encryption) Keys(profileName string) (*KeyManager, error) {
 
 // profileFor resolves a profile by name, or the only one when the name is empty.
 func (e *Encryption) profileFor(name string) (*profileState, error) {
+	if len(e.names) == 0 {
+		return nil, &Error{Message: "no property encryption profiles are configured, " +
+			"set config.Config.PropertyEncryptionProfiles"}
+	}
 	if name == "" {
-		switch {
-		case len(e.profiles) == 0:
-			return nil, &Error{Message: "no property encryption profiles are configured, " +
-				"set config.Config.PropertyEncryptionProfiles"}
-		case e.sole == "":
+		if len(e.names) > 1 {
 			return nil, &Error{Message: "more than one property encryption profile is " +
 				"configured (" + strings.Join(e.names, ", ") + "), so one must be named"}
 		}
-		name = e.sole
+		name = e.names[0]
 	}
 	state, ok := e.profiles[name]
 	if !ok {
-		if len(e.names) == 0 {
-			return nil, &Error{Message: "no property encryption profile is named " + name +
-				", none are configured"}
-		}
 		return nil, &Error{Message: "no property encryption profile is named " + name +
 			", the configured profiles are " + strings.Join(e.names, ", ")}
 	}
@@ -484,9 +474,6 @@ func (m *KeyManager) Create(
 	ctx context.Context, alias string, options map[string]string) (EncapsulatedKey, error) {
 
 	profile := m.state.profile
-	if options == nil {
-		options = map[string]string{}
-	}
 	result, err := profile.EncapsulationService.Encapsulate(ctx, options)
 	if err != nil {
 		return EncapsulatedKey{}, wrap("could not create an encryption key", err)
