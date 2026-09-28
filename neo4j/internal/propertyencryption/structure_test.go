@@ -241,39 +241,41 @@ func TestEncodeEncryptedRoundTrip(t *testing.T) {
 	}
 }
 
-// TestDecodeEncryptedIgnoresUnknownMetadata covers metadata a later profile version may add.
-func TestDecodeEncryptedIgnoresUnknownMetadata(t *testing.T) {
+// TestDecodeEncryptedMetadataEntries covers entries beyond the ones this profile version
+// writes: an unknown key is kept, a value of another type is malformed.
+func TestDecodeEncryptedMetadataEntries(t *testing.T) {
 	t.Parallel()
 
 	const prefix = fieldVersion + fieldHeader + fieldProfileType + fieldProfileVersion +
-		fieldProfile + fieldCipher + fieldTypeName + fieldMajor + fieldMinor
+		fieldProfile + fieldCipher + fieldTypeName + fieldMajor + fieldMinor + "a2" +
+		"826976" + "cc0101" // iv: 01
 
-	// Each case adds one metadata entry this driver has no use for, alongside the iv it
-	// does read. The shapes cover every branch the skip has to walk over.
-	unknown := map[string]string{
-		"boolean":            "82" + "7a7a" + "c3",
-		"null":               "82" + "7a7a" + "c0",
-		"float":              "82" + "7a7a" + "c1400a000000000000",
-		"uuid":               "82" + "7a7a" + "e0000102030405060708090a0b0c0d0e0f",
-		"list":               "82" + "7a7a" + "9201c3",
-		"nested list":        "82" + "7a7a" + "91" + "920102",
-		"dictionary":         "82" + "7a7a" + "a1" + "8161" + "01",
-		"nested dictionary":  "82" + "7a7a" + "a1" + "8161" + "a1" + "8162" + "c3",
-		"structure":          "82" + "7a7a" + "b144" + "01",
-		"structure of lists": "82" + "7a7a" + "b17a" + "920102",
-	}
+	t.Run("unknown key", func(t *testing.T) {
+		t.Parallel()
 
-	for name, entry := range unknown {
+		decoded, err := DecodeEncrypted(mustHex(t, prefix+"827a7a"+"8161")) // zz: "a"
+		if err != nil {
+			t.Fatalf("DecodeEncrypted returned %v", err)
+		}
+		if got, _ := decoded.Metadata.String("zz"); got != "a" {
+			t.Errorf("zz is %q, want a", got)
+		}
+	})
+
+	for name, entry := range map[string]string{
+		"boolean":   "c3",
+		"null":      "c0",
+		"float":     "c1400a000000000000",
+		"list":      "9201c3",
+		"structure": "b144" + "01",
+	} {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 
-			value := prefix + "a2" + "826976" + "cc0101" + entry
-			decoded, err := DecodeEncrypted(mustHex(t, value))
-			if err != nil {
-				t.Fatalf("DecodeEncrypted returned %v", err)
-			}
-			if iv, ok := decoded.Metadata.Bytes(MetadataIV); !ok || len(iv) != 1 {
-				t.Errorf("iv is %x (present: %t)", iv, ok)
+			_, err := DecodeEncrypted(mustHex(t, prefix+"827a7a"+entry))
+			var malformed *MalformedError
+			if !errors.As(err, &malformed) {
+				t.Fatalf("DecodeEncrypted returned %v, want a *MalformedError", err)
 			}
 		})
 	}

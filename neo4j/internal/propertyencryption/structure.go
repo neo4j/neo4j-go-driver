@@ -253,57 +253,9 @@ func (d *decoder) metadata() Metadata {
 		case packstream.PackedInt:
 			metadata.SetInt(key, d.unpacker.Int())
 		default:
-			// A later profile version may add metadata this driver has no use for.
-			d.skip()
-			if d.err != nil {
-				return metadata
-			}
+			d.malformed("the Encrypted metadata entry %q is not a string, bytes or integer", key)
+			return metadata
 		}
 	}
 	return metadata
-}
-
-// skip advances past the value the unpacker is currently positioned on.
-func (d *decoder) skip() {
-	switch d.unpacker.Curr {
-	case packstream.PackedInt, packstream.PackedFloat, packstream.PackedTrue,
-		packstream.PackedFalse, packstream.PackedNil:
-		d.discardScalar()
-	case packstream.PackedStr:
-		_ = d.unpacker.String()
-	case packstream.PackedByteArray:
-		_ = d.unpacker.ByteArray()
-	case packstream.PackedUUID:
-		_ = d.unpacker.UUID()
-	case packstream.PackedArray:
-		length := d.unpacker.Len()
-		for i := uint32(0); i < length && d.unpacker.Err == nil; i++ {
-			d.unpacker.Next()
-			d.skip()
-		}
-	case packstream.PackedMap:
-		entries := d.unpacker.Len()
-		for i := uint32(0); i < entries*2 && d.unpacker.Err == nil; i++ {
-			d.unpacker.Next()
-			d.skip()
-		}
-	case packstream.PackedStruct:
-		d.unpacker.StructTag()
-		fields := d.unpacker.Len()
-		for i := uint32(0); i < fields && d.unpacker.Err == nil; i++ {
-			d.unpacker.Next()
-			d.skip()
-		}
-	default:
-		d.malformed("cannot skip an unrecognised PackStream marker")
-	}
-}
-
-func (d *decoder) discardScalar() {
-	switch d.unpacker.Curr {
-	case packstream.PackedInt:
-		_ = d.unpacker.Int()
-	case packstream.PackedFloat:
-		_ = d.unpacker.Float()
-	}
 }
