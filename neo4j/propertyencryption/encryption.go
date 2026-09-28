@@ -129,16 +129,21 @@ func New(profiles []Profile) (*Encryption, error) {
 		newIV:    ipe.NewIV,
 	}
 	for _, profile := range profiles {
-		if profile == nil {
-			return nil, &errorutil.UsageError{Message: "a property encryption profile is nil"}
-		}
-		if err := profile.validate(); err != nil {
-			return nil, err
-		}
-		envelope, ok := profile.(EnvelopeProfile)
-		if !ok {
+		var envelope EnvelopeProfile
+		switch p := profile.(type) {
+		case EnvelopeProfile:
+			envelope = p
+		case *EnvelopeProfile:
+			if p == nil {
+				return nil, &errorutil.UsageError{Message: "a property encryption profile is nil"}
+			}
+			envelope = *p
+		default:
 			return nil, &errorutil.UsageError{Message: fmt.Sprintf(
-				"unsupported property encryption profile type %T", profile)}
+				"unsupported property encryption profile %T", profile)}
+		}
+		if err := envelope.validate(); err != nil {
+			return nil, err
 		}
 		if _, duplicate := encryption.profiles[envelope.Name]; duplicate {
 			return nil, &errorutil.UsageError{Message: "more than one property encryption " +

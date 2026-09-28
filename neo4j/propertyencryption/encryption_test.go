@@ -640,6 +640,20 @@ func TestProfileSelection(t *testing.T) {
 		}
 	})
 
+	t.Run("a profile may be given by pointer", func(t *testing.T) {
+		t.Parallel()
+		encryption, err := New([]Profile{&EnvelopeProfile{
+			Name: "p", EncapsulationService: newTestService(t), KeyRepository: newMemoryRepository(),
+		}})
+		if err != nil {
+			t.Fatalf("New returned %v", err)
+		}
+		createKey(t, encryption, "", "k1")
+		if _, err := encryption.Encrypt(ctx, EncryptRequest{Value: "a", Key: KeyAlias("k1")}); err != nil {
+			t.Fatalf("Encrypt returned %v", err)
+		}
+	})
+
 	t.Run("no profiles configured", func(t *testing.T) {
 		t.Parallel()
 		encryption, err := New(nil)
@@ -669,7 +683,8 @@ func TestNewRejectsBadProfiles(t *testing.T) {
 		profiles []Profile
 		want     string
 	}{
-		{name: "nil profile", profiles: []Profile{nil}, want: "is nil"},
+		{name: "nil profile", profiles: []Profile{nil}, want: "unsupported"},
+		{name: "nil pointer", profiles: []Profile{(*EnvelopeProfile)(nil)}, want: "is nil"},
 		{name: "no name", profiles: []Profile{EnvelopeProfile{
 			EncapsulationService: service, KeyRepository: repository}}, want: "must have a name"},
 		{name: "no encapsulation service", profiles: []Profile{EnvelopeProfile{
