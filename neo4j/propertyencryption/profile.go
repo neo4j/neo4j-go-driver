@@ -25,6 +25,9 @@ import (
 )
 
 // Default cache settings for an EnvelopeProfile.
+//
+// These are part of the property encryption preview feature (see README on what it means in
+// terms of support and compatibility guarantees).
 const (
 	DefaultKeyAliasIndexTTL  = ipe.DefaultKeyAliasIndexTTL
 	DefaultKeyAliasIndexSize = ipe.DefaultKeyAliasIndexSize

@@ -111,8 +111,8 @@ type Driver interface {
 	//		Key:   propertyencryption.KeyAlias("customer-pii"),
 	//	})
 	//
-	// Property encryption is a preview feature (see README on what it means in terms of
-	// support and compatibility guarantees).
+	// PropertyEncryption is part of the property encryption preview feature (see README on
+	// what it means in terms of support and compatibility guarantees).
 	PropertyEncryption() *propertyencryption.Encryption
 }
 
