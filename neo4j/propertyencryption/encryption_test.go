@@ -22,6 +22,7 @@ import (
 	"errors"
 	"fmt"
 	"strconv"
+	"strings"
 	"sync"
 	"testing"
 
@@ -654,6 +655,8 @@ func TestProfileSelection(t *testing.T) {
 	})
 }
 
+// TestNewRejectsBadProfiles checks a misconfigured profile is a UsageError that names the
+// problem.
 func TestNewRejectsBadProfiles(t *testing.T) {
 	t.Parallel()
 
@@ -664,27 +667,41 @@ func TestNewRejectsBadProfiles(t *testing.T) {
 	tests := []struct {
 		name     string
 		profiles []Profile
+		want     string
 	}{
-		{name: "nil profile", profiles: []Profile{nil}},
+		{name: "nil profile", profiles: []Profile{nil}, want: "is nil"},
 		{name: "no name", profiles: []Profile{EnvelopeProfile{
-			EncapsulationService: service, KeyRepository: repository}}},
+			EncapsulationService: service, KeyRepository: repository}}, want: "must have a name"},
 		{name: "no encapsulation service", profiles: []Profile{EnvelopeProfile{
-			Name: "p", KeyRepository: repository}}},
+			Name: "p", KeyRepository: repository}}, want: "no EncapsulationService"},
 		{name: "no key repository", profiles: []Profile{EnvelopeProfile{
-			Name: "p", EncapsulationService: service}}},
-		{name: "duplicate names", profiles: []Profile{valid, valid}},
-		{name: "negative cache ttl", profiles: []Profile{EnvelopeProfile{
-			Name: "p", EncapsulationService: service, KeyRepository: repository, KeyCacheTTL: -1}}},
-		{name: "negative cache size", profiles: []Profile{EnvelopeProfile{
-			Name: "p", EncapsulationService: service, KeyRepository: repository, KeyCacheSize: -1}}},
+			Name: "p", EncapsulationService: service}}, want: "no KeyRepository"},
+		{name: "duplicate names", profiles: []Profile{valid, valid}, want: "more than one"},
+		{name: "negative key cache ttl", profiles: []Profile{EnvelopeProfile{
+			Name: "p", EncapsulationService: service, KeyRepository: repository, KeyCacheTTL: -1}},
+			want: "negative cache time to live"},
+		{name: "negative alias index ttl", profiles: []Profile{EnvelopeProfile{
+			Name: "p", EncapsulationService: service, KeyRepository: repository, KeyAliasIndexTTL: -1}},
+			want: "negative cache time to live"},
+		{name: "negative key cache size", profiles: []Profile{EnvelopeProfile{
+			Name: "p", EncapsulationService: service, KeyRepository: repository, KeyCacheSize: -1}},
+			want: "negative cache size"},
+		{name: "negative alias index size", profiles: []Profile{EnvelopeProfile{
+			Name: "p", EncapsulationService: service, KeyRepository: repository, KeyAliasIndexSize: -1}},
+			want: "negative cache size"},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
 
-			if _, err := New(test.profiles); err == nil {
-				t.Fatal("New accepted the profile, want an error")
+			_, err := New(test.profiles)
+			var usageErr *errorutil.UsageError
+			if !errors.As(err, &usageErr) {
+				t.Fatalf("New returned %T (%v), want a *UsageError", err, err)
+			}
+			if !strings.Contains(err.Error(), test.want) {
+				t.Errorf("error is %q, want it to mention %q", err, test.want)
 			}
 		})
 	}

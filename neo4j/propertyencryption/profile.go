@@ -20,6 +20,7 @@ package propertyencryption
 import (
 	"time"
 
+	"github.com/neo4j/neo4j-go-driver/v6/neo4j/internal/errorutil"
 	ipe "github.com/neo4j/neo4j-go-driver/v6/neo4j/internal/propertyencryption"
 )
 
@@ -90,17 +91,18 @@ type EnvelopeProfile struct {
 func (p EnvelopeProfile) validate() error {
 	switch {
 	case p.Name == "":
-		return &Error{Message: "a property encryption profile must have a name"}
+		return &errorutil.UsageError{Message: "a property encryption profile must have a name"}
 	case p.EncapsulationService == nil:
-		return &Error{Message: "property encryption profile " + p.Name +
+		return &errorutil.UsageError{Message: "property encryption profile " + p.Name +
 			" has no EncapsulationService"}
 	case p.KeyRepository == nil:
-		return &Error{Message: "property encryption profile " + p.Name + " has no KeyRepository"}
+		return &errorutil.UsageError{Message: "property encryption profile " + p.Name +
+			" has no KeyRepository"}
 	case p.KeyCacheTTL < 0 || p.KeyAliasIndexTTL < 0:
-		return &Error{Message: "property encryption profile " + p.Name +
+		return &errorutil.UsageError{Message: "property encryption profile " + p.Name +
 			" has a negative cache time to live"}
 	case p.KeyCacheSize < 0 || p.KeyAliasIndexSize < 0:
-		return &Error{Message: "property encryption profile " + p.Name +
+		return &errorutil.UsageError{Message: "property encryption profile " + p.Name +
 			" has a negative cache size, use DisableKeyCache instead"}
 	}
 	return nil

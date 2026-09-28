@@ -33,6 +33,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/neo4j/neo4j-go-driver/v6/neo4j/internal/errorutil"
 	ipe "github.com/neo4j/neo4j-go-driver/v6/neo4j/internal/propertyencryption"
 )
 
@@ -117,6 +118,7 @@ type profileState struct {
 // New builds an Encryption from profiles. Applications normally configure profiles through
 // config.Config.PropertyEncryptionProfiles and reach the result through
 // neo4j.Driver.PropertyEncryption, but New allows encrypting and decrypting without a driver.
+// An invalid profile is a neo4j.UsageError.
 //
 // New is part of the property encryption preview feature (see README on what it means in
 // terms of support and compatibility guarantees).
@@ -128,19 +130,19 @@ func New(profiles []Profile) (*Encryption, error) {
 	}
 	for _, profile := range profiles {
 		if profile == nil {
-			return nil, &Error{Message: "a property encryption profile is nil"}
+			return nil, &errorutil.UsageError{Message: "a property encryption profile is nil"}
 		}
 		if err := profile.validate(); err != nil {
 			return nil, err
 		}
 		envelope, ok := profile.(EnvelopeProfile)
 		if !ok {
-			return nil, &Error{Message: fmt.Sprintf(
+			return nil, &errorutil.UsageError{Message: fmt.Sprintf(
 				"unsupported property encryption profile type %T", profile)}
 		}
 		if _, duplicate := encryption.profiles[envelope.Name]; duplicate {
-			return nil, &Error{Message: "more than one property encryption profile is named " +
-				envelope.Name}
+			return nil, &errorutil.UsageError{Message: "more than one property encryption " +
+				"profile is named " + envelope.Name}
 		}
 		envelope = envelope.withDefaults()
 		encryption.profiles[envelope.Name] = &profileState{
