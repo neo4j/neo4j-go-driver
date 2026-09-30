@@ -19,47 +19,13 @@
 
 package bolt
 
-import (
-	"crypto/tls"
-	"errors"
-	"syscall"
-)
+import "syscall"
 
-// Waiting bytes need the read to tell a NOOP chunk from a TLS close_notify.
-func (c *socketConnection) peerAlive() bool {
-	raw := c.Conn
-	if tlsConn, ok := raw.(*tls.Conn); ok {
-		raw = tlsConn.NetConn()
-	}
-	sc, ok := raw.(syscall.Conn)
-	if !ok {
-		return c.peerAliveByRead(peerProbeTimeout)
-	}
-	n, err := peek(sc)
-	if errors.Is(err, syscall.EAGAIN) {
-		return true
-	}
-	if err != nil || n == 0 {
-		return false
-	}
-	return c.peerAliveByRead(peerClassifyTimeout)
-}
+const errNothingWaiting = syscall.EAGAIN
 
-// peek returns how many bytes are waiting without consuming them, 0 meaning the peer closed.
 // The socket is non-blocking, so this never waits.
-func peek(sc syscall.Conn) (n int, err error) {
-	rawConn, err := sc.SyscallConn()
-	if err != nil {
-		return 0, err
-	}
-	var peekErr error
-	err = rawConn.Read(func(fd uintptr) bool {
-		var b [1]byte
-		n, _, peekErr = syscall.Recvfrom(int(fd), b[:], syscall.MSG_PEEK)
-		return true
-	})
-	if err != nil {
-		return 0, err
-	}
-	return n, peekErr
+func peekSocket(fd uintptr) (int, error) {
+	var b [1]byte
+	n, _, err := syscall.Recvfrom(int(fd), b[:], syscall.MSG_PEEK)
+	return n, err
 }
