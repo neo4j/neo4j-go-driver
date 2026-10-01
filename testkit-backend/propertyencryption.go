@@ -77,6 +77,9 @@ func (r *testkitKeyRepository) Create(
 
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
+	if _, ok := r.aliases[alias]; ok {
+		return propertyencryption.EncapsulatedKeyRecord{}, fmt.Errorf("alias %s is in use", alias)
+	}
 	id := strconv.Itoa(r.nextID)
 	r.nextID++
 	return r.store(id, alias, encapsulation, metadata), nil
@@ -88,6 +91,9 @@ func (r *testkitKeyRepository) SetAlias(_ context.Context, id, alias string) err
 	record, ok := r.keys[id]
 	if !ok {
 		return propertyencryption.ErrKeyNotFound
+	}
+	if owner, ok := r.aliases[alias]; ok && owner != id {
+		return fmt.Errorf("alias %s is in use", alias)
 	}
 	delete(r.aliases, record.Alias)
 	record.Alias = alias

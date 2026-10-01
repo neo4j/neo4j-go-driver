@@ -34,6 +34,8 @@ import (
 	ipe "github.com/neo4j/neo4j-go-driver/v6/neo4j/internal/propertyencryption"
 )
 
+var errAliasInUse = errors.New("alias in use")
+
 // memoryRepository is an EncapsulatedKeyRecordRepository backed by a map, counting calls so
 // caching can be asserted.
 type memoryRepository struct {
@@ -93,6 +95,9 @@ func (r *memoryRepository) Create(
 	if r.err != nil {
 		return EncapsulatedKeyRecord{}, r.err
 	}
+	if _, ok := r.aliases[alias]; ok {
+		return EncapsulatedKeyRecord{}, errAliasInUse
+	}
 	id := strconv.Itoa(r.nextID)
 	r.nextID++
 	record := EncapsulatedKeyRecord{
@@ -114,6 +119,9 @@ func (r *memoryRepository) SetAlias(_ context.Context, id, alias string) error {
 	record, ok := r.keys[id]
 	if !ok {
 		return ErrKeyNotFound
+	}
+	if owner, ok := r.aliases[alias]; ok && owner != id {
+		return errAliasInUse
 	}
 	if record.Alias != "" {
 		delete(r.aliases, record.Alias)
@@ -891,32 +899,17 @@ func TestKeyManagerCreate(t *testing.T) {
 		}
 	})
 
-	t.Run("rotation keeps old values readable", func(t *testing.T) {
+	t.Run("alias in use", func(t *testing.T) {
 		t.Parallel()
 
 		encryption, _, _ := newTestEncryption(t, "p")
 		createKey(t, encryption, "", "k1")
-		before, err := encryption.Encrypt(ctx, EncryptRequest{Value: "old", Key: KeyAlias("k1")})
+		keys, err := encryption.Keys("")
 		if err != nil {
-			t.Fatalf("Encrypt returned %v", err)
+			t.Fatalf("Keys returned %v", err)
 		}
-
-		// Creating the alias again makes a new key and moves the alias to it.
-		createKey(t, encryption, "", "k1")
-		after, err := encryption.Encrypt(ctx, EncryptRequest{Value: "new", Key: KeyAlias("k1")})
-		if err != nil {
-			t.Fatalf("Encrypt returned %v", err)
-		}
-
-		decrypted, err := encryption.Decrypt(ctx, before)
-		if err != nil {
-			t.Fatalf("a value encrypted before rotation no longer decrypts: %v", err)
-		}
-		if decrypted != "old" {
-			t.Errorf("decrypted to %#v", decrypted)
-		}
-		if decrypted, err = encryption.Decrypt(ctx, after); err != nil || decrypted != "new" {
-			t.Errorf("decrypted to %#v with %v", decrypted, err)
+		if _, err := keys.Create(ctx, "k1", nil); !errors.Is(err, errAliasInUse) {
+			t.Errorf("Create returned %v, want the repository's rejection", err)
 		}
 	})
 
@@ -1211,8 +1204,8 @@ func TestKeyManagerFindByAlias(t *testing.T) {
 	}
 }
 
-// TestKeyManagerSetAlias moves an alias between keys and checks the cached mapping does not
-// outlive the move.
+// TestKeyManagerSetAlias renames an alias and checks the cached mapping does not outlive the
+// rename.
 func TestKeyManagerSetAlias(t *testing.T) {
 	t.Parallel()
 
@@ -1232,32 +1225,15 @@ func TestKeyManagerSetAlias(t *testing.T) {
 		t.Fatalf("Encrypt returned %v", err)
 	}
 
-	if err := keys.SetAlias(ctx, second.ID, "current"); err != nil {
+	if err := keys.SetAlias(ctx, second.ID, "current"); !errors.Is(err, errAliasInUse) {
+		t.Fatalf("SetAlias returned %v, want the repository's rejection", err)
+	}
+	if err := keys.SetAlias(ctx, first.ID, "renamed"); err != nil {
 		t.Fatalf("SetAlias returned %v", err)
 	}
-	found, err := keys.FindByAlias(ctx, "current")
-	if err != nil {
-		t.Fatalf("FindByAlias returned %v", err)
-	}
-	if found.ID != second.ID {
-		t.Errorf("current resolves to %s, want %s", found.ID, second.ID)
-	}
-
-	encrypted, err := encryption.Encrypt(ctx, EncryptRequest{
-		Value: "a", Key: KeyAlias("current")})
-	if err != nil {
-		t.Fatalf("Encrypt returned %v", err)
-	}
-	structure, err := ipe.DecodeEncrypted(encrypted)
-	if err != nil {
-		t.Fatalf("DecodeEncrypted returned %v", err)
-	}
-	keyID, _ := structure.Metadata.String(ipe.MetadataKeyID)
-	if keyID != second.ID {
-		t.Errorf("encrypted under %s, want the rotated-to key %s", keyID, second.ID)
-	}
-	if keyID == first.ID {
-		t.Error("the alias index served the key the alias moved away from")
+	if _, err := encryption.Encrypt(ctx, EncryptRequest{
+		Value: "a", Key: KeyAlias("current")}); err == nil {
+		t.Error("the alias index served an alias the key no longer holds")
 	}
 
 	if err := keys.SetAlias(ctx, second.ID, ""); err == nil {

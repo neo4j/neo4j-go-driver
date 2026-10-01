@@ -56,8 +56,7 @@ type KeyReference struct {
 	value string
 }
 
-// KeyAlias names a key by the alias it was created under, which picks up a rotation once the
-// alias moves to a new key.
+// KeyAlias names a key by its alias, following the alias when it is bound to a different key.
 //
 // KeyAlias is part of the property encryption preview feature (see README on what it means in
 // terms of support and compatibility guarantees).
@@ -464,9 +463,8 @@ type KeyManager struct {
 // Create makes a data encryption key, protects it with the profile's KeyEncapsulationService
 // and stores it under alias, returning it without any key material.
 //
-// An empty alias leaves the key unbound, reachable only by id. Creating a key under an alias
-// already in use rotates it: the alias moves to the new key, while values encrypted under the
-// old one still decrypt, each having recorded its key id.
+// An empty alias leaves the key unbound, reachable only by id. An alias another key holds is
+// rejected.
 //
 // options is passed to the KeyEncapsulationService and stored with the key, for services that
 // need to record which key protected it. It may be nil.
@@ -515,8 +513,8 @@ func (m *KeyManager) FindByAlias(ctx context.Context, alias string) (Encapsulate
 	return record.EncapsulatedKey, nil
 }
 
-// SetAlias binds alias to the key stored under id, moving it from another key if it is
-// already in use. Use DeleteAlias to unbind one.
+// SetAlias binds alias to the key stored under id, rejecting an alias another key holds. Use
+// DeleteAlias to unbind one.
 func (m *KeyManager) SetAlias(ctx context.Context, id, alias string) error {
 	if alias == "" {
 		return &Error{Message: "an encryption key alias cannot be empty, use DeleteAlias"}
