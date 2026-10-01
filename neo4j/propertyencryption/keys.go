@@ -38,8 +38,8 @@ type EncapsulatedKey struct {
 	// the key and is how the key is found again when decrypting, so it must be unique and
 	// must never be reused.
 	ID string
-	// Alias is the name currently bound to this key, or empty. Unlike ID, an alias may be
-	// moved to a different key.
+	// Alias is the name currently bound to this key, or empty. Unlike ID, an alias may later
+	// be bound to a different key.
 	Alias string
 }
 
