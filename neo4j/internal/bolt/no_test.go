@@ -39,6 +39,10 @@ func (t *testStruct) String() string {
 	return s + "]}"
 }
 
+func (t *testStruct) GoString() string {
+	return t.String()
+}
+
 // Utility to test hydration
 func serverHydrator(unpacker *packstream.Unpacker) any {
 	switch unpacker.Curr {

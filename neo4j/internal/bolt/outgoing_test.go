@@ -1085,6 +1085,17 @@ func TestOutgoing(ot *testing.T) {
 			},
 		},
 		{
+			name: "map of dates before the epoch",
+			inp: map[string]any{
+				"midnight": dbtype.Date(time.Date(1969, 12, 31, 0, 0, 0, 0, time.UTC)),
+				"noon":     dbtype.Date(time.Date(1969, 12, 31, 12, 0, 0, 0, time.UTC)),
+			},
+			expect: map[string]any{
+				"midnight": &testStruct{tag: 'D', fields: []any{int64(-1)}},
+				"noon":     &testStruct{tag: 'D', fields: []any{int64(-1)}},
+			},
+		},
+		{
 			name: "map of custom native types",
 			inp: map[string]any{
 				"custom bool":           customBool(true),
