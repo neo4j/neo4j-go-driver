@@ -79,7 +79,6 @@ func TestEncodeValueBytes(t *testing.T) {
 			wantHex: "b14401", wantType: TypeDate,
 		},
 		{
-			// Truncating division would put this on 1970-01-01.
 			name:    "date before the epoch floors",
 			value:   dbtype.Date(time.Date(1969, 12, 31, 12, 0, 0, 0, time.UTC)),
 			wantHex: "b144ff", wantType: TypeDate,

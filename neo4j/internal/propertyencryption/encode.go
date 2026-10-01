@@ -284,7 +284,7 @@ func (e *encoder) packVector(inList bool, write func()) elemKind {
 func (e *encoder) packDate(d dbtype.Date) {
 	t := time.Time(d)
 	_, offset := t.Zone()
-	// Floored, not truncated, so a date before 1970 lands on the day it names.
+	// Floor, as a pre-1970 date with a time of day would otherwise become the next day.
 	seconds := t.Unix() + int64(offset)
 	days := seconds / secondsPerDay
 	if seconds%secondsPerDay < 0 {
