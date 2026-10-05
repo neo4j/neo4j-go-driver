@@ -18,10 +18,10 @@
 package bolt
 
 import (
-	"bufio"
 	"context"
 	"io"
 	"net"
+	"sync"
 
 	"github.com/neo4j/neo4j-go-driver/v6/neo4j/db"
 	idb "github.com/neo4j/neo4j-go-driver/v6/neo4j/internal/db"
@@ -31,106 +31,92 @@ import (
 // DefaultReadBufferSize specifies the default size (in bytes) of the buffer used for reading data from the network connection.
 const DefaultReadBufferSize = 8192
 
-const aliveRoutineBufferSize = 128
-
-type readProbe struct {
-	err error
-	buf []byte
+// pendingRead is one socket read waiting to be taken.
+type pendingRead struct {
+	bytes []byte
+	err   error
 }
 
-// socketConnection keeps the net.Conn reachable beneath the read buffer.
+// socketConnection reads ahead on its own goroutine, so a close by the remote end is seen while
+// the connection is idle in the pool. wantRead returns the buffer to that goroutine, so a
+// pending read and an outstanding read never coexist.
 type socketConnection struct {
 	net.Conn
-	reader          *bufio.Reader // nil when read buffering is off
-	readChan        chan readProbe
-	readRequestChan chan struct{}
-	closed          bool
+	pending   chan pendingRead
+	wantRead  chan struct{}
+	done      chan struct{}
+	closeOnce sync.Once
 }
 
 func (c *socketConnection) Read(p []byte) (int, error) {
-	//fmt.Println("socketConnection.Read: waiting for read probe", len(p), "bytes")
-	probe, ok := <-c.readChan
-	if !ok {
-		return 0, io.EOF // TODO: find out right error to return when Read after Close
+	var read pendingRead
+	select {
+	case read = <-c.pending:
+	case <-c.done:
+		return 0, net.ErrClosed
 	}
-	n := copy(p, probe.buf)
-	//fmt.Println("socketConnection.Read: read", n, "bytes, err:", probe.err)
-	//fmt.Println("socketConnection.Read: buff len", len(probe.buf), "remaining len", len(probe.buf[n:]))
-	if n < len(probe.buf) {
-		remaining := probe.buf[n:]
-		//fmt.Println("socketConnection.Read: putting remaining", len(remaining), "bytes back to readChan")
-		c.readChan <- readProbe{
-			err: probe.err,
-			buf: remaining,
-		}
-		probe.err = nil // defer error to later read
-	} else if !c.closed {
-		//fmt.Println("socketConnection.Read: requesting next read probe")
-		c.readRequestChan <- struct{}{}
+	n := copy(p, read.bytes)
+	if n < len(read.bytes) {
+		c.pending <- pendingRead{bytes: read.bytes[n:], err: read.err}
+		return n, nil
 	}
-	return n, probe.err
+	c.wantRead <- struct{}{}
+	return n, read.err
 }
 
 func (c *socketConnection) Close() error {
-	c.closed = true
-	close(c.readRequestChan)
+	c.closeOnce.Do(func() { close(c.done) })
 	return c.Conn.Close()
 }
 
-func (c *socketConnection) aliveRoutine() {
+func (c *socketConnection) readAhead(bufferSize int) {
+	buffer := make([]byte, bufferSize)
 	for {
-		//fmt.Println("aliveRoutine: waiting for read request")
 		select {
-		case _, ok := <-c.readRequestChan:
-			if !ok {
-				close(c.readChan)
-				return
-			}
+		case <-c.wantRead:
+		case <-c.done:
+			return
 		}
-		buffer := make([]byte, aliveRoutineBufferSize)
-		var n int
-		var err error
-		//fmt.Println("aliveRoutine: reading from connection")
-		if c.reader != nil {
-			n, err = c.Conn.Read(buffer)
-		} else {
-			n, err = c.Conn.Read(buffer)
-		}
-		buffer = buffer[:n]
-		//fmt.Println("aliveRoutine: read", n, "bytes, err:", err)
-		c.readChan <- readProbe{
-			err: err,
-			buf: buffer,
-		}
+		n, err := c.Conn.Read(buffer)
+		c.pending <- pendingRead{bytes: buffer[:n], err: err}
 	}
+}
+
+func peerAlive(conn io.ReadWriteCloser) bool {
+	if c, ok := conn.(*socketConnection); ok {
+		return c.peerAlive()
+	}
+	return true
 }
 
 func (c *socketConnection) peerAlive() bool {
 	select {
-	case probe, ok := <-c.readChan:
-		if !ok {
-			return false
-		}
-		res := probe.err == nil && len(probe.buf) > 0
-		c.readChan <- probe
-		return res
+	case <-c.done:
+		return false
+	default:
+	}
+	select {
+	case read := <-c.pending:
+		c.pending <- read
+		return read.err == nil
 	default:
 		return true
 	}
 }
 
 func bufferedConnection(conn net.Conn, readBufferSize int) io.ReadWriteCloser {
+	// Reading into a zero-length buffer never blocks.
+	if readBufferSize <= 0 {
+		readBufferSize = DefaultReadBufferSize
+	}
 	c := &socketConnection{
-		Conn:            conn,
-		readChan:        make(chan readProbe, 1),
-		readRequestChan: make(chan struct{}, 1),
-		closed:          false,
+		Conn:     conn,
+		pending:  make(chan pendingRead, 1),
+		wantRead: make(chan struct{}, 1),
+		done:     make(chan struct{}),
 	}
-	if readBufferSize > 0 {
-		c.reader = bufio.NewReaderSize(conn, readBufferSize)
-	}
-	go c.aliveRoutine()
-	c.readRequestChan <- struct{}{}
+	c.wantRead <- struct{}{}
+	go c.readAhead(readBufferSize)
 	return c
 }
 
