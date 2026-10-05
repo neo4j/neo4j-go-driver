@@ -332,7 +332,11 @@ func (o *outgoing) packStruct(x any) {
 		secs := t.Unix()
 		_, offset := t.Zone()
 		secs += int64(offset)
+		// Floor, as a pre-1970 date with a time of day would otherwise become the next day.
 		days := secs / (60 * 60 * 24)
+		if secs%(60*60*24) < 0 {
+			days--
+		}
 		o.packer.StructHeader('D', 1)
 		o.packer.Int64(days)
 	case dbtype.Time:
