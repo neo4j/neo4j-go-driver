@@ -22,134 +22,184 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"fmt"
-	"strconv"
 	"strings"
-	"sync"
 
 	"github.com/neo4j/neo4j-go-driver/v6/neo4j/propertyencryption"
 )
 
-// TestKit has no way to supply a key encapsulation service or key repository, so the backend
-// provides them and drives the driver's API against them.
-
-// testkitKeyRepository is an in-memory EncapsulatedKeyRecordRepository.
-type testkitKeyRepository struct {
-	mutex   sync.Mutex
-	keys    map[string]propertyencryption.EncapsulatedKeyRecord
-	aliases map[string]string
-	nextID  int
+type keyRepositoryReply struct {
+	name string
+	data map[string]any
 }
 
-func newTestkitKeyRepository() *testkitKeyRepository {
-	return &testkitKeyRepository{
-		keys:    map[string]propertyencryption.EncapsulatedKeyRecord{},
-		aliases: map[string]string{},
-	}
+// remoteKeyRepository is an EncapsulatedKeyRecordRepository served by TestKit.
+type remoteKeyRepository struct {
+	backend *backend
+	// id is what TestKit knows this repository by.
+	id string
 }
 
-func (r *testkitKeyRepository) FindByID(
+func (r *remoteKeyRepository) FindByID(
 	_ context.Context, id string) (propertyencryption.EncapsulatedKeyRecord, error) {
 
-	r.mutex.Lock()
-	defer r.mutex.Unlock()
-	record, ok := r.keys[id]
-	if !ok {
-		return propertyencryption.EncapsulatedKeyRecord{}, propertyencryption.ErrKeyNotFound
+	reply, err := r.call("EncapsulatedKeyRepositoryFindByIdRequest", map[string]any{"keyId": id})
+	if err != nil {
+		return propertyencryption.EncapsulatedKeyRecord{}, err
 	}
-	return record, nil
+	return toFoundKeyRecord(reply["record"])
 }
 
-func (r *testkitKeyRepository) FindByAlias(
+func (r *remoteKeyRepository) FindByAlias(
 	_ context.Context, alias string) (propertyencryption.EncapsulatedKeyRecord, error) {
 
-	r.mutex.Lock()
-	defer r.mutex.Unlock()
-	id, ok := r.aliases[alias]
-	if !ok {
-		return propertyencryption.EncapsulatedKeyRecord{}, propertyencryption.ErrKeyNotFound
+	reply, err := r.call("EncapsulatedKeyRepositoryFindByAliasRequest", map[string]any{"alias": alias})
+	if err != nil {
+		return propertyencryption.EncapsulatedKeyRecord{}, err
 	}
-	return r.keys[id], nil
+	return toFoundKeyRecord(reply["record"])
 }
 
-func (r *testkitKeyRepository) Create(
+func (r *remoteKeyRepository) Create(
 	_ context.Context, alias string, encapsulation []byte,
 	metadata map[string]string) (propertyencryption.EncapsulatedKeyRecord, error) {
 
-	r.mutex.Lock()
-	defer r.mutex.Unlock()
-	if _, ok := r.aliases[alias]; ok {
-		return propertyencryption.EncapsulatedKeyRecord{}, fmt.Errorf("alias %s is in use", alias)
+	reply, err := r.call("EncapsulatedKeyRepositoryCreateRequest", map[string]any{
+		"alias":         nullIfUnbound(alias),
+		"encapsulation": encodeTestkitHex(encapsulation),
+		"metadata":      metadata,
+	})
+	if err != nil {
+		return propertyencryption.EncapsulatedKeyRecord{}, err
 	}
-	id := strconv.Itoa(r.nextID)
-	r.nextID++
-	return r.store(id, alias, encapsulation, metadata), nil
+	return toKeyRecord(reply["record"])
 }
 
-func (r *testkitKeyRepository) SetAlias(_ context.Context, id, alias string) error {
-	r.mutex.Lock()
-	defer r.mutex.Unlock()
-	record, ok := r.keys[id]
-	if !ok {
-		return propertyencryption.ErrKeyNotFound
-	}
-	if owner, ok := r.aliases[alias]; ok && owner != id {
-		return fmt.Errorf("alias %s is in use", alias)
-	}
-	delete(r.aliases, record.Alias)
-	record.Alias = alias
-	r.keys[id] = record
-	if alias != "" {
-		r.aliases[alias] = id
-	}
-	return nil
+func (r *remoteKeyRepository) SetAlias(_ context.Context, id, alias string) error {
+	_, err := r.call("EncapsulatedKeyRepositorySetAliasRequest", map[string]any{
+		"keyId": id,
+		"alias": nullIfUnbound(alias),
+	})
+	return err
 }
 
-func (r *testkitKeyRepository) DeleteByID(_ context.Context, id string) error {
-	r.mutex.Lock()
-	defer r.mutex.Unlock()
-	record, ok := r.keys[id]
-	if !ok {
-		return propertyencryption.ErrKeyNotFound
-	}
-	delete(r.keys, id)
-	delete(r.aliases, record.Alias)
-	return nil
+func (r *remoteKeyRepository) DeleteByID(_ context.Context, id string) error {
+	_, err := r.call("EncapsulatedKeyRepositoryDeleteRequest", map[string]any{"keyId": id})
+	return err
 }
 
-// importKey seeds the repository with a key made elsewhere, under an id TestKit chooses.
-func (r *testkitKeyRepository) importKey(
+// importKey registers a key made elsewhere, under an id TestKit chooses.
+func (r *remoteKeyRepository) importKey(
 	id, alias string, encapsulation []byte,
-	metadata map[string]string) propertyencryption.EncapsulatedKeyRecord {
+	metadata map[string]string) (propertyencryption.EncapsulatedKeyRecord, error) {
 
-	r.mutex.Lock()
-	defer r.mutex.Unlock()
-	return r.store(id, alias, encapsulation, metadata)
+	reply, err := r.call("EncapsulatedKeyRepositoryImportRequest", map[string]any{
+		"keyId":         id,
+		"alias":         nullIfUnbound(alias),
+		"encapsulation": encodeTestkitHex(encapsulation),
+		"metadata":      metadata,
+	})
+	if err != nil {
+		return propertyencryption.EncapsulatedKeyRecord{}, err
+	}
+	return toKeyRecord(reply["record"])
 }
 
-// store records a key. The caller must hold the mutex.
-func (r *testkitKeyRepository) store(
-	id, alias string, encapsulation []byte,
-	metadata map[string]string) propertyencryption.EncapsulatedKeyRecord {
+// call sends one reverse request and waits for TestKit to answer it.
+func (r *remoteKeyRepository) call(name string, fields map[string]any) (map[string]any, error) {
+	id := r.backend.nextId()
+	fields["id"] = id
+	fields["repositoryId"] = r.id
+	r.backend.writeResponse(name, fields)
 
-	record := propertyencryption.EncapsulatedKeyRecord{
-		EncapsulatedKey: propertyencryption.EncapsulatedKey{ID: id, Alias: alias},
-		Encapsulation:   encapsulation,
-		Metadata:        metadata,
+	for r.backend.process() {
+		reply, ok := r.backend.keyRepositoryReplies[id]
+		if !ok {
+			continue
+		}
+		delete(r.backend.keyRepositoryReplies, id)
+		if reply.name == "EncapsulatedKeyRepositoryErrorCompleted" {
+			return nil, toKeyRepositoryError(reply.data)
+		}
+		return reply.data, nil
 	}
-	r.keys[id] = record
-	if alias != "" {
-		r.aliases[alias] = id
+	return nil, fmt.Errorf("TestKit closed before answering %s", name)
+}
+
+func toKeyRepositoryError(data map[string]any) error {
+	errorType := optionalString(data, "errorType")
+	detail := optionalString(data, "detail")
+	switch errorType {
+	case "KeyNotFound":
+		return propertyencryption.ErrKeyNotFound
+	case "AliasInUse":
+		return fmt.Errorf("alias %s is in use", detail)
+	default:
+		return fmt.Errorf("the key repository failed with %s for %s", errorType, detail)
 	}
-	return record
+}
+
+// toFoundKeyRecord reads a lookup answer, null meaning no such key.
+func toFoundKeyRecord(raw any) (propertyencryption.EncapsulatedKeyRecord, error) {
+	if raw == nil {
+		return propertyencryption.EncapsulatedKeyRecord{}, propertyencryption.ErrKeyNotFound
+	}
+	return toKeyRecord(raw)
+}
+
+func toKeyRecord(raw any) (propertyencryption.EncapsulatedKeyRecord, error) {
+	fields, ok := raw.(map[string]any)
+	if !ok {
+		return propertyencryption.EncapsulatedKeyRecord{}, fmt.Errorf(
+			"expected a key record, got %T", raw)
+	}
+	encapsulation, err := decodeTestkitHex(fields["encapsulation"])
+	if err != nil {
+		return propertyencryption.EncapsulatedKeyRecord{}, err
+	}
+	return propertyencryption.EncapsulatedKeyRecord{
+		EncapsulatedKey: propertyencryption.EncapsulatedKey{
+			ID:    optionalString(fields, "id"),
+			Alias: optionalString(fields, "alias"),
+		},
+		Encapsulation: encapsulation,
+		Metadata:      toKeyMetadata(fields["metadata"]),
+	}, nil
+}
+
+func toKeyMetadata(raw any) map[string]string {
+	metadata := map[string]string{}
+	if fields, ok := raw.(map[string]any); ok {
+		for name, value := range fields {
+			metadata[name] = fmt.Sprintf("%v", value)
+		}
+	}
+	return metadata
+}
+
+// nullIfUnbound sends an empty alias as the null TestKit expects.
+func nullIfUnbound(alias string) any {
+	if alias == "" {
+		return nil
+	}
+	return alias
 }
 
 // propertyEncryptionState holds the repositories the backend created for a driver.
 type propertyEncryptionState struct {
-	repositories map[string]*testkitKeyRepository
+	repositories map[string]*remoteKeyRepository
+}
+
+// ids returns the repository ids to announce to TestKit.
+func (s *propertyEncryptionState) ids() []string {
+	ids := make([]string, 0, len(s.repositories))
+	for _, repository := range s.repositories {
+		ids = append(ids, repository.id)
+	}
+	return ids
 }
 
 // repositoryFor returns the repository for a profile, or the only one when name is empty.
-func (s *propertyEncryptionState) repositoryFor(name string) (*testkitKeyRepository, error) {
+func (s *propertyEncryptionState) repositoryFor(name string) (*remoteKeyRepository, error) {
 	if name == "" {
 		if len(s.repositories) != 1 {
 			return nil, fmt.Errorf(
@@ -169,7 +219,7 @@ func (s *propertyEncryptionState) repositoryFor(name string) (*testkitKeyReposit
 
 // buildPropertyEncryptionProfiles turns the propertyEncryptionProfiles field of a NewDriver
 // request into configured profiles, and returns the repositories backing them.
-func buildPropertyEncryptionProfiles(
+func (b *backend) buildPropertyEncryptionProfiles(
 	raw any) ([]propertyencryption.Profile, *propertyEncryptionState, error) {
 
 	entries, ok := raw.([]any)
@@ -178,7 +228,7 @@ func buildPropertyEncryptionProfiles(
 	}
 
 	profiles := make([]propertyencryption.Profile, 0, len(entries))
-	state := &propertyEncryptionState{repositories: map[string]*testkitKeyRepository{}}
+	state := &propertyEncryptionState{repositories: map[string]*remoteKeyRepository{}}
 	for _, entry := range entries {
 		fields, ok := entry.(map[string]any)
 		if !ok {
@@ -205,7 +255,7 @@ func buildPropertyEncryptionProfiles(
 		if err != nil {
 			return nil, nil, err
 		}
-		repository := newTestkitKeyRepository()
+		repository := &remoteKeyRepository{backend: b, id: b.nextId()}
 		state.repositories[name] = repository
 		profiles = append(profiles, propertyencryption.EnvelopeProfile{
 			Name:                 name,

@@ -69,9 +69,10 @@ type backend struct {
 	resolvedClientCertificates      map[string]auth.ClientCertificate
 	closed                          bool
 	extrasData                      map[string]any
-	// propertyEncryption holds the key repositories the backend created per driver, so
-	// that keys can be seeded directly the way an application would.
+	// propertyEncryption holds a driver's key repositories, by driver id.
 	propertyEncryption map[string]*propertyEncryptionState
+	// keyRepositoryReplies holds TestKit's answers, by request id.
+	keyRepositoryReplies map[string]keyRepositoryReply
 }
 
 // To implement transactional functions a bit of extra state is needed on the
@@ -171,6 +172,7 @@ func newBackend(rd *bufio.Reader, wr io.Writer) *backend {
 		closed:                          false,
 		extrasData:                      newBackendExtraData(),
 		propertyEncryption:              make(map[string]*propertyEncryptionState),
+		keyRepositoryReplies:            make(map[string]keyRepositoryReply),
 	}
 }
 
@@ -608,6 +610,16 @@ func (b *backend) handleRequest(req map[string]any) {
 		addresses := data["addresses"].([]any)
 		b.resolvedAddresses[requestId] = addresses
 
+	case "EncapsulatedKeyRepositoryFindByIdCompleted",
+		"EncapsulatedKeyRepositoryFindByAliasCompleted",
+		"EncapsulatedKeyRepositoryCreateCompleted",
+		"EncapsulatedKeyRepositoryImportCompleted",
+		"EncapsulatedKeyRepositorySetAliasCompleted",
+		"EncapsulatedKeyRepositoryDeleteCompleted",
+		"EncapsulatedKeyRepositoryErrorCompleted":
+		requestId := data["requestId"].(string)
+		b.keyRepositoryReplies[requestId] = keyRepositoryReply{name: name, data: data}
+
 	case "BookmarksSupplierCompleted":
 		requestId := data["requestId"].(string)
 		rawBookmarks := data["bookmarks"].([]any)
@@ -703,7 +715,7 @@ func (b *backend) handleRequest(req map[string]any) {
 				c.DisableAutoCommitRetries = data["disableAutoCommitRetries"].(bool)
 			}
 			if data["propertyEncryptionProfiles"] != nil {
-				profiles, state, profileErr := buildPropertyEncryptionProfiles(data["propertyEncryptionProfiles"])
+				profiles, state, profileErr := b.buildPropertyEncryptionProfiles(data["propertyEncryptionProfiles"])
 				if profileErr != nil {
 					err = profileErr
 					return
@@ -746,10 +758,12 @@ func (b *backend) handleRequest(req map[string]any) {
 
 		idKey := b.nextId()
 		b.drivers[idKey] = driver
+		response := map[string]any{"id": idKey}
 		if propertyEncryptionState != nil {
 			b.propertyEncryption[idKey] = propertyEncryptionState
+			response["keyRepositories"] = propertyEncryptionState.ids()
 		}
-		b.writeResponse("Driver", map[string]any{"id": idKey})
+		b.writeResponse("Driver", response)
 
 	case "NewClientCertificateProvider":
 		provider := NewTestKitClientCertificateProvider(b.nextId(), b)
@@ -1330,15 +1344,12 @@ func (b *backend) handleRequest(req map[string]any) {
 			b.writeError(err)
 			return
 		}
-		metadata := map[string]string{}
-		if raw, ok := data["metadata"].(map[string]any); ok {
-			for name, value := range raw {
-				metadata[name] = fmt.Sprintf("%v", value)
-			}
+		key, err := repository.importKey(data["id"].(string), data["alias"].(string),
+			encapsulation, toKeyMetadata(data["metadata"]))
+		if err != nil {
+			b.writeError(err)
+			return
 		}
-		// Seeded into the repository directly, not through the driver's API.
-		key := repository.importKey(
-			data["id"].(string), data["alias"].(string), encapsulation, metadata)
 		b.writeResponse("EncapsulatedKey", map[string]any{
 			"id":    key.ID,
 			"alias": key.Alias,
