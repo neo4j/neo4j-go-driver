@@ -792,6 +792,7 @@ func (b *backend) handleRequest(req map[string]any) {
 			b.writeError(err)
 			return
 		}
+		delete(b.propertyEncryption, driverId)
 		b.writeResponse("Driver", map[string]any{"id": driverId})
 
 	case "GetServerInfo":
