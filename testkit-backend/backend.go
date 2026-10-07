@@ -1246,8 +1246,10 @@ func (b *backend) handleRequest(req map[string]any) {
 			Key:     reference,
 			Profile: optionalString(data, "profileName"),
 		}
+		// A Cypher NULL aad is still an aad, and the driver rejects it.
+		aadGiven := data["aad"] != nil
 		var aad any
-		if data["aad"] != nil {
+		if aadGiven {
 			aad, err = cypherToNative(data["aad"])
 			if err != nil {
 				b.writeError(err)
@@ -1266,7 +1268,7 @@ func (b *backend) handleRequest(req map[string]any) {
 			defer encryption.PinIV(iv)()
 		}
 		var encrypted []byte
-		if aad != nil {
+		if aadGiven {
 			encrypted, err = encryption.EncryptWithAAD(ctx, request, aad)
 		} else {
 			encrypted, err = encryption.Encrypt(ctx, request)
