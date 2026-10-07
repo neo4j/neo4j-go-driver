@@ -178,6 +178,11 @@ func DecodeEncrypted(value []byte) (Encrypted, error) {
 	if d.unpacker.Err != nil {
 		return Encrypted{}, &MalformedError{Message: d.unpacker.Err.Error()}
 	}
+	if remaining := d.unpacker.Remaining(); remaining > 0 {
+		// An encrypted value holds exactly one structure.
+		return Encrypted{}, &MalformedError{Message: fmt.Sprintf(
+			"%d bytes remain after the Encrypted structure", remaining)}
+	}
 	return encrypted, nil
 }
 
