@@ -38,7 +38,7 @@ func TestConnectionClosedByServer(outer *testing.T) {
 	server := dbserver.GetDbServer(ctx)
 
 	newDriver := func(t *testing.T, userAgent string) neo4j.Driver {
-		driver, err := neo4j.NewDriver(server.URI(), server.AuthToken(), func(c *config.Config) {
+		driver, err := neo4j.NewDriver(server.BoltURI(), server.AuthToken(), func(c *config.Config) {
 			c.MaxConnectionPoolSize = 1
 			c.UserAgent = userAgent
 		})
