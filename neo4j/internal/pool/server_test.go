@@ -296,6 +296,28 @@ func TestIdlenessThreshold(outer *testing.T) {
 		testutil.AssertIntEqual(t, srv.numBusy(), 1)
 	})
 
+	outer.Run("discards connections the peer closed before resetting them", func(t *testing.T) {
+		connection := &testutil.ConnFake{
+			Alive:        true,
+			ClosedByPeer: true,
+			Idle:         time.Now().Add(-2 * time.Hour),
+			ForceResetHook: func() {
+				t.Error("reset sent to a connection the peer closed")
+			},
+			ReAuthHook: func(context.Context, *db.ReAuthToken) error {
+				t.Error("re-auth sent to a connection the peer closed")
+				return nil
+			},
+		}
+		srv := NewServer()
+		registerIdle(srv, connection)
+
+		healthy, err := srv.healthCheck(context.Background(), srv.getIdle(), 1*time.Hour, nil, nil)
+
+		testutil.AssertNil(t, err)
+		testutil.AssertFalse(t, healthy)
+	})
+
 	outer.Run("purges long-idle connections when reset fails", func(t *testing.T) {
 		connection := &testutil.ConnFake{
 			Alive: true,

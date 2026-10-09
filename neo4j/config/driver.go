@@ -133,6 +133,8 @@ type Config struct {
 	// By default, no liveliness check is performed. A value of 0 ensures connections are always tested for
 	// validity, and negative values are not permitted.
 	//
+	// Connections the server has closed while idle in the pool are discarded regardless of this setting.
+	//
 	// default: pool.DefaultConnectionLivenessCheckTimeout
 	ConnectionLivenessCheckTimeout time.Duration
 	// Connect timeout that will be set on underlying sockets. Values less than
@@ -214,7 +216,7 @@ type Config struct {
 	// ReadBufferSize defines the size of the buffer used for reading data from the network connection.
 	// A larger buffer size can improve performance by reducing the number of read operations required
 	// for large data transfers. Currently, the default value is 8 KiB, but may change in the future.
-	// Set to 0 or below to disable buffering.
+	// Values of 0 or below select the default.
 	ReadBufferSize int
 }
 

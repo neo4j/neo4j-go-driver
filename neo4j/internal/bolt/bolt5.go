@@ -779,6 +779,10 @@ func (b *bolt5) IsAlive() bool {
 	return b.state != bolt5Dead
 }
 
+func (b *bolt5) IsPeerAlive() bool {
+	return peerAlive(b.conn)
+}
+
 func (b *bolt5) HasFailed() bool {
 	return b.state == bolt5Failed
 }

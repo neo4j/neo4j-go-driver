@@ -83,6 +83,7 @@ type ConnFake struct {
 	SsrEnabled              bool
 	PinHomeDatabaseCallback func(context.Context, string)
 	Closed                  bool
+	ClosedByPeer            bool
 }
 
 func (c *ConnFake) Connect(
@@ -110,6 +111,10 @@ func (c *ConnFake) IsAlive() bool {
 
 func (c *ConnFake) HasFailed() bool {
 	return false
+}
+
+func (c *ConnFake) IsPeerAlive() bool {
+	return !c.ClosedByPeer
 }
 
 func (c *ConnFake) Reset(context.Context) {

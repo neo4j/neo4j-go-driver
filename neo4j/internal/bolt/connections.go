@@ -18,10 +18,10 @@
 package bolt
 
 import (
-	"bufio"
 	"context"
 	"io"
 	"net"
+	"sync"
 
 	"github.com/neo4j/neo4j-go-driver/v6/neo4j/db"
 	idb "github.com/neo4j/neo4j-go-driver/v6/neo4j/internal/db"
@@ -31,23 +31,100 @@ import (
 // DefaultReadBufferSize specifies the default size (in bytes) of the buffer used for reading data from the network connection.
 const DefaultReadBufferSize = 8192
 
-func bufferedConnection(conn net.Conn, readBufferSize int) io.ReadWriteCloser {
-	var reader io.Reader
-	if readBufferSize > 0 {
-		reader = bufio.NewReaderSize(conn, readBufferSize)
-	} else {
-		reader = conn
-	}
+// pendingRead is one socket read waiting to be taken.
+type pendingRead struct {
+	bytes []byte
+	err   error
+}
 
-	return struct {
-		io.Reader
-		io.Writer
-		io.Closer
-	}{
-		Reader: reader,
-		Writer: conn,
-		Closer: conn,
+// socketConnection reads ahead on its own goroutine, so a close by the remote end is seen while
+// the connection sits idle in the pool.
+type socketConnection struct {
+	net.Conn
+	pending   chan pendingRead
+	wantRead  chan struct{}
+	done      chan struct{}
+	closeOnce sync.Once
+}
+
+func (c *socketConnection) Read(p []byte) (int, error) {
+	select {
+	case <-c.done:
+		return 0, net.ErrClosed
+	default:
 	}
+	var read pendingRead
+	select {
+	case read = <-c.pending:
+	case <-c.done:
+		return 0, net.ErrClosed
+	}
+	n := copy(p, read.bytes)
+	if n < len(read.bytes) {
+		c.pending <- pendingRead{bytes: read.bytes[n:], err: read.err}
+		return n, nil
+	}
+	c.wantRead <- struct{}{}
+	return n, read.err
+}
+
+func (c *socketConnection) Close() error {
+	c.closeOnce.Do(func() { close(c.done) })
+	return c.Conn.Close()
+}
+
+// readAhead keeps the buffer until Read asks again, so only one of them uses it at a time.
+func (c *socketConnection) readAhead(bufferSize int) {
+	buffer := make([]byte, bufferSize)
+	for {
+		select {
+		case <-c.wantRead:
+		case <-c.done:
+			return
+		}
+		n, err := c.Conn.Read(buffer)
+		c.pending <- pendingRead{bytes: buffer[:n], err: err}
+	}
+}
+
+func peerAlive(conn io.ReadWriteCloser) bool {
+	if c, ok := conn.(*socketConnection); ok {
+		return c.peerAlive()
+	}
+	return true
+}
+
+// peerAlive reports whether the remote end is still open. Only an idle connection may be asked,
+// since the pool hands a connection to one caller at a time.
+func (c *socketConnection) peerAlive() bool {
+	select {
+	case <-c.done:
+		return false
+	default:
+	}
+	select {
+	case read := <-c.pending:
+		c.pending <- read
+		return read.err == nil
+	default:
+		return true
+	}
+}
+
+func bufferedConnection(conn net.Conn, readBufferSize int) io.ReadWriteCloser {
+	// Reading into a zero-length buffer never blocks.
+	if readBufferSize <= 0 {
+		readBufferSize = DefaultReadBufferSize
+	}
+	c := &socketConnection{
+		Conn:     conn,
+		pending:  make(chan pendingRead, 1),
+		wantRead: make(chan struct{}, 1),
+		done:     make(chan struct{}),
+	}
+	c.wantRead <- struct{}{}
+	go c.readAhead(readBufferSize)
+	return c
 }
 
 type ConnectionErrorListener interface {

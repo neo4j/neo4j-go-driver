@@ -259,6 +259,39 @@ func TestPoolBorrowReturn(outer *testing.T) {
 		AssertIntEqual(t, pool.servers[serverName].numBusy(), 1)
 	})
 
+	outer.Run("Borrows the first idle connection the peer has not closed", func(t *testing.T) {
+		serverName := "a server"
+		closedByPeer := &ConnFake{Alive: true, Name: "closedByPeer", ClosedByPeer: true}
+		open := &ConnFake{Alive: true, Name: "open"}
+		conf := config.Config{MaxConnectionLifetime: maxAge, MaxConnectionPoolSize: 1}
+		pool := New(&conf, nil, logger, "pool id", &homedb.Cache{})
+		setIdleConnections(pool, map[string][]idb.Connection{serverName: {closedByPeer, open}})
+
+		result, err := pool.tryBorrow(ctx, serverName, nil, DefaultConnectionLivenessCheckTimeout, reAuthToken)
+
+		AssertNil(t, err)
+		AssertDeepEquals(t, result, open)
+		AssertIntEqual(t, pool.servers[serverName].numIdle(), 0)
+		AssertIntEqual(t, pool.servers[serverName].numBusy(), 1)
+	})
+
+	outer.Run("Borrows new connection if the peer closed every idle connection", func(t *testing.T) {
+		serverName := "a server"
+		closedByPeer1 := &ConnFake{Alive: true, Name: "closedByPeer1", ClosedByPeer: true}
+		closedByPeer2 := &ConnFake{Alive: true, Name: "closedByPeer2", ClosedByPeer: true}
+		fresh := &ConnFake{Alive: true, Name: "fresh"}
+		conf := config.Config{MaxConnectionLifetime: maxAge, MaxConnectionPoolSize: 1}
+		pool := New(&conf, connectTo(fresh), logger, "pool id", &homedb.Cache{})
+		setIdleConnections(pool, map[string][]idb.Connection{serverName: {closedByPeer1, closedByPeer2}})
+
+		result, err := pool.tryBorrow(ctx, serverName, nil, DefaultConnectionLivenessCheckTimeout, reAuthToken)
+
+		AssertNil(t, err)
+		AssertDeepEquals(t, result, fresh)
+		AssertIntEqual(t, pool.servers[serverName].numIdle(), 0)
+		AssertIntEqual(t, pool.servers[serverName].numBusy(), 1)
+	})
+
 	outer.Run("Waiting borrow does not receive returned broken connection", func(t *testing.T) {
 		itime.ForceFreezeTime()
 		defer itime.ForceUnfreezeTime()
