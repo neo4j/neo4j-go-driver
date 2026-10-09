@@ -164,6 +164,32 @@ func TestEncodeValueUsesUtcDateTimeStructures(t *testing.T) {
 	}
 }
 
+// TestPortableZone pins which zone ids may be written.
+func TestPortableZone(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		id   string
+		want bool
+	}{
+		{id: "UTC", want: true},
+		{id: "Europe/London", want: true},
+		{id: "", want: false},
+		{id: "Local", want: false},
+		{id: "Mars/Olympus_Mons", want: false},
+	}
+
+	for _, test := range tests {
+		t.Run(test.id, func(t *testing.T) {
+			t.Parallel()
+
+			if got := portableZone(test.id); got != test.want {
+				t.Errorf("portableZone(%q) is %v, want %v", test.id, got, test.want)
+			}
+		})
+	}
+}
+
 type (
 	namedBool   bool
 	namedString string
@@ -279,6 +305,9 @@ func TestEncodeValueRejects(t *testing.T) {
 			},
 		},
 		{name: "uint64 beyond int64", value: uint64(1) << 63},
+		{name: "unnamed fixed zone", value: time.Date(2026, 8, 21, 10, 0, 0, 0, time.FixedZone("", 19800))},
+		{name: "a zone named Local", value: time.Date(2026, 8, 21, 10, 0, 0, 0, time.FixedZone("Local", 19800))},
+		{name: "a zone that is not a zone", value: time.Date(2026, 8, 21, 10, 0, 0, 0, time.FixedZone("Mars/Olympus_Mons", 19800))},
 	}
 
 	for _, test := range tests {

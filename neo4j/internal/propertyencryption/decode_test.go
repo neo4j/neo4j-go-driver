@@ -20,6 +20,7 @@ package propertyencryption
 import (
 	"encoding/hex"
 	"errors"
+	"fmt"
 	"reflect"
 	"testing"
 	"time"
@@ -261,6 +262,36 @@ func TestDecodeValueRejectsUnknownZone(t *testing.T) {
 	var malformed *MalformedError
 	if !errors.As(err, &malformed) {
 		t.Fatalf("DecodeValue returned %T, want a *MalformedError", err)
+	}
+}
+
+func TestDecodeValueRejectsZonesThatMoveWithTheReader(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		zone string
+	}{
+		{name: "empty", zone: ""},
+		{name: "Local", zone: "Local"},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
+			// DateTimeZoneId(0, 0, zone).
+			plaintext := mustHex(t, fmt.Sprintf("b3690000d1%04x%s",
+				len(test.zone), hex.EncodeToString([]byte(test.zone))))
+			decoded, err := DecodeValue(plaintext, TypeZonedDateTime, baseline10)
+			if err == nil {
+				t.Fatalf("DecodeValue returned %#v, want an error", decoded)
+			}
+			var malformed *MalformedError
+			if !errors.As(err, &malformed) {
+				t.Fatalf("DecodeValue returned %T, want a *MalformedError", err)
+			}
+		})
 	}
 }
 

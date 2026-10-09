@@ -375,6 +375,10 @@ func (d *decoder) zonedDateTimeZoneId(fields uint32) any {
 	if d.err != nil {
 		return nil
 	}
+	if !portableZone(id) {
+		d.malformed("the encrypted value has time zone %q, which does not name one zone", id)
+		return nil
+	}
 	zone, err := time.LoadLocation(id)
 	if err != nil {
 		d.malformed("unknown time zone %q: %s", id, err)

@@ -332,10 +332,24 @@ func (e *encoder) packZonedDateTime(t time.Time) {
 		e.packer.Int(offset)
 		return
 	}
+	id := t.Location().String()
+	if !portableZone(id) {
+		e.setErr("the time zone %q cannot be encrypted, use a named zone or UTC", id)
+		return
+	}
 	e.packer.StructHeader('i', 3)
 	e.packer.Int64(t.Unix())
 	e.packer.Int(t.Nanosecond())
-	e.packer.String(t.Location().String())
+	e.packer.String(id)
+}
+
+// portableZone reports whether id names a zone every reader resolves the same way.
+func portableZone(id string) bool {
+	if id == "" || id == "Local" {
+		return false
+	}
+	_, err := time.LoadLocation(id)
+	return err == nil
 }
 
 func (e *encoder) packPoint2D(p dbtype.Point2D) {
