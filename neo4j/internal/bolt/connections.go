@@ -38,8 +38,7 @@ type pendingRead struct {
 }
 
 // socketConnection reads ahead on its own goroutine, so a close by the remote end is seen while
-// the connection is idle in the pool. wantRead returns the buffer to that goroutine, so a
-// pending read and an outstanding read never coexist.
+// the connection sits idle in the pool.
 type socketConnection struct {
 	net.Conn
 	pending   chan pendingRead
@@ -74,6 +73,7 @@ func (c *socketConnection) Close() error {
 	return c.Conn.Close()
 }
 
+// readAhead keeps the buffer until Read asks again, so only one of them uses it at a time.
 func (c *socketConnection) readAhead(bufferSize int) {
 	buffer := make([]byte, bufferSize)
 	for {
@@ -94,6 +94,8 @@ func peerAlive(conn io.ReadWriteCloser) bool {
 	return true
 }
 
+// peerAlive reports whether the remote end is still open. Only an idle connection may be asked,
+// since the pool hands a connection to one caller at a time.
 func (c *socketConnection) peerAlive() bool {
 	select {
 	case <-c.done:
