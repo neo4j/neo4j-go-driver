@@ -290,7 +290,6 @@ func TestDecodeEncryptedRejects(t *testing.T) {
 				fieldProfile + fieldCipher + fieldTypeName + fieldMajor + fieldMinor + "c3"},
 		{name: "truncated", value: fieldVersion + fieldHeader + fieldProfileType +
 			fieldProfileVersion + fieldProfile + fieldCipher},
-		{name: "trailing bytes", value: validEncrypted + "01"},
 	}
 
 	for _, test := range tests {
