@@ -62,6 +62,11 @@ func (u *Unpacker) setErr(err error) {
 	}
 }
 
+// Remaining returns the number of unconsumed bytes.
+func (u *Unpacker) Remaining() uint32 {
+	return u.len - u.off
+}
+
 func (u *Unpacker) Next() {
 	i := u.pop()
 	u.mrk = markers[i]

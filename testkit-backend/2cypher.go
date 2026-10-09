@@ -19,6 +19,7 @@ package main
 
 import (
 	"encoding/binary"
+	"encoding/hex"
 	"fmt"
 	"math"
 	"strings"
@@ -44,6 +45,8 @@ func nativeToCypher(v any) map[string]any {
 		return valueResponse("CypherBool", x)
 	case float64:
 		return valueResponse("CypherFloat", x)
+	case []byte:
+		return valueResponse("CypherBytes", addSpacesToHex(hex.EncodeToString(x)))
 	case dbtype.Date:
 		date := x.Time()
 		values := map[string]any{
