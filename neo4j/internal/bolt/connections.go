@@ -49,6 +49,11 @@ type socketConnection struct {
 }
 
 func (c *socketConnection) Read(p []byte) (int, error) {
+	select {
+	case <-c.done:
+		return 0, net.ErrClosed
+	default:
+	}
 	var read pendingRead
 	select {
 	case read = <-c.pending:

@@ -20,6 +20,7 @@ package bolt
 import (
 	"bytes"
 	"crypto/tls"
+	"errors"
 	"io"
 	"net"
 	"runtime"
@@ -254,24 +255,17 @@ func TestSocketConnectionRead(outer *testing.T) {
 		AssertError(t, err)
 	})
 
-	outer.Run("read after close does not block when bytes were waiting", func(t *testing.T) {
-		c, fake := scripted(t, pendingRead{bytes: []byte("xy")})
-		awaitDelivered(t, fake)
-		AssertNoError(t, c.Close())
-		done := make(chan error, 1)
-		go func() {
-			for {
-				if _, err := c.Read(make([]byte, 8)); err != nil {
-					done <- err
-					return
-				}
+	outer.Run("read after close errors even when bytes were waiting", func(t *testing.T) {
+		// Asserting it always errors takes more than one attempt.
+		for i := 0; i < 50; i++ {
+			c, fake := scripted(t, pendingRead{bytes: []byte("xy")})
+			awaitDelivered(t, fake)
+			AssertNoError(t, c.Close())
+			n, err := c.Read(make([]byte, 8))
+			if !errors.Is(err, net.ErrClosed) {
+				t.Fatalf("read %d bytes and got %v, want %v", n, err, net.ErrClosed)
 			}
-		}()
-		select {
-		case err := <-done:
-			AssertError(t, err)
-		case <-time.After(5 * time.Second):
-			t.Fatal("read blocked after close")
+			AssertIntEqual(t, n, 0)
 		}
 	})
 }
