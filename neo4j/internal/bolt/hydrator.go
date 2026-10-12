@@ -30,6 +30,7 @@ import (
 	"github.com/neo4j/neo4j-go-driver/v6/neo4j/internal/errorutil"
 	"github.com/neo4j/neo4j-go-driver/v6/neo4j/internal/gql"
 	"github.com/neo4j/neo4j-go-driver/v6/neo4j/internal/packstream"
+	"github.com/neo4j/neo4j-go-driver/v6/neo4j/internal/timezone"
 	"github.com/neo4j/neo4j-go-driver/v6/neo4j/log"
 )
 
@@ -814,7 +815,7 @@ func (h *hydrator) dateTimeNamedZone(n uint32) any {
 	// time.Time computed in UTC timezone, e.g. 15th of June 2020, 13:30 in UTC
 	utcTime := unixTime.UTC()
 	// time.Time **copied** as-is in the target timezone, e.g. 15th of June 2020, 13:30 in target tz
-	l, err := time.LoadLocation(zone)
+	l, err := timezone.Load(zone)
 	if err != nil {
 		return &dbtype.InvalidValue{
 			Message: "dateTimeNamedZone",
@@ -840,7 +841,7 @@ func (h *hydrator) utcDateTimeNamedZone(n uint32) any {
 	nans := h.unp.Int()
 	h.unp.Next()
 	zone := h.unp.String()
-	timeZone, err := time.LoadLocation(zone)
+	timeZone, err := timezone.Load(zone)
 	if err != nil {
 		return &dbtype.InvalidValue{
 			Message: "utcDateTimeNamedZone",
