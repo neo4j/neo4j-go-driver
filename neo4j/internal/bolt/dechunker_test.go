@@ -131,8 +131,11 @@ func TestDechunkerWithTimeout(ot *testing.T) {
 
 		_, _, err := dechunkMessage(context.Background(), serv, nil, timeout)
 
+		// With a non-cancelable context the server read-timeout hint is enforced
+		// via a socket deadline, so the underlying cause is an i/o timeout; it is
+		// still surfaced as a ConnectionReadTimeout.
 		AssertError(t, err)
-		AssertStringContain(t, err.Error(), "context deadline exceeded")
+		AssertStringContain(t, err.Error(), "Timeout while reading from connection")
 	})
 
 	ot.Run("Fails when connection deadline is reached via context", func(t *testing.T) {

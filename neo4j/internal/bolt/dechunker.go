@@ -38,20 +38,49 @@ func dechunkMessage(ctx context.Context, conn io.Reader, msgBuf []byte, readTime
 	sizeBuf := []byte{0x00, 0x00}
 	off := 0
 
-	reader := rio.NewRacingReader(conn)
+	// When the server set a read-timeout hint and the connection can carry a
+	// socket deadline, bound each read with SetReadDeadline instead of allocating
+	// a context.WithTimeout (plus timer and racing goroutine) per read. This is
+	// only safe when the caller's context is not cancelable: a cancelable context
+	// still needs the racing path to honor mid-read cancellation, so it keeps the
+	// legacy per-read timeout context.
+	deadliner, canSetDeadline := conn.(readDeadliner)
+	useSocketDeadline := readTimeout >= 0 && canSetDeadline && ctx.Done() == nil
 
-	for {
-		updatedCtx, cancelFunc := newContext(ctx, readTimeout)
-		_, err := reader.ReadFull(updatedCtx, sizeBuf)
-		if err != nil {
-			return msgBuf, nil, processReadError(err, ctx, readTimeout)
+	// The racing reader (and its per-read goroutine) is only needed when a read
+	// must be cancelable via context. The socket-deadline fast path reads
+	// directly, avoiding a per-message reader allocation.
+	var reader rio.RacingReader
+	if !useSocketDeadline {
+		reader = rio.NewRacingReader(conn)
+	}
+
+	readFull := func(buf []byte) error {
+		if useSocketDeadline {
+			_ = deadliner.SetReadDeadline(time.Now().Add(readTimeout))
+			_, err := io.ReadFull(conn, buf)
+			return err
 		}
+		updatedCtx, cancelFunc := newReadContext(ctx, readTimeout)
+		_, err := reader.ReadFull(updatedCtx, buf)
 		if cancelFunc != nil { // reading has been completed, time to release the context
 			cancelFunc()
+		}
+		return err
+	}
+
+	for {
+		if err := readFull(sizeBuf); err != nil {
+			return msgBuf, nil, processReadError(err, ctx, readTimeout)
 		}
 		chunkSize := int(binary.BigEndian.Uint16(sizeBuf))
 		if chunkSize == 0 {
 			if off > 0 {
+				if useSocketDeadline {
+					// Clear the deadline so a later read on a reused connection is
+					// not bounded by this now-stale deadline.
+					_ = deadliner.SetReadDeadline(time.Time{})
+				}
 				return msgBuf, msgBuf[:off], nil
 			}
 			// Got a nop chunk
@@ -65,24 +94,27 @@ func dechunkMessage(ctx context.Context, conn io.Reader, msgBuf []byte, readTime
 			msgBuf = newMsgBuf
 		}
 		// Read the chunk into buffer
-		updatedCtx, cancelFunc = newContext(ctx, readTimeout)
-		_, err = reader.ReadFull(updatedCtx, msgBuf[off:(off+chunkSize)])
-		if err != nil {
+		if err := readFull(msgBuf[off:(off + chunkSize)]); err != nil {
 			return msgBuf, nil, processReadError(err, ctx, readTimeout)
-		}
-		if cancelFunc != nil { // reading has been completed, time to release the context
-			cancelFunc()
 		}
 		off += chunkSize
 	}
 }
 
-// newContext computes a new context and cancel function if a readTimeout is set
-func newContext(ctx context.Context, readTimeout time.Duration) (context.Context, context.CancelFunc) {
-	if readTimeout >= 0 {
-		return context.WithTimeout(ctx, readTimeout)
+// readDeadliner is implemented by connections that can bound a read with a
+// socket deadline, allowing the read path to avoid a per-read timeout context.
+type readDeadliner interface {
+	SetReadDeadline(t time.Time) error
+}
+
+// newReadContext returns the context to use for a single racing read. When a
+// read timeout is configured it derives a per-read timeout context; otherwise it
+// returns the caller's context unchanged.
+func newReadContext(ctx context.Context, readTimeout time.Duration) (context.Context, context.CancelFunc) {
+	if readTimeout < 0 {
+		return ctx, nil
 	}
-	return ctx, nil
+	return context.WithTimeout(ctx, readTimeout)
 }
 
 func processReadError(err error, ctx context.Context, readTimeout time.Duration) error {
