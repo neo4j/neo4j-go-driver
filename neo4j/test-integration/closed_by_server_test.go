@@ -63,9 +63,7 @@ func TestConnectionClosedByServer(outer *testing.T) {
 			`CALL dbms.listConnections() YIELD connectionId, userAgent WHERE userAgent = $agent
 			 CALL dbms.killConnection(connectionId) YIELD message RETURN message`,
 			agentParam, neo4j.EagerResultTransformer, neo4j.ExecuteQueryWithReadersRouting())
-		if err != nil {
-			t.Skipf("server cannot close connections on request: %v", err)
-		}
+		assertNil(t, err)
 		deadline := time.Now().Add(10 * time.Second)
 		for countConnections(t) > 0 {
 			if time.Now().After(deadline) {
