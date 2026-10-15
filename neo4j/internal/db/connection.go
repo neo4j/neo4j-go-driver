@@ -139,6 +139,9 @@ type Connection interface {
 	IsAlive() bool
 	// HasFailed returns true if the connection has received a recoverable error (``FAILURE``).
 	HasFailed() bool
+	// IsPeerAlive returns false if the remote end has closed the connection. Only an idle
+	// connection may be asked.
+	IsPeerAlive() bool
 	// Birthdate returns the point in time when this connection was established.
 	Birthdate() time.Time
 	// IdleDate returns the point in time since which the connection is idle
