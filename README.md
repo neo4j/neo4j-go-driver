@@ -287,7 +287,7 @@ dateValueAsTime := dateValue.Time()
 
 Note:
 * When `neo4j.OffsetTime` is converted into `time.Time` or constructed through `OffsetTimeOf(time.Time)`, its `Location` is given a fixed name of `Offset` (i.e. assigned `time.FixedZone("Offset", offsetTime.offset)`).
-* When `time.Time` values are sent/received through the driver, if its `Zone()` returns a name of `Offset` the value is stored with its offset value and with its zone name otherwise.
+* When `time.Time` values are sent through the driver, the value is stored with its zone name if `Location()` names a zone that resolves, and with its offset otherwise.
 
 ### Vector Types
 
