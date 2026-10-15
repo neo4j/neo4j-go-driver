@@ -153,6 +153,22 @@ func TestSocketConnectionPeerAlive(outer *testing.T) {
 		AssertTrue(t, time.Since(start) < time.Second)
 	})
 
+	// Blocking behind a read would hang the borrow until the server sent something.
+	outer.Run("answers while another caller is blocked in a read", func(t *testing.T) {
+		client, _ := tcpPair(t)
+		c := socket(client)
+		go c.Read(make([]byte, 1))
+		time.Sleep(50 * time.Millisecond)
+		alive := make(chan bool, 1)
+		go func() { alive <- c.peerAlive() }()
+		select {
+		case got := <-alive:
+			AssertTrue(t, got)
+		case <-time.After(5 * time.Second):
+			t.Fatal("peerAlive blocked behind the read")
+		}
+	})
+
 	outer.Run("closed by peer", func(t *testing.T) {
 		client, server := tcpPair(t)
 		c := socket(client)
