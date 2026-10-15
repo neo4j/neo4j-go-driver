@@ -46,13 +46,14 @@ func TestConnectionClosedByServer(outer *testing.T) {
 		t.Cleanup(func() { assertNil(t, driver.Close(ctx)) })
 		return driver
 	}
+	readSession := neo4j.SessionConfig{AccessMode: neo4j.AccessModeRead}
 	admin := newDriver(outer, closedByServerAgent+"-admin")
 	agentParam := map[string]any{"agent": closedByServerAgent}
 
 	countConnections := func(t *testing.T) int64 {
 		result, err := neo4j.ExecuteQuery(ctx, admin,
 			"CALL dbms.listConnections() YIELD userAgent WHERE userAgent = $agent RETURN count(*)",
-			agentParam, neo4j.EagerResultTransformer)
+			agentParam, neo4j.EagerResultTransformer, neo4j.ExecuteQueryWithReadersRouting())
 		assertNil(t, err)
 		return result.Records[0].Values[0].(int64)
 	}
@@ -61,7 +62,7 @@ func TestConnectionClosedByServer(outer *testing.T) {
 		_, err := neo4j.ExecuteQuery(ctx, admin,
 			`CALL dbms.listConnections() YIELD connectionId, userAgent WHERE userAgent = $agent
 			 CALL dbms.killConnection(connectionId) YIELD message RETURN message`,
-			agentParam, neo4j.EagerResultTransformer)
+			agentParam, neo4j.EagerResultTransformer, neo4j.ExecuteQueryWithReadersRouting())
 		if err != nil {
 			t.Skipf("server cannot close connections on request: %v", err)
 		}
@@ -77,7 +78,7 @@ func TestConnectionClosedByServer(outer *testing.T) {
 	}
 
 	autoCommit := func(t *testing.T, driver neo4j.Driver) {
-		session := driver.NewSession(ctx, neo4j.SessionConfig{})
+		session := driver.NewSession(ctx, readSession)
 		defer session.Close(ctx)
 		result, err := session.Run(ctx, "RETURN 1", nil)
 		assertNil(t, err)
@@ -105,7 +106,7 @@ func TestConnectionClosedByServer(outer *testing.T) {
 		autoCommit(t, driver)
 		closeConnections(t)
 
-		session := driver.NewSession(ctx, neo4j.SessionConfig{})
+		session := driver.NewSession(ctx, readSession)
 		defer session.Close(ctx)
 		tx, err := session.BeginTransaction(ctx)
 		assertNil(t, err)
