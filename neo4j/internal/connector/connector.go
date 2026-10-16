@@ -52,11 +52,12 @@ func (c *Connector) Connect(
 	errorListener bolt.ConnectionErrorListener,
 	boltLogger log.BoltLogger,
 ) (connection db.Connection, err error) {
-	if c.SupplyConnection == nil {
-		c.SupplyConnection = c.createConnection
+	supplyConnection := c.SupplyConnection
+	if supplyConnection == nil {
+		supplyConnection = c.createConnection
 	}
 
-	conn, err := c.SupplyConnection(ctx, address)
+	conn, err := supplyConnection(ctx, address)
 	if err != nil {
 		errorListener.OnDialError(ctx, address, err)
 		return nil, err
