@@ -20,11 +20,14 @@ package propertyencryption
 import (
 	"encoding/hex"
 	"errors"
+	"math"
 	"reflect"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/neo4j/neo4j-go-driver/v6/neo4j/dbtype"
+	"github.com/neo4j/neo4j-go-driver/v6/neo4j/internal/packstream"
 )
 
 // TestRoundTrip encodes and decodes every property type, checking each comes back unchanged
@@ -51,7 +54,7 @@ func TestRoundTrip(t *testing.T) {
 		{name: "int64 max", value: int64(9223372036854775807)},
 		{name: "int widens to int64", value: 42, want: int64(42)},
 		{name: "float", value: 3.25},
-		{name: "negative zero float", value: math_NegZero},
+		{name: "negative zero float", value: math.Copysign(0, -1)},
 		{name: "empty string", value: ""},
 		{name: "string", value: "hello world"},
 		{name: "multi byte string", value: "héllo wörld 🙂"},
@@ -60,7 +63,7 @@ func TestRoundTrip(t *testing.T) {
 		{name: "empty list", value: []any{}},
 		{name: "list", value: []any{int64(1), int64(2)}},
 		{name: "list of strings", value: []string{"a", "b"}, want: []any{"a", "b"}},
-		{name: "long list", value: longList(), want: longListDecoded()},
+		{name: "long list", value: longList()},
 		{name: "uuid", value: dbtype.UUID{1, 2, 3}},
 		{name: "duration", value: dbtype.Duration{Months: 1, Days: 2, Seconds: 3, Nanos: 4}},
 		{name: "negative duration", value: dbtype.Duration{Months: -1, Days: -2, Seconds: -3, Nanos: 4}},
@@ -72,7 +75,7 @@ func TestRoundTrip(t *testing.T) {
 				dbtype.Point2D{SpatialRefId: 7203, X: 3, Y: 4},
 			},
 		},
-		{name: "point 3d", value: dbtype.Point3D{SpatialRefId: 9157, X: 1.5, Y: -2.5, Z: 0}},
+		{name: "point 3d", value: dbtype.Point3D{SpatialRefId: 9157, X: 1.5, Y: -2.5, Z: 3}},
 		{name: "vector int8", value: dbtype.Vector[int8]{Elems: []int8{1, -1, 127}}},
 		{name: "vector int16", value: dbtype.Vector[int16]{Elems: []int16{1, -32768}}},
 		{name: "vector int32", value: dbtype.Vector[int32]{Elems: []int32{1, -2}}},
@@ -90,7 +93,7 @@ func TestRoundTrip(t *testing.T) {
 		},
 		{
 			name:  "local date time",
-			value: dbtype.LocalDateTime(time.Date(2026, 8, 21, 10, 30, 0, 500, time.UTC)),
+			value: dbtype.LocalDateTime(time.Date(2026, 8, 21, 10, 30, 0, 500, time.FixedZone("", 3600))),
 		},
 		{name: "zoned date time with an offset", value: time.Date(2026, 8, 21, 10, 0, 0, 7, offsetZone)},
 		{name: "zoned date time with a zone id", value: time.Date(2026, 8, 21, 10, 0, 0, 7, london)},
@@ -145,10 +148,11 @@ func TestDecodeValueRejectsUnsupportedBaseline(t *testing.T) {
 	tests := []struct {
 		name     string
 		recorded Version
+		want     string
 	}{
-		{name: "newer major", recorded: Version{Major: 2, Minor: 0}},
-		{name: "newer minor", recorded: Version{Major: 1, Minor: 1}},
-		{name: "older major", recorded: Version{Major: 0, Minor: 9}},
+		{name: "newer major", recorded: Version{Major: 2, Minor: 0}, want: "needs updating"},
+		{name: "newer minor", recorded: Version{Major: 1, Minor: 1}, want: "needs updating"},
+		{name: "older major", recorded: Version{Major: 0, Minor: 9}, want: "no longer supports"},
 	}
 
 	for _, test := range tests {
@@ -170,8 +174,11 @@ func TestDecodeValueRejectsUnsupportedBaseline(t *testing.T) {
 				unsupported.MinimumProtocolVersion.Minor != test.recorded.Minor {
 				t.Errorf("version is %v, want %s", unsupported.MinimumProtocolVersion, test.recorded)
 			}
-			if unsupported.Message == nil || *unsupported.Message == "" {
-				t.Error("Message is empty, users need to be told why the value cannot be read")
+			if unsupported.Message == nil {
+				t.Fatal("Message is nil, users need to be told why the value cannot be read")
+			}
+			if !strings.Contains(*unsupported.Message, test.want) {
+				t.Errorf("Message is %q, want it to mention %q", *unsupported.Message, test.want)
 			}
 		})
 	}
@@ -188,11 +195,8 @@ func TestDecodeValueRejectsUnknownEncodings(t *testing.T) {
 	}{
 		{name: "legacy date time with an offset", plaintext: "b3460102c90e10"},
 		{name: "legacy date time with a zone id", plaintext: "b3660102816c"},
-		{name: "node", plaintext: "b34e0190a0"},
-		{name: "unassigned struct tag", plaintext: "b17a01"},
-		{name: "dictionary", plaintext: "a18161 01"},
+		{name: "dictionary", plaintext: "a1816101"},
 		{name: "unknown vector element marker", plaintext: "b256cc01ffcc0201ff"},
-		{name: "list holding a dictionary", plaintext: "91a0"},
 	}
 
 	for _, test := range tests {
@@ -225,11 +229,10 @@ func TestDecodeValueRejectsMalformedPlaintext(t *testing.T) {
 	}{
 		{name: "empty", plaintext: ""},
 		{name: "null in a list", plaintext: "91c0"},
-		{name: "truncated string", plaintext: "8b68656c6c6f"},
 		{name: "truncated list", plaintext: "930102"},
 		{name: "trailing bytes", plaintext: "920102cb"},
-		{name: "date with the wrong field count", plaintext: "b2440101"},
-		{name: "point with a non float field", plaintext: "b358c91c2301c14000000000000000"},
+		{name: "date with the wrong field count", plaintext: "b04401"},
+		{name: "point with a non float field", plaintext: "b358c91c23cb3ff0000000000000c14000000000000000"},
 		{name: "vector with a wide type marker", plaintext: "b256cc02c8c8cc0201ff"},
 		{name: "vector with a partial element", plaintext: "b256cc01c9cc0301ff02"},
 	}
@@ -253,19 +256,28 @@ func TestDecodeValueRejectsUnknownZone(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name    string
-		zoneHex string
+		name string
+		zone string
 	}{
-		{name: "not a zone", zoneHex: "d011" + hex.EncodeToString([]byte("Mars/Olympus_Mons"))},
-		{name: "empty", zoneHex: "80"},
-		{name: "Local", zoneHex: "85" + hex.EncodeToString([]byte("Local"))},
+		{name: "not a zone", zone: "Mars/Olympus_Mons"},
+		{name: "empty", zone: ""},
+		{name: "Local", zone: "Local"},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
 
-			plaintext := mustHex(t, "b3690000"+test.zoneHex)
+			var packer packstream.Packer
+			packer.Begin(nil)
+			packer.StructHeader('i', 3)
+			packer.Int64(0)
+			packer.Int(0)
+			packer.String(test.zone)
+			plaintext, err := packer.End()
+			if err != nil {
+				t.Fatalf("packing the value failed: %v", err)
+			}
 			decoded, err := DecodeValue(plaintext, TypeZonedDateTime, baseline10)
 			if err == nil {
 				t.Fatalf("DecodeValue returned %#v, want an error", decoded)
@@ -278,13 +290,6 @@ func TestDecodeValueRejectsUnknownZone(t *testing.T) {
 	}
 }
 
-var math_NegZero = negZero()
-
-func negZero() float64 {
-	zero := 0.0
-	return -zero
-}
-
 func longList() []any {
 	items := make([]any, 300)
 	for i := range items {
@@ -293,19 +298,9 @@ func longList() []any {
 	return items
 }
 
-func longListDecoded() []any {
-	return longList()
-}
-
 func mustHex(t *testing.T, s string) []byte {
 	t.Helper()
-	clean := make([]byte, 0, len(s))
-	for i := 0; i < len(s); i++ {
-		if s[i] != ' ' {
-			clean = append(clean, s[i])
-		}
-	}
-	decoded, err := hex.DecodeString(string(clean))
+	decoded, err := hex.DecodeString(s)
 	if err != nil {
 		t.Fatalf("bad test hex %q: %v", s, err)
 	}

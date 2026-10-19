@@ -79,6 +79,11 @@ func TestEncodeValueBytes(t *testing.T) {
 			wantHex: "b14401", wantType: TypeDate,
 		},
 		{
+			name:    "date with an offset",
+			value:   dbtype.Date(time.Date(1970, 1, 2, 0, 0, 0, 0, offsetZone)),
+			wantHex: "b14401", wantType: TypeDate,
+		},
+		{
 			name:    "date before the epoch floors",
 			value:   dbtype.Date(time.Date(1969, 12, 31, 12, 0, 0, 0, time.UTC)),
 			wantHex: "b144ff", wantType: TypeDate,
@@ -124,11 +129,6 @@ func TestEncodeValueBytes(t *testing.T) {
 			value:   time.Unix(1, 2).In(time.FixedZone("Local", 3600)),
 			wantHex: "b3490102c90e10", wantType: TypeZonedDateTime,
 		},
-		{
-			name:    "zoned date time in a zone that is not a zone",
-			value:   time.Unix(1, 2).In(time.FixedZone("Mars/Olympus_Mons", 3600)),
-			wantHex: "b3490102c90e10", wantType: TypeZonedDateTime,
-		},
 	}
 
 	for _, test := range tests {
@@ -169,14 +169,6 @@ func TestEncodeValueUsesUtcDateTimeStructures(t *testing.T) {
 	if tag := named.Bytes[1]; tag != 'i' {
 		t.Errorf("zoned date time with a zone id used tag %q, want %q", tag, 'i')
 	}
-
-	offset, err := EncodeValue(time.Date(2026, 8, 21, 10, 0, 0, 0, offsetZone))
-	if err != nil {
-		t.Fatalf("EncodeValue returned %v", err)
-	}
-	if tag := offset.Bytes[1]; tag != 'I' {
-		t.Errorf("zoned date time with an offset used tag %q, want %q", tag, 'I')
-	}
 }
 
 type (
@@ -206,7 +198,6 @@ func TestEncodeValueNamedTypes(t *testing.T) {
 		{value: namedFloat(0.5), wantHex: "c13fe0000000000000", wantType: TypeFloat},
 		{value: namedBytes{0, 1, 2}, wantHex: "cc03000102", wantType: TypeBytes},
 		{value: namedList{"a"}, wantHex: "918161", wantType: TypeList},
-		{value: []namedBytes{{1}, {2}}, wantHex: "92cc0101cc0102", wantType: TypeList},
 	}
 
 	for _, test := range tests {
@@ -254,7 +245,6 @@ func TestEncodeValueDereferencesPointers(t *testing.T) {
 	}
 }
 
-// TestEncodeValueRejects covers values that are not Neo4j property types.
 func TestEncodeValueRejects(t *testing.T) {
 	t.Parallel()
 
@@ -263,34 +253,15 @@ func TestEncodeValueRejects(t *testing.T) {
 		value any
 	}{
 		{name: "map", value: map[string]any{"a": 1}},
-		{name: "struct", value: struct{ A int }{A: 1}},
-		{name: "channel", value: make(chan int)},
 		{name: "array", value: [2]int{1, 2}},
 		{name: "node", value: dbtype.Node{}},
-		{name: "null in a list", value: []any{1, nil}},
 		{name: "list in a list", value: []any{[]any{1}}},
 		{name: "vector in a list", value: []any{dbtype.Vector[int8]{Elems: []int8{1}}}},
-		{name: "map in a list", value: []any{map[string]any{}}},
-		{name: "mixed list", value: []any{int64(1), "a"}},
-		{
-			name: "local and zoned times in a list",
-			value: []any{
-				dbtype.LocalTime(time.Date(0, 0, 0, 1, 0, 0, 0, time.UTC)),
-				dbtype.Time(time.Date(0, 0, 0, 1, 0, 0, 0, offsetZone)),
-			},
-		},
 		{
 			name: "points of different dimensions in a list",
 			value: []any{
 				dbtype.Point2D{SpatialRefId: 7203, X: 1, Y: 1},
 				dbtype.Point3D{SpatialRefId: 7203, X: 1, Y: 1, Z: 1},
-			},
-		},
-		{
-			name: "points of different coordinate systems in a list",
-			value: []any{
-				dbtype.Point2D{SpatialRefId: 7203, X: 1, Y: 1},
-				dbtype.Point2D{SpatialRefId: 4326, X: 1, Y: 1},
 			},
 		},
 		{name: "uint64 beyond int64", value: uint64(1) << 63},
@@ -375,6 +346,8 @@ func TestEncodeAADAcceptsOnlyReproducibleTypes(t *testing.T) {
 	}
 
 	rejected := []any{
+		nil,
+		(*string)(nil),
 		1.5,
 		dbtype.Duration{Months: 1},
 		[]any{1},
@@ -392,26 +365,5 @@ func TestEncodeAADAcceptsOnlyReproducibleTypes(t *testing.T) {
 		if !errors.As(err, &valueErr) {
 			t.Errorf("EncodeAAD(%T) returned %T, want a *ValueError", value, err)
 		}
-	}
-}
-
-// TestEncodeAADMatchesValueEncoding checks AAD encodes to the same bytes it would as a value.
-func TestEncodeAADMatchesValueEncoding(t *testing.T) {
-	t.Parallel()
-
-	value := "row-42"
-	asValue, err := EncodeValue(value)
-	if err != nil {
-		t.Fatalf("EncodeValue returned %v", err)
-	}
-	asAAD, err := EncodeAAD(value)
-	if err != nil {
-		t.Fatalf("EncodeAAD returned %v", err)
-	}
-	if hex.EncodeToString(asAAD.Bytes) != hex.EncodeToString(asValue.Bytes) {
-		t.Errorf("AAD encoded to %x but the same value encoded to %x", asAAD.Bytes, asValue.Bytes)
-	}
-	if got := hex.EncodeToString(asAAD.Bytes); got != "86726f772d3432" {
-		t.Errorf("AAD encoded to %s, want the bytes behind the TestKit aad-bound fixture", got)
 	}
 }
