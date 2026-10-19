@@ -75,6 +75,9 @@ func (s *server) healthCheck(
 	boltLogger log.BoltLogger) (healthy bool, _ error) {
 
 	connection.SetBoltLogger(boltLogger)
+	if !connection.IsPeerAlive() {
+		return false, nil
+	}
 	if itime.Since(connection.IdleDate()) > idlenessTimeout {
 		connection.ForceReset(ctx)
 		if !connection.IsAlive() {
