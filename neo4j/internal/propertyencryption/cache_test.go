@@ -116,32 +116,25 @@ func TestCacheEvictsLeastRecentlyUsed(t *testing.T) {
 	}
 }
 
-func TestCacheEvictsExpiredBeforeLive(t *testing.T) {
+func TestCachePutPurgesExpiredEntries(t *testing.T) {
 	itime.ForceFreezeTime()
 	defer itime.ForceUnfreezeTime()
 
-	cache := NewCache[string](10*time.Second, 2)
+	cache := NewCache[string](10*time.Second, 10)
 	cache.Put("stale", "1")
-
-	itime.ForceTickTime(2 * time.Second)
-	cache.Put("live", "2")
-
-	// Makes the live entry the least recently used, so plain LRU would evict it.
-	if _, ok := cache.Get("stale"); !ok {
-		t.Fatal("stale is missing")
-	}
-
-	itime.ForceTickTime(9 * time.Second)
-	cache.Put("new", "3")
+	cache.Put("staler", "2")
+	itime.ForceTickTime(5 * time.Second)
+	cache.Put("live", "3")
+	itime.ForceTickTime(6 * time.Second)
+	cache.Put("new", "4")
 
 	if cache.len() != 2 {
 		t.Fatalf("the cache holds %d entries, want 2", cache.len())
 	}
-	if _, ok := cache.Get("stale"); ok {
-		t.Error("the expired entry survived")
-	}
-	if _, ok := cache.Get("live"); !ok {
-		t.Error("the live entry was evicted in favour of an expired one")
+	for _, key := range []string{"live", "new"} {
+		if _, ok := cache.Get(key); !ok {
+			t.Errorf("%s was purged before its ttl", key)
+		}
 	}
 }
 

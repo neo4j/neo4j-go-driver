@@ -34,8 +34,7 @@ const (
 )
 
 // Cache holds at most maxSize entries for ttl each, evicting least recently used first.
-// Expiry is applied during lookups and insertions rather than by a background goroutine.
-// A maxSize of zero disables it, every entry being evicted as it is written.
+// Expired entries are dropped on read and on insert. A maxSize of zero disables it.
 // It is safe for concurrent use.
 type Cache[V any] struct {
 	mutex   sync.Mutex
@@ -87,6 +86,7 @@ func (c *Cache[V]) Put(key string, value V) {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
 
+	c.purgeExpired()
 	expires := itime.Now().Add(c.ttl)
 	if element, ok := c.entries[key]; ok {
 		entry := element.Value.(*cacheEntry[V])
@@ -128,18 +128,21 @@ func (c *Cache[V]) len() int {
 	return c.order.Len()
 }
 
-// evict brings the cache back within its size limit, discarding expired entries in
-// preference to live ones.
+// purgeExpired removes expired entries.
+func (c *Cache[V]) purgeExpired() {
+	for element := c.order.Front(); element != nil; {
+		next := element.Next()
+		if c.hasExpired(element.Value.(*cacheEntry[V])) {
+			c.remove(element)
+		}
+		element = next
+	}
+}
+
+// evict trims the cache to maxSize, least recently used first.
 func (c *Cache[V]) evict() {
 	for c.order.Len() > c.maxSize {
-		oldest := c.order.Back()
-		for element := oldest; element != nil; element = element.Prev() {
-			if c.hasExpired(element.Value.(*cacheEntry[V])) {
-				oldest = element
-				break
-			}
-		}
-		c.remove(oldest)
+		c.remove(c.order.Back())
 	}
 }
 
