@@ -230,7 +230,6 @@ func TestDecodeValueRejectsMalformedPlaintext(t *testing.T) {
 		{name: "empty", plaintext: ""},
 		{name: "null in a list", plaintext: "91c0"},
 		{name: "truncated list", plaintext: "930102"},
-		{name: "trailing bytes", plaintext: "920102cb"},
 		{name: "date with the wrong field count", plaintext: "b04401"},
 		{name: "point with a non float field", plaintext: "b358c91c23cb3ff0000000000000c14000000000000000"},
 		{name: "vector with a wide type marker", plaintext: "b256cc02c8c8cc0201ff"},

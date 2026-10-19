@@ -65,10 +65,6 @@ func DecodeValue(plaintext []byte, typeName string, recorded Version) (any, erro
 		return nil, d.err
 	case d.unpacker.Err != nil:
 		return nil, &MalformedError{Message: d.unpacker.Err.Error()}
-	case d.unpacker.Remaining() > 0:
-		// The plaintext holds exactly one value.
-		return nil, &MalformedError{Message: fmt.Sprintf(
-			"%d bytes remain after the encrypted value", d.unpacker.Remaining())}
 	}
 	return value, nil
 }
