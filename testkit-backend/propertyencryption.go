@@ -87,23 +87,6 @@ func (r *remoteKeyRepository) DeleteByID(_ context.Context, id string) error {
 	return err
 }
 
-// importKey registers a key made elsewhere, under an id TestKit chooses.
-func (r *remoteKeyRepository) importKey(
-	id, alias string, encapsulation []byte,
-	metadata map[string]string) (propertyencryption.EncapsulatedKeyRecord, error) {
-
-	reply, err := r.call("EncapsulatedKeyRepositoryImportRequest", map[string]any{
-		"keyId":         id,
-		"alias":         nullIfUnbound(alias),
-		"encapsulation": encodeTestkitHex(encapsulation),
-		"metadata":      metadata,
-	})
-	if err != nil {
-		return propertyencryption.EncapsulatedKeyRecord{}, err
-	}
-	return toKeyRecord(reply["record"])
-}
-
 // call sends one reverse request and waits for TestKit to answer it.
 func (r *remoteKeyRepository) call(name string, fields map[string]any) (map[string]any, error) {
 	id := r.backend.nextId()
@@ -184,59 +167,29 @@ func nullIfUnbound(alias string) any {
 	return alias
 }
 
-// propertyEncryptionState holds the repositories the backend created for a driver.
-type propertyEncryptionState struct {
-	repositories map[string]*remoteKeyRepository
-}
-
-// ids returns the repository ids to announce to TestKit.
-func (s *propertyEncryptionState) ids() []string {
-	ids := make([]string, 0, len(s.repositories))
-	for _, repository := range s.repositories {
-		ids = append(ids, repository.id)
-	}
-	return ids
-}
-
-// repositoryFor returns the repository for a profile, or the only one when name is empty.
-func (s *propertyEncryptionState) repositoryFor(name string) (*remoteKeyRepository, error) {
-	if name == "" {
-		if len(s.repositories) != 1 {
-			return nil, fmt.Errorf(
-				"%d property encryption profiles are configured, so one must be named",
-				len(s.repositories))
-		}
-		for _, repository := range s.repositories {
-			return repository, nil
-		}
-	}
-	repository := s.repositories[name]
-	if repository == nil {
-		return nil, fmt.Errorf("no property encryption profile is named %s", name)
-	}
-	return repository, nil
-}
-
 // buildPropertyEncryptionProfiles turns the propertyEncryptionProfiles field of a NewDriver
-// request into configured profiles, and returns the repositories backing them.
+// request into configured profiles.
 func (b *backend) buildPropertyEncryptionProfiles(
-	raw any) ([]propertyencryption.Profile, *propertyEncryptionState, error) {
+	raw any) ([]propertyencryption.Profile, error) {
 
 	entries, ok := raw.([]any)
 	if !ok {
-		return nil, nil, fmt.Errorf("propertyEncryptionProfiles must be a list, got %T", raw)
+		return nil, fmt.Errorf("propertyEncryptionProfiles must be a list, got %T", raw)
 	}
 
 	profiles := make([]propertyencryption.Profile, 0, len(entries))
-	state := &propertyEncryptionState{repositories: map[string]*remoteKeyRepository{}}
 	for _, entry := range entries {
 		fields, ok := entry.(map[string]any)
 		if !ok {
-			return nil, nil, fmt.Errorf("a property encryption profile must be an object, got %T", entry)
+			return nil, fmt.Errorf("a property encryption profile must be an object, got %T", entry)
 		}
 		name, ok := fields["name"].(string)
 		if !ok {
-			return nil, nil, fmt.Errorf("a property encryption profile must have a name")
+			return nil, fmt.Errorf("a property encryption profile must have a name")
+		}
+		repositoryID, ok := fields["repositoryId"].(string)
+		if !ok {
+			return nil, fmt.Errorf("profile %s must have a repositoryId", name)
 		}
 
 		// The deterministic tests pin the key encryption key.
@@ -244,26 +197,24 @@ func (b *backend) buildPropertyEncryptionProfiles(
 		if raw, given := fields["kek"]; given && raw != nil {
 			decoded, err := decodeTestkitHex(raw)
 			if err != nil {
-				return nil, nil, fmt.Errorf("profile %s has an unreadable kek: %w", name, err)
+				return nil, fmt.Errorf("profile %s has an unreadable kek: %w", name, err)
 			}
 			kek = decoded
 		} else if _, err := rand.Read(kek); err != nil {
-			return nil, nil, err
+			return nil, err
 		}
 
 		service, err := propertyencryption.NewLocalKeyEncapsulationService(kek)
 		if err != nil {
-			return nil, nil, err
+			return nil, err
 		}
-		repository := &remoteKeyRepository{backend: b, id: b.nextId()}
-		state.repositories[name] = repository
 		profiles = append(profiles, propertyencryption.EnvelopeProfile{
 			Name:                 name,
 			EncapsulationService: service,
-			KeyRepository:        repository,
+			KeyRepository:        &remoteKeyRepository{backend: b, id: repositoryID},
 		})
 	}
-	return profiles, state, nil
+	return profiles, nil
 }
 
 // decodeTestkitHex reads the space separated hex TestKit uses for byte fields, for example

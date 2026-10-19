@@ -69,8 +69,6 @@ type backend struct {
 	resolvedClientCertificates      map[string]auth.ClientCertificate
 	closed                          bool
 	extrasData                      map[string]any
-	// propertyEncryption holds a driver's key repositories, by driver id.
-	propertyEncryption map[string]*propertyEncryptionState
 	// keyRepositoryReplies holds TestKit's answers, by request id.
 	keyRepositoryReplies map[string]keyRepositoryReply
 }
@@ -171,7 +169,6 @@ func newBackend(rd *bufio.Reader, wr io.Writer) *backend {
 		resolvedClientCertificates:      make(map[string]auth.ClientCertificate),
 		closed:                          false,
 		extrasData:                      newBackendExtraData(),
-		propertyEncryption:              make(map[string]*propertyEncryptionState),
 		keyRepositoryReplies:            make(map[string]keyRepositoryReply),
 	}
 }
@@ -613,7 +610,6 @@ func (b *backend) handleRequest(req map[string]any) {
 	case "EncapsulatedKeyRepositoryFindByIdCompleted",
 		"EncapsulatedKeyRepositoryFindByAliasCompleted",
 		"EncapsulatedKeyRepositoryCreateCompleted",
-		"EncapsulatedKeyRepositoryImportCompleted",
 		"EncapsulatedKeyRepositorySetAliasCompleted",
 		"EncapsulatedKeyRepositoryDeleteCompleted",
 		"EncapsulatedKeyRepositoryErrorCompleted":
@@ -649,7 +645,6 @@ func (b *backend) handleRequest(req map[string]any) {
 		}
 		// Parse URI (or rather type cast)
 		uri := data["uri"].(string)
-		var propertyEncryptionState *propertyEncryptionState
 		driver, err := neo4j.NewDriver(uri, authToken, func(c *config.Config) {
 			// Setup custom logger that redirects log entries back to frontend
 			c.Log = &streamLog{writeLine: b.writeLineLocked}
@@ -715,13 +710,12 @@ func (b *backend) handleRequest(req map[string]any) {
 				c.DisableAutoCommitRetries = data["disableAutoCommitRetries"].(bool)
 			}
 			if data["propertyEncryptionProfiles"] != nil {
-				profiles, state, profileErr := b.buildPropertyEncryptionProfiles(data["propertyEncryptionProfiles"])
+				profiles, profileErr := b.buildPropertyEncryptionProfiles(data["propertyEncryptionProfiles"])
 				if profileErr != nil {
 					err = profileErr
 					return
 				}
 				c.PropertyEncryptionProfiles = profiles
-				propertyEncryptionState = state
 			}
 
 			clientCertificateProviderId := data["clientCertificateProviderId"]
@@ -758,12 +752,7 @@ func (b *backend) handleRequest(req map[string]any) {
 
 		idKey := b.nextId()
 		b.drivers[idKey] = driver
-		response := map[string]any{"id": idKey}
-		if propertyEncryptionState != nil {
-			b.propertyEncryption[idKey] = propertyEncryptionState
-			response["keyRepositories"] = propertyEncryptionState.ids()
-		}
-		b.writeResponse("Driver", response)
+		b.writeResponse("Driver", map[string]any{"id": idKey})
 
 	case "NewClientCertificateProvider":
 		provider := NewTestKitClientCertificateProvider(b.nextId(), b)
@@ -792,7 +781,6 @@ func (b *backend) handleRequest(req map[string]any) {
 			b.writeError(err)
 			return
 		}
-		delete(b.propertyEncryption, driverId)
 		b.writeResponse("Driver", map[string]any{"id": driverId})
 
 	case "GetServerInfo":
@@ -1321,34 +1309,6 @@ func (b *backend) handleRequest(req map[string]any) {
 			return
 		}
 		key, err := keys.Create(ctx, data["alias"].(string), nil)
-		if err != nil {
-			b.writeError(err)
-			return
-		}
-		b.writeResponse("EncapsulatedKey", map[string]any{
-			"id":    key.ID,
-			"alias": key.Alias,
-		})
-
-	case "ImportEncapsulatedKey":
-		driverId := data["driverId"].(string)
-		state := b.propertyEncryption[driverId]
-		if state == nil {
-			b.writeError(fmt.Errorf("this driver has no property encryption profiles"))
-			return
-		}
-		repository, err := state.repositoryFor(optionalString(data, "profileName"))
-		if err != nil {
-			b.writeError(err)
-			return
-		}
-		encapsulation, err := decodeTestkitHex(data["encapsulation"])
-		if err != nil {
-			b.writeError(err)
-			return
-		}
-		key, err := repository.importKey(data["id"].(string), data["alias"].(string),
-			encapsulation, toKeyMetadata(data["metadata"]))
 		if err != nil {
 			b.writeError(err)
 			return
