@@ -114,6 +114,21 @@ func TestEncodeValueBytes(t *testing.T) {
 			value:   time.Unix(1, 2).In(offsetZone),
 			wantHex: "b3490102c90e10", wantType: TypeZonedDateTime,
 		},
+		{
+			name:    "zoned date time in an unnamed zone",
+			value:   time.Unix(1, 2).In(time.FixedZone("", 3600)),
+			wantHex: "b3490102c90e10", wantType: TypeZonedDateTime,
+		},
+		{
+			name:    "zoned date time in a zone named Local",
+			value:   time.Unix(1, 2).In(time.FixedZone("Local", 3600)),
+			wantHex: "b3490102c90e10", wantType: TypeZonedDateTime,
+		},
+		{
+			name:    "zoned date time in a zone that is not a zone",
+			value:   time.Unix(1, 2).In(time.FixedZone("Mars/Olympus_Mons", 3600)),
+			wantHex: "b3490102c90e10", wantType: TypeZonedDateTime,
+		},
 	}
 
 	for _, test := range tests {
@@ -161,32 +176,6 @@ func TestEncodeValueUsesUtcDateTimeStructures(t *testing.T) {
 	}
 	if tag := offset.Bytes[1]; tag != 'I' {
 		t.Errorf("zoned date time with an offset used tag %q, want %q", tag, 'I')
-	}
-}
-
-// TestPortableZone pins which zone ids may be written.
-func TestPortableZone(t *testing.T) {
-	t.Parallel()
-
-	tests := []struct {
-		id   string
-		want bool
-	}{
-		{id: "UTC", want: true},
-		{id: "Europe/London", want: true},
-		{id: "", want: false},
-		{id: "Local", want: false},
-		{id: "Mars/Olympus_Mons", want: false},
-	}
-
-	for _, test := range tests {
-		t.Run(test.id, func(t *testing.T) {
-			t.Parallel()
-
-			if got := portableZone(test.id); got != test.want {
-				t.Errorf("portableZone(%q) is %v, want %v", test.id, got, test.want)
-			}
-		})
 	}
 }
 
@@ -305,9 +294,6 @@ func TestEncodeValueRejects(t *testing.T) {
 			},
 		},
 		{name: "uint64 beyond int64", value: uint64(1) << 63},
-		{name: "unnamed fixed zone", value: time.Date(2026, 8, 21, 10, 0, 0, 0, time.FixedZone("", 19800))},
-		{name: "a zone named Local", value: time.Date(2026, 8, 21, 10, 0, 0, 0, time.FixedZone("Local", 19800))},
-		{name: "a zone that is not a zone", value: time.Date(2026, 8, 21, 10, 0, 0, 0, time.FixedZone("Mars/Olympus_Mons", 19800))},
 	}
 
 	for _, test := range tests {

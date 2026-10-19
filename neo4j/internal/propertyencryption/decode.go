@@ -27,6 +27,7 @@ import (
 	"github.com/neo4j/neo4j-go-driver/v6/neo4j/db"
 	"github.com/neo4j/neo4j-go-driver/v6/neo4j/dbtype"
 	"github.com/neo4j/neo4j-go-driver/v6/neo4j/internal/packstream"
+	"github.com/neo4j/neo4j-go-driver/v6/neo4j/internal/timezone"
 )
 
 // MalformedError reports bytes that are not a well-formed encoding of a value.
@@ -375,13 +376,9 @@ func (d *decoder) zonedDateTimeZoneId(fields uint32) any {
 	if d.err != nil {
 		return nil
 	}
-	if !portableZone(id) {
-		d.malformed("the encrypted value has time zone %q, which does not name one zone", id)
-		return nil
-	}
-	zone, err := time.LoadLocation(id)
+	zone, err := timezone.Load(id)
 	if err != nil {
-		d.malformed("unknown time zone %q: %s", id, err)
+		d.malformed("%s", err)
 		return nil
 	}
 	return time.Unix(seconds, nanos).In(zone)

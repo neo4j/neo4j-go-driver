@@ -24,6 +24,7 @@ import (
 
 	"github.com/neo4j/neo4j-go-driver/v6/neo4j/dbtype"
 	"github.com/neo4j/neo4j-go-driver/v6/neo4j/internal/packstream"
+	"github.com/neo4j/neo4j-go-driver/v6/neo4j/internal/timezone"
 )
 
 const secondsPerDay = 60 * 60 * 24
@@ -324,7 +325,8 @@ func (e *encoder) packLocalDateTime(ldt dbtype.LocalDateTime) {
 // packZonedDateTime always writes the UTC-based structures, whatever Bolt version the
 // connection negotiated.
 func (e *encoder) packZonedDateTime(t time.Time) {
-	if zone, _ := t.Zone(); zone == "Offset" {
+	id := t.Location().String()
+	if _, err := timezone.Load(id); err != nil {
 		_, offset := t.Zone()
 		e.packer.StructHeader('I', 3)
 		e.packer.Int64(t.Unix())
@@ -332,24 +334,10 @@ func (e *encoder) packZonedDateTime(t time.Time) {
 		e.packer.Int(offset)
 		return
 	}
-	id := t.Location().String()
-	if !portableZone(id) {
-		e.setErr("the time zone %q cannot be encrypted, use a named zone or UTC", id)
-		return
-	}
 	e.packer.StructHeader('i', 3)
 	e.packer.Int64(t.Unix())
 	e.packer.Int(t.Nanosecond())
 	e.packer.String(id)
-}
-
-// portableZone reports whether id names a zone every reader resolves the same way.
-func portableZone(id string) bool {
-	if id == "" || id == "Local" {
-		return false
-	}
-	_, err := time.LoadLocation(id)
-	return err == nil
 }
 
 func (e *encoder) packPoint2D(p dbtype.Point2D) {

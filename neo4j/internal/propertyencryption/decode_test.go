@@ -20,7 +20,6 @@ package propertyencryption
 import (
 	"encoding/hex"
 	"errors"
-	"fmt"
 	"reflect"
 	"testing"
 	"time"
@@ -253,36 +252,20 @@ func TestDecodeValueRejectsMalformedPlaintext(t *testing.T) {
 func TestDecodeValueRejectsUnknownZone(t *testing.T) {
 	t.Parallel()
 
-	// DateTimeZoneId(0, 0, "Mars/Olympus_Mons").
-	plaintext := mustHex(t, "b3690000"+"d111"+hex.EncodeToString([]byte("Mars/Olympus_Mons")))
-	decoded, err := DecodeValue(plaintext, TypeZonedDateTime, baseline10)
-	if err == nil {
-		t.Fatalf("DecodeValue returned %#v, want an error", decoded)
-	}
-	var malformed *MalformedError
-	if !errors.As(err, &malformed) {
-		t.Fatalf("DecodeValue returned %T, want a *MalformedError", err)
-	}
-}
-
-func TestDecodeValueRejectsZonesThatMoveWithTheReader(t *testing.T) {
-	t.Parallel()
-
 	tests := []struct {
-		name string
-		zone string
+		name    string
+		zoneHex string
 	}{
-		{name: "empty", zone: ""},
-		{name: "Local", zone: "Local"},
+		{name: "not a zone", zoneHex: "d011" + hex.EncodeToString([]byte("Mars/Olympus_Mons"))},
+		{name: "empty", zoneHex: "80"},
+		{name: "Local", zoneHex: "85" + hex.EncodeToString([]byte("Local"))},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
 
-			// DateTimeZoneId(0, 0, zone).
-			plaintext := mustHex(t, fmt.Sprintf("b3690000d1%04x%s",
-				len(test.zone), hex.EncodeToString([]byte(test.zone))))
+			plaintext := mustHex(t, "b3690000"+test.zoneHex)
 			decoded, err := DecodeValue(plaintext, TypeZonedDateTime, baseline10)
 			if err == nil {
 				t.Fatalf("DecodeValue returned %#v, want an error", decoded)
