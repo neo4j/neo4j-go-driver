@@ -1278,6 +1278,10 @@ func (b *backend) handleRequest(req map[string]any) {
 		}
 
 		usePersisted, _ := data["usePersistedAad"].(bool)
+		if usePersisted && data["aad"] != nil {
+			b.writeError(fmt.Errorf("aad and usePersistedAad are mutually exclusive"))
+			return
+		}
 		var decrypted any
 		if usePersisted {
 			decrypted, err = driver.PropertyEncryption().Decrypt(ctx, encrypted)
