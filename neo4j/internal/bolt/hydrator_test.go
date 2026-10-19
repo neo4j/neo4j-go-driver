@@ -877,6 +877,42 @@ func TestHydrator(outer *testing.T) {
 			}},
 		},
 		{
+			name:   "Record of UTC datetime with an empty timezone name with UTC support enabled",
+			useUtc: true,
+			build: func() {
+				packer.StructHeader(byte(msgRecord), 1)
+				packer.ArrayHeader(1)
+				packer.StructHeader('i', 3)
+				packer.Int64(42)
+				packer.Int64(42)
+				packer.String("")
+			},
+			x: &db.Record{Values: []any{
+				&dbtype.InvalidValue{
+					Message: "utcDateTimeNamedZone",
+					Err:     fmt.Errorf(`unknown time zone ""`),
+				},
+			}},
+		},
+		{
+			name:   "Record of UTC datetime with a timezone name of Local with UTC support enabled",
+			useUtc: true,
+			build: func() {
+				packer.StructHeader(byte(msgRecord), 1)
+				packer.ArrayHeader(1)
+				packer.StructHeader('i', 3)
+				packer.Int64(42)
+				packer.Int64(42)
+				packer.String("Local")
+			},
+			x: &db.Record{Values: []any{
+				&dbtype.InvalidValue{
+					Message: "utcDateTimeNamedZone",
+					Err:     fmt.Errorf(`unknown time zone "Local"`),
+				},
+			}},
+		},
+		{
 			name: "Record of legacy datetime with invalid timezone name with UTC support disabled",
 			build: func() {
 				packer.StructHeader(byte(msgRecord), 1)
