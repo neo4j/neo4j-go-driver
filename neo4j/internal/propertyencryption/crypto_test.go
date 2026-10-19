@@ -184,8 +184,9 @@ func TestOpenRejects(t *testing.T) {
 	})
 	t.Run("cipher output shorter than the tag", func(t *testing.T) {
 		t.Parallel()
-		if _, err := key.Open(iv, cipherOutput[:TagSize-1], nil); err == nil {
-			t.Fatal("Open accepted a cipher output with no room for a tag")
+		_, err := key.Open(iv, cipherOutput[:15], nil)
+		if !errors.Is(err, ErrAuthentication) {
+			t.Fatalf("Open returned %v, want ErrAuthentication", err)
 		}
 	})
 }

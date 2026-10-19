@@ -30,8 +30,6 @@ const (
 	KeySize = 32
 	// IVSize is the AES-GCM initialisation vector size in bytes.
 	IVSize = 12
-	// TagSize is the AES-GCM authentication tag size in bytes.
-	TagSize = 16
 )
 
 // ErrAuthentication reports a cipher output that failed authentication, which AES-GCM cannot
@@ -74,10 +72,6 @@ func (k *DataKey) Seal(iv, plaintext, aad []byte) ([]byte, error) {
 func (k *DataKey) Open(iv, cipherOutput, aad []byte) ([]byte, error) {
 	if len(iv) != IVSize {
 		return nil, fmt.Errorf("the initialisation vector must be %d bytes but is %d", IVSize, len(iv))
-	}
-	if len(cipherOutput) < TagSize {
-		return nil, fmt.Errorf("the cipher output must be at least %d bytes but is %d",
-			TagSize, len(cipherOutput))
 	}
 	plaintext, err := k.aead.Open(nil, iv, cipherOutput, aad)
 	if err != nil {
