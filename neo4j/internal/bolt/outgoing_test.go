@@ -420,6 +420,72 @@ func TestOutgoing(ot *testing.T) {
 				},
 			},
 		},
+		{
+			name: "UTC datetime struct, an unnamed zone",
+			build: func(t *testing.T, out *outgoing) {
+				defer func() {
+					out.useUtc = false
+				}()
+				out.useUtc = true
+				tz := time.FixedZone("", 5*60*60+30*60)
+				out.begin()
+				// June 15, 2020 14:30:00 UTC
+				out.packStruct(time.Date(2020, 6, 15, 20, 0, 0, 42, tz))
+				out.end()
+			},
+			expect: &testStruct{
+				tag: 'I',
+				fields: []any{
+					int64(1592231400),
+					int64(42),
+					int64(5*60*60 + 30*60),
+				},
+			},
+		},
+		{
+			name: "UTC datetime struct, a zone named Local",
+			build: func(t *testing.T, out *outgoing) {
+				defer func() {
+					out.useUtc = false
+				}()
+				out.useUtc = true
+				tz := time.FixedZone("Local", 60*60)
+				out.begin()
+				// June 15, 2020 14:30:00 UTC
+				out.packStruct(time.Date(2020, 6, 15, 15, 30, 0, 42, tz))
+				out.end()
+			},
+			expect: &testStruct{
+				tag: 'I',
+				fields: []any{
+					int64(1592231400),
+					int64(42),
+					int64(60 * 60),
+				},
+			},
+		},
+		{
+			name: "UTC datetime struct, a name that is not a zone",
+			build: func(t *testing.T, out *outgoing) {
+				defer func() {
+					out.useUtc = false
+				}()
+				out.useUtc = true
+				tz := time.FixedZone("Fake/Zone", 0)
+				out.begin()
+				// June 15, 2020 14:30:00 UTC
+				out.packStruct(time.Date(2020, 6, 15, 14, 30, 0, 42, tz))
+				out.end()
+			},
+			expect: &testStruct{
+				tag: 'I',
+				fields: []any{
+					int64(1592231400),
+					int64(42),
+					int64(0),
+				},
+			},
+		},
 	}
 	for _, c := range cases {
 		ot.Run(c.name, func(t *testing.T) {

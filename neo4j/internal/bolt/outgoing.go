@@ -28,6 +28,7 @@ import (
 	idb "github.com/neo4j/neo4j-go-driver/v6/neo4j/internal/db"
 	"github.com/neo4j/neo4j-go-driver/v6/neo4j/internal/mapping"
 	"github.com/neo4j/neo4j-go-driver/v6/neo4j/internal/packstream"
+	"github.com/neo4j/neo4j-go-driver/v6/neo4j/internal/timezone"
 	"github.com/neo4j/neo4j-go-driver/v6/neo4j/log"
 )
 
@@ -307,18 +308,20 @@ func (o *outgoing) packStruct(x any) {
 		o.packer.Float64(v.Y)
 		o.packer.Float64(v.Z)
 	case time.Time:
+		id := v.Location().String()
+		_, err := timezone.Load(id)
 		if o.useUtc {
-			if zone, _ := v.Zone(); zone == "Offset" {
-				o.packUtcDateTimeWithTzOffset(v)
+			if err == nil {
+				o.packUtcDateTimeWithTzName(v, id)
 			} else {
-				o.packUtcDateTimeWithTzName(v)
+				o.packUtcDateTimeWithTzOffset(v)
 			}
 			break
 		}
-		if zone, _ := v.Zone(); zone == "Offset" {
-			o.packLegacyDateTimeWithTzOffset(v)
+		if err == nil {
+			o.packLegacyDateTimeWithTzName(v, id)
 		} else {
-			o.packLegacyDateTimeWithTzName(v)
+			o.packLegacyDateTimeWithTzOffset(v)
 		}
 	case dbtype.LocalDateTime:
 		t := time.Time(v)
@@ -586,12 +589,12 @@ func (o *outgoing) packLegacyDateTimeWithTzOffset(dateTime time.Time) {
 }
 
 // deprecated: remove once 4.x Neo4j all reach EOL
-func (o *outgoing) packLegacyDateTimeWithTzName(dateTime time.Time) {
+func (o *outgoing) packLegacyDateTimeWithTzName(dateTime time.Time, id string) {
 	_, offset := dateTime.Zone()
 	o.packer.StructHeader('f', 3)
 	o.packer.Int64(dateTime.Unix() + int64(offset))
 	o.packer.Int(dateTime.Nanosecond())
-	o.packer.String(dateTime.Location().String())
+	o.packer.String(id)
 }
 
 func (o *outgoing) packUtcDateTimeWithTzOffset(dateTime time.Time) {
@@ -602,11 +605,11 @@ func (o *outgoing) packUtcDateTimeWithTzOffset(dateTime time.Time) {
 	o.packer.Int(offset)
 }
 
-func (o *outgoing) packUtcDateTimeWithTzName(dateTime time.Time) {
+func (o *outgoing) packUtcDateTimeWithTzName(dateTime time.Time, id string) {
 	o.packer.StructHeader('i', 3)
 	o.packer.Int64(dateTime.Unix())
 	o.packer.Int(dateTime.Nanosecond())
-	o.packer.String(dateTime.Location().String())
+	o.packer.String(id)
 }
 
 func (o *outgoing) packArray(x any) {
