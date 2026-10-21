@@ -818,6 +818,10 @@ type shortKeyService struct {
 	size int
 }
 
+func (s shortKeyService) Decapsulate(context.Context, []byte, map[string]string) ([]byte, error) {
+	return make([]byte, s.size), nil
+}
+
 func (s shortKeyService) Encapsulate(
 	_ context.Context, _ map[string]string) (KeyEncapsulationResult, error) {
 
@@ -845,6 +849,47 @@ func (idlessRepository) Create(
 
 func (idlessRepository) FindByAlias(_ context.Context, alias string) (EncapsulatedKeyRecord, error) {
 	return EncapsulatedKeyRecord{EncapsulatedKey: EncapsulatedKey{Alias: alias}}, nil
+}
+
+func TestEncryptRejectsAnUnwrappedKeyThatIsNotAes256(t *testing.T) {
+	t.Parallel()
+
+	created, repository, _ := newTestEncryption(t, "p")
+	createKey(t, created, "", "k1")
+	encryption, err := New([]Profile{EnvelopeProfile{
+		Name:                 "p",
+		EncapsulationService: shortKeyService{size: 16},
+		KeyRepository:        repository,
+	}})
+	if err != nil {
+		t.Fatalf("New returned %v", err)
+	}
+	_, err = encryption.Encrypt(context.Background(), EncryptRequest{Value: "v", Key: KeyAlias("k1")})
+	if err == nil {
+		t.Error("Encrypt used a 16 byte key")
+	}
+}
+
+func TestLocalKeyEncapsulationServiceCopiesTheKey(t *testing.T) {
+	t.Parallel()
+
+	kek := testKEK()
+	service, err := NewLocalKeyEncapsulationService(kek)
+	if err != nil {
+		t.Fatalf("NewLocalKeyEncapsulationService returned %v", err)
+	}
+	result, err := service.Encapsulate(context.Background(), nil)
+	if err != nil {
+		t.Fatalf("Encapsulate returned %v", err)
+	}
+
+	// Clearing the caller's slice must not affect the service.
+	for i := range kek {
+		kek[i] = 0
+	}
+	if _, err := service.Decapsulate(context.Background(), result.Encapsulation, result.Metadata); err != nil {
+		t.Fatalf("Decapsulate returned %v after the caller cleared its key", err)
+	}
 }
 
 func TestLocalKeyEncapsulationServiceRejectsShortKeys(t *testing.T) {
@@ -1137,14 +1182,15 @@ func TestDisableKeyCacheResolvesEveryTime(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Keys returned %v", err)
 	}
-	if _, err := keys.Create(ctx, "k1", nil); err != nil {
+	key, err := keys.Create(ctx, "k1", nil)
+	if err != nil {
 		t.Fatalf("Create returned %v", err)
 	}
 
 	before := service.count()
 	for i := 0; i < 3; i++ {
 		if _, err := encryption.Encrypt(ctx, EncryptRequest{
-			Value: "a", Key: KeyAlias("k1")}); err != nil {
+			Value: "a", Key: KeyID(key.ID)}); err != nil {
 			t.Fatalf("Encrypt returned %v", err)
 		}
 	}
@@ -1195,4 +1241,47 @@ func TestResolveByAliasRejectsAKeyWithNoID(t *testing.T) {
 
 	_, err = encryption.Encrypt(context.Background(), EncryptRequest{Value: "a", Key: KeyAlias("k1")})
 	assertEncryptionError(t, err, "returned a key with no id")
+}
+
+func TestEncryptionIsSafeForConcurrentUse(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	encryption, _, _ := newTestEncryption(t, "p")
+	// Several keys, so the caches reorder.
+	for i := 0; i < 4; i++ {
+		createKey(t, encryption, "", "k"+strconv.Itoa(i))
+	}
+
+	var waitGroup sync.WaitGroup
+	errs := make(chan error, 64)
+	for worker := 0; worker < 8; worker++ {
+		waitGroup.Add(1)
+		go func(worker int) {
+			defer waitGroup.Done()
+			for i := 0; i < 100; i++ {
+				value := fmt.Sprintf("worker %d value %d", worker, i)
+				encrypted, err := encryption.EncryptWithAAD(ctx, EncryptRequest{
+					Value: value, Key: KeyAlias("k" + strconv.Itoa(i%4))}, strconv.Itoa(worker))
+				if err != nil {
+					errs <- err
+					return
+				}
+				decrypted, err := encryption.DecryptWithAAD(ctx, encrypted, strconv.Itoa(worker))
+				if err != nil {
+					errs <- err
+					return
+				}
+				if decrypted != value {
+					errs <- fmt.Errorf("decrypted %q to %#v", value, decrypted)
+					return
+				}
+			}
+		}(worker)
+	}
+	waitGroup.Wait()
+	close(errs)
+	for err := range errs {
+		t.Error(err)
+	}
 }
