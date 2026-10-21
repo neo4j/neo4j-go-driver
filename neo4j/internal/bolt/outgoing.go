@@ -308,17 +308,16 @@ func (o *outgoing) packStruct(x any) {
 		o.packer.Float64(v.Y)
 		o.packer.Float64(v.Z)
 	case time.Time:
-		id := v.Location().String()
-		_, err := timezone.Load(id)
+		id, ok := timezone.ID(v)
 		if o.useUtc {
-			if err == nil {
+			if ok {
 				o.packUtcDateTimeWithTzName(v, id)
 			} else {
 				o.packUtcDateTimeWithTzOffset(v)
 			}
 			break
 		}
-		if err == nil {
+		if ok {
 			o.packLegacyDateTimeWithTzName(v, id)
 		} else {
 			o.packLegacyDateTimeWithTzOffset(v)

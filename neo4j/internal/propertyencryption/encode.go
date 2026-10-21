@@ -325,8 +325,8 @@ func (e *encoder) packLocalDateTime(ldt dbtype.LocalDateTime) {
 // packZonedDateTime always writes the UTC-based structures, whatever Bolt version the
 // connection negotiated.
 func (e *encoder) packZonedDateTime(t time.Time) {
-	id := t.Location().String()
-	if _, err := timezone.Load(id); err != nil {
+	id, ok := timezone.ID(t)
+	if !ok {
 		_, offset := t.Zone()
 		e.packer.StructHeader('I', 3)
 		e.packer.Int64(t.Unix())

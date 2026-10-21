@@ -129,6 +129,11 @@ func TestEncodeValueBytes(t *testing.T) {
 			value:   time.Unix(1, 2).In(time.FixedZone("Local", 3600)),
 			wantHex: "b3490102c90e10", wantType: TypeZonedDateTime,
 		},
+		{
+			name:    "zoned date time with a zone name with another offset",
+			value:   time.Unix(1, 2).In(time.FixedZone("UTC", 3600)),
+			wantHex: "b3490102c90e10", wantType: TypeZonedDateTime,
+		},
 	}
 
 	for _, test := range tests {
