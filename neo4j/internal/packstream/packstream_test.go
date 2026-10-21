@@ -705,4 +705,29 @@ func TestPackStream(ot *testing.T) {
 			}
 		})
 	}
+
+	// Unpacker error cases, input that unpacker is expected to fail on
+	unpackerErrorCases := []struct {
+		name   string
+		packed []byte
+	}{
+		{name: "truncated string", packed: []byte{0xd0, 0x03, 0x61, 0x62}},
+		{name: "truncated []byte", packed: []byte{0xcc, 0x03, 0x01, 0x02}},
+		{name: "truncated UUID", packed: []byte{0xe0, 0x01, 0x02}},
+		{name: "string longer than the input", packed: []byte{0xd2, 0xff, 0xff, 0xff, 0xff, 0x61}},
+		{name: "[]byte longer than the input", packed: []byte{0xce, 0xff, 0xff, 0xff, 0xff, 0x01}},
+	}
+	for _, c := range unpackerErrorCases {
+		ot.Run(fmt.Sprintf("Unpacking error of %s", c.name), func(t *testing.T) {
+			u := &Unpacker{}
+			u.Reset(c.packed)
+			x := unpack(u)
+			if u.Err == nil {
+				t.Fatalf("Should have gotten an error, unpacked %v", x)
+			}
+			if b, ok := x.([]byte); ok && len(b) != 0 {
+				t.Errorf("Unpacked %d bytes from a truncated input", len(b))
+			}
+		})
+	}
 }

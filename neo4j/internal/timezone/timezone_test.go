@@ -17,7 +17,10 @@
 
 package timezone
 
-import "testing"
+import (
+	"testing"
+	"time"
+)
 
 // TestLoad pins which ids resolve and which are refused.
 func TestLoad(t *testing.T) {
@@ -44,6 +47,37 @@ func TestLoad(t *testing.T) {
 				if !test.resolves && err == nil {
 					t.Fatalf("Load is (%v, nil), want an error", zone)
 				}
+			}
+		})
+	}
+}
+
+// TestID pins when a time is sent by its zone id rather than its offset.
+func TestID(t *testing.T) {
+	london, err := time.LoadLocation("Europe/London")
+	if err != nil {
+		t.Fatal(err)
+	}
+	winter := time.Date(2024, 1, 15, 12, 0, 0, 0, time.UTC)
+	summer := time.Date(2024, 7, 15, 12, 0, 0, 0, time.UTC)
+
+	tests := []struct {
+		name string
+		time time.Time
+		id   string
+	}{
+		{name: "a named zone", time: summer.In(london), id: "Europe/London"},
+		{name: "a fixed zone whose name gives its offset", time: winter.In(time.FixedZone("CET", 3600)), id: "CET"},
+		{name: "a fixed zone whose name gives another offset", time: winter.In(time.FixedZone("UTC", 3600))},
+		{name: "a fixed zone whose name gives its offset in winter only", time: summer.In(time.FixedZone("CET", 3600))},
+		{name: "a name that is not a zone", time: winter.In(time.FixedZone("Fake/Zone", 0))},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			id, ok := ID(test.time)
+			if id != test.id || ok != (test.id != "") {
+				t.Fatalf("ID is (%q, %v), want %q", id, ok, test.id)
 			}
 		})
 	}

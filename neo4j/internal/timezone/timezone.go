@@ -53,3 +53,17 @@ func Load(id string) (*time.Location, error) {
 	known.Store(id, result{zone, err})
 	return zone, err
 }
+
+// ID returns t's zone id, or false if the zone fails to load or has another offset at that time.
+func ID(t time.Time) (string, bool) {
+	id := t.Location().String()
+	zone, err := Load(id)
+	if err != nil {
+		return "", false
+	}
+	_, offset := t.Zone()
+	if _, zoneOffset := t.In(zone).Zone(); zoneOffset != offset {
+		return "", false
+	}
+	return id, true
+}
