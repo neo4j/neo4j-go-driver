@@ -344,10 +344,12 @@ func (o *outgoing) packStruct(x any) {
 	case dbtype.Time:
 		t := time.Time(v)
 		_, tzOffsetSecs := t.Zone()
-		d := t.Sub(
-			time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, t.Location()))
+		nanos := int64(time.Hour)*int64(t.Hour()) +
+			int64(time.Minute)*int64(t.Minute()) +
+			int64(time.Second)*int64(t.Second()) +
+			int64(t.Nanosecond())
 		o.packer.StructHeader('T', 2)
-		o.packer.Int64(d.Nanoseconds())
+		o.packer.Int64(nanos)
 		o.packer.Int(tzOffsetSecs)
 	case dbtype.LocalTime:
 		t := time.Time(v)

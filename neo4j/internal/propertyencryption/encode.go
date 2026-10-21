@@ -298,9 +298,12 @@ func (e *encoder) packDate(d dbtype.Date) {
 func (e *encoder) packZonedTime(zt dbtype.Time) {
 	t := time.Time(zt)
 	_, offset := t.Zone()
-	midnight := time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, t.Location())
+	nanos := int64(time.Hour)*int64(t.Hour()) +
+		int64(time.Minute)*int64(t.Minute()) +
+		int64(time.Second)*int64(t.Second()) +
+		int64(t.Nanosecond())
 	e.packer.StructHeader('T', 2)
-	e.packer.Int64(t.Sub(midnight).Nanoseconds())
+	e.packer.Int64(nanos)
 	e.packer.Int(offset)
 }
 

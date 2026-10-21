@@ -519,6 +519,10 @@ func TestOutgoing(ot *testing.T) {
 	}
 
 	offsetZone := time.FixedZone("Offset", 100)
+	london, err := time.LoadLocation("Europe/London")
+	if err != nil {
+		ot.Fatal(err)
+	}
 
 	type (
 		customBool        bool
@@ -1160,6 +1164,7 @@ func TestOutgoing(ot *testing.T) {
 				"LocalDateTime":    dbtype.LocalDateTime(time.Unix(1, 2).UTC()),
 				"Date":             dbtype.Date(time.Date(1993, 11, 31, 7, 59, 1, 100, time.UTC)),
 				"Time":             dbtype.Time(time.Unix(1, 2).In(offsetZone)),
+				"Time DST change":  dbtype.Time(time.Date(2026, 3, 29, 12, 0, 0, 0, london)),
 				"LocalTime":        dbtype.LocalTime(time.Unix(1, 2).UTC()),
 				"Duration":         dbtype.Duration{Months: 1, Days: 2, Seconds: 3, Nanos: 4},
 			},
@@ -1170,6 +1175,7 @@ func TestOutgoing(ot *testing.T) {
 				"LocalDateTime":    &testStruct{tag: 'd', fields: []any{int64(1), int64(2)}},
 				"Date":             &testStruct{tag: 'D', fields: []any{int64(8735)}},
 				"Time":             &testStruct{tag: 'T', fields: []any{int64(101*time.Second + 2), int64(100)}},
+				"Time DST change":  &testStruct{tag: 'T', fields: []any{int64(12 * time.Hour), int64(3600)}},
 				"LocalTime":        &testStruct{tag: 't', fields: []any{int64(1*time.Second + 2)}},
 				"Duration":         &testStruct{tag: 'E', fields: []any{int64(1), int64(2), int64(3), int64(4)}},
 			},

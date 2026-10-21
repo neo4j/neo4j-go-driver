@@ -87,6 +87,7 @@ func TestRoundTrip(t *testing.T) {
 		{name: "date before the epoch", value: dbtype.Date(time.Date(1900, 1, 1, 0, 0, 0, 0, time.UTC))},
 		{name: "local time", value: dbtype.LocalTime(time.Date(0, 0, 0, 23, 59, 59, 999999999, time.UTC))},
 		{name: "zoned time", value: dbtype.Time(time.Date(0, 0, 0, 1, 2, 3, 4, offsetZone))},
+		{name: "zoned time on a clock change day", value: dbtype.Time(time.Date(2026, 3, 29, 12, 0, 0, 0, london))},
 		{
 			name:  "zoned time with a negative offset",
 			value: dbtype.Time(time.Date(0, 0, 0, 1, 2, 3, 4, time.FixedZone("Offset", -18000))),
