@@ -208,7 +208,7 @@ func (d *decoder) list() any {
 	items := make([]any, 0, min(length, 1024))
 	for i := uint32(0); i < length; i++ {
 		item := d.value(true)
-		if d.err != nil {
+		if d.err != nil || d.unpacker.Err != nil {
 			return nil
 		}
 		items = append(items, item)

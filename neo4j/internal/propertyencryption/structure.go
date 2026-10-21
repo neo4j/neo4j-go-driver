@@ -192,7 +192,7 @@ func (d *decoder) metadata() Metadata {
 		return nil
 	}
 
-	metadata := make(Metadata, entries)
+	metadata := make(Metadata)
 	for i := uint32(0); i < entries; i++ {
 		key := d.string()
 		if d.err != nil {

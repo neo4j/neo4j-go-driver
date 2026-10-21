@@ -193,6 +193,8 @@ func TestDecodeEncryptedRejects(t *testing.T) {
 		{name: "profile name is not a string",
 			value: fieldVersion + fieldHeader + fieldProfileType + fieldProfileVersion +
 				"cc0170" + fieldCipher + fieldTypeName + fieldMajor + fieldMinor + fieldMetadata},
+		{name: "a length past the end",
+			value: fieldVersion + fieldHeader + fieldProfileType + fieldProfileVersion + "d2ffffffff"},
 		{name: "metadata is not a dictionary",
 			value: fieldVersion + fieldHeader + fieldProfileType + fieldProfileVersion +
 				fieldProfile + fieldCipher + fieldTypeName + fieldMajor + fieldMinor + "c3"},
