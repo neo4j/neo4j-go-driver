@@ -43,7 +43,7 @@ type workload struct {
 
 type workloadQuery struct {
 	Text       string                 `json:"text"`
-	Parameters map[string]interface{} `json:"parameters"`
+	Parameters map[string]any `json:"parameters"`
 }
 
 const (
