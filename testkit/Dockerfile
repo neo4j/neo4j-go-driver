@@ -1,8 +1,10 @@
 ARG TIME_WARP=""
-FROM ubuntu:20.04 AS base
+FROM ubuntu:24.04 AS base
 
 ARG go_version_min=1.18
 ARG go_version_default=1.23.4
+# From https://go.dev/dl, change together with go_version_default
+ARG go_sha256_default=6924efde5de86fe277676e929dc9917d466efa02fb934197bc2eba35d5680971
 
 # Install all needed to build and run tests
 # Install tzdata to make sure Go timezone info works correctly (need noninteractive to avoid
@@ -18,6 +20,7 @@ RUN apt-get update && \
     && rm -rf /var/lib/apt/lists/* \
     # the packaged Golang version of Ubuntu is too old (requires manual install of gcc first)
     && wget --quiet https://golang.org/dl/go${go_version_default}.linux-amd64.tar.gz \
+    && echo "${go_sha256_default}  go${go_version_default}.linux-amd64.tar.gz" | sha256sum -c - \
     && tar -xzf go${go_version_default}.linux-amd64.tar.gz \
     && mv go /usr/local
 
@@ -25,8 +28,11 @@ ENV GOROOT=/usr/local/go
 ENV PATH=$GOROOT/bin:/root/go/bin:$PATH
 ENV GOMINBIN=go${go_version_min}
 
-# Install minimum version of Go alongside latest
-RUN go install golang.org/dl/go${go_version_min}@latest && go${go_version_min} download
+# Install minimum version of Go alongside latest, verified by the Go checksum database
+RUN root="$(GOTOOLCHAIN=go${go_version_min} go env GOROOT)" \
+    && mkdir -p /root/go/bin \
+    && printf '#!/bin/sh\nGOROOT=%s exec %s/bin/go "$@"\n' "$root" "$root" > /root/go/bin/${GOMINBIN} \
+    && chmod +x /root/go/bin/${GOMINBIN}
 
 
 FROM base AS backend-timewarp
