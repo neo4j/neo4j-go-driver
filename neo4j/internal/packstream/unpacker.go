@@ -141,7 +141,7 @@ func (u *Unpacker) Bool() bool {
 func (u *Unpacker) ByteArray() []byte {
 	n := u.Len()
 	buf := u.read(n)
-	out := make([]byte, n)
+	out := make([]byte, len(buf))
 	copy(out, buf)
 	return out
 }
@@ -166,7 +166,7 @@ func (u *Unpacker) pop() byte {
 func (u *Unpacker) read(n uint32) []byte {
 	start := u.off
 	end := u.off + n
-	if end > u.len {
+	if n > u.len-u.off {
 		u.setErr(&IoError{})
 		return []byte{}
 	}

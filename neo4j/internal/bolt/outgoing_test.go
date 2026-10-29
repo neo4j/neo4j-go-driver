@@ -486,6 +486,28 @@ func TestOutgoing(ot *testing.T) {
 				},
 			},
 		},
+		{
+			name: "UTC datetime struct, a zone name with another offset",
+			build: func(t *testing.T, out *outgoing) {
+				defer func() {
+					out.useUtc = false
+				}()
+				out.useUtc = true
+				tz := time.FixedZone("UTC", 60*60)
+				out.begin()
+				// June 15, 2020 14:30:00 UTC
+				out.packStruct(time.Date(2020, 6, 15, 15, 30, 0, 42, tz))
+				out.end()
+			},
+			expect: &testStruct{
+				tag: 'I',
+				fields: []any{
+					int64(1592231400),
+					int64(42),
+					int64(60 * 60),
+				},
+			},
+		},
 	}
 	for _, c := range cases {
 		ot.Run(c.name, func(t *testing.T) {
@@ -497,6 +519,10 @@ func TestOutgoing(ot *testing.T) {
 	}
 
 	offsetZone := time.FixedZone("Offset", 100)
+	london, err := time.LoadLocation("Europe/London")
+	if err != nil {
+		ot.Fatal(err)
+	}
 
 	type (
 		customBool        bool
@@ -1134,18 +1160,22 @@ func TestOutgoing(ot *testing.T) {
 			inp: map[string]any{
 				"time.Time UTC":    time.Unix(1, 2).UTC(),
 				"time.Time offset": time.Unix(1, 2).In(offsetZone),
+				"time.Time as UTC": time.Unix(1, 2).In(time.FixedZone("UTC", 100)),
 				"LocalDateTime":    dbtype.LocalDateTime(time.Unix(1, 2).UTC()),
 				"Date":             dbtype.Date(time.Date(1993, 11, 31, 7, 59, 1, 100, time.UTC)),
 				"Time":             dbtype.Time(time.Unix(1, 2).In(offsetZone)),
+				"Time DST change":  dbtype.Time(time.Date(2026, 3, 29, 12, 0, 0, 0, london)),
 				"LocalTime":        dbtype.LocalTime(time.Unix(1, 2).UTC()),
 				"Duration":         dbtype.Duration{Months: 1, Days: 2, Seconds: 3, Nanos: 4},
 			},
 			expect: map[string]any{
 				"time.Time UTC":    &testStruct{tag: 'f', fields: []any{int64(1), int64(2), "UTC"}},
 				"time.Time offset": &testStruct{tag: 'F', fields: []any{int64(101), int64(2), int64(100)}},
+				"time.Time as UTC": &testStruct{tag: 'F', fields: []any{int64(101), int64(2), int64(100)}},
 				"LocalDateTime":    &testStruct{tag: 'd', fields: []any{int64(1), int64(2)}},
 				"Date":             &testStruct{tag: 'D', fields: []any{int64(8735)}},
 				"Time":             &testStruct{tag: 'T', fields: []any{int64(101*time.Second + 2), int64(100)}},
+				"Time DST change":  &testStruct{tag: 'T', fields: []any{int64(12 * time.Hour), int64(3600)}},
 				"LocalTime":        &testStruct{tag: 't', fields: []any{int64(1*time.Second + 2)}},
 				"Duration":         &testStruct{tag: 'E', fields: []any{int64(1), int64(2), int64(3), int64(4)}},
 			},
