@@ -150,6 +150,16 @@ func cypherToNative(c any) (any, error) {
 			}, nil
 		}
 		panic(fmt.Errorf("unknown spatial reference ID: %s", spatialReference))
+	case "CypherBytes":
+		hexData := strings.ReplaceAll(d["value"].(string), " ", "")
+		if hexData == "" {
+			return []byte{}, nil
+		}
+		decoded, err := hex.DecodeString(hexData)
+		if err != nil {
+			return nil, fmt.Errorf("failed to decode CypherBytes hex data: %v", err)
+		}
+		return decoded, nil
 	case "CypherVector":
 		dtype := d["dtype"].(string)
 		data := d["data"].(string)

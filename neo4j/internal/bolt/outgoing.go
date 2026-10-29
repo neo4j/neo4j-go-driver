@@ -308,17 +308,16 @@ func (o *outgoing) packStruct(x any) {
 		o.packer.Float64(v.Y)
 		o.packer.Float64(v.Z)
 	case time.Time:
-		id := v.Location().String()
-		_, err := timezone.Load(id)
+		id, ok := timezone.ID(v)
 		if o.useUtc {
-			if err == nil {
+			if ok {
 				o.packUtcDateTimeWithTzName(v, id)
 			} else {
 				o.packUtcDateTimeWithTzOffset(v)
 			}
 			break
 		}
-		if err == nil {
+		if ok {
 			o.packLegacyDateTimeWithTzName(v, id)
 		} else {
 			o.packLegacyDateTimeWithTzOffset(v)
@@ -345,10 +344,12 @@ func (o *outgoing) packStruct(x any) {
 	case dbtype.Time:
 		t := time.Time(v)
 		_, tzOffsetSecs := t.Zone()
-		d := t.Sub(
-			time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, t.Location()))
+		nanos := int64(time.Hour)*int64(t.Hour()) +
+			int64(time.Minute)*int64(t.Minute()) +
+			int64(time.Second)*int64(t.Second()) +
+			int64(t.Nanosecond())
 		o.packer.StructHeader('T', 2)
-		o.packer.Int64(d.Nanoseconds())
+		o.packer.Int64(nanos)
 		o.packer.Int(tzOffsetSecs)
 	case dbtype.LocalTime:
 		t := time.Time(v)
