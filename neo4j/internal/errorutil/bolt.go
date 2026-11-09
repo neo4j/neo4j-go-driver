@@ -28,6 +28,15 @@ import (
 
 const InvalidTransactionError = "invalid transaction handle"
 
+// MessageTooLargeError is the error of a message from the server larger than Config.MaxMessageSize.
+type MessageTooLargeError struct {
+	MaxMessageSize int
+}
+
+func (e *MessageTooLargeError) Error() string {
+	return fmt.Sprintf("the server sent a message larger than the configured MaxMessageSize of %d bytes", e.MaxMessageSize)
+}
+
 type ConnectionReadTimeout struct {
 	UserContext context.Context
 	ReadTimeout time.Duration
