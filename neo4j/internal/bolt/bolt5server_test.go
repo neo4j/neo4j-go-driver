@@ -125,7 +125,7 @@ func (s *bolt5server) waitForLogon() map[string]any {
 }
 
 func (s *bolt5server) receiveMsg() *testStruct {
-	_, buf, err := dechunkMessage(context.Background(), s.conn, []byte{}, -1)
+	_, buf, err := dechunkMessage(context.Background(), s.conn, []byte{}, -1, 0)
 	if err != nil {
 		panic(err)
 	}

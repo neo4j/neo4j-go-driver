@@ -27,13 +27,14 @@ type incoming struct {
 	buf             []byte // Reused buffer
 	hyd             hydrator
 	connReadTimeout time.Duration
+	maxMessageSize  int
 }
 
 func (i *incoming) next(ctx context.Context, reader io.Reader) (any, error) {
 	// Get next message from transport layer
 	var err error
 	var msg []byte
-	i.buf, msg, err = dechunkMessage(ctx, reader, i.buf, i.connReadTimeout)
+	i.buf, msg, err = dechunkMessage(ctx, reader, i.buf, i.connReadTimeout, i.maxMessageSize)
 	if err != nil {
 		return nil, err
 	}

@@ -100,7 +100,7 @@ func (s *bolt3server) waitForHello() {
 }
 
 func (s *bolt3server) receiveMsg() *testStruct {
-	_, buf, err := dechunkMessage(context.Background(), s.conn, []byte{}, -1)
+	_, buf, err := dechunkMessage(context.Background(), s.conn, []byte{}, -1, 0)
 	if err != nil {
 		panic(err)
 	}

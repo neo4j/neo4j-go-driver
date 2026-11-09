@@ -68,6 +68,7 @@ func TestConnect(ot *testing.T) {
 			nil,
 			idb.NotificationConfig{},
 			DefaultReadBufferSize,
+			0,
 		)
 		AssertError(t, err)
 	})
@@ -95,6 +96,7 @@ func TestConnect(ot *testing.T) {
 			nil,
 			idb.NotificationConfig{},
 			DefaultReadBufferSize,
+			0,
 		)
 		AssertError(t, err)
 		if boltconn != nil {
