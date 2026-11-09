@@ -370,13 +370,17 @@ func (d *driverWithContext) NewSession(ctx context.Context, config SessionConfig
 		}
 	}
 
+	if config.Logger == nil {
+		config.Logger = d.log
+	}
+
 	d.mut.Lock()
 	defer d.mut.Unlock()
 	if d.pool == nil {
 		return &erroredSessionWithContext{
 			err: &UsageError{Message: "Trying to create session on closed driver"}}
 	}
-	return newSessionWithContext(ctx, d.config, config, d.router, d.pool, d.cache, d.log, reAuthToken)
+	return newSessionWithContext(ctx, d.config, config, d.router, d.pool, d.cache, reAuthToken)
 }
 
 func (d *driverWithContext) VerifyConnectivity(ctx context.Context) error {
@@ -678,6 +682,13 @@ func ExecuteQueryWithBoltLogger(boltLogger log.BoltLogger) ExecuteQueryConfigura
 	}
 }
 
+// ExecuteQueryWithLogger configures neo4j.ExecuteQuery to log messages with the provided Logger.
+func ExecuteQueryWithLogger(logger log.Logger) ExecuteQueryConfigurationOption {
+	return func(configuration *ExecuteQueryConfiguration) {
+		configuration.Logger = logger
+	}
+}
+
 // ExecuteQueryWithTransactionConfig configures neo4j.ExecuteQuery with additional transaction configuration.
 func ExecuteQueryWithTransactionConfig(configurers ...func(*TransactionConfig)) ExecuteQueryConfigurationOption {
 	return func(configuration *ExecuteQueryConfiguration) {
@@ -699,6 +710,7 @@ type ExecuteQueryConfiguration struct {
 	Database               string
 	BookmarkManager        BookmarkManager
 	BoltLogger             log.BoltLogger
+	Logger                 log.Logger
 	TransactionConfigurers []func(*TransactionConfig)
 	Auth                   *AuthToken
 }
@@ -719,6 +731,7 @@ func (c *ExecuteQueryConfiguration) toSessionConfig() SessionConfig {
 		DatabaseName:     c.Database,
 		BookmarkManager:  c.BookmarkManager,
 		BoltLogger:       c.BoltLogger,
+		Logger:           c.Logger,
 		Auth:             c.Auth,
 	}
 }
