@@ -333,8 +333,8 @@ func TestDecryptWithAAD(t *testing.T) {
 	})
 }
 
-// TestDecryptWithAADOnAnUnboundValue checks supplying AAD for a value that has none is
-// reported as such, not as an authentication failure.
+// TestDecryptWithAADOnAnUnboundValue checks supplying AAD for a value that has none fails
+// the same way as the wrong AAD.
 func TestDecryptWithAADOnAnUnboundValue(t *testing.T) {
 	t.Parallel()
 
@@ -342,13 +342,19 @@ func TestDecryptWithAADOnAnUnboundValue(t *testing.T) {
 	encryption, _, _ := newTestEncryption(t, "p")
 	createKey(t, encryption, "", "k1")
 
-	encrypted, err := encryption.Encrypt(ctx, EncryptRequest{Value: "plain", Key: KeyAlias("k1")})
+	unbound, err := encryption.Encrypt(ctx, EncryptRequest{Value: "plain", Key: KeyAlias("k1")})
 	if err != nil {
 		t.Fatalf("Encrypt returned %v", err)
 	}
+	bound, err := encryption.EncryptWithAAD(ctx, EncryptRequest{Value: "plain", Key: KeyAlias("k1")}, "row-1")
+	if err != nil {
+		t.Fatalf("EncryptWithAAD returned %v", err)
+	}
+	_, wrongAAD := encryption.DecryptWithAAD(ctx, bound, "row-42")
+	assertEncryptionError(t, wrongAAD, "could not decrypt the value")
 
-	_, err = encryption.DecryptWithAAD(ctx, encrypted, "row-42")
-	assertEncryptionError(t, err, "not encrypted with additional authenticated data")
+	_, err = encryption.DecryptWithAAD(ctx, unbound, "row-42")
+	assertEncryptionError(t, err, wrongAAD.Error())
 }
 
 func TestDecryptWithAADRejectsAnotherAADEncodingScheme(t *testing.T) {
