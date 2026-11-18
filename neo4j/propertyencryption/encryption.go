@@ -325,15 +325,9 @@ func aadFor(structure ipe.Encrypted, aad any, explicit bool) ([]byte, error) {
 		return nil, asError("the additional authenticated data cannot be used", err)
 	}
 
-	// Reproducing the bytes under a different encoding would fail to authenticate without
-	// saying why.
 	major, hasMajor := structure.Metadata.Int(ipe.MetadataAADEncodingSchemeMajor)
 	minor, hasMinor := structure.Metadata.Int(ipe.MetadataAADEncodingSchemeMinor)
 	if !hasMajor || !hasMinor {
-		if _, bound := structure.Metadata.Bytes(ipe.MetadataAAD); !bound {
-			return nil, &Error{Message: "this value was not encrypted with additional " +
-				"authenticated data, decrypt it with Decrypt"}
-		}
 		return encoded.Bytes, nil
 	}
 
