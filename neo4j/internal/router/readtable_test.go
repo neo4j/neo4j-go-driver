@@ -33,6 +33,7 @@ import (
 
 func TestReadTableTable(ot *testing.T) {
 	standardRouters := []string{"router1", "router2"}
+	setFirstRouter(ot, 0)
 
 	assertNoTable := func(t *testing.T, table *idb.RoutingTable, err error) {
 		t.Helper()
@@ -199,4 +200,43 @@ func TestReadTableTable(ot *testing.T) {
 			}
 		})
 	}
+}
+
+func TestReadTableStartsAtFirstRouterAndWraps(t *testing.T) {
+	setFirstRouter(t, 2)
+	var tried []string
+	p := &poolFake{
+		borrow: func(names []string, _ context.CancelFunc, _ log.BoltLogger) (idb.Connection, error) {
+			tried = append(tried, names[0])
+			if names[0] == "router3" {
+				return nil, errors.New("borrow fail")
+			}
+			return &testutil.ConnFake{Table: &idb.RoutingTable{}}, nil
+		},
+	}
+
+	table, err := readTable(
+		context.Background(),
+		p,
+		[]string{"router1", "router2", "router3"},
+		nil,
+		pool.DefaultConnectionLivenessCheckTimeout,
+		nil,
+		"dbname",
+		"",
+		&idb.ReAuthToken{Manager: iauth.Token{Tokens: map[string]any{"scheme": "none"}}},
+		nil)
+
+	if err != nil || table == nil {
+		t.Fatalf("expected a table, got %v, %v", table, err)
+	}
+	if len(tried) != 2 || tried[0] != "router3" || tried[1] != "router1" {
+		t.Errorf("expected routers tried as [router3 router1], got %v", tried)
+	}
+}
+
+func setFirstRouter(t testing.TB, i int) {
+	original := firstRouter
+	firstRouter = func(int) int { return i }
+	t.Cleanup(func() { firstRouter = original })
 }

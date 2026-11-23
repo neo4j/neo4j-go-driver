@@ -19,12 +19,17 @@ package router
 
 import (
 	"context"
+	"math/rand"
 	"time"
 
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/db"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/internal/errorutil"
 	"github.com/neo4j/neo4j-go-driver/v5/neo4j/log"
 )
+
+// Picks the router readTable tries first. Routers come back in a fixed order, and the connection
+// left idle after reading the table makes that router the pool's preferred reader.
+var firstRouter = rand.Intn
 
 // Tries to read routing table from any of the specified routers using new or existing connection
 // from the supplied pool.
@@ -46,7 +51,12 @@ func readTable(
 	// Try the routers one at the time since some of them might no longer support routing and we
 	// can't force the pool to not re-use these when putting them back in the pool and retrieving
 	// another db.
-	for _, router := range routers {
+	start := 0
+	if len(routers) > 1 {
+		start = firstRouter(len(routers))
+	}
+	for i := range routers {
+		router := routers[(start+i)%len(routers)]
 		var conn db.Connection
 		if conn, err = connectionPool.Borrow(ctx, getStaticServer(router), true, boltLogger, idlenessTimeout, auth); err != nil {
 			// Check if failed due to context timing out
