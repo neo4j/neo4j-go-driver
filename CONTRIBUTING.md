@@ -56,6 +56,21 @@ Make sure to install the pre-commit hook to your local repository:
 
 ```shell
 cp hooks/pre-commit .git/hooks/
+# or ln -rs hooks/pre-commit "$hooks/"
+```
+
+When working with working trees
+```shell
+# Run in the main tree:
+git config extensions.worktreeconfig true
+```
+```shell
+# Run in each working tree
+hooks="`git rev-parse --git-dir`/hooks"
+git config --worktree core.hookspath "$hooks"
+mkdir -p "$hooks"
+cp hooks/pre-commit .git/hooks/
+# or ln -rs hooks/pre-commit "$hooks/"
 ```
 
 ## Got an idea for a new project?
