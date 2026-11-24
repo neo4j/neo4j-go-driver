@@ -119,7 +119,7 @@ func TestOutgoing(ot *testing.T) {
 		}()
 
 		// Dechunk it
-		_, byts, err := dechunkMessage(context.Background(), serv, []byte{}, -1)
+		_, byts, err := dechunkMessage(context.Background(), serv, []byte{}, -1, 0)
 		if err != nil {
 			t.Fatal(err)
 		}

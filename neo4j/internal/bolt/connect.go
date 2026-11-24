@@ -79,6 +79,7 @@ func Connect(ctx context.Context,
 	boltLogger log.BoltLogger,
 	notificationConfig db.NotificationConfig,
 	readBufferSize int,
+	maxMessageSize int,
 ) (db.Connection, error) {
 	// Perform Bolt handshake to negotiate version
 	// Send handshake to server
@@ -134,13 +135,21 @@ func Connect(ctx context.Context,
 	var boltConn db.Connection
 	switch major {
 	case 3:
-		boltConn = NewBolt3(serverName, bufferedConn, errorListener, logger, boltLogger)
+		connection := NewBolt3(serverName, bufferedConn, errorListener, logger, boltLogger)
+		connection.in.maxMessageSize = maxMessageSize
+		boltConn = connection
 	case 4:
-		boltConn = NewBolt4(serverName, bufferedConn, errorListener, logger, boltLogger)
+		connection := NewBolt4(serverName, bufferedConn, errorListener, logger, boltLogger)
+		connection.queue.in.maxMessageSize = maxMessageSize
+		boltConn = connection
 	case 5:
-		boltConn = NewBolt5(serverName, bufferedConn, errorListener, logger, boltLogger)
+		connection := NewBolt5(serverName, bufferedConn, errorListener, logger, boltLogger)
+		connection.queue.in.maxMessageSize = maxMessageSize
+		boltConn = connection
 	case 6:
-		boltConn = NewBolt6(serverName, bufferedConn, errorListener, logger, boltLogger)
+		connection := NewBolt6(serverName, bufferedConn, errorListener, logger, boltLogger)
+		connection.queue.in.maxMessageSize = maxMessageSize
+		boltConn = connection
 	case 0:
 		return nil, fmt.Errorf("server did not accept any of the requested Bolt versions (%#v)", handshakeProposals)
 	default:

@@ -80,7 +80,7 @@ func TestDechunker(t *testing.T) {
 		go func() {
 			AssertWriteSucceeds(t, cli, str.Bytes())
 		}()
-		buf, msgBuf, err = dechunkMessage(context.Background(), serv, buf, -1)
+		buf, msgBuf, err = dechunkMessage(context.Background(), serv, buf, -1, 0)
 		AssertNoError(t, err)
 		AssertLen(t, msgBuf, int(msg.size))
 		// Check content of buffer
@@ -120,7 +120,7 @@ func TestDechunkerWithTimeout(ot *testing.T) {
 			AssertWriteSucceeds(t, cli, []byte{0x00, 0x00})
 		}()
 		buffer := make([]byte, 2)
-		_, _, err := dechunkMessage(context.Background(), serv, buffer, timeout)
+		_, _, err := dechunkMessage(context.Background(), serv, buffer, timeout, 0)
 		AssertNoError(t, err)
 		AssertTrue(t, reflect.DeepEqual(buffer, []byte{0xCA, 0xFE}))
 	})
@@ -129,7 +129,7 @@ func TestDechunkerWithTimeout(ot *testing.T) {
 		serv, cli := net.Pipe()
 		defer closePipe(ot, serv, cli)
 
-		_, _, err := dechunkMessage(context.Background(), serv, nil, timeout)
+		_, _, err := dechunkMessage(context.Background(), serv, nil, timeout, 0)
 
 		AssertError(t, err)
 		AssertStringContain(t, err.Error(), "context deadline exceeded")
@@ -141,7 +141,7 @@ func TestDechunkerWithTimeout(ot *testing.T) {
 		ctx, cancelFunc := context.WithTimeout(context.Background(), timeout)
 		defer cancelFunc()
 
-		_, _, err := dechunkMessage(ctx, serv, nil, -1)
+		_, _, err := dechunkMessage(ctx, serv, nil, -1, 0)
 
 		AssertError(t, err)
 		AssertStringContain(t, err.Error(), "context deadline exceeded")
@@ -152,4 +152,34 @@ func TestDechunkerWithTimeout(ot *testing.T) {
 func closePipe(t *testing.T, srv, cli net.Conn) {
 	AssertNoError(t, srv.Close())
 	AssertNoError(t, cli.Close())
+}
+
+func TestDechunkerWithMaxMessageSize(outer *testing.T) {
+	chunk := func(size int) []byte {
+		data := make([]byte, 2+size)
+		binary.BigEndian.PutUint16(data, uint16(size))
+		return data
+	}
+
+	outer.Run("accepts a message of exactly the limit over several chunks", func(t *testing.T) {
+		message := append(append(chunk(10), chunk(10)...), 0, 0)
+		_, read, err := dechunkMessage(context.Background(), bytes.NewReader(message), nil, -1, 20)
+		AssertNoError(t, err)
+		AssertIntEqual(t, len(read), 20)
+	})
+
+	outer.Run("refuses a message over the limit before reading the chunk that passes it", func(t *testing.T) {
+		message := append(chunk(10), 0, 11)
+		buffer := make([]byte, 16)
+		updated, _, err := dechunkMessage(context.Background(), bytes.NewReader(message), buffer, -1, 20)
+		AssertErrorMessageContains(t, err, "MaxMessageSize of 20 bytes")
+		AssertIntEqual(t, cap(updated), 16)
+	})
+
+	outer.Run("applies no limit by default", func(t *testing.T) {
+		message := append(append(chunk(60000), chunk(60000)...), 0, 0)
+		_, read, err := dechunkMessage(context.Background(), bytes.NewReader(message), nil, -1, 0)
+		AssertNoError(t, err)
+		AssertIntEqual(t, len(read), 120000)
+	})
 }

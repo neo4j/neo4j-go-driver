@@ -219,6 +219,16 @@ type Config struct {
 	// for large data transfers. Currently, the default value is 8 KiB, but may change in the future.
 	// Values of 0 or below select the default.
 	ReadBufferSize int
+	// MaxMessageSize limits the size, in bytes, of a single message the driver accepts from the server.
+	// The driver reads a message, which holds one whole record, into memory before it hands any of it
+	// to the application, so one record holding a very long list or string otherwise takes as much
+	// memory as the server sends. A message larger than the limit fails the query with a
+	// MessageTooLargeError and closes its connection, before the message is read further or decoded.
+	//
+	// The limit is on the encoded size. A decoded message can take several times that much memory.
+	//
+	// Values of 0 or below mean no limit, which is the default.
+	MaxMessageSize int
 	// PropertyEncryptionProfiles configures encryption of individual property values,
 	// reached through Driver.PropertyEncryption. Each profile names the key management to
 	// use, and every encrypted value records which profile produced it.

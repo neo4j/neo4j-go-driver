@@ -33,7 +33,8 @@ import (
 // Reads will race against the provided context ctx
 // If the server provides the connection read timeout hint readTimeout, a new context will be created from that timeout
 // and the user-provided context ctx before every read
-func dechunkMessage(ctx context.Context, conn io.Reader, msgBuf []byte, readTimeout time.Duration) ([]byte, []byte, error) {
+// A message larger than maxMessageSize, when it is above 0, fails with a MessageTooLargeError before its chunk is read
+func dechunkMessage(ctx context.Context, conn io.Reader, msgBuf []byte, readTimeout time.Duration, maxMessageSize int) ([]byte, []byte, error) {
 
 	sizeBuf := []byte{0x00, 0x00}
 	off := 0
@@ -56,6 +57,10 @@ func dechunkMessage(ctx context.Context, conn io.Reader, msgBuf []byte, readTime
 			}
 			// Got a nop chunk
 			continue
+		}
+
+		if maxMessageSize > 0 && off+chunkSize > maxMessageSize {
+			return msgBuf, nil, &errorutil.MessageTooLargeError{MaxMessageSize: maxMessageSize}
 		}
 
 		// Need to expand buffer

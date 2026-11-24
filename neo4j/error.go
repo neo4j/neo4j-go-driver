@@ -51,6 +51,9 @@ type ConnectivityError = errorutil.ConnectivityError
 
 type TransactionExecutionLimit = errorutil.TransactionExecutionLimit
 
+// MessageTooLargeError is returned when the server sends a message larger than Config.MaxMessageSize.
+type MessageTooLargeError = errorutil.MessageTooLargeError
+
 // PropertyEncryptionError is returned when a property value cannot be encrypted or decrypted.
 //
 // This is part of the property encryption preview feature (see README on what it means in
@@ -78,6 +81,12 @@ func IsNeo4jError(err error) bool {
 // IsUsageError returns true if the provided error is an instance of UsageError.
 func IsUsageError(err error) bool {
 	_, is := err.(*UsageError)
+	return is
+}
+
+// IsMessageTooLargeError returns true if the provided error is an instance of MessageTooLargeError.
+func IsMessageTooLargeError(err error) bool {
+	_, is := err.(*MessageTooLargeError)
 	return is
 }
 

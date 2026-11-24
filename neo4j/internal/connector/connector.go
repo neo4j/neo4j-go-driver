@@ -92,6 +92,7 @@ func (c *Connector) Connect(
 			boltLogger,
 			notificationConfig,
 			c.Config.ReadBufferSize,
+			c.Config.MaxMessageSize,
 		)
 		if err != nil {
 			return nil, err
@@ -129,6 +130,7 @@ func (c *Connector) Connect(
 		boltLogger,
 		notificationConfig,
 		c.Config.ReadBufferSize,
+		c.Config.MaxMessageSize,
 	)
 	if err != nil {
 		return nil, err
