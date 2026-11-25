@@ -45,6 +45,7 @@ type TokenManager interface {
 	//   - `neo4j.BasicAuth`
 	//   - `neo4j.KerberosAuth`
 	//   - `neo4j.BearerAuth`
+	//   - `neo4j.BearerAuthWithRealm`
 	//   - `neo4j.CustomAuth`
 	//
 	// The token returned must always belong to the same identity.

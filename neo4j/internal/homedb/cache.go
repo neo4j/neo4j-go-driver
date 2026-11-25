@@ -35,7 +35,6 @@ const keyScheme = "scheme"
 const schemeNone = "none"
 const schemeBasic = "basic"
 const schemeKerberos = "kerberos"
-const schemeBearer = "bearer"
 const keyPrincipal = "principal"
 const keyCredentials = "credentials"
 
@@ -123,10 +122,6 @@ func (c *Cache) ComputeKey(impersonatedUser string, sessionAuth *auth.Token) (st
 		case schemeKerberos:
 			if credentials, ok := sessionAuth.Tokens[keyCredentials].(string); ok {
 				return "kerberos:" + credentials, nil
-			}
-		case schemeBearer:
-			if credentials, ok := sessionAuth.Tokens[keyCredentials].(string); ok {
-				return "bearer:" + credentials, nil
 			}
 		case schemeNone:
 			return "none", nil

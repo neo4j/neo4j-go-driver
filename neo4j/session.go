@@ -185,6 +185,7 @@ type SessionConfig struct {
 	//   - `neo4j.BasicAuth`
 	//   - `neo4j.KerberosAuth`
 	//   - `neo4j.BearerAuth`
+	//   - `neo4j.BearerAuthWithRealm`
 	//   - `neo4j.CustomAuth`
 	Auth *AuthToken
 	// DisableAutoCommitRetries allows session level override of the driver config DisableAutoCommitRetries.
