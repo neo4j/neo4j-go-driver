@@ -162,9 +162,10 @@ func TestCache_ComputeKey(outer *testing.T) {
 				Tokens: map[string]any{
 					"scheme":      "bearer",
 					"credentials": "bearerToken",
+					"realm":       "bearerRealm",
 				},
 			},
-			expectedKey: "bearer:bearerToken",
+			expectedKey: "{\"scheme\":\"bearer\",\"tokens\":{\"credentials\":\"bearerToken\",\"realm\":\"bearerRealm\",\"scheme\":\"bearer\"}}",
 		},
 		{
 			name: "auth scheme none",

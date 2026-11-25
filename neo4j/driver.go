@@ -165,6 +165,7 @@ type ResultTransformer[T any] interface {
 //   - `neo4j.BasicAuth`
 //   - `neo4j.KerberosAuth`
 //   - `neo4j.BearerAuth`
+//   - `neo4j.BearerAuthWithRealm`
 //   - `neo4j.CustomAuth`
 func NewDriver(target string, auth auth.TokenManager, configurers ...func(*config.Config)) (Driver, error) {
 	parsed, err := url.Parse(target)
