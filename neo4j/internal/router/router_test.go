@@ -212,6 +212,7 @@ func TestUsesRootRouterWhenPreviousRoutersFails(t *testing.T) {
 // Verify that when the routing table can not be retrieved from the root router, a callback
 // should be invoked to get backup routers.
 func TestUseGetRoutersHookWhenInitialRouterFails(t *testing.T) {
+	setFirstRouter(t, 0)
 	var tried []string
 	pool := &poolFake{
 		borrow: func(names []string, cancel context.CancelFunc, _ log.BoltLogger) (db.Connection, error) {
